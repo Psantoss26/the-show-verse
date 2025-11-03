@@ -1,1 +1,36 @@
-node_modules
+# --- Dependencias ---
+node_modules/
+.pnpm-store/
+
+# --- Builds / Bundles ---
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+.turbo/
+.vercel/
+
+# --- Entornos / secretos ---
+.env
+.env.*        # .env.local, .env.development, etc.
+!.env.example # deja una plantilla con claves falsas
+
+# --- Logs / depuración ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# --- Sistemas / editores ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- Cobertura / tests ---
+coverage/
+.nyc_output/
