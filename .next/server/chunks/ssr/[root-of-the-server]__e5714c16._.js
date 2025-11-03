@@ -201,35 +201,35 @@ function Navbar() {
         className: "px-4 py-6 flex flex-wrap items-center justify-between gap-4 sm:gap-0 sm:flex-nowrap bg-black",
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "flex items-center justify-start",
+                className: "w-full sm:w-auto flex justify-center sm:justify-start items-center",
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                     href: "/",
                     className: "block h-14 overflow-hidden",
                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "h-full w-[150px] md:w-[180px] flex items-center justify-start overflow-hidden",
+                        className: "h-full w-[150px] md:w-[180px] flex items-center justify-center sm:justify-start overflow-hidden",
                         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
                             src: "/TheShowVerse2.png",
                             alt: "Logo The Show Verse",
-                            className: " h-full w-auto object-contain scale-[2.3] origin-left transition-transform duration-300 hover:scale-[2.0] "
+                            className: " h-full w-auto object-contain scale-[2.3] sm:scale-[2.3]     /* zoom visual controlado */ origin-center sm:origin-left   /* centrado en móvil, izquierda en desktop */ transition-transform duration-300 hover:scale-[2.0] "
                         }, void 0, false, {
                             fileName: "[project]/src/components/Navbar.jsx",
                             lineNumber: 46,
-                            columnNumber: 13
+                            columnNumber: 7
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/Navbar.jsx",
                         lineNumber: 45,
-                        columnNumber: 11
+                        columnNumber: 5
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/src/components/Navbar.jsx",
                     lineNumber: 44,
-                    columnNumber: 9
+                    columnNumber: 3
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/Navbar.jsx",
                 lineNumber: 43,
-                columnNumber: 7
+                columnNumber: 1
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "w-full sm:flex-grow sm:max-w-xl sm:mx-8 sm:px-4 relative",

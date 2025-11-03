@@ -40,24 +40,24 @@ export default function Navbar() {
   return (
     <nav className="px-4 py-6 flex flex-wrap items-center justify-between gap-4 sm:gap-0 sm:flex-nowrap bg-black">
       {/* Logo */}
-      <div className="flex items-center justify-start">
-        <Link href="/" className="block h-14 overflow-hidden">
-          <div className="h-full w-[150px] md:w-[180px] flex items-center justify-start overflow-hidden">
-            <img
-              src="/TheShowVerse2.png"
-              alt="Logo The Show Verse"
-              className="
-                h-full w-auto object-contain
-                scale-[2.3]
-                origin-left
-                transition-transform
-                duration-300
-                hover:scale-[2.0]
-              "
-            />
-          </div>
-        </Link>
-      </div>
+<div className="w-full sm:w-auto flex justify-center sm:justify-start items-center">
+  <Link href="/" className="block h-14 overflow-hidden">
+    <div className="h-full w-[150px] md:w-[180px] flex items-center justify-center sm:justify-start overflow-hidden">
+      <img
+        src="/TheShowVerse2.png"
+        alt="Logo The Show Verse"
+        className="
+          h-full w-auto object-contain
+          scale-[2.3] sm:scale-[2.3]     /* zoom visual controlado */
+          origin-center sm:origin-left   /* centrado en móvil, izquierda en desktop */
+          transition-transform duration-300
+          hover:scale-[2.0]
+        "
+      />
+    </div>
+  </Link>
+</div>
+
 
       {/* Barra de búsqueda */}
       <div className="w-full sm:flex-grow sm:max-w-xl sm:mx-8 sm:px-4 relative" ref={searchRef}>
