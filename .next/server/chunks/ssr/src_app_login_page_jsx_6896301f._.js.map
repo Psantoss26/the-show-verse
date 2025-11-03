@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 7, "column": 0}, "map": {"version":3,"sources":["file:///home/pablo/Dropbox/ASNPORTS/PELICULAS/Flick%20Verse/flick-verse/src/app/login/page.jsx"],"sourcesContent":["'use client'\n\nimport LoginForm from '@/components/auth/LoginForm'\n\nexport default function LoginPage() {\n  return (\n    <main className=\"min-h-screen flex items-center justify-center bg-black text-white\">\n      <LoginForm />\n    </main>\n  )\n}\n"],"names":[],"mappings":";;;;;;;;;AAAA;;;AAIe,SAAS;IACtB,qBACE,8OAAC;QAAK,WAAU;kBACd,cAAA,8OAAC;;;;;;;;;;AAGP","debugId":null}}]
+}

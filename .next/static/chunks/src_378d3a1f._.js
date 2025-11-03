@@ -1,0 +1,2046 @@
+(globalThis.TURBOPACK = globalThis.TURBOPACK || []).push([typeof document === "object" ? document.currentScript : undefined, {
+
+"[project]/src/lib/api/tmdb.js [app-client] (ecmascript)": ((__turbopack_context__) => {
+"use strict";
+
+var { g: global, __dirname, k: __turbopack_refresh__, m: module } = __turbopack_context__;
+{
+__turbopack_context__.s({
+    "fetchCultClassics": (()=>fetchCultClassics),
+    "fetchDramaMovies": (()=>fetchDramaMovies),
+    "fetchFeaturedMovies": (()=>fetchFeaturedMovies),
+    "fetchGenres": (()=>fetchGenres),
+    "fetchMindBendingMovies": (()=>fetchMindBendingMovies),
+    "fetchMoviesByGenre": (()=>fetchMoviesByGenre),
+    "fetchPopularInCountry": (()=>fetchPopularInCountry),
+    "fetchPopularInUS": (()=>fetchPopularInUS),
+    "fetchPopularMovies": (()=>fetchPopularMovies),
+    "fetchRecommendedMovies": (()=>fetchRecommendedMovies),
+    "fetchRisingMovies": (()=>fetchRisingMovies),
+    "fetchTopActionMovies": (()=>fetchTopActionMovies),
+    "fetchTopRatedMovies": (()=>fetchTopRatedMovies),
+    "fetchTrendingMovies": (()=>fetchTrendingMovies),
+    "fetchUnderratedMovies": (()=>fetchUnderratedMovies),
+    "getActorDetails": (()=>getActorDetails),
+    "getActorMovies": (()=>getActorMovies),
+    "getCredits": (()=>getCredits),
+    "getDetails": (()=>getDetails),
+    "getLogos": (()=>getLogos),
+    "getProviders": (()=>getProviders),
+    "getRecommendations": (()=>getRecommendations),
+    "getReviews": (()=>getReviews),
+    "getTvEpisodeRatings": (()=>getTvEpisodeRatings)
+});
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
+const API_KEY = ("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b");
+const BASE_URL = 'https://api.themoviedb.org/3';
+async function fetchFromTMDb(endpoint) {
+    try {
+        // Verificar que la clave de la API está configurada correctamente
+        if ("TURBOPACK compile-time falsy", 0) {
+            "TURBOPACK unreachable";
+        }
+        const response = await fetch(`${BASE_URL}${endpoint}?api_key=${API_KEY}&language=es-ES`);
+        // Verificar si la respuesta fue exitosa
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error(`Error fetching data from TMDb: ${response.statusText}`, errorData);
+            return null; // Regresar null si la respuesta no es OK
+        }
+        // Parsear la respuesta en formato JSON
+        const data = await response.json();
+        // Verificar si los datos son válidos
+        if (!data || Object.keys(data).length === 0) {
+            console.warn(`No data returned for endpoint: ${endpoint}`);
+            return null; // Regresar null si no hay datos
+        }
+        return data;
+    } catch (error) {
+        // Manejo de errores en caso de que falle la petición
+        console.error(`Error with ${endpoint}:`, error);
+        return null; // Regresar null en caso de error
+    }
+}
+async function fetchTopRatedMovies() {
+    const res = await fetch(`https://api.themoviedb.org/3/movie/top_rated?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&language=es-ES`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchTrendingMovies() {
+    const res = await fetch(`https://api.themoviedb.org/3/trending/movie/week?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchPopularMovies() {
+    const res = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&language=es-ES`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchRecommendedMovies(sessionId) {
+    const res = await fetch(`https://api.themoviedb.org/3/account/0/recommendations?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&session_id=${sessionId}&language=es-ES`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchDramaMovies() {
+    const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&with_genres=18&sort_by=vote_average.desc&vote_count.gte=100`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchCultClassics() {
+    const res = await fetch(`https://api.themoviedb.org/3/list/8146?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}`);
+    const data = await res.json();
+    return data.items || [];
+}
+async function fetchPopularInCountry(countryCode) {
+    const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&region=${countryCode}&sort_by=popularity.desc`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchTopActionMovies() {
+    const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&with_genres=28&sort_by=vote_average.desc&vote_count.gte=200&language=es-ES`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchMindBendingMovies() {
+    const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&with_keywords=2343&sort_by=vote_average.desc&vote_count.gte=100&language=es-ES`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchPopularInUS() {
+    const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&region=US&sort_by=popularity.desc&language=es-ES`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchUnderratedMovies() {
+    const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&sort_by=vote_average.desc&vote_count.lte=200&vote_average.gte=7.0&language=es-ES`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchRisingMovies() {
+    const currentYear = new Date().getFullYear();
+    const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&primary_release_year=${currentYear}&sort_by=vote_average.asc&vote_count.gte=50&language=es-ES`);
+    const data = await res.json();
+    return data.results;
+}
+async function fetchFeaturedMovies() {
+    try {
+        const response = await fetch(`${BASE_URL}/movie/popular?api_key=${API_KEY}&language=es-ES&page=1`);
+        if (!response.ok) {
+            throw new Error('Error fetching featured movies');
+        }
+        const data = await response.json();
+        return data.results; // Regresa las películas populares
+    } catch (error) {
+        console.error('Error fetching data from TMDb: ', error);
+        return []; // Regresa un array vacío si hay un error
+    }
+}
+async function fetchGenres() {
+    try {
+        const response = await fetch(`${BASE_URL}/genre/movie/list?api_key=${API_KEY}&language=es-ES`);
+        if (!response.ok) {
+            throw new Error('Error fetching genres');
+        }
+        const data = await response.json();
+        return data.genres; // Regresa los géneros
+    } catch (error) {
+        console.error('Error fetching data from TMDb: ', error);
+        return []; // Regresa un array vacío si hay un error
+    }
+}
+async function fetchMoviesByGenre(genreId) {
+    try {
+        const response = await fetch(`${BASE_URL}/discover/movie?api_key=${API_KEY}&language=es-ES&with_genres=${genreId}`);
+        if (!response.ok) {
+            throw new Error(`Error fetching movies for genre ${genreId}`);
+        }
+        const data = await response.json();
+        return data.results; // Regresa las películas filtradas por género
+    } catch (error) {
+        console.error('Error fetching data from TMDb: ', error);
+        return []; // Regresa un array vacío si hay un error
+    }
+}
+async function getDetails(type, id) {
+    const res = await fetch(`https://api.themoviedb.org/3/${type}/${id}?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}&language=es-ES&append_to_response=external_ids`);
+    const data = await res.json();
+    if (type === 'tv') {
+        data.imdb_id = data.external_ids?.imdb_id || null;
+    }
+    return data;
+}
+async function getLogos(type, id) {
+    const res = await fetch(`https://api.themoviedb.org/3/${type}/${id}/images?api_key=${("TURBOPACK compile-time value", "934b1e031967a214521ca1a5426baa2b")}`);
+    const data = await res.json();
+    // Filtrar logos en español o inglés
+    const filtered = data.logos.filter((logo)=>logo.iso_639_1 === 'es' || logo.iso_639_1 === 'en');
+    if (filtered.length === 0) return null;
+    // Intentar obtener el que más votos tenga
+    const voted = filtered.filter((logo)=>logo.vote_count > 0);
+    const bestLogo = (voted.length > 0 ? voted : filtered // fallback si ninguno tiene votos
+    ).reduce((max, logo)=>{
+        return (logo.vote_count || 0) > (max.vote_count || 0) ? logo : max;
+    });
+    return bestLogo?.file_path || null;
+}
+async function getRecommendations(type, id) {
+    if (!type || !id) {
+        console.error("Invalid parameters for getRecommendations");
+        return null;
+    }
+    return await fetchFromTMDb(`/${type}/${id}/recommendations`);
+}
+async function getCredits(type, id) {
+    if (!type || !id) {
+        console.error("Invalid parameters for getCredits");
+        return null;
+    }
+    return await fetchFromTMDb(`/${type}/${id}/credits`);
+}
+async function getProviders(type, id) {
+    if (!type || !id) {
+        console.error("Invalid parameters for getProviders");
+        return null;
+    }
+    return await fetchFromTMDb(`/${type}/${id}/watch/providers`);
+}
+async function getReviews(type, id) {
+    if (!type || !id) {
+        console.error("Invalid parameters for getReviews");
+        return null;
+    }
+    return await fetchFromTMDb(`/${type}/${id}/reviews`);
+}
+async function getActorDetails(id) {
+    try {
+        const response = await fetch(`${BASE_URL}/person/${id}?api_key=${API_KEY}`);
+        if (!response.ok) throw new Error('Error fetching actor details');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching actor details:', error);
+        return null;
+    }
+}
+async function getActorMovies(id) {
+    try {
+        const response = await fetch(`${BASE_URL}/person/${id}/movie_credits?api_key=${API_KEY}`);
+        if (!response.ok) throw new Error('Error fetching actor movies');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching actor movies:', error);
+        return {
+            cast: []
+        }; // Devolver un array vacío si hay error
+    }
+}
+async function getTvEpisodeRatings(tmdbId, { excludeSpecials = true } = {}) {
+    const res = await fetch(`/api/tv/${tmdbId}/ratings?excludeSpecials=${excludeSpecials ? 'true' : 'false'}`);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || 'No se pudo obtener ratings');
+    return json;
+}
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(module, globalThis.$RefreshHelpers$);
+}
+}}),
+"[project]/src/components/EpisodeRatingsGrid.jsx [app-client] (ecmascript)": ((__turbopack_context__) => {
+"use strict";
+
+var { g: global, __dirname, k: __turbopack_refresh__, m: module } = __turbopack_context__;
+{
+__turbopack_context__.s({
+    "default": (()=>EpisodeRatingsGrid)
+});
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+;
+var _s = __turbopack_context__.k.signature();
+'use client';
+;
+function EpisodeRatingsGrid({ ratings, initialSource = 'imdb', density = 'compact', fillMissingWithTmdb = true }) {
+    _s();
+    const [source, setSource] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(initialSource);
+    // --- tamaños
+    const SIZES = {
+        compact: {
+            cell: 'w-[42px] h-[28px] md:w-[50px] md:h-[32px] lg:w-[58px] lg:h-[36px]',
+            headerPad: 'px-2 py-1.5',
+            stickyCol: 'w-12 md:w-14 lg:w-16'
+        },
+        comfy: {
+            cell: 'w-[60px] h-[36px] md:w-[70px] md:h-[42px] lg:w-[80px] lg:h-[48px]',
+            headerPad: 'px-3 py-2',
+            stickyCol: 'w-16 md:w-20 lg:w-24'
+        }
+    };
+    const SZ = SIZES[density] ?? SIZES.compact;
+    // --- datos base
+    const { seasonsSorted, maxEpisodes } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+        "EpisodeRatingsGrid.useMemo": ()=>{
+            const seasons = (ratings?.seasons || []).slice().sort({
+                "EpisodeRatingsGrid.useMemo.seasons": (a, b)=>a.season_number - b.season_number
+            }["EpisodeRatingsGrid.useMemo.seasons"]);
+            const maxEp = seasons.reduce({
+                "EpisodeRatingsGrid.useMemo.maxEp": (m, s)=>Math.max(m, ...s.episodes.map({
+                        "EpisodeRatingsGrid.useMemo.maxEp": (e)=>e.episode_number
+                    }["EpisodeRatingsGrid.useMemo.maxEp"]))
+            }["EpisodeRatingsGrid.useMemo.maxEp"], 0);
+            return {
+                seasonsSorted: seasons,
+                maxEpisodes: maxEp
+            };
+        }
+    }["EpisodeRatingsGrid.useMemo"], [
+        ratings
+    ]);
+    const epIndexBySeason = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+        "EpisodeRatingsGrid.useMemo[epIndexBySeason]": ()=>{
+            const map = new Map();
+            seasonsSorted.forEach({
+                "EpisodeRatingsGrid.useMemo[epIndexBySeason]": (s)=>{
+                    const inner = new Map();
+                    s.episodes.forEach({
+                        "EpisodeRatingsGrid.useMemo[epIndexBySeason]": (e)=>inner.set(e.episode_number, e)
+                    }["EpisodeRatingsGrid.useMemo[epIndexBySeason]"]);
+                    map.set(s.season_number, inner);
+                }
+            }["EpisodeRatingsGrid.useMemo[epIndexBySeason]"]);
+            return map;
+        }
+    }["EpisodeRatingsGrid.useMemo[epIndexBySeason]"], [
+        seasonsSorted
+    ]);
+    // --- helpers
+    const format1 = (v)=>{
+        if (v == null) return null;
+        const num = Math.round(Number(v) * 10) / 10;
+        return Number.isInteger(num) ? num.toString() : num.toFixed(1);
+    };
+    const pickValue = (ep)=>{
+        if (!ep) return null;
+        if (source === 'tmdb') return ep.tmdbRating ?? null;
+        if (source === 'imdb') {
+            if (ep.imdbRating != null) return ep.imdbRating;
+            return fillMissingWithTmdb ? ep.tmdbRating ?? null : null;
+        }
+        const vals = [
+            ep.tmdbRating,
+            ep.imdbRating
+        ].filter((v)=>typeof v === 'number');
+        if (!vals.length) return null;
+        return Number((vals.reduce((a, b)=>a + b, 0) / vals.length).toFixed(1));
+    };
+    // Colores con contraste
+    const toneFor = (v)=>{
+        if (v == null) return {
+            bg: 'bg-zinc-800',
+            text: 'text-zinc-400',
+            ring: 'ring-white/5'
+        };
+        if (v >= 9.3) return {
+            bg: 'bg-emerald-700',
+            text: 'text-white',
+            ring: 'ring-white/10'
+        };
+        if (v >= 9.0) return {
+            bg: 'bg-emerald-600',
+            text: 'text-white',
+            ring: 'ring-white/10'
+        };
+        if (v >= 8.5) return {
+            bg: 'bg-emerald-500',
+            text: 'text-black',
+            ring: 'ring-black/10'
+        };
+        if (v >= 8.0) return {
+            bg: 'bg-lime-400',
+            text: 'text-black',
+            ring: 'ring-black/10'
+        };
+        if (v >= 7.0) return {
+            bg: 'bg-yellow-400',
+            text: 'text-black',
+            ring: 'ring-black/10'
+        };
+        if (v >= 6.0) return {
+            bg: 'bg-orange-500',
+            text: 'text-black',
+            ring: 'ring-black/10'
+        };
+        return {
+            bg: 'bg-red-600',
+            text: 'text-white',
+            ring: 'ring-white/10'
+        };
+    };
+    if (!seasonsSorted.length) return null;
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+        className: "space-y-3",
+        children: [
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "flex flex-wrap items-center gap-2",
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
+                        className: "text-lg font-semibold",
+                        children: "Puntuaciones por episodio"
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                        lineNumber: 81,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "flex items-center gap-1 text-xs",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                className: "opacity-70",
+                                children: "Fuente:"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                lineNumber: 83,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(Toggle, {
+                                active: source === 'avg',
+                                onClick: ()=>setSource('avg'),
+                                children: "Media"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                lineNumber: 84,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(Toggle, {
+                                active: source === 'tmdb',
+                                onClick: ()=>setSource('tmdb'),
+                                children: "TMDb"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                lineNumber: 85,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(Toggle, {
+                                active: source === 'imdb',
+                                onClick: ()=>setSource('imdb'),
+                                children: "IMDb"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                lineNumber: 86,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                        lineNumber: 82,
+                        columnNumber: 9
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                lineNumber: 80,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(LegendCompact, {}, void 0, false, {
+                fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                lineNumber: 90,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "overflow-x-auto overflow-y-visible",
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("table", {
+                    className: "border-separate border-spacing-0",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("thead", {
+                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("tr", {
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                        className: `sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-left text-[11px] text-zinc-400 font-medium ${SZ.stickyCol}`
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                        lineNumber: 97,
+                                        columnNumber: 15
+                                    }, this),
+                                    seasonsSorted.map((s)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                            className: `${SZ.headerPad} text-center text-xs text-zinc-200 font-semibold bg-black/60 backdrop-blur border-b border-white/10`,
+                                            children: [
+                                                "S",
+                                                s.season_number
+                                            ]
+                                        }, s.season_number, true, {
+                                            fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                            lineNumber: 99,
+                                            columnNumber: 17
+                                        }, this))
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                lineNumber: 96,
+                                columnNumber: 13
+                            }, this)
+                        }, void 0, false, {
+                            fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                            lineNumber: 95,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("tbody", {
+                            children: Array.from({
+                                length: maxEpisodes
+                            }).map((_, i)=>{
+                                const epNum = i + 1;
+                                return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("tr", {
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                            className: `sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-[11px] text-zinc-300 font-medium ${SZ.stickyCol} border-r border-white/5`,
+                                            children: [
+                                                "E",
+                                                epNum
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                            lineNumber: 112,
+                                            columnNumber: 19
+                                        }, this),
+                                        seasonsSorted.map((s)=>{
+                                            const ep = epIndexBySeason.get(s.season_number)?.get(epNum);
+                                            const raw = pickValue(ep);
+                                            const val = format1(raw);
+                                            const spec = toneFor(raw);
+                                            const titleText = ep?.name ?? `Episode ${epNum}`;
+                                            const imdbVotesStr = ep?.imdbVotes != null ? ep.imdbVotes.toLocaleString() : '—';
+                                            // Cambia posición del tooltip si es una de las primeras filas
+                                            const placeAbove = epNum > 2;
+                                            return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
+                                                className: "p-1",
+                                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "relative group",
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                            className: `
+                              ${spec.bg} ${spec.text} ring-1 ${spec.ring}
+                              rounded-[20px] md:rounded-[24px]
+                              ${SZ.cell}
+                              flex items-center justify-center
+                              font-medium leading-none tracking-tight
+                              [font-variant-numeric:tabular-nums]
+                              text-[15px] md:text-[16px] lg:text-[17px]
+                              shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]
+                              hover:brightness-[1.06] hover:scale-[1.02]
+                              transition will-change-transform
+                              outline-none focus:ring-2 focus:ring-white/30
+                              select-none
+                            `,
+                                                            style: {
+                                                                transform: 'scaleX(1.03)'
+                                                            },
+                                                            role: "button",
+                                                            tabIndex: 0,
+                                                            children: val ?? '—'
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                                            lineNumber: 131,
+                                                            columnNumber: 27
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                            className: [
+                                                                "pointer-events-none absolute left-1/2 -translate-x-1/2 z-50",
+                                                                placeAbove ? "-top-2 -translate-y-full" : "top-full mt-2",
+                                                                "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150",
+                                                                "px-3 py-2 rounded-md text-[12px] leading-tight bg-black/90 text-white shadow-lg",
+                                                                "whitespace-pre text-center max-w-[260px]"
+                                                            ].join(" "),
+                                                            children: [
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                                    className: "block",
+                                                                    children: titleText
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                                                    lineNumber: 165,
+                                                                    columnNumber: 29
+                                                                }, this),
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                    className: "block opacity-90",
+                                                                    children: [
+                                                                        "Season ",
+                                                                        s.season_number,
+                                                                        ", Episode ",
+                                                                        epNum
+                                                                    ]
+                                                                }, void 0, true, {
+                                                                    fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                                                    lineNumber: 166,
+                                                                    columnNumber: 29
+                                                                }, this),
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                    className: "block opacity-90",
+                                                                    children: [
+                                                                        "IMDb votes: ",
+                                                                        imdbVotesStr
+                                                                    ]
+                                                                }, void 0, true, {
+                                                                    fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                                                    lineNumber: 167,
+                                                                    columnNumber: 29
+                                                                }, this),
+                                                                placeAbove ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                    className: "absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-black/90"
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                                                    lineNumber: 170,
+                                                                    columnNumber: 31
+                                                                }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                    className: "absolute left-1/2 -top-2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent border-b-black/90"
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                                                    lineNumber: 172,
+                                                                    columnNumber: 31
+                                                                }, this)
+                                                            ]
+                                                        }, void 0, true, {
+                                                            fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                                            lineNumber: 154,
+                                                            columnNumber: 27
+                                                        }, this)
+                                                    ]
+                                                }, void 0, true, {
+                                                    fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                                    lineNumber: 130,
+                                                    columnNumber: 25
+                                                }, this)
+                                            }, `s${s.season_number}-e${epNum}`, false, {
+                                                fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                                lineNumber: 129,
+                                                columnNumber: 23
+                                            }, this);
+                                        })
+                                    ]
+                                }, `row-${epNum}`, true, {
+                                    fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                                    lineNumber: 111,
+                                    columnNumber: 17
+                                }, this);
+                            })
+                        }, void 0, false, {
+                            fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                            lineNumber: 107,
+                            columnNumber: 11
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                    lineNumber: 94,
+                    columnNumber: 9
+                }, this)
+            }, void 0, false, {
+                fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                lineNumber: 93,
+                columnNumber: 7
+            }, this)
+        ]
+    }, void 0, true, {
+        fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+        lineNumber: 78,
+        columnNumber: 5
+    }, this);
+}
+_s(EpisodeRatingsGrid, "C28lJ80DLT0OAEksHiphL0fYHWM=");
+_c = EpisodeRatingsGrid;
+function Toggle({ active, onClick, children }) {
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+        onClick: onClick,
+        className: `px-2.5 py-1 rounded-full border text-xs
+        ${active ? 'bg-white text-black border-white' : 'border-zinc-600 text-zinc-300 hover:bg-zinc-800'}
+      `,
+        children: children
+    }, void 0, false, {
+        fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+        lineNumber: 191,
+        columnNumber: 5
+    }, this);
+}
+_c1 = Toggle;
+function LegendCompact() {
+    const items = [
+        [
+            'bg-emerald-700',
+            '≥ 9.3'
+        ],
+        [
+            'bg-emerald-600',
+            '9.0–9.2'
+        ],
+        [
+            'bg-emerald-500',
+            '8.5–8.9'
+        ],
+        [
+            'bg-lime-400',
+            '8.0–8.4'
+        ],
+        [
+            'bg-yellow-400',
+            '7.0–7.9'
+        ],
+        [
+            'bg-orange-500',
+            '6.0–6.9'
+        ],
+        [
+            'bg-red-600',
+            '≤ 5.9'
+        ],
+        [
+            'bg-zinc-800',
+            '—'
+        ]
+    ];
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+        className: "flex flex-wrap items-center gap-2 text-[11px] text-zinc-300",
+        children: items.map(([c, l])=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                className: "inline-flex items-center gap-1",
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("i", {
+                        className: `inline-block w-3 h-3 rounded ${c}`
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                        lineNumber: 217,
+                        columnNumber: 11
+                    }, this),
+                    l
+                ]
+            }, l, true, {
+                fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+                lineNumber: 216,
+                columnNumber: 9
+            }, this))
+    }, void 0, false, {
+        fileName: "[project]/src/components/EpisodeRatingsGrid.jsx",
+        lineNumber: 214,
+        columnNumber: 5
+    }, this);
+}
+_c2 = LegendCompact;
+var _c, _c1, _c2;
+__turbopack_context__.k.register(_c, "EpisodeRatingsGrid");
+__turbopack_context__.k.register(_c1, "Toggle");
+__turbopack_context__.k.register(_c2, "LegendCompact");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(module, globalThis.$RefreshHelpers$);
+}
+}}),
+"[project]/src/components/DetailsClient.jsx [app-client] (ecmascript)": ((__turbopack_context__) => {
+"use strict";
+
+var { g: global, __dirname, k: __turbopack_refresh__, m: module } = __turbopack_context__;
+{
+__turbopack_context__.s({
+    "default": (()=>DetailsClient)
+});
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swiper$2f$react$2f$swiper$2d$react$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$module__evaluation$3e$__ = __turbopack_context__.i("[project]/node_modules/swiper/react/swiper-react.js [app-client] (ecmascript) <module evaluation>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swiper$2f$react$2f$swiper$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/swiper/react/swiper.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swiper$2f$react$2f$swiper$2d$slide$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/swiper/react/swiper-slide.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$EpisodeRatingsGrid$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/EpisodeRatingsGrid.jsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$calendar$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CalendarIcon$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/calendar.js [app-client] (ecmascript) <export default as CalendarIcon>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ClockIcon$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/clock.js [app-client] (ecmascript) <export default as ClockIcon>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$film$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FilmIcon$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/film.js [app-client] (ecmascript) <export default as FilmIcon>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$globe$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__GlobeIcon$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/globe.js [app-client] (ecmascript) <export default as GlobeIcon>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$star$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__StarIcon$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/star.js [app-client] (ecmascript) <export default as StarIcon>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$square$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageSquareIcon$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/message-square.js [app-client] (ecmascript) <export default as MessageSquareIcon>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$badge$2d$dollar$2d$sign$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__BadgeDollarSignIcon$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/badge-dollar-sign.js [app-client] (ecmascript) <export default as BadgeDollarSignIcon>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LinkIcon$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/link.js [app-client] (ecmascript) <export default as LinkIcon>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$tag$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__TagIcon$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/tag.js [app-client] (ecmascript) <export default as TagIcon>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ImageIcon$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/image.js [app-client] (ecmascript) <export default as ImageIcon>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$image$2d$off$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ImageOff$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/image-off.js [app-client] (ecmascript) <export default as ImageOff>");
+;
+var _s = __turbopack_context__.k.signature();
+'use client';
+;
+;
+;
+;
+;
+function DetailsClient({ type, id, data, recommendations, castData, providers, reviews }) {
+    _s();
+    const image = data.poster_path || data.profile_path;
+    const title = data.title || data.name;
+    const recRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])();
+    const [reviewLimit, setReviewLimit] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(2);
+    const [useBackdrop, setUseBackdrop] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
+    const scrollLeft = (ref)=>ref.current.scrollBy({
+            left: -400,
+            behavior: 'smooth'
+        });
+    const scrollRight = (ref)=>ref.current.scrollBy({
+            left: 400,
+            behavior: 'smooth'
+        });
+    const filmAffinitySearchUrl = `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent(data.title || data.name)}`;
+    // === Ratings por episodio ===
+    const [ratings, setRatings] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [ratingsError, setRatingsError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [ratingsLoading, setRatingsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "DetailsClient.useEffect": ()=>{
+            let ignore = false;
+            async function load() {
+                if (type !== 'tv') return;
+                setRatingsLoading(true);
+                setRatingsError(null);
+                try {
+                    const res = await fetch(`/api/tv/${id}/ratings?excludeSpecials=true`);
+                    const json = await res.json();
+                    if (!res.ok) throw new Error(json?.error || 'No se pudo obtener ratings');
+                    if (!ignore) setRatings(json);
+                } catch (e) {
+                    if (!ignore) setRatingsError(e.message);
+                } finally{
+                    if (!ignore) setRatingsLoading(false);
+                }
+            }
+            load();
+            return ({
+                "DetailsClient.useEffect": ()=>{
+                    ignore = true;
+                }
+            })["DetailsClient.useEffect"];
+        }
+    }["DetailsClient.useEffect"], [
+        id,
+        type
+    ]);
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+        className: "relative min-h-screen",
+        children: [
+            useBackdrop && data.backdrop_path ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "absolute inset-4 z-0 bg-cover bg-center blur-[10px]",
+                        style: {
+                            backgroundImage: `url(https://image.tmdb.org/t/p/original${data.backdrop_path})`
+                        }
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/DetailsClient.jsx",
+                        lineNumber: 66,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "absolute inset-0 z-0"
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/DetailsClient.jsx",
+                        lineNumber: 72,
+                        columnNumber: 11
+                    }, this)
+                ]
+            }, void 0, true) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "absolute inset-0 z-0 bg-black"
+            }, void 0, false, {
+                fileName: "[project]/src/components/DetailsClient.jsx",
+                lineNumber: 75,
+                columnNumber: 9
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "absolute top-4 right-4 z-20",
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                    onClick: ()=>setUseBackdrop((prev)=>!prev),
+                    className: "p-2 rounded-full transition-colors",
+                    "aria-label": "Alternar fondo",
+                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ImageIcon$3e$__["ImageIcon"], {
+                        className: `w-6 h-6 ${useBackdrop ? 'text-blue-500 hover:text-blue-400' : 'text-gray-500 hover:text-gray-400'}`
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/DetailsClient.jsx",
+                        lineNumber: 85,
+                        columnNumber: 11
+                    }, this)
+                }, void 0, false, {
+                    fileName: "[project]/src/components/DetailsClient.jsx",
+                    lineNumber: 80,
+                    columnNumber: 9
+                }, this)
+            }, void 0, false, {
+                fileName: "[project]/src/components/DetailsClient.jsx",
+                lineNumber: 79,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "absolute inset-0 z-0 bg-black/50"
+            }, void 0, false, {
+                fileName: "[project]/src/components/DetailsClient.jsx",
+                lineNumber: 96,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "relative z-10 px-4 py-10 lg:py-16 max-w-6xl mx-auto text-white",
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "flex flex-col lg:flex-row gap-8 mb-12",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "w-full lg:w-1/3 max-w-sm flex flex-col gap-4",
+                                children: [
+                                    image ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                        src: `https://image.tmdb.org/t/p/w500${image}`,
+                                        alt: title,
+                                        className: "rounded-lg shadow-lg w-full h-auto object-cover"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 105,
+                                        columnNumber: 13
+                                    }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "w-full aspect-[2/3] bg-gray-800 flex items-center justify-center rounded-lg shadow-lg",
+                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$image$2d$off$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ImageOff$3e$__["ImageOff"], {
+                                            size: 64,
+                                            className: "text-gray-500"
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/DetailsClient.jsx",
+                                            lineNumber: 112,
+                                            columnNumber: 15
+                                        }, this)
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 111,
+                                        columnNumber: 13
+                                    }, this),
+                                    providers && providers.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "mt-2",
+                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "flex flex-wrap gap-1",
+                                            children: [
+                                                providers.map((p)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "p-2 flex items-center",
+                                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                                            src: `https://image.tmdb.org/t/p/original${p.logo_path}`,
+                                                            alt: p.provider_name,
+                                                            className: "w-10 h-10 object-contain rounded-lg transition-transform duration-300 ease-in-out hover:scale-110"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/src/components/DetailsClient.jsx",
+                                                            lineNumber: 122,
+                                                            columnNumber: 21
+                                                        }, this)
+                                                    }, p.provider_id, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 121,
+                                                        columnNumber: 19
+                                                    }, this)),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                    href: `https://www.themoviedb.org/${type}/${id}/watch`,
+                                                    target: "_blank",
+                                                    className: "p-2 flex items-center",
+                                                    rel: "noreferrer",
+                                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                                        src: "https://play-lh.googleusercontent.com/Riuz226TXAawu8ZXlL7wnsjtMHkTMTDh_RSRiozAdoKe2TyGG4cLp3rPB0CxQFEUzFc",
+                                                        alt: "JustWatch",
+                                                        className: "object-contain w-11 h-11 rounded-lg transition-transform duration-300 ease-in-out hover:scale-110"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 137,
+                                                        columnNumber: 19
+                                                    }, this)
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/DetailsClient.jsx",
+                                                    lineNumber: 131,
+                                                    columnNumber: 17
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/src/components/DetailsClient.jsx",
+                                            lineNumber: 119,
+                                            columnNumber: 15
+                                        }, this)
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 118,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 103,
+                                columnNumber: 9
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex-1 flex flex-col gap-6",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
+                                                className: "text-4xl font-bold mb-2 mt-2",
+                                                children: title
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 150,
+                                                columnNumber: 13
+                                            }, this),
+                                            data.tagline && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: "italic text-gray-300 mb-4",
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$tag$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__TagIcon$3e$__["TagIcon"], {
+                                                        className: "inline w-4 h-4 mr-1"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 154,
+                                                        columnNumber: 17
+                                                    }, this),
+                                                    " ",
+                                                    data.tagline
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 153,
+                                                columnNumber: 15
+                                            }, this),
+                                            data.overview && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: "text-gray-300 text-base leading-relaxed",
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$square$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageSquareIcon$3e$__["MessageSquareIcon"], {
+                                                        className: "inline w-4 h-4 mr-1"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 160,
+                                                        columnNumber: 17
+                                                    }, this),
+                                                    " ",
+                                                    data.overview
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 159,
+                                                columnNumber: 15
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 149,
+                                        columnNumber: 11
+                                    }, this),
+                                    (data.homepage || data.imdb_id) && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "flex flex-wrap gap-4 items-center",
+                                        children: [
+                                            data.homepage && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                href: data.homepage,
+                                                target: "_blank",
+                                                className: "text-green-400 hover:underline inline-flex items-center gap-2",
+                                                rel: "noreferrer",
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LinkIcon$3e$__["LinkIcon"], {
+                                                        className: "w-4 h-4 text-green-300"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 174,
+                                                        columnNumber: 19
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: "Sitio web"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 175,
+                                                        columnNumber: 19
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 168,
+                                                columnNumber: 17
+                                            }, this),
+                                            data.imdb_id && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                        href: `https://www.imdb.com/title/${data.imdb_id}`,
+                                                        target: "_blank",
+                                                        className: "text-yellow-400 hover:underline inline-flex items-center gap-2",
+                                                        rel: "noreferrer",
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LinkIcon$3e$__["LinkIcon"], {
+                                                                className: "w-4 h-4 text-yellow-300"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 186,
+                                                                columnNumber: 21
+                                                            }, this),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                                children: "IMDb"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 187,
+                                                                columnNumber: 21
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 180,
+                                                        columnNumber: 19
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                        href: `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent(title)}`,
+                                                        target: "_blank",
+                                                        rel: "noopener noreferrer",
+                                                        className: "text-blue-400 hover:underline inline-flex items-center gap-2",
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LinkIcon$3e$__["LinkIcon"], {
+                                                                className: "w-4 h-4 text-blue-300"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 196,
+                                                                columnNumber: 21
+                                                            }, this),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                                children: "FilmAffinity"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 197,
+                                                                columnNumber: 21
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 190,
+                                                        columnNumber: 19
+                                                    }, this)
+                                                ]
+                                            }, void 0, true),
+                                            type === 'tv' && data.imdb_id && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                href: `https://tvcharts.co/show/${title.toLowerCase().split(' ').join('-')}-${data.imdb_id}`,
+                                                target: "_blank",
+                                                className: "text-pink-400 hover:underline inline-flex items-center gap-2",
+                                                rel: "noreferrer",
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LinkIcon$3e$__["LinkIcon"], {
+                                                        className: "w-4 h-4 text-pink-300"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 208,
+                                                        columnNumber: 19
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: "TV Charts"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 209,
+                                                        columnNumber: 19
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 202,
+                                                columnNumber: 17
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 166,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "flex flex-wrap gap-2",
+                                        children: data.genres?.map((genre)=>{
+                                            // Definir un color para cada género
+                                            const genreColors = {
+                                                "Acción": "bg-red-500",
+                                                "Aventura": "bg-amber-600",
+                                                "Animación": "bg-orange-500",
+                                                "Comedia": "bg-yellow-400",
+                                                "Crimen": "bg-rose-700",
+                                                "Documental": "bg-slate-500",
+                                                "Drama": "bg-blue-500",
+                                                "Familia": "bg-indigo-400",
+                                                "Fantasía": "bg-fuchsia-600",
+                                                "Historia": "bg-zinc-600",
+                                                "Terror": "bg-purple-700",
+                                                "Música": "bg-emerald-500",
+                                                "Misterio": "bg-teal-700",
+                                                "Romance": "bg-pink-500",
+                                                "Ciencia ficción": "bg-cyan-600",
+                                                "Película de TV": "bg-lime-600",
+                                                "Suspense": "bg-green-500",
+                                                "Bélica": "bg-gray-600",
+                                                "Western": "bg-neutral-600"
+                                            };
+                                            // Determinar el color del género, si no existe se asigna un color predeterminado
+                                            const genreColor = genreColors[genre.name] || "bg-gray-600";
+                                            return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                className: `${genreColor} text-white px-3 py-1.5 rounded-full text-sm`,
+                                                children: genre.name
+                                            }, genre.id, false, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 243,
+                                                columnNumber: 17
+                                            }, this);
+                                        })
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 214,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "text-sm text-gray-300 bg-gray-800 p-5 rounded-lg shadow-md space-y-1",
+                                        children: [
+                                            data.original_title && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$film$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FilmIcon$3e$__["FilmIcon"], {
+                                                        className: "inline w-4 h-4 mr-2 text-blue-400"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 252,
+                                                        columnNumber: 17
+                                                    }, this),
+                                                    " ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: "Título original:"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 252,
+                                                        columnNumber: 76
+                                                    }, this),
+                                                    " ",
+                                                    data.original_title
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 251,
+                                                columnNumber: 15
+                                            }, this),
+                                            data.release_date && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$calendar$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CalendarIcon$3e$__["CalendarIcon"], {
+                                                        className: "inline w-4 h-4 mr-2 text-green-400"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 257,
+                                                        columnNumber: 17
+                                                    }, this),
+                                                    " ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: "Estreno:"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 257,
+                                                        columnNumber: 81
+                                                    }, this),
+                                                    " ",
+                                                    data.release_date
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 256,
+                                                columnNumber: 15
+                                            }, this),
+                                            data.runtime && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ClockIcon$3e$__["ClockIcon"], {
+                                                        className: "inline w-4 h-4 mr-2 text-yellow-400"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 262,
+                                                        columnNumber: 17
+                                                    }, this),
+                                                    " ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: "Duración:"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 262,
+                                                        columnNumber: 79
+                                                    }, this),
+                                                    " ",
+                                                    data.runtime,
+                                                    " min"
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 261,
+                                                columnNumber: 15
+                                            }, this),
+                                            data.original_language && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$globe$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__GlobeIcon$3e$__["GlobeIcon"], {
+                                                        className: "inline w-4 h-4 mr-2 text-purple-400"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 267,
+                                                        columnNumber: 17
+                                                    }, this),
+                                                    " ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: "Idioma:"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 267,
+                                                        columnNumber: 79
+                                                    }, this),
+                                                    " ",
+                                                    data.original_language
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 266,
+                                                columnNumber: 15
+                                            }, this),
+                                            data.vote_average && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$star$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__StarIcon$3e$__["StarIcon"], {
+                                                        className: "inline w-4 h-4 mr-2 text-yellow-300"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 272,
+                                                        columnNumber: 17
+                                                    }, this),
+                                                    " ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: "Nota media:"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 272,
+                                                        columnNumber: 78
+                                                    }, this),
+                                                    " ",
+                                                    data.vote_average.toFixed(1)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 271,
+                                                columnNumber: 15
+                                            }, this),
+                                            data.vote_count && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$star$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__StarIcon$3e$__["StarIcon"], {
+                                                        className: "inline w-4 h-4 mr-2 text-yellow-300"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 277,
+                                                        columnNumber: 17
+                                                    }, this),
+                                                    " ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: "Votos:"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 277,
+                                                        columnNumber: 78
+                                                    }, this),
+                                                    " ",
+                                                    data.vote_count
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 276,
+                                                columnNumber: 15
+                                            }, this),
+                                            type === 'tv' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                                children: [
+                                                    data.first_air_date && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$calendar$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CalendarIcon$3e$__["CalendarIcon"], {
+                                                                className: "inline w-4 h-4 mr-2 text-green-400"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 284,
+                                                                columnNumber: 21
+                                                            }, this),
+                                                            " ",
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                                children: "Primera emisión:"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 284,
+                                                                columnNumber: 85
+                                                            }, this),
+                                                            " ",
+                                                            data.first_air_date
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 283,
+                                                        columnNumber: 19
+                                                    }, this),
+                                                    data.last_air_date && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$calendar$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CalendarIcon$3e$__["CalendarIcon"], {
+                                                                className: "inline w-4 h-4 mr-2 text-red-400"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 289,
+                                                                columnNumber: 21
+                                                            }, this),
+                                                            " ",
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                                children: "Última emisión:"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 289,
+                                                                columnNumber: 83
+                                                            }, this),
+                                                            " ",
+                                                            data.last_air_date
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 288,
+                                                        columnNumber: 19
+                                                    }, this),
+                                                    data.number_of_seasons && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$film$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FilmIcon$3e$__["FilmIcon"], {
+                                                                className: "inline w-4 h-4 mr-2 text-blue-300"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 294,
+                                                                columnNumber: 21
+                                                            }, this),
+                                                            " ",
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                                children: "Temporadas:"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 294,
+                                                                columnNumber: 80
+                                                            }, this),
+                                                            " ",
+                                                            data.number_of_seasons
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 293,
+                                                        columnNumber: 19
+                                                    }, this),
+                                                    data.number_of_episodes && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$film$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FilmIcon$3e$__["FilmIcon"], {
+                                                                className: "inline w-4 h-4 mr-2 text-blue-300"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 299,
+                                                                columnNumber: 21
+                                                            }, this),
+                                                            " ",
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                                children: "Episodios:"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 299,
+                                                                columnNumber: 80
+                                                            }, this),
+                                                            " ",
+                                                            data.number_of_episodes
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 298,
+                                                        columnNumber: 19
+                                                    }, this),
+                                                    data.episode_run_time?.[0] && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ClockIcon$3e$__["ClockIcon"], {
+                                                                className: "inline w-4 h-4 mr-2 text-yellow-400"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 304,
+                                                                columnNumber: 21
+                                                            }, this),
+                                                            " ",
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                                children: "Duración por episodio:"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 304,
+                                                                columnNumber: 83
+                                                            }, this),
+                                                            " ",
+                                                            data.episode_run_time[0],
+                                                            " min"
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 303,
+                                                        columnNumber: 19
+                                                    }, this),
+                                                    data.status && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$star$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__StarIcon$3e$__["StarIcon"], {
+                                                                className: "inline w-4 h-4 mr-2 text-gray-300"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 309,
+                                                                columnNumber: 21
+                                                            }, this),
+                                                            " ",
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                                children: "Estado:"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 309,
+                                                                columnNumber: 80
+                                                            }, this),
+                                                            " ",
+                                                            data.status
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 308,
+                                                        columnNumber: 19
+                                                    }, this)
+                                                ]
+                                            }, void 0, true),
+                                            data.budget > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$badge$2d$dollar$2d$sign$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__BadgeDollarSignIcon$3e$__["BadgeDollarSignIcon"], {
+                                                        className: "inline w-4 h-4 mr-2 text-green-500"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 316,
+                                                        columnNumber: 17
+                                                    }, this),
+                                                    " ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: "Presupuesto:"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 316,
+                                                        columnNumber: 88
+                                                    }, this),
+                                                    " $",
+                                                    data.budget.toLocaleString()
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 315,
+                                                columnNumber: 15
+                                            }, this),
+                                            data.revenue > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$badge$2d$dollar$2d$sign$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__BadgeDollarSignIcon$3e$__["BadgeDollarSignIcon"], {
+                                                        className: "inline w-4 h-4 mr-2 text-green-500"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 321,
+                                                        columnNumber: 17
+                                                    }, this),
+                                                    " ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: "Recaudación:"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 321,
+                                                        columnNumber: 88
+                                                    }, this),
+                                                    " $",
+                                                    data.revenue.toLocaleString()
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 320,
+                                                columnNumber: 15
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 249,
+                                        columnNumber: 11
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 148,
+                                columnNumber: 9
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/DetailsClient.jsx",
+                        lineNumber: 102,
+                        columnNumber: 7
+                    }, this),
+                    type === 'tv' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
+                        className: "mt-10",
+                        children: [
+                            ratingsLoading && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "text-sm text-gray-300",
+                                children: "Cargando ratings…"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 331,
+                                columnNumber: 30
+                            }, this),
+                            ratingsError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "bg-red-600/20 border border-red-700 text-red-300 p-3 rounded-lg",
+                                children: ratingsError
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 333,
+                                columnNumber: 13
+                            }, this),
+                            ratings && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$EpisodeRatingsGrid$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+                                ratings: ratings,
+                                initialSource: "avg",
+                                density: "compact"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 337,
+                                columnNumber: 23
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/DetailsClient.jsx",
+                        lineNumber: 330,
+                        columnNumber: 9
+                    }, this),
+                    castData && castData.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "mt-12",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                                className: "text-2xl font-bold text-white mb-4",
+                                children: "Reparto principal"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 344,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swiper$2f$react$2f$swiper$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Swiper"], {
+                                spaceBetween: 20,
+                                slidesPerView: 6,
+                                breakpoints: {
+                                    640: {
+                                        slidesPerView: 1,
+                                        spaceBetween: 10
+                                    },
+                                    768: {
+                                        slidesPerView: 2,
+                                        spaceBetween: 10
+                                    },
+                                    1024: {
+                                        slidesPerView: 6,
+                                        spaceBetween: 20
+                                    }
+                                },
+                                children: castData.slice(0, 20).map((actor)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swiper$2f$react$2f$swiper$2d$slide$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SwiperSlide"], {
+                                        className: "flex-shrink-0 text-center",
+                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "relative",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                href: `/details/person/${actor.id}`,
+                                                className: "block",
+                                                children: [
+                                                    actor.profile_path ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                                        src: `https://image.tmdb.org/t/p/w300${actor.profile_path}`,
+                                                        alt: actor.name,
+                                                        className: "w-full aspect-[2/3] object-cover rounded-lg"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 368,
+                                                        columnNumber: 23
+                                                    }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "w-full aspect-[2/3] bg-gray-800 flex items-center justify-center rounded-lg",
+                                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$image$2d$off$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ImageOff$3e$__["ImageOff"], {
+                                                            size: 48,
+                                                            className: "text-gray-500"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/src/components/DetailsClient.jsx",
+                                                            lineNumber: 375,
+                                                            columnNumber: 25
+                                                        }, this)
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 374,
+                                                        columnNumber: 23
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "text-white p-2",
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                                className: "font-semibold text-sm",
+                                                                children: actor.name
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 380,
+                                                                columnNumber: 23
+                                                            }, this),
+                                                            actor.character && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                                className: "text-xs text-gray-400",
+                                                                children: actor.character
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 382,
+                                                                columnNumber: 25
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 379,
+                                                        columnNumber: 21
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 366,
+                                                columnNumber: 19
+                                            }, this)
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/DetailsClient.jsx",
+                                            lineNumber: 365,
+                                            columnNumber: 17
+                                        }, this)
+                                    }, actor.id, false, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 364,
+                                        columnNumber: 15
+                                    }, this))
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 345,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/DetailsClient.jsx",
+                        lineNumber: 343,
+                        columnNumber: 9
+                    }, this),
+                    reviews && reviews.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "mt-12",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex justify-between items-center mb-4",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                                        className: "text-2xl font-bold text-white",
+                                        children: "Críticas de usuarios"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 397,
+                                        columnNumber: 13
+                                    }, this),
+                                    reviewLimit < reviews.length && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        onClick: ()=>setReviewLimit(reviewLimit + 2),
+                                        className: "px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm",
+                                        children: "Ver más críticas"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 399,
+                                        columnNumber: 15
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 396,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "grid md:grid-cols-2 gap-6",
+                                children: reviews.slice(0, reviewLimit).map((review)=>{
+                                    const { author, content, created_at, id, url, author_details } = review;
+                                    const avatar = author_details?.avatar_path?.includes('/https') ? author_details.avatar_path.slice(1) // quitar el primer slash si es URL completa
+                                     : `https://image.tmdb.org/t/p/w45${author_details?.avatar_path}`;
+                                    const rating = author_details?.rating;
+                                    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "bg-gray-800 p-4 rounded-lg flex flex-col gap-2",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "flex items-center gap-3",
+                                                children: [
+                                                    author_details?.avatar_path && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                                        src: avatar,
+                                                        alt: author,
+                                                        className: "w-10 h-10 rounded-full object-cover border border-gray-600"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 420,
+                                                        columnNumber: 23
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                                className: "text-white font-semibold",
+                                                                children: author_details?.username || author
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 427,
+                                                                columnNumber: 23
+                                                            }, this),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                                className: "text-sm text-gray-400",
+                                                                children: new Date(created_at).toLocaleDateString()
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 428,
+                                                                columnNumber: 23
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 426,
+                                                        columnNumber: 21
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 418,
+                                                columnNumber: 19
+                                            }, this),
+                                            rating && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: "text-yellow-400 text-sm mt-1",
+                                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                    children: [
+                                                        rating,
+                                                        " ⭐"
+                                                    ]
+                                                }, void 0, true, {
+                                                    fileName: "[project]/src/components/DetailsClient.jsx",
+                                                    lineNumber: 434,
+                                                    columnNumber: 23
+                                                }, this)
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 433,
+                                                columnNumber: 21
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: "text-gray-300 whitespace-pre-wrap text-sm mb-2",
+                                                dangerouslySetInnerHTML: {
+                                                    __html: content.slice(0, 300) + '...'
+                                                }
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 438,
+                                                columnNumber: 19
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                href: `https://www.themoviedb.org/review/${id}`,
+                                                target: "_blank",
+                                                className: "text-blue-400 text-sm self-start",
+                                                rel: "noreferrer",
+                                                children: "Leer más →"
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 445,
+                                                columnNumber: 19
+                                            }, this)
+                                        ]
+                                    }, id, true, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 417,
+                                        columnNumber: 17
+                                    }, this);
+                                })
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 408,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/DetailsClient.jsx",
+                        lineNumber: 395,
+                        columnNumber: 9
+                    }, this),
+                    recommendations && recommendations.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "mt-12",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                                className: "text-2xl font-bold text-white mb-4",
+                                children: "Recomendaciones"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 463,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swiper$2f$react$2f$swiper$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Swiper"], {
+                                spaceBetween: 20,
+                                slidesPerView: 6,
+                                breakpoints: {
+                                    640: {
+                                        slidesPerView: 1,
+                                        spaceBetween: 10
+                                    },
+                                    768: {
+                                        slidesPerView: 2,
+                                        spaceBetween: 10
+                                    },
+                                    1024: {
+                                        slidesPerView: 6,
+                                        spaceBetween: 20
+                                    }
+                                },
+                                children: recommendations.slice(0, 20).map((rec)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swiper$2f$react$2f$swiper$2d$slide$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SwiperSlide"], {
+                                        className: "flex-shrink-0 text-center",
+                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "relative",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                href: `/details/${rec.media_type || type}/${rec.id}`,
+                                                className: "block",
+                                                children: [
+                                                    rec.poster_path ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                                        src: `https://image.tmdb.org/t/p/w300${rec.poster_path}`,
+                                                        alt: rec.title || rec.name,
+                                                        className: "w-full h-full object-cover rounded-lg"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 488,
+                                                        columnNumber: 23
+                                                    }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "w-full aspect-[2/3] bg-gray-800 flex items-center justify-center rounded-lg",
+                                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$image$2d$off$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ImageOff$3e$__["ImageOff"], {
+                                                            size: 48,
+                                                            className: "text-gray-500"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/src/components/DetailsClient.jsx",
+                                                            lineNumber: 495,
+                                                            columnNumber: 25
+                                                        }, this)
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 494,
+                                                        columnNumber: 23
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "text-white p-2",
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                                className: "font-semibold text-sm",
+                                                                children: rec.title || rec.name
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 500,
+                                                                columnNumber: 23
+                                                            }, this),
+                                                            rec.vote_average && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                                className: "text-xs text-yellow-400",
+                                                                children: [
+                                                                    "⭐ ",
+                                                                    rec.vote_average.toFixed(1)
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                                lineNumber: 502,
+                                                                columnNumber: 25
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                                        lineNumber: 499,
+                                                        columnNumber: 21
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                                lineNumber: 486,
+                                                columnNumber: 19
+                                            }, this)
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/DetailsClient.jsx",
+                                            lineNumber: 484,
+                                            columnNumber: 17
+                                        }, this)
+                                    }, rec.id, false, {
+                                        fileName: "[project]/src/components/DetailsClient.jsx",
+                                        lineNumber: 483,
+                                        columnNumber: 15
+                                    }, this))
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/DetailsClient.jsx",
+                                lineNumber: 464,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/DetailsClient.jsx",
+                        lineNumber: 462,
+                        columnNumber: 9
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/components/DetailsClient.jsx",
+                lineNumber: 99,
+                columnNumber: 7
+            }, this)
+        ]
+    }, void 0, true, {
+        fileName: "[project]/src/components/DetailsClient.jsx",
+        lineNumber: 62,
+        columnNumber: 5
+    }, this);
+}
+_s(DetailsClient, "mRPDrHNSwPewDwNCAgYBh1GpZNY=");
+_c = DetailsClient;
+var _c;
+__turbopack_context__.k.register(_c, "DetailsClient");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(module, globalThis.$RefreshHelpers$);
+}
+}}),
+"[project]/src/app/details/tv/[id]/page.jsx [app-client] (ecmascript)": ((__turbopack_context__) => {
+"use strict";
+
+var { g: global, __dirname, k: __turbopack_refresh__, m: module } = __turbopack_context__;
+{
+__turbopack_context__.s({
+    "default": (()=>TvDetailsPage)
+});
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2f$tmdb$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/api/tmdb.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$DetailsClient$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/DetailsClient.jsx [app-client] (ecmascript)");
+;
+var _s = __turbopack_context__.k.signature();
+'use client';
+;
+;
+;
+;
+function TvDetailsPage() {
+    _s();
+    const { id } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useParams"])();
+    const [data, setData] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [recommendations, setRecommendations] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    const [castData, setCastData] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    const [providers, setProviders] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    const [reviews, setReviews] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "TvDetailsPage.useEffect": ()=>{
+            const fetchDetails = {
+                "TvDetailsPage.useEffect.fetchDetails": async ()=>{
+                    const details = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2f$tmdb$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getDetails"])('tv', id);
+                    setData(details);
+                    const [recs, revs, provs, cast] = await Promise.all([
+                        (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2f$tmdb$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getRecommendations"])('tv', id),
+                        (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2f$tmdb$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getReviews"])('tv', id),
+                        (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2f$tmdb$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getProviders"])('tv', id),
+                        (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2f$tmdb$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getCredits"])('tv', id)
+                    ]);
+                    setRecommendations(recs?.results || []);
+                    setReviews(revs?.results || []);
+                    setProviders(provs?.results?.ES?.flatrate || []);
+                    setCastData(cast?.cast || []);
+                }
+            }["TvDetailsPage.useEffect.fetchDetails"];
+            fetchDetails();
+        }
+    }["TvDetailsPage.useEffect"], [
+        id
+    ]);
+    if (!data) return null;
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$DetailsClient$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+        type: "tv",
+        id: id,
+        data: data,
+        recommendations: recommendations,
+        castData: castData,
+        providers: providers,
+        reviews: reviews
+    }, void 0, false, {
+        fileName: "[project]/src/app/details/tv/[id]/page.jsx",
+        lineNumber: 51,
+        columnNumber: 5
+    }, this);
+}
+_s(TvDetailsPage, "Jef/3hI6ewqooA3TQv2SHWt+LAs=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useParams"]
+    ];
+});
+_c = TvDetailsPage;
+var _c;
+__turbopack_context__.k.register(_c, "TvDetailsPage");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(module, globalThis.$RefreshHelpers$);
+}
+}}),
+}]);
+
+//# sourceMappingURL=src_378d3a1f._.js.map
