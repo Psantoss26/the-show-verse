@@ -1,10 +1,12 @@
-import { tmdbGet, json } from '../_utils';
+// Genera un request token de TMDb
+import { tmdbGet, json } from '../utils';
 
 export async function GET() {
   try {
-    const data = await tmdbGet('/authentication/token/new'); // { success, request_token, ... }
-    return json({ request_token: data.request_token });
+    // https://developer.themoviedb.org/reference/authentication-create-request-token
+    const data = await tmdbGet('/authentication/token/new');
+    return json(data, 200);
   } catch (e) {
-    return json({ error: e.message }, e.status || 500);
+    return json({ error: e.message || 'Error creando request token' }, e.status || 500);
   }
 }

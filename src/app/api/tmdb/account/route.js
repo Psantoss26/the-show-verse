@@ -1,15 +1,22 @@
-import { tmdbGet, json } from '../_utils';
+// Devuelve los datos de la cuenta de TMDb usando la session_id guardada en cookie
+import { cookies } from 'next/headers';
+import { tmdbGet, json } from '../utils';
 
-export async function GET(req) {
+const SESSION_COOKIE = 'tmdb_session_id';
+
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url);
-    const session_id = searchParams.get('session_id');
-    if (!session_id) return json({ error: 'session_id requerido' }, 400);
+    const store = await cookies();
+    const sessionId = store.get(SESSION_COOKIE)?.value;
 
-    const acc = await tmdbGet(`/account?session_id=${encodeURIComponent(session_id)}`);
-    // { id, username, name, ... }
-    return json(acc);
+    if (!sessionId) {
+      return json({ error: 'No hay sesión de TMDb' }, 401);
+    }
+
+    // https://developer.themoviedb.org/reference/account-details
+    const account = await tmdbGet(`/account?session_id=${encodeURIComponent(sessionId)}`);
+    return json(account, 200);
   } catch (e) {
-    return json({ error: e.message }, e.status || 500);
+    return json({ error: e.message || 'Error obteniendo la cuenta' }, e.status || 500);
   }
 }
