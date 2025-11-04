@@ -1,4 +1,4 @@
-import { tmdbPost, json } from '../../_utils';
+import { tmdbPost, json } from '../../utils';
 
 export async function POST(req) {
   try {
