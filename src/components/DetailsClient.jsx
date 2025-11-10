@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import 'swiper/swiper-bundle.css'
 import EpisodeRatingsGrid from '@/components/EpisodeRatingsGrid'
+import FavoriteWatchlistButtons from '@/components/FavoriteWatchlistButtons'
 
 import {
   CalendarIcon,
@@ -161,6 +162,7 @@ export default function DetailsClient({ type, id, data, recommendations, castDat
               </p>
             )}
           </div>
+          <FavoriteWatchlistButtons type={type} mediaId={id} />
           {/* Enlaces externos en una fila horizontal */}
           {(data.homepage || data.imdb_id) && (
             <div className="flex flex-wrap gap-4 items-center">

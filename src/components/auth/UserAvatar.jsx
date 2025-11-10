@@ -2,16 +2,21 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 
 export default function UserAvatar({ account }) {
   const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
+  const { logout } = useAuth()
 
-  const handleLogout = () => {
-    localStorage.removeItem('tmdb_session')
-    localStorage.removeItem('tmdb_account')
+  const handleLogout = (e) => {
+    e.preventDefault()
+    try {
+      logout()
+    } catch (err) {
+      console.error('Error en logout:', err)
+    }
     router.push('/')
-    router.refresh()
   }
 
   return (
@@ -22,11 +27,11 @@ export default function UserAvatar({ account }) {
       >
         <img
           src={
-            account.avatar?.tmdb?.avatar_path
+            account?.avatar?.tmdb?.avatar_path
               ? `https://image.tmdb.org/t/p/w64_and_h64_face${account.avatar.tmdb.avatar_path}`
               : '/default-avatar.png'
           }
-          alt={account.username}
+          alt={account?.username || 'Usuario'}
           className="w-10 h-10 rounded-full border border-gray-600 object-cover"
         />
       </div>

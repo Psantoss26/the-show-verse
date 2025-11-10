@@ -4,8 +4,17 @@ import { createRequestToken } from '@/lib/api/auth'
 
 export default function LoginButton() {
   const handleLogin = async () => {
-    const token = await createRequestToken()
-    window.location.href = `https://www.themoviedb.org/authenticate/${token}?redirect_to=${window.location.origin}/auth/callback?request_token=${token}`
+    try {
+      const token = await createRequestToken()
+      const redirectUrl = `${window.location.origin}/auth/callback`
+
+      window.location.href =
+        `https://www.themoviedb.org/authenticate/${token}` +
+        `?redirect_to=${encodeURIComponent(redirectUrl)}`
+    } catch (e) {
+      console.error('Error iniciando login TMDb', e)
+      alert('No se pudo iniciar el inicio de sesión con TMDb')
+    }
   }
 
   return (
