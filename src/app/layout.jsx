@@ -13,12 +13,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <body className="bg-black text-white">
-        <Navbar />
-        <AuthProvider>{children}</AuthProvider>
-
-        {/* Añade los componentes al final del body */}
-        <Analytics />
-        <SpeedInsights /> {/* opcional */}
+        <AuthProvider>
+          <Navbar />
+          {children}
+          <Analytics />
+          <SpeedInsights />
+        </AuthProvider>
       </body>
     </html>
   )

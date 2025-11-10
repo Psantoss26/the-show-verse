@@ -262,3 +262,170 @@ export async function getTvEpisodeRatings(tmdbId, { excludeSpecials = true } = {
   if (!res.ok) throw new Error(json?.error || 'No se pudo obtener ratings');
   return json;
 }
+
+// === FAVORITOS / WATCHLIST (PELIS + SERIES) DEL USUARIO ===
+
+/**
+ * Devuelve el estado de una película/serie para el usuario.
+ * type: 'movie' | 'tv'
+ */
+export async function getMediaAccountStates(type, id, sessionId) {
+  if (!sessionId) {
+    return { favorite: false, watchlist: false, rated: null }
+  }
+
+  try {
+    const res = await fetch(
+      `${BASE_URL}/${type}/${id}/account_states?api_key=${API_KEY}&session_id=${sessionId}`
+    )
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.status_message || 'Error account_states')
+    return {
+      favorite: !!data.favorite,
+      watchlist: !!data.watchlist,
+      rated: data.rated || null,
+    }
+  } catch (error) {
+    console.error('Error getMediaAccountStates:', error)
+    return { favorite: false, watchlist: false, rated: null }
+  }
+}
+
+/**
+ * Marca / desmarca como favorito.
+ * type: 'movie' | 'tv'
+ */
+export async function markAsFavorite({
+  accountId,
+  sessionId,
+  type,
+  mediaId,
+  favorite,
+}) {
+  if (!accountId || !sessionId) {
+    throw new Error('Faltan accountId o sessionId para marcar favorito')
+  }
+
+  const res = await fetch(
+    `${BASE_URL}/account/${accountId}/favorite?api_key=${API_KEY}&session_id=${sessionId}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        media_type: type,
+        media_id: mediaId,
+        favorite,
+      }),
+    }
+  )
+
+  const data = await res.json()
+  if (!res.ok || data.success === false) {
+    console.error('Error TMDb markAsFavorite:', data)
+    throw new Error(data.status_message || 'No se pudo actualizar favorito')
+  }
+
+  return data
+}
+
+/**
+ * Añade / quita de la watchlist (pendientes).
+ * type: 'movie' | 'tv'
+ */
+export async function markInWatchlist({
+  accountId,
+  sessionId,
+  type,
+  mediaId,
+  watchlist,
+}) {
+  if (!accountId || !sessionId) {
+    throw new Error('Faltan accountId o sessionId para watchlist')
+  }
+
+  const res = await fetch(
+    `${BASE_URL}/account/${accountId}/watchlist?api_key=${API_KEY}&session_id=${sessionId}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        media_type: type,
+        media_id: mediaId,
+        watchlist,
+      }),
+    }
+  )
+
+  const data = await res.json()
+  if (!res.ok || data.success === false) {
+    console.error('Error TMDb markInWatchlist:', data)
+    throw new Error(
+      data.status_message || 'No se pudo actualizar la lista de pendientes'
+    )
+  }
+
+  return data
+}
+
+/**
+ * Favoritas del usuario (pelis + series)
+ */
+export async function fetchFavoritesForUser(accountId, sessionId) {
+  if (!accountId || !sessionId) return []
+
+  const fetchList = async (path, mediaType) => {
+    const res = await fetch(
+      `${BASE_URL}${path}?api_key=${API_KEY}&session_id=${sessionId}&language=es-ES&sort_by=created_at.desc`
+    )
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.status_message || 'Error TMDb')
+    return (data.results || []).map((item) => ({
+      ...item,
+      media_type: mediaType,
+    }))
+  }
+
+  try {
+    const [movies, tv] = await Promise.all([
+      fetchList(`/account/${accountId}/favorite/movies`, 'movie'),
+      fetchList(`/account/${accountId}/favorite/tv`, 'tv'),
+    ])
+
+    // Las mezclamos sin complicarnos con orden por fecha
+    return [...movies, ...tv]
+  } catch (error) {
+    console.error('Error fetchFavoritesForUser:', error)
+    return []
+  }
+}
+
+/**
+ * Pendientes del usuario (pelis + series)
+ */
+export async function fetchWatchlistForUser(accountId, sessionId) {
+  if (!accountId || !sessionId) return []
+
+  const fetchList = async (path, mediaType) => {
+    const res = await fetch(
+      `${BASE_URL}${path}?api_key=${API_KEY}&session_id=${sessionId}&language=es-ES&sort_by=created_at.desc`
+    )
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.status_message || 'Error TMDb')
+    return (data.results || []).map((item) => ({
+      ...item,
+      media_type: mediaType,
+    }))
+  }
+
+  try {
+    const [movies, tv] = await Promise.all([
+      fetchList(`/account/${accountId}/watchlist/movies`, 'movie'),
+      fetchList(`/account/${accountId}/watchlist/tv`, 'tv'),
+    ])
+
+    return [...movies, ...tv]
+  } catch (error) {
+    console.error('Error fetchWatchlistForUser:', error)
+    return []
+  }
+}

@@ -35,11 +35,11 @@ export default function LoginForm() {
       const session_id = await createSession(validatedToken)
       const account = await getAccount(session_id)
 
+      // Esto ya guarda en localStorage, cookie y contexto
       login({ session_id, account })
 
       setSuccess(true)
       setTimeout(() => {
-        window.dispatchEvent(new Event('storage')) // Forzar que useAuth se actualice
         router.push('/')
       }, 1000)
     } catch (err) {
