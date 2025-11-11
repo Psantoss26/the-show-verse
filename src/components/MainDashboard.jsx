@@ -7,6 +7,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import 'swiper/swiper-bundle.css'
 import Link from 'next/link'
 import { Anton } from 'next/font/google'
+import { Heart, HeartOff, BookmarkPlus, BookmarkMinus, Loader2 } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 
 import {
   fetchTopRatedMovies,
@@ -20,6 +22,10 @@ import {
   fetchPopularMovies,
   fetchRecommendedMovies,
   getLogos,
+  // nuevas utilidades para estados/acciones
+  getMediaAccountStates,
+  markAsFavorite,
+  markInWatchlist,
 } from '@/lib/api/tmdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
@@ -35,8 +41,100 @@ const short = (t = '', n = 420) => (t.length > n ? t.slice(0, n - 1) + '…' : t
 
 /* ---------- Portal flotante grande (tipo Netflix/Prime) ---------- */
 function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
+  const { session, account } = useAuth()
+
+  // Estados para favoritos / pendientes
+  const [loadingStates, setLoadingStates] = useState(false)
+  const [favorite, setFavorite] = useState(false)
+  const [watchlist, setWatchlist] = useState(false)
+  const [updating, setUpdating] = useState(false)
+  const [error, setError] = useState('')
+
+  // Cargar estados cuando cambie la película (si hay login)
+  useEffect(() => {
+    let cancel = false
+    const load = async () => {
+      if (!open || !movie || !session || !account?.id) {
+        setFavorite(false)
+        setWatchlist(false)
+        return
+      }
+      try {
+        setLoadingStates(true)
+        const type = movie.media_type || 'movie'
+        const st = await getMediaAccountStates(type, movie.id, session)
+        if (!cancel) {
+          setFavorite(!!st.favorite)
+          setWatchlist(!!st.watchlist)
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        if (!cancel) setLoadingStates(false)
+      }
+    }
+    load()
+    return () => {
+      cancel = true
+    }
+  }, [open, movie, session, account])
+
+  const requireLogin = () => {
+    if (!session || !account?.id) {
+      // En tu app el login está en /login
+      window.location.href = '/login'
+      return true
+    }
+    return false
+  }
+
+  const handleToggleFavorite = async () => {
+    if (requireLogin() || updating || !movie) return
+    try {
+      setUpdating(true)
+      setError('')
+      const next = !favorite
+      setFavorite(next) // optimista
+      await markAsFavorite({
+        accountId: account.id,
+        sessionId: session,
+        type: movie.media_type || 'movie',
+        mediaId: movie.id,
+        favorite: next,
+      })
+    } catch (e) {
+      console.error(e)
+      setFavorite((v) => !v)
+      setError('No se pudo actualizar favoritos.')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleToggleWatchlist = async () => {
+    if (requireLogin() || updating || !movie) return
+    try {
+      setUpdating(true)
+      setError('')
+      const next = !watchlist
+      setWatchlist(next) // optimista
+      await markInWatchlist({
+        accountId: account.id,
+        sessionId: session,
+        type: movie.media_type || 'movie',
+        mediaId: movie.id,
+        watchlist: next,
+      })
+    } catch (e) {
+      console.error(e)
+      setWatchlist((v) => !v)
+      setError('No se pudo actualizar pendientes.')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   // Tamaño del panel: ancho grande con límite a viewport
-  const GAP = 12
   const MIN_W = 420
   const MAX_W = 750
 
@@ -44,11 +142,8 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     if (!anchorRect) return { left: 0, top: 0, width: MIN_W }
     const vw = window.innerWidth
     const w = Math.min(MAX_W, Math.max(MIN_W, anchorRect.width * 2.6))
-    // centrar respecto al centro del póster
     let left = anchorRect.left + anchorRect.width / 2 - w / 2
-    // clamp a viewport
     left = Math.max(8, Math.min(left, vw - w - 8))
-    // que el top pegue un poco arriba del póster, pero sin salirse
     let top = anchorRect.top - 24
     if (top < 8) top = 8
     return { left, top, width: w }
@@ -68,7 +163,6 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     }
   }, [open, calc])
 
-  // Cierre suave para permitir pasar del póster al panel
   const leaveTimer = useRef(null)
   const startClose = () => {
     clearTimeout(leaveTimer.current)
@@ -85,10 +179,12 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     <AnimatePresence>
       <motion.div
         key={movie.id}
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.98 }}
-        transition={{ duration: 0.18 }}
+        // Animación elástica desde abajo
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+
         onMouseEnter={cancelClose}
         onMouseLeave={startClose}
         style={{
@@ -101,18 +197,20 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
         }}
         className="rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
       >
-        {/* Imagen horizontal grande */}
-        <Link href={href} className="block">
+        {/* Imagen horizontal */}
+        <Link href={href} className="block relative group/preview">
           <img
             src={`https://image.tmdb.org/t/p/w1280${backdrop}`}
             alt={movie.title || movie.name}
             className="w-full object-cover aspect-video"
             loading="lazy"
           />
+          {/* Degradado para mejorar legibilidad de los botones/texto */}
+          <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-[#0b0b0b] to-transparent" />
         </Link>
 
-        {/* Banda inferior con detalles */}
-        <div className="p-4 md:p-5">
+        {/* Detalles + acciones */}
+        <div className="p-4 md:p-5 pt-3">
           <div className="mb-1 flex items-center gap-3 text-sm text-neutral-300">
             {yearOf(movie) && <span>{yearOf(movie)}</span>}
             <span className="flex items-center gap-1">
@@ -126,17 +224,52 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
           </h4>
 
           {movie.overview && (
-            <p className="text-sm md:text-base text-neutral-200 leading-relaxed">
+            <p className="text-sm md:text-base text-neutral-200 leading-relaxed line-clamp-3">
               {short(movie.overview)}
             </p>
           )}
 
-          <div className="mt-4 flex gap-2">
+          {/* Botones: Detalles + redondos (favoritos/pendientes) */}
+          <div className="mt-4 flex items-center gap-2">
             <Link href={href}>
               <button className="px-4 py-2 rounded-2xl bg-white text-black text-sm font-semibold hover:bg-neutral-200 transition-colors">
                 Ver detalles
               </button>
             </Link>
+
+            <div className="flex-grow flex justify-end gap-2">
+              {/* Favoritos */}
+              <button
+                onClick={handleToggleFavorite}
+                disabled={loadingStates || updating}
+                title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+              >
+                {loadingStates || updating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : favorite ? (
+                  <HeartOff className="w-5 h-5" />
+                ) : (
+                  <Heart className="w-5 h-5" />
+                )}
+              </button>
+
+              {/* Pendientes */}
+              <button
+                onClick={handleToggleWatchlist}
+                disabled={loadingStates || updating}
+                title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
+                className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+              >
+                {loadingStates || updating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : watchlist ? (
+                  <BookmarkMinus className="w-5 h-5" />
+                ) : (
+                  <BookmarkPlus className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -232,13 +365,12 @@ export default function MainDashboard({ sessionId = null }) {
     setHover({ movie, rect })
   }
   const onLeave = () => {
-    // damos margen para poder entrar en el panel
     setTimeout(() => setHover((h) => (h?.locked ? h : null)), 80)
   }
   const closeHover = () => setHover(null)
 
   /* ---------- Sección reusable (cada fila) ---------- */
-  const Row = ({ title, items, sectionKey }) => (
+  const Row = ({ title, items }) => (
     <div className="relative group">
       <h3 className="text-2xl sm:text-3xl md:text-4xl font-[730] text-primary-text mb-4 sm:text-left">
         <span
@@ -297,7 +429,7 @@ export default function MainDashboard({ sessionId = null }) {
     </div>
   )
 
-  /* ---------- Carrusel hero (igual que tenías) ---------- */
+  /* ---------- Carrusel hero ---------- */
   const TopRatedHero = () => (
     <div className="relative group mb-10 sm:mb-14">
       <Swiper
@@ -357,16 +489,16 @@ export default function MainDashboard({ sessionId = null }) {
       <TopRatedHero />
 
       <div className="space-y-12">
-        <Row title="Populares" items={dashboardData.popular} sectionKey="popular" />
-        <Row title="Tendencias Semanales" items={dashboardData.trending} sectionKey="trending" />
-        <Row title="Guiones Complejos" items={dashboardData.mind} sectionKey="mind" />
-        <Row title="Top Acción" items={dashboardData.action} sectionKey="action" />
-        <Row title="Populares en EE.UU." items={dashboardData.us} sectionKey="us" />
-        <Row title="Películas de Culto" items={dashboardData.cult} sectionKey="cult" />
-        <Row title="Infravaloradas" items={dashboardData.underrated} sectionKey="underrated" />
-        <Row title="En Ascenso" items={dashboardData.rising} sectionKey="rising" />
+        <Row title="Populares" items={dashboardData.popular} />
+        <Row title="Tendencias Semanales" items={dashboardData.trending} />
+        <Row title="Guiones Complejos" items={dashboardData.mind} />
+        <Row title="Top Acción" items={dashboardData.action} />
+        <Row title="Populares en EE.UU." items={dashboardData.us} />
+        <Row title="Películas de Culto" items={dashboardData.cult} />
+        <Row title="Infravaloradas" items={dashboardData.underrated} />
+        <Row title="En Ascenso" items={dashboardData.rising} />
         {dashboardData.recommended?.length > 0 && (
-          <Row title="Recomendadas Para Ti" items={dashboardData.recommended} sectionKey="recommended" />
+          <Row title="Recomendadas Para Ti" items={dashboardData.recommended} />
         )}
       </div>
 
