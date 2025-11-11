@@ -22,35 +22,76 @@ import {
   fetchPopularMovies,
   fetchRecommendedMovies,
   getLogos,
-  // nuevas utilidades para estados/acciones
+  // estados/acciones de cuenta
   getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
+  // helpers TMDB para runtime / external ids
+  getMovieDetails,
+  getExternalIds
 } from '@/lib/api/tmdb'
 
+import { fetchOmdbByImdb } from '@/lib/api/omdb'
+
 const anton = Anton({ weight: '400', subsets: ['latin'] })
+
+/* --- Icons: IMDb + TMDb (inline SVG, sin dependencias externas) --- */
+const IMDbIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 64 64" className={className} aria-label="IMDb" role="img">
+    <rect x="2" y="12" width="60" height="40" rx="6" fill="#F5C518" />
+    <path
+      d="M14 24h4v16h-4V24zm8 0h4v16h-4V24zm6 0h6c2.76 0 4 1.24 4 4v8c0 2.76-1.24 4-4 4h-6V24zm4 4v8h2c.67 0 1-.33 1-1v-6c0-.67-.33-1-1-1h-2zm12-4h4v16h-4V24z"
+      fill="#000"
+    />
+  </svg>
+)
+
+const TMDbIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 64 64" className={className} aria-label="TMDb" role="img">
+    <rect x="4" y="8" width="56" height="48" rx="10" fill="#01D277" />
+    <path
+      d="M18 24h-4v-4h12v4h-4v16h-4V24zm14-4h4l3 7 3-7h4v20h-4V28l-3 7h-2l-3-7v12h-4V20zm20 0h4v20h-4V20z"
+      fill="#001A0F"
+      opacity=".95"
+    />
+  </svg>
+)
 
 /* ---------- helpers ---------- */
 const yearOf = (m) =>
   m?.release_date?.slice(0, 4) || m?.first_air_date?.slice(0, 4) || ''
+
 const ratingOf = (m) =>
   typeof m?.vote_average === 'number' && m.vote_average > 0
     ? m.vote_average.toFixed(1)
     : '–'
+
 const short = (t = '', n = 420) => (t.length > n ? t.slice(0, n - 1) + '…' : t)
 
-/* ---------- Portal flotante grande (tipo Netflix/Prime) ---------- */
+const formatRuntime = (mins) => {
+  if (!mins || typeof mins !== 'number') return null
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  if (h <= 0) return `${m} min`
+  return m ? `${h} h ${m} min` : `${h} h`
+}
+
+/* ---------- Portal flotante grande ---------- */
 function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   const { session, account } = useAuth()
 
-  // Estados para favoritos / pendientes
+  // Estados de cuenta
   const [loadingStates, setLoadingStates] = useState(false)
   const [favorite, setFavorite] = useState(false)
   const [watchlist, setWatchlist] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
 
-  // Cargar estados cuando cambie la película (si hay login)
+  // Extras: runtime TMDB + awards OMDb + imdbRating
+  const [extras, setExtras] = useState({ runtime: null, awards: null, imdbRating: null })
+  const extrasCache = useRef(new Map()) // cache por movie.id
+
+  // Cargar estados (fav/watchlist)
   useEffect(() => {
     let cancel = false
     const load = async () => {
@@ -74,67 +115,68 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
       }
     }
     load()
-    return () => {
-      cancel = true
-    }
+    return () => { cancel = true }
   }, [open, movie, session, account])
 
-  const requireLogin = () => {
-    if (!session || !account?.id) {
-      // En tu app el login está en /login
-      window.location.href = '/login'
-      return true
-    }
-    return false
-  }
+  // Cargar extras (runtime + premios + imdbRating)
+  useEffect(() => {
+    let abort = false
+    const loadExtras = async () => {
+      if (!open || !movie) {
+        setExtras({ runtime: null, awards: null, imdbRating: null })
+        return
+      }
 
-  const handleToggleFavorite = async () => {
-    if (requireLogin() || updating || !movie) return
-    try {
-      setUpdating(true)
-      setError('')
-      const next = !favorite
-      setFavorite(next) // optimista
-      await markAsFavorite({
-        accountId: account.id,
-        sessionId: session,
-        type: movie.media_type || 'movie',
-        mediaId: movie.id,
-        favorite: next,
-      })
-    } catch (e) {
-      console.error(e)
-      setFavorite((v) => !v)
-      setError('No se pudo actualizar favoritos.')
-    } finally {
-      setUpdating(false)
-    }
-  }
+      const cached = extrasCache.current.get(movie.id)
+      if (cached) {
+        setExtras(cached)
+        return
+      }
 
-  const handleToggleWatchlist = async () => {
-    if (requireLogin() || updating || !movie) return
-    try {
-      setUpdating(true)
-      setError('')
-      const next = !watchlist
-      setWatchlist(next) // optimista
-      await markInWatchlist({
-        accountId: account.id,
-        sessionId: session,
-        type: movie.media_type || 'movie',
-        mediaId: movie.id,
-        watchlist: next,
-      })
-    } catch (e) {
-      console.error(e)
-      setWatchlist((v) => !v)
-      setError('No se pudo actualizar pendientes.')
-    } finally {
-      setUpdating(false)
-    }
-  }
+      try {
+        // 1) Runtime desde TMDB
+        let runtime = null
+        try {
+          const details = await getMovieDetails(movie.id) // { runtime, ... }
+          runtime = details?.runtime ?? null
+        } catch {}
 
-  // Tamaño del panel: ancho grande con límite a viewport
+        // 2) Premios/Nominaciones + rating IMDb desde OMDb usando imdb_id
+        let awards = null
+        let imdbRating = null
+        try {
+          let imdb = movie?.imdb_id
+          if (!imdb) {
+            const ext = await getExternalIds('movie', movie.id) // { imdb_id, ... }
+            imdb = ext?.imdb_id || null
+          }
+          if (imdb) {
+            const omdb = await fetchOmdbByImdb(imdb) // vía /api/omdb
+            const rawAwards = omdb?.Awards
+            if (rawAwards && typeof rawAwards === 'string' && rawAwards.trim()) {
+              awards = rawAwards.trim()
+            }
+            const r = omdb?.imdbRating
+            if (r && !Number.isNaN(Number(r))) {
+              imdbRating = Number(r)
+            }
+          }
+        } catch {}
+
+        const next = { runtime, awards, imdbRating }
+        if (!abort) {
+          extrasCache.current.set(movie.id, next)
+          setExtras(next)
+        }
+      } catch (e) {
+        if (!abort) setExtras({ runtime: null, awards: null, imdbRating: null })
+      }
+    }
+    loadExtras()
+    return () => { abort = true }
+  }, [open, movie])
+
+  // Layout/posición del panel
   const MIN_W = 420
   const MAX_W = 750
 
@@ -163,6 +205,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     }
   }, [open, calc])
 
+  // Hover grace period
   const leaveTimer = useRef(null)
   const startClose = () => {
     clearTimeout(leaveTimer.current)
@@ -175,16 +218,69 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   const backdrop = movie.backdrop_path || movie.poster_path
   const href = `/details/movie/${movie.id}`
 
+  const requireLogin = () => {
+    if (!session || !account?.id) {
+      window.location.href = '/login'
+      return true
+    }
+    return false
+  }
+
+  const handleToggleFavorite = async () => {
+    if (requireLogin() || updating || !movie) return
+    try {
+      setUpdating(true)
+      setError('')
+      const next = !favorite
+      setFavorite(next) // optimista
+      await markAsFavorite({
+        accountId: account.id,
+        sessionId: session,
+        type: movie.media_type || 'movie',
+        mediaId: movie.id,
+        favorite: next
+      })
+    } catch (e) {
+      console.error(e)
+      setFavorite((v) => !v)
+      setError('No se pudo actualizar favoritos.')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleToggleWatchlist = async () => {
+    if (requireLogin() || updating || !movie) return
+    try {
+      setUpdating(true)
+      setError('')
+      const next = !watchlist
+      setWatchlist(next) // optimista
+      await markInWatchlist({
+        accountId: account.id,
+        sessionId: session,
+        type: movie.media_type || 'movie',
+        mediaId: movie.id,
+        watchlist: next
+      })
+    } catch (e) {
+      console.error(e)
+      setWatchlist((v) => !v)
+      setError('No se pudo actualizar pendientes.')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   return (
     <AnimatePresence>
       <motion.div
         key={movie.id}
-        // Animación elástica desde abajo
+        // Animación elástica (rápida y suave)
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-
         onMouseEnter={cancelClose}
         onMouseLeave={startClose}
         style={{
@@ -193,7 +289,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
           top: pos.top,
           width: pos.width,
           zIndex: 80,
-          pointerEvents: 'auto',
+          pointerEvents: 'auto'
         }}
         className="rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
       >
@@ -205,26 +301,42 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             className="w-full object-cover aspect-video"
             loading="lazy"
           />
-          {/* Degradado para mejorar legibilidad de los botones/texto */}
           <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-[#0b0b0b] to-transparent" />
         </Link>
 
         {/* Detalles + acciones */}
         <div className="p-4 md:p-5 pt-3">
-          <div className="mb-1 flex items-center gap-3 text-sm text-neutral-300">
+          <div className="mb-1 flex items-center gap-3 text-sm text-neutral-300 flex-wrap">
             {yearOf(movie) && <span>{yearOf(movie)}</span>}
-            <span className="flex items-center gap-1">
-              <span className="text-yellow-400">★</span>
-              {ratingOf(movie)}
+            {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
+
+            {/* TMDb rating */}
+            <span className="inline-flex items-center gap-1.5">
+              <TMDbIcon className="w-4 h-4" />
+              <span className="font-medium">{ratingOf(movie)}</span>
             </span>
+
+            {/* IMDb rating */}
+            {typeof extras?.imdbRating === 'number' && (
+              <span className="inline-flex items-center gap-1.5">
+                <IMDbIcon className="w-4 h-4" />
+                <span className="font-medium">{extras.imdbRating.toFixed(1)}</span>
+              </span>
+            )}
           </div>
 
           <h4 className="text-xl md:text-2xl font-semibold mb-2">
             {movie.title || movie.name}
           </h4>
 
+          {extras?.awards && (
+            <div className="mt-1 text-[12px] md:text-xs text-emerald-300">
+              {extras.awards}
+            </div>
+          )}
+
           {movie.overview && (
-            <p className="text-sm md:text-base text-neutral-200 leading-relaxed line-clamp-3">
+            <p className="mt-2 text-sm md:text-base text-neutral-200 leading-relaxed line-clamp-3">
               {short(movie.overview)}
             </p>
           )}
@@ -271,6 +383,8 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
               </button>
             </div>
           </div>
+
+          {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
         </div>
       </motion.div>
     </AnimatePresence>
@@ -297,7 +411,7 @@ export default function MainDashboard({ sessionId = null }) {
           underrated,
           rising,
           trending,
-          popular,
+          popular
         ] = await Promise.all([
           fetchTopRatedMovies(),
           fetchCultClassics(),
@@ -307,7 +421,7 @@ export default function MainDashboard({ sessionId = null }) {
           fetchUnderratedMovies(),
           fetchRisingMovies(),
           fetchTrendingMovies(),
-          fetchPopularMovies(),
+          fetchPopularMovies()
         ])
 
         const recommended = sessionId
@@ -331,7 +445,7 @@ export default function MainDashboard({ sessionId = null }) {
           rising,
           trending,
           popular,
-          recommended,
+          recommended
         })
 
         setReady(true)
@@ -344,20 +458,6 @@ export default function MainDashboard({ sessionId = null }) {
   }, [sessionId])
 
   if (!ready) return null
-
-  const sections = [
-    { title: 'Populares', key: 'popular' },
-    { title: 'Tendencias Semanales', key: 'trending' },
-    { title: 'Guiones Complejos', key: 'mind' },
-    { title: 'Top Acción', key: 'action' },
-    { title: 'Populares en EE.UU.', key: 'us' },
-    { title: 'Películas de Culto', key: 'cult' },
-    { title: 'Infravaloradas', key: 'underrated' },
-    { title: 'En Ascenso', key: 'rising' },
-    ...(dashboardData.recommended?.length > 0
-      ? [{ title: 'Recomendadas Para Ti', key: 'recommended' }]
-      : []),
-  ]
 
   /* ---------- handlers hover ---------- */
   const onEnter = (movie, e) => {
@@ -397,7 +497,7 @@ export default function MainDashboard({ sessionId = null }) {
           480: { slidesPerView: 4, spaceBetween: 14 },
           768: { slidesPerView: 6, spaceBetween: 16 },
           1024: { slidesPerView: 8, spaceBetween: 18 },
-          1280: { slidesPerView: 10, spaceBetween: 20 },
+          1280: { slidesPerView: 10, spaceBetween: 20 }
         }}
       >
         {items?.map((m) => (
@@ -448,7 +548,7 @@ export default function MainDashboard({ sessionId = null }) {
         breakpoints={{
           0: { slidesPerView: 1, spaceBetween: 12 },
           640: { slidesPerView: 2, spaceBetween: 16 },
-          1024: { slidesPerView: 3, spaceBetween: 20 },
+          1024: { slidesPerView: 3, spaceBetween: 20 }
         }}
       >
         {dashboardData.topRated?.map((movie) => (
@@ -502,7 +602,7 @@ export default function MainDashboard({ sessionId = null }) {
         )}
       </div>
 
-      {/* Panel grande fuera del flujo, pegado a la tarjeta hovered */}
+      {/* Panel flotante */}
       <HoverPreviewPortal
         open={!!hover?.movie}
         anchorRect={hover?.rect || null}
