@@ -362,7 +362,7 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
  * Componente Principal: SeriesPage
  * ====================================================================
  */
-export default function SeriesPage({ sessionId = null }) {
+export default function SeriesPage() {
   const [ready, setReady] = useState(false)
   const [dashboardData, setDashboardData] = useState({})
   const [hover, setHover] = useState(null) // { show, rect }
