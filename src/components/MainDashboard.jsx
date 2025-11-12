@@ -1,3 +1,4 @@
+// src/app/MainDashboard.jsx
 'use client'
 
 import { useRef, useEffect, useState, useCallback } from 'react'
@@ -34,28 +35,6 @@ import {
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
-
-/* --- Icons: IMDb + TMDb (inline SVG, sin dependencias externas) --- */
-const IMDbIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 64 64" className={className} aria-label="IMDb" role="img">
-    <rect x="2" y="12" width="60" height="40" rx="6" fill="#F5C518" />
-    <path
-      d="M14 24h4v16h-4V24zm8 0h4v16h-4V24zm6 0h6c2.76 0 4 1.24 4 4v8c0 2.76-1.24 4-4 4h-6V24zm4 4v8h2c.67 0 1-.33 1-1v-6c0-.67-.33-1-1-1h-2zm12-4h4v16h-4V24z"
-      fill="#000"
-    />
-  </svg>
-)
-
-const TMDbIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 64 64" className={className} aria-label="TMDb" role="img">
-    <rect x="4" y="8" width="56" height="48" rx="10" fill="#01D277" />
-    <path
-      d="M18 24h-4v-4h12v4h-4v16h-4V24zm14-4h4l3 7 3-7h4v20h-4V28l-3 7h-2l-3-7v12h-4V20zm20 0h4v20h-4V20z"
-      fill="#001A0F"
-      opacity=".95"
-    />
-  </svg>
-)
 
 /* ---------- helpers ---------- */
 const yearOf = (m) =>
@@ -310,16 +289,28 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             {yearOf(movie) && <span>{yearOf(movie)}</span>}
             {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
 
-            {/* TMDb rating */}
+            {/* TMDb rating (logo local) */}
             <span className="inline-flex items-center gap-1.5">
-              <TMDbIcon className="w-4 h-4" />
+              <img
+                src="/logo-TMDb.png"
+                alt="TMDb"
+                className="h-4 w-auto"
+                loading="lazy"
+                decoding="async"
+              />
               <span className="font-medium">{ratingOf(movie)}</span>
             </span>
 
-            {/* IMDb rating */}
+            {/* IMDb rating (logo local) */}
             {typeof extras?.imdbRating === 'number' && (
               <span className="inline-flex items-center gap-1.5">
-                <IMDbIcon className="w-4 h-4" />
+                <img
+                  src="/logo-IMDb.png"
+                  alt="IMDb"
+                  className="h-4 w-auto"
+                  loading="lazy"
+                  decoding="async"
+                />
                 <span className="font-medium">{extras.imdbRating.toFixed(1)}</span>
               </span>
             )}

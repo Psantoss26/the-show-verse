@@ -14,42 +14,20 @@ import {
   // Importamos las funciones de descubrimiento
   fetchPopularMedia,
   fetchTopRatedIMDb,
-  fetchMoviesByGenre, // Usamos el nombre corregido
+  fetchMoviesByGenre, // <-- [CORREGIDO] Renombrado de fetchMediaByGenre
   fetchMediaByKeyword,
-  fetchMovieSections, 
+  fetchMovieSections, // <-- Asumiendo que esta existe para las filas base
   // Funciones de cuenta (las mismas del dashboard)
   getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
-  getDetails, // [CORREGIDO] Usamos getDetails genérico
+  getMovieDetails,
   getExternalIds
 } from '@/lib/api/tmdb'
 
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
-
-/* --- Icons: IMDb + TMDb (inline SVG) --- */
-const IMDbIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 64 64" className={className} aria-label="IMDb" role="img">
-    <rect x="2" y="12" width="60" height="40" rx="6" fill="#F5C518" />
-    <path
-      d="M14 24h4v16h-4V24zm8 0h4v16h-4V24zm6 0h6c2.76 0 4 1.24 4 4v8c0 2.76-1.24 4-4 4h-6V24zm4 4v8h2c.67 0 1-.33 1-1v-6c0-.67-.33-1-1-1h-2zm12-4h4v16h-4V24z"
-      fill="#000"
-    />
-  </svg>
-)
-
-const TMDbIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 64 64" className={className} aria-label="TMDb" role="img">
-    <rect x="4" y="8" width="56" height="48" rx="10" fill="#01D277" />
-    <path
-      d="M18 24h-4v-4h12v4h-4v16h-4V24zm14-4h4l3 7 3-7h4v20h-4V28l-3 7h-2l-3-7v12h-4V20zm20 0h4v20h-4V20z"
-      fill="#001A0F"
-      opacity=".95"
-    />
-  </svg>
-)
 
 /* ---------- helpers ---------- */
 const yearOf = (m) =>
@@ -81,16 +59,16 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
 
-  // [MODIFICADO] Un solo estado para todos los datos
+  // Extras: incluye backdropPath, title y overview en español
   const [extras, setExtras] = useState({ 
     runtime: null, 
     awards: null, 
     imdbRating: null,
-    backdropPath: null,
-    title: null,
-    overview: null
+    backdropPath: null, // Para el backdrop en 'es'
+    title: null,        // Para el título en 'es'
+    overview: null      // Para el overview en 'es'
   })
-  const extrasCache = useRef(new Map())
+  const extrasCache = useRef(new Map()) // cache por movie.id
 
   // Cargar estados (fav/watchlist)
   useEffect(() => {
@@ -111,7 +89,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     return () => { cancel = true }
   }, [open, movie, session, account])
 
-  // [MODIFICADO] Un solo useEffect para cargar TODOS los extras
+  // Cargar extras (runtime, premios, E imágenes/texto en 'es')
   useEffect(() => {
     let abort = false
     const loadExtras = async () => {
@@ -120,59 +98,36 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
         return
       }
 
-      // 1. Usar caché si existe
       const cached = extrasCache.current.get(movie.id)
-      if (cached) {
-        setExtras(cached)
-        return
-      }
-      
-      // 2. [SOLUCIÓN AL PARPADEO] Mostrar datos base *inmediatamente*
-      setExtras({
-        runtime: null, 
-        awards: null, 
-        imdbRating: null,
-        backdropPath: movie.backdrop_path || movie.poster_path, // Fallback instantáneo
-        title: movie.title || movie.name,
-        overview: movie.overview
-      })
+      if (cached) { setExtras(cached); return }
 
       try {
-        // 3. Iniciar fetch para datos localizados y detallados
+        // 1) Runtime, Título 'es', Overview 'es', e Imágenes 'es' en 1 llamada
         let runtime = null
         let bestBackdrop = null
         let esTitle = null
         let esOverview = null
         
         try {
-          const details = await getDetails('movie', movie.id, {
-            language: 'es-ES', // Pide textos en español
+          const details = await getMovieDetails(movie.id, {
+            language: 'es-ES',
             append_to_response: 'images',
-            include_image_language: 'en,es,null' // Pedimos explícitamente inglés, español y null
+            include_image_language: 'es,en,null'
           })
           
           runtime = details?.runtime ?? null
           esTitle = details?.title || null
           esOverview = details?.overview || null
           
-          // [CORREGIDO] Lógica de prioridad de imagen
-          const allBackdrops = details?.images?.backdrops || [];
+          const esBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'es');
+          const enBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'en');
+          const defaultBackdrop = details?.images?.backdrops?.[0];
           
-          const enBackdrop = allBackdrops.find(b => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US');
-          const esBackdrop = allBackdrops.find(b => b.iso_639_1 === 'es' || b.iso_639_1 === 'es-ES');
-          const nullBackdrop = allBackdrops.find(b => b.iso_639_1 === null);
-          const defaultBackdrop = allBackdrops[0]; 
+          bestBackdrop = esBackdrop?.file_path || enBackdrop?.file_path || defaultBackdrop?.file_path || null;
 
-          // Prioridad: 1º Inglés, 2º Español, 3º Neutral, 4º Cualquiera
-          bestBackdrop = enBackdrop?.file_path || 
-                         esBackdrop?.file_path || 
-                         nullBackdrop?.file_path || 
-                         defaultBackdrop?.file_path || 
-                         null;
+        } catch (e) { console.error("Error fetching details/images:", e) }
 
-        } catch (e) { console.error("Error fetching details/images for movie:", movie.id, e) }
-
-        // 4. Fetch de OMDb (Premios, etc)
+        // 2) Premios/Nominaciones + rating IMDb desde OMDb
         let awards = null
         let imdbRating = null
         try {
@@ -194,30 +149,18 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
           }
         } catch (e) { console.error("Error fetching OMDb:", e) }
 
-        // 5. Guardar todo en el estado y la caché
-        const next = { 
-          runtime, 
-          awards, 
-          imdbRating, 
-          backdropPath: bestBackdrop || movie.backdrop_path || movie.poster_path,
-          title: esTitle || movie.title,
-          overview: esOverview || movie.overview
-        }
-        
+        const next = { runtime, awards, imdbRating, backdropPath: bestBackdrop, title: esTitle, overview: esOverview }
         if (!abort) {
           extrasCache.current.set(movie.id, next)
           setExtras(next)
         }
       } catch (e) {
-        console.error("Error en loadExtras", e)
+        if (!abort) setExtras({ runtime: null, awards: null, imdbRating: null, backdropPath: null, title: null, overview: null })
       }
     }
-    
     loadExtras()
     return () => { abort = true }
   }, [open, movie])
-
-  // [ELIMINADO] El segundo useEffect que causaba el parpadeo
 
   // Layout/posición del panel
   const MIN_W = 420, MAX_W = 750
@@ -254,7 +197,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   }
   const cancelClose = () => clearTimeout(leaveTimer.current)
 
-  // Handlers de botones
+  // Handlers de botones (idénticos a MainDashboard)
   const requireLogin = () => {
     if (!session || !account?.id) {
       window.location.href = '/login'
@@ -289,20 +232,13 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     } finally { setUpdating(false) }
   }
 
+  if (!open || !movie || !anchorRect) return null
 
-  // [MODIFICADO] Condición de renderizado simplificada
-  if (!open || !movie || !anchorRect) {
-     return null
-  }
-
-  // [MODIFICADO] Usamos 'extras' con fallback a 'movie'
-  const backdrop = extras.backdropPath || movie.backdrop_path || movie.poster_path;
-  const title = extras.title || movie.title || movie.name;
-  const overview = extras.overview || movie.overview;
-  const href = `/details/movie/${movie.id}`;
-
-  // Si después de todo no hay imagen, no renderizar.
-  if (!backdrop) return null;
+  // Prioriza el backdrop, título y overview en español desde 'extras'
+  const backdrop = extras.backdropPath || movie.backdrop_path || movie.poster_path
+  const title = extras.title || movie.title || movie.name
+  const overview = extras.overview || movie.overview
+  const href = `/details/movie/${movie.id}`
 
   return (
     <AnimatePresence>
@@ -324,18 +260,13 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
         }}
         className="rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
       >
+        {/* Imagen horizontal (ahora usa 'backdrop' en 'es' si existe) */}
         <Link href={href} className="block relative group/preview">
           <img
             src={`https://image.tmdb.org/t/p/w1280${backdrop}`}
-            srcSet={
-              `https://image.tmdb.org/t/p/w780${backdrop} 780w, ` +
-              `https://image.tmdb.org/t/p/w1280${backdrop} 1280w`
-            }
-            sizes="(min-width:1536px) 820px, (min-width:1280px) 760px, (min-width:1024px) 660px, 90vw"
             alt={title}
             className="w-full object-cover aspect-video"
             loading="lazy"
-            decoding="async"
           />
           <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-[#0b0b0b] to-transparent" />
         </Link>
@@ -345,18 +276,35 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
           <div className="mb-1 flex items-center gap-3 text-sm text-neutral-300 flex-wrap">
             {yearOf(movie) && <span>{yearOf(movie)}</span>}
             {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
+
+            {/* TMDb rating con logo local */}
             <span className="inline-flex items-center gap-1.5">
-              <TMDbIcon className="w-4 h-4" />
+              <img
+                src="/logo-TMDb.png"
+                alt="TMDb"
+                className="h-4 w-auto"
+                loading="lazy"
+                decoding="async"
+              />
               <span className="font-medium">{ratingOf(movie)}</span>
             </span>
+
+            {/* IMDb rating con logo local */}
             {typeof extras?.imdbRating === 'number' && (
               <span className="inline-flex items-center gap-1.5">
-                <IMDbIcon className="w-4 h-4" />
+                <img
+                  src="/logo-IMDb.png"
+                  alt="IMDb"
+                  className="h-4 w-auto"
+                  loading="lazy"
+                  decoding="async"
+                />
                 <span className="font-medium">{extras.imdbRating.toFixed(1)}</span>
               </span>
             )}
           </div>
 
+          {/* Título (ahora usa 'title' en 'es' si existe) */}
           <h4 className="text-xl md:text-2xl font-semibold mb-2">
             {title}
           </h4>
@@ -367,12 +315,14 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             </div>
           )}
 
+          {/* Overview (ahora usa 'overview' en 'es' si existe) */}
           {overview && (
             <p className="mt-2 text-sm md:text-base text-neutral-200 leading-relaxed line-clamp-3">
               {short(overview)}
             </p>
           )}
 
+          {/* Botones de Acción */}
           <div className="mt-4 flex items-center gap-2">
             <Link href={href}>
               <button className="px-4 py-2 rounded-2xl bg-white text-black text-sm font-semibold hover:bg-neutral-200 transition-colors">
@@ -408,8 +358,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
 
 /* * ====================================================================
  * Componente Principal: MoviesPage
- * ====================================================================
- */
+ * ==================================================================== */
 export default function MoviesPage() {
   const [ready, setReady] = useState(false)
   const [dashboardData, setDashboardData] = useState({})
@@ -422,7 +371,7 @@ export default function MoviesPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const lang = 'es-ES' // Pedimos todo en español
+        const lang = 'es-ES'
         
         const [
           popular,
@@ -431,17 +380,14 @@ export default function MoviesPage() {
           scifi,
           thrillers,
           vengeance,
-          baseSections // Tus secciones originales de décadas, etc.
+          baseSections
         ] = await Promise.all([
           fetchPopularMedia({ type: 'movie', language: lang }),
           fetchTopRatedIMDb({ type: 'movie', minVotes: 15000, language: lang, limit: 20 }),
-          
-          fetchMoviesByGenre({ type: 'movie', genreId: 28, minVotes: 2000, language: lang }), // Acción
-          fetchMoviesByGenre({ type: 'movie', genreId: 878, minVotes: 2000, language: lang }), // Sci-Fi
-          fetchMoviesByGenre({ type: 'movie', genreId: 53, minVotes: 2000, language: lang }),  // Thriller
-          
-          fetchMediaByKeyword({ type: 'movie', keywordId: 9715, minVotes: 1000, language: lang }), // Venganza
-          
+          fetchMoviesByGenre({ type: 'movie', genreId: 28, minVotes: 2000, language: lang }),
+          fetchMoviesByGenre({ type: 'movie', genreId: 878, minVotes: 2000, language: lang }),
+          fetchMoviesByGenre({ type: 'movie', genreId: 53, minVotes: 2000, language: lang }),
+          fetchMediaByKeyword({ type: 'movie', keywordId: 9715, minVotes: 1000, language: lang }),
           fetchMovieSections ? fetchMovieSections({ language: lang }) : Promise.resolve({}) 
         ])
 
@@ -452,7 +398,7 @@ export default function MoviesPage() {
           scifi,
           thrillers,
           vengeance,
-          ...baseSections // Añadimos las secciones base (décadas, etc.)
+          ...baseSections
         })
 
         setReady(true)
@@ -516,6 +462,7 @@ export default function MoviesPage() {
               onMouseEnter={(e) => onEnter(m, e)}
               onMouseLeave={onLeave}
             >
+              {/* pósters verticales */}
               <img
                 src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
                 alt={m.title || m.name}
@@ -568,6 +515,7 @@ export default function MoviesPage() {
           <Row title="Historias de Venganza" items={dashboardData.vengeance} />
         )}
 
+        {/* Filas de 'fetchMovieSections' (décadas, etc.) */}
         {dashboardData['Década de 1990']?.length ? <Row title="Década de 1990" items={dashboardData['Década de 1990']} /> : null}
         {dashboardData['Década de 2000']?.length ? <Row title="Década de 2000" items={dashboardData['Década de 2000']} /> : null}
         {dashboardData['Década de 2010']?.length ? <Row title="Década de 2010" items={dashboardData['Década de 2010']} /> : null}
@@ -578,6 +526,7 @@ export default function MoviesPage() {
         <GenreRows groups={dashboardData['Por género']} />
       </div>
 
+      {/* Panel flotante (idéntico al del dashboard) */}
       <HoverPreviewPortal
         open={!!hover?.movie}
         anchorRect={hover?.rect || null}

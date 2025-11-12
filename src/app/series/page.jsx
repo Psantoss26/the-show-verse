@@ -11,17 +11,17 @@ import { Heart, HeartOff, BookmarkPlus, BookmarkMinus, Loader2 } from 'lucide-re
 import { useAuth } from '@/context/AuthContext'
 
 import {
-  // Importamos las funciones de descubrimiento
+  // Descubrimiento
   fetchPopularMedia,
   fetchTopRatedIMDb,
-  fetchMoviesByGenre, // Usamos la misma función, asumiendo que es genérica (recibe 'type')
+  fetchMoviesByGenre, // genérica: acepta 'type'
   fetchMediaByKeyword,
-  fetchTVSections, // Específica para series
-  // Funciones de cuenta
+  fetchTVSections, // específica para series
+  // Cuenta
   getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
-  getDetails, // <-- [CORREGIDO] Importamos 'getDetails' en lugar de 'getTvDetails'
+  getDetails, // getDetails('tv', id, opts)
   getExternalIds
 } from '@/lib/api/tmdb'
 
@@ -29,30 +29,8 @@ import { fetchOmdbByImdb } from '@/lib/api/omdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
 
-/* --- Icons: IMDb + TMDb (inline SVG) --- */
-const IMDbIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 64 64" className={className} aria-label="IMDb" role="img">
-    <rect x="2" y="12" width="60" height="40" rx="6" fill="#F5C518" />
-    <path
-      d="M14 24h4v16h-4V24zm8 0h4v16h-4V24zm6 0h6c2.76 0 4 1.24 4 4v8c0 2.76-1.24 4-4 4h-6V24zm4 4v8h2c.67 0 1-.33 1-1v-6c0-.67-.33-1-1-1h-2zm12-4h4v16h-4V24z"
-      fill="#000"
-    />
-  </svg>
-)
-
-const TMDbIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 64 64" className={className} aria-label="TMDb" role="img">
-    <rect x="4" y="8" width="56" height="48" rx="10" fill="#01D277" />
-    <path
-      d="M18 24h-4v-4h12v4h-4v16h-4V24zm14-4h4l3 7 3-7h4v20h-4V28l-3 7h-2l-3-7v12h-4V20zm20 0h4v20h-4V20z"
-      fill="#001A0F"
-      opacity=".95"
-    />
-  </svg>
-)
-
 /* ---------- helpers ---------- */
-// Modificado para priorizar 'first_air_date'
+// Prioriza 'first_air_date' para series
 const yearOf = (m) =>
   m?.first_air_date?.slice(0, 4) || m?.release_date?.slice(0, 4) || ''
 
@@ -63,7 +41,6 @@ const ratingOf = (m) =>
 
 const short = (t = '', n = 420) => (t.length > n ? t.slice(0, n - 1) + '…' : t)
 
-// Misma función, recibirá el 'episode_run_time'
 const formatRuntime = (mins) => {
   if (!mins || typeof mins !== 'number') return null
   const h = Math.floor(mins / 60)
@@ -83,13 +60,13 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
 
-  // Extras: incluye backdropPath, title y overview en español
-  const [extras, setExtras] = useState({ 
-    runtime: null, 
-    awards: null, 
+  // Extras: runtime, premios, rating IMDb + backdrop/título/overview localizados
+  const [extras, setExtras] = useState({
+    runtime: null,
+    awards: null,
     imdbRating: null,
     backdropPath: null,
-    title: null, // 'name' en el caso de series
+    title: null,   // 'name' en series
     overview: null
   })
   const extrasCache = useRef(new Map())
@@ -103,17 +80,23 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
       }
       try {
         setLoadingStates(true)
-        const type = show.media_type || 'tv' // <-- TIPO 'tv'
+        const type = show.media_type || 'tv'
         const st = await getMediaAccountStates(type, show.id, session)
-        if (!cancel) { setFavorite(!!st.favorite); setWatchlist(!!st.watchlist) }
-      } catch (e) { console.error(e) } 
-      finally { if (!cancel) setLoadingStates(false) }
+        if (!cancel) {
+          setFavorite(!!st.favorite)
+          setWatchlist(!!st.watchlist)
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        if (!cancel) setLoadingStates(false)
+      }
     }
     load()
     return () => { cancel = true }
   }, [open, show, session, account])
 
-  // Cargar extras (runtime, premios, E imágenes/texto en 'es')
+  // Cargar extras (runtime, premios, imágenes y textos en 'es')
   useEffect(() => {
     let abort = false
     const loadExtras = async () => {
@@ -130,25 +113,24 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
         let bestBackdrop = null
         let esTitle = null
         let esOverview = null
-        
+
         try {
-          // [CORREGIDO] Usamos getDetails('tv', ...)
           const details = await getDetails('tv', show.id, {
             language: 'es-ES',
             append_to_response: 'images',
             include_image_language: 'es,en,null'
           })
-          
           runtime = details?.episode_run_time?.[0] ?? null
           esTitle = details?.name || null
           esOverview = details?.overview || null
-          
-          const esBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'es');
-          const enBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'en');
-          const defaultBackdrop = details?.images?.backdrops?.[0];
-          bestBackdrop = esBackdrop?.file_path || enBackdrop?.file_path || defaultBackdrop?.file_path || null;
 
-        } catch (e) { console.error("Error fetching details/images:", e) }
+          const esBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'es')
+          const enBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'en')
+          const defaultBackdrop = details?.images?.backdrops?.[0]
+          bestBackdrop = esBackdrop?.file_path || enBackdrop?.file_path || defaultBackdrop?.file_path || null
+        } catch (e) {
+          console.error('Error fetching details/images:', e)
+        }
 
         let awards = null
         let imdbRating = null
@@ -169,7 +151,9 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
               imdbRating = Number(r)
             }
           }
-        } catch (e) { console.error("Error fetching OMDb:", e) }
+        } catch (e) {
+          console.error('Error fetching OMDb:', e)
+        }
 
         const next = { runtime, awards, imdbRating, backdropPath: bestBackdrop, title: esTitle, overview: esOverview }
         if (!abort) {
@@ -254,12 +238,11 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
     } finally { setUpdating(false) }
   }
 
-
   if (!open || !show || !anchorRect) return null
 
-  // Prioriza el backdrop, título y overview en español desde 'extras'
+  // Datos finales para render
   const backdrop = extras.backdropPath || show.backdrop_path || show.poster_path
-  const title = extras.title || show.name // 'name' para series
+  const title = extras.title || show.name
   const overview = extras.overview || show.overview
   const href = `/details/tv/${show.id}`
 
@@ -297,21 +280,35 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
           <div className="mb-1 flex items-center gap-3 text-sm text-neutral-300 flex-wrap">
             {yearOf(show) && <span>{yearOf(show)}</span>}
             {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
+
+            {/* TMDb rating con logo local */}
             <span className="inline-flex items-center gap-1.5">
-              <TMDbIcon className="w-4 h-4" />
+              <img
+                src="/logo-TMDb.png"
+                alt="TMDb"
+                className="h-4 w-auto"
+                loading="lazy"
+                decoding="async"
+              />
               <span className="font-medium">{ratingOf(show)}</span>
             </span>
+
+            {/* IMDb rating con logo local */}
             {typeof extras?.imdbRating === 'number' && (
               <span className="inline-flex items-center gap-1.5">
-                <IMDbIcon className="w-4 h-4" />
+                <img
+                  src="/logo-IMDb.png"
+                  alt="IMDb"
+                  className="h-4 w-auto"
+                  loading="lazy"
+                  decoding="async"
+                />
                 <span className="font-medium">{extras.imdbRating.toFixed(1)}</span>
               </span>
             )}
           </div>
 
-          <h4 className="text-xl md:text-2xl font-semibold mb-2">
-            {title}
-          </h4>
+          <h4 className="text-xl md:text-2xl font-semibold mb-2">{title}</h4>
 
           {extras?.awards && (
             <div className="mt-1 text-[12px] md:text-xs text-emerald-300">
@@ -360,8 +357,7 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
 
 /* * ====================================================================
  * Componente Principal: SeriesPage
- * ====================================================================
- */
+ * ==================================================================== */
 export default function SeriesPage() {
   const [ready, setReady] = useState(false)
   const [dashboardData, setDashboardData] = useState({})
@@ -374,8 +370,7 @@ export default function SeriesPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const lang = 'es-ES' // Pedimos todo en español
-        
+        const lang = 'es-ES'
         const [
           popular,
           top_imdb,
@@ -383,17 +378,15 @@ export default function SeriesPage() {
           scifi_fantasy,
           crime,
           animation,
-          baseSections // Secciones de fetchTVSections
+          baseSections
         ] = await Promise.all([
           fetchPopularMedia({ type: 'tv', language: lang }),
-          fetchTopRatedIMDb({ type: 'tv', minVotes: 5000, language: lang, limit: 20 }), // Menos votos para series
-          
-          fetchMoviesByGenre({ type: 'tv', genreId: 18, minVotes: 1000, language: lang }), // Drama
+          fetchTopRatedIMDb({ type: 'tv', minVotes: 5000, language: lang, limit: 20 }),
+          fetchMoviesByGenre({ type: 'tv', genreId: 18, minVotes: 1000, language: lang }),    // Drama
           fetchMoviesByGenre({ type: 'tv', genreId: 10765, minVotes: 1000, language: lang }), // Sci-Fi & Fantasy
-          fetchMoviesByGenre({ type: 'tv', genreId: 80, minVotes: 1000, language: lang }),  // Crimen
-          fetchMoviesByGenre({ type: 'tv', genreId: 16, minVotes: 500, language: lang }), // Animación
-          
-          fetchTVSections ? fetchTVSections({ language: lang }) : Promise.resolve({}) // Asumiendo que esta función existe
+          fetchMoviesByGenre({ type: 'tv', genreId: 80, minVotes: 1000, language: lang }),    // Crimen
+          fetchMoviesByGenre({ type: 'tv', genreId: 16, minVotes: 500, language: lang }),     // Animación
+          fetchTVSections ? fetchTVSections({ language: lang }) : Promise.resolve({})
         ])
 
         setDashboardData({
@@ -403,7 +396,7 @@ export default function SeriesPage() {
           scifi_fantasy,
           crime,
           animation,
-          ...baseSections // Añadimos las secciones base (En emisión, etc.)
+          ...baseSections
         })
 
         setReady(true)
@@ -420,9 +413,9 @@ export default function SeriesPage() {
   }
 
   /* ---------- handlers hover ---------- */
-  const onEnter = (show, e) => { // Renombrado a 'show'
+  const onEnter = (show, e) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    setHover({ show, rect }) // Renombrado a 'show'
+    setHover({ show, rect })
   }
   const onLeave = () => {
     setTimeout(() => setHover((h) => (h?.locked ? h : null)), 80)
@@ -467,10 +460,10 @@ export default function SeriesPage() {
               onMouseEnter={(e) => onEnter(m, e)}
               onMouseLeave={onLeave}
             >
-              {/* Usamos poster_path y aspect-[2/3] para portadas VERTICALES */}
+              {/* Pósters verticales */}
               <img
                 src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
-                alt={m.name || m.title} // 'name' es principal para series
+                alt={m.name || m.title}
                 className="w-full h-full object-cover rounded-3xl aspect-[2/3] transition-transform duration-300 hover:scale-105"
                 loading="lazy"
               />
@@ -517,11 +510,11 @@ export default function SeriesPage() {
         {dashboardData.crime?.length > 0 && (
           <Row title="Series de Crimen" items={dashboardData.crime} />
         )}
-         {dashboardData.animation?.length > 0 && (
+        {dashboardData.animation?.length > 0 && (
           <Row title="Animación" items={dashboardData.animation} />
         )}
 
-        {/* Filas de 'fetchTVSections' (En emisión, etc.) */}
+        {/* Secciones adicionales (En emisión, etc.) */}
         {dashboardData['Top 10 hoy en España']?.length ? <Row title="Top 10 hoy en España" items={dashboardData['Top 10 hoy en España']} /> : null}
         {dashboardData['En Emisión']?.length ? <Row title="En Emisión" items={dashboardData['En Emisión']} /> : null}
         {dashboardData['Aclamadas por la crítica']?.length ? <Row title="Aclamadas por la crítica" items={dashboardData['Aclamadas por la crítica']} /> : null}
@@ -532,7 +525,7 @@ export default function SeriesPage() {
       <HoverPreviewPortal
         open={!!hover?.show}
         anchorRect={hover?.rect || null}
-        show={hover?.show || null} // <-- Pasamos 'show'
+        show={hover?.show || null}
         onClose={closeHover}
       />
     </div>
