@@ -1,249 +1,294 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Navigation } from 'swiper'
+import { Navigation, Autoplay } from 'swiper'
+import { AnimatePresence, motion } from 'framer-motion'
 import 'swiper/swiper-bundle.css'
 import Link from 'next/link'
-import { AnimatePresence, motion } from 'framer-motion'
 import { Anton } from 'next/font/google'
 import { Heart, HeartOff, BookmarkPlus, BookmarkMinus, Loader2 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
-// [MODIFICADO] fetchTopRatedTMDb ya no se importa
-import { fetchTopRatedIMDb } from '@/lib/api/tmdb'
 import {
-  fetchTVSections,
+  // Importamos las funciones de descubrimiento
+  fetchPopularMedia,
+  fetchTopRatedIMDb,
+  fetchMoviesByGenre, // Usamos la misma función, asumiendo que es genérica (recibe 'type')
+  fetchMediaByKeyword,
+  fetchTVSections, // Específica para series
+  // Funciones de cuenta
   getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
-  getExternalIds,
+  getDetails, // <-- [CORREGIDO] Importamos 'getDetails' en lugar de 'getTvDetails'
+  getExternalIds
 } from '@/lib/api/tmdb'
+
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
 
+/* --- Icons: IMDb + TMDb (inline SVG) --- */
+const IMDbIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 64 64" className={className} aria-label="IMDb" role="img">
+    <rect x="2" y="12" width="60" height="40" rx="6" fill="#F5C518" />
+    <path
+      d="M14 24h4v16h-4V24zm8 0h4v16h-4V24zm6 0h6c2.76 0 4 1.24 4 4v8c0 2.76-1.24 4-4 4h-6V24zm4 4v8h2c.67 0 1-.33 1-1v-6c0-.67-.33-1-1-1h-2zm12-4h4v16h-4V24z"
+      fill="#000"
+    />
+  </svg>
+)
+
+const TMDbIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 64 64" className={className} aria-label="TMDb" role="img">
+    <rect x="4" y="8" width="56" height="48" rx="10" fill="#01D277" />
+    <path
+      d="M18 24h-4v-4h12v4h-4v16h-4V24zm14-4h4l3 7 3-7h4v20h-4V28l-3 7h-2l-3-7v12h-4V20zm20 0h4v20h-4V20z"
+      fill="#001A0F"
+      opacity=".95"
+    />
+  </svg>
+)
+
 /* ---------- helpers ---------- */
-const yearOf = (m) => m?.first_air_date?.slice(0, 4) || ''
+// Modificado para priorizar 'first_air_date'
+const yearOf = (m) =>
+  m?.first_air_date?.slice(0, 4) || m?.release_date?.slice(0, 4) || ''
+
 const ratingOf = (m) =>
-  typeof m?.vote_average === 'number' && m.vote_average > 0 ? m.vote_average.toFixed(1) : '–'
+  typeof m?.vote_average === 'number' && m.vote_average > 0
+    ? m.vote_average.toFixed(1)
+    : '–'
+
 const short = (t = '', n = 420) => (t.length > n ? t.slice(0, n - 1) + '…' : t)
 
-/* ---------- IMÁGENES LOCALIZADAS: ES → EN ---------- */
-async function fetchLocalizedPair(type, id) {
-  try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&include_image_language=es-ES,es,en-US,en`
-    const r = await fetch(url, { cache: 'force-cache' })
-    const j = await r.json()
-    const all = Array.isArray(j?.backdrops) ? j.backdrops : []
-    const es = all.filter(b => b.iso_639_1 === 'es' || b.iso_639_1 === 'es-ES')
-    const en = all.filter(b => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US')
-    const pick = (arr) => {
-      const a = arr.slice().sort((A,B) => (B.vote_count||0)-(A.vote_count||0))
-      return [a[0]?.file_path || null, a[1]?.file_path || (a[0]?.file_path || null)]
-    }
-    let [card, preview] = pick(es)
-    if (!card) [card, preview] = pick(en)
-    return { card, preview }
-  } catch {
-    return { card: null, preview: null }
-  }
-}
-async function prefetchListWithLimit(list, type, cacheRef, limit = 8) {
-  const q = [...list]
-  const workers = new Array(Math.min(limit, q.length)).fill(0).map(async () => {
-    while (q.length) {
-      const item = q.shift()
-      if (!item) break
-      if (!cacheRef.current.has(item.id)) {
-        const pair = await fetchLocalizedPair(type, item.id)
-        cacheRef.current.set(item.id, pair)
-      }
-      const pair = cacheRef.current.get(item.id)
-      item._locCard = pair.card || item.backdrop_path || item.poster_path || null
-      item._locPreview = pair.preview || item._locCard
-    }
-  })
-  await Promise.all(workers)
+// Misma función, recibirá el 'episode_run_time'
+const formatRuntime = (mins) => {
+  if (!mins || typeof mins !== 'number') return null
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  if (h <= 0) return `${m} min`
+  return m ? `${h} h ${m} min` : `${h} h`
 }
 
-/* ---------- logos TMDB / IMDb ---------- */
-function ImdbIcon({ className = 'w-5 h-5' }) {
-  return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden>
-      <rect width="64" height="64" rx="8" fill="#F5C518" />
-      <path d="M12 20h6v24h-6V20zm10 0h4l3 14 3-14h4v24h-4V28l-3 16h-2l-3-16v16h-4V20zm24 0h6c4 0 6 2.3 6 6.2V38c0 3.9-2 6-6 6h-6V20zm6 20c1.6 0 2-.7 2-2.5v-9c0-1.8-.4-2.5-2-2.5h-2v14h2z" fill="#000"/>
-    </svg>
-  )
-}
-function TmdbIcon({ className = 'w-5 h-5' }) {
-  return (
-    <svg viewBox="0 0 256 256" className={className} aria-hidden>
-      <rect width="256" height="256" rx="40" fill="#01d277" />
-      <text x="50%" y="57%" textAnchor="middle" fontSize="120" fontWeight="700" fill="#003b2b" fontFamily="Arial,Helvetica,sans-serif">TM</text>
-      <text x="50%" y="82%" textAnchor="middle" fontSize="120" fontWeight="700" fill="#003b2b" fontFamily="Arial,Helvetica,sans-serif">Db</text>
-    </svg>
-  )
-}
-
-/* ---------- PREVIEW ---------- */
-function HoverPreview({ open, anchorRect, show, onClose, locCacheRef }) {
+/* ---------- Portal flotante grande (Lógica para Series) ---------- */
+function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
   const { session, account } = useAuth()
+
+  // Estados de cuenta
+  const [loadingStates, setLoadingStates] = useState(false)
   const [favorite, setFavorite] = useState(false)
   const [watchlist, setWatchlist] = useState(false)
-  const [loadingStates, setLoadingStates] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
-  const [extras, setExtras] = useState({ awards: null, imdbRating: null })
 
-  const pair = show ? (locCacheRef.current.get(show.id) || { card: show._locCard, preview: show._locPreview }) : null
-  const previewBackdrop = pair?.preview || pair?.card || null
-
-  // posición
-  const MIN_W = 520, MAX_W = 820
-  const computePos = useCallback(() => {
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 1920
-    const rect = anchorRect || { left: 0, top: 0, width: 360 }
-    const w = Math.min(MAX_W, Math.max(MIN_W, rect.width * 2.3))
-    let left = rect.left + rect.width / 2 - w / 2
-    left = Math.max(8, Math.min(left, vw - w - 8))
-    let top = rect.top - 12
-    if (top < 8) top = 8
-    return { left, top, width: w }
-  }, [anchorRect])
-  const [pos, setPos] = useState(() => computePos())
-  useEffect(() => {
-    const u = () => setPos(computePos())
-    u()
-    if (typeof window !== 'undefined') {
-      window.addEventListener('resize', u)
-      window.addEventListener('scroll', u, { passive: true })
-      return () => { window.removeEventListener('resize', u); window.removeEventListener('scroll', u) }
-    }
-  }, [computePos])
-
-  // hover grace
-  const t = useRef(null)
-  const startClose = () => { clearTimeout(t.current); t.current = setTimeout(onClose, 120) }
-  const cancelClose = () => clearTimeout(t.current)
-
-  // estados cuenta (con cache/TTL/single-flight/rate-limit)
-  const STATES_TTL = 120000
-  const statesCacheRef = useRef(new Map())
-  const inflightRef = useRef(new Map())
-  const gateRef = useRef({
-    queue: [], active: 0, MAX_ACTIVE: 1, GAP_MS: 350,
-    run() {
-      if (!this.queue.length || this.active >= this.MAX_ACTIVE) return
-      this.active++
-      const { fn, resolve, reject } = this.queue.shift()
-      fn().then(resolve).catch(reject).finally(() => {
-        this.active--; setTimeout(() => this.run(), this.GAP_MS)
-      })
-    },
-    exec(fn) { return new Promise((resolve, reject) => { this.queue.push({ fn, resolve, reject }); this.run() }) }
+  // Extras: incluye backdropPath, title y overview en español
+  const [extras, setExtras] = useState({ 
+    runtime: null, 
+    awards: null, 
+    imdbRating: null,
+    backdropPath: null,
+    title: null, // 'name' en el caso de series
+    overview: null
   })
+  const extrasCache = useRef(new Map())
 
+  // Cargar estados (fav/watchlist)
   useEffect(() => {
     let cancel = false
-    if (!open || !show || !session || !account?.id) { setFavorite(false); setWatchlist(false); return }
-    const now = Date.now()
-    const cached = statesCacheRef.current.get(show.id)
-    if (cached && now - cached.t < STATES_TTL) {
-      setFavorite(!!cached.favorite); setWatchlist(!!cached.watchlist); return
-    }
-    const delay = setTimeout(async () => {
-      if (cancel) return
+    const load = async () => {
+      if (!open || !show || !session || !account?.id) {
+        setFavorite(false); setWatchlist(false); return
+      }
       try {
         setLoadingStates(true)
-        let p = inflightRef.current.get(show.id)
-        if (!p) {
-          p = gateRef.current.exec(() => getMediaAccountStates('tv', show.id, session))
-          inflightRef.current.set(show.id, p)
-        }
-        const st = await p
-        if (cancel) return
-        const next = { favorite: !!st.favorite, watchlist: !!st.watchlist, t: Date.now() }
-        statesCacheRef.current.set(show.id, next)
-        setFavorite(next.favorite); setWatchlist(next.watchlist)
-      } catch {}
-      finally { inflightRef.current.delete(show.id); if (!cancel) setLoadingStates(false) }
-    }, 200)
-    return () => { cancel = true; clearTimeout(delay) }
+        const type = show.media_type || 'tv' // <-- TIPO 'tv'
+        const st = await getMediaAccountStates(type, show.id, session)
+        if (!cancel) { setFavorite(!!st.favorite); setWatchlist(!!st.watchlist) }
+      } catch (e) { console.error(e) } 
+      finally { if (!cancel) setLoadingStates(false) }
+    }
+    load()
+    return () => { cancel = true }
   }, [open, show, session, account])
 
-  // extras
-  const extrasCache = useRef(new Map())
+  // Cargar extras (runtime, premios, E imágenes/texto en 'es')
   useEffect(() => {
     let abort = false
-    const run = async () => {
-      if (!open || !show) return
+    const loadExtras = async () => {
+      if (!open || !show) {
+        setExtras({ runtime: null, awards: null, imdbRating: null, backdropPath: null, title: null, overview: null })
+        return
+      }
+
       const cached = extrasCache.current.get(show.id)
       if (cached) { setExtras(cached); return }
-      let awards = null, imdbRating = null
+
       try {
-        const ext = await getExternalIds('tv', show.id)
-        const imdb = ext?.imdb_id || null
-        if (imdb) {
-          const omdb = await fetchOmdbByImdb(imdb)
-          const raw = omdb?.Awards
-          if (raw && typeof raw === 'string' && raw.trim()) awards = raw.trim()
-          if (omdb?.imdbRating && omdb.imdbRating !== 'N/A') imdbRating = Number(omdb.imdbRating)
+        let runtime = null
+        let bestBackdrop = null
+        let esTitle = null
+        let esOverview = null
+        
+        try {
+          // [CORREGIDO] Usamos getDetails('tv', ...)
+          const details = await getDetails('tv', show.id, {
+            language: 'es-ES',
+            append_to_response: 'images',
+            include_image_language: 'es,en,null'
+          })
+          
+          runtime = details?.episode_run_time?.[0] ?? null
+          esTitle = details?.name || null
+          esOverview = details?.overview || null
+          
+          const esBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'es');
+          const enBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'en');
+          const defaultBackdrop = details?.images?.backdrops?.[0];
+          bestBackdrop = esBackdrop?.file_path || enBackdrop?.file_path || defaultBackdrop?.file_path || null;
+
+        } catch (e) { console.error("Error fetching details/images:", e) }
+
+        let awards = null
+        let imdbRating = null
+        try {
+          let imdb = show?.imdb_id
+          if (!imdb) {
+            const ext = await getExternalIds('tv', show.id)
+            imdb = ext?.imdb_id || null
+          }
+          if (imdb) {
+            const omdb = await fetchOmdbByImdb(imdb)
+            const rawAwards = omdb?.Awards
+            if (rawAwards && typeof rawAwards === 'string' && rawAwards.trim()) {
+              awards = rawAwards.trim()
+            }
+            const r = omdb?.imdbRating
+            if (r && !Number.isNaN(Number(r))) {
+              imdbRating = Number(r)
+            }
+          }
+        } catch (e) { console.error("Error fetching OMDb:", e) }
+
+        const next = { runtime, awards, imdbRating, backdropPath: bestBackdrop, title: esTitle, overview: esOverview }
+        if (!abort) {
+          extrasCache.current.set(show.id, next)
+          setExtras(next)
         }
-      } catch {}
-      const next = { awards, imdbRating }
-      extrasCache.current.set(show.id, next)
-      if (!abort) setExtras(next)
+      } catch (e) {
+        if (!abort) setExtras({ runtime: null, awards: null, imdbRating: null, backdropPath: null, title: null, overview: null })
+      }
     }
-    run()
+    loadExtras()
     return () => { abort = true }
   }, [open, show])
 
-  const requireLogin = () => { if (!session || !account?.id) { window.location.href = '/login'; return true } return false }
-  const toggleFav = async () => {
+  // Layout/posición del panel
+  const MIN_W = 420, MAX_W = 750
+  const calc = useCallback(() => {
+    if (!anchorRect) return { left: 0, top: 0, width: MIN_W }
+    const vw = window.innerWidth
+    const w = Math.min(MAX_W, Math.max(MIN_W, anchorRect.width * 2.6))
+    let left = anchorRect.left + anchorRect.width / 2 - w / 2
+    left = Math.max(8, Math.min(left, vw - w - 8))
+    let top = anchorRect.top - 24
+    if (top < 8) top = 8
+    return { left, top, width: w }
+  }, [anchorRect])
+
+  const [pos, setPos] = useState(() => calc())
+
+  useEffect(() => {
+    if (!open) return
+    const update = () => setPos(calc())
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, { passive: true })
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update)
+    }
+  }, [open, calc])
+
+  // Hover grace period
+  const leaveTimer = useRef(null)
+  const startClose = () => {
+    clearTimeout(leaveTimer.current)
+    leaveTimer.current = setTimeout(onClose, 120)
+  }
+  const cancelClose = () => clearTimeout(leaveTimer.current)
+
+  // Handlers de botones
+  const requireLogin = () => {
+    if (!session || !account?.id) {
+      window.location.href = '/login'
+      return true
+    }
+    return false
+  }
+  const handleToggleFavorite = async () => {
     if (requireLogin() || updating || !show) return
     try {
       setUpdating(true); setError('')
       const next = !favorite; setFavorite(next)
-      await markAsFavorite({ accountId: account.id, sessionId: session, type: 'tv', mediaId: show.id, favorite: next })
-    } catch { setFavorite(v => !v); setError('No se pudo actualizar favoritos.') }
-    finally { setUpdating(false) }
+      await markAsFavorite({
+        accountId: account.id, sessionId: session,
+        type: show.media_type || 'tv', mediaId: show.id, favorite: next
+      })
+    } catch (e) {
+      console.error(e); setFavorite((v) => !v); setError('No se pudo actualizar favoritos.')
+    } finally { setUpdating(false) }
   }
-  const toggleWatch = async () => {
+  const handleToggleWatchlist = async () => {
     if (requireLogin() || updating || !show) return
     try {
       setUpdating(true); setError('')
       const next = !watchlist; setWatchlist(next)
-      await markInWatchlist({ accountId: account.id, sessionId: session, type: 'tv', mediaId: show.id, watchlist: next })
-    } catch { setWatchlist(v => !v); setError('No se pudo actualizar pendientes.') }
-    finally { setUpdating(false) }
+      await markInWatchlist({
+        accountId: account.id, sessionId: session,
+        type: show.media_type || 'tv', mediaId: show.id, watchlist: next
+      })
+    } catch (e) {
+      console.error(e); setWatchlist((v) => !v); setError('No se pudo actualizar pendientes.')
+    } finally { setUpdating(false) }
   }
 
-  const href = show ? `/details/tv/${show.id}` : '#'
-  if (!open || !show || !anchorRect || !previewBackdrop) return null
+
+  if (!open || !show || !anchorRect) return null
+
+  // Prioriza el backdrop, título y overview en español desde 'extras'
+  const backdrop = extras.backdropPath || show.backdrop_path || show.poster_path
+  const title = extras.title || show.name // 'name' para series
+  const overview = extras.overview || show.overview
+  const href = `/details/tv/${show.id}`
 
   return (
     <AnimatePresence>
       <motion.div
         key={show.id}
-        initial={{ opacity: 0, scale: 0.92, y: 14 }}
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.92, y: 14 }}
-        transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
         onMouseEnter={cancelClose}
         onMouseLeave={startClose}
-        style={{ position: 'fixed', left: pos.left, top: pos.top, width: pos.width, zIndex: 80, pointerEvents: 'auto' }}
+        style={{
+          position: 'fixed',
+          left: pos.left,
+          top: pos.top,
+          width: pos.width,
+          zIndex: 80,
+          pointerEvents: 'auto'
+        }}
         className="rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
       >
-        <Link href={href} className="block relative">
+        <Link href={href} className="block relative group/preview">
           <img
-            src={`https://image.tmdb.org/t/p/w1280${previewBackdrop}`}
-            srcSet={`https://image.tmdb.org/t/p/w780${previewBackdrop} 780w, https://image.tmdb.org/t/p/w1280${previewBackdrop} 1280w`}
-            sizes="(min-width:1536px) 820px, (min-width:1280px) 760px, (min-width:1024px) 660px, 90vw"
-            alt={show.name}
+            src={`https://image.tmdb.org/t/p/w1280${backdrop}`}
+            alt={title}
             className="w-full object-cover aspect-video"
             loading="lazy"
-            decoding="async"
           />
           <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-[#0b0b0b] to-transparent" />
         </Link>
@@ -251,19 +296,32 @@ function HoverPreview({ open, anchorRect, show, onClose, locCacheRef }) {
         <div className="p-4 md:p-5 pt-3">
           <div className="mb-1 flex items-center gap-3 text-sm text-neutral-300 flex-wrap">
             {yearOf(show) && <span>{yearOf(show)}</span>}
-            <span className="flex items-center gap-1"><TmdbIcon className="w-5 h-5"/>{ratingOf(show)}</span>
-            {typeof extras.imdbRating === 'number' && (
-              <span className="flex items-center gap-1"><ImdbIcon className="w-5 h-5"/>{extras.imdbRating.toFixed(1)}</span>
+            {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
+            <span className="inline-flex items-center gap-1.5">
+              <TMDbIcon className="w-4 h-4" />
+              <span className="font-medium">{ratingOf(show)}</span>
+            </span>
+            {typeof extras?.imdbRating === 'number' && (
+              <span className="inline-flex items-center gap-1.5">
+                <IMDbIcon className="w-4 h-4" />
+                <span className="font-medium">{extras.imdbRating.toFixed(1)}</span>
+              </span>
             )}
           </div>
 
-          <h4 className="text-lg md:text-xl font-semibold mb-1">{show.name}</h4>
+          <h4 className="text-xl md:text-2xl font-semibold mb-2">
+            {title}
+          </h4>
 
-          {extras.awards && <div className="mt-1 text-[12px] md:text-xs text-emerald-300">{extras.awards}</div>}
+          {extras?.awards && (
+            <div className="mt-1 text-[12px] md:text-xs text-emerald-300">
+              {extras.awards}
+            </div>
+          )}
 
-          {show.overview && (
-            <p className="mt-2 text-sm md:text-[15px] text-neutral-200 leading-relaxed line-clamp-3">
-              {short(show.overview)}
+          {overview && (
+            <p className="mt-2 text-sm md:text-base text-neutral-200 leading-relaxed line-clamp-3">
+              {short(overview)}
             </p>
           )}
 
@@ -273,10 +331,9 @@ function HoverPreview({ open, anchorRect, show, onClose, locCacheRef }) {
                 Ver detalles
               </button>
             </Link>
-
             <div className="flex-grow flex justify-end gap-2">
               <button
-                onClick={toggleFav}
+                onClick={handleToggleFavorite}
                 disabled={loadingStates || updating}
                 title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                 className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
@@ -284,7 +341,7 @@ function HoverPreview({ open, anchorRect, show, onClose, locCacheRef }) {
                 {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : favorite ? <HeartOff className="w-5 h-5" /> : <Heart className="w-5 h-5" />}
               </button>
               <button
-                onClick={toggleWatch}
+                onClick={handleToggleWatchlist}
                 disabled={loadingStates || updating}
                 title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
                 className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
@@ -301,152 +358,134 @@ function HoverPreview({ open, anchorRect, show, onClose, locCacheRef }) {
   )
 }
 
-/* ---------- Tarjeta (usa _locCard) ---------- */
-function ShowCard({ show, onEnter, onLeave }) {
-  const img = show._locCard
-  const imdbBadge = show?._imdb?.rating
-
-  return (
-    <div
-      className="relative rounded-3xl overflow-hidden cursor-pointer"
-      onMouseEnter={(e) => onEnter(show, e.currentTarget)}
-      onMouseLeave={onLeave}
-    >
-      {img ? (
-        <img
-          src={`https://image.tmdb.org/t/p/w780${img}`}
-          srcSet={`https://image.tmdb.org/t/p/w780${img} 780w, https://image.tmdb.org/t/p/w1280${img} 1280w`}
-          sizes="(min-width:1536px) 600px, (min-width:1280px) 520px, (min-width:1024px) 440px, (min-width:768px) 360px, 88vw"
-          alt={show.name}
-          className="w-full aspect-video object-cover transition-transform duration-200 hover:scale-[1.03]"
-          loading="lazy"
-          decoding="async"
-        />
-      ) : (
-        <div className="w-full aspect-video bg-neutral-800 flex items-center justify-center">
-          <span className="text-neutral-300 text-xs px-2 text-center">{show.name}</span>
-        </div>
-      )}
-      {imdbBadge && (
-        <span className="absolute top-2 left-2 bg-[#F5C518] text-black text-xs font-bold px-2 py-0.5 rounded">
-          IMDb {Number(imdbBadge).toFixed(1)}
-        </span>
-      )}
-    </div>
-  )
-}
-
-/* ---------- Página ---------- */
-export default function SeriesPage() {
-  const [sections, setSections] = useState({})
+/* * ====================================================================
+ * Componente Principal: SeriesPage
+ * ====================================================================
+ */
+export default function SeriesPage({ sessionId = null }) {
   const [ready, setReady] = useState(false)
+  const [dashboardData, setDashboardData] = useState({})
+  const [hover, setHover] = useState(null) // { show, rect }
 
-  // Hover controlado
-  const [hoverId, setHoverId] = useState(null)
-  const hoverShowRef = useRef(null)
-  const anchorRectRef = useRef(null)
+  const prevRef = useRef(null)
+  const nextRef = useRef(null)
 
-  // Caché de imágenes localizadas
-  const locCacheRef = useRef(new Map())
-
-  // timers
-  const openTimer = useRef(null)
-  const closeTimer = useRef(null)
-  const clearOpen = () => openTimer.current && clearTimeout(openTimer.current)
-  const clearClose = () => closeTimer.current && clearTimeout(closeTimer.current)
-
-  const pageRand = useMemo(() => Math.max(1, Math.floor(Math.random() * 10) + 1), [])
-
+  // Carga de datos para la página de series
   useEffect(() => {
-    let alive = true
-    ;(async () => {
+    const loadData = async () => {
       try {
-        // [MODIFICADO] 1) Traemos datos base, quitamos tmdbTop
-        const [base, imdbTop] = await Promise.all([
-          fetchTVSections({ pageRand }),
-          // fetchTopRatedTMDb({ type: 'tv', minVotes: 500, page: 1 }), // <-- ELIMINADO
-          fetchTopRatedIMDb({ type: 'tv', pages: 3, limit: 20, minVotes: 10000 }),
+        const lang = 'es-ES' // Pedimos todo en español
+        
+        const [
+          popular,
+          top_imdb,
+          drama,
+          scifi_fantasy,
+          crime,
+          animation,
+          baseSections // Secciones de fetchTVSections
+        ] = await Promise.all([
+          fetchPopularMedia({ type: 'tv', language: lang }),
+          fetchTopRatedIMDb({ type: 'tv', minVotes: 5000, language: lang, limit: 20 }), // Menos votos para series
+          
+          fetchMoviesByGenre({ type: 'tv', genreId: 18, minVotes: 1000, language: lang }), // Drama
+          fetchMoviesByGenre({ type: 'tv', genreId: 10765, minVotes: 1000, language: lang }), // Sci-Fi & Fantasy
+          fetchMoviesByGenre({ type: 'tv', genreId: 80, minVotes: 1000, language: lang }),  // Crimen
+          fetchMoviesByGenre({ type: 'tv', genreId: 16, minVotes: 500, language: lang }), // Animación
+          
+          fetchTVSections ? fetchTVSections({ language: lang }) : Promise.resolve({}) // Asumiendo que esta función existe
         ])
-        if (!alive) return
 
-        // [MODIFICADO] 2) Prefetch imágenes localizadas
-        const tmp = {
-          // 'Más votadas (TMDb)': tmdbTop || [], // <-- ELIMINADO
-          'Más votadas (IMDb)': imdbTop || [],
-          ...(base || {}),
-        }
+        setDashboardData({
+          popular,
+          top_imdb,
+          drama,
+          scifi_fantasy,
+          crime,
+          animation,
+          ...baseSections // Añadimos las secciones base (En emisión, etc.)
+        })
 
-        const allLists = Object.values(tmp).filter(Array.isArray)
-        for (const list of allLists) {
-          await prefetchListWithLimit(list, 'tv', locCacheRef, 8)
-        }
-
-        setSections(tmp)
         setReady(true)
-      } catch (e) {
-        console.error(e)
+      } catch (err) {
+        console.error('Error cargando la página de series:', err)
       }
-    })()
-    return () => { alive = false; clearOpen(); clearClose() }
-  }, [pageRand])
+    }
 
-  const handleEnterCard = useCallback((show, el) => {
-    clearClose()
-    if (!el || typeof el.getBoundingClientRect !== 'function') return
-    const rect = el.getBoundingClientRect()
-    if (hoverId === show.id) return
-    clearOpen()
-    openTimer.current = setTimeout(() => {
-      anchorRectRef.current = rect
-      hoverShowRef.current = show
-      setHoverId(show.id)
-    }, 120)
-  }, [hoverId])
-
-  const handleLeaveCard = useCallback(() => {
-    clearOpen()
-    clearClose()
-    closeTimer.current = setTimeout(() => {
-      setHoverId(null)
-      hoverShowRef.current = null
-      anchorRectRef.current = null
-    }, 120)
+    loadData()
   }, [])
 
-  const closePreviewNow = useCallback(() => {
-    clearOpen(); clearClose()
-    setHoverId(null)
-    hoverShowRef.current = null
-    anchorRectRef.current = null
-  }, [])
+  if (!ready) {
+    return <div className="h-screen bg-black" />
+  }
 
-  if (!ready) return null
+  /* ---------- handlers hover ---------- */
+  const onEnter = (show, e) => { // Renombrado a 'show'
+    const rect = e.currentTarget.getBoundingClientRect()
+    setHover({ show, rect }) // Renombrado a 'show'
+  }
+  const onLeave = () => {
+    setTimeout(() => setHover((h) => (h?.locked ? h : null)), 80)
+  }
+  const closeHover = () => setHover(null)
 
+  /* ---------- Sección reusable (cada fila) ---------- */
   const Row = ({ title, items }) => (
-    <div className="relative group mb-10">
-      <h2 className={`mb-4 text-2xl sm:text-3xl font-[730] bg-gradient-to-b from-blue-600 via-blue-400 to-white bg-clip-text text-transparent uppercase tracking-widest ${anton.className}`}>
-        {title}
-      </h2>
+    <div className="relative group">
+      <h3 className="text-2xl sm:text-3xl md:text-4xl font-[730] text-primary-text mb-4 sm:text-left">
+        <span
+          className={`bg-gradient-to-b from-blue-600 via-blue-400 to-white bg-clip-text text-transparent tracking-widest uppercase ${anton.className}`}
+        >
+          {title}
+        </span>
+      </h3>
 
       <Swiper
-        spaceBetween={18}
-        slidesPerView={6.2}
-        navigation
-        modules={[Navigation]}
-        breakpoints={{
-          0: { slidesPerView: 1.3, spaceBetween: 10 },
-          480: { slidesPerView: 2.1, spaceBetween: 12 },
-          768: { slidesPerView: 3.5, spaceBetween: 14 },
-          1024: { slidesPerView: 5, spaceBetween: 16 },
-          1280: { slidesPerView: 6.2, spaceBetween: 18 },
+        spaceBetween={20}
+        slidesPerView={10}
+        navigation={{ prevEl: prevRef.current, nextEl: nextRef.current }}
+        onInit={(swiper) => {
+          swiper.params.navigation.prevEl = prevRef.current
+          swiper.params.navigation.nextEl = nextRef.current
+          swiper.navigation.init()
+          swiper.navigation.update()
         }}
-        className="group"
+        modules={[Navigation]}
+        className="group relative"
+        breakpoints={{
+          0: { slidesPerView: 3, spaceBetween: 12 },
+          480: { slidesPerView: 4, spaceBetween: 14 },
+          768: { slidesPerView: 6, spaceBetween: 16 },
+          1024: { slidesPerView: 8, spaceBetween: 18 },
+          1280: { slidesPerView: 10, spaceBetween: 20 }
+        }}
       >
         {items?.map((m) => (
-          <SwiperSlide key={`${title}-${m.id}`}>
-            <ShowCard show={m} onEnter={handleEnterCard} onLeave={handleLeaveCard} />
+          <SwiperSlide key={m.id}>
+            <div
+              className="relative cursor-pointer overflow-hidden rounded-3xl"
+              onMouseEnter={(e) => onEnter(m, e)}
+              onMouseLeave={onLeave}
+            >
+              {/* Usamos poster_path y aspect-[2/3] para portadas VERTICALES */}
+              <img
+                src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
+                alt={m.name || m.title} // 'name' es principal para series
+                className="w-full h-full object-cover rounded-3xl aspect-[2/3] transition-transform duration-300 hover:scale-105"
+                loading="lazy"
+              />
+            </div>
           </SwiperSlide>
         ))}
+
+        <div
+          ref={prevRef}
+          className="swiper-button-prev !text-white !w-8 !h-8 !flex !items-center !justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        />
+        <div
+          ref={nextRef}
+          className="swiper-button-next !text-white !w-8 !h-8 !flex !items-center !justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        />
       </Swiper>
     </div>
   )
@@ -460,27 +499,41 @@ export default function SeriesPage() {
   )
 
   return (
-    <div className="px-6 md:px-8 py-6 text-white bg-black">
-      {/* [MODIFICADO] Se eliminan TMDb y 'Más votadas', se renombra IMDb */}
-      {/* {sections['Más votadas (TMDb)']?.length ? <Row title="Más votadas (TMDb)" items={sections['Más votadas (TMDb)']} /> : null} */}
-      {sections['Más votadas (IMDb)']?.length ? <Row title="Más votadas" items={sections['Más votadas (IMDb)']} /> : null}
-      {/* {sections['Más votadas']?.length ? <Row title="Más votadas" items={sections['Más votadas']} /> : null} */}
-      
-      {sections['Década de 1990']?.length ? <Row title="Década de 1990" items={sections['Década de 1990']} /> : null}
-      {sections['Década de 2000']?.length ? <Row title="Década de 2000" items={sections['Década de 2000']} /> : null}
-      {sections['Década de 2010']?.length ? <Row title="Década de 2010" items={sections['Década de 2010']} /> : null}
-      {sections['Década de 2020']?.length ? <Row title="Década de 2020" items={sections['Década de 2020']} /> : null}
-      {sections['Premiadas']?.length ? <Row title="Premiadas" items={sections['Premiadas']} /> : null}
-      {sections['Top 10 hoy en España']?.length ? <Row title="Top 10 hoy en España" items={sections['Top 10 hoy en España']} /> : null}
-      {sections['Superéxito']?.length ? <Row title="Series de superéxito" items={sections['Superéxito']} /> : null}
-      <GenreRows groups={sections['Por género']} />
+    <div className="px-8 py-2 text-white bg-black">
+      <div className="space-y-12 pt-10">
+        {/* Filas de la página de series */}
+        {dashboardData.popular?.length > 0 && (
+          <Row title="Populares" items={dashboardData.popular} />
+        )}
+        {dashboardData.top_imdb?.length > 0 && (
+          <Row title="Más Votadas" items={dashboardData.top_imdb} />
+        )}
+        {dashboardData.drama?.length > 0 && (
+          <Row title="Dramas Populares" items={dashboardData.drama} />
+        )}
+        {dashboardData.scifi_fantasy?.length > 0 && (
+          <Row title="Sci-Fi y Fantasía" items={dashboardData.scifi_fantasy} />
+        )}
+        {dashboardData.crime?.length > 0 && (
+          <Row title="Series de Crimen" items={dashboardData.crime} />
+        )}
+         {dashboardData.animation?.length > 0 && (
+          <Row title="Animación" items={dashboardData.animation} />
+        )}
 
-      <HoverPreview
-        open={!!hoverId && !!hoverShowRef.current}
-        anchorRect={anchorRectRef.current}
-        show={hoverShowRef.current}
-        onClose={closePreviewNow}
-        locCacheRef={locCacheRef}
+        {/* Filas de 'fetchTVSections' (En emisión, etc.) */}
+        {dashboardData['Top 10 hoy en España']?.length ? <Row title="Top 10 hoy en España" items={dashboardData['Top 10 hoy en España']} /> : null}
+        {dashboardData['En Emisión']?.length ? <Row title="En Emisión" items={dashboardData['En Emisión']} /> : null}
+        {dashboardData['Aclamadas por la crítica']?.length ? <Row title="Aclamadas por la crítica" items={dashboardData['Aclamadas por la crítica']} /> : null}
+        <GenreRows groups={dashboardData['Por género']} />
+      </div>
+
+      {/* Panel flotante */}
+      <HoverPreviewPortal
+        open={!!hover?.show}
+        anchorRect={hover?.rect || null}
+        show={hover?.show || null} // <-- Pasamos 'show'
+        onClose={closeHover}
       />
     </div>
   )

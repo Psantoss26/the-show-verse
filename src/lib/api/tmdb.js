@@ -409,6 +409,58 @@ export async function fetchTopRatedIMDb({ type = 'movie', pages = 3, limit = 20,
   return json.items || []
 }
 
+/**
+ * Obtiene las películas o series más populares del momento.
+ */
+export const fetchPopularMedia = async ({ type = 'movie', language = 'es-ES' }) => {
+  try {
+    const data = await tmdb(`${type}/popular`, { language, page: 1 });
+    return data?.results || [];
+  } catch (error) {
+    console.error(`Error fetching popular ${type}:`, error);
+    return [];
+  }
+};
+
+/**
+ * Obtiene medios por ID de género, ordenados por popularidad y con un mínimo de votos.
+ * ¡ESTA ES LA FUNCIÓN QUE TE FALTA!
+ */
+export const fetchMediaByGenre = async ({ type = 'movie', language = 'es-ES', genreId, minVotes = 1000 }) => {
+  try {
+    const data = await tmdb(`discover/${type}`, {
+      language,
+      sort_by: 'popularity.desc',
+      'vote_count.gte': minVotes,
+      with_genres: genreId,
+      page: 1,
+    });
+    return data?.results || [];
+  } catch (error) {
+    console.error(`Error fetching media by genre ${genreId}:`, error);
+    return [];
+  }
+};
+
+/**
+ * Obtiene medios por ID de keyword (ej. "superhéroe", "venganza", "viaje en el tiempo").
+ */
+export const fetchMediaByKeyword = async ({ type = 'movie', language = 'es-ES', keywordId, minVotes = 500 }) => {
+  try {
+    const data = await tmdb(`discover/${type}`, {
+      language,
+      sort_by: 'popularity.desc',
+      'vote_count.gte': minVotes,
+      with_keywords: keywordId,
+      page: 1,
+    });
+    return data?.results || [];
+  } catch (error) {
+    console.error(`Error fetching media by keyword ${keywordId}:`, error);
+    return [];
+  }
+};
+
 /* -------------------- Descubrimiento genérico -------------------- */
 export async function discoverMovies(params = {}) {
   const data = await tmdb('/discover/movie', params)
