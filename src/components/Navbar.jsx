@@ -9,8 +9,8 @@ import {
   Heart,
   Bookmark,
   Search as SearchIcon,
-  HomeIcon,
-  XIcon,
+  HomeIcon, // Añadido para la barra móvil
+  XIcon, // Añadido para cerrar la búsqueda móvil
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -53,6 +53,7 @@ function SearchBar({ onResultClick }) {
           `https://api.themoviedb.org/3/search/multi?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(query)}`
         )
         const data = await res.json()
+        // Filtrar personas con 'known_for_department' "Acting" para más relevancia
         const filteredResults = (data.results || []).filter(
           item => item.media_type !== 'person' || item.known_for_department === 'Acting'
         );
@@ -61,7 +62,7 @@ function SearchBar({ onResultClick }) {
       } catch (err) {
         console.error('Error buscando en TMDb:', err)
       }
-    }, 300)
+    }, 300) // 300ms de debounce
 
     return () => clearTimeout(searchTimer)
   }, [query])
@@ -70,7 +71,7 @@ function SearchBar({ onResultClick }) {
     setShowDropdown(false)
     setQuery('')
     setResults([])
-    if (onResultClick) onResultClick()
+    if (onResultClick) onResultClick() // Llama a la función del padre (para cerrar el overlay móvil)
   }
 
   return (
@@ -106,7 +107,7 @@ function SearchBar({ onResultClick }) {
                   src={
                     item.poster_path || item.profile_path
                       ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
-                      : '/default-poster.png'
+                      : '/default-poster.png' // Asegúrate de tener esta imagen en tu carpeta /public
                   }
                   alt={item.title || item.name || 'Resultado'}
                   className="w-12 h-16 rounded-md shadow-md object-cover"
@@ -159,12 +160,12 @@ export default function Navbar() {
         : 'text-neutral-400 hover:text-white hover:bg-white/5'
     }`
   
-  // Links de navegación superior (Móvil)
+  // [MODIFICADO] Links de navegación superior (Móvil)
   const navLinkClassMobileTop = (href) =>
-    `pb-2 text-base font-medium transition-colors ${
+    `text-base font-medium transition-colors ${
       isActive(href)
-        ? 'text-white border-b-2 border-white'
-        : 'text-neutral-400 hover:text-white'
+        ? 'text-white' // Activo
+        : 'text-neutral-400 hover:text-white' // Inactivo
     }`
 
   // Links de la barra inferior (Móvil)
@@ -193,7 +194,7 @@ export default function Navbar() {
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
           
           {/* 1. IZQUIERDA (Desktop) */}
-          <div className="flex items-center gap-6 flex-shrink-0 -ml-4"> 
+          <div className="flex items-center gap-6 flex-shrink-0 pl-6 -ml-10"> 
             <Link href="/" className="block h-12 overflow-hidden flex-shrink-0">
               <div className="h-full w-[170px] flex items-center justify-center overflow-hidden">
                 <img
@@ -212,7 +213,7 @@ export default function Navbar() {
           </div>
                     
           {/* 3. DERECHA (Desktop) */}
-          <div className="flex items-center gap-2 flex-shrink-0 pr-10"> 
+          <div className="flex items-center gap-2 flex-shrink-0 pr-12"> 
             <div className="flex items-center gap-2">
               <Link href="/news" className={iconLinkClass('/news')} title="Noticias">
                 <NewspaperIcon className="w-5 h-5" />
@@ -252,13 +253,13 @@ export default function Navbar() {
         </div>
 
         {/* --- LAYOUT MÓVIL (lg:hidden) --- */}
-        {/* [MODIFICADO] Aumentado px-4 para dar más aire en los extremos */}
-        <div className="lg:hidden flex flex-col px-10 pt-3 pb-2">
-          {/* Fila 1: Logo, Búsqueda, Perfil */}
-          <div className="flex items-center justify-between gap-2 h-10">
-            {/* Izquierda: Logo */}
-            {/* [MODIFICADO] Eliminado flex-shrink-0 del Link y ajustado el padding del div contenedor */}
-            <Link href="/" className="block h-10 overflow-hidden -ml-16">
+        {/* [MODIFICADO] Reestructurado para un centrado absoluto */}
+        <div className="lg:hidden relative flex items-center justify-between h-16"> {/* h-16 = 64px */}
+          
+          {/* 1. IZQUIERDA (Móvil): Logo */}
+          {/* [MODIFICADO] pl-2 para compensar espacio visual del logo. Quitamos -ml-2 */}
+          <div className="flex-shrink-0 pl-2">
+            <Link href="/" className="block h-10 overflow-hidden -ml-6">
               <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
                 <img
                   src="/TheShowVerse2.png"
@@ -267,43 +268,47 @@ export default function Navbar() {
                 />
               </div>
             </Link>
-            
-            {/* Derecha: Búsqueda y Perfil */}
-            {/* [MODIFICADO] Ajustado el gap entre los iconos */}
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setShowMobileSearch(true)} 
-                className={`p-2 rounded-full transition-colors text-neutral-400 hover:text-white hover:bg-white/5`}
-                title="Buscar"
-              >
-                <SearchIcon className="w-6 h-6" />
-              </button>
-              
-              {!account ? (
-                <Link
-                  href="/login"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
-                >
-                  Acceder
-                </Link>
-              ) : (
-                <UserAvatar account={account} />
-              )}
-            </div>
           </div>
-          
-          {/* Fila 2: Links de Navegación */}
-          {/* [MODIFICADO] Justify-around para distribuir los links, y px-0 porque ya hay padding en el padre */}
-          <div className="w-full flex items-center justify-around gap-6 text-neutral-400 mt-3 px-0"> 
-            <Link href="/" className={navLinkClassMobileTop('/')}>Inicio</Link>
+
+          {/* 2. CENTRO (Móvil - Absoluto) */}
+          {/* [MODIFICADO] Posicionado absoluto para centrado perfecto */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-5 -ml-1">
             <Link href="/movies" className={navLinkClassMobileTop('/movies')}>Películas</Link>
             <Link href="/series" className={navLinkClassMobileTop('/series')}>Series</Link>
+          </div>
+
+          {/* 3. DERECHA (Móvil): Búsqueda y Perfil */}
+          {/* [MODIFICADO] pr-4 para dar más aire. gap-2 para separar iconos */}
+          <div className="flex items-center gap-2 flex-shrink-0 pr-10">
+            <button 
+              onClick={() => setShowMobileSearch(true)} 
+              className={`p-2 rounded-full transition-colors text-neutral-400 hover:text-white hover:bg-white/5`}
+              title="Buscar"
+            >
+              <SearchIcon className="w-6 h-6" />
+            </button>
+            
+            {!account ? (
+              <Link
+                href="/login"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
+              >
+                Acceder
+              </Link>
+            ) : (
+              <UserAvatar account={account} />
+            )}
           </div>
         </div>
       </nav>
 
       {/* --- BARRA DE NAVEGACIÓN INFERIOR (MÓVIL) --- */}
+      {/* [MODIFICADO] Se añade "Inicio" aquí */}
       <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black border-t border-neutral-800 flex justify-around items-center">
+        <Link href="/" className={navLinkClassMobileBottom('/')}>
+          <HomeIcon className="w-6 h-6" />
+          <span className="text-xs">Inicio</span>
+        </Link>
         <Link href="/news" className={navLinkClassMobileBottom('/news')}>
           <NewspaperIcon className="w-6 h-6" />
           <span className="text-xs">Noticias</span>
