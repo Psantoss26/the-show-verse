@@ -403,7 +403,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose, onCancelClose })
  * Componente Principal: MoviesPage
  * ====================================================================
  */
-export default function MoviesPage({ sessionId = null }) {
+export default function MoviesPage() {
   const [ready, setReady] = useState(false)
   const [dashboardData, setDashboardData] = useState({})
   
