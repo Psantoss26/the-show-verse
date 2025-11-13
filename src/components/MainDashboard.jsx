@@ -1,4 +1,3 @@
-// src/app/MainDashboard.jsx
 'use client'
 
 import { useRef, useEffect, useState, useCallback } from 'react'
@@ -35,6 +34,17 @@ import {
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
+
+/* --- [NUEVO] Hook para detectar dispositivo táctil --- */
+const useIsTouchDevice = () => {
+  const [isTouch, setIsTouch] = useState(false)
+  useEffect(() => {
+    // Se ejecuta solo en el cliente
+    const onTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    setIsTouch(onTouch)
+  }, [])
+  return isTouch
+}
 
 /* ---------- helpers ---------- */
 const yearOf = (m) =>
@@ -111,26 +121,33 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
         setExtras(cached)
         return
       }
+      
+      // [SOLUCIÓN PARPADEO] Mostrar datos base inmediatamente
+      setExtras({
+        runtime: null,
+        awards: null,
+        imdbRating: null
+      })
 
       try {
         // 1) Runtime desde TMDB
         let runtime = null
         try {
-          const details = await getMovieDetails(movie.id) // { runtime, ... }
+          const details = await getMovieDetails(movie.id)
           runtime = details?.runtime ?? null
         } catch {}
 
-        // 2) Premios/Nominaciones + rating IMDb desde OMDb usando imdb_id
+        // 2) Premios/Nominaciones + rating IMDb desde OMDb
         let awards = null
         let imdbRating = null
         try {
           let imdb = movie?.imdb_id
           if (!imdb) {
-            const ext = await getExternalIds('movie', movie.id) // { imdb_id, ... }
+            const ext = await getExternalIds('movie', movie.id)
             imdb = ext?.imdb_id || null
           }
           if (imdb) {
-            const omdb = await fetchOmdbByImdb(imdb) // vía /api/omdb
+            const omdb = await fetchOmdbByImdb(imdb)
             const rawAwards = omdb?.Awards
             if (rawAwards && typeof rawAwards === 'string' && rawAwards.trim()) {
               awards = rawAwards.trim()
@@ -255,7 +272,6 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     <AnimatePresence>
       <motion.div
         key={movie.id}
-        // Animación elástica (rápida y suave)
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -270,7 +286,8 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
           zIndex: 80,
           pointerEvents: 'auto'
         }}
-        className="rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+        // [MODIFICADO] Oculto en móvil (lg:block)
+        className="hidden lg:block rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
       >
         {/* Imagen horizontal */}
         <Link href={href} className="block relative group/preview">
@@ -386,7 +403,8 @@ export default function MainDashboard({ sessionId = null }) {
   const [ready, setReady] = useState(false)
   const [dashboardData, setDashboardData] = useState({})
   const [hover, setHover] = useState(null) // { movie, rect }
-
+  const isTouchDevice = useIsTouchDevice() // <-- [NUEVO] Hook
+ 
   const prevRef = useRef(null)
   const nextRef = useRef(null)
 
@@ -450,12 +468,14 @@ export default function MainDashboard({ sessionId = null }) {
 
   if (!ready) return null
 
-  /* ---------- handlers hover ---------- */
+  /* ---------- [MODIFICADO] handlers hover ---------- */
   const onEnter = (movie, e) => {
-    const rect = e.currentTarget.getBoundingClientRect()
+    if (isTouchDevice) return // No hacer nada en móvil
+    const rect = e.currentTarget.getBoundingClientRect() // <-- Ahora 'e' es el evento
     setHover({ movie, rect })
   }
   const onLeave = () => {
+    if (isTouchDevice) return // No hacer nada en móvil
     setTimeout(() => setHover((h) => (h?.locked ? h : null)), 80)
   }
   const closeHover = () => setHover(null)
@@ -493,18 +513,22 @@ export default function MainDashboard({ sessionId = null }) {
       >
         {items?.map((m) => (
           <SwiperSlide key={m.id}>
-            <div
-              className="relative cursor-pointer overflow-hidden rounded-3xl"
-              onMouseEnter={(e) => onEnter(m, e)}
-              onMouseLeave={onLeave}
-            >
-              <img
-                src={`https://image.tmdb.org/t/p/w300${m.poster_path || m.profile_path || m.backdrop_path}`}
-                alt={m.title || m.name}
-                className="w-full h-full object-cover rounded-3xl aspect-[2/3] transition-transform duration-300 hover:scale-105"
-                loading="lazy"
-              />
-            </div>
+            {/* [MODIFICADO] Enlace añadido para navegación móvil */}
+            <Link href={`/details/movie/${m.id}`}>
+              <div
+                className="relative cursor-pointer overflow-hidden rounded-3xl"
+                // [CORREGIDO] Pasamos el evento 'e' completo
+                onMouseEnter={(e) => onEnter(m, e)}
+                onMouseLeave={onLeave}
+              >
+                <img
+                  src={`https://image.tmdb.org/t/p/w300${m.poster_path || m.profile_path || m.backdrop_path}`}
+                  alt={m.title || m.name}
+                  className="w-full h-full object-cover rounded-3xl aspect-[2/3] transition-transform duration-300 hover:scale-105"
+                  loading="lazy"
+                />
+              </div>
+            </Link>
           </SwiperSlide>
         ))}
 
