@@ -35,11 +35,11 @@ import { fetchOmdbByImdb } from '@/lib/api/omdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
 
-/* --- [NUEVO] Hook para detectar dispositivo táctil --- */
+/* --- Hook para detectar dispositivo táctil --- */
 const useIsTouchDevice = () => {
   const [isTouch, setIsTouch] = useState(false)
   useEffect(() => {
-    // Se ejecuta solo en el cliente
+    // Solo se ejecuta en el cliente
     const onTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
     setIsTouch(onTouch)
   }, [])
@@ -66,7 +66,7 @@ const formatRuntime = (mins) => {
 }
 
 /* ---------- Portal flotante grande ---------- */
-function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
+function HoverPreviewPortal({ open, anchorRect, movie, onClose, onCancelClose }) {
   const { session, account } = useAuth()
 
   // Estados de cuenta
@@ -76,18 +76,16 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
 
-  // Extras: runtime TMDB + awards OMDb + imdbRating
+  // Extras
   const [extras, setExtras] = useState({ runtime: null, awards: null, imdbRating: null })
-  const extrasCache = useRef(new Map()) // cache por movie.id
+  const extrasCache = useRef(new Map())
 
   // Cargar estados (fav/watchlist)
   useEffect(() => {
     let cancel = false
     const load = async () => {
       if (!open || !movie || !session || !account?.id) {
-        setFavorite(false)
-        setWatchlist(false)
-        return
+        setFavorite(false); setWatchlist(false); return
       }
       try {
         setLoadingStates(true)
@@ -97,11 +95,8 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
           setFavorite(!!st.favorite)
           setWatchlist(!!st.watchlist)
         }
-      } catch (e) {
-        console.error(e)
-      } finally {
-        if (!cancel) setLoadingStates(false)
-      }
+      } catch (e) { console.error(e) } 
+      finally { if (!cancel) setLoadingStates(false) }
     }
     load()
     return () => { cancel = true }
@@ -122,22 +117,15 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
         return
       }
       
-      // [SOLUCIÓN PARPADEO] Mostrar datos base inmediatamente
-      setExtras({
-        runtime: null,
-        awards: null,
-        imdbRating: null
-      })
+      setExtras({ runtime: null, awards: null, imdbRating: null });
 
       try {
-        // 1) Runtime desde TMDB
         let runtime = null
         try {
           const details = await getMovieDetails(movie.id)
           runtime = details?.runtime ?? null
         } catch {}
 
-        // 2) Premios/Nominaciones + rating IMDb desde OMDb
         let awards = null
         let imdbRating = null
         try {
@@ -173,8 +161,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   }, [open, movie])
 
   // Layout/posición del panel
-  const MIN_W = 420
-  const MAX_W = 750
+  const MIN_W = 420, MAX_W = 750
 
   const calc = useCallback(() => {
     if (!anchorRect) return { left: 0, top: 0, width: MIN_W }
@@ -201,13 +188,6 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     }
   }, [open, calc])
 
-  // Hover grace period
-  const leaveTimer = useRef(null)
-  const startClose = () => {
-    clearTimeout(leaveTimer.current)
-    leaveTimer.current = setTimeout(onClose, 120)
-  }
-  const cancelClose = () => clearTimeout(leaveTimer.current)
 
   if (!open || !movie || !anchorRect) return null
 
@@ -228,7 +208,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
       setUpdating(true)
       setError('')
       const next = !favorite
-      setFavorite(next) // optimista
+      setFavorite(next)
       await markAsFavorite({
         accountId: account.id,
         sessionId: session,
@@ -251,7 +231,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
       setUpdating(true)
       setError('')
       const next = !watchlist
-      setWatchlist(next) // optimista
+      setWatchlist(next)
       await markInWatchlist({
         accountId: account.id,
         sessionId: session,
@@ -276,8 +256,8 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-        onMouseEnter={cancelClose}
-        onMouseLeave={startClose}
+        onMouseEnter={onCancelClose}
+        onMouseLeave={onClose}
         style={{
           position: 'fixed',
           left: pos.left,
@@ -286,7 +266,6 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
           zIndex: 80,
           pointerEvents: 'auto'
         }}
-        // [MODIFICADO] Oculto en móvil (lg:block)
         className="hidden lg:block rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
       >
         {/* Imagen horizontal */}
@@ -306,7 +285,6 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             {yearOf(movie) && <span>{yearOf(movie)}</span>}
             {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
 
-            {/* TMDb rating (logo local) */}
             <span className="inline-flex items-center gap-1.5">
               <img
                 src="/logo-TMDb.png"
@@ -318,7 +296,6 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
               <span className="font-medium">{ratingOf(movie)}</span>
             </span>
 
-            {/* IMDb rating (logo local) */}
             {typeof extras?.imdbRating === 'number' && (
               <span className="inline-flex items-center gap-1.5">
                 <img
@@ -349,7 +326,6 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             </p>
           )}
 
-          {/* Botones: Detalles + redondos (favoritos/pendientes) */}
           <div className="mt-4 flex items-center gap-2">
             <Link href={href}>
               <button className="px-4 py-2 rounded-2xl bg-white text-black text-sm font-semibold hover:bg-neutral-200 transition-colors">
@@ -358,7 +334,6 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             </Link>
 
             <div className="flex-grow flex justify-end gap-2">
-              {/* Favoritos */}
               <button
                 onClick={handleToggleFavorite}
                 disabled={loadingStates || updating}
@@ -373,8 +348,6 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
                   <Heart className="w-5 h-5" />
                 )}
               </button>
-
-              {/* Pendientes */}
               <button
                 onClick={handleToggleWatchlist}
                 disabled={loadingStates || updating}
@@ -402,8 +375,11 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
 export default function MainDashboard({ sessionId = null }) {
   const [ready, setReady] = useState(false)
   const [dashboardData, setDashboardData] = useState({})
-  const [hover, setHover] = useState(null) // { movie, rect }
-  const isTouchDevice = useIsTouchDevice() // <-- [NUEVO] Hook
+  const [hover, setHover] = useState(null)
+  const isTouchDevice = useIsTouchDevice()
+
+  const openTimerRef = useRef(null)
+  const closeTimerRef = useRef(null)
  
   const prevRef = useRef(null)
   const nextRef = useRef(null)
@@ -468,17 +444,47 @@ export default function MainDashboard({ sessionId = null }) {
 
   if (!ready) return null
 
-  /* ---------- [MODIFICADO] handlers hover ---------- */
+  /* ---------- [MODIFICADO] handlers hover con lógica de swap ---------- */
+  
   const onEnter = (movie, e) => {
-    if (isTouchDevice) return // No hacer nada en móvil
-    const rect = e.currentTarget.getBoundingClientRect() // <-- Ahora 'e' es el evento
-    setHover({ movie, rect })
-  }
+    if (isTouchDevice) return; 
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    
+    clearTimeout(closeTimerRef.current);
+    clearTimeout(openTimerRef.current);
+    
+    if (hover) {
+      // Si el portal YA ESTÁ ABIERTO, cambia el contenido inmediatamente
+      setHover({ movie, rect });
+    } else {
+      // Si el portal ESTÁ CERRADO, espera 400ms para abrirlo
+      openTimerRef.current = setTimeout(() => {
+        setHover({ movie, rect });
+      }, 400); // 400ms de retraso
+    }
+  };
+
   const onLeave = () => {
-    if (isTouchDevice) return // No hacer nada en móvil
-    setTimeout(() => setHover((h) => (h?.locked ? h : null)), 80)
-  }
-  const closeHover = () => setHover(null)
+    if (isTouchDevice) return;
+    
+    clearTimeout(openTimerRef.current); // Cancela cualquier apertura pendiente
+    
+    closeTimerRef.current = setTimeout(() => {
+      setHover(null);
+    }, 150); // 150ms de gracia
+  };
+
+  const cancelCloseHover = () => {
+      if (isTouchDevice) return;
+      clearTimeout(closeTimerRef.current);
+  };
+  
+  const closeHover = () => {
+    clearTimeout(openTimerRef.current);
+    clearTimeout(closeTimerRef.current);
+    setHover(null);
+  };
 
   /* ---------- Sección reusable (cada fila) ---------- */
   const Row = ({ title, items }) => (
@@ -513,11 +519,9 @@ export default function MainDashboard({ sessionId = null }) {
       >
         {items?.map((m) => (
           <SwiperSlide key={m.id}>
-            {/* [MODIFICADO] Enlace añadido para navegación móvil */}
             <Link href={`/details/movie/${m.id}`}>
               <div
                 className="relative cursor-pointer overflow-hidden rounded-3xl"
-                // [CORREGIDO] Pasamos el evento 'e' completo
                 onMouseEnter={(e) => onEnter(m, e)}
                 onMouseLeave={onLeave}
               >
@@ -623,6 +627,7 @@ export default function MainDashboard({ sessionId = null }) {
         anchorRect={hover?.rect || null}
         movie={hover?.movie || null}
         onClose={closeHover}
+        onCancelClose={cancelCloseHover}
       />
     </div>
   )

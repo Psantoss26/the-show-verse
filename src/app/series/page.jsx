@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Navigation, Autoplay } from 'swiper'
+import { Navigation } from 'swiper' // Autoplay no se usa aquí
 import { AnimatePresence, motion } from 'framer-motion'
 import 'swiper/swiper-bundle.css'
 import Link from 'next/link'
@@ -29,8 +29,41 @@ import { fetchOmdbByImdb } from '@/lib/api/omdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
 
+/* --- [NUEVO] Hook para detectar dispositivo táctil --- */
+const useIsTouchDevice = () => {
+  const [isTouch, setIsTouch] = useState(false)
+  useEffect(() => {
+    // Solo se ejecuta en el cliente
+    const onTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    setIsTouch(onTouch)
+  }, [])
+  return isTouch
+}
+
+/* --- Icons: IMDb + TMDb (inline SVG) --- */
+const IMDbIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 64 64" className={className} aria-label="IMDb" role="img">
+    <rect x="2" y="12" width="60" height="40" rx="6" fill="#F5C518" />
+    <path
+      d="M14 24h4v16h-4V24zm8 0h4v16h-4V24zm6 0h6c2.76 0 4 1.24 4 4v8c0 2.76-1.24 4-4 4h-6V24zm4 4v8h2c.67 0 1-.33 1-1v-6c0-.67-.33-1-1-1h-2zm12-4h4v16h-4V24z"
+      fill="#000"
+    />
+  </svg>
+)
+
+const TMDbIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 64 64" className={className} aria-label="TMDb" role="img">
+    <rect x="4" y="8" width="56" height="48" rx="10" fill="#01D277" />
+    <path
+      d="M18 24h-4v-4h12v4h-4v16h-4V24zm14-4h4l3 7 3-7h4v20h-4V28l-3 7h-2l-3-7v12h-4V20zm20 0h4v20h-4V20z"
+      fill="#001A0F"
+      opacity=".95"
+    />
+  </svg>
+)
+
+
 /* ---------- helpers ---------- */
-// Prioriza 'first_air_date' para series
 const yearOf = (m) =>
   m?.first_air_date?.slice(0, 4) || m?.release_date?.slice(0, 4) || ''
 
@@ -49,8 +82,10 @@ const formatRuntime = (mins) => {
   return m ? `${h} h ${m} min` : `${h} h`
 }
 
-/* ---------- Portal flotante grande (Lógica para Series) ---------- */
-function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
+/* ====================================================================
+ * [MODIFICADO] Portal flotante (con lógica de hover del padre)
+ * ==================================================================== */
+function HoverPreviewPortal({ open, anchorRect, show, onClose, onCancelClose }) {
   const { session, account } = useAuth()
 
   // Estados de cuenta
@@ -60,13 +95,13 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
 
-  // Extras: runtime, premios, rating IMDb + backdrop/título/overview localizados
+  // Extras
   const [extras, setExtras] = useState({
     runtime: null,
     awards: null,
     imdbRating: null,
     backdropPath: null,
-    title: null,   // 'name' en series
+    title: null,
     overview: null
   })
   const extrasCache = useRef(new Map())
@@ -86,11 +121,8 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
           setFavorite(!!st.favorite)
           setWatchlist(!!st.watchlist)
         }
-      } catch (e) {
-        console.error(e)
-      } finally {
-        if (!cancel) setLoadingStates(false)
-      }
+      } catch (e) { console.error(e) } 
+      finally { if (!cancel) setLoadingStates(false) }
     }
     load()
     return () => { cancel = true }
@@ -107,6 +139,16 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
 
       const cached = extrasCache.current.get(show.id)
       if (cached) { setExtras(cached); return }
+      
+      // Mostrar datos base inmediatamente
+      setExtras({
+        runtime: null, 
+        awards: null, 
+        imdbRating: null,
+        backdropPath: show.backdrop_path || show.poster_path, // Fallback instantáneo
+        title: show.name || show.title,
+        overview: show.overview
+      })
 
       try {
         let runtime = null
@@ -118,16 +160,17 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
           const details = await getDetails('tv', show.id, {
             language: 'es-ES',
             append_to_response: 'images',
-            include_image_language: 'es,en,null'
+            include_image_language: 'en' // Solo Inglés
           })
           runtime = details?.episode_run_time?.[0] ?? null
           esTitle = details?.name || null
           esOverview = details?.overview || null
 
-          const esBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'es')
-          const enBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'en')
-          const defaultBackdrop = details?.images?.backdrops?.[0]
-          bestBackdrop = esBackdrop?.file_path || enBackdrop?.file_path || defaultBackdrop?.file_path || null
+          const allBackdrops = details?.images?.backdrops || [];
+          const enBackdrop = allBackdrops.find(b => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US');
+          
+          bestBackdrop = enBackdrop?.file_path || null;
+
         } catch (e) {
           console.error('Error fetching details/images:', e)
         }
@@ -155,7 +198,14 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
           console.error('Error fetching OMDb:', e)
         }
 
-        const next = { runtime, awards, imdbRating, backdropPath: bestBackdrop, title: esTitle, overview: esOverview }
+        const next = { 
+          runtime, 
+          awards, 
+          imdbRating, 
+          backdropPath: bestBackdrop || show.backdrop_path || show.poster_path, 
+          title: esTitle || show.name, 
+          overview: esOverview || show.overview 
+        }
         if (!abort) {
           extrasCache.current.set(show.id, next)
           setExtras(next)
@@ -194,14 +244,6 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
       window.removeEventListener('scroll', update)
     }
   }, [open, calc])
-
-  // Hover grace period
-  const leaveTimer = useRef(null)
-  const startClose = () => {
-    clearTimeout(leaveTimer.current)
-    leaveTimer.current = setTimeout(onClose, 120)
-  }
-  const cancelClose = () => clearTimeout(leaveTimer.current)
 
   // Handlers de botones
   const requireLogin = () => {
@@ -254,8 +296,9 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-        onMouseEnter={cancelClose}
-        onMouseLeave={startClose}
+        // [MODIFICADO] Handlers de hover
+        onMouseEnter={onCancelClose}
+        onMouseLeave={onClose}
         style={{
           position: 'fixed',
           left: pos.left,
@@ -264,7 +307,8 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
           zIndex: 80,
           pointerEvents: 'auto'
         }}
-        className="rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+        // [MODIFICADO] Oculto en móvil
+        className="hidden lg:block rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
       >
         <Link href={href} className="block relative group/preview">
           <img
@@ -281,7 +325,6 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
             {yearOf(show) && <span>{yearOf(show)}</span>}
             {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
 
-            {/* TMDb rating con logo local */}
             <span className="inline-flex items-center gap-1.5">
               <img
                 src="/logo-TMDb.png"
@@ -293,7 +336,6 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
               <span className="font-medium">{ratingOf(show)}</span>
             </span>
 
-            {/* IMDb rating con logo local */}
             {typeof extras?.imdbRating === 'number' && (
               <span className="inline-flex items-center gap-1.5">
                 <img
@@ -361,7 +403,13 @@ function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
 export default function SeriesPage() {
   const [ready, setReady] = useState(false)
   const [dashboardData, setDashboardData] = useState({})
+  
   const [hover, setHover] = useState(null) // { show, rect }
+  const isTouchDevice = useIsTouchDevice() // <-- [NUEVO] Hook
+
+  // [NUEVO] Refs para los timers
+  const openTimerRef = useRef(null)
+  const closeTimerRef = useRef(null)
 
   const prevRef = useRef(null)
   const nextRef = useRef(null)
@@ -412,15 +460,46 @@ export default function SeriesPage() {
     return <div className="h-screen bg-black" />
   }
 
-  /* ---------- handlers hover ---------- */
+  /* ---------- [MODIFICADO] handlers hover con delay ---------- */
   const onEnter = (show, e) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    setHover({ show, rect })
-  }
+    if (isTouchDevice) return; 
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    
+    clearTimeout(closeTimerRef.current);
+    clearTimeout(openTimerRef.current);
+    
+    if (hover) {
+      // Si el portal YA ESTÁ ABIERTO, cambia el contenido inmediatamente
+      setHover({ show, rect });
+    } else {
+      // Si el portal ESTÁ CERRADO, espera 400ms para abrirlo
+      openTimerRef.current = setTimeout(() => {
+        setHover({ show, rect });
+      }, 400); // 400ms de retraso
+    }
+  };
+
   const onLeave = () => {
-    setTimeout(() => setHover((h) => (h?.locked ? h : null)), 80)
-  }
-  const closeHover = () => setHover(null)
+    if (isTouchDevice) return;
+    
+    clearTimeout(openTimerRef.current);
+    
+    closeTimerRef.current = setTimeout(() => {
+      setHover(null);
+    }, 150); // 150ms de gracia
+  };
+
+  const cancelCloseHover = () => {
+      if (isTouchDevice) return;
+      clearTimeout(closeTimerRef.current);
+  };
+  
+  const closeHover = () => {
+    clearTimeout(openTimerRef.current);
+    clearTimeout(closeTimerRef.current);
+    setHover(null);
+  };
 
   /* ---------- Sección reusable (cada fila) ---------- */
   const Row = ({ title, items }) => (
@@ -455,19 +534,22 @@ export default function SeriesPage() {
       >
         {items?.map((m) => (
           <SwiperSlide key={m.id}>
-            <div
-              className="relative cursor-pointer overflow-hidden rounded-3xl"
-              onMouseEnter={(e) => onEnter(m, e)}
-              onMouseLeave={onLeave}
-            >
-              {/* Pósters verticales */}
-              <img
-                src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
-                alt={m.name || m.title}
-                className="w-full h-full object-cover rounded-3xl aspect-[2/3] transition-transform duration-300 hover:scale-105"
-                loading="lazy"
-              />
-            </div>
+            {/* [MODIFICADO] Enlace añadido para navegación móvil */}
+            <Link href={`/details/tv/${m.id}`}> {/* <-- 'tv' para series */}
+              <div
+                className="relative cursor-pointer overflow-hidden rounded-3xl"
+                onMouseEnter={(e) => onEnter(m, e)}
+                onMouseLeave={onLeave}
+              >
+                {/* Pósters verticales */}
+                <img
+                  src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
+                  alt={m.name || m.title}
+                  className="w-full h-full object-cover rounded-3xl aspect-[2/3] transition-transform duration-300 hover:scale-105"
+                  loading="lazy"
+                />
+              </div>
+            </Link>
           </SwiperSlide>
         ))}
 
@@ -521,12 +603,13 @@ export default function SeriesPage() {
         <GenreRows groups={dashboardData['Por género']} />
       </div>
 
-      {/* Panel flotante */}
+      {/* [MODIFICADO] Panel flotante con nuevos props */}
       <HoverPreviewPortal
         open={!!hover?.show}
         anchorRect={hover?.rect || null}
-        show={hover?.show || null}
+        show={hover?.show || null} // <-- Pasamos 'show'
         onClose={closeHover}
+        onCancelClose={cancelCloseHover}
       />
     </div>
   )
