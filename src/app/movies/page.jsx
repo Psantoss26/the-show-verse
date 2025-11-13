@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Navigation, Autoplay } from 'swiper'
+import { Navigation } from 'swiper' // Autoplay no se usa aquí
 import { AnimatePresence, motion } from 'framer-motion'
 import 'swiper/swiper-bundle.css'
 import Link from 'next/link'
@@ -14,10 +14,10 @@ import {
   // Importamos las funciones de descubrimiento
   fetchPopularMedia,
   fetchTopRatedIMDb,
-  fetchMoviesByGenre, // <-- [CORREGIDO] Renombrado de fetchMediaByGenre
+  fetchMoviesByGenre,
   fetchMediaByKeyword,
-  fetchMovieSections, // <-- Asumiendo que esta existe para las filas base
-  // Funciones de cuenta (las mismas del dashboard)
+  fetchMovieSections,
+  // Funciones de cuenta
   getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
@@ -28,6 +28,40 @@ import {
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
+
+/* --- [NUEVO] Hook para detectar dispositivo táctil --- */
+const useIsTouchDevice = () => {
+  const [isTouch, setIsTouch] = useState(false)
+  useEffect(() => {
+    // Solo se ejecuta en el cliente
+    const onTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    setIsTouch(onTouch)
+  }, [])
+  return isTouch
+}
+
+
+/* --- Icons: IMDb + TMDb (inline SVG) --- */
+const IMDbIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 64 64" className={className} aria-label="IMDb" role="img">
+    <rect x="2" y="12" width="60" height="40" rx="6" fill="#F5C518" />
+    <path
+      d="M14 24h4v16h-4V24zm8 0h4v16h-4V24zm6 0h6c2.76 0 4 1.24 4 4v8c0 2.76-1.24 4-4 4h-6V24zm4 4v8h2c.67 0 1-.33 1-1v-6c0-.67-.33-1-1-1h-2zm12-4h4v16h-4V24z"
+      fill="#000"
+    />
+  </svg>
+)
+
+const TMDbIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 64 64" className={className} aria-label="TMDb" role="img">
+    <rect x="4" y="8" width="56" height="48" rx="10" fill="#01D277" />
+    <path
+      d="M18 24h-4v-4h12v4h-4v16h-4V24zm14-4h4l3 7 3-7h4v20h-4V28l-3 7h-2l-3-7v12h-4V20zm20 0h4v20h-4V20z"
+      fill="#001A0F"
+      opacity=".95"
+    />
+  </svg>
+)
 
 /* ---------- helpers ---------- */
 const yearOf = (m) =>
@@ -48,8 +82,10 @@ const formatRuntime = (mins) => {
   return m ? `${h} h ${m} min` : `${h} h`
 }
 
-/* ---------- Portal flotante grande (Con lógica de idioma) ---------- */
-function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
+/* ====================================================================
+ * [MODIFICADO] Portal flotante (con lógica de hover del padre)
+ * ==================================================================== */
+function HoverPreviewPortal({ open, anchorRect, movie, onClose, onCancelClose }) {
   const { session, account } = useAuth()
 
   // Estados de cuenta
@@ -59,16 +95,16 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
 
-  // Extras: incluye backdropPath, title y overview en español
+  // Un solo estado para todos los datos
   const [extras, setExtras] = useState({ 
     runtime: null, 
     awards: null, 
     imdbRating: null,
-    backdropPath: null, // Para el backdrop en 'es'
-    title: null,        // Para el título en 'es'
-    overview: null      // Para el overview en 'es'
+    backdropPath: null,
+    title: null,
+    overview: null
   })
-  const extrasCache = useRef(new Map()) // cache por movie.id
+  const extrasCache = useRef(new Map())
 
   // Cargar estados (fav/watchlist)
   useEffect(() => {
@@ -89,7 +125,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     return () => { cancel = true }
   }, [open, movie, session, account])
 
-  // Cargar extras (runtime, premios, E imágenes/texto en 'es')
+  // Un solo useEffect para cargar TODOS los extras
   useEffect(() => {
     let abort = false
     const loadExtras = async () => {
@@ -99,35 +135,44 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
       }
 
       const cached = extrasCache.current.get(movie.id)
-      if (cached) { setExtras(cached); return }
+      if (cached) {
+        setExtras(cached)
+        return
+      }
+      
+      setExtras({
+        runtime: null, 
+        awards: null, 
+        imdbRating: null,
+        backdropPath: movie.backdrop_path || movie.poster_path, // Fallback instantáneo
+        title: movie.title || movie.name,
+        overview: movie.overview
+      })
 
       try {
-        // 1) Runtime, Título 'es', Overview 'es', e Imágenes 'es' en 1 llamada
         let runtime = null
         let bestBackdrop = null
         let esTitle = null
         let esOverview = null
         
         try {
-          const details = await getMovieDetails(movie.id, {
+          const details = await getMovieDetails(movie.id, { // Usamos getMovieDetails como en tu código
             language: 'es-ES',
             append_to_response: 'images',
-            include_image_language: 'es,en,null'
+            include_image_language: 'en' // Solo Inglés
           })
           
           runtime = details?.runtime ?? null
           esTitle = details?.title || null
           esOverview = details?.overview || null
           
-          const esBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'es');
-          const enBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'en');
-          const defaultBackdrop = details?.images?.backdrops?.[0];
-          
-          bestBackdrop = esBackdrop?.file_path || enBackdrop?.file_path || defaultBackdrop?.file_path || null;
+          const allBackdrops = details?.images?.backdrops || [];
+          const enBackdrop = allBackdrops.find(b => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US');
 
-        } catch (e) { console.error("Error fetching details/images:", e) }
+          bestBackdrop = enBackdrop?.file_path || null;
 
-        // 2) Premios/Nominaciones + rating IMDb desde OMDb
+        } catch (e) { console.error("Error fetching details/images for movie:", movie.id, e) }
+
         let awards = null
         let imdbRating = null
         try {
@@ -149,15 +194,24 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
           }
         } catch (e) { console.error("Error fetching OMDb:", e) }
 
-        const next = { runtime, awards, imdbRating, backdropPath: bestBackdrop, title: esTitle, overview: esOverview }
+        const next = { 
+          runtime, 
+          awards, 
+          imdbRating, 
+          backdropPath: bestBackdrop || movie.backdrop_path || movie.poster_path,
+          title: esTitle || movie.title,
+          overview: esOverview || movie.overview
+        }
+        
         if (!abort) {
           extrasCache.current.set(movie.id, next)
           setExtras(next)
         }
       } catch (e) {
-        if (!abort) setExtras({ runtime: null, awards: null, imdbRating: null, backdropPath: null, title: null, overview: null })
+        console.error("Error en loadExtras", e)
       }
     }
+    
     loadExtras()
     return () => { abort = true }
   }, [open, movie])
@@ -189,15 +243,12 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     }
   }, [open, calc])
 
-  // Hover grace period
-  const leaveTimer = useRef(null)
-  const startClose = () => {
-    clearTimeout(leaveTimer.current)
-    leaveTimer.current = setTimeout(onClose, 120)
-  }
-  const cancelClose = () => clearTimeout(leaveTimer.current)
+  // [ELIMINADOS] Timers locales
+  // const leaveTimer = useRef(null)
+  // const startClose = ...
+  // const cancelClose = ...
 
-  // Handlers de botones (idénticos a MainDashboard)
+  // Handlers de botones
   const requireLogin = () => {
     if (!session || !account?.id) {
       window.location.href = '/login'
@@ -232,13 +283,17 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     } finally { setUpdating(false) }
   }
 
-  if (!open || !movie || !anchorRect) return null
 
-  // Prioriza el backdrop, título y overview en español desde 'extras'
-  const backdrop = extras.backdropPath || movie.backdrop_path || movie.poster_path
-  const title = extras.title || movie.title || movie.name
-  const overview = extras.overview || movie.overview
-  const href = `/details/movie/${movie.id}`
+  if (!open || !movie || !anchorRect) {
+     return null
+  }
+
+  const backdrop = extras.backdropPath || movie.backdrop_path || movie.poster_path;
+  const title = extras.title || movie.title || movie.name;
+  const overview = extras.overview || movie.overview;
+  const href = `/details/movie/${movie.id}`;
+
+  if (!backdrop) return null;
 
   return (
     <AnimatePresence>
@@ -248,8 +303,9 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-        onMouseEnter={cancelClose}
-        onMouseLeave={startClose}
+        // [MODIFICADO] Handlers de hover pasados desde el padre
+        onMouseEnter={onCancelClose}
+        onMouseLeave={onClose}
         style={{
           position: 'fixed',
           left: pos.left,
@@ -258,15 +314,21 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
           zIndex: 80,
           pointerEvents: 'auto'
         }}
-        className="rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+        // [MODIFICADO] Oculto en móvil
+        className="hidden lg:block rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
       >
-        {/* Imagen horizontal (ahora usa 'backdrop' en 'es' si existe) */}
         <Link href={href} className="block relative group/preview">
           <img
             src={`https://image.tmdb.org/t/p/w1280${backdrop}`}
+            srcSet={
+              `https://image.tmdb.org/t/p/w780${backdrop} 780w, ` +
+              `https://image.tmdb.org/t/p/w1280${backdrop} 1280w`
+            }
+            sizes="(min-width:1536px) 820px, (min-width:1280px) 760px, (min-width:1024px) 660px, 90vw"
             alt={title}
             className="w-full object-cover aspect-video"
             loading="lazy"
+            decoding="async"
           />
           <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-[#0b0b0b] to-transparent" />
         </Link>
@@ -276,35 +338,18 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
           <div className="mb-1 flex items-center gap-3 text-sm text-neutral-300 flex-wrap">
             {yearOf(movie) && <span>{yearOf(movie)}</span>}
             {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
-
-            {/* TMDb rating con logo local */}
             <span className="inline-flex items-center gap-1.5">
-              <img
-                src="/logo-TMDb.png"
-                alt="TMDb"
-                className="h-4 w-auto"
-                loading="lazy"
-                decoding="async"
-              />
+              <TMDbIcon className="w-4 h-4" />
               <span className="font-medium">{ratingOf(movie)}</span>
             </span>
-
-            {/* IMDb rating con logo local */}
             {typeof extras?.imdbRating === 'number' && (
               <span className="inline-flex items-center gap-1.5">
-                <img
-                  src="/logo-IMDb.png"
-                  alt="IMDb"
-                  className="h-4 w-auto"
-                  loading="lazy"
-                  decoding="async"
-                />
+                <IMDbIcon className="w-4 h-4" />
                 <span className="font-medium">{extras.imdbRating.toFixed(1)}</span>
               </span>
             )}
           </div>
 
-          {/* Título (ahora usa 'title' en 'es' si existe) */}
           <h4 className="text-xl md:text-2xl font-semibold mb-2">
             {title}
           </h4>
@@ -315,14 +360,12 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             </div>
           )}
 
-          {/* Overview (ahora usa 'overview' en 'es' si existe) */}
           {overview && (
             <p className="mt-2 text-sm md:text-base text-neutral-200 leading-relaxed line-clamp-3">
               {short(overview)}
             </p>
           )}
 
-          {/* Botones de Acción */}
           <div className="mt-4 flex items-center gap-2">
             <Link href={href}>
               <button className="px-4 py-2 rounded-2xl bg-white text-black text-sm font-semibold hover:bg-neutral-200 transition-colors">
@@ -358,11 +401,18 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
 
 /* * ====================================================================
  * Componente Principal: MoviesPage
- * ==================================================================== */
-export default function MoviesPage() {
+ * ====================================================================
+ */
+export default function MoviesPage({ sessionId = null }) {
   const [ready, setReady] = useState(false)
   const [dashboardData, setDashboardData] = useState({})
-  const [hover, setHover] = useState(null) // { movie, rect }
+  
+  const [hover, setHover] = useState(null)
+  const isTouchDevice = useIsTouchDevice() // <-- [NUEVO] Hook
+
+  // [NUEVO] Refs para los timers
+  const openTimerRef = useRef(null)
+  const closeTimerRef = useRef(null)
 
   const prevRef = useRef(null)
   const nextRef = useRef(null)
@@ -414,15 +464,46 @@ export default function MoviesPage() {
     return <div className="h-screen bg-black" />
   }
 
-  /* ---------- handlers hover ---------- */
+  /* ---------- [MODIFICADO] handlers hover con delay ---------- */
   const onEnter = (movie, e) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    setHover({ movie, rect })
-  }
+    if (isTouchDevice) return; 
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    
+    clearTimeout(closeTimerRef.current);
+    clearTimeout(openTimerRef.current);
+    
+    if (hover) {
+      // Si el portal YA ESTÁ ABIERTO, cambia el contenido inmediatamente
+      setHover({ movie, rect });
+    } else {
+      // Si el portal ESTÁ CERRADO, espera 400ms para abrirlo
+      openTimerRef.current = setTimeout(() => {
+        setHover({ movie, rect });
+      }, 400); // 400ms de retraso
+    }
+  };
+
   const onLeave = () => {
-    setTimeout(() => setHover((h) => (h?.locked ? h : null)), 80)
-  }
-  const closeHover = () => setHover(null)
+    if (isTouchDevice) return;
+    
+    clearTimeout(openTimerRef.current);
+    
+    closeTimerRef.current = setTimeout(() => {
+      setHover(null);
+    }, 150); // 150ms de gracia
+  };
+
+  const cancelCloseHover = () => {
+      if (isTouchDevice) return;
+      clearTimeout(closeTimerRef.current);
+  };
+  
+  const closeHover = () => {
+    clearTimeout(openTimerRef.current);
+    clearTimeout(closeTimerRef.current);
+    setHover(null);
+  };
 
   /* ---------- Sección reusable (cada fila) ---------- */
   const Row = ({ title, items }) => (
@@ -457,19 +538,22 @@ export default function MoviesPage() {
       >
         {items?.map((m) => (
           <SwiperSlide key={m.id}>
-            <div
-              className="relative cursor-pointer overflow-hidden rounded-3xl"
-              onMouseEnter={(e) => onEnter(m, e)}
-              onMouseLeave={onLeave}
-            >
-              {/* pósters verticales */}
-              <img
-                src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
-                alt={m.title || m.name}
-                className="w-full h-full object-cover rounded-3xl aspect-[2/3] transition-transform duration-300 hover:scale-105"
-                loading="lazy"
-              />
-            </div>
+            {/* [MODIFICADO] Enlace añadido para navegación móvil */}
+            <Link href={`/details/movie/${m.id}`}>
+              <div
+                className="relative cursor-pointer overflow-hidden rounded-3xl"
+                onMouseEnter={(e) => onEnter(m, e)}
+                onMouseLeave={onLeave}
+              >
+                <img
+                  src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
+                  alt={m.title || m.name}
+                  className="w-full h-full object-cover rounded-3xl aspect-[2/3] transition-transform duration-300 hover:scale-105"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+            </Link>
           </SwiperSlide>
         ))}
 
@@ -515,7 +599,6 @@ export default function MoviesPage() {
           <Row title="Historias de Venganza" items={dashboardData.vengeance} />
         )}
 
-        {/* Filas de 'fetchMovieSections' (décadas, etc.) */}
         {dashboardData['Década de 1990']?.length ? <Row title="Década de 1990" items={dashboardData['Década de 1990']} /> : null}
         {dashboardData['Década de 2000']?.length ? <Row title="Década de 2000" items={dashboardData['Década de 2000']} /> : null}
         {dashboardData['Década de 2010']?.length ? <Row title="Década de 2010" items={dashboardData['Década de 2010']} /> : null}
@@ -526,12 +609,13 @@ export default function MoviesPage() {
         <GenreRows groups={dashboardData['Por género']} />
       </div>
 
-      {/* Panel flotante (idéntico al del dashboard) */}
+      {/* [MODIFICADO] Panel flotante con nuevos props */}
       <HoverPreviewPortal
         open={!!hover?.movie}
         anchorRect={hover?.rect || null}
         movie={hover?.movie || null}
         onClose={closeHover}
+        onCancelClose={cancelCloseHover}
       />
     </div>
   )
