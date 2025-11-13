@@ -193,7 +193,7 @@ export default function Navbar() {
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
           
           {/* 1. IZQUIERDA (Desktop) */}
-          <div className="flex items-center gap-6 flex-shrink-0 pl-6"> 
+          <div className="flex items-center gap-6 flex-shrink-0 -ml-4"> 
             <Link href="/" className="block h-12 overflow-hidden flex-shrink-0">
               <div className="h-full w-[170px] flex items-center justify-center overflow-hidden">
                 <img
@@ -212,7 +212,7 @@ export default function Navbar() {
           </div>
                     
           {/* 3. DERECHA (Desktop) */}
-          <div className="flex items-center gap-2 flex-shrink-0 pr-6"> 
+          <div className="flex items-center gap-2 flex-shrink-0 pr-10"> 
             <div className="flex items-center gap-2">
               <Link href="/news" className={iconLinkClass('/news')} title="Noticias">
                 <NewspaperIcon className="w-5 h-5" />
@@ -253,12 +253,12 @@ export default function Navbar() {
 
         {/* --- LAYOUT MÓVIL (lg:hidden) --- */}
         {/* [MODIFICADO] Aumentado px-4 para dar más aire en los extremos */}
-        <div className="lg:hidden flex flex-col px-8 pt-3 pb-2">
+        <div className="lg:hidden flex flex-col px-10 pt-3 pb-2">
           {/* Fila 1: Logo, Búsqueda, Perfil */}
           <div className="flex items-center justify-between gap-2 h-10">
             {/* Izquierda: Logo */}
             {/* [MODIFICADO] Eliminado flex-shrink-0 del Link y ajustado el padding del div contenedor */}
-            <Link href="/" className="block h-10 overflow-hidden -ml-12">
+            <Link href="/" className="block h-10 overflow-hidden -ml-14">
               <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
                 <img
                   src="/TheShowVerse2.png"
