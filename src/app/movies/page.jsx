@@ -1,4 +1,3 @@
-// src/app/MainDashboard.jsx
 'use client'
 
 import { useRef, useEffect, useState, useCallback } from 'react'
@@ -12,22 +11,16 @@ import { Heart, HeartOff, BookmarkPlus, BookmarkMinus, Loader2 } from 'lucide-re
 import { useAuth } from '@/context/AuthContext'
 
 import {
-  fetchTopRatedMovies,
-  fetchCultClassics,
-  fetchMindBendingMovies,
-  fetchTopActionMovies,
-  fetchPopularInUS,
-  fetchUnderratedMovies,
-  fetchRisingMovies,
-  fetchTrendingMovies,
-  fetchPopularMovies,
-  fetchRecommendedMovies,
-  getLogos,
-  // estados/acciones de cuenta
+  // Importamos las funciones de descubrimiento
+  fetchPopularMedia,
+  fetchTopRatedIMDb,
+  fetchMoviesByGenre, // <-- [CORREGIDO] Renombrado de fetchMediaByGenre
+  fetchMediaByKeyword,
+  fetchMovieSections, // <-- Asumiendo que esta existe para las filas base
+  // Funciones de cuenta (las mismas del dashboard)
   getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
-  // helpers TMDB para runtime / external ids
   getMovieDetails,
   getExternalIds
 } from '@/lib/api/tmdb'
@@ -55,7 +48,7 @@ const formatRuntime = (mins) => {
   return m ? `${h} h ${m} min` : `${h} h`
 }
 
-/* ---------- Portal flotante grande ---------- */
+/* ---------- Portal flotante grande (Con lógica de idioma) ---------- */
 function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   const { session, account } = useAuth()
 
@@ -66,8 +59,15 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
 
-  // Extras: runtime TMDB + awards OMDb + imdbRating
-  const [extras, setExtras] = useState({ runtime: null, awards: null, imdbRating: null })
+  // Extras: incluye backdropPath, title y overview en español
+  const [extras, setExtras] = useState({ 
+    runtime: null, 
+    awards: null, 
+    imdbRating: null,
+    backdropPath: null, // Para el backdrop en 'es'
+    title: null,        // Para el título en 'es'
+    overview: null      // Para el overview en 'es'
+  })
   const extrasCache = useRef(new Map()) // cache por movie.id
 
   // Cargar estados (fav/watchlist)
@@ -75,62 +75,69 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     let cancel = false
     const load = async () => {
       if (!open || !movie || !session || !account?.id) {
-        setFavorite(false)
-        setWatchlist(false)
-        return
+        setFavorite(false); setWatchlist(false); return
       }
       try {
         setLoadingStates(true)
         const type = movie.media_type || 'movie'
         const st = await getMediaAccountStates(type, movie.id, session)
-        if (!cancel) {
-          setFavorite(!!st.favorite)
-          setWatchlist(!!st.watchlist)
-        }
-      } catch (e) {
-        console.error(e)
-      } finally {
-        if (!cancel) setLoadingStates(false)
-      }
+        if (!cancel) { setFavorite(!!st.favorite); setWatchlist(!!st.watchlist) }
+      } catch (e) { console.error(e) } 
+      finally { if (!cancel) setLoadingStates(false) }
     }
     load()
     return () => { cancel = true }
   }, [open, movie, session, account])
 
-  // Cargar extras (runtime + premios + imdbRating)
+  // Cargar extras (runtime, premios, E imágenes/texto en 'es')
   useEffect(() => {
     let abort = false
     const loadExtras = async () => {
       if (!open || !movie) {
-        setExtras({ runtime: null, awards: null, imdbRating: null })
+        setExtras({ runtime: null, awards: null, imdbRating: null, backdropPath: null, title: null, overview: null })
         return
       }
 
       const cached = extrasCache.current.get(movie.id)
-      if (cached) {
-        setExtras(cached)
-        return
-      }
+      if (cached) { setExtras(cached); return }
 
       try {
-        // 1) Runtime desde TMDB
+        // 1) Runtime, Título 'es', Overview 'es', e Imágenes 'es' en 1 llamada
         let runtime = null
+        let bestBackdrop = null
+        let esTitle = null
+        let esOverview = null
+        
         try {
-          const details = await getMovieDetails(movie.id) // { runtime, ... }
+          const details = await getMovieDetails(movie.id, {
+            language: 'es-ES',
+            append_to_response: 'images',
+            include_image_language: 'es,en,null'
+          })
+          
           runtime = details?.runtime ?? null
-        } catch {}
+          esTitle = details?.title || null
+          esOverview = details?.overview || null
+          
+          const esBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'es');
+          const enBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'en');
+          const defaultBackdrop = details?.images?.backdrops?.[0];
+          
+          bestBackdrop = esBackdrop?.file_path || enBackdrop?.file_path || defaultBackdrop?.file_path || null;
 
-        // 2) Premios/Nominaciones + rating IMDb desde OMDb usando imdb_id
+        } catch (e) { console.error("Error fetching details/images:", e) }
+
+        // 2) Premios/Nominaciones + rating IMDb desde OMDb
         let awards = null
         let imdbRating = null
         try {
           let imdb = movie?.imdb_id
           if (!imdb) {
-            const ext = await getExternalIds('movie', movie.id) // { imdb_id, ... }
+            const ext = await getExternalIds('movie', movie.id)
             imdb = ext?.imdb_id || null
           }
           if (imdb) {
-            const omdb = await fetchOmdbByImdb(imdb) // vía /api/omdb
+            const omdb = await fetchOmdbByImdb(imdb)
             const rawAwards = omdb?.Awards
             if (rawAwards && typeof rawAwards === 'string' && rawAwards.trim()) {
               awards = rawAwards.trim()
@@ -140,15 +147,15 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
               imdbRating = Number(r)
             }
           }
-        } catch {}
+        } catch (e) { console.error("Error fetching OMDb:", e) }
 
-        const next = { runtime, awards, imdbRating }
+        const next = { runtime, awards, imdbRating, backdropPath: bestBackdrop, title: esTitle, overview: esOverview }
         if (!abort) {
           extrasCache.current.set(movie.id, next)
           setExtras(next)
         }
       } catch (e) {
-        if (!abort) setExtras({ runtime: null, awards: null, imdbRating: null })
+        if (!abort) setExtras({ runtime: null, awards: null, imdbRating: null, backdropPath: null, title: null, overview: null })
       }
     }
     loadExtras()
@@ -156,9 +163,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   }, [open, movie])
 
   // Layout/posición del panel
-  const MIN_W = 420
-  const MAX_W = 750
-
+  const MIN_W = 420, MAX_W = 750
   const calc = useCallback(() => {
     if (!anchorRect) return { left: 0, top: 0, width: MIN_W }
     const vw = window.innerWidth
@@ -192,11 +197,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   }
   const cancelClose = () => clearTimeout(leaveTimer.current)
 
-  if (!open || !movie || !anchorRect) return null
-
-  const backdrop = movie.backdrop_path || movie.poster_path
-  const href = `/details/movie/${movie.id}`
-
+  // Handlers de botones (idénticos a MainDashboard)
   const requireLogin = () => {
     if (!session || !account?.id) {
       window.location.href = '/login'
@@ -204,58 +205,45 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     }
     return false
   }
-
   const handleToggleFavorite = async () => {
     if (requireLogin() || updating || !movie) return
     try {
-      setUpdating(true)
-      setError('')
-      const next = !favorite
-      setFavorite(next) // optimista
+      setUpdating(true); setError('')
+      const next = !favorite; setFavorite(next)
       await markAsFavorite({
-        accountId: account.id,
-        sessionId: session,
-        type: movie.media_type || 'movie',
-        mediaId: movie.id,
-        favorite: next
+        accountId: account.id, sessionId: session,
+        type: movie.media_type || 'movie', mediaId: movie.id, favorite: next
       })
     } catch (e) {
-      console.error(e)
-      setFavorite((v) => !v)
-      setError('No se pudo actualizar favoritos.')
-    } finally {
-      setUpdating(false)
-    }
+      console.error(e); setFavorite((v) => !v); setError('No se pudo actualizar favoritos.')
+    } finally { setUpdating(false) }
   }
-
   const handleToggleWatchlist = async () => {
     if (requireLogin() || updating || !movie) return
     try {
-      setUpdating(true)
-      setError('')
-      const next = !watchlist
-      setWatchlist(next) // optimista
+      setUpdating(true); setError('')
+      const next = !watchlist; setWatchlist(next)
       await markInWatchlist({
-        accountId: account.id,
-        sessionId: session,
-        type: movie.media_type || 'movie',
-        mediaId: movie.id,
-        watchlist: next
+        accountId: account.id, sessionId: session,
+        type: movie.media_type || 'movie', mediaId: movie.id, watchlist: next
       })
     } catch (e) {
-      console.error(e)
-      setWatchlist((v) => !v)
-      setError('No se pudo actualizar pendientes.')
-    } finally {
-      setUpdating(false)
-    }
+      console.error(e); setWatchlist((v) => !v); setError('No se pudo actualizar pendientes.')
+    } finally { setUpdating(false) }
   }
+
+  if (!open || !movie || !anchorRect) return null
+
+  // Prioriza el backdrop, título y overview en español desde 'extras'
+  const backdrop = extras.backdropPath || movie.backdrop_path || movie.poster_path
+  const title = extras.title || movie.title || movie.name
+  const overview = extras.overview || movie.overview
+  const href = `/details/movie/${movie.id}`
 
   return (
     <AnimatePresence>
       <motion.div
         key={movie.id}
-        // Animación elástica (rápida y suave)
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -272,11 +260,11 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
         }}
         className="rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
       >
-        {/* Imagen horizontal */}
+        {/* Imagen horizontal (ahora usa 'backdrop' en 'es' si existe) */}
         <Link href={href} className="block relative group/preview">
           <img
             src={`https://image.tmdb.org/t/p/w1280${backdrop}`}
-            alt={movie.title || movie.name}
+            alt={title}
             className="w-full object-cover aspect-video"
             loading="lazy"
           />
@@ -289,7 +277,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             {yearOf(movie) && <span>{yearOf(movie)}</span>}
             {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
 
-            {/* TMDb rating (logo local) */}
+            {/* TMDb rating con logo local */}
             <span className="inline-flex items-center gap-1.5">
               <img
                 src="/logo-TMDb.png"
@@ -301,7 +289,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
               <span className="font-medium">{ratingOf(movie)}</span>
             </span>
 
-            {/* IMDb rating (logo local) */}
+            {/* IMDb rating con logo local */}
             {typeof extras?.imdbRating === 'number' && (
               <span className="inline-flex items-center gap-1.5">
                 <img
@@ -316,8 +304,9 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             )}
           </div>
 
+          {/* Título (ahora usa 'title' en 'es' si existe) */}
           <h4 className="text-xl md:text-2xl font-semibold mb-2">
-            {movie.title || movie.name}
+            {title}
           </h4>
 
           {extras?.awards && (
@@ -326,51 +315,36 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             </div>
           )}
 
-          {movie.overview && (
+          {/* Overview (ahora usa 'overview' en 'es' si existe) */}
+          {overview && (
             <p className="mt-2 text-sm md:text-base text-neutral-200 leading-relaxed line-clamp-3">
-              {short(movie.overview)}
+              {short(overview)}
             </p>
           )}
 
-          {/* Botones: Detalles + redondos (favoritos/pendientes) */}
+          {/* Botones de Acción */}
           <div className="mt-4 flex items-center gap-2">
             <Link href={href}>
               <button className="px-4 py-2 rounded-2xl bg-white text-black text-sm font-semibold hover:bg-neutral-200 transition-colors">
                 Ver detalles
               </button>
             </Link>
-
             <div className="flex-grow flex justify-end gap-2">
-              {/* Favoritos */}
               <button
                 onClick={handleToggleFavorite}
                 disabled={loadingStates || updating}
                 title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                 className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
               >
-                {loadingStates || updating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : favorite ? (
-                  <HeartOff className="w-5 h-5" />
-                ) : (
-                  <Heart className="w-5 h-5" />
-                )}
+                {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : favorite ? <HeartOff className="w-5 h-5" /> : <Heart className="w-5 h-5" />}
               </button>
-
-              {/* Pendientes */}
               <button
                 onClick={handleToggleWatchlist}
                 disabled={loadingStates || updating}
                 title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
                 className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
               >
-                {loadingStates || updating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : watchlist ? (
-                  <BookmarkMinus className="w-5 h-5" />
-                ) : (
-                  <BookmarkPlus className="w-5 h-5" />
-                )}
+                {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : watchlist ? <BookmarkMinus className="w-5 h-5" /> : <BookmarkPlus className="w-5 h-5" />}
               </button>
             </div>
           </div>
@@ -382,7 +356,10 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   )
 }
 
-export default function MainDashboard({ sessionId = null }) {
+/* * ====================================================================
+ * Componente Principal: MoviesPage
+ * ==================================================================== */
+export default function MoviesPage() {
   const [ready, setReady] = useState(false)
   const [dashboardData, setDashboardData] = useState({})
   const [hover, setHover] = useState(null) // { movie, rect }
@@ -390,65 +367,52 @@ export default function MainDashboard({ sessionId = null }) {
   const prevRef = useRef(null)
   const nextRef = useRef(null)
 
+  // Carga de datos para la página de películas
   useEffect(() => {
     const loadData = async () => {
       try {
+        const lang = 'es-ES'
+        
         const [
-          topRated,
-          cult,
-          mind,
+          popular,
+          top_imdb,
           action,
-          us,
-          underrated,
-          rising,
-          trending,
-          popular
+          scifi,
+          thrillers,
+          vengeance,
+          baseSections
         ] = await Promise.all([
-          fetchTopRatedMovies(),
-          fetchCultClassics(),
-          fetchMindBendingMovies(),
-          fetchTopActionMovies(),
-          fetchPopularInUS(),
-          fetchUnderratedMovies(),
-          fetchRisingMovies(),
-          fetchTrendingMovies(),
-          fetchPopularMovies()
+          fetchPopularMedia({ type: 'movie', language: lang }),
+          fetchTopRatedIMDb({ type: 'movie', minVotes: 15000, language: lang, limit: 20 }),
+          fetchMoviesByGenre({ type: 'movie', genreId: 28, minVotes: 2000, language: lang }),
+          fetchMoviesByGenre({ type: 'movie', genreId: 878, minVotes: 2000, language: lang }),
+          fetchMoviesByGenre({ type: 'movie', genreId: 53, minVotes: 2000, language: lang }),
+          fetchMediaByKeyword({ type: 'movie', keywordId: 9715, minVotes: 1000, language: lang }),
+          fetchMovieSections ? fetchMovieSections({ language: lang }) : Promise.resolve({}) 
         ])
 
-        const recommended = sessionId
-          ? await fetchRecommendedMovies(sessionId)
-          : []
-
-        const topRatedWithLogos = await Promise.all(
-          topRated.map(async (movie) => {
-            const logo = await getLogos('movie', movie.id)
-            return { ...movie, logo_path: logo }
-          })
-        )
-
         setDashboardData({
-          topRated: topRatedWithLogos,
-          cult,
-          mind,
-          action,
-          us,
-          underrated,
-          rising,
-          trending,
           popular,
-          recommended
+          top_imdb,
+          action,
+          scifi,
+          thrillers,
+          vengeance,
+          ...baseSections
         })
 
         setReady(true)
       } catch (err) {
-        console.error('Error cargando dashboard:', err)
+        console.error('Error cargando la página de películas:', err)
       }
     }
 
     loadData()
-  }, [sessionId])
+  }, [])
 
-  if (!ready) return null
+  if (!ready) {
+    return <div className="h-screen bg-black" />
+  }
 
   /* ---------- handlers hover ---------- */
   const onEnter = (movie, e) => {
@@ -498,8 +462,9 @@ export default function MainDashboard({ sessionId = null }) {
               onMouseEnter={(e) => onEnter(m, e)}
               onMouseLeave={onLeave}
             >
+              {/* pósters verticales */}
               <img
-                src={`https://image.tmdb.org/t/p/w300${m.poster_path || m.profile_path || m.backdrop_path}`}
+                src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
                 alt={m.title || m.name}
                 className="w-full h-full object-cover rounded-3xl aspect-[2/3] transition-transform duration-300 hover:scale-105"
                 loading="lazy"
@@ -520,80 +485,48 @@ export default function MainDashboard({ sessionId = null }) {
     </div>
   )
 
-  /* ---------- Carrusel hero ---------- */
-  const TopRatedHero = () => (
-    <div className="relative group mb-10 sm:mb-14">
-      <Swiper
-        spaceBetween={20}
-        slidesPerView={3}
-        autoplay={{ delay: 5000 }}
-        navigation={{ prevEl: prevRef.current, nextEl: nextRef.current }}
-        onInit={(swiper) => {
-          swiper.params.navigation.prevEl = prevRef.current
-          swiper.params.navigation.nextEl = nextRef.current
-          swiper.navigation.init()
-          swiper.navigation.update()
-        }}
-        modules={[Navigation, Autoplay]}
-        className="group relative"
-        breakpoints={{
-          0: { slidesPerView: 1, spaceBetween: 12 },
-          640: { slidesPerView: 2, spaceBetween: 16 },
-          1024: { slidesPerView: 3, spaceBetween: 20 }
-        }}
-      >
-        {dashboardData.topRated?.map((movie) => (
-          <SwiperSlide key={movie.id}>
-            <Link href={`/details/movie/${movie.id}`}>
-              <div className="relative cursor-pointer overflow-hidden rounded-3xl">
-                <img
-                  src={`https://image.tmdb.org/t/p/original${movie.backdrop_path}`}
-                  alt={movie.title}
-                  className="w-full h-full object-cover rounded-3xl hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-                {movie.logo_path && (
-                  <img
-                    src={`https://image.tmdb.org/t/p/w200${movie.logo_path}`}
-                    alt={`${movie.title} logo`}
-                    className="absolute bottom-4 left-1/2 -translate-x-1/2 h-18 object-contain max-w-[50%] pointer-events-none"
-                  />
-                )}
-              </div>
-            </Link>
-          </SwiperSlide>
-        ))}
-        <div
-          ref={prevRef}
-          className="swiper-button-prev hidden sm:flex !text-white !w-8 !h-8 !items-center !justify-center group-hover:opacity-100 transition-opacity duration-300"
-        />
-        <div
-          ref={nextRef}
-          className="swiper-button-next hidden sm:flex !text-white !w-8 !h-8 !items-center !justify-center group-hover:opacity-100 transition-opacity duration-300"
-        />
-      </Swiper>
-    </div>
+  const GenreRows = ({ groups }) => (
+    <>
+      {Object.entries(groups || {}).map(([gname, list]) =>
+        list?.length ? <Row key={`genre-${gname}`} title={`Por género — ${gname}`} items={list} /> : null
+      )}
+    </>
   )
 
   return (
     <div className="px-8 py-2 text-white bg-black">
-      <TopRatedHero />
-
-      <div className="space-y-12">
-        <Row title="Populares" items={dashboardData.popular} />
-        <Row title="Tendencias Semanales" items={dashboardData.trending} />
-        <Row title="Guiones Complejos" items={dashboardData.mind} />
-        <Row title="Top Acción" items={dashboardData.action} />
-        <Row title="Populares en EE.UU." items={dashboardData.us} />
-        <Row title="Películas de Culto" items={dashboardData.cult} />
-        <Row title="Infravaloradas" items={dashboardData.underrated} />
-        <Row title="En Ascenso" items={dashboardData.rising} />
-        {dashboardData.recommended?.length > 0 && (
-          <Row title="Recomendadas Para Ti" items={dashboardData.recommended} />
+      <div className="space-y-12 pt-10">
+        {dashboardData.popular?.length > 0 && (
+          <Row title="Populares" items={dashboardData.popular} />
         )}
+        {dashboardData.top_imdb?.length > 0 && (
+          <Row title="Más Votadas" items={dashboardData.top_imdb} />
+        )}
+        {dashboardData.action?.length > 0 && (
+          <Row title="Acción Popular" items={dashboardData.action} />
+        )}
+        {dashboardData.scifi?.length > 0 && (
+          <Row title="Ciencia Ficción" items={dashboardData.scifi} />
+        )}
+        {dashboardData.thrillers?.length > 0 && (
+          <Row title="Thrillers" items={dashboardData.thrillers} />
+        )}
+        {dashboardData.vengeance?.length > 0 && (
+          <Row title="Historias de Venganza" items={dashboardData.vengeance} />
+        )}
+
+        {/* Filas de 'fetchMovieSections' (décadas, etc.) */}
+        {dashboardData['Década de 1990']?.length ? <Row title="Década de 1990" items={dashboardData['Década de 1990']} /> : null}
+        {dashboardData['Década de 2000']?.length ? <Row title="Década de 2000" items={dashboardData['Década de 2000']} /> : null}
+        {dashboardData['Década de 2010']?.length ? <Row title="Década de 2010" items={dashboardData['Década de 2010']} /> : null}
+        {dashboardData['Década de 2020']?.length ? <Row title="Década de 2020" items={dashboardData['Década de 2020']} /> : null}
+        {dashboardData['Premiadas']?.length ? <Row title="Premiadas" items={dashboardData['Premiadas']} /> : null}
+        {dashboardData['Top 10 hoy en España']?.length ? <Row title="Top 10 hoy en España" items={dashboardData['Top 10 hoy en España']} /> : null}
+        {dashboardData['Superéxito']?.length ? <Row title="Películas de superéxito" items={dashboardData['Superéxito']} /> : null}
+        <GenreRows groups={dashboardData['Por género']} />
       </div>
 
-      {/* Panel flotante */}
+      {/* Panel flotante (idéntico al del dashboard) */}
       <HoverPreviewPortal
         open={!!hover?.movie}
         anchorRect={hover?.rect || null}

@@ -1,4 +1,3 @@
-// src/app/MainDashboard.jsx
 'use client'
 
 import { useRef, useEffect, useState, useCallback } from 'react'
@@ -12,23 +11,17 @@ import { Heart, HeartOff, BookmarkPlus, BookmarkMinus, Loader2 } from 'lucide-re
 import { useAuth } from '@/context/AuthContext'
 
 import {
-  fetchTopRatedMovies,
-  fetchCultClassics,
-  fetchMindBendingMovies,
-  fetchTopActionMovies,
-  fetchPopularInUS,
-  fetchUnderratedMovies,
-  fetchRisingMovies,
-  fetchTrendingMovies,
-  fetchPopularMovies,
-  fetchRecommendedMovies,
-  getLogos,
-  // estados/acciones de cuenta
+  // Descubrimiento
+  fetchPopularMedia,
+  fetchTopRatedIMDb,
+  fetchMoviesByGenre, // genérica: acepta 'type'
+  fetchMediaByKeyword,
+  fetchTVSections, // específica para series
+  // Cuenta
   getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
-  // helpers TMDB para runtime / external ids
-  getMovieDetails,
+  getDetails, // getDetails('tv', id, opts)
   getExternalIds
 } from '@/lib/api/tmdb'
 
@@ -37,8 +30,9 @@ import { fetchOmdbByImdb } from '@/lib/api/omdb'
 const anton = Anton({ weight: '400', subsets: ['latin'] })
 
 /* ---------- helpers ---------- */
+// Prioriza 'first_air_date' para series
 const yearOf = (m) =>
-  m?.release_date?.slice(0, 4) || m?.first_air_date?.slice(0, 4) || ''
+  m?.first_air_date?.slice(0, 4) || m?.release_date?.slice(0, 4) || ''
 
 const ratingOf = (m) =>
   typeof m?.vote_average === 'number' && m.vote_average > 0
@@ -55,8 +49,8 @@ const formatRuntime = (mins) => {
   return m ? `${h} h ${m} min` : `${h} h`
 }
 
-/* ---------- Portal flotante grande ---------- */
-function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
+/* ---------- Portal flotante grande (Lógica para Series) ---------- */
+function HoverPreviewPortal({ open, anchorRect, show, onClose }) {
   const { session, account } = useAuth()
 
   // Estados de cuenta
@@ -66,23 +60,28 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
 
-  // Extras: runtime TMDB + awards OMDb + imdbRating
-  const [extras, setExtras] = useState({ runtime: null, awards: null, imdbRating: null })
-  const extrasCache = useRef(new Map()) // cache por movie.id
+  // Extras: runtime, premios, rating IMDb + backdrop/título/overview localizados
+  const [extras, setExtras] = useState({
+    runtime: null,
+    awards: null,
+    imdbRating: null,
+    backdropPath: null,
+    title: null,   // 'name' en series
+    overview: null
+  })
+  const extrasCache = useRef(new Map())
 
   // Cargar estados (fav/watchlist)
   useEffect(() => {
     let cancel = false
     const load = async () => {
-      if (!open || !movie || !session || !account?.id) {
-        setFavorite(false)
-        setWatchlist(false)
-        return
+      if (!open || !show || !session || !account?.id) {
+        setFavorite(false); setWatchlist(false); return
       }
       try {
         setLoadingStates(true)
-        const type = movie.media_type || 'movie'
-        const st = await getMediaAccountStates(type, movie.id, session)
+        const type = show.media_type || 'tv'
+        const st = await getMediaAccountStates(type, show.id, session)
         if (!cancel) {
           setFavorite(!!st.favorite)
           setWatchlist(!!st.watchlist)
@@ -95,42 +94,54 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     }
     load()
     return () => { cancel = true }
-  }, [open, movie, session, account])
+  }, [open, show, session, account])
 
-  // Cargar extras (runtime + premios + imdbRating)
+  // Cargar extras (runtime, premios, imágenes y textos en 'es')
   useEffect(() => {
     let abort = false
     const loadExtras = async () => {
-      if (!open || !movie) {
-        setExtras({ runtime: null, awards: null, imdbRating: null })
+      if (!open || !show) {
+        setExtras({ runtime: null, awards: null, imdbRating: null, backdropPath: null, title: null, overview: null })
         return
       }
 
-      const cached = extrasCache.current.get(movie.id)
-      if (cached) {
-        setExtras(cached)
-        return
-      }
+      const cached = extrasCache.current.get(show.id)
+      if (cached) { setExtras(cached); return }
 
       try {
-        // 1) Runtime desde TMDB
         let runtime = null
-        try {
-          const details = await getMovieDetails(movie.id) // { runtime, ... }
-          runtime = details?.runtime ?? null
-        } catch {}
+        let bestBackdrop = null
+        let esTitle = null
+        let esOverview = null
 
-        // 2) Premios/Nominaciones + rating IMDb desde OMDb usando imdb_id
+        try {
+          const details = await getDetails('tv', show.id, {
+            language: 'es-ES',
+            append_to_response: 'images',
+            include_image_language: 'es,en,null'
+          })
+          runtime = details?.episode_run_time?.[0] ?? null
+          esTitle = details?.name || null
+          esOverview = details?.overview || null
+
+          const esBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'es')
+          const enBackdrop = details?.images?.backdrops?.find(b => b.iso_639_1 === 'en')
+          const defaultBackdrop = details?.images?.backdrops?.[0]
+          bestBackdrop = esBackdrop?.file_path || enBackdrop?.file_path || defaultBackdrop?.file_path || null
+        } catch (e) {
+          console.error('Error fetching details/images:', e)
+        }
+
         let awards = null
         let imdbRating = null
         try {
-          let imdb = movie?.imdb_id
+          let imdb = show?.imdb_id
           if (!imdb) {
-            const ext = await getExternalIds('movie', movie.id) // { imdb_id, ... }
+            const ext = await getExternalIds('tv', show.id)
             imdb = ext?.imdb_id || null
           }
           if (imdb) {
-            const omdb = await fetchOmdbByImdb(imdb) // vía /api/omdb
+            const omdb = await fetchOmdbByImdb(imdb)
             const rawAwards = omdb?.Awards
             if (rawAwards && typeof rawAwards === 'string' && rawAwards.trim()) {
               awards = rawAwards.trim()
@@ -140,25 +151,25 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
               imdbRating = Number(r)
             }
           }
-        } catch {}
+        } catch (e) {
+          console.error('Error fetching OMDb:', e)
+        }
 
-        const next = { runtime, awards, imdbRating }
+        const next = { runtime, awards, imdbRating, backdropPath: bestBackdrop, title: esTitle, overview: esOverview }
         if (!abort) {
-          extrasCache.current.set(movie.id, next)
+          extrasCache.current.set(show.id, next)
           setExtras(next)
         }
       } catch (e) {
-        if (!abort) setExtras({ runtime: null, awards: null, imdbRating: null })
+        if (!abort) setExtras({ runtime: null, awards: null, imdbRating: null, backdropPath: null, title: null, overview: null })
       }
     }
     loadExtras()
     return () => { abort = true }
-  }, [open, movie])
+  }, [open, show])
 
   // Layout/posición del panel
-  const MIN_W = 420
-  const MAX_W = 750
-
+  const MIN_W = 420, MAX_W = 750
   const calc = useCallback(() => {
     if (!anchorRect) return { left: 0, top: 0, width: MIN_W }
     const vw = window.innerWidth
@@ -192,11 +203,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   }
   const cancelClose = () => clearTimeout(leaveTimer.current)
 
-  if (!open || !movie || !anchorRect) return null
-
-  const backdrop = movie.backdrop_path || movie.poster_path
-  const href = `/details/movie/${movie.id}`
-
+  // Handlers de botones
   const requireLogin = () => {
     if (!session || !account?.id) {
       window.location.href = '/login'
@@ -204,58 +211,45 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
     }
     return false
   }
-
   const handleToggleFavorite = async () => {
-    if (requireLogin() || updating || !movie) return
+    if (requireLogin() || updating || !show) return
     try {
-      setUpdating(true)
-      setError('')
-      const next = !favorite
-      setFavorite(next) // optimista
+      setUpdating(true); setError('')
+      const next = !favorite; setFavorite(next)
       await markAsFavorite({
-        accountId: account.id,
-        sessionId: session,
-        type: movie.media_type || 'movie',
-        mediaId: movie.id,
-        favorite: next
+        accountId: account.id, sessionId: session,
+        type: show.media_type || 'tv', mediaId: show.id, favorite: next
       })
     } catch (e) {
-      console.error(e)
-      setFavorite((v) => !v)
-      setError('No se pudo actualizar favoritos.')
-    } finally {
-      setUpdating(false)
-    }
+      console.error(e); setFavorite((v) => !v); setError('No se pudo actualizar favoritos.')
+    } finally { setUpdating(false) }
+  }
+  const handleToggleWatchlist = async () => {
+    if (requireLogin() || updating || !show) return
+    try {
+      setUpdating(true); setError('')
+      const next = !watchlist; setWatchlist(next)
+      await markInWatchlist({
+        accountId: account.id, sessionId: session,
+        type: show.media_type || 'tv', mediaId: show.id, watchlist: next
+      })
+    } catch (e) {
+      console.error(e); setWatchlist((v) => !v); setError('No se pudo actualizar pendientes.')
+    } finally { setUpdating(false) }
   }
 
-  const handleToggleWatchlist = async () => {
-    if (requireLogin() || updating || !movie) return
-    try {
-      setUpdating(true)
-      setError('')
-      const next = !watchlist
-      setWatchlist(next) // optimista
-      await markInWatchlist({
-        accountId: account.id,
-        sessionId: session,
-        type: movie.media_type || 'movie',
-        mediaId: movie.id,
-        watchlist: next
-      })
-    } catch (e) {
-      console.error(e)
-      setWatchlist((v) => !v)
-      setError('No se pudo actualizar pendientes.')
-    } finally {
-      setUpdating(false)
-    }
-  }
+  if (!open || !show || !anchorRect) return null
+
+  // Datos finales para render
+  const backdrop = extras.backdropPath || show.backdrop_path || show.poster_path
+  const title = extras.title || show.name
+  const overview = extras.overview || show.overview
+  const href = `/details/tv/${show.id}`
 
   return (
     <AnimatePresence>
       <motion.div
-        key={movie.id}
-        // Animación elástica (rápida y suave)
+        key={show.id}
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -272,24 +266,22 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
         }}
         className="rounded-3xl overflow-hidden bg-[#0b0b0b] border border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
       >
-        {/* Imagen horizontal */}
         <Link href={href} className="block relative group/preview">
           <img
             src={`https://image.tmdb.org/t/p/w1280${backdrop}`}
-            alt={movie.title || movie.name}
+            alt={title}
             className="w-full object-cover aspect-video"
             loading="lazy"
           />
           <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-[#0b0b0b] to-transparent" />
         </Link>
 
-        {/* Detalles + acciones */}
         <div className="p-4 md:p-5 pt-3">
           <div className="mb-1 flex items-center gap-3 text-sm text-neutral-300 flex-wrap">
-            {yearOf(movie) && <span>{yearOf(movie)}</span>}
+            {yearOf(show) && <span>{yearOf(show)}</span>}
             {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
 
-            {/* TMDb rating (logo local) */}
+            {/* TMDb rating con logo local */}
             <span className="inline-flex items-center gap-1.5">
               <img
                 src="/logo-TMDb.png"
@@ -298,10 +290,10 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
                 loading="lazy"
                 decoding="async"
               />
-              <span className="font-medium">{ratingOf(movie)}</span>
+              <span className="font-medium">{ratingOf(show)}</span>
             </span>
 
-            {/* IMDb rating (logo local) */}
+            {/* IMDb rating con logo local */}
             {typeof extras?.imdbRating === 'number' && (
               <span className="inline-flex items-center gap-1.5">
                 <img
@@ -316,9 +308,7 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             )}
           </div>
 
-          <h4 className="text-xl md:text-2xl font-semibold mb-2">
-            {movie.title || movie.name}
-          </h4>
+          <h4 className="text-xl md:text-2xl font-semibold mb-2">{title}</h4>
 
           {extras?.awards && (
             <div className="mt-1 text-[12px] md:text-xs text-emerald-300">
@@ -326,51 +316,34 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
             </div>
           )}
 
-          {movie.overview && (
+          {overview && (
             <p className="mt-2 text-sm md:text-base text-neutral-200 leading-relaxed line-clamp-3">
-              {short(movie.overview)}
+              {short(overview)}
             </p>
           )}
 
-          {/* Botones: Detalles + redondos (favoritos/pendientes) */}
           <div className="mt-4 flex items-center gap-2">
             <Link href={href}>
               <button className="px-4 py-2 rounded-2xl bg-white text-black text-sm font-semibold hover:bg-neutral-200 transition-colors">
                 Ver detalles
               </button>
             </Link>
-
             <div className="flex-grow flex justify-end gap-2">
-              {/* Favoritos */}
               <button
                 onClick={handleToggleFavorite}
                 disabled={loadingStates || updating}
                 title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                 className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
               >
-                {loadingStates || updating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : favorite ? (
-                  <HeartOff className="w-5 h-5" />
-                ) : (
-                  <Heart className="w-5 h-5" />
-                )}
+                {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : favorite ? <HeartOff className="w-5 h-5" /> : <Heart className="w-5 h-5" />}
               </button>
-
-              {/* Pendientes */}
               <button
                 onClick={handleToggleWatchlist}
                 disabled={loadingStates || updating}
                 title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
                 className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
               >
-                {loadingStates || updating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : watchlist ? (
-                  <BookmarkMinus className="w-5 h-5" />
-                ) : (
-                  <BookmarkPlus className="w-5 h-5" />
-                )}
+                {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : watchlist ? <BookmarkMinus className="w-5 h-5" /> : <BookmarkPlus className="w-5 h-5" />}
               </button>
             </div>
           </div>
@@ -382,78 +355,67 @@ function HoverPreviewPortal({ open, anchorRect, movie, onClose }) {
   )
 }
 
-export default function MainDashboard({ sessionId = null }) {
+/* * ====================================================================
+ * Componente Principal: SeriesPage
+ * ==================================================================== */
+export default function SeriesPage() {
   const [ready, setReady] = useState(false)
   const [dashboardData, setDashboardData] = useState({})
-  const [hover, setHover] = useState(null) // { movie, rect }
+  const [hover, setHover] = useState(null) // { show, rect }
 
   const prevRef = useRef(null)
   const nextRef = useRef(null)
 
+  // Carga de datos para la página de series
   useEffect(() => {
     const loadData = async () => {
       try {
+        const lang = 'es-ES'
         const [
-          topRated,
-          cult,
-          mind,
-          action,
-          us,
-          underrated,
-          rising,
-          trending,
-          popular
+          popular,
+          top_imdb,
+          drama,
+          scifi_fantasy,
+          crime,
+          animation,
+          baseSections
         ] = await Promise.all([
-          fetchTopRatedMovies(),
-          fetchCultClassics(),
-          fetchMindBendingMovies(),
-          fetchTopActionMovies(),
-          fetchPopularInUS(),
-          fetchUnderratedMovies(),
-          fetchRisingMovies(),
-          fetchTrendingMovies(),
-          fetchPopularMovies()
+          fetchPopularMedia({ type: 'tv', language: lang }),
+          fetchTopRatedIMDb({ type: 'tv', minVotes: 5000, language: lang, limit: 20 }),
+          fetchMoviesByGenre({ type: 'tv', genreId: 18, minVotes: 1000, language: lang }),    // Drama
+          fetchMoviesByGenre({ type: 'tv', genreId: 10765, minVotes: 1000, language: lang }), // Sci-Fi & Fantasy
+          fetchMoviesByGenre({ type: 'tv', genreId: 80, minVotes: 1000, language: lang }),    // Crimen
+          fetchMoviesByGenre({ type: 'tv', genreId: 16, minVotes: 500, language: lang }),     // Animación
+          fetchTVSections ? fetchTVSections({ language: lang }) : Promise.resolve({})
         ])
 
-        const recommended = sessionId
-          ? await fetchRecommendedMovies(sessionId)
-          : []
-
-        const topRatedWithLogos = await Promise.all(
-          topRated.map(async (movie) => {
-            const logo = await getLogos('movie', movie.id)
-            return { ...movie, logo_path: logo }
-          })
-        )
-
         setDashboardData({
-          topRated: topRatedWithLogos,
-          cult,
-          mind,
-          action,
-          us,
-          underrated,
-          rising,
-          trending,
           popular,
-          recommended
+          top_imdb,
+          drama,
+          scifi_fantasy,
+          crime,
+          animation,
+          ...baseSections
         })
 
         setReady(true)
       } catch (err) {
-        console.error('Error cargando dashboard:', err)
+        console.error('Error cargando la página de series:', err)
       }
     }
 
     loadData()
-  }, [sessionId])
+  }, [])
 
-  if (!ready) return null
+  if (!ready) {
+    return <div className="h-screen bg-black" />
+  }
 
   /* ---------- handlers hover ---------- */
-  const onEnter = (movie, e) => {
+  const onEnter = (show, e) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    setHover({ movie, rect })
+    setHover({ show, rect })
   }
   const onLeave = () => {
     setTimeout(() => setHover((h) => (h?.locked ? h : null)), 80)
@@ -498,9 +460,10 @@ export default function MainDashboard({ sessionId = null }) {
               onMouseEnter={(e) => onEnter(m, e)}
               onMouseLeave={onLeave}
             >
+              {/* Pósters verticales */}
               <img
-                src={`https://image.tmdb.org/t/p/w300${m.poster_path || m.profile_path || m.backdrop_path}`}
-                alt={m.title || m.name}
+                src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
+                alt={m.name || m.title}
                 className="w-full h-full object-cover rounded-3xl aspect-[2/3] transition-transform duration-300 hover:scale-105"
                 loading="lazy"
               />
@@ -520,84 +483,49 @@ export default function MainDashboard({ sessionId = null }) {
     </div>
   )
 
-  /* ---------- Carrusel hero ---------- */
-  const TopRatedHero = () => (
-    <div className="relative group mb-10 sm:mb-14">
-      <Swiper
-        spaceBetween={20}
-        slidesPerView={3}
-        autoplay={{ delay: 5000 }}
-        navigation={{ prevEl: prevRef.current, nextEl: nextRef.current }}
-        onInit={(swiper) => {
-          swiper.params.navigation.prevEl = prevRef.current
-          swiper.params.navigation.nextEl = nextRef.current
-          swiper.navigation.init()
-          swiper.navigation.update()
-        }}
-        modules={[Navigation, Autoplay]}
-        className="group relative"
-        breakpoints={{
-          0: { slidesPerView: 1, spaceBetween: 12 },
-          640: { slidesPerView: 2, spaceBetween: 16 },
-          1024: { slidesPerView: 3, spaceBetween: 20 }
-        }}
-      >
-        {dashboardData.topRated?.map((movie) => (
-          <SwiperSlide key={movie.id}>
-            <Link href={`/details/movie/${movie.id}`}>
-              <div className="relative cursor-pointer overflow-hidden rounded-3xl">
-                <img
-                  src={`https://image.tmdb.org/t/p/original${movie.backdrop_path}`}
-                  alt={movie.title}
-                  className="w-full h-full object-cover rounded-3xl hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-                {movie.logo_path && (
-                  <img
-                    src={`https://image.tmdb.org/t/p/w200${movie.logo_path}`}
-                    alt={`${movie.title} logo`}
-                    className="absolute bottom-4 left-1/2 -translate-x-1/2 h-18 object-contain max-w-[50%] pointer-events-none"
-                  />
-                )}
-              </div>
-            </Link>
-          </SwiperSlide>
-        ))}
-        <div
-          ref={prevRef}
-          className="swiper-button-prev hidden sm:flex !text-white !w-8 !h-8 !items-center !justify-center group-hover:opacity-100 transition-opacity duration-300"
-        />
-        <div
-          ref={nextRef}
-          className="swiper-button-next hidden sm:flex !text-white !w-8 !h-8 !items-center !justify-center group-hover:opacity-100 transition-opacity duration-300"
-        />
-      </Swiper>
-    </div>
+  const GenreRows = ({ groups }) => (
+    <>
+      {Object.entries(groups || {}).map(([gname, list]) =>
+        list?.length ? <Row key={`genre-${gname}`} title={`Por género — ${gname}`} items={list} /> : null
+      )}
+    </>
   )
 
   return (
     <div className="px-8 py-2 text-white bg-black">
-      <TopRatedHero />
-
-      <div className="space-y-12">
-        <Row title="Populares" items={dashboardData.popular} />
-        <Row title="Tendencias Semanales" items={dashboardData.trending} />
-        <Row title="Guiones Complejos" items={dashboardData.mind} />
-        <Row title="Top Acción" items={dashboardData.action} />
-        <Row title="Populares en EE.UU." items={dashboardData.us} />
-        <Row title="Películas de Culto" items={dashboardData.cult} />
-        <Row title="Infravaloradas" items={dashboardData.underrated} />
-        <Row title="En Ascenso" items={dashboardData.rising} />
-        {dashboardData.recommended?.length > 0 && (
-          <Row title="Recomendadas Para Ti" items={dashboardData.recommended} />
+      <div className="space-y-12 pt-10">
+        {/* Filas de la página de series */}
+        {dashboardData.popular?.length > 0 && (
+          <Row title="Populares" items={dashboardData.popular} />
         )}
+        {dashboardData.top_imdb?.length > 0 && (
+          <Row title="Más Votadas" items={dashboardData.top_imdb} />
+        )}
+        {dashboardData.drama?.length > 0 && (
+          <Row title="Dramas Populares" items={dashboardData.drama} />
+        )}
+        {dashboardData.scifi_fantasy?.length > 0 && (
+          <Row title="Sci-Fi y Fantasía" items={dashboardData.scifi_fantasy} />
+        )}
+        {dashboardData.crime?.length > 0 && (
+          <Row title="Series de Crimen" items={dashboardData.crime} />
+        )}
+        {dashboardData.animation?.length > 0 && (
+          <Row title="Animación" items={dashboardData.animation} />
+        )}
+
+        {/* Secciones adicionales (En emisión, etc.) */}
+        {dashboardData['Top 10 hoy en España']?.length ? <Row title="Top 10 hoy en España" items={dashboardData['Top 10 hoy en España']} /> : null}
+        {dashboardData['En Emisión']?.length ? <Row title="En Emisión" items={dashboardData['En Emisión']} /> : null}
+        {dashboardData['Aclamadas por la crítica']?.length ? <Row title="Aclamadas por la crítica" items={dashboardData['Aclamadas por la crítica']} /> : null}
+        <GenreRows groups={dashboardData['Por género']} />
       </div>
 
       {/* Panel flotante */}
       <HoverPreviewPortal
-        open={!!hover?.movie}
+        open={!!hover?.show}
         anchorRect={hover?.rect || null}
-        movie={hover?.movie || null}
+        show={hover?.show || null}
         onClose={closeHover}
       />
     </div>
