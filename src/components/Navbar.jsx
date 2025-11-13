@@ -258,7 +258,7 @@ export default function Navbar() {
           <div className="flex items-center justify-between gap-2 h-10">
             {/* Izquierda: Logo */}
             {/* [MODIFICADO] Eliminado flex-shrink-0 del Link y ajustado el padding del div contenedor */}
-            <Link href="/" className="block h-10 overflow-hidden -ml-14">
+            <Link href="/" className="block h-10 overflow-hidden -ml-16">
               <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
                 <img
                   src="/TheShowVerse2.png"
