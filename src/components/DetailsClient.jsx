@@ -920,12 +920,6 @@ export default function DetailsClient({
                 <h2 className="text-2xl font-bold text-white mb-1">
                   Imágenes de la película
                 </h2>
-                <p className="text-xs text-gray-400">
-                  Elige la portada, el backdrop de vista previa y el fondo de la
-                  ficha. Se guardará en este navegador para futuras visitas.
-                  También puedes descargar cualquier imagen en resolución
-                  original o copiar su enlace.
-                </p>
               </div>
 
               {(selectedPosterPath ||
