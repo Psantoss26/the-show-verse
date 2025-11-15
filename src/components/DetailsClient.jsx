@@ -82,11 +82,17 @@ export default function DetailsClient({
   const endpointType = type === 'tv' ? 'tv' : 'movie'
 
   // ====== PREFERENCIAS DE IMÁGENES ======
+  // Portada
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
-  const backdropStorageKey = `showverse:${endpointType}:${id}:backdrop`
+  // Backdrop de VISTA PREVIA (mantiene la clave antigua para no romper nada)
+  const previewBackdropStorageKey = `showverse:${endpointType}:${id}:backdrop`
+  // Fondo de la vista de detalles (nuevo)
+  const backgroundStorageKey = `showverse:${endpointType}:${id}:background`
 
   const [selectedPosterPath, setSelectedPosterPath] = useState(null)
-  const [selectedBackdropPath, setSelectedBackdropPath] = useState(null)
+  const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] =
+    useState(null)
+  const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null)
 
   // Todas las imágenes (inicialmente al menos la portada/backdrop principal)
   const [imagesState, setImagesState] = useState(() => ({
@@ -99,13 +105,21 @@ export default function DetailsClient({
   }))
   const [imagesLoading, setImagesLoading] = useState(false)
   const [imagesError, setImagesError] = useState('')
-  const [activeImagesTab, setActiveImagesTab] = useState('posters') // 'posters' | 'backdrops'
+  const [activeImagesTab, setActiveImagesTab] = useState('posters') // 'posters' | 'backdrops' | 'background'
+
+  // Scroll horizontal de la fila de imágenes
+  const imagesScrollRef = useRef(null)
+  const [isHoveredImages, setIsHoveredImages] = useState(false)
+  const [canPrevImages, setCanPrevImages] = useState(false)
+  const [canNextImages, setCanNextImages] = useState(false)
 
   // Imagen final que se usa para la portada grande y el fondo
   const displayPosterPath =
     selectedPosterPath || data.poster_path || data.profile_path || null
+
+  // El fondo del detalle SOLO depende de selectedBackgroundPath
   const displayBackdropPath =
-    selectedBackdropPath || data.backdrop_path || null
+    selectedBackgroundPath || data.backdrop_path || null
 
   // ====== ESTADOS DE CUENTA (fetch) ======
   useEffect(() => {
@@ -205,7 +219,6 @@ export default function DetailsClient({
     } catch (err) {
       console.error(err)
       setRatingError(err.message || 'No se pudo guardar la puntuación.')
-      // revertir valor local: en este caso no sabemos el valor anterior, pero al menos no petamos
     } finally {
       setRatingLoading(false)
     }
@@ -315,11 +328,24 @@ export default function DetailsClient({
   // ====== Cargar selección guardada de imágenes ======
   useEffect(() => {
     if (typeof window === 'undefined') return
+
     const savedPoster = window.localStorage.getItem(posterStorageKey)
-    const savedBackdrop = window.localStorage.getItem(backdropStorageKey)
+    const savedPreviewBackdrop = window.localStorage.getItem(
+      previewBackdropStorageKey
+    )
+    const savedBackground = window.localStorage.getItem(backgroundStorageKey)
+
     if (savedPoster) setSelectedPosterPath(savedPoster)
-    if (savedBackdrop) setSelectedBackdropPath(savedBackdrop)
-  }, [posterStorageKey, backdropStorageKey])
+    if (savedPreviewBackdrop) setSelectedPreviewBackdropPath(savedPreviewBackdrop)
+
+    // Migración suave: si no hay fondo guardado pero sí backdrop previo, úsalo como fondo
+    if (savedBackground) {
+      setSelectedBackgroundPath(savedBackground)
+    } else if (savedPreviewBackdrop) {
+      setSelectedBackgroundPath(savedPreviewBackdrop)
+      window.localStorage.setItem(backgroundStorageKey, savedPreviewBackdrop)
+    }
+  }, [posterStorageKey, previewBackdropStorageKey, backgroundStorageKey])
 
   // ====== Cargar imágenes de TMDb ======
   useEffect(() => {
@@ -382,7 +408,7 @@ export default function DetailsClient({
     }
   }, [type, id, data?.images])
 
-  // ====== Handlers selección de poster / backdrop ======
+  // ====== Handlers selección de poster / backdrops / fondo ======
   const handleSelectPoster = (filePath) => {
     setSelectedPosterPath(filePath)
     if (typeof window !== 'undefined') {
@@ -394,25 +420,89 @@ export default function DetailsClient({
     }
   }
 
-  const handleSelectBackdrop = (filePath) => {
-    setSelectedBackdropPath(filePath)
+  // Backdrop para VISTA PREVIA
+  const handleSelectPreviewBackdrop = (filePath) => {
+    setSelectedPreviewBackdropPath(filePath)
     if (typeof window !== 'undefined') {
       if (filePath) {
-        window.localStorage.setItem(backdropStorageKey, filePath)
+        window.localStorage.setItem(previewBackdropStorageKey, filePath)
       } else {
-        window.localStorage.removeItem(backdropStorageKey)
+        window.localStorage.removeItem(previewBackdropStorageKey)
+      }
+    }
+  }
+
+  // Fondo de la vista de detalles
+  const handleSelectBackground = (filePath) => {
+    setSelectedBackgroundPath(filePath)
+    if (typeof window !== 'undefined') {
+      if (filePath) {
+        window.localStorage.setItem(backgroundStorageKey, filePath)
+      } else {
+        window.localStorage.removeItem(backgroundStorageKey)
       }
     }
   }
 
   const handleResetArtwork = () => {
     setSelectedPosterPath(null)
-    setSelectedBackdropPath(null)
+    setSelectedPreviewBackdropPath(null)
+    setSelectedBackgroundPath(null)
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(posterStorageKey)
-      window.localStorage.removeItem(backdropStorageKey)
+      window.localStorage.removeItem(previewBackdropStorageKey)
+      window.localStorage.removeItem(backgroundStorageKey)
     }
   }
+
+  // ====== Scroll horizontal imágenes: cálculo de flechas ======
+  const updateImagesNav = () => {
+    const el = imagesScrollRef.current
+    if (!el) return
+    const { scrollLeft, scrollWidth, clientWidth } = el
+    const hasOverflow = scrollWidth > clientWidth + 1
+    setCanPrevImages(hasOverflow && scrollLeft > 0)
+    setCanNextImages(
+      hasOverflow && scrollLeft + clientWidth < scrollWidth - 1
+    )
+  }
+
+  const handleImagesScroll = () => {
+    updateImagesNav()
+  }
+
+  const handlePrevImagesClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const el = imagesScrollRef.current
+    if (!el) return
+    el.scrollBy({ left: -400, behavior: 'smooth' })
+  }
+
+  const handleNextImagesClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const el = imagesScrollRef.current
+    if (!el) return
+    el.scrollBy({ left: 400, behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    updateImagesNav()
+    const onResize = () => updateImagesNav()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', onResize)
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', onResize)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagesState, activeImagesTab])
+
+  const showPrevImages = isHoveredImages && canPrevImages
+  const showNextImages = isHoveredImages && canNextImages
 
   // ===== UI helpers =====
   const scrollLeft = (ref) =>
@@ -516,9 +606,7 @@ export default function DetailsClient({
                 <button
                   onClick={toggleFavorite}
                   disabled={favLoading}
-                  title={
-                    favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'
-                  }
+                  title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                   className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
                 >
                   {favLoading ? (
@@ -534,9 +622,7 @@ export default function DetailsClient({
                   onClick={toggleWatchlist}
                   disabled={wlLoading}
                   title={
-                    watchlist
-                      ? 'Quitar de pendientes'
-                      : 'Añadir a pendientes'
+                    watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'
                   }
                   className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
                 >
@@ -560,7 +646,7 @@ export default function DetailsClient({
                     alt="TMDb"
                     className="h-4 w-auto rounded-[3px]"
                   />
-                <span className="text-white/90">
+                  <span className="text-white/90">
                     {Number(data.vote_average || 0).toFixed(1)}
                   </span>
                 </span>
@@ -815,12 +901,14 @@ export default function DetailsClient({
                   Imágenes de la película
                 </h2>
                 <p className="text-xs text-gray-400">
-                  Elige la portada y el fondo que prefieras. Se guardará en este
-                  navegador para futuras visitas.
+                  Elige la portada, el backdrop de vista previa y el fondo de la
+                  ficha. Se guardará en este navegador para futuras visitas.
                 </p>
               </div>
 
-              {(selectedPosterPath || selectedBackdropPath) && (
+              {(selectedPosterPath ||
+                selectedPreviewBackdropPath ||
+                selectedBackgroundPath) && (
                 <button
                   onClick={handleResetArtwork}
                   className="px-3 py-1 text-xs rounded-full bg-neutral-800 hover:bg-neutral-700 text-gray-200 border border-neutral-600"
@@ -830,7 +918,7 @@ export default function DetailsClient({
               )}
             </div>
 
-            {/* Tabs posters / backdrops */}
+            {/* Tabs posters / backdrops / fondo */}
             <div className="inline-flex items-center bg-neutral-900/80 rounded-full p-1 border border-neutral-700 mb-4">
               <button
                 type="button"
@@ -854,6 +942,17 @@ export default function DetailsClient({
               >
                 Backdrops
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveImagesTab('background')}
+                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                  activeImagesTab === 'background'
+                    ? 'bg-white text-black'
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                Fondo
+              </button>
             </div>
 
             {/* Estado de carga / error */}
@@ -869,24 +968,45 @@ export default function DetailsClient({
               </div>
             )}
 
-            {/* Listado de imágenes */}
-            <div className="relative">
-              <div className="flex gap-3 overflow-x-auto pb-2">
+            {/* Listado de imágenes con flechas y fondo difuminado lateral */}
+            <div
+              className="relative"
+              onMouseEnter={() => setIsHoveredImages(true)}
+              onMouseLeave={() => setIsHoveredImages(false)}
+            >
+              <div
+                ref={imagesScrollRef}
+                onScroll={handleImagesScroll}
+                className="flex gap-3 overflow-x-auto pb-2 no-scrollbar"
+              >
                 {(activeImagesTab === 'posters'
                   ? imagesState.posters
                   : imagesState.backdrops
                 ).map((img) => {
                   const filePath = img.file_path
+
                   const isPosterTab = activeImagesTab === 'posters'
+                  const isPreviewTab = activeImagesTab === 'backdrops'
+                  const isBackgroundTab = activeImagesTab === 'background'
 
-                  const isActive = isPosterTab
-                    ? displayPosterPath === filePath
-                    : displayBackdropPath === filePath
+                  let isActive = false
+                  if (isPosterTab) {
+                    isActive = displayPosterPath === filePath
+                  } else if (isPreviewTab) {
+                    isActive = selectedPreviewBackdropPath === filePath
+                  } else if (isBackgroundTab) {
+                    isActive = displayBackdropPath === filePath
+                  }
 
-                  const handleClick = () =>
-                    isPosterTab
-                      ? handleSelectPoster(filePath)
-                      : handleSelectBackdrop(filePath)
+                  const handleClick = () => {
+                    if (isPosterTab) {
+                      handleSelectPoster(filePath)
+                    } else if (isPreviewTab) {
+                      handleSelectPreviewBackdrop(filePath)
+                    } else {
+                      handleSelectBackground(filePath)
+                    }
+                  }
 
                   return (
                     <button
@@ -903,7 +1023,9 @@ export default function DetailsClient({
                         src={`https://image.tmdb.org/t/p/${
                           isPosterTab ? 'w342' : 'w780'
                         }${filePath}`}
-                        alt={`${title} ${isPosterTab ? 'poster' : 'backdrop'}`}
+                        alt={`${title} ${
+                          isPosterTab ? 'poster' : 'backdrop'
+                        }`}
                         className={`${
                           isPosterTab
                             ? 'w-[150px] aspect-[2/3]'
@@ -930,11 +1052,47 @@ export default function DetailsClient({
                       No hay{' '}
                       {activeImagesTab === 'posters'
                         ? 'portadas'
-                        : 'backdrops'}{' '}
+                        : activeImagesTab === 'backdrops'
+                        ? 'backdrops'
+                        : 'fondos'}{' '}
                       adicionales disponibles para esta película.
                     </div>
                   )}
               </div>
+
+              {/* LATERAL IZQUIERDO – franja difuminada */}
+              {showPrevImages && (
+                <button
+                  type="button"
+                  onClick={handlePrevImagesClick}
+                  className="absolute inset-y-0 left-0 w-20 z-30
+                             hidden sm:flex items-center justify-start
+                             bg-gradient-to-r from-black/80 via-black/55 to-transparent
+                             hover:from-black/95 hover:via-black/75
+                             transition-colors pointer-events-auto"
+                >
+                  <span className="ml-3 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
+                    ‹
+                  </span>
+                </button>
+              )}
+
+              {/* LATERAL DERECHO – franja difuminada */}
+              {showNextImages && (
+                <button
+                  type="button"
+                  onClick={handleNextImagesClick}
+                  className="absolute inset-y-0 right-0 w-20 z-30
+                             hidden sm:flex items-center justify-end
+                             bg-gradient-to-l from-black/80 via-black/55 to-transparent
+                             hover:from-black/95 hover:via-black/75
+                             transition-colors pointer-events-auto"
+                >
+                  <span className="mr-3 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
+                    ›
+                  </span>
+                </button>
+              )}
             </div>
           </section>
         )}
@@ -1070,9 +1228,7 @@ export default function DetailsClient({
                           {author_details?.username || author}
                         </p>
                         <p className="text-sm text-gray-400">
-                          {new Date(
-                            created_at
-                          ).toLocaleDateString()}
+                          {new Date(created_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
