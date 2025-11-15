@@ -52,6 +52,10 @@ const mergeUniqueImages = (current, incoming) => {
   return merged
 }
 
+// URL original de TMDb
+const buildOriginalImageUrl = (filePath) =>
+  `https://image.tmdb.org/t/p/original${filePath}`
+
 export default function DetailsClient({
   type,
   id,
@@ -452,6 +456,22 @@ export default function DetailsClient({
       window.localStorage.removeItem(posterStorageKey)
       window.localStorage.removeItem(previewBackdropStorageKey)
       window.localStorage.removeItem(backgroundStorageKey)
+    }
+  }
+
+  // Copiar enlace de imagen original
+  const handleCopyImageUrl = async (filePath) => {
+    const url = buildOriginalImageUrl(filePath)
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url)
+        // Si quieres, aquí podrías añadir un pequeño toast de "Copiado"
+      } else {
+        // Fallback simple
+        window.prompt('Copia el enlace de la imagen:', url)
+      }
+    } catch {
+      window.prompt('Copia el enlace de la imagen:', url)
     }
   }
 
@@ -903,6 +923,8 @@ export default function DetailsClient({
                 <p className="text-xs text-gray-400">
                   Elige la portada, el backdrop de vista previa y el fondo de la
                   ficha. Se guardará en este navegador para futuras visitas.
+                  También puedes descargar cualquier imagen en resolución
+                  original o copiar su enlace.
                 </p>
               </div>
 
@@ -1008,38 +1030,71 @@ export default function DetailsClient({
                     }
                   }
 
+                  const originalUrl = buildOriginalImageUrl(filePath)
+
                   return (
-                    <button
+                    <div
                       key={`${activeImagesTab}-${filePath}`}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={handleClick}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleClick();
+                        }
+                      }}
                       className={`relative flex-shrink-0 rounded-lg overflow-hidden border-2 ${
                         isActive
-                          ? 'border-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.6)]'
-                          : 'border-transparent hover:border-neutral-500'
+                          ? "border-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.6)]"
+                          : "border-transparent hover:border-neutral-500"
                       } transition-all`}
                     >
                       <img
                         src={`https://image.tmdb.org/t/p/${
-                          isPosterTab ? 'w342' : 'w780'
+                          isPosterTab ? "w342" : "w780"
                         }${filePath}`}
-                        alt={`${title} ${
-                          isPosterTab ? 'poster' : 'backdrop'
-                        }`}
+                        alt={`${title} ${isPosterTab ? "poster" : "backdrop"}`}
                         className={`${
                           isPosterTab
-                            ? 'w-[150px] aspect-[2/3]'
-                            : 'w-[260px] aspect-[16/9]'
+                            ? "w-[150px] aspect-[2/3]"
+                            : "w-[260px] aspect-[16/9]"
                         } object-cover`}
                       />
 
+                      {/* Estado "usando" */}
                       {isActive && (
                         <div className="absolute top-1 left-1 px-2 py-0.5 rounded-full bg-emerald-500/90 text-[10px] font-semibold text-black">
                           Usando
                         </div>
                       )}
-                    </button>
-                  )
+
+                      {/* ICONO DE DESCARGA (solo uno, abre nueva pestaña) */}
+                      <a
+                        href={originalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute bottom-1 right-1 bg-black/70 hover:bg-black/90 text-white p-1.5 rounded-full transition"
+                        title="Ver imagen en alta resolución"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"
+                          />
+                        </svg>
+                      </a>
+                    </div>
+                  );
                 })}
 
                 {/* Sin resultados en la pestaña actual */}
