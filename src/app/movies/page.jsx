@@ -140,11 +140,9 @@ function curateList(
       return votes >= minV && rating >= minR
     })
 
-  // 1) intento con filtro “fuerte”
   let current = applyFilter(minVotes, minRating)
   if (current.length >= minSize) return current.slice(0, maxSize)
 
-  // 2) relajar filtros en varios pasos para asegurar tamaño mínimo
   const steps = [
     { factorV: 0.7, deltaR: -0.3 },
     { factorV: 0.5, deltaR: -0.6 },
@@ -162,7 +160,6 @@ function curateList(
     if (current.length >= minSize) return current.slice(0, maxSize)
   }
 
-  // 3) fallback: top por votos sin filtro, asegurando mínimo
   if (sorted.length === 0) return []
   const size = Math.min(sorted.length, Math.max(minSize, maxSize))
   return sorted.slice(0, size)
@@ -292,10 +289,9 @@ function getArtworkPreference(movieId) {
  * Portada normal (2:3), mismo alto que la vista previa
  * ==================================================================== */
 function PosterImage({ movie, cache, heightClass }) {
-  const [posterPath, setPosterPath] = useState(
-    movie.poster_path || movie.backdrop_path || null
-  )
-  const [ready, setReady] = useState(!!posterPath)
+  // 👇 Portada inicial solo usa poster_path
+  const [posterPath, setPosterPath] = useState(movie.poster_path || null)
+  const [ready, setReady] = useState(!!movie.poster_path)
 
   useEffect(() => {
     let abort = false
@@ -303,17 +299,14 @@ function PosterImage({ movie, cache, heightClass }) {
     const load = async () => {
       if (!movie) return
 
-      // 1) Preferencia del usuario (poster o backdrop elegido en DetailsClient)
-      const { poster: userPoster, backdrop: userBackdrop } =
-        getArtworkPreference(movie.id)
-      const userPreferred = userPoster || userBackdrop || null
-
-      if (userPreferred) {
-        const url = buildImg(userPreferred, 'w342')
+      // 1) Preferencia del usuario: SOLO poster
+      const { poster: userPoster } = getArtworkPreference(movie.id)
+      if (userPoster) {
+        const url = buildImg(userPoster, 'w342')
         await preloadImage(url)
         if (!abort) {
-          cache.current.set(movie.id, userPreferred)
-          setPosterPath(userPreferred)
+          cache.current.set(movie.id, userPoster)
+          setPosterPath(userPoster)
           setReady(true)
         }
         return
@@ -334,7 +327,8 @@ function PosterImage({ movie, cache, heightClass }) {
       // 3) Lógica normal: mejor poster ES/EN
       setReady(false)
       const preferred = await fetchPosterEsThenEn(movie.id)
-      const chosen = preferred || movie.poster_path || movie.backdrop_path || null
+      const chosen =
+        preferred || movie.poster_path || movie.backdrop_path || null
       const url = chosen ? buildImg(chosen, 'w342') : null
       await preloadImage(url)
       if (!abort) {
@@ -425,10 +419,9 @@ function InlinePreviewCard({ movie, heightClass }) {
     if (!movie) return
 
     const loadAll = async () => {
-      // 1) Backdrop preferido por el usuario (o incluso poster)
-      const { poster: userPoster, backdrop: userBackdrop } =
-        getArtworkPreference(movie.id)
-      const userPreferredBackdrop = userBackdrop || userPoster || null
+      // 1) Backdrop preferido por el usuario (SOLO :backdrop)
+      const { backdrop: userBackdrop } = getArtworkPreference(movie.id)
+      const userPreferredBackdrop = userBackdrop || null
 
       if (userPreferredBackdrop) {
         movieBackdropCache.set(movie.id, userPreferredBackdrop)
@@ -541,7 +534,6 @@ function InlinePreviewCard({ movie, heightClass }) {
     return false
   }
 
-  // Evitar que los botones disparen la navegación
   const handleToggleFavorite = async (e) => {
     e.stopPropagation()
     if (requireLogin() || updating || !movie) return
@@ -588,11 +580,12 @@ function InlinePreviewCard({ movie, heightClass }) {
     }
   }
 
-  const backdrop =
+  // 👇 Backdrop final para la preview: SOLO se ve afectado por :backdrop,
+  // nunca por la portada personalizada
+  const resolvedBackdrop =
     backdropPath || movie.backdrop_path || movie.poster_path || null
-  const bgSrc = backdrop ? buildImg(backdrop, 'w1280') : null
+  const bgSrc = resolvedBackdrop ? buildImg(resolvedBackdrop, 'w1280') : null
 
-  // Géneros legibles (máx 3)
   const genres = (() => {
     const ids =
       movie.genre_ids ||
@@ -624,20 +617,17 @@ function InlinePreviewCard({ movie, heightClass }) {
           />
         )}
 
-        {/* Difuminado únicamente en la parte inferior */}
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%]
                  bg-gradient-to-t from-black/95 via-black/65 to-transparent"
         />
       </div>
 
-      {/* Contenido en franja inferior (sin título) */}
+      {/* Contenido en franja inferior */}
       <div className="relative z-10 flex-1 flex flex-col justify-end">
         <div className="px-4 sm:px-6 lg:px-8 pb-4 sm:pb-5 lg:pb-6">
           <div className="flex items-end justify-between gap-4">
-            {/* Columna izquierda: meta + géneros + premios */}
             <div className="min-w-0 flex-1 space-y-1">
-              {/* Línea de meta / ratings */}
               <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
                 {yearOf(movie) && <span>{yearOf(movie)}</span>}
                 {extras?.runtime && (
@@ -671,14 +661,12 @@ function InlinePreviewCard({ movie, heightClass }) {
                 )}
               </div>
 
-              {/* Géneros */}
               {genres && (
                 <div className="text-[11px] sm:text-xs text-neutral-100/90 line-clamp-1 drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]">
                   {genres}
                 </div>
               )}
 
-              {/* Premios / nominaciones */}
               {extras?.awards && (
                 <div className="text-[11px] sm:text-xs text-emerald-300 line-clamp-2 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
                   {extras.awards}
@@ -686,7 +674,6 @@ function InlinePreviewCard({ movie, heightClass }) {
               )}
             </div>
 
-            {/* Columna derecha: botones */}
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
               <button
                 onClick={handleToggleFavorite}
@@ -741,7 +728,6 @@ export default function MoviesPage() {
   const [dashboardData, setDashboardData] = useState({})
   const isTouchDevice = useIsTouchDevice()
 
-  // Caché global de portadas (movie.id -> file_path)
   const posterCacheRef = useRef(new Map())
 
   useEffect(() => {
