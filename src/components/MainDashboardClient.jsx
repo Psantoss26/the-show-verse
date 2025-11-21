@@ -33,7 +33,9 @@ const anton = Anton({ weight: '400', subsets: ['latin'] })
 const useIsTouchDevice = () => {
     const [isTouch, setIsTouch] = useState(false)
     useEffect(() => {
-        const onTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+        const onTouch =
+            typeof window !== 'undefined' &&
+            ('ontouchstart' in window || navigator.maxTouchPoints > 0)
         setIsTouch(onTouch)
     }, [])
     return isTouch
@@ -114,7 +116,6 @@ async function fetchBackdropEsThenEn(movieId) {
             `https://api.themoviedb.org/3/movie/${movieId}/images` +
             `?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}` +
             `&language=es-ES&include_image_language=es,es-ES,en,en-US`
-
         const r = await fetch(url, { cache: 'force-cache' })
         const j = await r.json()
         const backs = Array.isArray(j?.backdrops) ? j.backdrops : []
@@ -166,7 +167,8 @@ function preloadImage(src) {
 
 /* =================== CACHÉS COMPARTIDOS (cliente) =================== */
 const movieExtrasCache = new Map() // movie.id -> { runtime, awards, imdbRating }
-const movieBackdropCache = new Map() // movie.id -> backdrop file_path
+const movieBackdropCache = new Map() // movie.id -> backdrop file_path (preview)
+const heroBackdropCache = new Map() // movie.id -> backdrop file_path (hero)
 
 /* ====================================================================
  * Portada normal (2:3), mismo alto que la vista previa
@@ -286,13 +288,13 @@ function InlinePreviewCard({ movie, heightClass }) {
         }
     }, [movie, session, account])
 
-    // Backdrop + extras con caché (AHORA usando selección ES/EN por votos)
+    // Backdrop + extras con caché (ES/EN por votos)
     useEffect(() => {
         let abort = false
         if (!movie) return
 
         const loadAll = async () => {
-            // Backdrop: idioma ES -> EN + votos, con caché
+            // === BACKDROP (mismo criterio que en Películas/Series) ===
             const cachedBackdrop = movieBackdropCache.get(movie.id)
             if (cachedBackdrop !== undefined) {
                 if (!abort) {
@@ -336,7 +338,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                 }
             }
 
-            // Extras (runtime, awards, imdbRating)
+            // === EXTRAS (runtime, awards, imdbRating) ===
             const cachedExtras = movieExtrasCache.get(movie.id)
             if (cachedExtras) {
                 if (!abort) setExtras(cachedExtras)
@@ -570,6 +572,103 @@ function InlinePreviewCard({ movie, heightClass }) {
     )
 }
 
+/* =================== SLIDE del HERO con mismo filtro de backdrops =================== */
+
+const HERO_HEIGHT =
+    'h-[220px] sm:h-[260px] md:h-[320px] lg:h-[380px] xl:h-[420px]'
+
+function HeroSlide({ movie }) {
+    const [path, setPath] = useState(
+        movie.backdrop_path || movie.poster_path || movie.profile_path || null
+    )
+    const [ready, setReady] = useState(false)
+
+    useEffect(() => {
+        let abort = false
+
+        const load = async () => {
+            if (!movie) return
+
+            // 1) Intentar caché
+            const cached = heroBackdropCache.get(movie.id)
+            if (cached !== undefined) {
+                if (!abort) {
+                    setPath(cached)
+                    if (cached) {
+                        const url = buildImg(cached, 'w1280')
+                        await preloadImage(url)
+                        if (!abort) setReady(true)
+                    } else {
+                        setReady(false)
+                    }
+                }
+                return
+            }
+
+            // 2) Seleccionar ES -> EN por votos (igual que en Películas/Series)
+            try {
+                const preferred = await fetchBackdropEsThenEn(movie.id)
+                const chosen =
+                    preferred ||
+                    movie.backdrop_path ||
+                    movie.poster_path ||
+                    movie.profile_path ||
+                    null
+
+                heroBackdropCache.set(movie.id, chosen)
+
+                if (!abort) {
+                    if (chosen) {
+                        const url = buildImg(chosen, 'w1280')
+                        await preloadImage(url)
+                        if (!abort) {
+                            setPath(chosen)
+                            setReady(true)
+                        }
+                    } else {
+                        setPath(null)
+                        setReady(false)
+                    }
+                }
+            } catch {
+                if (!abort) {
+                    setReady(false)
+                }
+            }
+        }
+
+        load()
+        return () => {
+            abort = true
+        }
+    }, [movie])
+
+    return (
+        <div
+            className={`relative cursor-pointer overflow-hidden rounded-3xl ${HERO_HEIGHT} bg-neutral-900`}
+        >
+            {!ready && (
+                <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
+            )}
+
+            {ready && path && (
+                <img
+                    src={buildImg(path, 'w1280')}
+                    srcSet={`${buildImg(path, 'w780')} 780w, ${buildImg(
+                        path,
+                        'w1280'
+                    )} 1280w, ${buildImg(path, 'original')} 2400w`}
+                    sizes="(min-width:1536px) 1200px, (min-width:1280px) 1100px, (min-width:1024px) 900px, 95vw"
+                    alt={movie.title || movie.name}
+                    className="w-full h-full object-cover rounded-3xl hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                    decoding="async"
+                />
+            )}
+        </div>
+    )
+}
+
 /* ---------- Fila reusable (mismo diseño que películas/series) ---------- */
 function Row({ title, items, isTouchDevice, posterCacheRef }) {
     if (!items || items.length === 0) return null
@@ -659,7 +758,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         1280: { spaceBetween: 20 }
                     }}
                 >
-                    {items.map((m, i) => {
+                    {items.slice(0, 12).map((m, i) => {
                         const isActive = hoveredId === m.id
                         const isLast = i === items.length - 1
 
@@ -856,31 +955,10 @@ function TopRatedHero({ items, isTouchDevice }) {
                         1024: { slidesPerView: 3, spaceBetween: 20 }
                     }}
                 >
-                    {items.map((movie) => (
+                    {items.slice(0, 12).map((movie) => (
                         <SwiperSlide key={movie.id}>
                             <Link href={`/details/movie/${movie.id}`}>
-                                <div className="relative cursor-pointer overflow-hidden rounded-3xl">
-                                    {movie.backdrop_path && (
-                                        <img
-                                            src={buildImg(movie.backdrop_path, 'w1280')}
-                                            srcSet={`${buildImg(
-                                                movie.backdrop_path,
-                                                'w780'
-                                            )} 780w, ${buildImg(
-                                                movie.backdrop_path,
-                                                'w1280'
-                                            )} 1280w, ${buildImg(
-                                                movie.backdrop_path,
-                                                'original'
-                                            )} 2400w`}
-                                            sizes="(min-width:1536px) 1200px, (min-width:1280px) 1100px, (min-width:1024px) 900px, 95vw"
-                                            alt={movie.title || movie.name}
-                                            className="w-full h-full object-cover rounded-3xl hover:scale-105 transition-transform duration-300"
-                                            loading="lazy"
-                                            decoding="async"
-                                        />
-                                    )}
-                                </div>
+                                <HeroSlide movie={movie} />
                             </Link>
                         </SwiperSlide>
                     ))}
