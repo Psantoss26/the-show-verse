@@ -63,7 +63,6 @@ const buildImg = (path, size = 'original') =>
     `https://image.tmdb.org/t/p/${size}${path}`
 
 /* ========= elegir mejor poster: ES -> EN, y por calidad ========= */
-/* AHORA solo se usa como fallback si no hay ninguna imagen en los datos del servidor */
 async function fetchMoviePosterEsThenEn(movieId) {
     try {
         const url =
@@ -109,7 +108,6 @@ async function fetchMoviePosterEsThenEn(movieId) {
 }
 
 /* ========= elegir mejor backdrop: ES -> EN, y por calidad ========= */
-/* AHORA solo se usa como fallback si no hay backdrop/poster/profile en los datos del servidor */
 async function fetchBackdropEsThenEn(movieId) {
     try {
         const url =
@@ -171,8 +169,6 @@ const movieExtrasCache = new Map() // movie.id -> { runtime, awards, imdbRating 
 const movieBackdropCache = new Map() // movie.id -> backdrop file_path
 
 /* ======== Preferencias de artwork guardadas en localStorage ======== */
-/* Siguen existiendo como override personal, pero por debajo quedan
-   los overrides globales que llegan ya en movie.poster_path/backdrop_path */
 function getArtworkPreference(movieId) {
     if (typeof window === 'undefined') {
         return { poster: null, backdrop: null }
@@ -200,7 +196,7 @@ function PosterImage({ movie, cache, heightClass }) {
         const load = async () => {
             if (!movie) return
 
-            // 1) Preferencia del usuario (poster) – override personal
+            // 1) Preferencia del usuario (poster)
             const { poster: userPoster } = getArtworkPreference(movie.id)
             if (userPoster) {
                 const url = buildImg(userPoster, 'w342')
@@ -213,7 +209,7 @@ function PosterImage({ movie, cache, heightClass }) {
                 return
             }
 
-            // 2) Cache en memoria (puede venir de ejecuciones previas en esta sesión)
+            // 2) Cache en memoria
             const cached = cache.current.get(movie.id)
             if (cached) {
                 const url = buildImg(cached, 'w342')
@@ -225,21 +221,15 @@ function PosterImage({ movie, cache, heightClass }) {
                 return
             }
 
-            // 3) Datos que YA vienen del servidor (incluyendo overrides globales)
-            //    Si hay poster/backdrop/profile, NO pisamos nada con heurística
-            const serverPoster =
-                movie.poster_path || movie.backdrop_path || movie.profile_path || null
-
-            let chosen = serverPoster
-            let preferred = null
-
-            // 4) Solo si NO hay ninguna imagen en los datos del servidor,
-            //    usamos la lógica ES/EN + votos como fallback
-            if (!chosen) {
-                preferred = await fetchMoviePosterEsThenEn(movie.id)
-                chosen = preferred || null
-            }
-
+            // 3) Lógica normal: mejor poster ES/EN
+            setReady(false)
+            const preferred = await fetchMoviePosterEsThenEn(movie.id)
+            const chosen =
+                preferred ||
+                movie.poster_path ||
+                movie.backdrop_path ||
+                movie.profile_path ||
+                null
             const url = chosen ? buildImg(chosen, 'w342') : null
             await preloadImage(url)
             if (!abort) {
@@ -324,13 +314,13 @@ function InlinePreviewCard({ movie, heightClass }) {
         }
     }, [movie, session, account])
 
-    // Backdrop + extras con caché, overrides globales y preferencia de usuario
+    // Backdrop + extras con caché y preferencia de usuario (igual que en MoviesPageClient)
     useEffect(() => {
         let abort = false
         if (!movie) return
 
         const loadAll = async () => {
-            // 1) Backdrop preferido por el usuario (override personal)
+            // 1) Backdrop preferido por el usuario
             const { backdrop: userBackdrop } = getArtworkPreference(movie.id)
             const userPreferredBackdrop = userBackdrop || null
 
@@ -343,28 +333,9 @@ function InlinePreviewCard({ movie, heightClass }) {
                     setBackdropReady(true)
                 }
             } else {
-                // 2) Valor que llega del servidor (incluye overrides globales en BD)
-                const serverBackdrop =
-                    movie.backdrop_path ||
-                    movie.poster_path ||
-                    movie.profile_path ||
-                    null
-
+                // 2) Backdrop desde caché o TMDb (ES -> EN + votos)
                 const cachedBackdrop = movieBackdropCache.get(movie.id)
-
-                if (serverBackdrop) {
-                    // El servidor manda: sincronizamos la caché con lo que venga de ahí
-                    if (cachedBackdrop !== serverBackdrop) {
-                        movieBackdropCache.set(movie.id, serverBackdrop)
-                    }
-                    const url = buildImg(serverBackdrop, 'w1280')
-                    await preloadImage(url)
-                    if (!abort) {
-                        setBackdropPath(serverBackdrop)
-                        setBackdropReady(true)
-                    }
-                } else if (cachedBackdrop !== undefined) {
-                    // No hay dato de servidor, pero sí algo cacheado en esta sesión
+                if (cachedBackdrop !== undefined) {
                     if (!abort) {
                         setBackdropPath(cachedBackdrop)
                         if (cachedBackdrop) {
@@ -376,10 +347,14 @@ function InlinePreviewCard({ movie, heightClass }) {
                         }
                     }
                 } else {
-                    // 3) Sin servidor ni caché: usamos la lógica ES/EN + votos como fallback
                     try {
                         const preferred = await fetchBackdropEsThenEn(movie.id)
-                        const chosen = preferred || null
+                        const chosen =
+                            preferred ||
+                            movie.backdrop_path ||
+                            movie.poster_path ||
+                            movie.profile_path ||
+                            null
 
                         movieBackdropCache.set(movie.id, chosen)
 
@@ -403,7 +378,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                 }
             }
 
-            // 4) Extras (runtime, awards, imdbRating) con caché
+            // 3) Extras (runtime, awards, imdbRating)
             const cachedExtras = movieExtrasCache.get(movie.id)
             if (cachedExtras) {
                 if (!abort) setExtras(cachedExtras)
@@ -924,18 +899,14 @@ function TopRatedHero({ items, isTouchDevice }) {
                     }}
                 >
                     {items.map((movie) => {
-                        // Usar el mismo criterio que la vista previa pero
-                        // confiando primero en lo que viene del servidor (overrides globales)
+                        // Usar el mismo criterio de selección que en la vista previa:
+                        // 1) backdrop preferido del usuario
+                        // 2) backdrop cacheado
+                        // 3) backdrop ya calculado en server
                         const { backdrop: userBackdrop } = getArtworkPreference(movie.id)
                         const cached = movieBackdropCache.get(movie.id) || null
-                        const fromServer =
-                            movie.backdrop_path ||
-                            movie.poster_path ||
-                            movie.profile_path ||
-                            null
-
                         const heroBackdrop =
-                            userBackdrop || fromServer || cached || null
+                            userBackdrop || cached || movie.backdrop_path || movie.poster_path
 
                         if (!heroBackdrop) {
                             return (
@@ -953,16 +924,10 @@ function TopRatedHero({ items, isTouchDevice }) {
                                     <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9]">
                                         <img
                                             src={buildImg(heroBackdrop, 'w1280')}
-                                            srcSet={`${buildImg(
-                                                heroBackdrop,
-                                                'w780'
-                                            )} 780w, ${buildImg(
+                                            srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
                                                 heroBackdrop,
                                                 'w1280'
-                                            )} 1280w, ${buildImg(
-                                                heroBackdrop,
-                                                'original'
-                                            )} 2400w`}
+                                            )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
                                             sizes="(min-width:1536px) 1200px, (min-width:1280px) 1100px, (min-width:1024px) 900px, 95vw"
                                             alt={movie.title || movie.name}
                                             className="absolute inset-0 w-full h-full object-cover rounded-3xl hover:scale-105 transition-transform duration-300"
@@ -1004,7 +969,7 @@ function TopRatedHero({ items, isTouchDevice }) {
                        hover:from-black/90 hover:via-black/65
                        transition-colors pointer-events-auto"
                     >
-                        <span className="mr-4 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
+                        <span className="mr-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ›
                         </span>
                     </button>
