@@ -56,6 +56,42 @@ const mergeUniqueImages = (current, incoming) => {
 const buildOriginalImageUrl = (filePath) =>
   `https://image.tmdb.org/t/p/original${filePath}`
 
+/**
+ * Persistir override global de artwork (portada / backdrop) en el backend.
+ * Espera que existan las rutas:
+ *   /api/artwork/movie
+ *   /api/artwork/tv
+ * con método POST que acepte { tmdbId, poster_path, backdrop_path }.
+ */
+async function persistArtworkOverride({
+  endpointType,
+  id,
+  posterPath,
+  backdropPath
+}) {
+  try {
+    const res = await fetch(`/api/artwork/${endpointType}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        tmdbId: Number(id),
+        // null => volver a usar las imágenes originales de TMDb
+        poster_path: posterPath ?? null,
+        backdrop_path: backdropPath ?? null
+      })
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      console.error('No se pudo guardar la selección global de imágenes:', text)
+    }
+  } catch (err) {
+    console.error('Error de red guardando la selección global de imágenes:', err)
+  }
+}
+
 export default function DetailsClient({
   type,
   id,
@@ -88,9 +124,9 @@ export default function DetailsClient({
   // ====== PREFERENCIAS DE IMÁGENES ======
   // Portada
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
-  // Backdrop de VISTA PREVIA (mantiene la clave antigua para no romper nada)
+  // Backdrop de VISTA PREVIA (se mantiene esta key para que funcione con Movies/MainDashboard)
   const previewBackdropStorageKey = `showverse:${endpointType}:${id}:backdrop`
-  // Fondo de la vista de detalles (nuevo)
+  // Fondo de la vista de detalles (solo local)
   const backgroundStorageKey = `showverse:${endpointType}:${id}:background`
 
   const [selectedPosterPath, setSelectedPosterPath] = useState(null)
@@ -100,9 +136,7 @@ export default function DetailsClient({
 
   // Todas las imágenes (inicialmente al menos la portada/backdrop principal)
   const [imagesState, setImagesState] = useState(() => ({
-    posters: data.poster_path
-      ? [{ file_path: data.poster_path, from: 'main' }]
-      : [],
+    posters: data.poster_path ? [{ file_path: data.poster_path, from: 'main' }] : [],
     backdrops: data.backdrop_path
       ? [{ file_path: data.backdrop_path, from: 'main' }]
       : []
@@ -117,11 +151,11 @@ export default function DetailsClient({
   const [canPrevImages, setCanPrevImages] = useState(false)
   const [canNextImages, setCanNextImages] = useState(false)
 
-  // Imagen final que se usa para la portada grande y el fondo
+  // Imagen final que se usa para la portada grande
   const displayPosterPath =
     selectedPosterPath || data.poster_path || data.profile_path || null
 
-  // El fondo del detalle SOLO depende de selectedBackgroundPath
+  // El fondo del detalle SOLO depende de selectedBackgroundPath o del backdrop de data
   const displayBackdropPath =
     selectedBackgroundPath || data.backdrop_path || null
 
@@ -369,7 +403,7 @@ export default function DetailsClient({
 
     if (!TMDB_API_KEY) {
       setImagesError(
-        'Falta NEXT_PUBLIC_TMD_API_KEY para cargar las imágenes desde TMDb.'
+        'Falta NEXT_PUBLIC_TMDB_API_KEY para cargar las imágenes desde TMDb.'
       )
       return
     }
@@ -422,9 +456,21 @@ export default function DetailsClient({
         window.localStorage.removeItem(posterStorageKey)
       }
     }
+
+    // Persistimos globalmente PORTADA.
+    // Backdrop global: usamos el de vista previa si está seleccionado, si no el que venga de data.
+    const effectiveBackdrop =
+      selectedPreviewBackdropPath || data.backdrop_path || null
+
+    persistArtworkOverride({
+      endpointType,
+      id,
+      posterPath: filePath,
+      backdropPath: effectiveBackdrop
+    })
   }
 
-  // Backdrop para VISTA PREVIA
+  // Backdrop para VISTA PREVIA (afecta carruseles / main dashboard global)
   const handleSelectPreviewBackdrop = (filePath) => {
     setSelectedPreviewBackdropPath(filePath)
     if (typeof window !== 'undefined') {
@@ -434,9 +480,19 @@ export default function DetailsClient({
         window.localStorage.removeItem(previewBackdropStorageKey)
       }
     }
+
+    // Persistimos globalmente BACKDROP (preview).
+    const effectivePoster = selectedPosterPath || data.poster_path || null
+
+    persistArtworkOverride({
+      endpointType,
+      id,
+      posterPath: effectivePoster,
+      backdropPath: filePath
+    })
   }
 
-  // Fondo de la vista de detalles
+  // Fondo de la vista de detalles (solo local, NO global)
   const handleSelectBackground = (filePath) => {
     setSelectedBackgroundPath(filePath)
     if (typeof window !== 'undefined') {
@@ -446,28 +502,36 @@ export default function DetailsClient({
         window.localStorage.removeItem(backgroundStorageKey)
       }
     }
+    // No se persiste en BD: es solo preferencia local para el fondo de esta vista.
   }
 
   const handleResetArtwork = () => {
     setSelectedPosterPath(null)
     setSelectedPreviewBackdropPath(null)
     setSelectedBackgroundPath(null)
+
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(posterStorageKey)
       window.localStorage.removeItem(previewBackdropStorageKey)
       window.localStorage.removeItem(backgroundStorageKey)
     }
+
+    // Reset global: indicar null en poster y backdrop
+    persistArtworkOverride({
+      endpointType,
+      id,
+      posterPath: null,
+      backdropPath: null
+    })
   }
 
-  // Copiar enlace de imagen original
+  // Copiar enlace de imagen original (no se usa en el UI actual, pero lo dejamos por si quieres reutilizarlo)
   const handleCopyImageUrl = async (filePath) => {
     const url = buildOriginalImageUrl(filePath)
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(url)
-        // Si quieres, aquí podrías añadir un pequeño toast de "Copiado"
       } else {
-        // Fallback simple
         window.prompt('Copia el enlace de la imagen:', url)
       }
     } catch {
@@ -558,11 +622,10 @@ export default function DetailsClient({
           aria-label="Alternar fondo"
         >
           <ImageIcon
-            className={`w-6 h-6 ${
-              useBackdrop
-                ? 'text-blue-500 hover:text-blue-400'
-                : 'text-gray-500 hover:text-gray-400'
-            }`}
+            className={`w-6 h-6 ${useBackdrop
+              ? 'text-blue-500 hover:text-blue-400'
+              : 'text-gray-500 hover:text-gray-400'
+              }`}
           />
         </button>
       </div>
@@ -925,13 +988,13 @@ export default function DetailsClient({
               {(selectedPosterPath ||
                 selectedPreviewBackdropPath ||
                 selectedBackgroundPath) && (
-                <button
-                  onClick={handleResetArtwork}
-                  className="px-3 py-1 text-xs rounded-full bg-neutral-800 hover:bg-neutral-700 text-gray-200 border border-neutral-600"
-                >
-                  Restaurar imágenes por defecto
-                </button>
-              )}
+                  <button
+                    onClick={handleResetArtwork}
+                    className="px-3 py-1 text-xs rounded-full bg-neutral-800 hover:bg-neutral-700 text-gray-200 border border-neutral-600"
+                  >
+                    Restaurar imágenes por defecto
+                  </button>
+                )}
             </div>
 
             {/* Tabs posters / backdrops / fondo */}
@@ -939,35 +1002,32 @@ export default function DetailsClient({
               <button
                 type="button"
                 onClick={() => setActiveImagesTab('posters')}
-                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
-                  activeImagesTab === 'posters'
-                    ? 'bg-white text-black'
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${activeImagesTab === 'posters'
+                  ? 'bg-white text-black'
+                  : 'text-gray-300 hover:text-white'
+                  }`}
               >
                 Portadas
               </button>
               <button
                 type="button"
                 onClick={() => setActiveImagesTab('backdrops')}
-                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
-                  activeImagesTab === 'backdrops'
-                    ? 'bg-white text-black'
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${activeImagesTab === 'backdrops'
+                  ? 'bg-white text-black'
+                  : 'text-gray-300 hover:text-white'
+                  }`}
               >
-                Backdrops
+                Vista previa
               </button>
               <button
                 type="button"
                 onClick={() => setActiveImagesTab('background')}
-                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
-                  activeImagesTab === 'background'
-                    ? 'bg-white text-black'
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${activeImagesTab === 'background'
+                  ? 'bg-white text-black'
+                  : 'text-gray-300 hover:text-white'
+                  }`}
               >
-                Fondo
+                Fondo detalles
               </button>
             </div>
 
@@ -1034,26 +1094,28 @@ export default function DetailsClient({
                       onClick={handleClick}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleClick();
+                          e.preventDefault()
+                          handleClick()
                         }
                       }}
-                      className={`relative flex-shrink-0 rounded-lg overflow-hidden border-2 ${
-                        isActive
-                          ? "border-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.6)]"
-                          : "border-transparent hover:border-neutral-500"
-                      } transition-all`}
+                      className={`relative flex-shrink-0 rounded-lg overflow-hidden border-2 ${isActive
+                        ? 'border-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.6)]'
+                        : 'border-transparent hover:border-neutral-500'
+                        } transition-all`}
                     >
                       <img
-                        src={`https://image.tmdb.org/t/p/${
-                          isPosterTab ? "w342" : "w780"
-                        }${filePath}`}
-                        alt={`${title} ${isPosterTab ? "poster" : "backdrop"}`}
-                        className={`${
-                          isPosterTab
-                            ? "w-[150px] aspect-[2/3]"
-                            : "w-[260px] aspect-[16/9]"
-                        } object-cover`}
+                        src={`https://image.tmdb.org/t/p/${isPosterTab ? 'w342' : 'w780'
+                          }${filePath}`}
+                        alt={`${title} ${isPosterTab
+                          ? 'poster'
+                          : isPreviewTab
+                            ? 'backdrop vista previa'
+                            : 'fondo'
+                          }`}
+                        className={`${isPosterTab
+                          ? 'w-[150px] aspect-[2/3]'
+                          : 'w-[260px] aspect-[16/9]'
+                          } object-cover`}
                       />
 
                       {/* Estado "usando" */}
@@ -1063,7 +1125,7 @@ export default function DetailsClient({
                         </div>
                       )}
 
-                      {/* ICONO DE DESCARGA (solo uno, abre nueva pestaña) */}
+                      {/* Icono abrir en alta resolución */}
                       <a
                         href={originalUrl}
                         target="_blank"
@@ -1088,7 +1150,7 @@ export default function DetailsClient({
                         </svg>
                       </a>
                     </div>
-                  );
+                  )
                 })}
 
                 {/* Sin resultados en la pestaña actual */}
@@ -1102,8 +1164,8 @@ export default function DetailsClient({
                       {activeImagesTab === 'posters'
                         ? 'portadas'
                         : activeImagesTab === 'backdrops'
-                        ? 'backdrops'
-                        : 'fondos'}{' '}
+                          ? 'backdrops'
+                          : 'fondos'}{' '}
                       adicionales disponibles para esta película.
                     </div>
                   )}
