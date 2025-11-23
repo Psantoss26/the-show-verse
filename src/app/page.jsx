@@ -1,5 +1,6 @@
 // /src/app/page.jsx
 import MainDashboardClient from '@/components/MainDashboardClient'
+import { cookies } from 'next/headers'
 
 import {
   fetchTopRatedMovies,
@@ -11,7 +12,7 @@ import {
   fetchRisingMovies,
   fetchTrendingMovies,
   fetchPopularMovies,
-  fetchRecommendedMovies
+  fetchRecommendedMovies,
 } from '@/lib/api/tmdb'
 
 export const revalidate = 1800 // 30 minutos
@@ -74,7 +75,7 @@ async function getDashboardData(sessionId = null) {
       underrated,
       rising,
       trending,
-      popular
+      popular,
     ] = await Promise.all([
       fetchTopRatedMovies(),
       fetchCultClassics(),
@@ -84,20 +85,20 @@ async function getDashboardData(sessionId = null) {
       fetchUnderratedMovies(),
       fetchRisingMovies(),
       fetchTrendingMovies(),
-      fetchPopularMovies()
+      fetchPopularMovies(),
     ])
 
     const recommended = sessionId
       ? await fetchRecommendedMovies(sessionId)
       : []
 
-    // Preparamos los backdrops del hero SIN flicker (ES/EN por votos)
+    // Preparamos los backdrops del hero SIN flicker (fallback ES/EN por votos)
     const topRatedWithBackdrop = await Promise.all(
       topRated.map(async (m) => {
         const preferred = await fetchBackdropEsThenEnServer(m.id)
         return {
           ...m,
-          backdrop_path: preferred || m.backdrop_path || m.poster_path || null
+          backdrop_path: preferred || m.backdrop_path || m.poster_path || null,
         }
       })
     )
@@ -112,7 +113,7 @@ async function getDashboardData(sessionId = null) {
       rising,
       trending,
       popular,
-      recommended
+      recommended,
     }
   } catch (err) {
     console.error('Error cargando MainDashboard (SSR):', err)
@@ -122,6 +123,9 @@ async function getDashboardData(sessionId = null) {
 
 /* =================== Página de Inicio =================== */
 export default async function HomePage() {
-  const dashboardData = await getDashboardData(null)
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get('tmdb_session')?.value || null
+
+  const dashboardData = await getDashboardData(sessionId)
   return <MainDashboardClient initialData={dashboardData} />
 }

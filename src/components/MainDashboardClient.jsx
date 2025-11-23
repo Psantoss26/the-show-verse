@@ -13,7 +13,7 @@ import {
     HeartOff,
     BookmarkPlus,
     BookmarkMinus,
-    Loader2
+    Loader2,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
@@ -22,7 +22,7 @@ import {
     markAsFavorite,
     markInWatchlist,
     getMovieDetails,
-    getExternalIds
+    getExternalIds,
 } from '@/lib/api/tmdb'
 
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
@@ -180,34 +180,16 @@ function getArtworkPreference(movieId) {
     const backdrop = window.localStorage.getItem(backdropKey)
     return {
         poster: poster || null,
-        backdrop: backdrop || null
+        backdrop: backdrop || null,
     }
 }
 
-/**
- * Backdrop para el HERO:
- * 1) Prioriza el FONDO elegido en Detalles: showverse:movie:{id}:background
- * 2) Si no hay, usa el BACKDROP (vista previa): showverse:movie:{id}:backdrop
- */
-function getHeroBackdropPreference(movieId) {
-    if (typeof window === 'undefined') return null
-
-    const backgroundKey = `showverse:movie:${movieId}:background`
-    const backdropKey = `showverse:movie:${movieId}:backdrop`
-
-    const bg = window.localStorage.getItem(backgroundKey)
-    if (bg) return bg
-
-    const backdrop = window.localStorage.getItem(backdropKey)
-    return backdrop || null
-}
-
 /* ====================================================================
- * Portada normal (2:3), mismo alto que la vista previa
+ * Portada normal (2:3) — arranca en skeleton para evitar salto
  * ==================================================================== */
 function PosterImage({ movie, cache, heightClass }) {
-    const [posterPath, setPosterPath] = useState(movie.poster_path || null)
-    const [ready, setReady] = useState(!!movie.poster_path)
+    const [posterPath, setPosterPath] = useState(null)
+    const [ready, setReady] = useState(false)
 
     useEffect(() => {
         let abort = false
@@ -240,7 +222,7 @@ function PosterImage({ movie, cache, heightClass }) {
                 return
             }
 
-            // 3) Lógica normal: mejor poster ES/EN
+            // 3) Lógica normal: mejor poster ES/EN o fallback de TMDb
             setReady(false)
             const preferred = await fetchMoviePosterEsThenEn(movie.id)
             const chosen =
@@ -249,6 +231,7 @@ function PosterImage({ movie, cache, heightClass }) {
                 movie.backdrop_path ||
                 movie.profile_path ||
                 null
+
             const url = chosen ? buildImg(chosen, 'w342') : null
             await preloadImage(url)
             if (!abort) {
@@ -264,23 +247,22 @@ function PosterImage({ movie, cache, heightClass }) {
         }
     }, [movie, cache])
 
+    if (!ready || !posterPath) {
+        return (
+            <div
+                className={`w-full ${heightClass} rounded-3xl bg-neutral-800 animate-pulse`}
+            />
+        )
+    }
+
     return (
-        <>
-            {!ready && (
-                <div
-                    className={`w-full ${heightClass} rounded-3xl bg-neutral-800 animate-pulse`}
-                />
-            )}
-            {ready && posterPath && (
-                <img
-                    src={buildImg(posterPath, 'w342')}
-                    alt={movie.title || movie.name}
-                    className={`w-full ${heightClass} object-cover rounded-3xl`}
-                    loading="lazy"
-                    decoding="async"
-                />
-            )}
-        </>
+        <img
+            src={buildImg(posterPath, 'w342')}
+            alt={movie.title || movie.name}
+            className={`w-full ${heightClass} object-cover rounded-3xl`}
+            loading="lazy"
+            decoding="async"
+        />
     )
 }
 
@@ -293,7 +275,7 @@ function InlinePreviewCard({ movie, heightClass }) {
     const [extras, setExtras] = useState({
         runtime: null,
         awards: null,
-        imdbRating: null
+        imdbRating: null,
     })
     const [backdropPath, setBackdropPath] = useState(null)
     const [backdropReady, setBackdropReady] = useState(false)
@@ -474,7 +456,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                 sessionId: session,
                 type: movie.media_type || 'movie',
                 mediaId: movie.id,
-                favorite: next
+                favorite: next,
             })
         } catch {
             setFavorite((v) => !v)
@@ -497,7 +479,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                 sessionId: session,
                 type: movie.media_type || 'movie',
                 mediaId: movie.id,
-                watchlist: next
+                watchlist: next,
             })
         } catch {
             setWatchlist((v) => !v)
@@ -507,9 +489,7 @@ function InlinePreviewCard({ movie, heightClass }) {
         }
     }
 
-    const resolvedBackdrop =
-        backdropPath || movie.backdrop_path || movie.poster_path || null
-    const bgSrc = resolvedBackdrop ? buildImg(resolvedBackdrop, 'w1280') : null
+    const bgSrc = backdropPath ? buildImg(backdropPath, 'w1280') : null
 
     return (
         <div
@@ -589,7 +569,9 @@ function InlinePreviewCard({ movie, heightClass }) {
                             <button
                                 onClick={handleToggleFavorite}
                                 disabled={loadingStates || updating}
-                                title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                                title={
+                                    favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'
+                                }
                                 className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 backdrop-blur-sm border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
                             >
                                 {loadingStates || updating ? (
@@ -605,7 +587,9 @@ function InlinePreviewCard({ movie, heightClass }) {
                                 onClick={handleToggleWatchlist}
                                 disabled={loadingStates || updating}
                                 title={
-                                    watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'
+                                    watchlist
+                                        ? 'Quitar de pendientes'
+                                        : 'Añadir a pendientes'
                                 }
                                 className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 backdrop-blur-sm border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
                             >
@@ -714,7 +698,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         0: { spaceBetween: 12 },
                         640: { spaceBetween: 14 },
                         1024: { spaceBetween: 18 },
-                        1280: { spaceBetween: 20 }
+                        1280: { spaceBetween: 20 },
                     }}
                 >
                     {items.map((m, i) => {
@@ -829,39 +813,63 @@ function TopRatedHero({ items, isTouchDevice }) {
     const [canPrev, setCanPrev] = useState(false)
     const [canNext, setCanNext] = useState(false)
 
-    // backdrops globales escogidos por el usuario (kind = 'backdrop')
-    // overrides[movieId] = file_path
+    // mapa id -> backdrop definitivo (override o fallback)
     const [heroBackdrops, setHeroBackdrops] = useState({})
+    const [heroLoaded, setHeroLoaded] = useState(false)
 
-    // Cargar overrides desde la API
+    // Cargar overrides desde la API y calcular el backdrop final por película
     useEffect(() => {
-        if (!items || items.length === 0) return
+        if (!items || items.length === 0) {
+            setHeroLoaded(true)
+            return
+        }
 
-        const controller = new AbortController()
+        let canceled = false
 
-        const loadOverrides = async () => {
+        const load = async () => {
             try {
                 const ids = items.map((m) => m.id).filter(Boolean)
-                if (!ids.length) return
+                if (!ids.length) {
+                    if (!canceled) setHeroLoaded(true)
+                    return
+                }
 
                 const overrides = await fetchArtworkOverrides({
                     type: 'movie',
-                    kind: 'backdrop', // lo que guardamos desde DetailsClient
-                    ids
+                    kind: 'backdrop',
+                    ids,
                 })
 
-                if (!controller.signal.aborted) {
-                    setHeroBackdrops(overrides || {})
+                if (canceled) return
+
+                const map = {}
+                for (const movie of items) {
+                    const override = overrides?.[movie.id] || null
+                    map[movie.id] =
+                        override || movie.backdrop_path || movie.poster_path || null
                 }
+
+                setHeroBackdrops(map)
+                setHeroLoaded(true)
             } catch (err) {
-                if (err?.name === 'AbortError') return
+                if (canceled) return
                 console.error('Error cargando backdrops del hero', err)
+
+                // fallback: usamos solo lo que viene de TMDb
+                const map = {}
+                for (const movie of items) {
+                    map[movie.id] = movie.backdrop_path || movie.poster_path || null
+                }
+                setHeroBackdrops(map)
+                setHeroLoaded(true)
             }
         }
 
-        loadOverrides()
+        load()
 
-        return () => controller.abort()
+        return () => {
+            canceled = true
+        }
     }, [items])
 
     const updateNav = (swiper) => {
@@ -902,115 +910,124 @@ function TopRatedHero({ items, isTouchDevice }) {
                 onMouseEnter={() => setIsHoveredHero(true)}
                 onMouseLeave={() => setIsHoveredHero(false)}
             >
-                <Swiper
-                    spaceBetween={20}
-                    slidesPerView="auto" // evita que el primer slide se ponga full-width al cargar
-                    autoplay={{ delay: 5000 }}
-                    onSwiper={handleSwiper}
-                    onSlideChange={updateNav}
-                    onResize={updateNav}
-                    onReachBeginning={updateNav}
-                    onReachEnd={updateNav}
-                    loop={false}
-                    watchOverflow={true}
-                    grabCursor={!isTouchDevice}
-                    allowTouchMove={true}
-                    preventClicks={true}
-                    preventClicksPropagation={true}
-                    threshold={5}
-                    modules={[Navigation, Autoplay]}
-                    className="group relative"
-                    breakpoints={{
-                        0: { spaceBetween: 12 },
-                        640: { spaceBetween: 16 },
-                        1024: { spaceBetween: 20 }
-                    }}
-                >
-                    {items.map((movie) => {
-                        // 1) Backdrop global escogido en "Backdrops" de la ficha
-                        const overrideBackdrop = heroBackdrops[movie.id] || null
-
-                        // 2) Fallback a datos de TMDb
-                        const heroBackdrop =
-                            overrideBackdrop ||
-                            movie.backdrop_path ||
-                            movie.poster_path ||
-                            null
-
-                        if (!heroBackdrop) {
-                            return (
-                                <SwiperSlide
-                                    key={movie.id}
-                                    className="!w-[75%] sm:!w-[55%] lg:!w-[40%] xl:!w-[33%] select-none"
-                                >
-                                    <Link href={`/details/movie/${movie.id}`}>
-                                        <div className="relative rounded-3xl bg-neutral-900 aspect-[16/9]" />
-                                    </Link>
-                                </SwiperSlide>
-                            )
-                        }
-
-                        return (
-                            <SwiperSlide
+                {!heroLoaded ? (
+                    // Skeleton inicial para evitar mostrar backdrops "equivocados"
+                    <div className="flex gap-4 overflow-hidden">
+                        {items.slice(0, 3).map((movie) => (
+                            <div
                                 key={movie.id}
-                                className="!w-[75%] sm:!w-[55%] lg:!w-[40%] xl:!w-[33%] select-none"
-                            >
-                                <Link href={`/details/movie/${movie.id}`}>
-                                    <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9]">
-                                        <img
-                                            src={buildImg(heroBackdrop, 'w1280')}
-                                            srcSet={`${buildImg(
-                                                heroBackdrop,
-                                                'w780'
-                                            )} 780w, ${buildImg(
-                                                heroBackdrop,
-                                                'w1280'
-                                            )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
-                                            sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
-                                            alt={movie.title || movie.name}
-                                            className="absolute inset-0 w-full h-full object-cover rounded-3xl hover:scale-105 transition-transform duration-300"
-                                            loading="lazy"
-                                            decoding="async"
-                                        />
-                                    </div>
-                                </Link>
-                            </SwiperSlide>
-                        )
-                    })}
-                </Swiper>
+                                className="flex-1 rounded-3xl bg-neutral-900 aspect-[16/9] animate-pulse"
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <>
+                        <Swiper
+                            spaceBetween={20}
+                            slidesPerView="auto" // evita que el primer slide se ponga full-width al cargar
+                            autoplay={{ delay: 5000 }}
+                            onSwiper={handleSwiper}
+                            onSlideChange={updateNav}
+                            onResize={updateNav}
+                            onReachBeginning={updateNav}
+                            onReachEnd={updateNav}
+                            loop={false}
+                            watchOverflow={true}
+                            grabCursor={!isTouchDevice}
+                            allowTouchMove={true}
+                            preventClicks={true}
+                            preventClicksPropagation={true}
+                            threshold={5}
+                            modules={[Navigation, Autoplay]}
+                            className="group relative"
+                            breakpoints={{
+                                0: { spaceBetween: 12 },
+                                640: { spaceBetween: 16 },
+                                1024: { spaceBetween: 20 },
+                            }}
+                        >
+                            {items.map((movie) => {
+                                const heroBackdrop = heroBackdrops[movie.id] || null
 
-                {/* Flecha izquierda hero */}
-                {showPrev && (
-                    <button
-                        type="button"
-                        onClick={handlePrevClick}
-                        className="absolute inset-y-0 left-0 w-32 z-20
+                                if (!heroBackdrop) {
+                                    return (
+                                        <SwiperSlide
+                                            key={movie.id}
+                                            className="!w-[75%] sm:!w-[55%] lg:!w-[40%] xl:!w-[33%] select-none"
+                                        >
+                                            <Link href={`/details/movie/${movie.id}`}>
+                                                <div className="relative rounded-3xl bg-neutral-900 aspect-[16/9]" />
+                                            </Link>
+                                        </SwiperSlide>
+                                    )
+                                }
+
+                                return (
+                                    <SwiperSlide
+                                        key={movie.id}
+                                        className="!w-[75%] sm:!w-[55%] lg:!w-[40%] xl:!w-[33%] select-none"
+                                    >
+                                        <Link href={`/details/movie/${movie.id}`}>
+                                            <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9]">
+                                                <img
+                                                    src={buildImg(heroBackdrop, 'w1280')}
+                                                    srcSet={`${buildImg(
+                                                        heroBackdrop,
+                                                        'w780'
+                                                    )} 780w, ${buildImg(
+                                                        heroBackdrop,
+                                                        'w1280'
+                                                    )} 1280w, ${buildImg(
+                                                        heroBackdrop,
+                                                        'original'
+                                                    )} 2400w`}
+                                                    sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
+                                                    alt={movie.title || movie.name}
+                                                    className="absolute inset-0 w-full h-full object-cover rounded-3xl hover:scale-105 transition-transform duration-300"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                />
+                                            </div>
+                                        </Link>
+                                    </SwiperSlide>
+                                )
+                            })}
+                        </Swiper>
+
+                        {/* Flecha izquierda hero */}
+                        {showPrev && (
+                            <button
+                                type="button"
+                                onClick={handlePrevClick}
+                                className="absolute inset-y-0 left-0 w-32 z-20
                            hidden sm:flex items-center justify-start
                            bg-gradient-to-r from-black/75 via-black/45 to-transparent
                            hover:from-black/90 hover:via-black/65
                            transition-colors pointer-events-auto"
-                    >
-                        <span className="ml-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
-                            ‹
-                        </span>
-                    </button>
-                )}
+                            >
+                                <span className="ml-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
+                                    ‹
+                                </span>
+                            </button>
+                        )}
 
-                {/* Flecha derecha hero */}
-                {showNext && (
-                    <button
-                        type="button"
-                        onClick={handleNextClick}
-                        className="absolute inset-y-0 right-0 w-32 z-20
+                        {/* Flecha derecha hero */}
+                        {showNext && (
+                            <button
+                                type="button"
+                                onClick={handleNextClick}
+                                className="absolute inset-y-0 right-0 w-32 z-20
                            hidden sm:flex items-center justify-end
                            bg-gradient-to-l from-black/75 via-black/45 to-transparent
                            hover:from-black/90 hover:via-black/65
                            transition-colors pointer-events-auto"
-                    >
-                        <span className="mr-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
-                            ›
-                        </span>
-                    </button>
+                            >
+                                <span className="mr-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
+                                    ›
+                                </span>
+                            </button>
+                        )}
+                    </>
                 )}
             </div>
         </div>
