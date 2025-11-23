@@ -26,6 +26,7 @@ import {
 } from '@/lib/api/tmdb'
 
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
+import { fetchArtworkOverrides } from '@/lib/artworkApi'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
 
@@ -183,6 +184,24 @@ function getArtworkPreference(movieId) {
     }
 }
 
+/**
+ * Backdrop para el HERO:
+ * 1) Prioriza el FONDO elegido en Detalles: showverse:movie:{id}:background
+ * 2) Si no hay, usa el BACKDROP (vista previa): showverse:movie:{id}:backdrop
+ */
+function getHeroBackdropPreference(movieId) {
+    if (typeof window === 'undefined') return null
+
+    const backgroundKey = `showverse:movie:${movieId}:background`
+    const backdropKey = `showverse:movie:${movieId}:backdrop`
+
+    const bg = window.localStorage.getItem(backgroundKey)
+    if (bg) return bg
+
+    const backdrop = window.localStorage.getItem(backdropKey)
+    return backdrop || null
+}
+
 /* ====================================================================
  * Portada normal (2:3), mismo alto que la vista previa
  * ==================================================================== */
@@ -314,7 +333,7 @@ function InlinePreviewCard({ movie, heightClass }) {
         }
     }, [movie, session, account])
 
-    // Backdrop + extras con caché y preferencia de usuario (igual que en MoviesPageClient)
+    // Backdrop + extras con caché y preferencia de usuario
     useEffect(() => {
         let abort = false
         if (!movie) return
@@ -642,8 +661,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
         e.stopPropagation()
         const swiper = swiperRef.current
         if (!swiper) return
-        const target = Math.max((swiper.activeIndex || 0) - 6, 0)
-        swiper.slideTo(target)
+        swiper.slidePrev()
     }
 
     const handleNextClick = (e) => {
@@ -651,9 +669,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
         e.stopPropagation()
         const swiper = swiperRef.current
         if (!swiper) return
-        const maxIndex = swiper.slides.length - 1
-        const target = Math.min((swiper.activeIndex || 0) + 6, maxIndex)
-        swiper.slideTo(target)
+        swiper.slideNext()
     }
 
     const showPrev = (isHoveredRow || hasActivePreview) && canPrev
@@ -813,22 +829,44 @@ function TopRatedHero({ items, isTouchDevice }) {
     const [canPrev, setCanPrev] = useState(false)
     const [canNext, setCanNext] = useState(false)
 
-    const computeSlidesPerView = (swiper) => {
-        if (!swiper) return 1
-        const param = swiper.params.slidesPerView
-        if (typeof param === 'number') return param
-        if (typeof swiper.slidesPerViewDynamic === 'function') {
-            const dyn = swiper.slidesPerViewDynamic()
-            if (typeof dyn === 'number' && dyn > 0) return dyn
+    // backdrops globales escogidos por el usuario (kind = 'backdrop')
+    // overrides[movieId] = file_path
+    const [heroBackdrops, setHeroBackdrops] = useState({})
+
+    // Cargar overrides desde la API
+    useEffect(() => {
+        if (!items || items.length === 0) return
+
+        const controller = new AbortController()
+
+        const loadOverrides = async () => {
+            try {
+                const ids = items.map((m) => m.id).filter(Boolean)
+                if (!ids.length) return
+
+                const overrides = await fetchArtworkOverrides({
+                    type: 'movie',
+                    kind: 'backdrop', // lo que guardamos desde DetailsClient
+                    ids
+                })
+
+                if (!controller.signal.aborted) {
+                    setHeroBackdrops(overrides || {})
+                }
+            } catch (err) {
+                if (err?.name === 'AbortError') return
+                console.error('Error cargando backdrops del hero', err)
+            }
         }
-        return 1
-    }
+
+        loadOverrides()
+
+        return () => controller.abort()
+    }, [items])
 
     const updateNav = (swiper) => {
         if (!swiper) return
-        const total = swiper.slides.length
-        const spv = computeSlidesPerView(swiper)
-        const hasOverflow = total > spv
+        const hasOverflow = !swiper.isLocked
         setCanPrev(hasOverflow && !swiper.isBeginning)
         setCanNext(hasOverflow && !swiper.isEnd)
     }
@@ -838,30 +876,20 @@ function TopRatedHero({ items, isTouchDevice }) {
         updateNav(swiper)
     }
 
-    const slideBy = (delta) => {
-        const swiper = swiperRef.current
-        if (!swiper) return
-        const total = swiper.slides.length
-        if (!total) return
-
-        const active = swiper.activeIndex || 0
-        const spv = computeSlidesPerView(swiper)
-        const maxIndex = Math.max(0, total - spv)
-        const target = Math.min(Math.max(active + delta, 0), maxIndex)
-
-        swiper.slideTo(target)
-    }
-
     const handlePrevClick = (e) => {
         e.preventDefault()
         e.stopPropagation()
-        slideBy(-1)
+        const swiper = swiperRef.current
+        if (!swiper) return
+        swiper.slidePrev()
     }
 
     const handleNextClick = (e) => {
         e.preventDefault()
         e.stopPropagation()
-        slideBy(1)
+        const swiper = swiperRef.current
+        if (!swiper) return
+        swiper.slideNext()
     }
 
     const showPrev = isHoveredHero && canPrev
@@ -876,7 +904,7 @@ function TopRatedHero({ items, isTouchDevice }) {
             >
                 <Swiper
                     spaceBetween={20}
-                    slidesPerView={3}
+                    slidesPerView="auto" // evita que el primer slide se ponga full-width al cargar
                     autoplay={{ delay: 5000 }}
                     onSwiper={handleSwiper}
                     onSlideChange={updateNav}
@@ -893,24 +921,28 @@ function TopRatedHero({ items, isTouchDevice }) {
                     modules={[Navigation, Autoplay]}
                     className="group relative"
                     breakpoints={{
-                        0: { slidesPerView: 1, spaceBetween: 12 },
-                        640: { slidesPerView: 2, spaceBetween: 16 },
-                        1024: { slidesPerView: 3, spaceBetween: 20 }
+                        0: { spaceBetween: 12 },
+                        640: { spaceBetween: 16 },
+                        1024: { spaceBetween: 20 }
                     }}
                 >
                     {items.map((movie) => {
-                        // Usar el mismo criterio de selección que en la vista previa:
-                        // 1) backdrop preferido del usuario
-                        // 2) backdrop cacheado
-                        // 3) backdrop ya calculado en server
-                        const { backdrop: userBackdrop } = getArtworkPreference(movie.id)
-                        const cached = movieBackdropCache.get(movie.id) || null
+                        // 1) Backdrop global escogido en "Backdrops" de la ficha
+                        const overrideBackdrop = heroBackdrops[movie.id] || null
+
+                        // 2) Fallback a datos de TMDb
                         const heroBackdrop =
-                            userBackdrop || cached || movie.backdrop_path || movie.poster_path
+                            overrideBackdrop ||
+                            movie.backdrop_path ||
+                            movie.poster_path ||
+                            null
 
                         if (!heroBackdrop) {
                             return (
-                                <SwiperSlide key={movie.id}>
+                                <SwiperSlide
+                                    key={movie.id}
+                                    className="!w-[75%] sm:!w-[55%] lg:!w-[40%] xl:!w-[33%] select-none"
+                                >
                                     <Link href={`/details/movie/${movie.id}`}>
                                         <div className="relative rounded-3xl bg-neutral-900 aspect-[16/9]" />
                                     </Link>
@@ -919,16 +951,22 @@ function TopRatedHero({ items, isTouchDevice }) {
                         }
 
                         return (
-                            <SwiperSlide key={movie.id}>
+                            <SwiperSlide
+                                key={movie.id}
+                                className="!w-[75%] sm:!w-[55%] lg:!w-[40%] xl:!w-[33%] select-none"
+                            >
                                 <Link href={`/details/movie/${movie.id}`}>
                                     <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9]">
                                         <img
                                             src={buildImg(heroBackdrop, 'w1280')}
-                                            srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
+                                            srcSet={`${buildImg(
+                                                heroBackdrop,
+                                                'w780'
+                                            )} 780w, ${buildImg(
                                                 heroBackdrop,
                                                 'w1280'
                                             )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
-                                            sizes="(min-width:1536px) 1200px, (min-width:1280px) 1100px, (min-width:1024px) 900px, 95vw"
+                                            sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
                                             alt={movie.title || movie.name}
                                             className="absolute inset-0 w-full h-full object-cover rounded-3xl hover:scale-105 transition-transform duration-300"
                                             loading="lazy"
@@ -947,10 +985,10 @@ function TopRatedHero({ items, isTouchDevice }) {
                         type="button"
                         onClick={handlePrevClick}
                         className="absolute inset-y-0 left-0 w-32 z-20
-                       hidden sm:flex items-center justify-start
-                       bg-gradient-to-r from-black/75 via-black/45 to-transparent
-                       hover:from-black/90 hover:via-black/65
-                       transition-colors pointer-events-auto"
+                           hidden sm:flex items-center justify-start
+                           bg-gradient-to-r from-black/75 via-black/45 to-transparent
+                           hover:from-black/90 hover:via-black/65
+                           transition-colors pointer-events-auto"
                     >
                         <span className="ml-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ‹
@@ -964,10 +1002,10 @@ function TopRatedHero({ items, isTouchDevice }) {
                         type="button"
                         onClick={handleNextClick}
                         className="absolute inset-y-0 right-0 w-32 z-20
-                       hidden sm:flex items-center justify-end
-                       bg-gradient-to-l from-black/75 via-black/45 to-transparent
-                       hover:from-black/90 hover:via-black/65
-                       transition-colors pointer-events-auto"
+                           hidden sm:flex items-center justify-end
+                           bg-gradient-to-l from-black/75 via-black/45 to-transparent
+                           hover:from-black/90 hover:via-black/65
+                           transition-colors pointer-events-auto"
                     >
                         <span className="mr-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ›
