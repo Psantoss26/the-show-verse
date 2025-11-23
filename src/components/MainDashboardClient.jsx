@@ -626,7 +626,9 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
     const [hoveredId, setHoveredId] = useState(null)
 
     const hasActivePreview = !!hoveredId
-    const heightClass = 'h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
+
+    // algo más compacto en móvil para que quepan bien las portadas
+    const heightClass = 'h-[200px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
 
     const updateNav = (swiper) => {
         if (!swiper) return
@@ -678,8 +680,9 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                 }}
             >
                 <Swiper
-                    spaceBetween={16}
-                    slidesPerView="auto"
+                    // En móvil: 3 portadas por vista. En escritorio: ancho auto como antes.
+                    slidesPerView={isTouchDevice ? 3 : 'auto'}
+                    spaceBetween={isTouchDevice ? 8 : 16}
                     onSwiper={handleSwiper}
                     onSlideChange={updateNav}
                     onResize={updateNav}
@@ -695,38 +698,56 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     modules={[Navigation]}
                     className="group relative"
                     breakpoints={{
-                        0: { spaceBetween: 12 },
-                        640: { spaceBetween: 14 },
-                        1024: { spaceBetween: 18 },
-                        1280: { spaceBetween: 20 },
+                        // A partir de 640px recuperamos el comportamiento "auto" clásico
+                        640: {
+                            slidesPerView: 'auto',
+                            spaceBetween: 14,
+                        },
+                        1024: {
+                            spaceBetween: 18,
+                        },
+                        1280: {
+                            spaceBetween: 20,
+                        },
                     }}
                 >
                     {items.map((m, i) => {
-                        const isActive = hoveredId === m.id
+                        // En dispositivos táctiles NO hay hover => nunca se activa la vista previa gigante
+                        const isActive = !isTouchDevice && hoveredId === m.id
                         const isLast = i === items.length - 1
 
                         const base =
                             'relative flex-shrink-0 transition-all duration-300 ease-out'
 
-                        const sizeClasses = isActive
-                            ? 'w-[390px] sm:w-[460px] md:w-[530px] xl:w-[600px] z-20'
-                            : 'w-[140px] sm:w-[170px] md:w-[190px] xl:w-[210px] z-10'
+                        // En móvil: cada slide ocupa todo su ancho de celda (Swiper ya divide en 3)
+                        // En escritorio: mantenemos el comportamiento de antes (poster pequeño / preview grande)
+                        const sizeClasses = isTouchDevice
+                            ? 'w-full z-10'
+                            : isActive
+                                ? 'w-[390px] sm:w-[460px] md:w-[530px] xl:w-[600px] z-20'
+                                : 'w-[140px] sm:w-[170px] md:w-[190px] xl:w-[210px] z-10'
 
                         const transformClass =
-                            isActive && isLast
+                            !isTouchDevice && isActive && isLast
                                 ? '-translate-x-[250px] sm:-translate-x-[290px] md:-translate-x-[340px] xl:-translate-x-[390px]'
                                 : ''
 
                         return (
-                            <SwiperSlide key={m.id} className="!w-auto select-none">
+                            <SwiperSlide
+                                key={m.id}
+                                className="!w-auto select-none"
+                            >
                                 <div
                                     className={`${base} ${sizeClasses} ${heightClass} ${transformClass}`}
-                                    onMouseEnter={() => setHoveredId(m.id)}
+                                    onMouseEnter={() => {
+                                        if (!isTouchDevice) setHoveredId(m.id)
+                                    }}
                                     onMouseLeave={() =>
                                         setHoveredId((prev) => (prev === m.id ? null : prev))
                                     }
                                 >
                                     <AnimatePresence initial={false} mode="wait">
+                                        {/* En móvil siempre mostramos la portada normal */}
                                         {isActive ? (
                                             <motion.div
                                                 key="preview"
@@ -734,7 +755,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.98 }}
                                                 transition={{ duration: 0.18 }}
-                                                className="w-full h-full"
+                                                className="w-full h-full hidden sm:block"
                                             >
                                                 <InlinePreviewCard
                                                     movie={m}
@@ -766,8 +787,8 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     })}
                 </Swiper>
 
-                {/* Lateral izquierdo – franja difuminada */}
-                {showPrev && (
+                {/* Lateral izquierdo – franja difuminada (solo tiene sentido en escritorio) */}
+                {showPrev && !isTouchDevice && (
                     <button
                         type="button"
                         onClick={handlePrevClick}
@@ -784,7 +805,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                 )}
 
                 {/* Lateral derecho – franja difuminada */}
-                {showNext && (
+                {showNext && !isTouchDevice && (
                     <button
                         type="button"
                         onClick={handleNextClick}
