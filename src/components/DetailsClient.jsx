@@ -5,6 +5,7 @@ import { useRef, useState, useEffect } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import 'swiper/swiper-bundle.css'
 import EpisodeRatingsGrid from '@/components/EpisodeRatingsGrid'
+import { saveArtworkOverride } from '@/lib/artworkApi'
 
 import {
   CalendarIcon,
@@ -412,9 +413,11 @@ export default function DetailsClient({
     }
   }, [type, id, data?.images])
 
-  // ====== Handlers selección de poster / backdrops / fondo ======
+  // Portada (poster)
   const handleSelectPoster = (filePath) => {
     setSelectedPosterPath(filePath)
+
+    // localStorage para respuesta inmediata en este dispositivo
     if (typeof window !== 'undefined') {
       if (filePath) {
         window.localStorage.setItem(posterStorageKey, filePath)
@@ -422,11 +425,20 @@ export default function DetailsClient({
         window.localStorage.removeItem(posterStorageKey)
       }
     }
+
+    // Guardar globalmente para todo el mundo
+    saveArtworkOverride({
+      type: endpointType,      // 'movie' o 'tv'
+      id,                      // id de la obra
+      kind: 'poster',
+      filePath                 // puede ser null para borrar
+    })
   }
 
-  // Backdrop para VISTA PREVIA
+  // Backdrop de VISTA PREVIA (la pestaña "Backdrops")
   const handleSelectPreviewBackdrop = (filePath) => {
     setSelectedPreviewBackdropPath(filePath)
+
     if (typeof window !== 'undefined') {
       if (filePath) {
         window.localStorage.setItem(previewBackdropStorageKey, filePath)
@@ -434,11 +446,20 @@ export default function DetailsClient({
         window.localStorage.removeItem(previewBackdropStorageKey)
       }
     }
+
+    // Guardar globalmente como 'backdrop'
+    saveArtworkOverride({
+      type: endpointType,
+      id,
+      kind: 'backdrop',
+      filePath
+    })
   }
 
-  // Fondo de la vista de detalles
+  // Fondo del detalle (background difuminado detrás de todo)
   const handleSelectBackground = (filePath) => {
     setSelectedBackgroundPath(filePath)
+
     if (typeof window !== 'undefined') {
       if (filePath) {
         window.localStorage.setItem(backgroundStorageKey, filePath)
@@ -446,17 +467,46 @@ export default function DetailsClient({
         window.localStorage.removeItem(backgroundStorageKey)
       }
     }
+
+    // Guardar globalmente como 'background'
+    saveArtworkOverride({
+      type: endpointType,
+      id,
+      kind: 'background',
+      filePath
+    })
   }
 
   const handleResetArtwork = () => {
     setSelectedPosterPath(null)
     setSelectedPreviewBackdropPath(null)
     setSelectedBackgroundPath(null)
+
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(posterStorageKey)
       window.localStorage.removeItem(previewBackdropStorageKey)
       window.localStorage.removeItem(backgroundStorageKey)
     }
+
+    // Borrar en el servidor
+    saveArtworkOverride({
+      type: endpointType,
+      id,
+      kind: 'poster',
+      filePath: null
+    })
+    saveArtworkOverride({
+      type: endpointType,
+      id,
+      kind: 'backdrop',
+      filePath: null
+    })
+    saveArtworkOverride({
+      type: endpointType,
+      id,
+      kind: 'background',
+      filePath: null
+    })
   }
 
   // Copiar enlace de imagen original

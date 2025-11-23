@@ -14,8 +14,6 @@ import {
   fetchRecommendedMovies
 } from '@/lib/api/tmdb'
 
-import { applyArtworkOverridesToDashboard } from '@/lib/artworkOverrides'
-
 export const revalidate = 1800 // 30 minutos
 
 /* ========= elegir mejor backdrop: ES -> EN, y por calidad (SERVER) ========= */
@@ -93,7 +91,7 @@ async function getDashboardData(sessionId = null) {
       ? await fetchRecommendedMovies(sessionId)
       : []
 
-    // 1) Preparamos los backdrops del hero SIN flicker (fallback ES/EN por votos)
+    // Preparamos los backdrops del hero SIN flicker (ES/EN por votos)
     const topRatedWithBackdrop = await Promise.all(
       topRated.map(async (m) => {
         const preferred = await fetchBackdropEsThenEnServer(m.id)
@@ -104,8 +102,7 @@ async function getDashboardData(sessionId = null) {
       })
     )
 
-    // 2) Dashboard "crudo" antes de aplicar overrides globales
-    const rawDashboardData = {
+    return {
       topRated: topRatedWithBackdrop,
       cult,
       mind,
@@ -117,12 +114,6 @@ async function getDashboardData(sessionId = null) {
       popular,
       recommended
     }
-
-    // 3) Aplicar overrides globales (poster/backdrop elegidos en Detalles)
-    const dashboardWithOverrides =
-      await applyArtworkOverridesToDashboard(rawDashboardData)
-
-    return dashboardWithOverrides
   } catch (err) {
     console.error('Error cargando MainDashboard (SSR):', err)
     return {}
@@ -131,9 +122,6 @@ async function getDashboardData(sessionId = null) {
 
 /* =================== Página de Inicio =================== */
 export default async function HomePage() {
-  // Si más adelante quieres recomendaciones personalizadas,
-  // aquí podrías leer cookies() o headers() y pasar sessionId.
   const dashboardData = await getDashboardData(null)
-
   return <MainDashboardClient initialData={dashboardData} />
 }
