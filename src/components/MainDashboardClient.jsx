@@ -626,9 +626,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
     const [hoveredId, setHoveredId] = useState(null)
 
     const hasActivePreview = !!hoveredId
-
-    // algo más compacto en móvil para que quepan bien las portadas
-    const heightClass = 'h-[200px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
+    const heightClass = 'h-[210px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
 
     const updateNav = (swiper) => {
         if (!swiper) return
@@ -680,9 +678,9 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                 }}
             >
                 <Swiper
-                    // En móvil: 3 portadas por vista. En escritorio: ancho auto como antes.
-                    slidesPerView={isTouchDevice ? 3 : 'auto'}
-                    spaceBetween={isTouchDevice ? 8 : 16}
+                    // En móvil: 3 portadas completas con separación
+                    slidesPerView={3}
+                    spaceBetween={12}
                     onSwiper={handleSwiper}
                     onSlideChange={updateNav}
                     onResize={updateNav}
@@ -698,38 +696,37 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     modules={[Navigation]}
                     className="group relative"
                     breakpoints={{
-                        // A partir de 640px recuperamos el comportamiento "auto" clásico
+                        // A partir de sm volvemos al comportamiento anterior
                         640: {
                             slidesPerView: 'auto',
                             spaceBetween: 14,
                         },
                         1024: {
+                            slidesPerView: 'auto',
                             spaceBetween: 18,
                         },
                         1280: {
+                            slidesPerView: 'auto',
                             spaceBetween: 20,
                         },
                     }}
                 >
                     {items.map((m, i) => {
-                        // En dispositivos táctiles NO hay hover => nunca se activa la vista previa gigante
                         const isActive = !isTouchDevice && hoveredId === m.id
                         const isLast = i === items.length - 1
 
                         const base =
                             'relative flex-shrink-0 transition-all duration-300 ease-out'
 
-                        // En móvil: cada slide ocupa todo su ancho de celda (Swiper ya divide en 3)
-                        // En escritorio: mantenemos el comportamiento de antes (poster pequeño / preview grande)
-                        const sizeClasses = isTouchDevice
-                            ? 'w-full z-10'
-                            : isActive
-                                ? 'w-[390px] sm:w-[460px] md:w-[530px] xl:w-[600px] z-20'
-                                : 'w-[140px] sm:w-[170px] md:w-[190px] xl:w-[210px] z-10'
+                        // En móvil: w-full para ocupar todo el ancho del slide (Swiper ya lo divide en 3).
+                        // En sm+: tamaños antiguos para póster / preview.
+                        const sizeClasses = isActive
+                            ? 'w-full sm:w-[390px] md:w-[530px] xl:w-[600px] sm:z-20'
+                            : 'w-full sm:w-[140px] md:w-[190px] xl:w-[210px] sm:z-10'
 
                         const transformClass =
                             !isTouchDevice && isActive && isLast
-                                ? '-translate-x-[250px] sm:-translate-x-[290px] md:-translate-x-[340px] xl:-translate-x-[390px]'
+                                ? 'sm:-translate-x-[250px] md:-translate-x-[340px] xl:-translate-x-[390px]'
                                 : ''
 
                         return (
@@ -747,7 +744,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                     }
                                 >
                                     <AnimatePresence initial={false} mode="wait">
-                                        {/* En móvil siempre mostramos la portada normal */}
+                                        {/* En móvil solo vemos póster (no preview grande) */}
                                         {isActive ? (
                                             <motion.div
                                                 key="preview"
@@ -787,7 +784,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     })}
                 </Swiper>
 
-                {/* Lateral izquierdo – franja difuminada (solo tiene sentido en escritorio) */}
+                {/* Flechas solo en escritorio (no en móvil/touch) */}
                 {showPrev && !isTouchDevice && (
                     <button
                         type="button"
@@ -804,7 +801,6 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     </button>
                 )}
 
-                {/* Lateral derecho – franja difuminada */}
                 {showNext && !isTouchDevice && (
                     <button
                         type="button"
