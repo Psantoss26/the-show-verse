@@ -23,13 +23,29 @@ async function tmdb(path, params = {}, options = {}) {
     console.error('TMDb API key missing (NEXT_PUBLIC_TMDB_API_KEY)')
     return null
   }
+
   try {
-    const res = await fetch(buildUrl(path, params), { cache: 'no-store', ...options })
+    const res = await fetch(buildUrl(path, params), {
+      cache: 'no-store',
+      ...options,
+    })
+
     const json = await res.json().catch(() => ({}))
+
     if (!res.ok) {
+      // 404 / status_code 34 => recurso no disponible (p.ej. /account/0/recommendations)
+      // No lo tratamos como error "ruidoso", simplemente devolvemos null.
+      if (res.status === 404 || json?.status_code === 34) {
+        // Si quieres ver algo en desarrollo, puedes dejar un console.warn:
+        // console.warn('TMDb recurso no encontrado:', path)
+        return null
+      }
+
+      // Para otros errores (401, 500, etc.) sí mantenemos el log
       console.error('TMDb error:', res.status, json)
       return null
     }
+
     return json
   } catch (e) {
     console.error('TMDb fetch error:', path, e)
