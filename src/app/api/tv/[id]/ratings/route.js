@@ -1,122 +1,278 @@
-// /src/app/api/tv/[id]/ratings/route.js
-export const dynamic = 'force-dynamic';
+// src/app/api/tv/[id]/ratings/route.js
+import { NextResponse } from 'next/server'
 
-const TMDB_BASE = 'https://api.themoviedb.org/3';
-const OMDB_BASE  = 'https://www.omdbapi.com/';
+const TMDB_API_KEY =
+  process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY
 
-const CACHE_TTL_MS = 1000 * 60 * 10; // 10 min
-const cache = new Map();
-const getCache = (k) => {
-  const v = cache.get(k);
-  if (!v) return null;
-  if (Date.now() - v.t > CACHE_TTL_MS) { cache.delete(k); return null; }
-  return v.d;
-};
-const setCache = (k, d) => cache.set(k, { d, t: Date.now() });
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3'
 
-const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
-async function tmdb(path, params = {}) {
-  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  if (!apiKey) throw new Error('Falta NEXT_PUBLIC_TMDB_API_KEY');
-  const url = new URL(`${TMDB_BASE}${path}`);
-  url.searchParams.set('api_key', apiKey);
-  url.searchParams.set('language', 'en-US');
-  for (const [k,v] of Object.entries(params)) if (v!=null) url.searchParams.set(k, String(v));
-  const res = await fetch(url, { next:{ revalidate:300 } });
-  if (!res.ok) throw new Error(`TMDb ${res.status}: ${await res.text()}`);
-  return res.json();
-}
-async function omdb(params = {}, { retries=2, backoff=500 } = {}) {
-  const apiKey = process.env.OMDB_API_KEY;
-  if (!apiKey) throw new Error('Falta OMDB_API_KEY');
-  const url = new URL(OMDB_BASE);
-  url.searchParams.set('apikey', apiKey);
-  for (const [k,v] of Object.entries(params)) if (v!=null) url.searchParams.set(k, String(v));
+// OMDb (IMDb)
+const OMDB_API_KEY = process.env.OMDB_API_KEY
+const OMDB_BASE_URL = 'https://www.omdbapi.com/'
 
-  for (let i=0;i<=retries;i++){
-    const res = await fetch(url, { next:{ revalidate:120 } });
-    let json=null; try{ json = await res.json(); }catch{}
-    const limited = json?.Error && /limit/i.test(json.Error);
-    if (res.ok && json && json.Response !== 'False') return json;
-    if (i<retries && limited) { await sleep(backoff*(i+1)); continue; }
-    return json || { Response:'False', Error:`HTTP ${res.status}` };
+/**
+ * Pequeño helper para llamar a TMDb con control de errores.
+ */
+async function tmdbFetch(path, searchParams = {}) {
+  if (!TMDB_API_KEY) {
+    throw new Error(
+      'TMDB_API_KEY o NEXT_PUBLIC_TMDB_API_KEY no está configurada en el entorno.'
+    )
   }
-}
 
-const parseVotes = (x)=>{
-  if (x==null) return null;
-  if (typeof x==='number') return x;
-  if (typeof x==='string') {
-    const n = Number(x.replaceAll(',','').trim());
-    return Number.isFinite(n) ? n : null;
+  const url = new URL(TMDB_BASE_URL + path)
+
+  url.searchParams.set('api_key', TMDB_API_KEY)
+
+  // parámetros extra
+  for (const [k, v] of Object.entries(searchParams)) {
+    if (v !== undefined && v !== null) {
+      url.searchParams.set(k, String(v))
+    }
   }
-  return null;
-};
 
-export async function GET(req, ctx) {
-  const { id } = await ctx.params; // Next 15
+  const res = await fetch(url.toString(), {
+    // algo de caché para no reventar la API
+    next: { revalidate: 60 * 60 } // 1 hora
+  })
+
+  const status = res.status
+  let json = null
   try {
-    const { searchParams } = new URL(req.url);
-    const excludeSpecials = searchParams.get('excludeSpecials') === 'true';
+    json = await res.json()
+  } catch {
+    json = null
+  }
 
-    const cacheKey = `fast:${id}:${excludeSpecials?1:0}`;
-    const hit = getCache(cacheKey);
-    if (hit) return Response.json(hit);
+  if (!res.ok) {
+    const msg =
+      json?.status_message || json?.error || 'Error en la llamada a TMDb.'
+    const err = new Error(msg)
+    err.status = status
+    throw err
+  }
 
-    // Serie + imdb_id
-    const [details, ext] = await Promise.all([
-      tmdb(`/tv/${id}`),
-      tmdb(`/tv/${id}/external_ids`),
-    ]);
-    const imdbSeriesId = ext?.imdb_id || null;
+  return json
+}
 
-    const seasonsMeta = Array.isArray(details.seasons) ? details.seasons : [];
-    const seasons = [];
-    // Carga en paralelo: TMDb season + OMDb season (si hay imdb id)
-    await Promise.all(seasonsMeta.map(async (s) => {
-      if (excludeSpecials && s.season_number === 0) return;
+/**
+ * Llama a OMDb y devuelve TODA una temporada de golpe.
+ * Si hay cualquier problema, devuelve null (no rompemos el endpoint).
+ */
+async function omdbFetchSeason(imdbId, seasonNumber) {
+  if (!OMDB_API_KEY || !imdbId) return null
 
-      const [tmdbSeason, omdbSeason] = await Promise.all([
-        tmdb(`/tv/${id}/season/${s.season_number}`),
-        imdbSeriesId ? omdb({ i: imdbSeriesId, Season: s.season_number }) : Promise.resolve(null),
-      ]);
+  const url = new URL(OMDB_BASE_URL)
+  url.searchParams.set('apikey', OMDB_API_KEY)
+  url.searchParams.set('i', imdbId)
+  url.searchParams.set('Season', String(seasonNumber))
 
-      // Mapa rápido imdbRating por nº de episodio (OMDb Season)
-      const imdbMap = {};
-      if (omdbSeason?.Episodes) {
-        for (const e of omdbSeason.Episodes) {
-          const n = Number(e.Episode);
-          const r = e?.imdbRating && e.imdbRating !== 'N/A' ? Number(e.imdbRating) : null;
-          imdbMap[n] = Number.isFinite(r) ? r : null;
+  try {
+    const res = await fetch(url.toString(), {
+      next: { revalidate: 24 * 60 * 60 } // 24h
+    })
+    const json = await res.json()
+    if (!res.ok || json?.Response === 'False') return null
+    return json
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Ejecuta promesas en lotes para limitar la concurrencia.
+ */
+async function runBatched(promisesFactories, batchSize = 4) {
+  const results = []
+  for (let i = 0; i < promisesFactories.length; i += batchSize) {
+    const batch = promisesFactories.slice(i, i + batchSize)
+    const batchResults = await Promise.all(batch.map((fn) => fn()))
+    results.push(...batchResults)
+  }
+  return results
+}
+
+// 👇 IMPORTANTE: params es asíncrono, hay que hacerle await
+export async function GET(request, context) {
+  const { params } = context
+  const { id } = await params
+
+  if (!id) {
+    return NextResponse.json(
+      { error: 'Falta el parámetro id de la serie.' },
+      { status: 400 }
+    )
+  }
+
+  const url = new URL(request.url)
+  const excludeSpecials = url.searchParams.get('excludeSpecials') === 'true'
+
+  try {
+    // 1) Detalles básicos de la serie (lista de temporadas + imdb_id)
+    const show = await tmdbFetch(`/tv/${id}`, {
+      language: 'es-ES',
+      append_to_response: 'external_ids'
+    })
+
+    const allSeasons = Array.isArray(show.seasons) ? show.seasons : []
+
+    const imdbId = show?.external_ids?.imdb_id || null
+    const useOmdb = Boolean(imdbId && OMDB_API_KEY)
+
+    // Filtramos temporadas reales (y quitamos specials si toca)
+    const seasons = allSeasons
+      .filter((s) => {
+        if (!s) return false
+        if (excludeSpecials && s.season_number === 0) return false
+        if (!s.episode_count || s.episode_count <= 0) return false
+        return true
+      })
+      .sort((a, b) => a.season_number - b.season_number)
+
+    // 2) Para cada temporada:
+    //    - /tv/{id}/season/{n} en TMDb
+    //    - Season en OMDb (IMDb) en una sola llamada
+    const seasonFactories = seasons.map((seasonMeta) => async () => {
+      try {
+        const [seasonDetail, omdbSeason] = await Promise.all([
+          tmdbFetch(`/tv/${id}/season/${seasonMeta.season_number}`, {
+            language: 'es-ES'
+          }),
+          useOmdb
+            ? omdbFetchSeason(imdbId, seasonMeta.season_number)
+            : Promise.resolve(null)
+        ])
+
+        const tmdbEpisodes = Array.isArray(seasonDetail.episodes)
+          ? seasonDetail.episodes
+          : []
+        const omdbEpisodes = Array.isArray(omdbSeason?.Episodes)
+          ? omdbSeason.Episodes
+          : []
+
+        // índice por número de episodio en OMDb
+        const omdbByEp = new Map()
+        for (const ep of omdbEpisodes) {
+          const n = Number(ep.Episode)
+          if (Number.isFinite(n)) omdbByEp.set(n, ep)
         }
+
+        const mappedEpisodes = tmdbEpisodes
+          .filter((ep) => ep && typeof ep.episode_number === 'number')
+          .sort((a, b) => a.episode_number - b.episode_number)
+          .map((ep) => {
+            // TMDb
+            const tmdbRating =
+              typeof ep.vote_average === 'number' ? ep.vote_average : null
+            const tmdbVotes =
+              typeof ep.vote_count === 'number' ? ep.vote_count : null
+
+            // IMDb desde OMDb
+            const om = omdbByEp.get(ep.episode_number) || null
+            let imdbRating = null
+            let imdbVotes = null
+
+            if (om) {
+              if (om.imdbRating && om.imdbRating !== 'N/A') {
+                const r = Number(om.imdbRating)
+                if (Number.isFinite(r)) imdbRating = r
+              }
+              if (om.imdbVotes && om.imdbVotes !== 'N/A') {
+                const v = Number(String(om.imdbVotes).replace(/,/g, ''))
+                if (Number.isFinite(v)) imdbVotes = v
+              }
+            }
+
+            const values = [tmdbRating, imdbRating].filter(
+              (v) => typeof v === 'number'
+            )
+            const avg =
+              values.length > 0
+                ? Number(
+                  (
+                    values.reduce((a, b) => a + b, 0) / values.length
+                  ).toFixed(1)
+                )
+                : null
+
+            return {
+              episodeNumber: ep.episode_number,
+              name: ep.name || om?.Title || `Episodio ${ep.episode_number}`,
+              airDate: ep.air_date || om?.Released || null,
+              tmdb: tmdbRating,
+              tmdbVotes,
+              imdb: imdbRating,
+              imdbVotes,
+              avg
+            }
+          })
+
+        const hasAnyRating = mappedEpisodes.some(
+          (ep) =>
+            typeof ep.tmdb === 'number' || typeof ep.imdb === 'number'
+        )
+
+        if (!mappedEpisodes.length || !hasAnyRating) return null
+
+        return {
+          seasonNumber: seasonMeta.season_number,
+          name: seasonMeta.name || `Temporada ${seasonMeta.season_number}`,
+          episodeCount:
+            seasonMeta.episode_count || mappedEpisodes.length,
+          episodes: mappedEpisodes
+        }
+      } catch (e) {
+        console.error(
+          `Error cargando temporada ${seasonMeta.season_number} de ${id}:`,
+          e
+        )
+        return null
       }
+    })
 
-      const episodes = (tmdbSeason.episodes || []).map(ep => ({
-        episode_number: ep.episode_number,
-        name: ep.name,
-        tmdbRating: typeof ep.vote_average === 'number' ? ep.vote_average : null,
-        tmdbVotes: parseVotes(ep.vote_count),
-        imdbRating: imdbMap[ep.episode_number] ?? null, // ⚡️ instantáneo
-        imdbVotes: null,                                // se piden a demanda
-      })).sort((a,b)=>a.episode_number-b.episode_number);
+    // 3) Ejecutamos en lotes para no abusar de las APIs
+    const seasonsWithEpisodesRaw = await runBatched(seasonFactories, 4)
+    const seasonsWithEpisodes = seasonsWithEpisodesRaw.filter(Boolean)
 
-      seasons.push({ season_number: s.season_number, name: s.name, episodes });
-    }));
-
-    seasons.sort((a,b)=>a.season_number-b.season_number);
+    const totalEpisodes = seasonsWithEpisodes.reduce(
+      (acc, s) => acc + (s.episodeCount || 0),
+      0
+    )
 
     const payload = {
-      tmdbId: details.id,
-      name: details.name,
-      first_air_date: details.first_air_date,
-      poster_path: details.poster_path ?? null,
-      imdb_id: imdbSeriesId,
-      seasons,
-    };
+      meta: {
+        id: show.id,
+        name: show.name || show.original_name || '',
+        totalSeasons: seasonsWithEpisodes.length,
+        totalEpisodes,
+        sources: useOmdb ? ['avg', 'tmdb', 'imdb'] : ['avg', 'tmdb']
+      },
+      seasons: seasonsWithEpisodes
+    }
 
-    setCache(cacheKey, payload);
-    return Response.json(payload);
-  } catch (e) {
-    return Response.json({ error: e.message || 'Error' }, { status: 500 });
+    return NextResponse.json(payload, { status: 200 })
+  } catch (err) {
+    console.error('Error en /api/tv/[id]/ratings:', err)
+
+    const status = err.status || 500
+
+    if (status === 429) {
+      return NextResponse.json(
+        {
+          error:
+            'Se ha alcanzado el límite de peticiones a TMDb al obtener las puntuaciones por episodio. Inténtalo de nuevo más tarde.'
+        },
+        { status }
+      )
+    }
+
+    return NextResponse.json(
+      {
+        error:
+          err.message ||
+          'Error inesperado al obtener las puntuaciones por episodio.'
+      },
+      { status }
+    )
   }
 }

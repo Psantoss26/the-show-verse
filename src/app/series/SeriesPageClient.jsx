@@ -33,7 +33,9 @@ const anton = Anton({ weight: '400', subsets: ['latin'] })
 const useIsTouchDevice = () => {
     const [isTouch, setIsTouch] = useState(false)
     useEffect(() => {
-        const onTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+        const onTouch =
+            typeof window !== 'undefined' &&
+            ('ontouchstart' in window || navigator.maxTouchPoints > 0)
         setIsTouch(onTouch)
     }, [])
     return isTouch
@@ -188,8 +190,24 @@ function preloadImage(src) {
 const tvExtrasCache = new Map() // show.id -> { runtime, awards, imdbRating }
 const tvBackdropCache = new Map() // show.id -> backdrop file_path
 
+/* ======== Preferencias de artwork guardadas en localStorage (TV) ======== */
+function getTVArtworkPreference(showId) {
+    if (typeof window === 'undefined') {
+        return { poster: null, backdrop: null, background: null }
+    }
+    const base = `showverse:tv:${showId}`
+    const poster = window.localStorage.getItem(`${base}:poster`)
+    const backdrop = window.localStorage.getItem(`${base}:backdrop`)
+    const background = window.localStorage.getItem(`${base}:background`)
+    return {
+        poster: poster || null,
+        backdrop: backdrop || null,
+        background: background || null
+    }
+}
+
 /* ====================================================================
- * Portada TV 2:3 con caché
+ * Portada TV 2:3 con caché + overrides
  * ==================================================================== */
 function PosterImage({ show, cache, heightClass }) {
     const [posterPath, setPosterPath] = useState(
@@ -203,6 +221,20 @@ function PosterImage({ show, cache, heightClass }) {
         const load = async () => {
             if (!show) return
 
+            // 1) Preferencia seleccionada en detalles (admin) para esta serie (localStorage)
+            const { poster: userPoster } = getTVArtworkPreference(show.id)
+            if (userPoster) {
+                const url = buildImg(userPoster, 'w342')
+                await preloadImage(url)
+                if (!abort) {
+                    cache.current.set(show.id, userPoster)
+                    setPosterPath(userPoster)
+                    setReady(true)
+                }
+                return
+            }
+
+            // 2) Cache en memoria
             const cached = cache.current.get(show.id)
             if (cached) {
                 const url = buildImg(cached, 'w342')
@@ -214,10 +246,22 @@ function PosterImage({ show, cache, heightClass }) {
                 return
             }
 
+            // 3) Si el servidor ya ha marcado una portada (incluye overrides globales)
+            if (show.poster_path) {
+                const url = buildImg(show.poster_path, 'w342')
+                await preloadImage(url)
+                if (!abort) {
+                    cache.current.set(show.id, show.poster_path)
+                    setPosterPath(show.poster_path)
+                    setReady(true)
+                }
+                return
+            }
+
+            // 4) Fallback: buscar mejor poster ES/EN desde TMDb o usar backdrop
             setReady(false)
             const preferred = await fetchTVPosterEsThenEn(show.id)
-            const chosen =
-                preferred || show.poster_path || show.backdrop_path || null
+            const chosen = preferred || show.backdrop_path || null
             const url = chosen ? buildImg(chosen, 'w342') : null
             await preloadImage(url)
             if (!abort) {
@@ -302,50 +346,74 @@ function InlinePreviewCard({ show, heightClass }) {
         }
     }, [show, session, account])
 
-    // Backdrop + extras con caché
+    // Backdrop + extras con caché y overrides
     useEffect(() => {
         let abort = false
         if (!show) return
 
         const loadAll = async () => {
-            // Backdrop desde caché o TMDb
-            const cachedBackdrop = tvBackdropCache.get(show.id)
-            if (cachedBackdrop !== undefined) {
+            // === BACKDROP ===
+
+            // 1) Backdrop preferido por el usuario (admin) en este dispositivo
+            const { backdrop: userBackdrop } = getTVArtworkPreference(show.id)
+            if (userBackdrop) {
+                tvBackdropCache.set(show.id, userBackdrop)
+                const url = buildImg(userBackdrop, 'w1280')
+                await preloadImage(url)
                 if (!abort) {
-                    setBackdropPath(cachedBackdrop)
-                    if (cachedBackdrop) {
-                        const url = buildImg(cachedBackdrop, 'w1280')
-                        await preloadImage(url)
-                        if (!abort) setBackdropReady(true)
-                    } else {
-                        setBackdropReady(false)
-                    }
+                    setBackdropPath(userBackdrop)
+                    setBackdropReady(true)
+                }
+            } else if (show.backdrop_path) {
+                // 2) Backdrop que viene ya del servidor (incluye overrides globales)
+                tvBackdropCache.set(show.id, show.backdrop_path)
+                const url = buildImg(show.backdrop_path, 'w1280')
+                await preloadImage(url)
+                if (!abort) {
+                    setBackdropPath(show.backdrop_path)
+                    setBackdropReady(true)
                 }
             } else {
-                try {
-                    const preferred = await fetchTVBackdropEsThenEn(show.id)
-                    const chosen = preferred || show.backdrop_path || show.poster_path || null
-                    tvBackdropCache.set(show.id, chosen)
-                    if (chosen) {
-                        const url = buildImg(chosen, 'w1280')
-                        await preloadImage(url)
-                        if (!abort) {
-                            setBackdropPath(chosen)
-                            setBackdropReady(true)
-                        }
-                    } else if (!abort) {
-                        setBackdropPath(null)
-                        setBackdropReady(false)
-                    }
-                } catch {
+                // 3) Caché o TMDb como fallback
+                const cachedBackdrop = tvBackdropCache.get(show.id)
+                if (cachedBackdrop !== undefined) {
                     if (!abort) {
-                        setBackdropPath(null)
-                        setBackdropReady(false)
+                        setBackdropPath(cachedBackdrop)
+                        if (cachedBackdrop) {
+                            const url = buildImg(cachedBackdrop, 'w1280')
+                            await preloadImage(url)
+                            if (!abort) setBackdropReady(true)
+                        } else {
+                            setBackdropReady(false)
+                        }
+                    }
+                } else {
+                    try {
+                        const preferred = await fetchTVBackdropEsThenEn(show.id)
+                        const chosen = preferred || show.poster_path || null
+                        tvBackdropCache.set(show.id, chosen)
+
+                        if (chosen) {
+                            const url = buildImg(chosen, 'w1280')
+                            await preloadImage(url)
+                            if (!abort) {
+                                setBackdropPath(chosen)
+                                setBackdropReady(true)
+                            }
+                        } else if (!abort) {
+                            setBackdropPath(null)
+                            setBackdropReady(false)
+                        }
+                    } catch {
+                        if (!abort) {
+                            setBackdropPath(null)
+                            setBackdropReady(false)
+                        }
                     }
                 }
             }
 
-            // Extras
+            // === EXTRAS (runtime, awards, imdbRating) ===
             const cachedExtras = tvExtrasCache.get(show.id)
             if (cachedExtras) {
                 if (!abort) setExtras(cachedExtras)
@@ -720,7 +788,10 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                             transition={{ duration: 0.18 }}
                                             className="w-full h-full"
                                         >
-                                            <InlinePreviewCard show={s} heightClass={heightClass} />
+                                            <InlinePreviewCard
+                                                show={s}
+                                                heightClass={heightClass}
+                                            />
                                         </motion.div>
                                     ) : (
                                         <motion.div
