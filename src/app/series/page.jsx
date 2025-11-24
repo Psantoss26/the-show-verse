@@ -7,6 +7,8 @@ import {
   fetchTVSections
 } from '@/lib/api/tmdb'
 
+import { applyArtworkOverridesToDashboard } from '@/lib/artworkApi' // ⬅️ mismo helper que en películas
+
 export const revalidate = 1800 // 30 min
 
 /* ========= Utilidad para obtener la URL base en servidor ========= */
@@ -173,6 +175,9 @@ async function getDashboardData() {
     })
 
     const curatedBaseSections = {}
+    const curatedByGenre = {}
+
+    // Curado de secciones base TMDb
     for (const [key, list] of Object.entries(baseSections || {})) {
       if (!Array.isArray(list)) continue
 
@@ -204,6 +209,7 @@ async function getDashboardData() {
           maxSize: 60
         }
       } else if (key === 'Por género') {
+        // se trata más abajo
         continue
       } else {
         params = {
@@ -217,7 +223,7 @@ async function getDashboardData() {
       curatedBaseSections[key] = curateList(list, params)
     }
 
-    const curatedByGenre = {}
+    // Curado de "Por género"
     const byGenreRaw = baseSections?.['Por género'] || {}
     for (const [gname, list] of Object.entries(byGenreRaw)) {
       if (!Array.isArray(list) || list.length === 0) continue
@@ -232,7 +238,8 @@ async function getDashboardData() {
       curatedBaseSections['Por género'] = curatedByGenre
     }
 
-    return {
+    // Objeto final de dashboard ANTES de aplicar overrides
+    const dashboard = {
       popular: curatedPopular,
       top_imdb: curatedTopIMDb,
       drama: curatedDrama,
@@ -241,6 +248,15 @@ async function getDashboardData() {
       animation: curatedAnimation,
       ...curatedBaseSections
     }
+
+    // ⬇️ AQUÍ aplicamos las overrides globales para TV
+    // (portadas / backdrops seleccionados en DetailsClient con saveArtworkOverride)
+    const dashboardWithArtwork = await applyArtworkOverridesToDashboard(
+      'tv',
+      dashboard
+    )
+
+    return dashboardWithArtwork
   } catch (err) {
     console.error('Error cargando la página de series (SSR):', err)
     return {}
