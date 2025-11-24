@@ -34,11 +34,25 @@ export default function EpisodeRatingsGrid({
     (Array.isArray(ratings?.seasons) ? ratings.seasons.length : 0)
   const totalEpisodesEstimate = meta.totalEpisodes ?? 0
 
-  // Modo "toda la serie en una sola temporada" (estilo SeriesGraph)
+  // Modo "toda la serie en una sola temporada" para series enormes
   const shouldFlatten =
     meta.forceSingleSeason === true ||
     totalSeasonsEstimate >= 15 ||
     totalEpisodesEstimate >= 400
+
+  // helper para votos: acepta number o string "12,345"
+  const toNumberSafe = (value) => {
+    if (value == null) return null
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null
+    }
+    if (typeof value === 'string') {
+      const cleaned = value.replace(/,/g, '').trim()
+      const n = Number(cleaned)
+      return Number.isFinite(n) ? n : null
+    }
+    return null
+  }
 
   // === Normalizar datos de entrada ===
   const { seasonsSorted, maxEpisodes } = useMemo(() => {
@@ -48,7 +62,6 @@ export default function EpisodeRatingsGrid({
         ? ratings
         : []
 
-    // 1) Normalizar temporadas + episodios
     const normalized = rawSeasons
       .map((s) => {
         const seasonNumber =
@@ -71,25 +84,36 @@ export default function EpisodeRatingsGrid({
                   : null
             if (episodeNumber == null) return null
 
+            const tmdbRating =
+              typeof ep.tmdbRating === 'number'
+                ? ep.tmdbRating
+                : typeof ep.tmdb === 'number'
+                  ? ep.tmdb
+                  : null
+            const imdbRating =
+              typeof ep.imdbRating === 'number'
+                ? ep.imdbRating
+                : typeof ep.imdb === 'number'
+                  ? ep.imdb
+                  : null
+
+            const tmdbVotes = toNumberSafe(
+              ep.tmdbVotes ?? ep.tmdb_votes ?? ep.vote_count
+            )
+            const imdbVotes = toNumberSafe(
+              ep.imdbVotes ??
+              ep.imdb_votes ??
+              ep.imdbVotesCount ??
+              ep.imdb_votes_count
+            )
+
             return {
               episodeNumber,
               name: ep.name || '',
-              tmdbRating:
-                typeof ep.tmdbRating === 'number'
-                  ? ep.tmdbRating
-                  : typeof ep.tmdb === 'number'
-                    ? ep.tmdb
-                    : null,
-              imdbRating:
-                typeof ep.imdbRating === 'number'
-                  ? ep.imdbRating
-                  : typeof ep.imdb === 'number'
-                    ? ep.imdb
-                    : null,
-              tmdbVotes:
-                typeof ep.tmdbVotes === 'number' ? ep.tmdbVotes : null,
-              imdbVotes:
-                typeof ep.imdbVotes === 'number' ? ep.imdbVotes : null
+              tmdbRating,
+              imdbRating,
+              tmdbVotes,
+              imdbVotes
             }
           })
           .filter(Boolean)
@@ -104,7 +128,7 @@ export default function EpisodeRatingsGrid({
 
     let seasons = normalized.filter((s) => s.episodes.length > 0)
 
-    // 2) O bien mantenemos temporadas reales, o aplanamos en una sola
+    // Aplanar varias temporadas en una sola (estilo SeriesGraph)
     if (shouldFlatten && seasons.length > 1) {
       const allEpisodes = []
       let counter = 1
@@ -121,7 +145,6 @@ export default function EpisodeRatingsGrid({
 
             allEpisodes.push({
               ...ep,
-              // numeración global tipo E1, E2, E3, ...
               episodeNumber: counter++
             })
           })
@@ -162,7 +185,6 @@ export default function EpisodeRatingsGrid({
     return { seasonsSorted: seasons, maxEpisodes: maxEp }
   }, [ratings, shouldFlatten])
 
-  // ¿Estamos mostrando una sola temporada sintética?
   const singleSeasonView =
     shouldFlatten && seasonsSorted.length === 1 && totalSeasonsEstimate > 1
 
@@ -191,7 +213,6 @@ export default function EpisodeRatingsGrid({
       if (ep.imdbRating != null) return ep.imdbRating
       return fillMissingWithTmdb ? ep.tmdbRating ?? null : null
     }
-    // media (avg)
     const vals = [ep.tmdbRating, ep.imdbRating].filter(
       (v) => typeof v === 'number'
     )
@@ -201,7 +222,7 @@ export default function EpisodeRatingsGrid({
     )
   }
 
-  // Colores con contraste
+  // Colores
   const toneFor = (v) => {
     if (v == null)
       return {
@@ -298,7 +319,6 @@ export default function EpisodeRatingsGrid({
                   key={s.season_number}
                   className={`${SZ.headerPad} text-center text-xs text-zinc-200 font-semibold bg-black/60 backdrop-blur border-b border-white/10`}
                 >
-                  {/* En modo "aplanado" mostramos solo S1 */}
                   S{s.season_number}
                 </th>
               ))}
@@ -325,16 +345,44 @@ export default function EpisodeRatingsGrid({
                     const spec = toneFor(raw)
 
                     const titleText = ep?.name || `Episodio ${epNum}`
+
+                    const tmdbVal =
+                      typeof ep?.tmdbRating === 'number'
+                        ? ep.tmdbRating
+                        : null
+                    const imdbVal =
+                      typeof ep?.imdbRating === 'number'
+                        ? ep.imdbRating
+                        : null
+                    const avgVal =
+                      tmdbVal == null && imdbVal == null
+                        ? null
+                        : Number(
+                          (
+                            [tmdbVal, imdbVal]
+                              .filter((v) => typeof v === 'number')
+                              .reduce((a, b) => a + b, 0) /
+                            [tmdbVal, imdbVal].filter(
+                              (v) => typeof v === 'number'
+                            ).length
+                          ).toFixed(1)
+                        )
+
+                    const tmdbVotesStr =
+                      ep?.tmdbVotes != null
+                        ? ep.tmdbVotes.toLocaleString()
+                        : null
                     const imdbVotesStr =
                       ep?.imdbVotes != null
                         ? ep.imdbVotes.toLocaleString()
-                        : '—'
+                        : null
 
                     const placeAbove = epNum > 2
 
                     return (
                       <td key={`s${s.season_number}-e${epNum}`} className="p-1">
                         <div className="relative group">
+                          {/* Píldora de rating */}
                           <div
                             className={`
                               ${spec.bg} ${spec.text} ring-1 ${spec.ring}
@@ -357,8 +405,8 @@ export default function EpisodeRatingsGrid({
                             {val ?? '—'}
                           </div>
 
-                          {/* Tooltip visual */}
-                          {ep && raw != null && (
+                          {/* Tooltip visual mejorado */}
+                          {ep && (tmdbVal != null || imdbVal != null) && (
                             <div
                               className={[
                                 'pointer-events-none absolute left-1/2 -translate-x-1/2 z-50',
@@ -366,29 +414,75 @@ export default function EpisodeRatingsGrid({
                                   ? '-top-2 -translate-y-full'
                                   : 'top-full mt-2',
                                 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150',
-                                'px-3 py-2 rounded-md text-[12px] leading-tight bg-black/90 text-white shadow-lg',
-                                'whitespace-pre text-center max-w-[260px]'
+                                'px-3 py-2 rounded-md bg-black text-white shadow-xl border border-white/10',
+                                'text-[11px] md:text-[12px] leading-tight',
+                                'max-w-[260px] sm:max-w-[320px]'
                               ].join(' ')}
                             >
-                              <strong className="block">
+                              {/* Título */}
+                              <div className="font-semibold text-[12px] md:text-[13px] mb-1 line-clamp-2">
                                 {titleText}
-                              </strong>
-                              <span className="block opacity-90">
+                              </div>
+
+                              {/* Season / Episode */}
+                              <div className="text-[11px] text-emerald-300 mb-2">
                                 {singleSeasonView
                                   ? `Episode ${epNum}`
                                   : `Season ${s.season_number}, Episode ${epNum}`}
-                              </span>
-                              <span className="block opacity-90">
-                                {sourceLabel}: {format1(raw)}
-                              </span>
-                              <span className="block opacity-80">
-                                Votes: {imdbVotesStr}
-                              </span>
+                              </div>
 
+                              {/* Bloques TMDb / IMDb */}
+                              <div className="space-y-2">
+                                {tmdbVal != null && (
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] uppercase tracking-wide text-emerald-300 font-semibold">
+                                      TMDb
+                                    </span>
+                                    <span className="text-[14px] font-semibold">
+                                      {format1(tmdbVal)}
+                                    </span>
+                                    {tmdbVotesStr && (
+                                      <span className="text-[10px] text-zinc-400">
+                                        {tmdbVotesStr} votos
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {imdbVal != null && (
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] uppercase tracking-wide text-yellow-300 font-semibold">
+                                      IMDb
+                                    </span>
+                                    <span className="text-[14px] font-semibold">
+                                      {format1(imdbVal)}
+                                    </span>
+                                    {imdbVotesStr && (
+                                      <span className="text-[10px] text-zinc-400">
+                                        {imdbVotesStr} votos
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Media general */}
+                              {avgVal != null && (
+                                <div className="mt-2 pt-2 border-t border-white/10 text-[11px] flex justify-between gap-3">
+                                  <span className="text-zinc-400">
+                                    Media TMDb + IMDb
+                                  </span>
+                                  <span className="font-semibold text-zinc-100">
+                                    {format1(avgVal)}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Flechita */}
                               {placeAbove ? (
-                                <span className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-black/90" />
+                                <span className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-black" />
                               ) : (
-                                <span className="absolute left-1/2 -top-2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent border-b-black/90" />
+                                <span className="absolute left-1/2 -top-2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent border-b-black" />
                               )}
                             </div>
                           )}
