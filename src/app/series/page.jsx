@@ -1,3 +1,4 @@
+// /src/app/series/page.jsx
 import SeriesPageClient from './SeriesPageClient'
 
 import {
@@ -6,8 +7,6 @@ import {
   fetchMediaByKeyword,
   fetchTVSections
 } from '@/lib/api/tmdb'
-
-import { applyArtworkOverridesToDashboard } from '@/lib/artworkApi' // ⬅️ mismo helper que en películas
 
 export const revalidate = 1800 // 30 min
 
@@ -209,7 +208,7 @@ async function getDashboardData() {
           maxSize: 60
         }
       } else if (key === 'Por género') {
-        // se trata más abajo
+        // Se trata más abajo
         continue
       } else {
         params = {
@@ -238,7 +237,7 @@ async function getDashboardData() {
       curatedBaseSections['Por género'] = curatedByGenre
     }
 
-    // Objeto final de dashboard ANTES de aplicar overrides
+    // Objeto final de dashboard que se envía al cliente
     const dashboard = {
       popular: curatedPopular,
       top_imdb: curatedTopIMDb,
@@ -249,14 +248,7 @@ async function getDashboardData() {
       ...curatedBaseSections
     }
 
-    // ⬇️ AQUÍ aplicamos las overrides globales para TV
-    // (portadas / backdrops seleccionados en DetailsClient con saveArtworkOverride)
-    const dashboardWithArtwork = await applyArtworkOverridesToDashboard(
-      'tv',
-      dashboard
-    )
-
-    return dashboardWithArtwork
+    return dashboard
   } catch (err) {
     console.error('Error cargando la página de series (SSR):', err)
     return {}
