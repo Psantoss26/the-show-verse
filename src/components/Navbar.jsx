@@ -9,8 +9,8 @@ import {
   Heart,
   Bookmark,
   Search as SearchIcon,
-  HomeIcon, // Añadido para la barra móvil
-  XIcon, // Añadido para cerrar la búsqueda móvil
+  HomeIcon,
+  XIcon,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -28,7 +28,6 @@ function SearchBar({ onResultClick }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const searchRef = useRef(null)
 
-  // Hook para cerrar el dropdown si se hace clic fuera
   useEffect(() => {
     const handler = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) {
@@ -39,7 +38,6 @@ function SearchBar({ onResultClick }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Hook para manejar la búsqueda con un debounce
   useEffect(() => {
     if (!query.trim()) {
       setResults([])
@@ -50,19 +48,22 @@ function SearchBar({ onResultClick }) {
     const searchTimer = setTimeout(async () => {
       try {
         const res = await fetch(
-          `https://api.themoviedb.org/3/search/multi?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(query)}`
+          `https://api.themoviedb.org/3/search/multi?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(
+            query
+          )}`
         )
         const data = await res.json()
-        // Filtrar personas con 'known_for_department' "Acting" para más relevancia
         const filteredResults = (data.results || []).filter(
-          item => item.media_type !== 'person' || item.known_for_department === 'Acting'
-        );
+          (item) =>
+            item.media_type !== 'person' ||
+            item.known_for_department === 'Acting'
+        )
         setResults(filteredResults)
         setShowDropdown(true)
       } catch (err) {
         console.error('Error buscando en TMDb:', err)
       }
-    }, 300) // 300ms de debounce
+    }, 300)
 
     return () => clearTimeout(searchTimer)
   }, [query])
@@ -71,7 +72,7 @@ function SearchBar({ onResultClick }) {
     setShowDropdown(false)
     setQuery('')
     setResults([])
-    if (onResultClick) onResultClick() // Llama a la función del padre (para cerrar el overlay móvil)
+    if (onResultClick) onResultClick()
   }
 
   return (
@@ -106,8 +107,9 @@ function SearchBar({ onResultClick }) {
                 <img
                   src={
                     item.poster_path || item.profile_path
-                      ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
-                      : '/default-poster.png' // Asegúrate de tener esta imagen en tu carpeta /public
+                      ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path
+                      }`
+                      : '/default-poster.png'
                   }
                   alt={item.title || item.name || 'Resultado'}
                   className="w-12 h-16 rounded-md shadow-md object-cover"
@@ -117,10 +119,13 @@ function SearchBar({ onResultClick }) {
                     {item.title || item.name}
                   </p>
                   <p className="text-sm text-neutral-400 capitalize">
-                    {item.media_type === 'movie' ? 'Película'
-                     : item.media_type === 'tv' ? 'Serie'
-                     : item.media_type === 'person' ? 'Persona'
-                     : item.media_type}
+                    {item.media_type === 'movie'
+                      ? 'Película'
+                      : item.media_type === 'tv'
+                        ? 'Serie'
+                        : item.media_type === 'person'
+                          ? 'Persona'
+                          : item.media_type}
                   </p>
                 </div>
               </Link>
@@ -132,69 +137,54 @@ function SearchBar({ onResultClick }) {
   )
 }
 
-
 /* ====================================================================
  * Componente Principal de la Barra de Navegación
  * ==================================================================== */
 export default function Navbar() {
-  const { account } = useAuth()
+  // 👇 ahora usamos también `hydrated`
+  const { account, hydrated } = useAuth()
   const pathname = usePathname()
   const [showMobileSearch, setShowMobileSearch] = useState(false)
 
-  // --- Clases de Links (Helpers) ---
-  const isActive = (href) => pathname === href || (href !== '/' && pathname?.startsWith(href))
+  const isActive = (href) =>
+    pathname === href || (href !== '/' && pathname?.startsWith(href))
 
-  // Links de navegación (Desktop)
   const navLinkClass = (href) =>
-    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-      isActive(href)
-        ? 'bg-white/10 text-white'
-        : 'text-neutral-400 hover:text-white hover:bg-white/5'
+    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(href)
+      ? 'bg-white/10 text-white'
+      : 'text-neutral-400 hover:text-white hover:bg-white/5'
     }`
 
-  // Links de iconos (Desktop)
   const iconLinkClass = (href) =>
-    `p-2 rounded-full transition-colors ${
-      isActive(href)
-        ? 'text-white bg-white/10'
-        : 'text-neutral-400 hover:text-white hover:bg-white/5'
-    }`
-  
-  // [MODIFICADO] Links de navegación superior (Móvil)
-  const navLinkClassMobileTop = (href) =>
-    `text-base font-medium transition-colors ${
-      isActive(href)
-        ? 'text-white' // Activo
-        : 'text-neutral-400 hover:text-white' // Inactivo
+    `p-2 rounded-full transition-colors ${isActive(href)
+      ? 'text-white bg-white/10'
+      : 'text-neutral-400 hover:text-white hover:bg-white/5'
     }`
 
-  // Links de la barra inferior (Móvil)
-  const navLinkClassMobileBottom = (href) =>
-    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${
-      isActive(href)
-        ? 'text-blue-400'
-        : 'text-neutral-400 hover:text-white'
+  const navLinkClassMobileTop = (href) =>
+    `text-base font-medium transition-colors ${isActive(href) ? 'text-white' : 'text-neutral-400 hover:text-white'
     }`
-  
+
+  const navLinkClassMobileBottom = (href) =>
+    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${isActive(href) ? 'text-blue-400' : 'text-neutral-400 hover:text-white'
+    }`
+
   useEffect(() => {
     if (showMobileSearch) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden'
     } else {
-      document.body.style.overflow = 'auto';
+      document.body.style.overflow = 'auto'
     }
   }, [showMobileSearch])
-
 
   return (
     <>
       {/* --- BARRA DE NAVEGACIÓN PRINCIPAL --- */}
       <nav className="relative sticky top-0 z-40 w-full bg-black/80 backdrop-blur-md border-b border-neutral-800">
-        
         {/* --- LAYOUT DESKTOP (lg:flex) --- */}
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
-          
           {/* 1. IZQUIERDA (Desktop) */}
-          <div className="flex items-center gap-6 flex-shrink-0 pl-6 -ml-10"> 
+          <div className="flex items-center gap-6 flex-shrink-0 pl-6 -ml-10">
             <Link href="/" className="block h-12 overflow-hidden flex-shrink-0">
               <div className="h-full w-[170px] flex items-center justify-center overflow-hidden">
                 <img
@@ -204,37 +194,63 @@ export default function Navbar() {
                 />
               </div>
             </Link>
-            
+
             <div className="flex items-center gap-4">
-              <Link href="/" className={navLinkClass('/')}>Inicio</Link>
-              <Link href="/movies" className={navLinkClass('/movies')}>Películas</Link>
-              <Link href="/series" className={navLinkClass('/series')}>Series</Link>
+              <Link href="/" className={navLinkClass('/')}>
+                Inicio
+              </Link>
+              <Link href="/movies" className={navLinkClass('/movies')}>
+                Películas
+              </Link>
+              <Link href="/series" className={navLinkClass('/series')}>
+                Series
+              </Link>
             </div>
           </div>
-                    
+
           {/* 3. DERECHA (Desktop) */}
-          <div className="flex items-center gap-2 flex-shrink-0 pr-12"> 
+          <div className="flex items-center gap-2 flex-shrink-0 pr-12">
             <div className="flex items-center gap-2">
-              <Link href="/news" className={iconLinkClass('/news')} title="Noticias">
+              <Link
+                href="/news"
+                className={iconLinkClass('/news')}
+                title="Noticias"
+              >
                 <NewspaperIcon className="w-5 h-5" />
               </Link>
-              <Link href="/calendar" className={iconLinkClass('/calendar')} title="Calendario">
+              <Link
+                href="/calendar"
+                className={iconLinkClass('/calendar')}
+                title="Calendario"
+              >
                 <CalendarDaysIcon className="w-5 h-5" />
               </Link>
 
-              {account && (
+              {hydrated && account && (
                 <>
-                  <Link href="/favorites" className={iconLinkClass('/favorites')} title="Favoritas">
+                  <Link
+                    href="/favorites"
+                    className={iconLinkClass('/favorites')}
+                    title="Favoritas"
+                  >
                     <Heart className="w-5 h-5" />
                   </Link>
-                  <Link href="/watchlist" className={iconLinkClass('/watchlist')} title="Pendientes">
+                  <Link
+                    href="/watchlist"
+                    className={iconLinkClass('/watchlist')}
+                    title="Pendientes"
+                  >
                     <Bookmark className="w-5 h-5" />
                   </Link>
                 </>
               )}
             </div>
 
-            {!account ? (
+            {/* 👇 Zona login / avatar sin parpadeo */}
+            {!hydrated ? (
+              // Skeleton mientras no sabemos si hay sesión
+              <div className="ml-2 w-28 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
+            ) : !account ? (
               <Link
                 href="/login"
                 className="ml-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
@@ -253,11 +269,8 @@ export default function Navbar() {
         </div>
 
         {/* --- LAYOUT MÓVIL (lg:hidden) --- */}
-        {/* [MODIFICADO] Reestructurado para un centrado absoluto */}
-        <div className="lg:hidden relative flex items-center justify-between h-16"> {/* h-16 = 64px */}
-          
+        <div className="lg:hidden relative flex items-center justify-between h-16">
           {/* 1. IZQUIERDA (Móvil): Logo */}
-          {/* [MODIFICADO] pl-2 para compensar espacio visual del logo. Quitamos -ml-2 */}
           <div className="flex-shrink-0 pl-2">
             <Link href="/" className="block h-10 overflow-hidden -ml-6">
               <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
@@ -271,24 +284,29 @@ export default function Navbar() {
           </div>
 
           {/* 2. CENTRO (Móvil - Absoluto) */}
-          {/* [MODIFICADO] Posicionado absoluto para centrado perfecto */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-5 -ml-1">
-            <Link href="/movies" className={navLinkClassMobileTop('/movies')}>Películas</Link>
-            <Link href="/series" className={navLinkClassMobileTop('/series')}>Series</Link>
+            <Link href="/movies" className={navLinkClassMobileTop('/movies')}>
+              Películas
+            </Link>
+            <Link href="/series" className={navLinkClassMobileTop('/series')}>
+              Series
+            </Link>
           </div>
 
           {/* 3. DERECHA (Móvil): Búsqueda y Perfil */}
-          {/* [MODIFICADO] pr-4 para dar más aire. gap-2 para separar iconos */}
           <div className="flex items-center gap-2 flex-shrink-0 pr-10">
-            <button 
-              onClick={() => setShowMobileSearch(true)} 
-              className={`p-2 rounded-full transition-colors text-neutral-400 hover:text-white hover:bg-white/5`}
+            <button
+              onClick={() => setShowMobileSearch(true)}
+              className="p-2 rounded-full transition-colors text-neutral-400 hover:text-white hover:bg-white/5"
               title="Buscar"
             >
               <SearchIcon className="w-6 h-6" />
             </button>
-            
-            {!account ? (
+
+            {!hydrated ? (
+              // Skeleton redondo mientras se hidrata auth
+              <div className="w-8 h-8 rounded-full bg-neutral-800/80 animate-pulse" />
+            ) : !account ? (
               <Link
                 href="/login"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
@@ -303,7 +321,6 @@ export default function Navbar() {
       </nav>
 
       {/* --- BARRA DE NAVEGACIÓN INFERIOR (MÓVIL) --- */}
-      {/* [MODIFICADO] Se añade "Inicio" aquí */}
       <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black border-t border-neutral-800 flex justify-around items-center">
         <Link href="/" className={navLinkClassMobileBottom('/')}>
           <HomeIcon className="w-6 h-6" />
@@ -317,31 +334,37 @@ export default function Navbar() {
           <CalendarDaysIcon className="w-6 h-6" />
           <span className="text-xs">Calendario</span>
         </Link>
-        
-        {account && (
-           <>
-             <Link href="/favorites" className={navLinkClassMobileBottom('/favorites')}>
+
+        {hydrated && account && (
+          <>
+            <Link
+              href="/favorites"
+              className={navLinkClassMobileBottom('/favorites')}
+            >
               <Heart className="w-6 h-6" />
               <span className="text-xs">Favoritas</span>
             </Link>
-             <Link href="/watchlist" className={navLinkClassMobileBottom('/watchlist')}>
+            <Link
+              href="/watchlist"
+              className={navLinkClassMobileBottom('/watchlist')}
+            >
               <Bookmark className="w-6 h-6" />
               <span className="text-xs">Pendientes</span>
             </Link>
-           </>
+          </>
         )}
       </div>
 
       {/* --- OVERLAY DE BÚSQUEDA (MÓVIL) --- */}
       <AnimatePresence>
         {showMobileSearch && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg flex flex-col items-center gap-6 p-4 pt-10"
           >
-            <button 
+            <button
               onClick={() => setShowMobileSearch(false)}
               className="absolute top-4 right-4 text-neutral-400 hover:text-white"
             >
