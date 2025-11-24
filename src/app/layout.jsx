@@ -4,31 +4,27 @@ import Navbar from '@/components/Navbar'
 import { AuthProvider } from '@/context/AuthContext'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
-import { cookies } from 'next/headers'
 
 export const metadata = {
   title: 'The Show Verse',
   description: 'Tu plataforma de películas y series',
+
+  // 👇 Iconos para navegadores y iOS
+  icons: {
+    icon: '/TheShowVerse2.png',       // favicon / icono general
+    shortcut: '/TheShowVerse2.png',   // atajos
+    apple: '/TheShowVerse2.png',      // icono al añadir a pantalla de inicio en iOS
+  },
+
+  // 👇 Manifest PWA (lo creamos en el paso 2)
+  manifest: '/site.webmanifest',
 }
 
-export default async function RootLayout({ children }) {
-  const cookieStore = await cookies()
-  const sessionId = cookieStore.get('tmdb_session')?.value || null
-  const accountRaw = cookieStore.get('tmdb_account')?.value || null
-
-  let initialAccount = null
-  if (accountRaw) {
-    try {
-      initialAccount = JSON.parse(accountRaw)
-    } catch {
-      initialAccount = null
-    }
-  }
-
+export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <body className="bg-black text-white">
-        <AuthProvider initialSession={sessionId} initialAccount={initialAccount}>
+        <AuthProvider>
           <Navbar />
           {children}
           <Analytics />
