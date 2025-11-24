@@ -1,9 +1,7 @@
-// /src/app/series/page.jsx
 import SeriesPageClient from './SeriesPageClient'
 
 import {
   fetchPopularMedia,
-  // NO usamos fetchTopRatedIMDb aquí para evitar URLs relativas en servidor
   fetchMoviesByGenre,
   fetchMediaByKeyword,
   fetchTVSections

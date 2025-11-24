@@ -57,6 +57,70 @@ const mergeUniqueImages = (current, incoming) => {
 const buildOriginalImageUrl = (filePath) =>
   `https://image.tmdb.org/t/p/original${filePath}`
 
+// -------- Helpers solo para SERIES (mismo criterio que en /series) --------
+async function fetchTVImages(showId) {
+  if (!TMDB_API_KEY) return { posters: [], backdrops: [] }
+
+  const url =
+    `https://api.themoviedb.org/3/tv/${showId}/images` +
+    `?api_key=${TMDB_API_KEY}` +
+    `&language=es-ES&include_image_language=es,es-ES,en,en-US`
+
+  const res = await fetch(url)
+  const json = await res.json()
+  if (!res.ok) throw new Error(json?.status_message || 'Error al cargar imágenes')
+
+  return {
+    posters: Array.isArray(json.posters) ? json.posters : [],
+    backdrops: Array.isArray(json.backdrops) ? json.backdrops : []
+  }
+}
+
+function pickBestImage(list) {
+  if (!Array.isArray(list) || list.length === 0) return null
+  const sorted = [...list].sort((a, b) => {
+    const vc = (b.vote_count || 0) - (a.vote_count || 0)
+    if (vc !== 0) return vc
+    const va = (b.vote_average || 0) - (a.vote_average || 0)
+    if (va !== 0) return va
+    return (b.width || 0) - (a.width || 0)
+  })
+  const topVote = sorted[0]?.vote_count || 0
+  const topSet = sorted.filter((x) => (x.vote_count || 0) === topVote)
+  topSet.sort((a, b) => (b.width || 0) - (a.width || 0))
+  return topSet[0] || sorted[0]
+}
+
+const pickBestPosterTV = (posters) => {
+  const es = posters.filter(
+    (p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES'
+  )
+  const en = posters.filter(
+    (p) => p.iso_639_1 === 'en' || p.iso_639_1 === 'en-US'
+  )
+  const bestES = pickBestImage(es)
+  if (bestES?.file_path) return bestES.file_path
+  const bestEN = pickBestImage(en)
+  if (bestEN?.file_path) return bestEN.file_path
+  return null
+}
+
+const pickBestBackdropTV = (backs) => {
+  const es = backs.filter(
+    (b) => b.iso_639_1 === 'es' || b.iso_639_1 === 'es-ES'
+  )
+  const en = backs.filter(
+    (b) => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US'
+  )
+  const bestES = pickBestImage(es)
+  if (bestES?.file_path) return bestES.file_path
+  const bestEN = pickBestImage(en)
+  if (bestEN?.file_path) return bestEN.file_path
+  return null
+}
+
+// =====================================================================
+
 export default function DetailsClient({
   type,
   id,
@@ -73,6 +137,10 @@ export default function DetailsClient({
 
   // ====== ESTADOS DE CUENTA ======
   const { session, account } = useAuth()
+  // Solo este usuario puede gestionar las imágenes de portada/backdrop
+  const isAdmin =
+    account?.username === 'psantos26' || account?.name === 'psantos26'
+
   const [favLoading, setFavLoading] = useState(false)
   const [wlLoading, setWlLoading] = useState(false)
   const [favorite, setFavorite] = useState(false)
@@ -87,17 +155,22 @@ export default function DetailsClient({
   const endpointType = type === 'tv' ? 'tv' : 'movie'
 
   // ====== PREFERENCIAS DE IMÁGENES ======
-  // Portada
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
-  // Backdrop de VISTA PREVIA (mantiene la clave antigua para no romper nada)
   const previewBackdropStorageKey = `showverse:${endpointType}:${id}:backdrop`
-  // Fondo de la vista de detalles (nuevo)
   const backgroundStorageKey = `showverse:${endpointType}:${id}:background`
 
   const [selectedPosterPath, setSelectedPosterPath] = useState(null)
   const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] =
     useState(null)
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null)
+
+  // base = lo que viene de TMDb (aplicando criterio ES->EN para series)
+  const [basePosterPath, setBasePosterPath] = useState(
+    data.poster_path || data.profile_path || null
+  )
+  const [baseBackdropPath, setBaseBackdropPath] = useState(
+    data.backdrop_path || null
+  )
 
   // Todas las imágenes (inicialmente al menos la portada/backdrop principal)
   const [imagesState, setImagesState] = useState(() => ({
@@ -110,7 +183,7 @@ export default function DetailsClient({
   }))
   const [imagesLoading, setImagesLoading] = useState(false)
   const [imagesError, setImagesError] = useState('')
-  const [activeImagesTab, setActiveImagesTab] = useState('posters') // 'posters' | 'backdrops' | 'background'
+  const [activeImagesTab, setActiveImagesTab] = useState('posters')
 
   // Scroll horizontal de la fila de imágenes
   const imagesScrollRef = useRef(null)
@@ -118,13 +191,88 @@ export default function DetailsClient({
   const [canPrevImages, setCanPrevImages] = useState(false)
   const [canNextImages, setCanNextImages] = useState(false)
 
-  // Imagen final que se usa para la portada grande y el fondo
+  // ====== Inicializar artwork (criterio por defecto + overrides localStorage) ======
+  useEffect(() => {
+    let cancelled = false
+
+    const initArtwork = async () => {
+      // 1) Base a partir de los datos que vienen del servidor
+      let poster = data.poster_path || data.profile_path || null
+      let backdrop = data.backdrop_path || null
+
+      // 2) Si es serie, aplicamos MISMO criterio que en /series:
+      //    pedir /tv/{id}/images y escoger mejor ES → EN
+      if (endpointType === 'tv' && TMDB_API_KEY) {
+        try {
+          const { posters, backdrops } = await fetchTVImages(id)
+          const bestPoster = pickBestPosterTV(posters)
+          const bestBackdrop = pickBestBackdropTV(backdrops)
+
+          if (!cancelled) {
+            if (bestPoster) poster = bestPoster
+            if (bestBackdrop) backdrop = bestBackdrop
+          }
+
+          // además fusionamos estas imágenes con las que ya teníamos
+          if (!cancelled) {
+            setImagesState((prev) => ({
+              posters: mergeUniqueImages(prev.posters, posters),
+              backdrops: mergeUniqueImages(prev.backdrops, backdrops)
+            }))
+          }
+        } catch (e) {
+          // si falla, usamos las que ya tenemos
+          if (!cancelled) {
+            console.error('Error cargando imágenes TV para detalles:', e)
+          }
+        }
+      }
+
+      if (!cancelled) {
+        setBasePosterPath(poster)
+        setBaseBackdropPath(backdrop)
+      }
+
+      // 3) Overrides guardados en localStorage (mismas claves que en dashboard)
+      if (typeof window !== 'undefined' && !cancelled) {
+        const savedPoster = window.localStorage.getItem(posterStorageKey)
+        const savedPreviewBackdrop = window.localStorage.getItem(
+          previewBackdropStorageKey
+        )
+        const savedBackground =
+          window.localStorage.getItem(backgroundStorageKey)
+
+        if (savedPoster) setSelectedPosterPath(savedPoster)
+        if (savedPreviewBackdrop)
+          setSelectedPreviewBackdropPath(savedPreviewBackdrop)
+
+        if (savedBackground) {
+          setSelectedBackgroundPath(savedBackground)
+        } else if (savedPreviewBackdrop) {
+          // migración: si solo existía el viejo backdrop, úsalo como fondo
+          setSelectedBackgroundPath(savedPreviewBackdrop)
+          window.localStorage.setItem(
+            backgroundStorageKey,
+            savedPreviewBackdrop
+          )
+        }
+      }
+    }
+
+    initArtwork()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, endpointType])
+
+  // Imagen final que se usa para la portada grande
   const displayPosterPath =
-    selectedPosterPath || data.poster_path || data.profile_path || null
+    selectedPosterPath || basePosterPath || data.profile_path || null
 
   // El fondo del detalle SOLO depende de selectedBackgroundPath
   const displayBackdropPath =
-    selectedBackgroundPath || data.backdrop_path || null
+    selectedBackgroundPath || baseBackdropPath || null
 
   // ====== ESTADOS DE CUENTA (fetch) ======
   useEffect(() => {
@@ -330,29 +478,7 @@ export default function DetailsClient({
     }
   }, [id, type])
 
-  // ====== Cargar selección guardada de imágenes ======
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const savedPoster = window.localStorage.getItem(posterStorageKey)
-    const savedPreviewBackdrop = window.localStorage.getItem(
-      previewBackdropStorageKey
-    )
-    const savedBackground = window.localStorage.getItem(backgroundStorageKey)
-
-    if (savedPoster) setSelectedPosterPath(savedPoster)
-    if (savedPreviewBackdrop) setSelectedPreviewBackdropPath(savedPreviewBackdrop)
-
-    // Migración suave: si no hay fondo guardado pero sí backdrop previo, úsalo como fondo
-    if (savedBackground) {
-      setSelectedBackgroundPath(savedBackground)
-    } else if (savedPreviewBackdrop) {
-      setSelectedBackgroundPath(savedPreviewBackdrop)
-      window.localStorage.setItem(backgroundStorageKey, savedPreviewBackdrop)
-    }
-  }, [posterStorageKey, previewBackdropStorageKey, backgroundStorageKey])
-
-  // ====== Cargar imágenes de TMDb ======
+  // ====== Cargar imágenes adicionales de TMDb (pelis) ======
   useEffect(() => {
     let abort = false
 
@@ -365,12 +491,11 @@ export default function DetailsClient({
       return
     }
 
-    // Solo hacemos fetch extra para películas
+    // Para películas también podemos pedir /movie/{id}/images
     if (type !== 'movie') return
-
     if (!TMDB_API_KEY) {
       setImagesError(
-        'Falta NEXT_PUBLIC_TMD_API_KEY para cargar las imágenes desde TMDb.'
+        'Falta NEXT_PUBLIC_TMDB_API_KEY para cargar las imágenes desde TMDb.'
       )
       return
     }
@@ -413,11 +538,10 @@ export default function DetailsClient({
     }
   }, [type, id, data?.images])
 
-  // Portada (poster)
+  // ====== Handlers artwork ======
   const handleSelectPoster = (filePath) => {
     setSelectedPosterPath(filePath)
 
-    // localStorage para respuesta inmediata en este dispositivo
     if (typeof window !== 'undefined') {
       if (filePath) {
         window.localStorage.setItem(posterStorageKey, filePath)
@@ -426,16 +550,14 @@ export default function DetailsClient({
       }
     }
 
-    // Guardar globalmente para todo el mundo
     saveArtworkOverride({
-      type: endpointType,      // 'movie' o 'tv'
-      id,                      // id de la obra
+      type: endpointType,
+      id,
       kind: 'poster',
-      filePath                 // puede ser null para borrar
+      filePath
     })
   }
 
-  // Backdrop de VISTA PREVIA (la pestaña "Backdrops")
   const handleSelectPreviewBackdrop = (filePath) => {
     setSelectedPreviewBackdropPath(filePath)
 
@@ -447,7 +569,6 @@ export default function DetailsClient({
       }
     }
 
-    // Guardar globalmente como 'backdrop'
     saveArtworkOverride({
       type: endpointType,
       id,
@@ -456,7 +577,6 @@ export default function DetailsClient({
     })
   }
 
-  // Fondo del detalle (background difuminado detrás de todo)
   const handleSelectBackground = (filePath) => {
     setSelectedBackgroundPath(filePath)
 
@@ -468,7 +588,6 @@ export default function DetailsClient({
       }
     }
 
-    // Guardar globalmente como 'background'
     saveArtworkOverride({
       type: endpointType,
       id,
@@ -488,7 +607,6 @@ export default function DetailsClient({
       window.localStorage.removeItem(backgroundStorageKey)
     }
 
-    // Borrar en el servidor
     saveArtworkOverride({
       type: endpointType,
       id,
@@ -509,15 +627,12 @@ export default function DetailsClient({
     })
   }
 
-  // Copiar enlace de imagen original
   const handleCopyImageUrl = async (filePath) => {
     const url = buildOriginalImageUrl(filePath)
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(url)
-        // Si quieres, aquí podrías añadir un pequeño toast de "Copiado"
       } else {
-        // Fallback simple
         window.prompt('Copia el enlace de la imagen:', url)
       }
     } catch {
@@ -574,11 +689,6 @@ export default function DetailsClient({
   const showPrevImages = isHoveredImages && canPrevImages
   const showNextImages = isHoveredImages && canNextImages
 
-  // ===== UI helpers =====
-  const scrollLeft = (ref) =>
-    ref.current.scrollBy({ left: -400, behavior: 'smooth' })
-  const scrollRight = (ref) =>
-    ref.current.scrollBy({ left: 400, behavior: 'smooth' })
   const filmAffinitySearchUrl = `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent(
     data.title || data.name
   )}`
@@ -847,8 +957,7 @@ export default function DetailsClient({
                   Bélica: 'bg-gray-600',
                   Western: 'bg-neutral-600'
                 }
-                const genreColor =
-                  genreColors[genre.name] || 'bg-gray-600'
+                const genreColor = genreColors[genre.name] || 'bg-gray-600'
                 return (
                   <span
                     key={genre.id}
@@ -961,13 +1070,13 @@ export default function DetailsClient({
           </div>
         </div>
 
-        {/* === SELECCIÓN DE IMÁGENES (solo películas) === */}
-        {type === 'movie' && (
+        {/* === SELECCIÓN DE IMÁGENES (películas y series, solo admin) === */}
+        {(type === 'movie' || type === 'tv') && isAdmin && (
           <section className="mt-6">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h2 className="text-2xl font-bold text-white mb-1">
-                  Imágenes de la película
+                  Imágenes de la {type === 'tv' ? 'serie' : 'película'}
                 </h2>
               </div>
 
@@ -1044,7 +1153,7 @@ export default function DetailsClient({
                 {(activeImagesTab === 'posters'
                   ? imagesState.posters
                   : imagesState.backdrops
-                ).map((img) => {
+                ).map((img, index) => {
                   const filePath = img.file_path
 
                   const isPosterTab = activeImagesTab === 'posters'
@@ -1074,28 +1183,28 @@ export default function DetailsClient({
 
                   return (
                     <div
-                      key={`${activeImagesTab}-${filePath}`}
+                      key={`${activeImagesTab}-${filePath}-${index}`}
                       role="button"
                       tabIndex={0}
                       onClick={handleClick}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleClick();
+                          e.preventDefault()
+                          handleClick()
                         }
                       }}
                       className={`relative flex-shrink-0 rounded-lg overflow-hidden border-2 ${isActive
-                        ? "border-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.6)]"
-                        : "border-transparent hover:border-neutral-500"
+                        ? 'border-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.6)]'
+                        : 'border-transparent hover:border-neutral-500'
                         } transition-all`}
                     >
                       <img
-                        src={`https://image.tmdb.org/t/p/${isPosterTab ? "w342" : "w780"
+                        src={`https://image.tmdb.org/t/p/${isPosterTab ? 'w342' : 'w780'
                           }${filePath}`}
-                        alt={`${title} ${isPosterTab ? "poster" : "backdrop"}`}
+                        alt={`${title} ${isPosterTab ? 'poster' : 'backdrop'}`}
                         className={`${isPosterTab
-                          ? "w-[150px] aspect-[2/3]"
-                          : "w-[260px] aspect-[16/9]"
+                          ? 'w-[150px] aspect-[2/3]'
+                          : 'w-[260px] aspect-[16/9]'
                           } object-cover`}
                       />
 
@@ -1106,14 +1215,15 @@ export default function DetailsClient({
                         </div>
                       )}
 
-                      {/* ICONO DE DESCARGA (solo uno, abre nueva pestaña) */}
-                      <a
-                        href={originalUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
+                      {/* ICONO DE DESCARGA */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCopyImageUrl(filePath)
+                        }}
                         className="absolute bottom-1 right-1 bg-black/70 hover:bg-black/90 text-white p-1.5 rounded-full transition"
-                        title="Ver imagen en alta resolución"
+                        title="Copiar enlace en alta resolución"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -1129,9 +1239,9 @@ export default function DetailsClient({
                             d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"
                           />
                         </svg>
-                      </a>
+                      </button>
                     </div>
-                  );
+                  )
                 })}
 
                 {/* Sin resultados en la pestaña actual */}
@@ -1147,7 +1257,7 @@ export default function DetailsClient({
                         : activeImagesTab === 'backdrops'
                           ? 'backdrops'
                           : 'fondos'}{' '}
-                      adicionales disponibles para esta película.
+                      adicionales disponibles.
                     </div>
                   )}
               </div>

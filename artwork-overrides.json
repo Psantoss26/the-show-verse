@@ -19,5 +19,43 @@
   },
   "movie:155": {
     "backdrop": "/efMhrHXZ4cQgGelVomuhEN3Sk2p.jpg"
+  },
+  "tv:1399": {
+    "backdrop": "/tSYgEZqrVtEeru9UhhXlbxUBL8u.jpg",
+    "poster": "/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg",
+    "background": "/zZqpAXxVSBtxV9qPBcscfXBcL2w.jpg"
+  },
+  "movie:1242898": {
+    "poster": "/zxhavGoVhMW08rtOyJ0W5GmYtGG.jpg"
+  },
+  "tv:66732": {
+    "poster": "/cVxVGwHce6xnW8UaVUggaPXbmoE.jpg"
+  },
+  "tv:1402": {
+    "poster": "/ng3cMtxYKt1OSQYqFlnKWnVsqNO.jpg",
+    "backdrop": "/eUMwG5vXg4ovEUvXLAFgrr4bQvp.jpg"
+  },
+  "tv:153312": {
+    "poster": "/qJ579ciJ2vZxVVBJUbz8UwvIGkh.jpg"
+  },
+  "tv:37854": {
+    "poster": "/uiIB9ctqZFbfRXXimtpmZb5dusi.jpg",
+    "backdrop": "/kphUAM2fM7EMKM34OqqDUiT8mmG.jpg"
+  },
+  "movie:1116465": {
+    "poster": "/uvwPOrrp3IOuntAbw2qHQ2fkoMB.jpg",
+    "backdrop": "/3vLAtlIcFKmwLhHSXCb62rY2F5e.jpg"
+  },
+  "tv:63174": {
+    "poster": "/ekZobS8isE6mA53RAiGDG93hBxL.jpg",
+    "backdrop": "/3NpUuvM9t9c7Y8DOZSNCeiGkWG1.jpg"
+  },
+  "movie:429": {
+    "poster": "/oayZt3jvtVmqOg0kLRt870z62YE.jpg",
+    "backdrop": "/3ComlDyLUTvJdKJlxR5vXgMBoBo.jpg"
+  },
+  "movie:372058": {
+    "poster": "/q719jXXEzOoYaps6babgKnONONX.jpg",
+    "background": "/yWFJSBJ7H0I0T12LOPDSiEBNNh1.jpg"
   }
 }
