@@ -57,14 +57,13 @@ const mergeUniqueImages = (current, incoming) => {
 const buildOriginalImageUrl = (filePath) =>
   `https://image.tmdb.org/t/p/original${filePath}`
 
-// -------- Helpers solo para SERIES (mismo criterio que en /series) --------
+// -------- Helpers solo para SERIES (mismo criterio base que en /series) --------
 async function fetchTVImages(showId) {
   if (!TMDB_API_KEY) return { posters: [], backdrops: [] }
 
   const url =
     `https://api.themoviedb.org/3/tv/${showId}/images` +
-    `?api_key=${TMDB_API_KEY}` +
-    `&language=es-ES&include_image_language=es,es-ES,en,en-US`
+    `?api_key=${TMDB_API_KEY}`
 
   const res = await fetch(url)
   const json = await res.json()
@@ -119,6 +118,19 @@ const pickBestBackdropTV = (backs) => {
   return null
 }
 
+// Backdrop para fondo de series: priorizar imágenes SIN idioma (sin texto)
+const pickBestBackdropTVNeutralFirst = (backs) => {
+  if (!Array.isArray(backs) || backs.length === 0) return null
+
+  // 1) Primero, backdrops sin idioma (iso_639_1 === null)
+  const neutral = backs.filter((b) => !b.iso_639_1)
+  const bestNeutral = pickBestImage(neutral)
+  if (bestNeutral?.file_path) return bestNeutral.file_path
+
+  // 2) Si no hay neutros, usamos el criterio normal ES -> EN
+  return pickBestBackdropTV(backs)
+}
+
 // =====================================================================
 
 export default function DetailsClient({
@@ -164,13 +176,16 @@ export default function DetailsClient({
     useState(null)
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null)
 
-  // base = lo que viene de TMDb (aplicando criterio ES->EN para series)
+  // base = lo que viene de TMDb (aplicando criterio ES->EN / neutro para series)
   const [basePosterPath, setBasePosterPath] = useState(
     data.poster_path || data.profile_path || null
   )
   const [baseBackdropPath, setBaseBackdropPath] = useState(
     data.backdrop_path || null
   )
+
+  // Flag para evitar mostrar una imagen "provisional" antes de tener el criterio aplicado
+  const [artworkInitialized, setArtworkInitialized] = useState(false)
 
   // Todas las imágenes (inicialmente al menos la portada/backdrop principal)
   const [imagesState, setImagesState] = useState(() => ({
@@ -200,17 +215,19 @@ export default function DetailsClient({
       let poster = data.poster_path || data.profile_path || null
       let backdrop = data.backdrop_path || null
 
-      // 2) Si es serie, aplicamos MISMO criterio que en /series:
-      //    pedir /tv/{id}/images y escoger mejor ES → EN
+      // 2) Si es serie, aplicamos criterio:
+      //    - Poster: ES -> EN
+      //    - Fondo: backdrops SIN idioma (sin texto) -> si no, ES -> EN
       if (endpointType === 'tv' && TMDB_API_KEY) {
         try {
           const { posters, backdrops } = await fetchTVImages(id)
           const bestPoster = pickBestPosterTV(posters)
-          const bestBackdrop = pickBestBackdropTV(backdrops)
+          const bestBackdropForBackground =
+            pickBestBackdropTVNeutralFirst(backdrops)
 
           if (!cancelled) {
             if (bestPoster) poster = bestPoster
-            if (bestBackdrop) backdrop = bestBackdrop
+            if (bestBackdropForBackground) backdrop = bestBackdropForBackground
           }
 
           // además fusionamos estas imágenes con las que ya teníamos
@@ -221,7 +238,6 @@ export default function DetailsClient({
             }))
           }
         } catch (e) {
-          // si falla, usamos las que ya tenemos
           if (!cancelled) {
             console.error('Error cargando imágenes TV para detalles:', e)
           }
@@ -257,6 +273,10 @@ export default function DetailsClient({
           )
         }
       }
+
+      if (!cancelled) {
+        setArtworkInitialized(true)
+      }
     }
 
     initArtwork()
@@ -267,12 +287,14 @@ export default function DetailsClient({
   }, [id, endpointType])
 
   // Imagen final que se usa para la portada grande
-  const displayPosterPath =
-    selectedPosterPath || basePosterPath || data.profile_path || null
+  const displayPosterPath = artworkInitialized
+    ? selectedPosterPath || basePosterPath || data.profile_path || null
+    : null
 
-  // El fondo del detalle SOLO depende de selectedBackgroundPath
-  const displayBackdropPath =
-    selectedBackgroundPath || baseBackdropPath || null
+  // El fondo del detalle SOLO depende de selectedBackgroundPath o baseBackdropPath
+  const displayBackdropPath = artworkInitialized
+    ? selectedBackgroundPath || baseBackdropPath || null
+    : null
 
   // ====== ESTADOS DE CUENTA (fetch) ======
   useEffect(() => {
@@ -696,7 +718,7 @@ export default function DetailsClient({
   return (
     <div className="relative min-h-screen">
       {/* Fondo difuminado */}
-      {useBackdrop && displayBackdropPath ? (
+      {useBackdrop && artworkInitialized && displayBackdropPath ? (
         <>
           <div
             className="absolute inset-4 z-0 bg-cover bg-center blur-[10px]"
@@ -741,9 +763,8 @@ export default function DetailsClient({
                 className="rounded-lg shadow-lg w-full h-auto object-cover"
               />
             ) : (
-              <div className="w-full aspect-[2/3] bg-gray-800 flex items-center justify-center rounded-lg shadow-lg">
-                <ImageOff size={64} className="text-gray-500" />
-              </div>
+              // Sin icono de "no hay imagen": solo un bloque neutro
+              <div className="w-full aspect-[2/3] bg-gray-900/80 rounded-lg shadow-lg" />
             )}
 
             {/* Plataformas */}
@@ -1201,7 +1222,8 @@ export default function DetailsClient({
                       <img
                         src={`https://image.tmdb.org/t/p/${isPosterTab ? 'w342' : 'w780'
                           }${filePath}`}
-                        alt={`${title} ${isPosterTab ? 'poster' : 'backdrop'}`}
+                        alt={`${title} ${isPosterTab ? 'poster' : 'backdrop'
+                          }`}
                         className={`${isPosterTab
                           ? 'w-[150px] aspect-[2/3]'
                           : 'w-[260px] aspect-[16/9]'

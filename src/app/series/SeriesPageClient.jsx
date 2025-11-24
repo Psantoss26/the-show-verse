@@ -208,97 +208,107 @@ function getTVArtworkPreference(showId) {
 
 /* ====================================================================
  * Portada TV 2:3 con caché + overrides
+ * Criterio por defecto igual que películas/MainDashboard:
+ *  - override localStorage
+ *  - caché memoria
+ *  - mejor poster ES/EN vía /images
+ *  - fallback poster_path/backdrop_path
  * ==================================================================== */
 function PosterImage({ show, cache, heightClass }) {
-    const [posterPath, setPosterPath] = useState(
-        show.poster_path || show.backdrop_path || null
-    )
-    const [ready, setReady] = useState(!!posterPath)
+    const [posterPath, setPosterPath] = useState(null)
+    const [ready, setReady] = useState(false)
 
     useEffect(() => {
         let abort = false
 
-        const load = async () => {
+        const resolvePoster = async () => {
             if (!show) return
+            setReady(false)
 
-            // 1) Preferencia seleccionada en detalles (admin) para esta serie (localStorage)
+            // 1) Preferencia manual (detalles, admin)
             const { poster: userPoster } = getTVArtworkPreference(show.id)
             if (userPoster) {
                 const url = buildImg(userPoster, 'w342')
-                await preloadImage(url)
-                if (!abort) {
-                    cache.current.set(show.id, userPoster)
-                    setPosterPath(userPoster)
-                    setReady(true)
-                }
+                const ok = await preloadImage(url)
+                if (abort) return
+                cache.current.set(show.id, userPoster)
+                setPosterPath(ok ? userPoster : null)
+                setReady(ok)
                 return
             }
 
-            // 2) Cache en memoria
+            // 2) Caché en memoria
             const cached = cache.current.get(show.id)
             if (cached) {
                 const url = buildImg(cached, 'w342')
-                await preloadImage(url)
-                if (!abort) {
-                    setPosterPath(cached)
-                    setReady(true)
-                }
+                const ok = await preloadImage(url)
+                if (abort) return
+                setPosterPath(ok ? cached : null)
+                setReady(ok)
                 return
             }
 
-            // 3) Si el servidor ya ha marcado una portada (incluye overrides globales)
-            if (show.poster_path) {
-                const url = buildImg(show.poster_path, 'w342')
-                await preloadImage(url)
-                if (!abort) {
-                    cache.current.set(show.id, show.poster_path)
-                    setPosterPath(show.poster_path)
-                    setReady(true)
-                }
+            // 3) Mismo criterio que películas/MainDashboard:
+            //    mejor poster ES→EN vía /images
+            let chosen = null
+            try {
+                const preferred = await fetchTVPosterEsThenEn(show.id)
+                chosen = preferred || show.poster_path || show.backdrop_path || null
+            } catch {
+                chosen = show.poster_path || show.backdrop_path || null
+            }
+
+            if (abort) return
+
+            cache.current.set(show.id, chosen)
+
+            if (!chosen) {
+                setPosterPath(null)
+                setReady(false)
                 return
             }
 
-            // 4) Fallback: buscar mejor poster ES/EN desde TMDb o usar backdrop
-            setReady(false)
-            const preferred = await fetchTVPosterEsThenEn(show.id)
-            const chosen = preferred || show.backdrop_path || null
-            const url = chosen ? buildImg(chosen, 'w342') : null
-            await preloadImage(url)
-            if (!abort) {
-                cache.current.set(show.id, chosen)
-                setPosterPath(chosen)
-                setReady(!!chosen)
-            }
+            const url = buildImg(chosen, 'w342')
+            const ok = await preloadImage(url)
+            if (abort) return
+
+            setPosterPath(ok ? chosen : null)
+            setReady(ok)
         }
 
-        load()
+        resolvePoster()
         return () => {
             abort = true
         }
     }, [show, cache])
 
+    // Skeleton hasta que tengamos la portada definitiva
+    if (!ready || !posterPath) {
+        return (
+            <div
+                className={`w-full ${heightClass} rounded-3xl bg-neutral-800 animate-pulse`}
+            />
+        )
+    }
+
     return (
-        <>
-            {!ready && (
-                <div
-                    className={`w-full ${heightClass} rounded-3xl bg-neutral-800 animate-pulse`}
-                />
-            )}
-            {ready && posterPath && (
-                <img
-                    src={buildImg(posterPath, 'w342')}
-                    alt={show.name || show.title}
-                    className={`w-full ${heightClass} object-cover rounded-3xl`}
-                    loading="lazy"
-                    decoding="async"
-                />
-            )}
-        </>
+        <img
+            src={buildImg(posterPath, 'w342')}
+            alt={show.name || show.title}
+            className={`w-full ${heightClass} object-cover rounded-3xl`}
+            loading="lazy"
+            decoding="async"
+        />
     )
 }
 
 /* ====================================================================
  * Vista previa inline tipo Amazon (backdrop horizontal) para TV
+ * Criterio por defecto igual que películas/MainDashboard:
+ *  - override localStorage
+ *  - caché memoria
+ *  - mejor backdrop ES/EN vía /images
+ *  - fallback backdrop_path/poster_path
  * ==================================================================== */
 function InlinePreviewCard({ show, heightClass }) {
     const { session, account } = useAuth()
@@ -353,64 +363,43 @@ function InlinePreviewCard({ show, heightClass }) {
 
         const loadAll = async () => {
             // === BACKDROP ===
-
-            // 1) Backdrop preferido por el usuario (admin) en este dispositivo
             const { backdrop: userBackdrop } = getTVArtworkPreference(show.id)
+
+            let chosen = null
+
+            // 1) Override manual
             if (userBackdrop) {
-                tvBackdropCache.set(show.id, userBackdrop)
-                const url = buildImg(userBackdrop, 'w1280')
-                await preloadImage(url)
-                if (!abort) {
-                    setBackdropPath(userBackdrop)
-                    setBackdropReady(true)
-                }
-            } else if (show.backdrop_path) {
-                // 2) Backdrop que viene ya del servidor (incluye overrides globales)
-                tvBackdropCache.set(show.id, show.backdrop_path)
-                const url = buildImg(show.backdrop_path, 'w1280')
-                await preloadImage(url)
-                if (!abort) {
-                    setBackdropPath(show.backdrop_path)
-                    setBackdropReady(true)
-                }
+                chosen = userBackdrop
             } else {
-                // 3) Caché o TMDb como fallback
-                const cachedBackdrop = tvBackdropCache.get(show.id)
-                if (cachedBackdrop !== undefined) {
-                    if (!abort) {
-                        setBackdropPath(cachedBackdrop)
-                        if (cachedBackdrop) {
-                            const url = buildImg(cachedBackdrop, 'w1280')
-                            await preloadImage(url)
-                            if (!abort) setBackdropReady(true)
-                        } else {
-                            setBackdropReady(false)
-                        }
-                    }
+                // 2) Caché en memoria
+                const cached = tvBackdropCache.get(show.id)
+                if (cached) {
+                    chosen = cached
                 } else {
+                    // 3) Mismo criterio que películas/MainDashboard:
+                    //    mejor backdrop ES→EN vía /images
                     try {
                         const preferred = await fetchTVBackdropEsThenEn(show.id)
-                        const chosen = preferred || show.poster_path || null
-                        tvBackdropCache.set(show.id, chosen)
-
-                        if (chosen) {
-                            const url = buildImg(chosen, 'w1280')
-                            await preloadImage(url)
-                            if (!abort) {
-                                setBackdropPath(chosen)
-                                setBackdropReady(true)
-                            }
-                        } else if (!abort) {
-                            setBackdropPath(null)
-                            setBackdropReady(false)
-                        }
+                        chosen =
+                            preferred || show.backdrop_path || show.poster_path || null
                     } catch {
-                        if (!abort) {
-                            setBackdropPath(null)
-                            setBackdropReady(false)
-                        }
+                        chosen = show.backdrop_path || show.poster_path || null
                     }
                 }
+            }
+
+            tvBackdropCache.set(show.id, chosen)
+
+            if (chosen) {
+                const url = buildImg(chosen, 'w1280')
+                await preloadImage(url)
+                if (!abort) {
+                    setBackdropPath(chosen)
+                    setBackdropReady(true)
+                }
+            } else if (!abort) {
+                setBackdropPath(null)
+                setBackdropReady(false)
             }
 
             // === EXTRAS (runtime, awards, imdbRating) ===
