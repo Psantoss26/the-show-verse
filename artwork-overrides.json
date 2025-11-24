@@ -22,18 +22,19 @@
   },
   "tv:1399": {
     "backdrop": "/tSYgEZqrVtEeru9UhhXlbxUBL8u.jpg",
-    "poster": "/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg",
+    "poster": "/6eEYfJtcJQ6e6J2lzkgzUDShR6V.jpg",
     "background": "/zZqpAXxVSBtxV9qPBcscfXBcL2w.jpg"
   },
   "movie:1242898": {
     "poster": "/zxhavGoVhMW08rtOyJ0W5GmYtGG.jpg"
   },
   "tv:66732": {
-    "poster": "/cVxVGwHce6xnW8UaVUggaPXbmoE.jpg"
+    "poster": "/uOOtwVbSr4QDjAGIifLDwpb2Pdl.jpg"
   },
   "tv:1402": {
     "poster": "/ng3cMtxYKt1OSQYqFlnKWnVsqNO.jpg",
-    "backdrop": "/eUMwG5vXg4ovEUvXLAFgrr4bQvp.jpg"
+    "backdrop": "/eUMwG5vXg4ovEUvXLAFgrr4bQvp.jpg",
+    "background": "/5kosg4zhYIuzTxbPcrJVFylgOYk.jpg"
   },
   "tv:153312": {
     "poster": "/qJ579ciJ2vZxVVBJUbz8UwvIGkh.jpg"
@@ -57,5 +58,11 @@
   "movie:372058": {
     "poster": "/q719jXXEzOoYaps6babgKnONONX.jpg",
     "background": "/yWFJSBJ7H0I0T12LOPDSiEBNNh1.jpg"
+  },
+  "movie:1054867": {
+    "poster": "/iZ1499F6hYxDxiqioy8oSUaxipG.jpg"
+  },
+  "tv:119051": {
+    "backdrop": "/yrbrSqtKPmh6Q5OH7PgRqiaJVGE.jpg"
   }
 }
