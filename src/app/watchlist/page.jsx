@@ -3,25 +3,81 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
-import { fetchWatchlistForUser } from '@/lib/api/tmdb'
+import { fetchWatchlistForUser, getExternalIds } from '@/lib/api/tmdb'
+import { fetchOmdbByImdb } from '@/lib/api/omdb'
 import {
   Loader2,
   Bookmark,
   FilmIcon,
   TvIcon,
-  Star,
-  SlidersHorizontal,
 } from 'lucide-react'
+
+/**
+ * Enriquecer items con IMDb en segundo plano
+ * (no bloquea el primer render).
+ */
+async function enrichItemsWithImdb(items, batchSize = 6) {
+  if (!Array.isArray(items) || items.length === 0) return items
+
+  const imdbCache = new Map()
+  const result = [...items]
+
+  for (let i = 0; i < result.length; i += batchSize) {
+    const slice = result.slice(i, i + batchSize)
+
+    await Promise.all(
+      slice.map(async (item, idx) => {
+        const index = i + idx
+        if (typeof item.imdbRating === 'number') return
+
+        let imdbRating = null
+        try {
+          const mediaType =
+            item.media_type || (item.title ? 'movie' : 'tv')
+
+          const ext = await getExternalIds(mediaType, item.id)
+          const imdbId = ext?.imdb_id
+          if (!imdbId) {
+            result[index] = { ...item, imdbRating: null }
+            return
+          }
+
+          if (imdbCache.has(imdbId)) {
+            imdbRating = imdbCache.get(imdbId)
+          } else {
+            const omdb = await fetchOmdbByImdb(imdbId)
+            const raw = omdb?.imdbRating
+            if (raw && raw !== 'N/A' && !Number.isNaN(Number(raw))) {
+              imdbRating = Number(raw)
+            } else {
+              imdbRating = null
+            }
+            imdbCache.set(imdbId, imdbRating)
+          }
+        } catch {
+          imdbRating = null
+        }
+
+        result[index] = { ...item, imdbRating }
+      })
+    )
+  }
+
+  return result
+}
 
 export default function WatchlistPage() {
   const { session, account } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const [typeFilter, setTypeFilter] = useState('all') // 'all' | 'movie' | 'tv'
+  const [typeFilter, setTypeFilter] = useState('all')
   const [yearFilter, setYearFilter] = useState('')
   const [sortBy, setSortBy] = useState('rating_desc')
 
+  const [imdbLoaded, setImdbLoaded] = useState(false)
+
+  // 1) Carga rápida desde TMDb
   useEffect(() => {
     const load = async () => {
       if (!session || !account?.id) {
@@ -30,7 +86,9 @@ export default function WatchlistPage() {
       }
       try {
         const data = await fetchWatchlistForUser(account.id, session)
-        setItems(data)
+        const baseItems = Array.isArray(data) ? data : []
+        setItems(baseItems)
+        setImdbLoaded(false)
       } finally {
         setLoading(false)
       }
@@ -38,6 +96,32 @@ export default function WatchlistPage() {
 
     load()
   }, [session, account])
+
+  // 2) Enriquecer con IMDb en segundo plano
+  useEffect(() => {
+    if (!session || !account?.id) return
+    if (!items.length) return
+    if (imdbLoaded) return
+
+    let cancelled = false
+
+    const run = async () => {
+      try {
+        const enriched = await enrichItemsWithImdb(items)
+        if (!cancelled) {
+          setItems(enriched)
+          setImdbLoaded(true)
+        }
+      } catch {
+        if (!cancelled) setImdbLoaded(true)
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [items, session, account, imdbLoaded])
 
   const processedItems = useMemo(() => {
     let list = [...items]
@@ -120,38 +204,32 @@ export default function WatchlistPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <div className="flex items-center gap-2">
-          </div>
-
           {/* Tipo */}
           <div className="h-9 flex gap-1 bg-neutral-900/70 border border-neutral-700 rounded-2xl p-1">
             <button
-              className={`px-3 py-1 rounded-2xl ${
-                typeFilter === 'all'
-                  ? 'bg-neutral-100 text-black'
-                  : 'text-neutral-300'
-              }`}
+              className={`px-3 py-1 rounded-2xl ${typeFilter === 'all'
+                ? 'bg-neutral-100 text-black'
+                : 'text-neutral-300'
+                }`}
               onClick={() => setTypeFilter('all')}
             >
               Todo
             </button>
             <button
-              className={`px-3 py-1 rounded-2xl flex items-center gap-1 ${
-                typeFilter === 'movie'
-                  ? 'bg-neutral-100 text-black'
-                  : 'text-neutral-300'
-              }`}
+              className={`px-3 py-1 rounded-2xl flex items-center gap-1 ${typeFilter === 'movie'
+                ? 'bg-neutral-100 text-black'
+                : 'text-neutral-300'
+                }`}
               onClick={() => setTypeFilter('movie')}
             >
               <FilmIcon className="w-3 h-3" />
               Pelis
             </button>
             <button
-              className={`px-3 py-1 rounded-2xl flex items-center gap-1 ${
-                typeFilter === 'tv'
-                  ? 'bg-neutral-100 text-black'
-                  : 'text-neutral-300'
-              }`}
+              className={`px-3 py-1 rounded-2xl flex items-center gap-1 ${typeFilter === 'tv'
+                ? 'bg-neutral-100 text-black'
+                : 'text-neutral-300'
+                }`}
               onClick={() => setTypeFilter('tv')}
             >
               <TvIcon className="w-3 h-3" />
@@ -201,10 +279,14 @@ export default function WatchlistPage() {
             const imagePath =
               item.poster_path || item.backdrop_path || item.profile_path
 
-            const rating = item.vote_average
-            const ratingText =
-              typeof rating === 'number' && rating > 0
-                ? rating.toFixed(1)
+            const tmdbRating =
+              typeof item.vote_average === 'number' && item.vote_average > 0
+                ? item.vote_average.toFixed(1)
+                : '–'
+
+            const imdbRating =
+              typeof item.imdbRating === 'number' && item.imdbRating > 0
+                ? item.imdbRating.toFixed(1)
                 : '–'
 
             return (
@@ -216,14 +298,14 @@ export default function WatchlistPage() {
                 <div className="relative aspect-[2/3] overflow-hidden rounded-3xl bg-neutral-900 mb-2">
                   {imagePath ? (
                     <img
-                        src={`https://image.tmdb.org/t/p/w342${imagePath}`}
-                        alt={title}
-                        loading="lazy"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      src={`https://image.tmdb.org/t/p/w342${imagePath}`}
+                      alt={title}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs text-neutral-500">
-                        Sin imagen
+                      Sin imagen
                     </div>
                   )}
 
@@ -236,10 +318,42 @@ export default function WatchlistPage() {
                     )}
                   </div>
 
-                  {/* Rating */}
-                  <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/75 px-2 py-0.5 rounded-full text-[11px]">
-                    <Star className="w-3 h-3 text-yellow-400" />
-                    <span>{ratingText}</span>
+                  {/* TMDb + IMDb: aparecen sólo al hacer hover, animando desde la derecha */}
+                  <div
+                    className="
+                      pointer-events-none
+                      absolute bottom-2 right-2
+                      flex flex-col items-end gap-1
+                      opacity-0 translate-x-4
+                      transition-all duration-300
+                      group-hover:opacity-100 group-hover:translate-x-0
+                      group-focus-within:opacity-100 group-focus-within:translate-x-0
+                    "
+                  >
+                    <div className="flex items-center gap-1 bg-black/85 px-2 py-0.5 rounded-full text-[10px]">
+                      <img
+                        src="/logo-TMDb.png"
+                        alt="TMDb"
+                        className="h-3 w-auto rounded-[2px]"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <span className="text-neutral-50 font-medium">
+                        {tmdbRating}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-black/85 px-2 py-0.5 rounded-full text-[10px]">
+                      <img
+                        src="/logo-IMDb.png"
+                        alt="IMDb"
+                        className="h-3 w-auto"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <span className="text-neutral-50 font-medium">
+                        {imdbRating}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
