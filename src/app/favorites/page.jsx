@@ -64,6 +64,7 @@ export default function FavoritesPage() {
   const { session, account } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const [typeFilter, setTypeFilter] = useState('all')
   const [yearFilter, setYearFilter] = useState('')
@@ -73,21 +74,41 @@ export default function FavoritesPage() {
 
   // 1) Carga rápida inicial
   useEffect(() => {
+    let cancelled = false
+
     const load = async () => {
+      // Si no hay sesión todavía, paramos el loading para que la vista
+      // decida si muestra el mensaje de login o no.
       if (!session || !account?.id) {
         setLoading(false)
+        setItems([])
+        setError(null)
         return
       }
+
+      setLoading(true)
+      setError(null)
+
       try {
         const data = await fetchFavoritesForUser(account.id, session)
+        if (cancelled) return
         const baseItems = Array.isArray(data) ? data : []
         setItems(baseItems)
         setImdbLoaded(false)
+      } catch (err) {
+        if (cancelled) return
+        console.error(err)
+        setItems([])
+        setError('No se han podido cargar tus favoritas. Inténtalo de nuevo más tarde.')
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
+
     load()
+    return () => {
+      cancelled = true
+    }
   }, [session, account])
 
   // 2) Enriquecer IMDb en segundo plano
@@ -154,6 +175,7 @@ export default function FavoritesPage() {
     return list
   }, [items, typeFilter, yearFilter, sortBy])
 
+  // Caso usuario no logueado
   if (!session || !account?.id) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-12 flex flex-col items-center justify-center min-h-[50vh] text-center">
@@ -172,20 +194,10 @@ export default function FavoritesPage() {
     )
   }
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-12 flex items-center justify-center min-h-[50vh] gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-yellow-500" />
-        <span className="text-neutral-300 text-lg">
-          Cargando tu colección...
-        </span>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-[#101010] text-gray-100 font-sans">
       <div className="max-w-[1600px] mx-auto px-4 py-12">
+
         {/* Cabecera + Filtros */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
           <div className="flex items-center gap-3">
@@ -212,11 +224,7 @@ export default function FavoritesPage() {
                     : 'text-neutral-400 hover:text-neutral-200'
                     }`}
                 >
-                  {type === 'all'
-                    ? 'Todo'
-                    : type === 'movie'
-                      ? 'Películas'
-                      : 'Series'}
+                  {type === 'all' ? 'Todo' : type === 'movie' ? 'Películas' : 'Series'}
                 </button>
               ))}
             </div>
@@ -263,8 +271,34 @@ export default function FavoritesPage() {
           </div>
         </div>
 
-        {/* Grid de Resultados */}
-        {processedItems.length === 0 ? (
+        {/* Contenido / Grid / Estados */}
+        {loading ? (
+          // LOADER mientras se cargan las favoritas (también al refrescar)
+          <div className="flex items-center justify-center py-20 min-h-[50vh] gap-3">
+            <Loader2 className="w-6 h-6 animate-spin text-yellow-500" />
+            <span className="text-neutral-300 text-lg">
+              Cargando tu colección...
+            </span>
+          </div>
+        ) : error ? (
+          // ESTADO DE ERROR
+          <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-red-700 rounded-xl bg-red-950/20">
+            <FilmIcon className="w-12 h-12 text-red-500 mb-3" />
+            <p className="text-red-400 text-lg mb-2">
+              {error}
+            </p>
+            <button
+              onClick={() => {
+                // reintento simple recargando la página
+                window.location.reload()
+              }}
+              className="mt-2 px-4 py-2 text-sm font-semibold rounded-full bg-red-500 text-white hover:bg-red-400 transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : processedItems.length === 0 ? (
+          // ESTADO SIN RESULTADOS / SIN FAVORITAS
           <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-neutral-800 rounded-xl bg-neutral-900/20">
             <FilmIcon className="w-12 h-12 text-neutral-600 mb-3" />
             <p className="text-neutral-400 text-lg">
@@ -282,12 +316,11 @@ export default function FavoritesPage() {
             </button>
           </div>
         ) : (
-          // Grid estándar
+          // GRID de resultados
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
             {processedItems.map((item) => {
               const isMovie = item.media_type === 'movie'
-              const href = `/details/${item.media_type || (isMovie ? 'movie' : 'tv')
-                }/${item.id}`
+              const href = `/details/${item.media_type || (isMovie ? 'movie' : 'tv')}/${item.id}`
               const title = isMovie ? item.title : item.name
 
               const imagePath = item.poster_path
@@ -322,7 +355,7 @@ export default function FavoritesPage() {
                     {/* Overlay sutil */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-                    {/* Badge Tipo (Peli/Serie) */}
+                    {/* Badge Tipo */}
                     <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider text-white/90 border border-white/10 shadow-lg z-10">
                       {isMovie ? (
                         <FilmIcon className="w-3 h-3" />
@@ -331,7 +364,7 @@ export default function FavoritesPage() {
                       )}
                     </div>
 
-                    {/* === Badges Puntuación (TMDb / IMDb) - MISMO DISEÑO QUE RECOMENDACIONES === */}
+                    {/* Badges TMDb / IMDb – mismo diseño que en recomendaciones */}
                     <div className="absolute bottom-2 right-2 flex flex-row-reverse items-center gap-1 transform-gpu opacity-0 translate-y-2 translate-x-2 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300 ease-out z-10">
                       {/* TMDb */}
                       {item.vote_average > 0 && (
