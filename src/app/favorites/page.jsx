@@ -10,7 +10,7 @@ import {
   Loader2,
   Heart,
   FilmIcon,
-  TvIcon,
+  TvIcon
 } from 'lucide-react'
 
 // --- Helper para enriquecer con IMDb ---
@@ -62,8 +62,12 @@ async function enrichItemsWithImdb(items, batchSize = 6) {
 
 export default function FavoritesPage() {
   const { session, account } = useAuth()
+
+  // 'checking' | 'anonymous' | 'authenticated'
+  const [authStatus, setAuthStatus] = useState('checking')
+
   const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true) // carga de favoritas
   const [error, setError] = useState(null)
 
   const [typeFilter, setTypeFilter] = useState('all')
@@ -72,19 +76,33 @@ export default function FavoritesPage() {
 
   const [imdbLoaded, setImdbLoaded] = useState(false)
 
-  // 1) Carga rápida inicial
+  // === Estado de autenticación (sin parpadeos) ===
+  useEffect(() => {
+    if (session && account?.id) {
+      setAuthStatus('authenticated')
+    } else if (session === null || account === null) {
+      // El contexto ya sabe que NO hay sesión
+      setAuthStatus('anonymous')
+    }
+    // Mientras tanto seguimos en 'checking'
+  }, [session, account])
+
+  // === Carga inicial de favoritas (solo si autenticado) ===
   useEffect(() => {
     let cancelled = false
 
+    if (authStatus === 'checking') return
+
+    if (authStatus === 'anonymous') {
+      setItems([])
+      setLoading(false)
+      setError(null)
+      return
+    }
+
+    // authStatus === 'authenticated'
     const load = async () => {
-      // Si no hay sesión todavía, paramos el loading para que la vista
-      // decida si muestra el mensaje de login o no.
-      if (!session || !account?.id) {
-        setLoading(false)
-        setItems([])
-        setError(null)
-        return
-      }
+      if (!session || !account?.id) return
 
       setLoading(true)
       setError(null)
@@ -99,7 +117,9 @@ export default function FavoritesPage() {
         if (cancelled) return
         console.error(err)
         setItems([])
-        setError('No se han podido cargar tus favoritas. Inténtalo de nuevo más tarde.')
+        setError(
+          'No se han podido cargar tus favoritas. Inténtalo de nuevo más tarde.'
+        )
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -109,10 +129,11 @@ export default function FavoritesPage() {
     return () => {
       cancelled = true
     }
-  }, [session, account])
+  }, [authStatus, session, account])
 
-  // 2) Enriquecer IMDb en segundo plano
+  // === Enriquecer IMDb en segundo plano ===
   useEffect(() => {
+    if (authStatus !== 'authenticated') return
     if (!session || !account?.id) return
     if (!items.length) return
     if (imdbLoaded) return
@@ -130,10 +151,12 @@ export default function FavoritesPage() {
       }
     }
     run()
-    return () => { cancelled = true }
-  }, [items, session, account, imdbLoaded])
+    return () => {
+      cancelled = true
+    }
+  }, [authStatus, items, session, account, imdbLoaded])
 
-  // Filtros y Ordenación
+  // === Lista filtrada/ordenada ===
   const processedItems = useMemo(() => {
     let list = [...items]
 
@@ -157,32 +180,41 @@ export default function FavoritesPage() {
       const dateB = isMovieB ? b.release_date : b.first_air_date
       const yearA = dateA ? parseInt(dateA.slice(0, 4)) : 0
       const yearB = dateB ? parseInt(dateB.slice(0, 4)) : 0
-      const ratingA = typeof a.vote_average === 'number' ? a.vote_average : 0
-      const ratingB = typeof b.vote_average === 'number' ? b.vote_average : 0
+      const ratingA =
+        typeof a.vote_average === 'number' ? a.vote_average : 0
+      const ratingB =
+        typeof b.vote_average === 'number' ? b.vote_average : 0
       const titleA = (isMovieA ? a.title : a.name || '').toLowerCase()
       const titleB = (isMovieB ? b.title : b.name || '').toLowerCase()
 
       switch (sortBy) {
-        case 'year_desc': return yearB - yearA
-        case 'year_asc': return yearA - yearB
-        case 'rating_desc': return ratingB - ratingA
-        case 'rating_asc': return ratingA - ratingB
-        case 'title_desc': return titleB.localeCompare(titleA)
+        case 'year_desc':
+          return yearB - yearA
+        case 'year_asc':
+          return yearA - yearB
+        case 'rating_desc':
+          return ratingB - ratingA
+        case 'rating_asc':
+          return ratingA - ratingB
+        case 'title_desc':
+          return titleB.localeCompare(titleA)
         case 'title_asc':
-        default: return titleA.localeCompare(titleB)
+        default:
+          return titleA.localeCompare(titleB)
       }
     })
     return list
   }, [items, typeFilter, yearFilter, sortBy])
 
-  // Caso usuario no logueado
-  if (!session || !account?.id) {
+  // === 1) Usuario anónimo (solo cuando YA sabemos que no hay sesión) ===
+  if (authStatus === 'anonymous') {
     return (
       <div className="max-w-7xl mx-auto px-4 py-12 flex flex-col items-center justify-center min-h-[50vh] text-center">
         <Heart className="w-16 h-16 text-neutral-700 mb-4" />
         <h1 className="text-3xl font-bold text-white mb-2">Favoritas</h1>
         <p className="text-neutral-400 max-w-md">
-          Inicia sesión para acceder a tu colección personal de películas y series favoritas.
+          Inicia sesión para acceder a tu colección personal de películas y
+          series favoritas.
         </p>
         <Link
           href="/login"
@@ -194,10 +226,12 @@ export default function FavoritesPage() {
     )
   }
 
+  // === 2) Usuario autenticado o auth todavía resolviéndose ===
+  const isInitialLoading = authStatus === 'checking' || loading
+
   return (
     <div className="min-h-screen bg-[#101010] text-gray-100 font-sans">
       <div className="max-w-[1600px] mx-auto px-4 py-12">
-
         {/* Cabecera + Filtros */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
           <div className="flex items-center gap-3">
@@ -224,7 +258,11 @@ export default function FavoritesPage() {
                     : 'text-neutral-400 hover:text-neutral-200'
                     }`}
                 >
-                  {type === 'all' ? 'Todo' : type === 'movie' ? 'Películas' : 'Series'}
+                  {type === 'all'
+                    ? 'Todo'
+                    : type === 'movie'
+                      ? 'Películas'
+                      : 'Series'}
                 </button>
               ))}
             </div>
@@ -264,7 +302,7 @@ export default function FavoritesPage() {
                     strokeLinejoin="round"
                     strokeWidth="2"
                     d="M19 9l-7 7-7-7"
-                  ></path>
+                  />
                 </svg>
               </div>
             </div>
@@ -272,8 +310,8 @@ export default function FavoritesPage() {
         </div>
 
         {/* Contenido / Grid / Estados */}
-        {loading ? (
-          // LOADER mientras se cargan las favoritas (también al refrescar)
+        {isInitialLoading ? (
+          // ÚNICO estado de carga previo al contenido
           <div className="flex items-center justify-center py-20 min-h-[50vh] gap-3">
             <Loader2 className="w-6 h-6 animate-spin text-yellow-500" />
             <span className="text-neutral-300 text-lg">
@@ -281,24 +319,19 @@ export default function FavoritesPage() {
             </span>
           </div>
         ) : error ? (
-          // ESTADO DE ERROR
+          // Error
           <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-red-700 rounded-xl bg-red-950/20">
             <FilmIcon className="w-12 h-12 text-red-500 mb-3" />
-            <p className="text-red-400 text-lg mb-2">
-              {error}
-            </p>
+            <p className="text-red-400 text-lg mb-2">{error}</p>
             <button
-              onClick={() => {
-                // reintento simple recargando la página
-                window.location.reload()
-              }}
+              onClick={() => window.location.reload()}
               className="mt-2 px-4 py-2 text-sm font-semibold rounded-full bg-red-500 text-white hover:bg-red-400 transition-colors"
             >
               Reintentar
             </button>
           </div>
         ) : processedItems.length === 0 ? (
-          // ESTADO SIN RESULTADOS / SIN FAVORITAS
+          // Sin resultados / sin favoritas
           <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-neutral-800 rounded-xl bg-neutral-900/20">
             <FilmIcon className="w-12 h-12 text-neutral-600 mb-3" />
             <p className="text-neutral-400 text-lg">
@@ -316,7 +349,7 @@ export default function FavoritesPage() {
             </button>
           </div>
         ) : (
-          // GRID de resultados
+          // Grid de resultados
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
             {processedItems.map((item) => {
               const isMovie = item.media_type === 'movie'
@@ -364,7 +397,7 @@ export default function FavoritesPage() {
                       )}
                     </div>
 
-                    {/* Badges TMDb / IMDb – mismo diseño que en recomendaciones */}
+                    {/* Badges TMDb / IMDb */}
                     <div className="absolute bottom-2 right-2 flex flex-row-reverse items-center gap-1 transform-gpu opacity-0 translate-y-2 translate-x-2 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300 ease-out z-10">
                       {/* TMDb */}
                       {item.vote_average > 0 && (
