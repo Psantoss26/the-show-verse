@@ -16,38 +16,32 @@ function TooltipPortal({ activeData, anchorRect, onClose }) {
     const { width: tW, height: tH } = tooltip.getBoundingClientRect()
     const { top: rTop, left: rLeft, width: rW, height: rH } = anchorRect
 
-    // Espacio seguro desde el borde
     const GAP = 8
     const VIEWPORT_PADDING = 10
 
-    // Posición ideal: Centrado arriba
+    // Posición ideal: centrado arriba
     let left = rLeft + rW / 2 - tW / 2
     let top = rTop - tH - GAP
     let placement = 'top'
 
-    // 1. Corrección horizontal (Eje X)
-    // Si se sale por la izquierda
+    // Corrección X
     if (left < VIEWPORT_PADDING) {
       left = VIEWPORT_PADDING
-    }
-    // Si se sale por la derecha
-    else if (left + tW > window.innerWidth - VIEWPORT_PADDING) {
+    } else if (left + tW > window.innerWidth - VIEWPORT_PADDING) {
       left = window.innerWidth - tW - VIEWPORT_PADDING
     }
 
-    // 2. Corrección vertical (Eje Y)
-    // Si no cabe arriba, poner abajo
+    // Si no cabe arriba, lo ponemos abajo
     if (top < VIEWPORT_PADDING) {
       top = rTop + rH + GAP
       placement = 'bottom'
     }
 
     setCoords({ top, left, placement })
-  }, [anchorRect]) // Recalcular si cambia el elemento ancla
+  }, [anchorRect])
 
   if (!activeData) return null
 
-  // Usamos createPortal para "teletransportar" este div al body
   return createPortal(
     <div
       ref={tooltipRef}
@@ -55,12 +49,11 @@ function TooltipPortal({ activeData, anchorRect, onClose }) {
       style={{
         top: coords.top,
         left: coords.left,
-        // Usamos opacidad para evitar parpadeos mientras calculamos posición
         opacity: anchorRect ? 1 : 0
       }}
     >
       <div className="bg-black text-white px-3 py-2 rounded-md shadow-2xl border border-white/10 max-w-[280px] sm:max-w-[320px]">
-        {/* Contenido del Tooltip reutilizado */}
+        {/* Título episodio */}
         <div className="font-semibold text-[13px] mb-1 leading-snug text-balance">
           {activeData.titleText}
         </div>
@@ -70,12 +63,20 @@ function TooltipPortal({ activeData, anchorRect, onClose }) {
         </div>
 
         <div className="space-y-2">
+          {/* BLOQUE TMDB CON LOGO */}
           {activeData.tmdbVal != null && (
             <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wide text-emerald-300 font-bold">
-                TMDb
-              </span>
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-center gap-1">
+                <img
+                  src="/logo-TMDb.png"
+                  alt="TMDb"
+                  className="h-3 w-auto rounded-[2px]"
+                />
+                <span className="text-[10px] uppercase tracking-wide text-emerald-300 font-bold">
+                  TMDb
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-[14px] font-bold">
                   {activeData.format1(activeData.tmdbVal)}
                 </span>
@@ -88,12 +89,20 @@ function TooltipPortal({ activeData, anchorRect, onClose }) {
             </div>
           )}
 
+          {/* BLOQUE IMDB CON LOGO */}
           {activeData.imdbVal != null && (
             <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wide text-yellow-300 font-bold">
-                IMDb
-              </span>
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-center gap-1">
+                <img
+                  src="/logo-IMDb.png"
+                  alt="IMDb"
+                  className="h-3 w-auto"
+                />
+                <span className="text-[10px] uppercase tracking-wide text-yellow-300 font-bold">
+                  IMDb
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-[14px] font-bold">
                   {activeData.format1(activeData.imdbVal)}
                 </span>
@@ -109,14 +118,12 @@ function TooltipPortal({ activeData, anchorRect, onClose }) {
 
         {activeData.avgVal != null && (
           <div className="mt-2 pt-2 border-t border-white/20 text-[11px] flex justify-between gap-4 items-center">
-            <span className="text-zinc-400">Media Global</span>
+            <span className="text-zinc-400">Media global</span>
             <span className="font-bold text-white text-[13px]">
               {activeData.format1(activeData.avgVal)}
             </span>
           </div>
         )}
-
-        {/* Flechita decorativa (opcional, ajustada al centro del trigger si es posible, o eliminada por simplicidad en portales complejos) */}
       </div>
     </div>,
     document.body
