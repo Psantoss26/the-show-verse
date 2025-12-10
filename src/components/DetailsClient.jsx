@@ -16,14 +16,24 @@ import {
   MessageSquareIcon,
   BadgeDollarSignIcon,
   LinkIcon,
-  TagIcon,
   ImageIcon,
   ImageOff,
   Heart,
   HeartOff,
   BookmarkPlus,
   BookmarkMinus,
-  Loader2
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  MonitorPlay,
+  TrendingUp,
+  Layers,
+  Users,
+  Building2,
+  MapPin,
+  Languages,
+  Library,
+  Trophy
 } from 'lucide-react'
 
 /* === cuenta / api === */
@@ -40,35 +50,27 @@ import StarRating from './StarRating'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
-// Fusiona imágenes nuevas con las actuales evitando duplicados por file_path
+// --- Helpers de Imágenes ---
 const mergeUniqueImages = (current, incoming) => {
   const seen = new Set(current.map((img) => img.file_path))
   const merged = [...current]
   for (const img of incoming || []) {
-    if (!seen.has(img.file_path)) {
-      seen.add(img.file_path)
-      merged.push(img)
-    }
+    if (seen.has(img.file_path)) continue
+    seen.add(img.file_path)
+    merged.push(img)
   }
   return merged
 }
 
-// URL original de TMDb
 const buildOriginalImageUrl = (filePath) =>
   `https://image.tmdb.org/t/p/original${filePath}`
 
-// -------- Helpers solo para SERIES (mismo criterio base que en /series) --------
 async function fetchTVImages(showId) {
   if (!TMDB_API_KEY) return { posters: [], backdrops: [] }
-
-  const url =
-    `https://api.themoviedb.org/3/tv/${showId}/images` +
-    `?api_key=${TMDB_API_KEY}`
-
+  const url = `https://api.themoviedb.org/3/tv/${showId}/images?api_key=${TMDB_API_KEY}`
   const res = await fetch(url)
   const json = await res.json()
   if (!res.ok) throw new Error(json?.status_message || 'Error al cargar imágenes')
-
   return {
     posters: Array.isArray(json.posters) ? json.posters : [],
     backdrops: Array.isArray(json.backdrops) ? json.backdrops : []
@@ -91,12 +93,8 @@ function pickBestImage(list) {
 }
 
 const pickBestPosterTV = (posters) => {
-  const es = posters.filter(
-    (p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES'
-  )
-  const en = posters.filter(
-    (p) => p.iso_639_1 === 'en' || p.iso_639_1 === 'en-US'
-  )
+  const es = posters.filter((p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES')
+  const en = posters.filter((p) => p.iso_639_1 === 'en' || p.iso_639_1 === 'en-US')
   const bestES = pickBestImage(es)
   if (bestES?.file_path) return bestES.file_path
   const bestEN = pickBestImage(en)
@@ -105,12 +103,8 @@ const pickBestPosterTV = (posters) => {
 }
 
 const pickBestBackdropTV = (backs) => {
-  const es = backs.filter(
-    (b) => b.iso_639_1 === 'es' || b.iso_639_1 === 'es-ES'
-  )
-  const en = backs.filter(
-    (b) => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US'
-  )
+  const es = backs.filter((b) => b.iso_639_1 === 'es' || b.iso_639_1 === 'es-ES')
+  const en = backs.filter((b) => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US')
   const bestES = pickBestImage(es)
   if (bestES?.file_path) return bestES.file_path
   const bestEN = pickBestImage(en)
@@ -118,17 +112,56 @@ const pickBestBackdropTV = (backs) => {
   return null
 }
 
-// Backdrop para fondo de series: priorizar imágenes SIN idioma (sin texto)
 const pickBestBackdropTVNeutralFirst = (backs) => {
   if (!Array.isArray(backs) || backs.length === 0) return null
-
-  // 1) Primero, backdrops sin idioma (iso_639_1 === null)
   const neutral = backs.filter((b) => !b.iso_639_1)
   const bestNeutral = pickBestImage(neutral)
   if (bestNeutral?.file_path) return bestNeutral.file_path
-
-  // 2) Si no hay neutros, usamos el criterio normal ES -> EN
   return pickBestBackdropTV(backs)
+}
+
+// --- Helper para SeriesGraph (slug) ---
+const slugifyForSeriesGraph = (name) => {
+  if (!name) return ''
+  return name
+    .normalize('NFD') // quitar acentos
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-') // todo lo que no sea letra/número -> guion
+    .replace(/(^-|-$)+/g, '') // quitar guiones al principio/fin
+}
+
+// --- Componente UI para Títulos de Sección ---
+const SectionTitle = ({ title, icon: Icon }) => (
+  <div className="flex items-center gap-3 mb-6 border-l-4 border-yellow-500 pl-4 py-1">
+    {Icon && <Icon className="text-yellow-500 w-6 h-6" />}
+    <h2 className="text-2xl md:text-3xl font-bold text-white tracking-wide">
+      {title}
+    </h2>
+  </div>
+)
+
+// --- Componente UI para Items de Metadatos ---
+const MetaItem = ({ icon: Icon, label, value, colorClass = 'text-gray-400' }) => {
+  if (!value) return null
+  return (
+    <div className="flex-grow basis-[190px] max-w-full flex items-center gap-3 bg-neutral-800/40 p-3 rounded-xl border border-neutral-700/50 hover:bg-neutral-800 transition-colors h-[72px]">
+      <div className={`p-2 rounded-lg bg-neutral-900/80 shrink-0 ${colorClass}`}>
+        <Icon size={18} />
+      </div>
+      <div className="flex flex-col min-w-0 overflow-hidden">
+        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider truncate">
+          {label}
+        </span>
+        <span
+          className="text-sm text-gray-200 font-medium leading-tight truncate whitespace-nowrap"
+          title={typeof value === 'string' ? value : ''}
+        >
+          {value}
+        </span>
+      </div>
+    </div>
+  )
 }
 
 // =====================================================================
@@ -143,13 +176,14 @@ export default function DetailsClient({
   reviews
 }) {
   const title = data.title || data.name
-  const recRef = useRef()
+
+  // Estado para desplegable de imágenes admin
+  const [showAdminImages, setShowAdminImages] = useState(false)
   const [reviewLimit, setReviewLimit] = useState(2)
   const [useBackdrop, setUseBackdrop] = useState(true)
 
   // ====== ESTADOS DE CUENTA ======
   const { session, account } = useAuth()
-  // Solo este usuario puede gestionar las imágenes de portada/backdrop
   const isAdmin =
     account?.username === 'psantos26' || account?.name === 'psantos26'
 
@@ -158,12 +192,11 @@ export default function DetailsClient({
   const [favorite, setFavorite] = useState(false)
   const [watchlist, setWatchlist] = useState(false)
 
-  // Rating del usuario en TMDb
-  const [userRating, setUserRating] = useState(null) // número 1-10 o null
+  // Rating del usuario
+  const [userRating, setUserRating] = useState(null)
   const [ratingLoading, setRatingLoading] = useState(false)
   const [ratingError, setRatingError] = useState('')
 
-  // endpoint para rating / imágenes
   const endpointType = type === 'tv' ? 'tv' : 'movie'
 
   // ====== PREFERENCIAS DE IMÁGENES ======
@@ -176,18 +209,14 @@ export default function DetailsClient({
     useState(null)
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null)
 
-  // base = lo que viene de TMDb (aplicando criterio ES->EN / neutro para series)
   const [basePosterPath, setBasePosterPath] = useState(
     data.poster_path || data.profile_path || null
   )
   const [baseBackdropPath, setBaseBackdropPath] = useState(
     data.backdrop_path || null
   )
-
-  // Flag para evitar mostrar una imagen "provisional" antes de tener el criterio aplicado
   const [artworkInitialized, setArtworkInitialized] = useState(false)
 
-  // Todas las imágenes (inicialmente al menos la portada/backdrop principal)
   const [imagesState, setImagesState] = useState(() => ({
     posters: data.poster_path
       ? [{ file_path: data.poster_path, from: 'main' }]
@@ -200,24 +229,19 @@ export default function DetailsClient({
   const [imagesError, setImagesError] = useState('')
   const [activeImagesTab, setActiveImagesTab] = useState('posters')
 
-  // Scroll horizontal de la fila de imágenes
+  // Scroll horizontal imágenes
   const imagesScrollRef = useRef(null)
   const [isHoveredImages, setIsHoveredImages] = useState(false)
   const [canPrevImages, setCanPrevImages] = useState(false)
   const [canNextImages, setCanNextImages] = useState(false)
 
-  // ====== Inicializar artwork (criterio por defecto + overrides localStorage) ======
+  // ====== Inicializar artwork ======
   useEffect(() => {
     let cancelled = false
-
     const initArtwork = async () => {
-      // 1) Base a partir de los datos que vienen del servidor
       let poster = data.poster_path || data.profile_path || null
       let backdrop = data.backdrop_path || null
 
-      // 2) Si es serie, aplicamos criterio:
-      //    - Poster: ES -> EN
-      //    - Fondo: backdrops SIN idioma (sin texto) -> si no, ES -> EN
       if (endpointType === 'tv' && TMDB_API_KEY) {
         try {
           const { posters, backdrops } = await fetchTVImages(id)
@@ -229,8 +253,6 @@ export default function DetailsClient({
             if (bestPoster) poster = bestPoster
             if (bestBackdropForBackground) backdrop = bestBackdropForBackground
           }
-
-          // además fusionamos estas imágenes con las que ya teníamos
           if (!cancelled) {
             setImagesState((prev) => ({
               posters: mergeUniqueImages(prev.posters, posters),
@@ -238,9 +260,7 @@ export default function DetailsClient({
             }))
           }
         } catch (e) {
-          if (!cancelled) {
-            console.error('Error cargando imágenes TV para detalles:', e)
-          }
+          if (!cancelled) console.error('Error cargando imágenes TV:', e)
         }
       }
 
@@ -249,7 +269,6 @@ export default function DetailsClient({
         setBaseBackdropPath(backdrop)
       }
 
-      // 3) Overrides guardados en localStorage (mismas claves que en dashboard)
       if (typeof window !== 'undefined' && !cancelled) {
         const savedPoster = window.localStorage.getItem(posterStorageKey)
         const savedPreviewBackdrop = window.localStorage.getItem(
@@ -261,42 +280,32 @@ export default function DetailsClient({
         if (savedPoster) setSelectedPosterPath(savedPoster)
         if (savedPreviewBackdrop)
           setSelectedPreviewBackdropPath(savedPreviewBackdrop)
-
         if (savedBackground) {
           setSelectedBackgroundPath(savedBackground)
         } else if (savedPreviewBackdrop) {
-          // migración: si solo existía el viejo backdrop, úsalo como fondo
           setSelectedBackgroundPath(savedPreviewBackdrop)
-          window.localStorage.setItem(
-            backgroundStorageKey,
-            savedPreviewBackdrop
-          )
+          window.localStorage.setItem(backgroundStorageKey, savedPreviewBackdrop)
         }
       }
 
-      if (!cancelled) {
-        setArtworkInitialized(true)
-      }
+      if (!cancelled) setArtworkInitialized(true)
     }
 
     initArtwork()
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, endpointType])
+  }, [id, endpointType, data])
 
-  // Imagen final que se usa para la portada grande
   const displayPosterPath = artworkInitialized
     ? selectedPosterPath || basePosterPath || data.profile_path || null
     : null
 
-  // El fondo del detalle SOLO depende de selectedBackgroundPath o baseBackdropPath
   const displayBackdropPath = artworkInitialized
     ? selectedBackgroundPath || baseBackdropPath || null
     : null
 
-  // ====== ESTADOS DE CUENTA (fetch) ======
+  // ====== Account States ======
   useEffect(() => {
     let cancel = false
     const load = async () => {
@@ -312,9 +321,7 @@ export default function DetailsClient({
               : null
           setUserRating(ratedValue)
         }
-      } catch {
-        // silencioso
-      }
+      } catch { }
     }
     load()
     return () => {
@@ -370,30 +377,21 @@ export default function DetailsClient({
     }
   }
 
-  // ====== RATING TMDb ======
   const sendRating = async (value) => {
     if (requireLogin() || ratingLoading || !TMDB_API_KEY) return
     try {
       setRatingLoading(true)
       setRatingError('')
       setUserRating(value)
-
       const url = `https://api.themoviedb.org/3/${endpointType}/${id}/rating?api_key=${TMDB_API_KEY}&session_id=${session}`
-
       const res = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json;charset=utf-8'
-        },
+        headers: { 'Content-Type': 'application/json;charset=utf-8' },
         body: JSON.stringify({ value })
       })
-      const json = await res.json()
-      if (!res.ok) {
-        throw new Error(json?.status_message || 'No se pudo guardar la puntuación')
-      }
+      if (!res.ok) throw new Error('Error al guardar puntuación')
     } catch (err) {
-      console.error(err)
-      setRatingError(err.message || 'No se pudo guardar la puntuación.')
+      setRatingError(err.message)
     } finally {
       setRatingLoading(false)
     }
@@ -406,28 +404,20 @@ export default function DetailsClient({
       setRatingLoading(true)
       setRatingError('')
       setUserRating(null)
-
       const url = `https://api.themoviedb.org/3/${endpointType}/${id}/rating?api_key=${TMDB_API_KEY}&session_id=${session}`
-
       const res = await fetch(url, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json;charset=utf-8'
-        }
+        headers: { 'Content-Type': 'application/json;charset=utf-8' }
       })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) {
-        throw new Error(json?.status_message || 'No se pudo borrar la puntuación')
-      }
+      if (!res.ok) throw new Error('Error al borrar puntuación')
     } catch (err) {
-      console.error(err)
-      setRatingError(err.message || 'No se pudo borrar la puntuación.')
+      setRatingError(err.message)
     } finally {
       setRatingLoading(false)
     }
   }
 
-  // ====== EXTRAS: IMDb rating + premios ======
+  // ====== Extras: IMDb rating + Awards ======
   const [extras, setExtras] = useState({ imdbRating: null, awards: null })
   useEffect(() => {
     let abort = false
@@ -451,7 +441,6 @@ export default function DetailsClient({
           if (!abort) setExtras({ imdbRating: null, awards: null })
           return
         }
-
         const omdb = await fetchOmdbByImdb(imdb)
         const rating =
           omdb?.imdbRating && omdb.imdbRating !== 'N/A'
@@ -461,7 +450,6 @@ export default function DetailsClient({
           typeof omdb?.Awards === 'string' && omdb.Awards.trim()
             ? omdb.Awards.trim()
             : null
-
         if (!abort) setExtras({ imdbRating: rating, awards })
       } catch {
         if (!abort) setExtras({ imdbRating: null, awards: null })
@@ -473,7 +461,7 @@ export default function DetailsClient({
     }
   }, [type, id, data?.imdb_id])
 
-  // === Ratings por episodio (TV) ===
+  // ====== Ratings Episodios (TV) ======
   const [ratings, setRatings] = useState(null)
   const [ratingsError, setRatingsError] = useState(null)
   const [ratingsLoading, setRatingsLoading] = useState(false)
@@ -482,11 +470,10 @@ export default function DetailsClient({
     async function load() {
       if (type !== 'tv') return
       setRatingsLoading(true)
-      setRatingsError(null)
       try {
         const res = await fetch(`/api/tv/${id}/ratings?excludeSpecials=true`)
         const json = await res.json()
-        if (!res.ok) throw new Error(json?.error || 'No se pudo obtener ratings')
+        if (!res.ok) throw new Error(json?.error)
         if (!ignore) setRatings(json)
       } catch (e) {
         if (!ignore) setRatingsError(e.message)
@@ -500,11 +487,9 @@ export default function DetailsClient({
     }
   }, [id, type])
 
-  // ====== Cargar imágenes adicionales de TMDb (pelis) ======
+  // ====== Cargar Imágenes Adicionales (Pelis) ======
   useEffect(() => {
     let abort = false
-
-    // Si el servidor ya ha devuelto images con append_to_response=images
     if (data?.images && !abort) {
       setImagesState((prev) => ({
         posters: mergeUniqueImages(prev.posters, data.images.posters || []),
@@ -512,29 +497,15 @@ export default function DetailsClient({
       }))
       return
     }
-
-    // Para películas también podemos pedir /movie/{id}/images
-    if (type !== 'movie') return
-    if (!TMDB_API_KEY) {
-      setImagesError(
-        'Falta NEXT_PUBLIC_TMDB_API_KEY para cargar las imágenes desde TMDb.'
-      )
-      return
-    }
-
+    if (type !== 'movie' || !TMDB_API_KEY) return
     const fetchImages = async () => {
       try {
         setImagesLoading(true)
         setImagesError('')
-
         const url = `https://api.themoviedb.org/3/movie/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,null,es`
         const res = await fetch(url)
         const json = await res.json()
-
-        if (!res.ok) {
-          throw new Error(json?.status_message || 'No se pudieron obtener las imágenes')
-        }
-
+        if (!res.ok) throw new Error(json?.status_message)
         if (!abort) {
           setImagesState((prev) => ({
             posters: mergeUniqueImages(prev.posters, json.posters || []),
@@ -542,93 +513,54 @@ export default function DetailsClient({
           }))
         }
       } catch (err) {
-        if (!abort) {
-          console.error(err)
-          setImagesError(
-            err.message || 'No se pudieron obtener las imágenes disponibles.'
-          )
-        }
+        if (!abort) setImagesError(err.message)
       } finally {
         if (!abort) setImagesLoading(false)
       }
     }
-
     fetchImages()
-
     return () => {
       abort = true
     }
   }, [type, id, data?.images])
 
-  // ====== Handlers artwork ======
+  // ====== Handlers Artwork ======
   const handleSelectPoster = (filePath) => {
     setSelectedPosterPath(filePath)
-
     if (typeof window !== 'undefined') {
-      if (filePath) {
-        window.localStorage.setItem(posterStorageKey, filePath)
-      } else {
-        window.localStorage.removeItem(posterStorageKey)
-      }
-    }
-
-    saveArtworkOverride({
-      type: endpointType,
-      id,
-      kind: 'poster',
       filePath
-    })
+        ? window.localStorage.setItem(posterStorageKey, filePath)
+        : window.localStorage.removeItem(posterStorageKey)
+    }
+    saveArtworkOverride({ type: endpointType, id, kind: 'poster', filePath })
   }
-
   const handleSelectPreviewBackdrop = (filePath) => {
     setSelectedPreviewBackdropPath(filePath)
-
     if (typeof window !== 'undefined') {
-      if (filePath) {
-        window.localStorage.setItem(previewBackdropStorageKey, filePath)
-      } else {
-        window.localStorage.removeItem(previewBackdropStorageKey)
-      }
-    }
-
-    saveArtworkOverride({
-      type: endpointType,
-      id,
-      kind: 'backdrop',
       filePath
-    })
+        ? window.localStorage.setItem(previewBackdropStorageKey, filePath)
+        : window.localStorage.removeItem(previewBackdropStorageKey)
+    }
+    saveArtworkOverride({ type: endpointType, id, kind: 'backdrop', filePath })
   }
-
   const handleSelectBackground = (filePath) => {
     setSelectedBackgroundPath(filePath)
-
     if (typeof window !== 'undefined') {
-      if (filePath) {
-        window.localStorage.setItem(backgroundStorageKey, filePath)
-      } else {
-        window.localStorage.removeItem(backgroundStorageKey)
-      }
-    }
-
-    saveArtworkOverride({
-      type: endpointType,
-      id,
-      kind: 'background',
       filePath
-    })
+        ? window.localStorage.setItem(backgroundStorageKey, filePath)
+        : window.localStorage.removeItem(backgroundStorageKey)
+    }
+    saveArtworkOverride({ type: endpointType, id, kind: 'background', filePath })
   }
-
   const handleResetArtwork = () => {
     setSelectedPosterPath(null)
     setSelectedPreviewBackdropPath(null)
     setSelectedBackgroundPath(null)
-
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(posterStorageKey)
       window.localStorage.removeItem(previewBackdropStorageKey)
       window.localStorage.removeItem(backgroundStorageKey)
     }
-
     saveArtworkOverride({
       type: endpointType,
       id,
@@ -648,64 +580,41 @@ export default function DetailsClient({
       filePath: null
     })
   }
-
   const handleCopyImageUrl = async (filePath) => {
     const url = buildOriginalImageUrl(filePath)
     try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url)
-      } else {
-        window.prompt('Copia el enlace de la imagen:', url)
-      }
+      navigator?.clipboard?.writeText
+        ? await navigator.clipboard.writeText(url)
+        : window.prompt('Copiar URL:', url)
     } catch {
-      window.prompt('Copia el enlace de la imagen:', url)
+      window.prompt('Copiar URL:', url)
     }
   }
 
-  // ====== Scroll horizontal imágenes: cálculo de flechas ======
+  // Scroll Nav Logic
   const updateImagesNav = () => {
     const el = imagesScrollRef.current
     if (!el) return
     const { scrollLeft, scrollWidth, clientWidth } = el
     const hasOverflow = scrollWidth > clientWidth + 1
     setCanPrevImages(hasOverflow && scrollLeft > 0)
-    setCanNextImages(
-      hasOverflow && scrollLeft + clientWidth < scrollWidth - 1
-    )
+    setCanNextImages(hasOverflow && scrollLeft + clientWidth < scrollWidth - 1)
   }
-
-  const handleImagesScroll = () => {
-    updateImagesNav()
-  }
-
+  const handleImagesScroll = () => updateImagesNav()
   const handlePrevImagesClick = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    const el = imagesScrollRef.current
-    if (!el) return
-    el.scrollBy({ left: -400, behavior: 'smooth' })
+    imagesScrollRef.current?.scrollBy({ left: -400, behavior: 'smooth' })
   }
-
   const handleNextImagesClick = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    const el = imagesScrollRef.current
-    if (!el) return
-    el.scrollBy({ left: 400, behavior: 'smooth' })
+    imagesScrollRef.current?.scrollBy({ left: 400, behavior: 'smooth' })
   }
-
   useEffect(() => {
     updateImagesNav()
-    const onResize = () => updateImagesNav()
-    if (typeof window !== 'undefined') {
-      window.addEventListener('resize', onResize)
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('resize', onResize)
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    window.addEventListener('resize', updateImagesNav)
+    return () => window.removeEventListener('resize', updateImagesNav)
   }, [imagesState, activeImagesTab])
 
   const showPrevImages = isHoveredImages && canPrevImages
@@ -715,833 +624,838 @@ export default function DetailsClient({
     data.title || data.name
   )}`
 
+  const seriesGraphUrl =
+    type === 'tv' && data?.id && (data.name || data.original_name)
+      ? `https://seriesgraph.com/show/${data.id}-${slugifyForSeriesGraph(
+        data.original_name || data.name
+      )}`
+      : null
+
+  // --- Extract Additional Metadata Helpers ---
+  const directors =
+    type === 'movie'
+      ? data.credits?.crew?.filter((c) => c.job === 'Director') || []
+      : data.created_by || []
+  const production =
+    data.production_companies
+      ?.slice(0, 2)
+      .map((c) => c.name)
+      .join(', ') || null
+  const countries =
+    data.production_countries?.map((c) => c.iso_3166_1).join(', ') || null
+  const languages =
+    data.spoken_languages
+      ?.map((l) => l.english_name || l.name)
+      .join(', ') || null
+
+  // ====== IMDb para RECOMENDACIONES ======
+  const [recImdbRatings, setRecImdbRatings] = useState({})
+
+  useEffect(() => {
+    let abort = false
+
+    const loadImdbForRecs = async () => {
+      if (!recommendations || recommendations.length === 0) {
+        if (!abort) setRecImdbRatings({})
+        return
+      }
+
+      try {
+        const entries = await Promise.all(
+          recommendations.slice(0, 15).map(async (rec) => {
+            try {
+              // 1) si ya viene la nota en el objeto de recomendación
+              const raw =
+                rec.imdb_rating ?? rec.imdbRating ?? rec.imdbScore ?? null
+              if (raw != null && raw !== 'N/A') {
+                const n = Number(raw)
+                return [rec.id, Number.isFinite(n) ? n : null]
+              }
+
+              // 2) si no, buscamos imdb_id en TMDb y luego OMDb
+              const mediaType =
+                rec.media_type === 'movie' || rec.media_type === 'tv'
+                  ? rec.media_type
+                  : type === 'tv'
+                    ? 'tv'
+                    : 'movie'
+
+              const ext = await getExternalIds(mediaType, rec.id)
+              const imdbId = ext?.imdb_id
+              if (!imdbId) return [rec.id, null]
+
+              const omdb = await fetchOmdbByImdb(imdbId)
+              const r =
+                omdb?.imdbRating && omdb.imdbRating !== 'N/A'
+                  ? Number(omdb.imdbRating)
+                  : null
+
+              return [rec.id, Number.isFinite(r) ? r : null]
+            } catch {
+              return [rec.id, null]
+            }
+          })
+        )
+
+        if (!abort) {
+          const map = {}
+          for (const [rid, rating] of entries) map[rid] = rating
+          setRecImdbRatings(map)
+        }
+      } catch {
+        if (!abort) setRecImdbRatings({})
+      }
+    }
+
+    loadImdbForRecs()
+    return () => {
+      abort = true
+    }
+  }, [recommendations, type])
+
   return (
-    <div className="relative min-h-screen">
-      {/* Fondo difuminado */}
-      {useBackdrop && artworkInitialized && displayBackdropPath ? (
-        <>
+    <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
+      {/* --- BACKGROUND & OVERLAY --- */}
+      <div className="fixed inset-0 z-0">
+        {useBackdrop && artworkInitialized && displayBackdropPath ? (
           <div
-            className="absolute inset-4 z-0 bg-cover bg-center blur-[10px]"
+            className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
             style={{
               backgroundImage: `url(https://image.tmdb.org/t/p/original${displayBackdropPath})`
             }}
           />
-          <div className="absolute inset-0 z-0" />
-        </>
-      ) : (
-        <div className="absolute inset-0 z-0 bg-black" />
-      )}
-
-      {/* Botón alternar fondo */}
-      <div className="absolute top-4 right-4 z-20">
-        <button
-          onClick={() => setUseBackdrop((prev) => !prev)}
-          className="p-2 rounded-full transition-colors"
-          aria-label="Alternar fondo"
-        >
-          <ImageIcon
-            className={`w-6 h-6 ${useBackdrop
-              ? 'text-blue-500 hover:text-blue-400'
-              : 'text-gray-500 hover:text-gray-400'
-              }`}
-          />
-        </button>
+        ) : (
+          <div className="absolute inset-0 bg-[#0a0a0a]" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/90 to-black/40 backdrop-blur-[4px]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-80" />
       </div>
 
-      {/* Capa oscura */}
-      <div className="absolute inset-0 z-0 bg-black/50" />
+      {/* --- BOTÓN TOGGLE BACKDROP --- */}
+      <button
+        onClick={() => setUseBackdrop(!useBackdrop)}
+        className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md border border-white/20 transition-all text-white/80 hover:text-white shadow-lg"
+        title="Alternar fondo"
+      >
+        <ImageIcon className="w-5 h-5" />
+      </button>
 
-      {/* Contenido */}
-      <div className="relative z-10 px-4 py-10 lg:py-16 max-w-6xl mx-auto text-white">
-        {/* Cabecera */}
-        <div className="flex flex-col lg:flex-row gap-8 mb-12">
-          <div className="w-full lg:w-1/3 max-w-sm flex flex-col gap-4">
-            {displayPosterPath ? (
-              <img
-                src={`https://image.tmdb.org/t/p/w500${displayPosterPath}`}
-                alt={title}
-                className="rounded-lg shadow-lg w-full h-auto object-cover"
-              />
-            ) : (
-              // Sin icono de "no hay imagen": solo un bloque neutro
-              <div className="w-full aspect-[2/3] bg-gray-900/80 rounded-lg shadow-lg" />
-            )}
+      {/* --- CONTENIDO PRINCIPAL --- */}
+      <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
+        {/* HEADER HERO SECTION */}
+        <div className="flex flex-col lg:flex-row gap-10 mb-16 animate-in fade-in duration-700 slide-in-from-bottom-4">
+          {/* POSTER */}
+          <div className="w-full lg:w-[350px] flex-shrink-0 flex flex-col gap-5">
+            <div className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/60 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.95)] hover:border-yellow-500/60">
+              {displayPosterPath ? (
+                <>
+                  <img
+                    src={`https://image.tmdb.org/t/p/w780${displayPosterPath}`}
+                    alt={title}
+                    className="w-full h-auto object-cover transform-gpu transition-transform duration-700 group-hover:scale-[1.12] group-hover:-translate-y-1 group-hover:rotate-[0.6deg] group-hover:saturate-150"
+                  />
+                  <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-t from-black/75 via-transparent to-transparent" />
+                </>
+              ) : (
+                <div className="w-full aspect-[2/3] bg-neutral-900 flex items-center justify-center">
+                  <ImageOff className="w-12 h-12 text-neutral-700" />
+                </div>
+              )}
+            </div>
 
             {/* Plataformas */}
             {providers && providers.length > 0 && (
-              <div className="mt-2">
-                <div className="flex flex-wrap gap-1">
-                  {providers.map((p) => (
-                    <div key={p.provider_id} className="p-2 flex items-center">
-                      <img
-                        src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
-                        alt={p.provider_name}
-                        className="w-10 h-10 object-contain rounded-lg transition-transform duration-300 ease-in-out hover:scale-110"
-                      />
-                    </div>
-                  ))}
-                  <a
-                    href={`https://www.themoviedb.org/${type}/${id}/watch`}
-                    target="_blank"
-                    className="p-2 flex items-center"
-                    rel="noreferrer"
-                  >
-                    <img
-                      src="https://play-lh.googleusercontent.com/Riuz226TXAawu8ZXlL7wnsjtMHkTMTDh_RSRiozAdoKe2TyGG4cLp3rPB0CxQFEUzFc"
-                      alt="JustWatch"
-                      className="object-contain w-11 h-11 rounded-lg transition-transform duration-300 ease-in-out hover:scale-110"
-                    />
-                  </a>
-                </div>
+              <div className="flex flex-wrap justifycenter lg:justify-start gap-2 p-3 bg-black/30 rounded-xl backdrop-blur-sm border border-white/5">
+                {providers.map((p) => (
+                  <img
+                    key={p.provider_id}
+                    src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                    alt={p.provider_name}
+                    className="w-10 h-10 rounded-lg object-contain hover:scale-110 hover:-translate-y-0.5 transition-transform cursor-pointer"
+                    title={p.provider_name}
+                  />
+                ))}
+                <a
+                  href={`https://www.themoviedb.org/${type}/${id}/watch`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center w-10 h-10 bg-neutral-800 rounded-lg hover:bg-neutral-700 transition-colors"
+                  title="Ver todos en JustWatch"
+                >
+                  <LinkIcon className="w-5 h-5 text-gray-400" />
+                </a>
               </div>
             )}
           </div>
 
-          <div className="flex-1 flex flex-col gap-4">
-            {/* Título + icon buttons */}
-            <div className="flex items-start justify-between gap-4">
-              <h1 className="text-4xl font-bold mt-2">{title}</h1>
+          {/* INFO COLUMN */}
+          <div className="flex-1 flex flex-col gap-5">
+            {/* Título y Acciones */}
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white leading-tight drop-shadow-lg tracking-tight">
+                {title}
+                {data.release_date && (
+                  <span className="text-2xl md:text-3xl font-light text-gray-400 ml-3">
+                    ({data.release_date.split('-')[0]})
+                  </span>
+                )}
+              </h1>
 
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-3 shrink-0">
                 <button
                   onClick={toggleFavorite}
                   disabled={favLoading}
-                  title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                  className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu ${favorite
+                    ? 'bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/30 hover:shadow-[0_0_25px_rgba(248,113,113,0.4)]'
+                    : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:shadow-lg'
+                    }`}
                 >
                   {favLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                   ) : favorite ? (
-                    <HeartOff className="w-5 h-5" />
+                    <Heart className="fill-current w-6 h-6" />
                   ) : (
-                    <Heart className="w-5 h-5" />
+                    <Heart className="w-6 h-6" />
                   )}
                 </button>
-
                 <button
                   onClick={toggleWatchlist}
                   disabled={wlLoading}
-                  title={
-                    watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'
-                  }
-                  className="w-10 h-10 rounded-full bg-neutral-700/60 hover:bg-neutral-600/80 backdrop-blur-sm border border-neutral-600/50 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu ${watchlist
+                    ? 'bg-blue-500/20 border-blue-500 text-blue-400 hover:bg-blue-500/30 hover:shadow-[0_0_25px_rgba(59,130,246,0.4)]'
+                    : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:shadow-lg'
+                    }`}
                 >
                   {wlLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                   ) : watchlist ? (
-                    <BookmarkMinus className="w-5 h-5" />
+                    <BookmarkMinus className="fill-current w-6 h-6" />
                   ) : (
-                    <BookmarkPlus className="w-5 h-5" />
+                    <BookmarkPlus className="w-6 h-6" />
                   )}
                 </button>
               </div>
             </div>
 
-            {/* Fila: TMDb + IMDb + Premios */}
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-5 text-emerald-300">
-                <span className="inline-flex items-center gap-2">
-                  <img
-                    src="/logo-TMDb.png"
-                    alt="TMDb"
-                    className="h-4 w-auto rounded-[3px]"
-                  />
-                  <span className="text-white/90">
-                    {Number(data.vote_average || 0).toFixed(1)}
-                  </span>
+            {/* Tags / Géneros */}
+            <div className="flex flex-wrap gap-2 text-sm font-medium">
+              {data.genres?.map((g) => (
+                <span
+                  key={g.id}
+                  className="px-3 py-1 rounded-full bg-white/10 text-gray-200 border border-white/5 hover:bg-white/20 transition-colors cursor-default"
+                >
+                  {g.name}
                 </span>
+              ))}
+            </div>
 
-                {typeof extras.imdbRating === 'number' && (
-                  <span className="inline-flex items-center gap-2">
-                    <img
-                      src="/logo-IMDb.png"
-                      alt="IMDb"
-                      className="h-4 w-auto"
-                    />
-                    <span className="text-white/90">
-                      {extras.imdbRating.toFixed(1)}
-                    </span>
-                  </span>
-                )}
-
-                {extras.awards && (
-                  <span className="truncate">{extras.awards}</span>
-                )}
+            {/* RATINGS BADGES */}
+            <div className="flex items-center gap-6 py-2 border-y border-white/10">
+              <div className="flex items-center gap-2">
+                <img src="/logo-TMDb.png" alt="TMDb" className="h-5 w-auto" />
+                <span className="text-xl font-bold text-emerald-400">
+                  {data.vote_average?.toFixed(1)}
+                </span>
               </div>
-
-              {/* Tu puntuación */}
-              {session && account?.id ? (
-                <div className="mt-2 text-sm text-gray-200">
-                  {ratingLoading && !ratingError && (
-                    <div className="flex items-center gap-2 mb-2 h-10">
-                      <Loader2 className="w-4 h-4 animate-spin text-yellow-300" />
-                      <span className="text-gray-300">Guardando...</span>
-                    </div>
-                  )}
-
-                  <div className={ratingLoading ? 'hidden' : ''}>
-                    <StarRating
-                      rating={userRating}
-                      onRating={sendRating}
-                      onClearRating={clearRating}
-                      disabled={ratingLoading}
-                    />
-                  </div>
-
-                  {ratingError && (
-                    <p className="mt-1 text-xs text-red-400">{ratingError}</p>
-                  )}
+              {extras.imdbRating && (
+                <div className="flex items-center gap-2 border-l border-white/10 pl-6">
+                  <img src="/logo-IMDb.png" alt="IMDb" className="h-5 w-auto" />
+                  <span className="text-xl font-bold text-yellow-400">
+                    {extras.imdbRating}
+                  </span>
                 </div>
-              ) : (
-                <p className="mt-4 text-xs text-gray-400">
-                  Inicia sesión para poder puntuar esta{' '}
-                  {type === 'tv' ? 'serie' : 'película'}.
+              )}
+              {session && (
+                <div className="flex items-center gap-2 border-l border-white/10 pl-6">
+                  <span className="text-xs text-gray-400 uppercase mr-2 hidden md:block">
+                    Tu nota:
+                  </span>
+                  <StarRating
+                    rating={userRating}
+                    onRating={sendRating}
+                    onClearRating={clearRating}
+                    disabled={ratingLoading}
+                  />
+                </div>
+              )}
+              {!session && (
+                <p className="ml-auto text-xs text-gray-400">
+                  Inicia sesión para puntuar.
                 </p>
               )}
             </div>
 
-            {/* Tagline + overview */}
-            {data.tagline && (
-              <p className="italic text-gray-300 mt-1">
-                <TagIcon className="inline w-4 h-4 mr-1" /> {data.tagline}
-              </p>
+            {ratingError && (
+              <p className="text-xs text-red-400 mt-1">{ratingError}</p>
             )}
-            {data.overview && (
-              <p className="text-gray-300 text-base leading-relaxed">
-                <MessageSquareIcon className="inline w-4 h-4 mr-1" />{' '}
+
+            {/* Tagline & Overview */}
+            <div>
+              {data.tagline && (
+                <p className="text-xl text-gray-400 italic font-light mb-3">
+                  "{data.tagline}"
+                </p>
+              )}
+              <p className="text-gray-300 text-lg leading-relaxed text-justify md:text-left">
                 {data.overview}
               </p>
-            )}
-
-            {/* Enlaces externos */}
-            {(data.homepage || data.imdb_id) && (
-              <div className="flex flex-wrap gap-4 items-center">
-                {data.homepage && (
-                  <a
-                    href={data.homepage}
-                    target="_blank"
-                    className="text-green-400 hover:underline inline-flex items-center gap-2"
-                    rel="noreferrer"
-                  >
-                    <LinkIcon className="w-4 h-4 text-green-300" />
-                    <strong>Sitio web</strong>
-                  </a>
-                )}
-                {(data.imdb_id || extras.imdbRating !== null) && (
-                  <>
-                    {data.imdb_id && (
-                      <a
-                        href={`https://www.imdb.com/title/${data.imdb_id}`}
-                        target="_blank"
-                        className="text-yellow-400 hover:underline inline-flex items-center gap-2"
-                        rel="noreferrer"
-                      >
-                        <LinkIcon className="w-4 h-4 text-yellow-300" />
-                        <strong>IMDb</strong>
-                      </a>
-                    )}
-                    <a
-                      href={filmAffinitySearchUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:underline inline-flex items-center gap-2"
-                    >
-                      <LinkIcon className="w-4 h-4 text-blue-300" />
-                      <strong>FilmAffinity</strong>
-                    </a>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Chips de géneros */}
-            <div className="flex flex-wrap gap-2">
-              {data.genres?.map((genre) => {
-                const genreColors = {
-                  Acción: 'bg-red-500',
-                  Aventura: 'bg-amber-600',
-                  Animación: 'bg-orange-500',
-                  Comedia: 'bg-yellow-400',
-                  Crimen: 'bg-rose-700',
-                  Documental: 'bg-slate-500',
-                  Drama: 'bg-blue-500',
-                  Familia: 'bg-indigo-400',
-                  Fantasía: 'bg-fuchsia-600',
-                  Historia: 'bg-zinc-600',
-                  Terror: 'bg-purple-700',
-                  Música: 'bg-emerald-500',
-                  Misterio: 'bg-teal-700',
-                  Romance: 'bg-pink-500',
-                  'Ciencia ficción': 'bg-cyan-600',
-                  'Película de TV': 'bg-lime-600',
-                  Suspense: 'bg-green-500',
-                  Bélica: 'bg-gray-600',
-                  Western: 'bg-neutral-600'
-                }
-                const genreColor = genreColors[genre.name] || 'bg-gray-600'
-                return (
-                  <span
-                    key={genre.id}
-                    className={`${genreColor} text-white px-3 py-1.5 rounded-full text-sm`}
-                  >
-                    {genre.name}
-                  </span>
-                )
-              })}
             </div>
 
-            {/* Tabla de metadatos */}
-            <div className="text-sm text-gray-300 bg-gray-800 p-5 rounded-lg shadow-md space-y-1">
+            {/* Links Externos */}
+            <div className="flex gap-5 mt-2 flex-wrap">
+              {data.homepage && (
+                <a
+                  href={data.homepage}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 hover:text-blue-300 flex items-center gap-1 hover:underline"
+                >
+                  <LinkIcon size={16} /> Web Oficial
+                </a>
+              )}
+
+              {data.imdb_id && (
+                <a
+                  href={`https://www.imdb.com/title/${data.imdb_id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-yellow-500 hover:text-yellow-400 flex items-center gap-1 hover:underline"
+                >
+                  <LinkIcon size={16} /> IMDb
+                </a>
+              )}
+
+              <a
+                href={filmAffinitySearchUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 hover:underline"
+              >
+                <LinkIcon size={16} /> FilmAffinity
+              </a>
+
+              {type === 'tv' && seriesGraphUrl && (
+                <a
+                  href={seriesGraphUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sky-400 hover:text-sky-300 flex items-center gap-1 hover:underline"
+                >
+                  <LinkIcon size={16} /> SeriesGraph
+                </a>
+              )}
+            </div>
+
+            {/* METADATOS */}
+            <div className="flex flex-wrap gap-3 mt-4">
               {data.original_title && (
-                <p>
-                  <FilmIcon className="inline w-4 h-4 mr-2 text-blue-400" />{' '}
-                  <strong>Título original:</strong> {data.original_title}
-                </p>
+                <MetaItem
+                  icon={FilmIcon}
+                  label="Título Original"
+                  value={data.original_title}
+                  colorClass="text-blue-400"
+                />
               )}
-              {data.release_date && (
-                <p>
-                  <CalendarIcon className="inline w-4 h-4 mr-2 text-green-400" />{' '}
-                  <strong>Estreno:</strong> {data.release_date}
-                </p>
+
+              {directors.length > 0 && (
+                <MetaItem
+                  icon={Users}
+                  label={type === 'movie' ? 'Director' : 'Creado por'}
+                  value={directors.map((d) => d.name).join(', ')}
+                  colorClass="text-rose-400"
+                />
               )}
+
               {data.runtime && (
-                <p>
-                  <ClockIcon className="inline w-4 h-4 mr-2 text-yellow-400" />{' '}
-                  <strong>Duración:</strong> {data.runtime} min
-                </p>
+                <MetaItem
+                  icon={ClockIcon}
+                  label="Duración"
+                  value={`${Math.floor(data.runtime / 60)}h ${data.runtime % 60
+                    }m`}
+                  colorClass="text-purple-400"
+                />
               )}
-              {data.original_language && (
-                <p>
-                  <GlobeIcon className="inline w-4 h-4 mr-2 text-purple-400" />{' '}
-                  <strong>Idioma:</strong> {data.original_language}
-                </p>
+
+              {languages && (
+                <MetaItem
+                  icon={Languages}
+                  label="Idiomas"
+                  value={languages}
+                  colorClass="text-indigo-400"
+                />
               )}
-              {data.vote_average && (
-                <p>
-                  <StarIcon className="inline w-4 h-4 mr-2 text-yellow-300" />{' '}
-                  <strong>Nota media:</strong>{' '}
-                  {data.vote_average.toFixed(1)}
-                </p>
+
+              {countries && (
+                <MetaItem
+                  icon={MapPin}
+                  label="País"
+                  value={countries}
+                  colorClass="text-red-400"
+                />
               )}
-              {data.vote_count && (
-                <p>
-                  <StarIcon className="inline w-4 h-4 mr-2 text-yellow-300" />{' '}
-                  <strong>Votos:</strong> {data.vote_count}
-                </p>
+
+              {production && (
+                <MetaItem
+                  icon={Building2}
+                  label="Producción"
+                  value={production}
+                  colorClass="text-zinc-400"
+                />
               )}
+
+              {data.budget > 0 && (
+                <MetaItem
+                  icon={BadgeDollarSignIcon}
+                  label="Presupuesto"
+                  value={`$${(data.budget / 1000000).toFixed(1)}M`}
+                  colorClass="text-yellow-500"
+                />
+              )}
+
+              {data.revenue > 0 && (
+                <MetaItem
+                  icon={TrendingUp}
+                  label="Recaudación"
+                  value={`$${(data.revenue / 1000000).toFixed(1)}M`}
+                  colorClass="text-emerald-500"
+                />
+              )}
+
               {type === 'tv' && (
                 <>
-                  {data.first_air_date && (
-                    <p>
-                      <CalendarIcon className="inline w-4 h-4 mr-2 text-green-400" />{' '}
-                      <strong>Primera emisión:</strong>{' '}
-                      {data.first_air_date}
-                    </p>
-                  )}
-                  {data.last_air_date && (
-                    <p>
-                      <CalendarIcon className="inline w-4 h-4 mr-2 text-red-400" />{' '}
-                      <strong>Última emisión:</strong> {data.last_air_date}
-                    </p>
-                  )}
-                  {data.number_of_seasons && (
-                    <p>
-                      <FilmIcon className="inline w-4 h-4 mr-2 text-blue-300" />{' '}
-                      <strong>Temporadas:</strong>{' '}
-                      {data.number_of_seasons}
-                    </p>
-                  )}
-                  {data.number_of_episodes && (
-                    <p>
-                      <FilmIcon className="inline w-4 h-4 mr-2 text-blue-300" />{' '}
-                      <strong>Episodios:</strong>{' '}
-                      {data.number_of_episodes}
-                    </p>
-                  )}
-                  {data.episode_run_time?.[0] && (
-                    <p>
-                      <ClockIcon className="inline w-4 h-4 mr-2 text-yellow-400" />{' '}
-                      <strong>Duración por episodio:</strong>{' '}
-                      {data.episode_run_time[0]} min
-                    </p>
-                  )}
-                  {data.status && (
-                    <p>
-                      <StarIcon className="inline w-4 h-4 mr-2 text-gray-300" />{' '}
-                      <strong>Estado:</strong> {data.status}
-                    </p>
-                  )}
+                  <MetaItem
+                    icon={Layers}
+                    label="Temporadas"
+                    value={`${data.number_of_seasons} Temporadas`}
+                    colorClass="text-orange-400"
+                  />
+                  <MetaItem
+                    icon={MonitorPlay}
+                    label="Episodios"
+                    value={`${data.number_of_episodes} Episodios`}
+                    colorClass="text-pink-400"
+                  />
+                  <MetaItem
+                    icon={CalendarIcon}
+                    label="Estado"
+                    value={data.status}
+                    colorClass="text-blue-300"
+                  />
                 </>
               )}
-              {data.budget > 0 && (
-                <p>
-                  <BadgeDollarSignIcon className="inline w-4 h-4 mr-2 text-green-500" />{' '}
-                  <strong>Presupuesto:</strong> $
-                  {data.budget.toLocaleString()}
-                </p>
+
+              {data.belongs_to_collection && (
+                <MetaItem
+                  icon={Library}
+                  label="Colección"
+                  value={data.belongs_to_collection.name}
+                  colorClass="text-teal-400"
+                />
               )}
-              {data.revenue > 0 && (
-                <p>
-                  <BadgeDollarSignIcon className="inline w-4 h-4 mr-2 text-green-500" />{' '}
-                  <strong>Recaudación:</strong> $
-                  {data.revenue.toLocaleString()}
-                </p>
+
+              {extras.awards && (
+                <MetaItem
+                  icon={Trophy}
+                  label="Premios"
+                  value={extras.awards}
+                  colorClass="text-yellow-500"
+                />
               )}
             </div>
           </div>
         </div>
 
-        {/* === SELECCIÓN DE IMÁGENES (películas y series, solo admin) === */}
+        {/* ADMIN: SELECCIÓN DE IMÁGENES */}
         {(type === 'movie' || type === 'tv') && isAdmin && (
-          <section className="mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-1">
-                  Imágenes de la {type === 'tv' ? 'serie' : 'película'}
-                </h2>
+          <div className="mb-12 border border-neutral-800 bg-neutral-900/40 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setShowAdminImages(!showAdminImages)}
+              className="w-full flex items-center justify-between p-4 px-6 hover:bg-white/5 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <ImageIcon className="text-yellow-500" />
+                <span className="font-bold text-gray-200">
+                  Administrar Portadas y Fondos
+                </span>
               </div>
+              {showAdminImages ? (
+                <ChevronUp className="text-gray-400" />
+              ) : (
+                <ChevronDown className="text-gray-400" />
+              )}
+            </button>
 
-              {(selectedPosterPath ||
-                selectedPreviewBackdropPath ||
-                selectedBackgroundPath) && (
+            {showAdminImages && (
+              <div className="p-6 border-t border-neutral-800 animate-in slide-in-from-top-2">
+                <div className="flex flex-wrap items-center gap-4 mb-6">
+                  <div className="flex bg-neutral-950 rounded-lg p-1 border border-neutral-800">
+                    {['posters', 'backdrops', 'background'].map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveImagesTab(tab)}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeImagesTab === tab
+                          ? 'bg-neutral-800 text-white shadow'
+                          : 'text-gray-400 hover:text-gray-200'
+                          }`}
+                      >
+                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      </button>
+                    ))}
+                  </div>
                   <button
                     onClick={handleResetArtwork}
-                    className="px-3 py-1 text-xs rounded-full bg-neutral-800 hover:bg-neutral-700 text-gray-200 border border-neutral-600"
+                    className="text-xs text-red-400 hover:text-red-300 hover:underline ml-auto"
                   >
-                    Restaurar imágenes por defecto
+                    Restaurar valores por defecto
                   </button>
-                )}
-            </div>
+                </div>
 
-            {/* Tabs posters / backdrops / fondo */}
-            <div className="inline-flex items-center bg-neutral-900/80 rounded-full p-1 border border-neutral-700 mb-4">
-              <button
-                type="button"
-                onClick={() => setActiveImagesTab('posters')}
-                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${activeImagesTab === 'posters'
-                  ? 'bg-white text-black'
-                  : 'text-gray-300 hover:text-white'
-                  }`}
-              >
-                Portadas
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveImagesTab('backdrops')}
-                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${activeImagesTab === 'backdrops'
-                  ? 'bg-white text-black'
-                  : 'text-gray-300 hover:text-white'
-                  }`}
-              >
-                Backdrops
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveImagesTab('background')}
-                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${activeImagesTab === 'background'
-                  ? 'bg-white text-black'
-                  : 'text-gray-300 hover:text-white'
-                  }`}
-              >
-                Fondo
-              </button>
-            </div>
-
-            {/* Estado de carga / error */}
-            {imagesLoading && (
-              <div className="flex items-center gap-2 text-sm text-gray-300 mb-3">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Cargando imágenes desde TMDb...
-              </div>
-            )}
-            {imagesError && (
-              <div className="bg-red-600/20 border border-red-700 text-red-300 p-3 rounded-lg mb-3 text-sm">
-                {imagesError}
-              </div>
-            )}
-
-            {/* Listado de imágenes con flechas y fondo difuminado lateral */}
-            <div
-              className="relative"
-              onMouseEnter={() => setIsHoveredImages(true)}
-              onMouseLeave={() => setIsHoveredImages(false)}
-            >
-              <div
-                ref={imagesScrollRef}
-                onScroll={handleImagesScroll}
-                className="flex gap-3 overflow-x-auto pb-2 no-scrollbar"
-              >
-                {(activeImagesTab === 'posters'
-                  ? imagesState.posters
-                  : imagesState.backdrops
-                ).map((img, index) => {
-                  const filePath = img.file_path
-
-                  const isPosterTab = activeImagesTab === 'posters'
-                  const isPreviewTab = activeImagesTab === 'backdrops'
-                  const isBackgroundTab = activeImagesTab === 'background'
-
-                  let isActive = false
-                  if (isPosterTab) {
-                    isActive = displayPosterPath === filePath
-                  } else if (isPreviewTab) {
-                    isActive = selectedPreviewBackdropPath === filePath
-                  } else if (isBackgroundTab) {
-                    isActive = displayBackdropPath === filePath
-                  }
-
-                  const handleClick = () => {
-                    if (isPosterTab) {
-                      handleSelectPoster(filePath)
-                    } else if (isPreviewTab) {
-                      handleSelectPreviewBackdrop(filePath)
-                    } else {
-                      handleSelectBackground(filePath)
-                    }
-                  }
-
-                  const originalUrl = buildOriginalImageUrl(filePath)
-
-                  return (
-                    <div
-                      key={`${activeImagesTab}-${filePath}-${index}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={handleClick}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          handleClick()
-                        }
-                      }}
-                      className={`relative flex-shrink-0 rounded-lg overflow-hidden border-2 ${isActive
-                        ? 'border-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.6)]'
-                        : 'border-transparent hover:border-neutral-500'
-                        } transition-all`}
-                    >
-                      <img
-                        src={`https://image.tmdb.org/t/p/${isPosterTab ? 'w342' : 'w780'
-                          }${filePath}`}
-                        alt={`${title} ${isPosterTab ? 'poster' : 'backdrop'
-                          }`}
-                        className={`${isPosterTab
-                          ? 'w-[150px] aspect-[2/3]'
-                          : 'w-[260px] aspect-[16/9]'
-                          } object-cover`}
-                      />
-
-                      {/* Estado "usando" */}
-                      {isActive && (
-                        <div className="absolute top-1 left-1 px-2 py-0.5 rounded-full bg-emerald-500/90 text-[10px] font-semibold text-black">
-                          Usando
-                        </div>
-                      )}
-
-                      {/* ICONO DE DESCARGA */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleCopyImageUrl(filePath)
-                        }}
-                        className="absolute bottom-1 right-1 bg-black/70 hover:bg-black/90 text-white p-1.5 rounded-full transition"
-                        title="Copiar enlace en alta resolución"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                  )
-                })}
-
-                {/* Sin resultados en la pestaña actual */}
-                {!imagesLoading &&
-                  !imagesError &&
-                  (activeImagesTab === 'posters'
-                    ? imagesState.posters.length === 0
-                    : imagesState.backdrops.length === 0) && (
-                    <div className="text-sm text-gray-400">
-                      No hay{' '}
-                      {activeImagesTab === 'posters'
-                        ? 'portadas'
-                        : activeImagesTab === 'backdrops'
-                          ? 'backdrops'
-                          : 'fondos'}{' '}
-                      adicionales disponibles.
-                    </div>
-                  )}
-              </div>
-
-              {/* LATERAL IZQUIERDO – franja difuminada */}
-              {showPrevImages && (
-                <button
-                  type="button"
-                  onClick={handlePrevImagesClick}
-                  className="absolute inset-y-0 left-0 w-20 z-30
-                             hidden sm:flex items-center justify-start
-                             bg-gradient-to-r from-black/80 via-black/55 to-transparent
-                             hover:from-black/95 hover:via-black/75
-                             transition-colors pointer-events-auto"
-                >
-                  <span className="ml-3 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
-                    ‹
-                  </span>
-                </button>
-              )}
-
-              {/* LATERAL DERECHO – franja difuminada */}
-              {showNextImages && (
-                <button
-                  type="button"
-                  onClick={handleNextImagesClick}
-                  className="absolute inset-y-0 right-0 w-20 z-30
-                             hidden sm:flex items-center justify-end
-                             bg-gradient-to-l from-black/80 via-black/55 to-transparent
-                             hover:from-black/95 hover:via-black/75
-                             transition-colors pointer-events-auto"
-                >
-                  <span className="mr-3 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
-                    ›
-                  </span>
-                </button>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* === Puntuaciones por episodio (TV) === */}
-        {type === 'tv' && (
-          <section className="mt-10">
-            {ratingsLoading && (
-              <div className="text-sm text-gray-300">
-                Cargando ratings…
-              </div>
-            )}
-            {ratingsError && (
-              <div className="bg-red-600/20 border border-red-700 text-red-300 p-3 rounded-lg">
-                {ratingsError}
-              </div>
-            )}
-            {ratings && (
-              <EpisodeRatingsGrid
-                ratings={ratings}
-                initialSource="avg"
-                density="compact"
-              />
-            )}
-          </section>
-        )}
-
-        {/* Reparto */}
-        {castData && castData.length > 0 && (
-          <div className="mt-12">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Reparto principal
-            </h2>
-            <Swiper
-              spaceBetween={20}
-              slidesPerView={6}
-              breakpoints={{
-                640: { slidesPerView: 1, spaceBetween: 10 },
-                768: { slidesPerView: 2, spaceBetween: 10 },
-                1024: { slidesPerView: 6, spaceBetween: 20 }
-              }}
-            >
-              {castData.slice(0, 20).map((actor) => (
-                <SwiperSlide
-                  key={actor.id}
-                  className="flex-shrink-0 text-center"
-                >
-                  <div className="relative">
-                    <a
-                      href={`/details/person/${actor.id}`}
-                      className="block"
-                    >
-                      {actor.profile_path ? (
-                        <img
-                          src={`https://image.tmdb.org/t/p/w300${actor.profile_path}`}
-                          alt={actor.name}
-                          className="w-full aspect-[2/3] object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div className="w-full aspect-[2/3] bg-gray-800 flex items-center justify-center rounded-lg">
-                          <ImageOff
-                            size={48}
-                            className="text-gray-500"
-                          />
-                        </div>
-                      )}
-                      <div className="text-white p-2">
-                        <p className="font-semibold text-sm">
-                          {actor.name}
-                        </p>
-                        {actor.character && (
-                          <p className="text-xs text-gray-400">
-                            {actor.character}
-                          </p>
-                        )}
-                      </div>
-                    </a>
+                {imagesLoading && (
+                  <div className="text-gray-400	o flex items-center gap-2">
+                    <Loader2 className="animate-spin w-4 h-4" /> Cargando TMDb...
                   </div>
-                </SwiperSlide>
-              ))}
-            </Swiper>
+                )}
+                {imagesError && (
+                  <p className="text-red-400 text-sm">{imagesError}</p>
+                )}
+
+                <div
+                  className="relative group"
+                  onMouseEnter={() => setIsHoveredImages(true)}
+                  onMouseLeave={() => setIsHoveredImages(false)}
+                >
+                  {/* Flecha Izq */}
+                  {showPrevImages && (
+                    <button
+                      onClick={handlePrevImagesClick}
+                      className="absolute left-0 top-0 bottom-0 z-20 w-16 bg-gradient-to-r from-black to-transparent flex items-center justify-start pl-2 text-white hover:text-yellow-400 transition-colors"
+                    >
+                      <div className="bg-black/50 rounded-full p-1">
+                        <ChevronDown className="rotate-90 w-8 h-8" />
+                      </div>
+                    </button>
+                  )}
+
+                  <div
+                    ref={imagesScrollRef}
+                    onScroll={handleImagesScroll}
+                    className="flex gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth"
+                  >
+                    {(activeImagesTab === 'posters'
+                      ? imagesState.posters
+                      : imagesState.backdrops
+                    ).map((img, idx) => {
+                      const isActive =
+                        activeImagesTab === 'posters'
+                          ? displayPosterPath === img.file_path
+                          : activeImagesTab === 'backdrops'
+                            ? selectedPreviewBackdropPath === img.file_path
+                            : displayBackdropPath === img.file_path
+
+                      const aspectClass =
+                        activeImagesTab === 'posters'
+                          ? 'w-[140px] aspect-[2/3]'
+                          : 'w-[280px] aspect-[16/9]'
+
+                      return (
+                        <div
+                          key={img.file_path + idx}
+                          onClick={() => {
+                            if (activeImagesTab === 'posters')
+                              handleSelectPoster(img.file_path)
+                            else if (activeImagesTab === 'backdrops')
+                              handleSelectPreviewBackdrop(img.file_path)
+                            else handleSelectBackground(img.file_path)
+                          }}
+                          className={`relative flex-shrink-0 cursor-pointer rounded-lg overflow-hidden border-2 transition-all transform-gpu hover:scale-105 hover:-translate-y-1 ${isActive
+                            ? 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                            : 'border-transparent hover:border-white/30'
+                            }`}
+                        >
+                          <img
+                            src={`https://image.tmdb.org/t/p/w300${img.file_path}`}
+                            className={`${aspectClass} object-cover`}
+                            alt="option"
+                          />
+                          {isActive && (
+                            <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCopyImageUrl(img.file_path)
+                            }}
+                            className="absolute bottom-2 right-2 p-1 bg-black/60 rounded text-white opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
+                          >
+                            <LinkIcon size={12} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Flecha Der */}
+                  {showNextImages && (
+                    <button
+                      onClick={handleNextImagesClick}
+                      className="absolute right-0 top-0 bottom-0 z-20 w-16 bg-gradient-to-l from-black to-transparent flex items-center justify-end pr-2 text-white hover:text-yellow-400 transition-colors"
+                    >
+                      <div className="bg-black/50 rounded-full p-1">
+                        <ChevronDown className="-rotate-90 w-8 h-8" />
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Críticas */}
-        {reviews && reviews.length > 0 && (
-          <div className="mt-12">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-white">
-                Críticas de usuarios
-              </h2>
-              {reviewLimit < reviews.length && (
-                <button
-                  onClick={() => setReviewLimit(reviewLimit + 2)}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm"
-                >
-                  Ver más críticas
-                </button>
-              )}
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {reviews.slice(0, reviewLimit).map((review) => {
-                const {
-                  author,
-                  content,
-                  created_at,
-                  id: rid,
-                  author_details
-                } = review
-                const avatar = author_details?.avatar_path?.includes(
-                  '/https'
-                )
-                  ? author_details.avatar_path.slice(1)
-                  : `https://image.tmdb.org/t/p/w45${author_details?.avatar_path}`
-                const rating = author_details?.rating
-
-                return (
-                  <div
-                    key={rid}
-                    className="bg-gray-800 p-4 rounded-lg flex flex-col gap-2"
+        {/* === REPARTO PRINCIPAL (Cast) === */}
+        {castData && castData.length > 0 && (
+          <section className="mb-16">
+            <SectionTitle title="Reparto Principal" icon={UsersIconComponent} />
+            <Swiper
+              spaceBetween={20}
+              slidesPerView={2}
+              breakpoints={{
+                500: { slidesPerView: 3 },
+                768: { slidesPerView: 4 },
+                1024: { slidesPerView: 5 },
+                1280: { slidesPerView: 6 }
+              }}
+              className="pb-8"
+            >
+              {castData.slice(0, 20).map((actor) => (
+                <SwiperSlide key={actor.id}>
+                  <a
+                    href={`/details/person/${actor.id}`}
+                    className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                   >
-                    <div className="flex items-center gap-3">
-                      {author_details?.avatar_path && (
+                    <div className="aspect-[2/3] overflow-hidden relative">
+                      {actor.profile_path ? (
                         <img
-                          src={avatar}
-                          alt={author}
-                          className="w-10 h-10 rounded-full object-cover border border-gray-600"
+                          src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
+                          alt={actor.name}
+                          className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.12] group-hover:-translate-y-1 group-hover:rotate-[0.5deg] group-hover:grayscale-0 grayscale-[20%]"
                         />
+                      ) : (
+                        <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
+                          <UsersIconComponent size={40} />
+                        </div>
                       )}
-                      <div>
-                        <p className="text-white font-semibold">
-                          {author_details?.username || author}
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-70 group-hover:opacity-90 transition-opacity duration-300" />
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <p className="text-white	font-bold text-sm truncate leading-tight">
+                          {actor.name}
                         </p>
-                        <p className="text-sm text-gray-400">
-                          {new Date(created_at).toLocaleDateString()}
+                        <p className="text-gray-300 text-xs truncate">
+                          {actor.character}
                         </p>
                       </div>
                     </div>
+                  </a>
+                </SwiperSlide>
+              ))}
+            </Swiper>
+          </section>
+        )}
 
-                    {rating && (
-                      <p className="text-yellow-400 text-sm mt-1">
-                        <strong>{rating} ⭐</strong>
-                      </p>
-                    )}
+        {/* EPISODIOS (TV) */}
+        {type === 'tv' && ratings && (
+          <section className="mb-16">
+            <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
+            <div className="bg-neutral-900/50 p-6 rounded-2xl border border-white/5">
+              {ratingsLoading && (
+                <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
+              )}
+              {ratingsError && (
+                <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
+              )}
+              {!ratingsError && (
+                <EpisodeRatingsGrid
+                  ratings={ratings}
+                  initialSource="avg"
+                  density="compact"
+                />
+              )}
+            </div>
+          </section>
+        )}
 
-                    <p
-                      className="text-gray-300 whitespace-pre-wrap text-sm mb-2"
-                      dangerouslySetInnerHTML={{
-                        __html: content.slice(0, 300) + '...'
-                      }}
-                    />
+        {/* === RECOMENDACIONES === */}
+        {recommendations && recommendations.length > 0 && (
+          <section className="mb-16">
+            <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
 
+            <Swiper
+              spaceBetween={16}
+              slidesPerView={2}
+              breakpoints={{
+                500: { slidesPerView: 3 },
+                768: { slidesPerView: 4 },
+                1024: { slidesPerView: 5 },
+                1280: { slidesPerView: 6 }
+              }}
+            >
+              {recommendations.slice(0, 15).map((rec) => {
+                const tmdbScore =
+                  typeof rec.vote_average === 'number' && rec.vote_average > 0
+                    ? rec.vote_average
+                    : null
+
+                const imdbScore =
+                  recImdbRatings[rec.id] != null
+                    ? recImdbRatings[rec.id]
+                    : undefined
+
+                return (
+                  <SwiperSlide key={rec.id}>
                     <a
-                      href={`https://www.themoviedb.org/review/${rid}`}
-                      target="_blank"
-                      className="text-blue-400 text-sm self-start"
-                      rel="noreferrer"
+                      href={`/details/${rec.media_type || type}/${rec.id}`}
+                      className="block group"
                     >
-                      Leer más →
+                      {/* Tarjeta solo con la portada; margen top para que no se recorte al subir */}
+                      <div className="mt-3 relative rounded-lg overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:scale-105 hover:-translate-y-1 bg-black/40">
+                        <img
+                          src={
+                            rec.poster_path
+                              ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
+                              : '/placeholder.png'
+                          }
+                          alt={rec.title || rec.name}
+                          className="w-full h-full object-cover"
+                        />
+
+                        {/* Badges TMDb + IMDb desde esquina inferior derecha hacia la izquierda */}
+                        <div className="absolute bottom-2 right-2 flex flex-row-reverse items-center gap-1 transform-gpu opacity-0 translate-y-2 translate-x-2 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300 ease-out">
+                          {tmdbScore && (
+                            <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-emerald-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-75 group-hover:scale-110 group-hover:translate-y-0">
+                              <img
+                                src="/logo-TMDb.png"
+                                alt="TMDb"
+                                className="w-auto h-3"
+                              />
+                              <span className="text-emerald-400 text-[10px] font-bold font-mono">
+                                {tmdbScore.toFixed(1)}
+                              </span>
+                            </div>
+                          )}
+
+                          {imdbScore && (
+                            <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-yellow-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-150 group-hover:scale-110 group-hover:translate-y-0">
+                              <img
+                                src="/logo-IMDb.png"
+                                alt="IMDb"
+                                className="w-auto h-3"
+                              />
+                              <span className="text-yellow-400 text-[10px] font-bold font-mono">
+                                {Number(imdbScore).toFixed(1)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </a>
+                  </SwiperSlide>
+                )
+              })}
+            </Swiper>
+          </section>
+        )}
+
+        {/* CRÍTICAS */}
+        {reviews && reviews.length > 0 && (
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <SectionTitle
+                title="Críticas de Usuarios"
+                icon={MessageSquareIcon}
+              />
+              {reviewLimit < reviews.length && (
+                <button
+                  onClick={() => setReviewLimit((prev) => prev + 2)}
+                  className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
+                >
+                  Ver más
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {reviews.slice(0, reviewLimit).map((r) => {
+                const avatar = r.author_details?.avatar_path
+                  ? r.author_details.avatar_path.startsWith('/https')
+                    ? r.author_details.avatar_path.slice(1)
+                    : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
+                  : `https://ui-avatars.com/api/?name=${r.author}&background=random`
+
+                return (
+                  <div
+                    key={r.id}
+                    className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
+                  >
+                    <div className="flex items-center gap-4">
+                      <img
+                        src={avatar}
+                        alt={r.author}
+                        className="w-12 h-12 rounded-full object-cover shadow-lg"
+                      />
+                      <div>
+                        <h4 className="font-bold text-white">{r.author}</h4>
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <span>
+                            {new Date(r.created_at).toLocaleDateString()}
+                          </span>
+                          {r.author_details?.rating && (
+                            <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
+                              ★ {r.author_details.rating}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
+                      "
+                      {r.content.replace(/<[^>]*>?/gm, '')}
+                      "
+                    </div>
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
+                    >
+                      Leer review completa en TMDb &rarr;
                     </a>
                   </div>
                 )
               })}
             </div>
-          </div>
-        )}
-
-        {/* Recomendaciones */}
-        {recommendations && recommendations.length > 0 && (
-          <div className="mt-12">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Recomendaciones
-            </h2>
-            <Swiper
-              spaceBetween={20}
-              slidesPerView={6}
-              breakpoints={{
-                640: { slidesPerView: 1, spaceBetween: 10 },
-                768: { slidesPerView: 2, spaceBetween: 10 },
-                1024: { slidesPerView: 6, spaceBetween: 20 }
-              }}
-            >
-              {recommendations.slice(0, 20).map((rec) => (
-                <SwiperSlide
-                  key={rec.id}
-                  className="flex-shrink-0 text-center"
-                >
-                  <div className="relative">
-                    <a
-                      href={`/details/${rec.media_type || type}/${rec.id}`}
-                      className="block"
-                    >
-                      {rec.poster_path ? (
-                        <img
-                          src={`https://image.tmdb.org/t/p/w300${rec.poster_path}`}
-                          alt={rec.title || rec.name}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div className="w-full aspect-[2/3] bg-gray-800 flex items-center justify-center rounded-lg">
-                          <ImageOff
-                            size={48}
-                            className="text-gray-500"
-                          />
-                        </div>
-                      )}
-                      <div className="text-white p-2">
-                        <p className="font-semibold text-sm">
-                          {rec.title || rec.name}
-                        </p>
-                        {rec.vote_average && (
-                          <p className="text-xs text-yellow-400">
-                            ⭐ {rec.vote_average.toFixed(1)}
-                          </p>
-                        )}
-                      </div>
-                    </a>
-                  </div>
-                </SwiperSlide>
-              ))}
-            </Swiper>
-          </div>
+          </section>
         )}
       </div>
     </div>
   )
 }
+
+// Icon helper para el reparto
+const UsersIconComponent = ({ size = 24, className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
