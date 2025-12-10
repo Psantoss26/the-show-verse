@@ -55,10 +55,9 @@ const mergeUniqueImages = (current, incoming) => {
   const seen = new Set(current.map((img) => img.file_path))
   const merged = [...current]
   for (const img of incoming || []) {
-    if (!seen.has(img.file_path)) {
-      seen.add(img.file_path)
-      merged.push(img)
-    }
+    if (seen.has(img.file_path)) continue
+    seen.add(img.file_path)
+    merged.push(img)
   }
   return merged
 }
@@ -119,6 +118,17 @@ const pickBestBackdropTVNeutralFirst = (backs) => {
   const bestNeutral = pickBestImage(neutral)
   if (bestNeutral?.file_path) return bestNeutral.file_path
   return pickBestBackdropTV(backs)
+}
+
+// --- Helper para SeriesGraph (slug) ---
+const slugifyForSeriesGraph = (name) => {
+  if (!name) return ''
+  return name
+    .normalize('NFD') // quitar acentos
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-') // todo lo que no sea letra/número -> guion
+    .replace(/(^-|-$)+/g, '') // quitar guiones al principio/fin
 }
 
 // --- Componente UI para Títulos de Sección ---
@@ -609,9 +619,17 @@ export default function DetailsClient({
 
   const showPrevImages = isHoveredImages && canPrevImages
   const showNextImages = isHoveredImages && canNextImages
+
   const filmAffinitySearchUrl = `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent(
     data.title || data.name
   )}`
+
+  const seriesGraphUrl =
+    type === 'tv' && data?.id && (data.name || data.original_name)
+      ? `https://seriesgraph.com/show/${data.id}-${slugifyForSeriesGraph(
+        data.original_name || data.name
+      )}`
+      : null
 
   // --- Extract Additional Metadata Helpers ---
   const directors =
@@ -884,32 +902,48 @@ export default function DetailsClient({
             </div>
 
             {/* Links Externos */}
-            <div className="flex gap-5 mt-2">
+            <div className="flex gap-5 mt-2 flex-wrap">
               {data.homepage && (
                 <a
                   href={data.homepage}
                   target="_blank"
+                  rel="noreferrer"
                   className="text-blue-400 hover:text-blue-300 flex items-center gap-1 hover:underline"
                 >
                   <LinkIcon size={16} /> Web Oficial
                 </a>
               )}
+
               {data.imdb_id && (
                 <a
                   href={`https://www.imdb.com/title/${data.imdb_id}`}
                   target="_blank"
+                  rel="noreferrer"
                   className="text-yellow-500 hover:text-yellow-400 flex items-center gap-1 hover:underline"
                 >
                   <LinkIcon size={16} /> IMDb
                 </a>
               )}
+
               <a
                 href={filmAffinitySearchUrl}
                 target="_blank"
+                rel="noreferrer"
                 className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 hover:underline"
               >
                 <LinkIcon size={16} /> FilmAffinity
               </a>
+
+              {type === 'tv' && seriesGraphUrl && (
+                <a
+                  href={seriesGraphUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sky-400 hover:text-sky-300 flex items-center gap-1 hover:underline"
+                >
+                  <LinkIcon size={16} /> SeriesGraph
+                </a>
+              )}
             </div>
 
             {/* METADATOS */}

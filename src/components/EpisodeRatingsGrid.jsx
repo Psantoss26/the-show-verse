@@ -3,9 +3,8 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
-// --- Componente Portal para el Tooltip ---
-// Este componente se renderiza fuera de la tabla (en el body)
-function TooltipPortal({ activeData, anchorRect, onClose }) {
+// --- Tooltip flotante en portal (igual que antes) ---
+function TooltipPortal({ activeData, anchorRect }) {
   const tooltipRef = useRef(null)
   const [coords, setCoords] = useState({ top: 0, left: 0, placement: 'top' })
 
@@ -19,19 +18,16 @@ function TooltipPortal({ activeData, anchorRect, onClose }) {
     const GAP = 8
     const VIEWPORT_PADDING = 10
 
-    // Posición ideal: centrado arriba
     let left = rLeft + rW / 2 - tW / 2
     let top = rTop - tH - GAP
     let placement = 'top'
 
-    // Corrección X
     if (left < VIEWPORT_PADDING) {
       left = VIEWPORT_PADDING
     } else if (left + tW > window.innerWidth - VIEWPORT_PADDING) {
       left = window.innerWidth - tW - VIEWPORT_PADDING
     }
 
-    // Si no cabe arriba, lo ponemos abajo
     if (top < VIEWPORT_PADDING) {
       top = rTop + rH + GAP
       placement = 'bottom'
@@ -63,7 +59,7 @@ function TooltipPortal({ activeData, anchorRect, onClose }) {
         </div>
 
         <div className="space-y-2">
-          {/* BLOQUE TMDB CON LOGO */}
+          {/* TMDb */}
           {activeData.tmdbVal != null && (
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
@@ -89,15 +85,11 @@ function TooltipPortal({ activeData, anchorRect, onClose }) {
             </div>
           )}
 
-          {/* BLOQUE IMDB CON LOGO */}
+          {/* IMDb */}
           {activeData.imdbVal != null && (
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
-                <img
-                  src="/logo-IMDb.png"
-                  alt="IMDb"
-                  className="h-3 w-auto"
-                />
+                <img src="/logo-IMDb.png" alt="IMDb" className="h-3 w-auto" />
                 <span className="text-[10px] uppercase tracking-wide text-yellow-300 font-bold">
                   IMDb
                 </span>
@@ -132,18 +124,21 @@ function TooltipPortal({ activeData, anchorRect, onClose }) {
 
 export default function EpisodeRatingsGrid({
   ratings,
-  initialSource = 'imdb',
+  initialSource = 'imdb', // ya no se usa, pero lo dejamos por compatibilidad
   density = 'compact',
-  fillMissingWithTmdb = false
+  fillMissingWithTmdb = true
 }) {
-  const [source, setSource] = useState(initialSource)
+  // Controles estilo SeriesGraph
+  const [layoutMode, setLayoutMode] = useState('grid') // 'grid' | 'wrapped'
+  const [inverted, setInverted] = useState(false)
+  const [showSeasonAvg, setShowSeasonAvg] = useState(false)
 
-  // --- ESTADO PARA EL TOOLTIP ---
+  // Tooltip
   const [hoveredEp, setHoveredEp] = useState(null)
   const [anchorRect, setAnchorRect] = useState(null)
 
-  // --- Manejadores del ratón ---
   const handleMouseEnter = (e, epData) => {
+    if (!epData) return
     const rect = e.currentTarget.getBoundingClientRect()
     setAnchorRect(rect)
     setHoveredEp(epData)
@@ -154,15 +149,15 @@ export default function EpisodeRatingsGrid({
     setAnchorRect(null)
   }
 
-  // --- tamaños
+  // tamaños
   const SIZES = {
     compact: {
-      cell: 'w-[42px] h-[28px] md:w-[50px] md:h-[32px] lg:w-[58px] lg:h-[36px]',
+      cell: 'w-[46px] h-[30px] md:w-[54px] md:h-[34px] lg:w-[60px] lg:h-[38px]',
       headerPad: 'px-2 py-1.5',
       stickyCol: 'w-12 md:w-14 lg:w-16'
     },
     comfy: {
-      cell: 'w-[60px] h-[36px] md:w-[70px] md:h-[42px] lg:w-[80px] lg:h-[48px]',
+      cell: 'w-[64px] h-[38px] md:w-[74px] md:h-[44px] lg:w-[84px] lg:h-[48px]',
       headerPad: 'px-3 py-2',
       stickyCol: 'w-16 md:w-20 lg:w-24'
     }
@@ -175,7 +170,7 @@ export default function EpisodeRatingsGrid({
     (Array.isArray(ratings?.seasons) ? ratings.seasons.length : 0)
   const totalEpisodesEstimate = meta.totalEpisodes ?? 0
 
-  // === helpers numéricos ===
+  // helpers numéricos
   const toRatingNumber = (value) => {
     if (value == null) return null
     if (typeof value === 'number') return Number.isFinite(value) ? value : null
@@ -198,13 +193,15 @@ export default function EpisodeRatingsGrid({
     return null
   }
 
-  const shouldFlatten =
-    meta.forceSingleSeason === true ||
-    totalSeasonsEstimate >= 15 ||
-    totalEpisodesEstimate >= 400
+  // const shouldFlatten =
+  //   meta.forceSingleSeason === true ||
+  //   totalSeasonsEstimate >= 15 ||
+  //   totalEpisodesEstimate >= 400
 
-  // === Normalizar datos de entrada ===
-  const { seasonsSorted, maxEpisodes } = useMemo(() => {
+  const shouldFlatten = meta.forceSingleSeason === true
+
+  // === Normalizar datos ===
+  const { seasonsSorted, maxEpisodes, seasonAverages } = useMemo(() => {
     const rawSeasons = Array.isArray(ratings?.seasons)
       ? ratings.seasons
       : Array.isArray(ratings)
@@ -238,6 +235,11 @@ export default function EpisodeRatingsGrid({
             )
             const imdbRating = toRatingNumber(ep.imdbRating ?? ep.imdb)
 
+            let displayRating = imdbRating
+            if (displayRating == null && fillMissingWithTmdb) {
+              displayRating = tmdbRating
+            }
+
             const tmdbVotes = toNumberSafe(
               ep.tmdbVotes ?? ep.tmdb_votes ?? ep.vote_count
             )
@@ -253,6 +255,7 @@ export default function EpisodeRatingsGrid({
               name: ep.name || '',
               tmdbRating,
               imdbRating,
+              displayRating,
               tmdbVotes,
               imdbVotes
             }
@@ -278,10 +281,7 @@ export default function EpisodeRatingsGrid({
         .sort((a, b) => a.season_number - b.season_number)
         .forEach((s) => {
           s.episodes.forEach((ep) => {
-            const hasRating =
-              typeof ep.tmdbRating === 'number' ||
-              typeof ep.imdbRating === 'number'
-            if (!hasRating) return
+            if (ep.displayRating == null) return
             allEpisodes.push({
               ...ep,
               episodeNumber: counter++
@@ -300,9 +300,7 @@ export default function EpisodeRatingsGrid({
       seasons = seasons
         .map((s) => {
           const hasAnyRating = s.episodes.some(
-            (ep) =>
-              typeof ep.tmdbRating === 'number' ||
-              typeof ep.imdbRating === 'number'
+            (ep) => typeof ep.displayRating === 'number'
           )
           return { ...s, hasAnyRating }
         })
@@ -321,8 +319,21 @@ export default function EpisodeRatingsGrid({
       return Math.max(m, localMax)
     }, 0)
 
-    return { seasonsSorted: seasons, maxEpisodes: maxEp }
-  }, [ratings, shouldFlatten])
+    const seasonAveragesMap = new Map()
+    seasons.forEach((s) => {
+      const vals = s.episodes
+        .map((e) => e.displayRating)
+        .filter((v) => typeof v === 'number')
+      if (!vals.length) {
+        seasonAveragesMap.set(s.season_number, null)
+        return
+      }
+      const avg = vals.reduce((a, b) => a + b, 0) / vals.length
+      seasonAveragesMap.set(s.season_number, avg)
+    })
+
+    return { seasonsSorted: seasons, maxEpisodes: maxEp, seasonAverages: seasonAveragesMap }
+  }, [ratings, shouldFlatten, fillMissingWithTmdb])
 
   const singleSeasonView =
     shouldFlatten && seasonsSorted.length === 1 && totalSeasonsEstimate > 1
@@ -337,27 +348,13 @@ export default function EpisodeRatingsGrid({
     return map
   }, [seasonsSorted])
 
-  // --- helpers visuales ---
   const format1 = (v) => {
     if (v == null) return null
     const num = Math.round(Number(v) * 10) / 10
     return Number.isInteger(num) ? num.toString() : num.toFixed(1)
   }
 
-  const pickValue = (ep) => {
-    if (!ep) return null
-    if (source === 'tmdb') return ep.tmdbRating ?? null
-    if (source === 'imdb') return ep.imdbRating ?? null
-
-    const vals = [ep.tmdbRating, ep.imdbRating].filter(
-      (v) => typeof v === 'number'
-    )
-    if (!vals.length) return null
-    return Number(
-      (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)
-    )
-  }
-
+  // Colores estilo SeriesGraph (Bad = rojo, Garbage = morado)
   const toneFor = (v) => {
     if (v == null)
       return {
@@ -365,213 +362,478 @@ export default function EpisodeRatingsGrid({
         text: 'text-zinc-400',
         ring: 'ring-white/5'
       }
-    if (v >= 9.3)
+
+    if (v >= 9.5)
       return {
-        bg: 'bg-emerald-700',
-        text: 'text-white',
-        ring: 'ring-white/10'
+        bg: 'bg-teal-400',      // Absolute Cinema
+        text: 'text-black',
+        ring: 'ring-black/10'
       }
     if (v >= 9.0)
       return {
-        bg: 'bg-emerald-600',
-        text: 'text-white',
-        ring: 'ring-white/10'
-      }
-    if (v >= 8.5)
-      return {
-        bg: 'bg-emerald-500',
-        text: 'text-black',
+        bg: 'bg-emerald-700',   // Awesome
+        text: 'text-white/90',
         ring: 'ring-black/10'
       }
     if (v >= 8.0)
       return {
-        bg: 'bg-lime-400',
+        bg: 'bg-green-500',     // Great
         text: 'text-black',
         ring: 'ring-black/10'
       }
     if (v >= 7.0)
       return {
-        bg: 'bg-yellow-400',
+        bg: 'bg-yellow-300',      // Good
         text: 'text-black',
         ring: 'ring-black/10'
       }
     if (v >= 6.0)
       return {
-        bg: 'bg-orange-500',
+        bg: 'bg-yellow-500',    // Average
         text: 'text-black',
         ring: 'ring-black/10'
       }
-    return { bg: 'bg-red-600', text: 'text-white', ring: 'ring-white/10' }
+    if (v >= 5.0)
+      return {
+        bg: 'bg-red-500',       // Bad
+        text: 'text-white',
+        ring: 'ring-black/10'
+      }
+
+    return {
+      bg: 'bg-purple-700',      // Garbage
+      text: 'text-white',
+      ring: 'ring-white/10'
+    }
+  }
+
+  const buildTooltipData = (ep, seasonNumber, episodeNumber) => {
+    if (!ep) return null
+    const hasData =
+      ep.tmdbRating != null ||
+      ep.imdbRating != null ||
+      ep.displayRating != null
+    if (!hasData) return null
+
+    const titleText = ep.name || `Episodio ${episodeNumber}`
+    const tmdbVal = ep.tmdbRating
+    const imdbVal = ep.imdbRating
+    const tmdbVotesStr = ep.tmdbVotes ? ep.tmdbVotes.toLocaleString() : null
+    const imdbVotesStr = ep.imdbVotes ? ep.imdbVotes.toLocaleString() : null
+
+    const nums = [tmdbVal, imdbVal].filter((v) => typeof v === 'number')
+    const avgVal = nums.length
+      ? Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1))
+      : null
+
+    const seasonInfo = singleSeasonView
+      ? `Episode ${episodeNumber}`
+      : `Season ${seasonNumber}, Episode ${episodeNumber}`
+
+    return {
+      titleText,
+      seasonInfo,
+      tmdbVal,
+      imdbVal,
+      tmdbVotesStr,
+      imdbVotesStr,
+      avgVal,
+      format1
+    }
   }
 
   if (!seasonsSorted.length || maxEpisodes === 0) return null
 
+  // === Render Grid normal (S columnas / E filas) ===
+  const renderGrid = () => (
+    <div className="overflow-x-auto overflow-y-visible mt-2">
+      <table className="border-separate border-spacing-0">
+        <thead>
+          <tr>
+            <th
+              className={`sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-left text-[11px] text-zinc-400 font-medium ${SZ.stickyCol}`}
+            />
+            {seasonsSorted.map((s) => (
+              <th
+                key={s.season_number}
+                className={`${SZ.headerPad} text-center text-xs text-zinc-200 font-semibold bg-black/60 backdrop-blur border-b border-white/10`}
+              >
+                S{s.season_number}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: maxEpisodes }).map((_, i) => {
+            const epNum = i + 1
+            return (
+              <tr key={`row-${epNum}`}>
+                <td
+                  className={`sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-[11px] text-zinc-300 font-medium ${SZ.stickyCol} border-r border-white/5`}
+                >
+                  E{epNum}
+                </td>
+
+                {seasonsSorted.map((s) => {
+                  const ep = epIndexBySeason
+                    .get(s.season_number)
+                    ?.get(epNum)
+                  const raw = ep?.displayRating ?? null
+                  const val = format1(raw)
+                  const spec = toneFor(raw)
+
+                  const tooltipData = buildTooltipData(
+                    ep,
+                    s.season_number,
+                    epNum
+                  )
+
+                  return (
+                    <td key={`s${s.season_number}-e${epNum}`} className="p-1">
+                      <div
+                        onMouseEnter={(e) =>
+                          tooltipData && handleMouseEnter(e, tooltipData)
+                        }
+                        onMouseLeave={handleMouseLeave}
+                      >
+                        <div
+                          className={`
+                            ${spec.bg} ${spec.text}
+                            ${SZ.cell}
+                            rounded-[6px]
+                            flex items-center justify-center
+                            text-[14px] md:text-[15px] lg:text-[22px]
+                            font-semibold
+                            [font-variant-numeric:tabular-nums]
+                            shadow-[0_0_0_2px_rgba(0,0,0,0.9)]
+                            cursor-default select-none
+                          `}
+                        >
+                          {val ?? '—'}
+                        </div>
+
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+
+          {showSeasonAvg && (
+            <tr>
+              <td
+                className={`sticky left-0 z-10 bg-black/80 backdrop-blur ${SZ.headerPad} text-[11px] text-zinc-100 font-semibold ${SZ.stickyCol} border-t border-white/10 border-r border-white/5`}
+              >
+                AVG
+              </td>
+
+              {seasonsSorted.map((s) => {
+                const avg = seasonAverages.get(s.season_number) ?? null
+                const spec = toneFor(avg)
+                const val = format1(avg)
+
+                return (
+                  <td
+                    key={`avg-s${s.season_number}`}
+                    className="px-2 pt-3 pb-2 text-center align-bottom border-t border-white/10"
+                  >
+                    <div className="flex flex-col items-center gap-[2px] min-w-[40px]">
+                      {/* número */}
+                      <span
+                        className="
+                          text-sm md:text-base lg:text-lg
+                          font-semibold
+                          text-white
+                          [font-variant-numeric:tabular-nums]
+                        "
+                      >
+                        {val ?? '—'}
+                      </span>
+
+                      {/* barra de color */}
+                      <span
+                        className={`
+                          mt-[2px]
+                          h-[3px] md:h-[4px]
+                          w-8 md:w-10 lg:w-12
+                          rounded-full
+                          ${avg == null ? 'bg-zinc-700' : spec.bg}
+                        `}
+                      />
+                    </div>
+                  </td>
+                )
+              })}
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+
+  // === Render Grid invertido (E columnas / S filas) ===
+  const renderGridInverted = () => (
+    <div className="overflow-x-auto overflow-y-visible mt-2">
+      <table className="border-separate border-spacing-0">
+        <thead>
+          <tr>
+            <th
+              className={`sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-left text-[11px] text-zinc-400 font-medium ${SZ.stickyCol}`}
+            >
+              {/* vacío */}
+            </th>
+            {Array.from({ length: maxEpisodes }).map((_, i) => (
+              <th
+                key={`eh-${i + 1}`}
+                className={`${SZ.headerPad} text-center text-xs text-zinc-200 font-semibold bg-black/60 backdrop-blur border-b border-white/10`}
+              >
+                E{i + 1}
+              </th>
+            ))}
+            {showSeasonAvg && (
+              <th
+                className={`${SZ.headerPad} text-center text-xs text-zinc-200 font-semibold bg-black/60 backdrop-blur border-b border-white/10`}
+              >
+                AVG
+              </th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {seasonsSorted.map((s) => (
+            <tr key={`row-s${s.season_number}`}>
+              <td
+                className={`sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-[11px] text-zinc-300 font-medium ${SZ.stickyCol} border-r border-white/5`}
+              >
+                S{s.season_number}
+              </td>
+              {Array.from({ length: maxEpisodes }).map((_, i) => {
+                const epNum = i + 1
+                const ep = epIndexBySeason
+                  .get(s.season_number)
+                  ?.get(epNum)
+                const raw = ep?.displayRating ?? null
+                const val = format1(raw)
+                const spec = toneFor(raw)
+                const tooltipData = buildTooltipData(
+                  ep,
+                  s.season_number,
+                  epNum
+                )
+
+                return (
+                  <td
+                    key={`s${s.season_number}-e${epNum}`}
+                    className="p-1"
+                  >
+                    <div
+                      onMouseEnter={(e) =>
+                        tooltipData && handleMouseEnter(e, tooltipData)
+                      }
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      <div
+                        className={`
+                          ${spec.bg} ${spec.text} ring-1 ${spec.ring}
+                          rounded-[6px] md:rounded-[6px]
+                          ${SZ.cell}
+                          flex items-center justify-center
+                          font-semibold leading-none tracking-tight
+                          [font-variant-numeric:tabular-nums]
+                          text-[15px] md:text-[16px] lg:text-[22px]
+                          shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]
+                          hover:brightness-[1.1] hover:scale-[1.1] hover:z-20
+                          transition duration-200
+                          cursor-default
+                          outline-none focus:ring-2 focus:ring-white/30
+                          select-none
+                        `}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        {val ?? '—'}
+                      </div>
+                    </div>
+                  </td>
+                )
+              })}
+
+              {showSeasonAvg && (
+                <td className="px-2 pt-3 pb-2 text-center align-bottom border-l border-white/10">
+                  {(() => {
+                    const avg =
+                      seasonAverages.get(s.season_number) ?? null
+                    const spec = toneFor(avg)
+                    const val = format1(avg)
+
+                    return (
+                      <div className="flex flex-col items-center gap-[2px] min-w-[40px]">
+                        <span
+                          className="
+                            text-sm md:text-base lg:text-lg
+                            font-semibold
+                            text-white
+                            [font-variant-numeric:tabular-nums]
+                          "
+                        >
+                          {val ?? '—'}
+                        </span>
+                        <span
+                          className={`
+                            mt-[2px]
+                            h-[3px] md:h-[4px]
+                            w-8 md:w-10 lg:w-12
+                            rounded-full
+                            ${avg == null ? 'bg-zinc-700' : spec.bg}
+                          `}
+                        />
+                      </div>
+                    )
+                  })()}
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+
+  // === Render Wrapped (cada temporada en un bloque) ===
+  const renderWrapped = () => (
+    <div className="space-y-6 mt-2">
+      {seasonsSorted.map((s) => {
+        const avg = seasonAverages.get(s.season_number) ?? null
+        return (
+          <div key={`wrap-s${s.season_number}`}>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-sm font-semibold text-zinc-100">
+                Season {s.season_number}
+              </span>
+              {showSeasonAvg && avg != null && (
+                <span className="text-xs text-zinc-400">
+                  Avg:{' '}
+                  <span className="font-semibold text-white">
+                    {format1(avg)}
+                  </span>
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {s.episodes.map((ep) => {
+                const raw = ep.displayRating ?? null
+                const spec = toneFor(raw)
+                const val = format1(raw)
+                const tooltipData = buildTooltipData(
+                  ep,
+                  s.season_number,
+                  ep.episodeNumber
+                )
+                return (
+                  <div
+                    key={`wrap-s${s.season_number}-e${ep.episodeNumber}`}
+                    className="flex flex-col items-center gap-1"
+                    onMouseEnter={(e) =>
+                      tooltipData && handleMouseEnter(e, tooltipData)
+                    }
+                    onMouseLeave={handleMouseLeave}
+                  >
+                    <div
+                      className={`
+                        ${spec.bg} ${spec.text} ring-1 ${spec.ring}
+                        rounded-[6px] md:rounded-[6px]
+                        ${SZ.cell}
+                        flex items-center justify-center
+                        font-semibold leading-none tracking-tight
+                        [font-variant-numeric:tabular-nums]
+                        text-[15px] md:text-[16px] lg:text-[22px]
+                        shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]
+                        hover:brightness-[1.1] hover:scale-[1.05]
+                        transition duration-200
+                        cursor-default
+                        select-none
+                      `}
+                    >
+                      {val ?? '—'}
+                    </div>
+                    <span className="text-[10px] text-zinc-400">
+                      E{ep.episodeNumber}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+
   return (
     <>
       <div className="space-y-3">
-        {/* Cabecera */}
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-lg font-semibold">
-            Puntuaciones por episodio
-          </h3>
-          <div className="flex items-center gap-1 text-xs">
-            <span className="opacity-70">Fuente:</span>
-            <Toggle
-              active={source === 'avg'}
-              onClick={() => setSource('avg')}
+        {/* Controles estilo SeriesGraph */}
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedToggle
+              options={[
+                { id: 'grid', label: 'Grid' },
+                { id: 'wrapped', label: 'Wrapped' }
+              ]}
+              value={layoutMode}
+              onChange={setLayoutMode}
+            />
+            <ModeChip
+              active={inverted}
+              disabled={layoutMode === 'wrapped'}
+              onClick={() =>
+                layoutMode === 'grid' && setInverted((v) => !v)
+              }
             >
-              Media
-            </Toggle>
-            <Toggle
-              active={source === 'tmdb'}
-              onClick={() => setSource('tmdb')}
-            >
-              TMDb
-            </Toggle>
-            <Toggle
-              active={source === 'imdb'}
-              onClick={() => setSource('imdb')}
-            >
-              IMDb
-            </Toggle>
+              Inverted
+            </ModeChip>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-zinc-300">
+            <span>Season Avg.</span>
+            <Switch
+              checked={showSeasonAvg}
+              onChange={setShowSeasonAvg}
+            />
           </div>
         </div>
 
-        <LegendCompact />
+        <LegendSeriesGraph />
 
-        {/* Tabla */}
-        <div className="overflow-x-auto overflow-y-visible">
-          <table className="border-separate border-spacing-0">
-            <thead>
-              <tr>
-                <th
-                  className={`sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-left text-[11px] text-zinc-400 font-medium ${SZ.stickyCol}`}
-                />
-                {seasonsSorted.map((s) => (
-                  <th
-                    key={s.season_number}
-                    className={`${SZ.headerPad} text-center text-xs text-zinc-200 font-semibold bg-black/60 backdrop-blur border-b border-white/10`}
-                  >
-                    S{s.season_number}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {Array.from({ length: maxEpisodes }).map((_, i) => {
-                const epNum = i + 1
-                return (
-                  <tr key={`row-${epNum}`}>
-                    <td
-                      className={`sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-[11px] text-zinc-300 font-medium ${SZ.stickyCol} border-r border-white/5`}
-                    >
-                      E{epNum}
-                    </td>
-
-                    {seasonsSorted.map((s) => {
-                      const ep = epIndexBySeason
-                        .get(s.season_number)
-                        ?.get(epNum)
-                      const raw = pickValue(ep)
-                      const val = format1(raw)
-                      const spec = toneFor(raw)
-
-                      // Preparamos datos para el tooltip
-                      const hasData = ep && (ep.tmdbRating != null || ep.imdbRating != null)
-
-                      let tooltipData = null
-                      if (hasData) {
-                        const titleText = ep?.name || `Episodio ${epNum}`
-                        const tmdbVal = ep.tmdbRating
-                        const imdbVal = ep.imdbRating
-                        const tmdbVotesStr = ep.tmdbVotes ? ep.tmdbVotes.toLocaleString() : null
-                        const imdbVotesStr = ep.imdbVotes ? ep.imdbVotes.toLocaleString() : null
-
-                        const avgVal = (tmdbVal == null && imdbVal == null)
-                          ? null
-                          : Number(
-                            ([tmdbVal, imdbVal].filter((v) => typeof v === 'number').reduce((a, b) => a + b, 0) /
-                              [tmdbVal, imdbVal].filter((v) => typeof v === 'number').length).toFixed(1)
-                          )
-
-                        const seasonInfo = singleSeasonView
-                          ? `Episode ${epNum}`
-                          : `Season ${s.season_number}, Episode ${epNum}`
-
-                        tooltipData = {
-                          titleText,
-                          seasonInfo,
-                          tmdbVal,
-                          imdbVal,
-                          tmdbVotesStr,
-                          imdbVotesStr,
-                          avgVal,
-                          format1 // pasamos la funcion helper
-                        }
-                      }
-
-                      return (
-                        <td key={`s${s.season_number}-e${epNum}`} className="p-1">
-                          <div
-                            // Ya no usamos relative ni group para el tooltip interno
-                            // Usamos handlers de JS para el portal
-                            onMouseEnter={(e) => hasData && handleMouseEnter(e, tooltipData)}
-                            onMouseLeave={handleMouseLeave}
-                          >
-                            <div
-                              className={`
-                                ${spec.bg} ${spec.text} ring-1 ${spec.ring}
-                                rounded-[20px] md:rounded-[24px]
-                                ${SZ.cell}
-                                flex items-center justify-center
-                                font-medium leading-none tracking-tight
-                                [font-variant-numeric:tabular-nums]
-                                text-[15px] md:text-[16px] lg:text-[17px]
-                                shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]
-                                hover:brightness-[1.1] hover:scale-[1.1] hover:z-20
-                                transition duration-200
-                                cursor-default
-                                outline-none focus:ring-2 focus:ring-white/30
-                                select-none
-                              `}
-                              role="button"
-                              tabIndex={0}
-                            >
-                              {val ?? '—'}
-                            </div>
-
-                            {/* NOTA: Eliminamos el Tooltip interno de aquí */}
-                          </div>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        {/* Layout */}
+        {layoutMode === 'grid'
+          ? (inverted ? renderGridInverted() : renderGrid())
+          : renderWrapped()}
       </div>
 
-      {/* Renderizamos el Portal al final. Solo aparece cuando hay hover */}
-      <TooltipPortal
-        activeData={hoveredEp}
-        anchorRect={anchorRect}
-      />
+      <TooltipPortal activeData={hoveredEp} anchorRect={anchorRect} />
     </>
   )
 }
 
-function Toggle({ active, onClick, children }) {
+// === Controles auxiliares ===
+
+function ModeChip({ active, disabled, onClick, children }) {
   return (
     <button
+      type="button"
+      disabled={disabled}
       onClick={onClick}
-      className={`px-2.5 py-1 rounded-full border text-xs transition-colors
-        ${active
-          ? 'bg-white text-black border-white'
-          : 'border-zinc-600 text-zinc-300 hover:bg-zinc-800'
-        }
+      className={`
+        px-3 py-1.5 rounded-md text-[11px] font-medium border
+        flex items-center gap-1
+        transition-colors
+        ${disabled
+          ? 'opacity-40 cursor-not-allowed border-zinc-700 bg-zinc-900 text-zinc-500'
+          : active
+            ? 'bg-zinc-100 text-black border-zinc-100 shadow-sm'
+            : 'bg-zinc-900/70 text-zinc-300 border-zinc-700 hover:bg-zinc-800'}
       `}
     >
       {children}
@@ -579,22 +841,73 @@ function Toggle({ active, onClick, children }) {
   )
 }
 
-function LegendCompact() {
-  const items = [
-    ['bg-emerald-700', '≥ 9.3'],
-    ['bg-emerald-600', '9.0–9.2'],
-    ['bg-emerald-500', '8.5–8.9'],
-    ['bg-lime-400', '8.0–8.4'],
-    ['bg-yellow-400', '7.0–7.9'],
-    ['bg-orange-500', '6.0–6.9'],
-    ['bg-red-600', '≤ 5.9'],
-    ['bg-zinc-800', '—']
-  ]
+function SegmentedToggle({ options, value, onChange }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-300">
+    <div className="inline-flex rounded-md bg-zinc-900/70 border border-zinc-700 p-0.5">
+      {options.map((opt) => {
+        const active = opt.id === value
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => onChange(opt.id)}
+            className={`
+              px-3 py-1.5 text-[11px] font-medium rounded-[6px]
+              transition-colors
+              ${active
+                ? 'bg-zinc-100 text-black shadow-sm'
+                : 'text-zinc-300 hover:bg-zinc-800'}
+            `}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function Switch({ checked, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`
+        w-9 h-5 rounded-full flex items-center px-[3px]
+        transition-colors
+        ${checked ? 'bg-emerald-500' : 'bg-zinc-700'}
+      `}
+      aria-pressed={checked}
+    >
+      <span
+        className={`
+          w-4 h-4 rounded-full bg-white shadow
+          transform transition-transform
+          ${checked ? 'translate-x-4' : 'translate-x-0'}
+        `}
+      />
+    </button>
+  )
+}
+
+// Leyenda con los mismos rangos / etiquetas que SeriesGraph
+function LegendSeriesGraph() {
+  const items = [
+    ['bg-teal-400', 'Absolute Cinema'],
+    ['bg-emerald-500', 'Awesome'],
+    ['bg-green-500', 'Great'],
+    ['bg-lime-400', 'Good'],
+    ['bg-yellow-400', 'Average'],
+    ['bg-red-500', 'Bad'],
+    ['bg-purple-700', 'Garbage'],
+    ['bg-zinc-800', 'Sin nota']
+  ]
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-300">
       {items.map(([c, l]) => (
         <span key={l} className="inline-flex items-center gap-1">
-          <i className={`inline-block w-3 h-3 rounded ${c}`} />
+          <span className={`inline-block w-3 h-3 rounded-full ${c}`} />
           {l}
         </span>
       ))}
