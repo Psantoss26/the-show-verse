@@ -1,3 +1,4 @@
+// src/app/watchlist/page.jsx
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
@@ -12,10 +13,7 @@ import {
   TvIcon,
 } from 'lucide-react'
 
-/**
- * Enriquecer items con IMDb en segundo plano
- * (no bloquea el primer render).
- */
+// --- Helper para enriquecer con IMDb (igual que en Favoritas) ---
 async function enrichItemsWithImdb(items, batchSize = 6) {
   if (!Array.isArray(items) || items.length === 0) return items
 
@@ -32,9 +30,7 @@ async function enrichItemsWithImdb(items, batchSize = 6) {
 
         let imdbRating = null
         try {
-          const mediaType =
-            item.media_type || (item.title ? 'movie' : 'tv')
-
+          const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
           const ext = await getExternalIds(mediaType, item.id)
           const imdbId = ext?.imdb_id
           if (!imdbId) {
@@ -57,19 +53,22 @@ async function enrichItemsWithImdb(items, batchSize = 6) {
         } catch {
           imdbRating = null
         }
-
         result[index] = { ...item, imdbRating }
       })
     )
   }
-
   return result
 }
 
 export default function WatchlistPage() {
   const { session, account } = useAuth()
+
+  // 'checking' | 'anonymous' | 'authenticated'
+  const [authStatus, setAuthStatus] = useState('checking')
+
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const [typeFilter, setTypeFilter] = useState('all')
   const [yearFilter, setYearFilter] = useState('')
@@ -77,34 +76,69 @@ export default function WatchlistPage() {
 
   const [imdbLoaded, setImdbLoaded] = useState(false)
 
-  // 1) Carga rápida desde TMDb
+  // === Estado de autenticación (sin parpadeos) ===
   useEffect(() => {
+    if (session && account?.id) {
+      setAuthStatus('authenticated')
+    } else if (session === null || account === null) {
+      // El contexto ya sabe que NO hay sesión
+      setAuthStatus('anonymous')
+    }
+    // Mientras tanto seguimos en 'checking'
+  }, [session, account])
+
+  // === Carga inicial de pendientes (solo si autenticado) ===
+  useEffect(() => {
+    let cancelled = false
+
+    if (authStatus === 'checking') return
+
+    if (authStatus === 'anonymous') {
+      setItems([])
+      setLoading(false)
+      setError(null)
+      return
+    }
+
+    // authStatus === 'authenticated'
     const load = async () => {
-      if (!session || !account?.id) {
-        setLoading(false)
-        return
-      }
+      if (!session || !account?.id) return
+
+      setLoading(true)
+      setError(null)
+
       try {
         const data = await fetchWatchlistForUser(account.id, session)
+        if (cancelled) return
         const baseItems = Array.isArray(data) ? data : []
         setItems(baseItems)
         setImdbLoaded(false)
+      } catch (err) {
+        if (cancelled) return
+        console.error(err)
+        setItems([])
+        setError(
+          'No se ha podido cargar tu lista de pendientes. Inténtalo de nuevo más tarde.'
+        )
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     load()
-  }, [session, account])
+    return () => {
+      cancelled = true
+    }
+  }, [authStatus, session, account])
 
-  // 2) Enriquecer con IMDb en segundo plano
+  // === Enriquecer IMDb en segundo plano ===
   useEffect(() => {
+    if (authStatus !== 'authenticated') return
     if (!session || !account?.id) return
     if (!items.length) return
     if (imdbLoaded) return
 
     let cancelled = false
-
     const run = async () => {
       try {
         const enriched = await enrichItemsWithImdb(items)
@@ -116,13 +150,13 @@ export default function WatchlistPage() {
         if (!cancelled) setImdbLoaded(true)
       }
     }
-
     run()
     return () => {
       cancelled = true
     }
-  }, [items, session, account, imdbLoaded])
+  }, [authStatus, items, session, account, imdbLoaded])
 
+  // === Lista filtrada/ordenada (igual que en Favoritas) ===
   const processedItems = useMemo(() => {
     let list = [...items]
 
@@ -146,8 +180,10 @@ export default function WatchlistPage() {
       const dateB = isMovieB ? b.release_date : b.first_air_date
       const yearA = dateA ? parseInt(dateA.slice(0, 4)) : 0
       const yearB = dateB ? parseInt(dateB.slice(0, 4)) : 0
-      const ratingA = typeof a.vote_average === 'number' ? a.vote_average : 0
-      const ratingB = typeof b.vote_average === 'number' ? b.vote_average : 0
+      const ratingA =
+        typeof a.vote_average === 'number' ? a.vote_average : 0
+      const ratingB =
+        typeof b.vote_average === 'number' ? b.vote_average : 0
       const titleA = (isMovieA ? a.title : a.name || '').toLowerCase()
       const titleB = (isMovieB ? b.title : b.name || '').toLowerCase()
 
@@ -167,209 +203,237 @@ export default function WatchlistPage() {
           return titleA.localeCompare(titleB)
       }
     })
-
     return list
   }, [items, typeFilter, yearFilter, sortBy])
 
-  if (!session || !account?.id) {
+  // === 1) Usuario anónimo (mismo diseño que Favoritas, pero para Pendientes) ===
+  if (authStatus === 'anonymous') {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-10">
-        <h1 className="text-2xl font-bold mb-4">Pendientes</h1>
-        <p className="text-neutral-400">
-          Inicia sesión en TMDb para ver tu lista de películas y series
-          pendientes.
+      <div className="max-w-7xl mx-auto px-4 py-12 flex flex-col items-center justify-center min-h-[50vh] text-center">
+        <Bookmark className="w-16 h-16 text-neutral-700 mb-4" />
+        <h1 className="text-3xl font-bold text-white mb-2">Pendientes</h1>
+        <p className="text-neutral-400 max-w-md">
+          Inicia sesión para acceder a tu lista personal de películas y
+          series pendientes.
         </p>
+        <Link
+          href="/login"
+          className="mt-6 px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-neutral-200 transition-colors"
+        >
+          Iniciar Sesión
+        </Link>
       </div>
     )
   }
 
-  if (loading) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 py-10 flex items-center gap-2">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        <span>Cargando tu lista de pendientes...</span>
-      </div>
-    )
-  }
+  // === 2) Usuario autenticado o auth todavía resolviéndose ===
+  const isInitialLoading = authStatus === 'checking' || loading
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10">
-      {/* Cabecera + filtros */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <Bookmark className="w-5 h-5 text-blue-400" />
-          <h1 className="text-2xl font-bold">
-            Pendientes
-          </h1>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          {/* Tipo */}
-          <div className="h-9 flex gap-1 bg-neutral-900/70 border border-neutral-700 rounded-2xl p-1">
-            <button
-              className={`px-3 py-1 rounded-2xl ${typeFilter === 'all'
-                ? 'bg-neutral-100 text-black'
-                : 'text-neutral-300'
-                }`}
-              onClick={() => setTypeFilter('all')}
-            >
-              Todo
-            </button>
-            <button
-              className={`px-3 py-1 rounded-2xl flex items-center gap-1 ${typeFilter === 'movie'
-                ? 'bg-neutral-100 text-black'
-                : 'text-neutral-300'
-                }`}
-              onClick={() => setTypeFilter('movie')}
-            >
-              <FilmIcon className="w-3 h-3" />
-              Pelis
-            </button>
-            <button
-              className={`px-3 py-1 rounded-2xl flex items-center gap-1 ${typeFilter === 'tv'
-                ? 'bg-neutral-100 text-black'
-                : 'text-neutral-300'
-                }`}
-              onClick={() => setTypeFilter('tv')}
-            >
-              <TvIcon className="w-3 h-3" />
-              Series
-            </button>
+    <div className="min-h-screen bg-[#101010] text-gray-100 font-sans">
+      <div className="max-w-[1600px] mx-auto px-4 py-12">
+        {/* Cabecera + Filtros (mismo layout que Favoritas) */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-500/10 rounded-full">
+              <Bookmark className="w-6 h-6 text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-white">Pendientes</h1>
+              <p className="text-sm text-neutral-400">
+                {items.length} títulos en tu lista de pendientes
+              </p>
+            </div>
           </div>
 
-          {/* Año */}
-          <input
-            type="number"
-            inputMode="numeric"
-            pattern="\d*"
-            placeholder="Año"
-            value={yearFilter}
-            onChange={(e) => setYearFilter(e.target.value)}
-            className="h-9 w-20 px-2.5 py-1 bg-neutral-900 border border-neutral-700 rounded-2xl text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filtro Tipo */}
+            <div className="bg-neutral-900 border border-neutral-800 p-1 rounded-lg flex gap-1">
+              {['all', 'movie', 'tv'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setTypeFilter(type)}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${typeFilter === type
+                    ? 'bg-neutral-800 text-white shadow-sm'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                    }`}
+                >
+                  {type === 'all'
+                    ? 'Todo'
+                    : type === 'movie'
+                      ? 'Películas'
+                      : 'Series'}
+                </button>
+              ))}
+            </div>
 
-          {/* Orden */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="h-9 px-3 bg-neutral-900 border border-neutral-700 rounded-2xl text-neutral-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="rating_desc">Puntuación ↓</option>
-            <option value="rating_asc">Puntuación ↑</option>
-            <option value="year_desc">Año ↓</option>
-            <option value="year_asc">Año ↑</option>
-            <option value="title_asc">Nombre A-Z</option>
-            <option value="title_desc">Nombre Z-A</option>
-          </select>
-        </div>
-      </div>
+            {/* Filtro Año */}
+            <input
+              type="number"
+              placeholder="Año..."
+              value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value)}
+              className="h-10 w-24 px-3 bg-neutral-900 border border-neutral-800 rounded-lg text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600 transition-colors"
+            />
 
-      {processedItems.length === 0 ? (
-        <p className="text-neutral-400">
-          No hay resultados con los filtros actuales.
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {processedItems.map((item) => {
-            const isMovie = item.media_type === 'movie'
-            const href = `/details/${item.media_type || (isMovie ? 'movie' : 'tv')}/${item.id}`
-            const title = isMovie ? item.title : item.name
-            const date = isMovie ? item.release_date : item.first_air_date
-
-            const imagePath =
-              item.poster_path || item.backdrop_path || item.profile_path
-
-            const tmdbRating =
-              typeof item.vote_average === 'number' && item.vote_average > 0
-                ? item.vote_average.toFixed(1)
-                : '–'
-
-            const imdbRating =
-              typeof item.imdbRating === 'number' && item.imdbRating > 0
-                ? item.imdbRating.toFixed(1)
-                : '–'
-
-            return (
-              <Link
-                key={`${item.media_type}-${item.id}`}
-                href={href}
-                className="group block"
+            {/* Ordenar Por */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="h-10 pl-3 pr-8 bg-neutral-900 border border-neutral-800 rounded-lg text-sm text-white focus:outline-none focus:border-neutral-600 appearance-none cursor-pointer min-w-[140px] transition-colors"
               >
-                <div className="relative aspect-[2/3] overflow-hidden rounded-3xl bg-neutral-900 mb-2">
-                  {imagePath ? (
-                    <img
-                      src={`https://image.tmdb.org/t/p/w342${imagePath}`}
-                      alt={title}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-neutral-500">
-                      Sin imagen
-                    </div>
-                  )}
-
-                  {/* Peli / Serie icono */}
-                  <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/75 px-2 py-0.5 rounded-full text-[10px] uppercase">
-                    {isMovie ? (
-                      <FilmIcon className="w-3 h-4" />
-                    ) : (
-                      <TvIcon className="w-3 h-4" />
-                    )}
-                  </div>
-
-                  {/* TMDb + IMDb: aparecen sólo al hacer hover, animando desde la derecha */}
-                  <div
-                    className="
-                      pointer-events-none
-                      absolute bottom-2 right-2
-                      flex flex-col items-end gap-1
-                      opacity-0 translate-x-4
-                      transition-all duration-300
-                      group-hover:opacity-100 group-hover:translate-x-0
-                      group-focus-within:opacity-100 group-focus-within:translate-x-0
-                    "
-                  >
-                    <div className="flex items-center gap-1 bg-black/85 px-2 py-0.5 rounded-full text-[10px]">
-                      <img
-                        src="/logo-TMDb.png"
-                        alt="TMDb"
-                        className="h-3 w-auto rounded-[2px]"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                      <span className="text-neutral-50 font-medium">
-                        {tmdbRating}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 bg-black/85 px-2 py-0.5 rounded-full text-[10px]">
-                      <img
-                        src="/logo-IMDb.png"
-                        alt="IMDb"
-                        className="h-3 w-auto"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                      <span className="text-neutral-50 font-medium">
-                        {imdbRating}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <h3 className="text-sm font-semibold line-clamp-2">
-                  {title}
-                </h3>
-                {date && (
-                  <p className="text-xs text-neutral-400">
-                    {date.slice(0, 4)}
-                  </p>
-                )}
-              </Link>
-            )
-          })}
+                <option value="rating_desc">Más valoradas</option>
+                <option value="rating_asc">Menos valoradas</option>
+                <option value="year_desc">Más recientes</option>
+                <option value="year_asc">Más antiguas</option>
+                <option value="title_asc">A - Z</option>
+                <option value="title_desc">Z - A</option>
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-500">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* Contenido / Grid / Estados */}
+        {isInitialLoading ? (
+          // Estado de carga
+          <div className="flex items-center justify-center py-20 min-h-[50vh] gap-3">
+            <Loader2 className="w-6 h-6 animate-spin text-yellow-500" />
+            <span className="text-neutral-300 text-lg">
+              Cargando tu lista de pendientes...
+            </span>
+          </div>
+        ) : error ? (
+          // Error
+          <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-red-700 rounded-xl bg-red-950/20">
+            <FilmIcon className="w-12 h-12 text-red-500 mb-3" />
+            <p className="text-red-400 text-lg mb-2">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 px-4 py-2 text-sm font-semibold rounded-full bg-red-500 text-white hover:bg-red-400 transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : processedItems.length === 0 ? (
+          // Sin resultados / sin pendientes (con filtros)
+          <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-neutral-800 rounded-xl bg-neutral-900/20">
+            <FilmIcon className="w-12 h-12 text-neutral-600 mb-3" />
+            <p className="text-neutral-400 text-lg">
+              No se encontraron resultados con estos filtros.
+            </p>
+            <button
+              onClick={() => {
+                setTypeFilter('all')
+                setYearFilter('')
+                setSortBy('rating_desc')
+              }}
+              className="mt-4 text-sm text-yellow-500 hover:underline"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        ) : (
+          // Grid de resultados (idéntico a Favoritas)
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+            {processedItems.map((item) => {
+              const isMovie = item.media_type === 'movie'
+              const href = `/details/${item.media_type || (isMovie ? 'movie' : 'tv')}/${item.id}`
+              const title = isMovie ? item.title : item.name
+
+              const imagePath = item.poster_path
+                ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+                : item.backdrop_path
+                  ? `https://image.tmdb.org/t/p/w500${item.backdrop_path}`
+                  : null
+
+              return (
+                <Link
+                  key={`${item.media_type}-${item.id}`}
+                  href={href}
+                  className="group block relative"
+                  title={title}
+                >
+                  <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-neutral-900 shadow-xl group-hover:shadow-emerald-900/30 group-hover:shadow-2xl transition-all duration-500 ease-out group-hover:-translate-y-2 z-0 border border-white/5 group-hover:border-white/20">
+                    {/* Imagen */}
+                    {imagePath ? (
+                      <img
+                        src={imagePath}
+                        alt={title}
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-neutral-600 p-4 text-center bg-neutral-800">
+                        <FilmIcon className="w-12 h-12 mb-2 opacity-50" />
+                        <span className="text-sm font-medium">{title}</span>
+                      </div>
+                    )}
+
+                    {/* Overlay sutil */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                    {/* Badge Tipo */}
+                    <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider text-white/90 border border-white/10 shadow-lg z-10">
+                      {isMovie ? (
+                        <FilmIcon className="w-3 h-3" />
+                      ) : (
+                        <TvIcon className="w-3 h-3" />
+                      )}
+                    </div>
+
+                    {/* Badges TMDb / IMDb */}
+                    <div className="absolute bottom-2 right-2 flex flex-row-reverse items-center gap-1 transform-gpu opacity-0 translate-y-2 translate-x-2 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300 ease-out z-10">
+                      {/* TMDb */}
+                      {item.vote_average > 0 && (
+                        <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-emerald-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-75 group-hover:scale-110 group-hover:translate-y-0">
+                          <img
+                            src="/logo-TMDb.png"
+                            alt="TMDb"
+                            className="w-auto h-3"
+                          />
+                          <span className="text-emerald-400 text-[10px] font-bold font-mono">
+                            {item.vote_average.toFixed(1)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* IMDb */}
+                      {item.imdbRating > 0 && (
+                        <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-yellow-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-150 group-hover:scale-110 group-hover:translate-y-0">
+                          <img
+                            src="/logo-IMDb.png"
+                            alt="IMDb"
+                            className="w-auto h-3"
+                          />
+                          <span className="text-yellow-400 text-[10px] font-bold font-mono">
+                            {item.imdbRating.toFixed(1)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 // /lib/api/tmdb.js
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 const BASE_URL = 'https://api.themoviedb.org/3'
+const IS_SERVER = typeof window === 'undefined'
 
 /* -------------------- Helper unificado -------------------- */
 function buildUrl(path, params = {}) {
@@ -8,46 +9,90 @@ function buildUrl(path, params = {}) {
   // defaults
   url.searchParams.set('api_key', API_KEY || '')
   if (!('language' in params)) {
-    // por defecto ES si aplica
     url.searchParams.set('language', 'es-ES')
   }
-  // user params
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null) url.searchParams.set(k, String(v))
   })
   return url.toString()
 }
 
+/**
+ * Cliente TMDb con:
+ * - Timeout
+ * - Caching en servidor (ISR) para endpoints de catálogo
+ * - Menos ruido en consola con aborts
+ */
 async function tmdb(path, params = {}, options = {}) {
   if (!API_KEY) {
     console.error('TMDb API key missing (NEXT_PUBLIC_TMDB_API_KEY)')
     return null
   }
 
+  // En servidor: timeout más corto, caching por defecto
+  // En cliente: dejamos más margen al usuario
+  const { timeoutMs = IS_SERVER ? 4000 : 8000, ...fetchOptions } = options
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
   try {
+    // En servidor: cacheamos y revalidamos cada 10 min por defecto.
+    // En cliente: no-store (el browser ya gestiona su propio cache HTTP).
+    const baseInit = IS_SERVER
+      ? {
+        cache: 'force-cache',
+        next: { revalidate: 60 * 10 }, // 10 minutos
+      }
+      : {
+        cache: 'no-store',
+      }
+
     const res = await fetch(buildUrl(path, params), {
-      cache: 'no-store',
-      ...options,
+      ...baseInit,
+      ...fetchOptions,      // permite override: cache, next, headers...
+      signal: controller.signal,
     })
+
+    clearTimeout(timeoutId)
 
     const json = await res.json().catch(() => ({}))
 
     if (!res.ok) {
-      // 404 / status_code 34 => recurso no disponible (p.ej. /account/0/recommendations)
-      // No lo tratamos como error "ruidoso", simplemente devolvemos null.
+      // 404 / status_code 34 => recurso inexistente
       if (res.status === 404 || json?.status_code === 34) {
-        // Si quieres ver algo en desarrollo, puedes dejar un console.warn:
-        // console.warn('TMDb recurso no encontrado:', path)
+        // Si quieres ver algo en dev, descomenta:
+        // if (process.env.NODE_ENV === 'development') {
+        //   console.warn('TMDb recurso no encontrado:', path)
+        // }
         return null
       }
 
-      // Para otros errores (401, 500, etc.) sí mantenemos el log
       console.error('TMDb error:', res.status, json)
       return null
     }
 
     return json
   } catch (e) {
+    clearTimeout(timeoutId)
+    const code = e?.code || e?.cause?.code
+
+    // Abort típico por cambio de ruta / navegación / timeout
+    if (e?.name === 'AbortError' || code === 'UND_ERR_ABORTED') {
+      // Estos aborts son normales al navegar, NO queremos ruido:
+      // Si quieres debug, puedes activar el log:
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.warn('[TMDb] Petición abortada (timeout/navegación):', path)
+      // }
+      return null
+    }
+
+    // Timeout de conexión real hasta TMDb
+    if (code === 'UND_ERR_CONNECT_TIMEOUT') {
+      console.warn('[TMDb] Timeout de conexión con TMDb en', path)
+      return null
+    }
+
     console.error('TMDb fetch error:', path, e)
     return null
   }
@@ -442,40 +487,47 @@ export const fetchPopularMedia = async ({ type = 'movie', language = 'es-ES' }) 
  * Obtiene medios por ID de género, ordenados por popularidad y con un mínimo de votos.
  * ¡ESTA ES LA FUNCIÓN QUE TE FALTA!
  */
-export const fetchMediaByGenre = async ({ type = 'movie', language = 'es-ES', genreId, minVotes = 1000 }) => {
+export const fetchMediaByGenre = async ({
+  type = 'movie',
+  language = 'es-ES',
+  genreId,
+  minVotes = 1000,
+}) => {
   try {
-    const data = await tmdb(`discover/${type}`, {
+    const data = await tmdb(`/discover/${type}`, {
       language,
       sort_by: 'popularity.desc',
       'vote_count.gte': minVotes,
       with_genres: genreId,
       page: 1,
-    });
-    return data?.results || [];
+    })
+    return data?.results || []
   } catch (error) {
-    console.error(`Error fetching media by genre ${genreId}:`, error);
-    return [];
+    console.error(`Error fetching media by genre ${genreId}:`, error)
+    return []
   }
-};
+}
 
-/**
- * Obtiene medios por ID de keyword (ej. "superhéroe", "venganza", "viaje en el tiempo").
- */
-export const fetchMediaByKeyword = async ({ type = 'movie', language = 'es-ES', keywordId, minVotes = 500 }) => {
+export const fetchMediaByKeyword = async ({
+  type = 'movie',
+  language = 'es-ES',
+  keywordId,
+  minVotes = 500,
+}) => {
   try {
-    const data = await tmdb(`discover/${type}`, {
+    const data = await tmdb(`/discover/${type}`, {
       language,
       sort_by: 'popularity.desc',
       'vote_count.gte': minVotes,
       with_keywords: keywordId,
       page: 1,
-    });
-    return data?.results || [];
+    })
+    return data?.results || []
   } catch (error) {
-    console.error(`Error fetching media by keyword ${keywordId}:`, error);
-    return [];
+    console.error(`Error fetching media by keyword ${keywordId}:`, error)
+    return []
   }
-};
+}
 
 /* -------------------- Descubrimiento genérico -------------------- */
 export async function discoverMovies(params = {}) {
