@@ -33,7 +33,9 @@ const anton = Anton({ weight: '400', subsets: ['latin'] })
 const useIsTouchDevice = () => {
     const [isTouch, setIsTouch] = useState(false)
     useEffect(() => {
-        const onTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+        const onTouch =
+            typeof window !== 'undefined' &&
+            ('ontouchstart' in window || navigator.maxTouchPoints > 0)
         setIsTouch(onTouch)
     }, [])
     return isTouch
@@ -203,10 +205,12 @@ function getArtworkPreference(movieId) {
 
 /* ====================================================================
  * Portada normal (2:3), mismo alto que la vista previa
+ *  -> ahora NO mostramos ninguna imagen hasta tener la versión final
  * ==================================================================== */
 function PosterImage({ movie, cache, heightClass }) {
-    const [posterPath, setPosterPath] = useState(movie.poster_path || null)
-    const [ready, setReady] = useState(!!movie.poster_path)
+    // Antes: arrancaba con movie.poster_path y ready = true -> parpadeo.
+    const [posterPath, setPosterPath] = useState(null)
+    const [ready, setReady] = useState(false)
 
     useEffect(() => {
         let abort = false
