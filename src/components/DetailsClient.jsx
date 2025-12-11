@@ -79,44 +79,75 @@ async function fetchTVImages(showId) {
 
 function pickBestImage(list) {
   if (!Array.isArray(list) || list.length === 0) return null
+
+  // Orden básico: más votos -> mejor media -> más ancho
   const sorted = [...list].sort((a, b) => {
     const vc = (b.vote_count || 0) - (a.vote_count || 0)
     if (vc !== 0) return vc
+
     const va = (b.vote_average || 0) - (a.vote_average || 0)
     if (va !== 0) return va
+
     return (b.width || 0) - (a.width || 0)
   })
-  const topVote = sorted[0]?.vote_count || 0
-  const topSet = sorted.filter((x) => (x.vote_count || 0) === topVote)
-  topSet.sort((a, b) => (b.width || 0) - (a.width || 0))
-  return topSet[0] || sorted[0]
+
+  return sorted[0] || null
 }
 
-const pickBestPosterTV = (posters) => {
-  const es = posters.filter((p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES')
-  const en = posters.filter((p) => p.iso_639_1 === 'en' || p.iso_639_1 === 'en-US')
-  const bestES = pickBestImage(es)
-  if (bestES?.file_path) return bestES.file_path
-  const bestEN = pickBestImage(en)
-  if (bestEN?.file_path) return bestEN.file_path
-  return null
+// === POSTER (PORTADA) -> PRIORIDAD INGLÉS, LUEGO ESPAÑOL ===
+const pickBestPosterTV = (posters = []) => {
+  if (!Array.isArray(posters) || posters.length === 0) return null
+
+  const en = posters.filter(
+    (p) => p.iso_639_1 === 'en' || p.iso_639_1 === 'en-US'
+  )
+  const es = posters.filter(
+    (p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES'
+  )
+  const others = posters.filter(
+    (p) =>
+      !['en', 'en-US', 'es', 'es-ES'].includes(p.iso_639_1 || '')
+  )
+
+  const bestEn = pickBestImage(en)
+  if (bestEn?.file_path) return bestEn.file_path
+
+  const bestEs = pickBestImage(es)
+  if (bestEs?.file_path) return bestEs.file_path
+
+  const bestOther = pickBestImage(others)
+  return bestOther?.file_path || null
 }
 
-const pickBestBackdropTV = (backs) => {
-  const es = backs.filter((b) => b.iso_639_1 === 'es' || b.iso_639_1 === 'es-ES')
-  const en = backs.filter((b) => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US')
-  const bestES = pickBestImage(es)
-  if (bestES?.file_path) return bestES.file_path
-  const bestEN = pickBestImage(en)
-  if (bestEN?.file_path) return bestEN.file_path
-  return null
-}
-
-const pickBestBackdropTVNeutralFirst = (backs) => {
+// === BACKDROP "NORMAL" (por si lo usas en otras partes) ===
+// Aquí también damos preferencia a inglés, luego resto
+const pickBestBackdropTV = (backs = []) => {
   if (!Array.isArray(backs) || backs.length === 0) return null
+
+  const en = backs.filter(
+    (b) => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US'
+  )
+  const others = backs.filter(
+    (b) => !(b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US')
+  )
+
+  const bestEn = pickBestImage(en)
+  if (bestEn?.file_path) return bestEn.file_path
+
+  const bestOther = pickBestImage(others)
+  return bestOther?.file_path || null
+}
+
+// === BACKDROP PARA FONDO DE DETALLE -> PRIORIDAD SIN IDIOMA (SIN TEXTO) ===
+const pickBestBackdropTVNeutralFirst = (backs = []) => {
+  if (!Array.isArray(backs) || backs.length === 0) return null
+
+  // 1) Preferimos SIEMPRE imágenes sin idioma (sin texto)
   const neutral = backs.filter((b) => !b.iso_639_1)
   const bestNeutral = pickBestImage(neutral)
   if (bestNeutral?.file_path) return bestNeutral.file_path
+
+  // 2) Si no hay sin idioma, usamos la lógica normal (inglés primero)
   return pickBestBackdropTV(backs)
 }
 
