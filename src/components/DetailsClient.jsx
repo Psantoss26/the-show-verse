@@ -164,6 +164,70 @@ const MetaItem = ({ icon: Icon, label, value, colorClass = 'text-gray-400' }) =>
   )
 }
 
+// --- Botón redondo de enlace externo con animación previa al redirect ---
+const ExternalIconLink = ({
+  href,
+  title,
+  imgSrc,
+  imgAlt,
+  Icon,
+  bgClass = ''
+}) => {
+  const [pressed, setPressed] = useState(false)
+
+  const handleClick = (e) => {
+    e.preventDefault()
+    if (!href || pressed) return
+
+    setPressed(true)
+
+    // Pequeña animación y luego abrimos la pestaña nueva
+    setTimeout(() => {
+      window.open(href, '_blank', 'noopener,noreferrer')
+      setPressed(false)
+    }, 160)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      title={title}
+      className={`
+        relative w-11 h-11 rounded-full
+        flex items-center justify-center
+        border border-white/15
+        bg-black/40 backdrop-blur-sm
+        shadow-md shadow-black/40
+        overflow-hidden
+        transform-gpu transition-all duration-200
+        hover:shadow-yellow-500/30 hover:border-yellow-400/70
+        hover:-translate-y-0.5
+        ${pressed ? 'scale-90' : 'hover:scale-105'}
+        ${bgClass}
+      `}
+    >
+      <span className="sr-only">{title}</span>
+
+      {imgSrc ? (
+        <img src={imgSrc} alt={imgAlt || title} className="h-5 w-auto" />
+      ) : Icon ? (
+        <Icon className="w-5 h-5 text-white" />
+      ) : null}
+
+      {/* “ripple” suave al pulsar */}
+      <span
+        className={`
+          pointer-events-none absolute inset-0 rounded-full
+          bg-white/40 opacity-0 scale-75
+          transition-transform transition-opacity duration-200
+          ${pressed ? 'opacity-40 scale-110' : ''}
+        `}
+      />
+    </button>
+  )
+}
+
 // =====================================================================
 
 export default function DetailsClient({
@@ -173,9 +237,14 @@ export default function DetailsClient({
   recommendations,
   castData,
   providers,
+  watchLink,
   reviews
 }) {
   const title = data.title || data.name
+  // URL de la página de watch en TMDb (para JustWatch/deep links)
+  const tmdbWatchUrl =
+    watchLink ||
+    (type && id ? `https://www.themoviedb.org/${type}/${id}/watch` : null)
 
   // Estado para desplegable de imágenes admin
   const [showAdminImages, setShowAdminImages] = useState(false)
@@ -734,7 +803,7 @@ export default function DetailsClient({
       {/* --- BOTÓN TOGGLE BACKDROP --- */}
       <button
         onClick={() => setUseBackdrop(!useBackdrop)}
-        className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md border border-white/20 transition-all text-white/80 hover:text-white shadow-lg"
+        className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-black/40 hover:bg-black/90 backdrop-blur-md border border-white/20 transition-all text-white/80 hover:text-white shadow-lg"
         title="Alternar fondo"
       >
         <ImageIcon className="w-5 h-5" />
@@ -765,25 +834,23 @@ export default function DetailsClient({
 
             {/* Plataformas */}
             {providers && providers.length > 0 && (
-              <div className="flex flex-wrap justifycenter lg:justify-start gap-2 p-3 bg-black/30 rounded-xl backdrop-blur-sm border border-white/5">
+              <div className="flex flex-wrap justifycenter lg:justify-start gap-3 p-1">
                 {providers.map((p) => (
-                  <img
+                  <a
                     key={p.provider_id}
-                    src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
-                    alt={p.provider_name}
-                    className="w-10 h-10 rounded-lg object-contain hover:scale-110 hover:-translate-y-0.5 transition-transform cursor-pointer"
+                    href={tmdbWatchUrl || '#'}
+                    target={tmdbWatchUrl ? '_blank' : undefined}
+                    rel={tmdbWatchUrl ? 'noreferrer' : undefined}
                     title={p.provider_name}
-                  />
+                    className="flex items-center justify-center"
+                  >
+                    <img
+                      src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                      alt={p.provider_name}
+                      className="w-10 h-10 rounded-lg object-contain hover:scale-110 hover:-translate-y-0.5 transition-transform cursor-pointer"
+                    />
+                  </a>
                 ))}
-                <a
-                  href={`https://www.themoviedb.org/${type}/${id}/watch`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-center w-10 h-10 bg-neutral-800 rounded-lg hover:bg-neutral-700 transition-colors"
-                  title="Ver todos en JustWatch"
-                >
-                  <LinkIcon className="w-5 h-5 text-gray-400" />
-                </a>
               </div>
             )}
           </div>
@@ -801,7 +868,7 @@ export default function DetailsClient({
                 )}
               </h1>
 
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center mt-3 gap-3 shrink-0">
                 <button
                   onClick={toggleFavorite}
                   disabled={favLoading}
@@ -867,9 +934,6 @@ export default function DetailsClient({
               )}
               {session && (
                 <div className="flex items-center gap-2 border-l border-white/10 pl-6">
-                  <span className="text-xs text-gray-400 uppercase mr-2 hidden md:block">
-                    Tu nota:
-                  </span>
                   <StarRating
                     rating={userRating}
                     onRating={sendRating}
@@ -901,16 +965,21 @@ export default function DetailsClient({
               </p>
             </div>
 
-            {/* Links Externos */}
-            <div className="flex gap-5 mt-2 flex-wrap">
+            {/* Links Externos – solo icono */}
+            <div className="flex gap-2 flex-wrap">
               {data.homepage && (
                 <a
                   href={data.homepage}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-blue-400 hover:text-blue-300 flex items-center gap-1 hover:underline"
+                  title="Web oficial"
+                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
                 >
-                  <LinkIcon size={16} /> Web Oficial
+                  <img
+                    src="/logo-Web.png"
+                    alt="Web oficial"
+                    className="w-9 h-9 object-contain rounded-lg"
+                  />
                 </a>
               )}
 
@@ -919,9 +988,14 @@ export default function DetailsClient({
                   href={`https://www.imdb.com/title/${data.imdb_id}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-yellow-500 hover:text-yellow-400 flex items-center gap-1 hover:underline"
+                  title="IMDb"
+                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
                 >
-                  <LinkIcon size={16} /> IMDb
+                  <img
+                    src="/logo-IMDb.png"
+                    alt="IMDb"
+                    className="w-9 h-9 object-contain rounded-lg"
+                  />
                 </a>
               )}
 
@@ -929,9 +1003,14 @@ export default function DetailsClient({
                 href={filmAffinitySearchUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 hover:underline"
+                title="FilmAffinity"
+                className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
               >
-                <LinkIcon size={16} /> FilmAffinity
+                <img
+                  src="/logo-filmaffinity.png"
+                  alt="FilmAffinity"
+                  className="w-9 h-9 object-contain rounded-lg"
+                />
               </a>
 
               {type === 'tv' && seriesGraphUrl && (
@@ -939,129 +1018,168 @@ export default function DetailsClient({
                   href={seriesGraphUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-sky-400 hover:text-sky-300 flex items-center gap-1 hover:underline"
+                  title="SeriesGraph"
+                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
                 >
-                  <LinkIcon size={16} /> SeriesGraph
+                  <img
+                    src="/logo-seriesgraph.png"
+                    alt="SeriesGraph"
+                    className="w-9 h-9 object-contain rounded-lg"
+                  />
                 </a>
               )}
             </div>
 
             {/* METADATOS */}
-            <div className="flex flex-wrap gap-3 mt-4">
-              {data.original_title && (
-                <MetaItem
-                  icon={FilmIcon}
-                  label="Título Original"
-                  value={data.original_title}
-                  colorClass="text-blue-400"
-                />
-              )}
-
-              {directors.length > 0 && (
-                <MetaItem
-                  icon={Users}
-                  label={type === 'movie' ? 'Director' : 'Creado por'}
-                  value={directors.map((d) => d.name).join(', ')}
-                  colorClass="text-rose-400"
-                />
-              )}
-
-              {data.runtime && (
-                <MetaItem
-                  icon={ClockIcon}
-                  label="Duración"
-                  value={`${Math.floor(data.runtime / 60)}h ${data.runtime % 60
-                    }m`}
-                  colorClass="text-purple-400"
-                />
-              )}
-
-              {languages && (
-                <MetaItem
-                  icon={Languages}
-                  label="Idiomas"
-                  value={languages}
-                  colorClass="text-indigo-400"
-                />
-              )}
-
-              {countries && (
-                <MetaItem
-                  icon={MapPin}
-                  label="País"
-                  value={countries}
-                  colorClass="text-red-400"
-                />
-              )}
-
-              {production && (
-                <MetaItem
-                  icon={Building2}
-                  label="Producción"
-                  value={production}
-                  colorClass="text-zinc-400"
-                />
-              )}
-
-              {data.budget > 0 && (
-                <MetaItem
-                  icon={BadgeDollarSignIcon}
-                  label="Presupuesto"
-                  value={`$${(data.budget / 1000000).toFixed(1)}M`}
-                  colorClass="text-yellow-500"
-                />
-              )}
-
-              {data.revenue > 0 && (
-                <MetaItem
-                  icon={TrendingUp}
-                  label="Recaudación"
-                  value={`$${(data.revenue / 1000000).toFixed(1)}M`}
-                  colorClass="text-emerald-500"
-                />
-              )}
-
-              {type === 'tv' && (
-                <>
+            <div className="mt-4 space-y-3">
+              {/* FILA 1: datos generales */}
+              <div className="flex flex-wrap gap-3">
+                {type === 'movie' && data.original_title && (
                   <MetaItem
-                    icon={Layers}
-                    label="Temporadas"
-                    value={`${data.number_of_seasons} Temporadas`}
-                    colorClass="text-orange-400"
+                    icon={FilmIcon}
+                    label="Título Original"
+                    value={data.original_title}
+                    colorClass="text-blue-400"
                   />
-                  <MetaItem
-                    icon={MonitorPlay}
-                    label="Episodios"
-                    value={`${data.number_of_episodes} Episodios`}
-                    colorClass="text-pink-400"
-                  />
-                  <MetaItem
-                    icon={CalendarIcon}
-                    label="Estado"
-                    value={data.status}
-                    colorClass="text-blue-300"
-                  />
-                </>
-              )}
+                )}
 
-              {data.belongs_to_collection && (
-                <MetaItem
-                  icon={Library}
-                  label="Colección"
-                  value={data.belongs_to_collection.name}
-                  colorClass="text-teal-400"
-                />
-              )}
+                {type === 'tv' && data.original_name && (
+                  <MetaItem
+                    icon={FilmIcon}
+                    label="Título Original"
+                    value={data.original_name}
+                    colorClass="text-blue-400"
+                  />
+                )}
 
-              {extras.awards && (
-                <MetaItem
-                  icon={Trophy}
-                  label="Premios"
-                  value={extras.awards}
-                  colorClass="text-yellow-500"
-                />
-              )}
+                {directors.length > 0 && (
+                  <MetaItem
+                    icon={Users}
+                    label={type === 'movie' ? 'Director' : 'Creado por'}
+                    value={directors.map((d) => d.name).join(', ')}
+                    colorClass="text-rose-400"
+                  />
+                )}
+
+                {type === 'movie' && data.runtime && (
+                  <MetaItem
+                    icon={ClockIcon}
+                    label="Duración"
+                    value={`${Math.floor(data.runtime / 60)}h ${data.runtime % 60
+                      }m`}
+                    colorClass="text-purple-400"
+                  />
+                )}
+
+                {languages && (
+                  <MetaItem
+                    icon={Languages}
+                    label="Idiomas"
+                    value={languages}
+                    colorClass="text-indigo-400"
+                  />
+                )}
+
+                {/* Para series ponemos País en la primera fila
+                    (para pelis va en la segunda junto a presupuesto/recaudación) */}
+                {type === 'tv' && countries && (
+                  <MetaItem
+                    icon={MapPin}
+                    label="País"
+                    value={countries}
+                    colorClass="text-red-400"
+                  />
+                )}
+              </div>
+
+              {/* FILA 2:
+                  - Películas: País + Presupuesto + Recaudación
+                  - Series: Estado + Episodios + Temporadas */}
+              <div className="flex flex-wrap gap-3">
+                {type === 'movie' ? (
+                  <>
+                    {countries && (
+                      <MetaItem
+                        icon={MapPin}
+                        label="País"
+                        value={countries}
+                        colorClass="text-red-400"
+                      />
+                    )}
+
+                    {data.budget > 0 && (
+                      <MetaItem
+                        icon={BadgeDollarSignIcon}
+                        label="Presupuesto"
+                        value={`$${(data.budget / 1_000_000).toFixed(1)}M`}
+                        colorClass="text-yellow-500"
+                      />
+                    )}
+
+                    {data.revenue > 0 && (
+                      <MetaItem
+                        icon={TrendingUp}
+                        label="Recaudación"
+                        value={`$${(data.revenue / 1_000_000).toFixed(1)}M`}
+                        colorClass="text-emerald-500"
+                      />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <MetaItem
+                      icon={CalendarIcon}
+                      label="Estado"
+                      value={data.status}
+                      colorClass="text-blue-300"
+                    />
+                    <MetaItem
+                      icon={MonitorPlay}
+                      label="Episodios"
+                      value={`${data.number_of_episodes} Episodios`}
+                      colorClass="text-pink-400"
+                    />
+                    <MetaItem
+                      icon={Layers}
+                      label="Temporadas"
+                      value={`${data.number_of_seasons} Temporadas`}
+                      colorClass="text-orange-400"
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* FILA 3 (última): Colección + Producción + Premios */}
+              <div className="flex flex-wrap gap-3">
+                {data.belongs_to_collection && (
+                  <MetaItem
+                    icon={Library}
+                    label="Colección"
+                    value={data.belongs_to_collection.name}
+                    colorClass="text-teal-400"
+                  />
+                )}
+
+                {production && (
+                  <MetaItem
+                    icon={Building2}
+                    label="Producción"
+                    value={production}
+                    colorClass="text-zinc-400"
+                  />
+                )}
+
+                {extras.awards && (
+                  <MetaItem
+                    icon={Trophy}
+                    label="Premios"
+                    value={extras.awards}
+                    colorClass="text-yellow-500"
+                  />
+                )}
+              </div>
             </div>
+
           </div>
         </div>
 
@@ -1266,7 +1384,7 @@ export default function DetailsClient({
         {type === 'tv' && ratings && (
           <section className="mb-16">
             <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
-            <div className="bg-neutral-900/50 p-6 rounded-2xl border border-white/5">
+            <div className="p-6">
               {ratingsLoading && (
                 <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
               )}
