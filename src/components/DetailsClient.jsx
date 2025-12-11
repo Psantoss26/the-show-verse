@@ -829,7 +829,7 @@ export default function DetailsClient({
 
             {/* Plataformas */}
             {providers && providers.length > 0 && (
-              <div className="flex flex-wrap justifycenter lg:justify-start gap-2 p-3 bg-black/30 rounded-xl backdrop-blur-sm border border-white/5">
+              <div className="flex flex-wrap justifycenter lg:justify-start gap-3 p-2">
                 {providers.map((p) => (
                   <img
                     key={p.provider_id}
