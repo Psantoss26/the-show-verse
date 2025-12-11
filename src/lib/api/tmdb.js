@@ -252,12 +252,12 @@ export async function fetchDramaTV() {
 }
 
 export async function getWatchProviders(type, id, region = 'ES') {
-  if (!TMDB_API_KEY) {
+  if (!API_KEY) {
     return { providers: [], link: null }
   }
 
   const res = await fetch(
-    `https://api.themoviedb.org/3/${type}/${id}/watch/providers?api_key=${TMDB_API_KEY}`,
+    `https://api.themoviedb.org/3/${type}/${id}/watch/providers?api_key=${API_KEY}`,
     { next: { revalidate: 60 * 60 } } // opcional: cache 1h
   )
 

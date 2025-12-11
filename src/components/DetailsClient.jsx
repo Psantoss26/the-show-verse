@@ -1031,121 +1031,155 @@ export default function DetailsClient({
             </div>
 
             {/* METADATOS */}
-            <div className="flex flex-wrap gap-3 mt-4">
-              {data.original_title && (
-                <MetaItem
-                  icon={FilmIcon}
-                  label="Título Original"
-                  value={data.original_title}
-                  colorClass="text-blue-400"
-                />
-              )}
-
-              {directors.length > 0 && (
-                <MetaItem
-                  icon={Users}
-                  label={type === 'movie' ? 'Director' : 'Creado por'}
-                  value={directors.map((d) => d.name).join(', ')}
-                  colorClass="text-rose-400"
-                />
-              )}
-
-              {data.runtime && (
-                <MetaItem
-                  icon={ClockIcon}
-                  label="Duración"
-                  value={`${Math.floor(data.runtime / 60)}h ${data.runtime % 60
-                    }m`}
-                  colorClass="text-purple-400"
-                />
-              )}
-
-              {languages && (
-                <MetaItem
-                  icon={Languages}
-                  label="Idiomas"
-                  value={languages}
-                  colorClass="text-indigo-400"
-                />
-              )}
-
-              {countries && (
-                <MetaItem
-                  icon={MapPin}
-                  label="País"
-                  value={countries}
-                  colorClass="text-red-400"
-                />
-              )}
-
-              {production && (
-                <MetaItem
-                  icon={Building2}
-                  label="Producción"
-                  value={production}
-                  colorClass="text-zinc-400"
-                />
-              )}
-
-              {data.budget > 0 && (
-                <MetaItem
-                  icon={BadgeDollarSignIcon}
-                  label="Presupuesto"
-                  value={`$${(data.budget / 1000000).toFixed(1)}M`}
-                  colorClass="text-yellow-500"
-                />
-              )}
-
-              {data.revenue > 0 && (
-                <MetaItem
-                  icon={TrendingUp}
-                  label="Recaudación"
-                  value={`$${(data.revenue / 1000000).toFixed(1)}M`}
-                  colorClass="text-emerald-500"
-                />
-              )}
-
-              {type === 'tv' && (
-                <>
+            <div className="mt-4 space-y-3">
+              {/* FILA 1: datos generales */}
+              <div className="flex flex-wrap gap-3">
+                {type === 'movie' && data.original_title && (
                   <MetaItem
-                    icon={Layers}
-                    label="Temporadas"
-                    value={`${data.number_of_seasons} Temporadas`}
-                    colorClass="text-orange-400"
+                    icon={FilmIcon}
+                    label="Título Original"
+                    value={data.original_title}
+                    colorClass="text-blue-400"
                   />
-                  <MetaItem
-                    icon={MonitorPlay}
-                    label="Episodios"
-                    value={`${data.number_of_episodes} Episodios`}
-                    colorClass="text-pink-400"
-                  />
-                  <MetaItem
-                    icon={CalendarIcon}
-                    label="Estado"
-                    value={data.status}
-                    colorClass="text-blue-300"
-                  />
-                </>
-              )}
+                )}
 
-              {data.belongs_to_collection && (
-                <MetaItem
-                  icon={Library}
-                  label="Colección"
-                  value={data.belongs_to_collection.name}
-                  colorClass="text-teal-400"
-                />
-              )}
+                {type === 'tv' && data.original_name && (
+                  <MetaItem
+                    icon={FilmIcon}
+                    label="Título Original"
+                    value={data.original_name}
+                    colorClass="text-blue-400"
+                  />
+                )}
 
-              {extras.awards && (
-                <MetaItem
-                  icon={Trophy}
-                  label="Premios"
-                  value={extras.awards}
-                  colorClass="text-yellow-500"
-                />
-              )}
+                {directors.length > 0 && (
+                  <MetaItem
+                    icon={Users}
+                    label={type === 'movie' ? 'Director' : 'Creado por'}
+                    value={directors.map((d) => d.name).join(', ')}
+                    colorClass="text-rose-400"
+                  />
+                )}
+
+                {type === 'movie' && data.runtime && (
+                  <MetaItem
+                    icon={ClockIcon}
+                    label="Duración"
+                    value={`${Math.floor(data.runtime / 60)}h ${data.runtime % 60
+                      }m`}
+                    colorClass="text-purple-400"
+                  />
+                )}
+
+                {languages && (
+                  <MetaItem
+                    icon={Languages}
+                    label="Idiomas"
+                    value={languages}
+                    colorClass="text-indigo-400"
+                  />
+                )}
+
+                {/* Para series ponemos País en la primera fila
+                    (para pelis va en la segunda junto a presupuesto/recaudación) */}
+                {type === 'tv' && countries && (
+                  <MetaItem
+                    icon={MapPin}
+                    label="País"
+                    value={countries}
+                    colorClass="text-red-400"
+                  />
+                )}
+              </div>
+
+              {/* FILA 2:
+                  - Películas: País + Presupuesto + Recaudación
+                  - Series: Estado + Episodios + Temporadas */}
+              <div className="flex flex-wrap gap-3">
+                {type === 'movie' ? (
+                  <>
+                    {countries && (
+                      <MetaItem
+                        icon={MapPin}
+                        label="País"
+                        value={countries}
+                        colorClass="text-red-400"
+                      />
+                    )}
+
+                    {data.budget > 0 && (
+                      <MetaItem
+                        icon={BadgeDollarSignIcon}
+                        label="Presupuesto"
+                        value={`$${(data.budget / 1_000_000).toFixed(1)}M`}
+                        colorClass="text-yellow-500"
+                      />
+                    )}
+
+                    {data.revenue > 0 && (
+                      <MetaItem
+                        icon={TrendingUp}
+                        label="Recaudación"
+                        value={`$${(data.revenue / 1_000_000).toFixed(1)}M`}
+                        colorClass="text-emerald-500"
+                      />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <MetaItem
+                      icon={CalendarIcon}
+                      label="Estado"
+                      value={data.status}
+                      colorClass="text-blue-300"
+                    />
+                    <MetaItem
+                      icon={MonitorPlay}
+                      label="Episodios"
+                      value={`${data.number_of_episodes} Episodios`}
+                      colorClass="text-pink-400"
+                    />
+                    <MetaItem
+                      icon={Layers}
+                      label="Temporadas"
+                      value={`${data.number_of_seasons} Temporadas`}
+                      colorClass="text-orange-400"
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* FILA 3 (última): Colección + Producción + Premios */}
+              <div className="flex flex-wrap gap-3">
+                {data.belongs_to_collection && (
+                  <MetaItem
+                    icon={Library}
+                    label="Colección"
+                    value={data.belongs_to_collection.name}
+                    colorClass="text-teal-400"
+                  />
+                )}
+
+                {production && (
+                  <MetaItem
+                    icon={Building2}
+                    label="Producción"
+                    value={production}
+                    colorClass="text-zinc-400"
+                  />
+                )}
+
+                {extras.awards && (
+                  <MetaItem
+                    icon={Trophy}
+                    label="Premios"
+                    value={extras.awards}
+                    colorClass="text-yellow-500"
+                  />
+                )}
+              </div>
             </div>
+
           </div>
         </div>
 
