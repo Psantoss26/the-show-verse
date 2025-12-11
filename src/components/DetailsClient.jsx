@@ -237,9 +237,14 @@ export default function DetailsClient({
   recommendations,
   castData,
   providers,
+  watchLink,
   reviews
 }) {
   const title = data.title || data.name
+  // URL de la página de watch en TMDb (para JustWatch/deep links)
+  const tmdbWatchUrl =
+    watchLink ||
+    (type && id ? `https://www.themoviedb.org/${type}/${id}/watch` : null)
 
   // Estado para desplegable de imágenes admin
   const [showAdminImages, setShowAdminImages] = useState(false)
@@ -798,7 +803,7 @@ export default function DetailsClient({
       {/* --- BOTÓN TOGGLE BACKDROP --- */}
       <button
         onClick={() => setUseBackdrop(!useBackdrop)}
-        className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md border border-white/20 transition-all text-white/80 hover:text-white shadow-lg"
+        className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-black/40 hover:bg-black/90 backdrop-blur-md border border-white/20 transition-all text-white/80 hover:text-white shadow-lg"
         title="Alternar fondo"
       >
         <ImageIcon className="w-5 h-5" />
@@ -829,25 +834,23 @@ export default function DetailsClient({
 
             {/* Plataformas */}
             {providers && providers.length > 0 && (
-              <div className="flex flex-wrap justifycenter lg:justify-start gap-3 p-2">
+              <div className="flex flex-wrap justifycenter lg:justify-start gap-3 p-1">
                 {providers.map((p) => (
-                  <img
+                  <a
                     key={p.provider_id}
-                    src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
-                    alt={p.provider_name}
-                    className="w-10 h-10 rounded-lg object-contain hover:scale-110 hover:-translate-y-0.5 transition-transform cursor-pointer"
+                    href={tmdbWatchUrl || '#'}
+                    target={tmdbWatchUrl ? '_blank' : undefined}
+                    rel={tmdbWatchUrl ? 'noreferrer' : undefined}
                     title={p.provider_name}
-                  />
+                    className="flex items-center justify-center"
+                  >
+                    <img
+                      src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                      alt={p.provider_name}
+                      className="w-10 h-10 rounded-lg object-contain hover:scale-110 hover:-translate-y-0.5 transition-transform cursor-pointer"
+                    />
+                  </a>
                 ))}
-                <a
-                  href={`https://www.themoviedb.org/${type}/${id}/watch`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-center w-10 h-10 bg-neutral-800 rounded-lg hover:bg-neutral-700 transition-colors"
-                  title="Ver todos en JustWatch"
-                >
-                  <LinkIcon className="w-5 h-5 text-gray-400" />
-                </a>
               </div>
             )}
           </div>
@@ -865,7 +868,7 @@ export default function DetailsClient({
                 )}
               </h1>
 
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center mt-3 gap-3 shrink-0">
                 <button
                   onClick={toggleFavorite}
                   disabled={favLoading}
