@@ -164,6 +164,70 @@ const MetaItem = ({ icon: Icon, label, value, colorClass = 'text-gray-400' }) =>
   )
 }
 
+// --- Botón redondo de enlace externo con animación previa al redirect ---
+const ExternalIconLink = ({
+  href,
+  title,
+  imgSrc,
+  imgAlt,
+  Icon,
+  bgClass = ''
+}) => {
+  const [pressed, setPressed] = useState(false)
+
+  const handleClick = (e) => {
+    e.preventDefault()
+    if (!href || pressed) return
+
+    setPressed(true)
+
+    // Pequeña animación y luego abrimos la pestaña nueva
+    setTimeout(() => {
+      window.open(href, '_blank', 'noopener,noreferrer')
+      setPressed(false)
+    }, 160)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      title={title}
+      className={`
+        relative w-11 h-11 rounded-full
+        flex items-center justify-center
+        border border-white/15
+        bg-black/40 backdrop-blur-sm
+        shadow-md shadow-black/40
+        overflow-hidden
+        transform-gpu transition-all duration-200
+        hover:shadow-yellow-500/30 hover:border-yellow-400/70
+        hover:-translate-y-0.5
+        ${pressed ? 'scale-90' : 'hover:scale-105'}
+        ${bgClass}
+      `}
+    >
+      <span className="sr-only">{title}</span>
+
+      {imgSrc ? (
+        <img src={imgSrc} alt={imgAlt || title} className="h-5 w-auto" />
+      ) : Icon ? (
+        <Icon className="w-5 h-5 text-white" />
+      ) : null}
+
+      {/* “ripple” suave al pulsar */}
+      <span
+        className={`
+          pointer-events-none absolute inset-0 rounded-full
+          bg-white/40 opacity-0 scale-75
+          transition-transform transition-opacity duration-200
+          ${pressed ? 'opacity-40 scale-110' : ''}
+        `}
+      />
+    </button>
+  )
+}
+
 // =====================================================================
 
 export default function DetailsClient({
@@ -867,9 +931,6 @@ export default function DetailsClient({
               )}
               {session && (
                 <div className="flex items-center gap-2 border-l border-white/10 pl-6">
-                  <span className="text-xs text-gray-400 uppercase mr-2 hidden md:block">
-                    Tu nota:
-                  </span>
                   <StarRating
                     rating={userRating}
                     onRating={sendRating}
@@ -901,16 +962,21 @@ export default function DetailsClient({
               </p>
             </div>
 
-            {/* Links Externos */}
-            <div className="flex gap-5 mt-2 flex-wrap">
+            {/* Links Externos – solo icono */}
+            <div className="flex gap-2 flex-wrap">
               {data.homepage && (
                 <a
                   href={data.homepage}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-blue-400 hover:text-blue-300 flex items-center gap-1 hover:underline"
+                  title="Web oficial"
+                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
                 >
-                  <LinkIcon size={16} /> Web Oficial
+                  <img
+                    src="/logo-Web.png"
+                    alt="Web oficial"
+                    className="w-9 h-9 object-contain rounded-lg"
+                  />
                 </a>
               )}
 
@@ -919,9 +985,14 @@ export default function DetailsClient({
                   href={`https://www.imdb.com/title/${data.imdb_id}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-yellow-500 hover:text-yellow-400 flex items-center gap-1 hover:underline"
+                  title="IMDb"
+                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
                 >
-                  <LinkIcon size={16} /> IMDb
+                  <img
+                    src="/logo-IMDb.png"
+                    alt="IMDb"
+                    className="w-9 h-9 object-contain rounded-lg"
+                  />
                 </a>
               )}
 
@@ -929,9 +1000,14 @@ export default function DetailsClient({
                 href={filmAffinitySearchUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 hover:underline"
+                title="FilmAffinity"
+                className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
               >
-                <LinkIcon size={16} /> FilmAffinity
+                <img
+                  src="/logo-filmaffinity.png"
+                  alt="FilmAffinity"
+                  className="w-9 h-9 object-contain rounded-lg"
+                />
               </a>
 
               {type === 'tv' && seriesGraphUrl && (
@@ -939,9 +1015,14 @@ export default function DetailsClient({
                   href={seriesGraphUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-sky-400 hover:text-sky-300 flex items-center gap-1 hover:underline"
+                  title="SeriesGraph"
+                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
                 >
-                  <LinkIcon size={16} /> SeriesGraph
+                  <img
+                    src="/logo-seriesgraph.png"
+                    alt="SeriesGraph"
+                    className="w-9 h-9 object-contain rounded-lg"
+                  />
                 </a>
               )}
             </div>
@@ -1266,7 +1347,7 @@ export default function DetailsClient({
         {type === 'tv' && ratings && (
           <section className="mb-16">
             <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
-            <div className="bg-neutral-900/50 p-6 rounded-2xl border border-white/5">
+            <div className="p-6">
               {ratingsLoading && (
                 <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
               )}

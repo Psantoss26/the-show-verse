@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { LayoutGrid, WrapText, ArrowUpDown, BarChart3 } from 'lucide-react'
 
 // --- Tooltip flotante en portal (igual que antes) ---
 function TooltipPortal({ activeData, anchorRect }) {
@@ -171,13 +172,17 @@ export default function EpisodeRatingsGrid({
   const totalEpisodesEstimate = meta.totalEpisodes ?? 0
 
   // helpers numéricos
+  // -> 0 ó valores <= 0 se consideran "sin nota" (null)
   const toRatingNumber = (value) => {
     if (value == null) return null
-    if (typeof value === 'number') return Number.isFinite(value) ? value : null
+    if (typeof value === 'number') {
+      const n = Number(value)
+      return Number.isFinite(n) && n > 0 ? n : null
+    }
     if (typeof value === 'string') {
       const cleaned = value.replace(',', '.').trim()
       const num = Number(cleaned)
-      return Number.isFinite(num) ? num : null
+      return Number.isFinite(num) && num > 0 ? num : null
     }
     return null
   }
@@ -192,11 +197,6 @@ export default function EpisodeRatingsGrid({
     }
     return null
   }
-
-  // const shouldFlatten =
-  //   meta.forceSingleSeason === true ||
-  //   totalSeasonsEstimate >= 15 ||
-  //   totalEpisodesEstimate >= 400
 
   const shouldFlatten = meta.forceSingleSeason === true
 
@@ -230,14 +230,31 @@ export default function EpisodeRatingsGrid({
                   : null
             if (episodeNumber == null) return null
 
-            const tmdbRating = toRatingNumber(
+            // detectar episodios no emitidos
+            const airDateStr = ep.air_date || ep.airDate || null
+            let isUnaired = false
+            if (airDateStr) {
+              const d = new Date(airDateStr)
+              if (!Number.isNaN(d.getTime()) && d > new Date()) {
+                isUnaired = true
+              }
+            }
+
+            let tmdbRating = toRatingNumber(
               ep.tmdbRating ?? ep.tmdb ?? ep.vote_average
             )
-            const imdbRating = toRatingNumber(ep.imdbRating ?? ep.imdb)
+            let imdbRating = toRatingNumber(ep.imdbRating ?? ep.imdb)
 
             let displayRating = imdbRating
             if (displayRating == null && fillMissingWithTmdb) {
               displayRating = tmdbRating
+            }
+
+            // si aún no ha salido, no hay nota (evitamos 0s) y luego mostraremos "?"
+            if (isUnaired) {
+              tmdbRating = null
+              imdbRating = null
+              displayRating = null
             }
 
             const tmdbVotes = toNumberSafe(
@@ -257,7 +274,9 @@ export default function EpisodeRatingsGrid({
               imdbRating,
               displayRating,
               tmdbVotes,
-              imdbVotes
+              imdbVotes,
+              airDate: airDateStr,
+              isUnaired
             }
           })
           .filter(Boolean)
@@ -362,7 +381,6 @@ export default function EpisodeRatingsGrid({
         text: 'text-zinc-400',
         ring: 'ring-white/5'
       }
-
     if (v >= 9.5)
       return {
         bg: 'bg-teal-400',      // Absolute Cinema
@@ -383,7 +401,7 @@ export default function EpisodeRatingsGrid({
       }
     if (v >= 7.0)
       return {
-        bg: 'bg-yellow-300',      // Good
+        bg: 'bg-yellow-300',    // Good
         text: 'text-black',
         ring: 'ring-black/10'
       }
@@ -407,8 +425,9 @@ export default function EpisodeRatingsGrid({
     }
   }
 
+  // no mostramos tooltip para episodios futuros
   const buildTooltipData = (ep, seasonNumber, episodeNumber) => {
-    if (!ep) return null
+    if (!ep || ep.isUnaired) return null
     const hasData =
       ep.tmdbRating != null ||
       ep.imdbRating != null ||
@@ -478,15 +497,21 @@ export default function EpisodeRatingsGrid({
                   const ep = epIndexBySeason
                     .get(s.season_number)
                     ?.get(epNum)
-                  const raw = ep?.displayRating ?? null
-                  const val = format1(raw)
-                  const spec = toneFor(raw)
 
-                  const tooltipData = buildTooltipData(
-                    ep,
-                    s.season_number,
-                    epNum
-                  )
+                  const isUpcoming = ep?.isUnaired
+                  const raw = isUpcoming ? null : ep?.displayRating ?? null
+                  const val = isUpcoming ? '?' : format1(raw)
+                  const spec = toneFor(raw)
+                  const bgClass = isUpcoming ? 'bg-zinc-400' : spec.bg
+                  const textClass = isUpcoming ? 'text-black' : spec.text
+
+                  const tooltipData = isUpcoming
+                    ? null
+                    : buildTooltipData(
+                      ep,
+                      s.season_number,
+                      epNum
+                    )
 
                   return (
                     <td key={`s${s.season_number}-e${epNum}`} className="p-1">
@@ -498,7 +523,7 @@ export default function EpisodeRatingsGrid({
                       >
                         <div
                           className={`
-                            ${spec.bg} ${spec.text}
+                            ${bgClass} ${textClass}
                             ${SZ.cell}
                             rounded-[6px]
                             flex items-center justify-center
@@ -511,7 +536,6 @@ export default function EpisodeRatingsGrid({
                         >
                           {val ?? '—'}
                         </div>
-
                       </div>
                     </td>
                   )
@@ -613,14 +637,20 @@ export default function EpisodeRatingsGrid({
                 const ep = epIndexBySeason
                   .get(s.season_number)
                   ?.get(epNum)
-                const raw = ep?.displayRating ?? null
-                const val = format1(raw)
+
+                const isUpcoming = ep?.isUnaired
+                const raw = isUpcoming ? null : ep?.displayRating ?? null
+                const val = isUpcoming ? '?' : format1(raw)
                 const spec = toneFor(raw)
-                const tooltipData = buildTooltipData(
-                  ep,
-                  s.season_number,
-                  epNum
-                )
+                const bgClass = isUpcoming ? 'bg-zinc-400' : spec.bg
+                const textClass = isUpcoming ? 'text-black' : spec.text
+                const tooltipData = isUpcoming
+                  ? null
+                  : buildTooltipData(
+                    ep,
+                    s.season_number,
+                    epNum
+                  )
 
                 return (
                   <td
@@ -635,7 +665,7 @@ export default function EpisodeRatingsGrid({
                     >
                       <div
                         className={`
-                          ${spec.bg} ${spec.text} ring-1 ${spec.ring}
+                          ${bgClass} ${textClass} ring-1 ${spec.ring}
                           rounded-[6px] md:rounded-[6px]
                           ${SZ.cell}
                           flex items-center justify-center
@@ -713,7 +743,7 @@ export default function EpisodeRatingsGrid({
               </span>
               {showSeasonAvg && avg != null && (
                 <span className="text-xs text-zinc-400">
-                  Avg:{' '}
+                  Avg{' '}
                   <span className="font-semibold text-white">
                     {format1(avg)}
                   </span>
@@ -722,14 +752,19 @@ export default function EpisodeRatingsGrid({
             </div>
             <div className="flex flex-wrap gap-2">
               {s.episodes.map((ep) => {
-                const raw = ep.displayRating ?? null
+                const isUpcoming = ep.isUnaired
+                const raw = isUpcoming ? null : ep.displayRating ?? null
                 const spec = toneFor(raw)
-                const val = format1(raw)
-                const tooltipData = buildTooltipData(
-                  ep,
-                  s.season_number,
-                  ep.episodeNumber
-                )
+                const bgClass = isUpcoming ? 'bg-zinc-400' : spec.bg
+                const textClass = isUpcoming ? 'text-black' : spec.text
+                const val = isUpcoming ? '?' : format1(raw)
+                const tooltipData = isUpcoming
+                  ? null
+                  : buildTooltipData(
+                    ep,
+                    s.season_number,
+                    ep.episodeNumber
+                  )
                 return (
                   <div
                     key={`wrap-s${s.season_number}-e${ep.episodeNumber}`}
@@ -741,7 +776,7 @@ export default function EpisodeRatingsGrid({
                   >
                     <div
                       className={`
-                        ${spec.bg} ${spec.text} ring-1 ${spec.ring}
+                        ${bgClass} ${textClass} ring-1 ${spec.ring}
                         rounded-[6px] md:rounded-[6px]
                         ${SZ.cell}
                         flex items-center justify-center
@@ -774,29 +809,37 @@ export default function EpisodeRatingsGrid({
     <>
       <div className="space-y-3">
         {/* Controles estilo SeriesGraph */}
-        <div className="flex flex-wrap items-center gap-3 justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <SegmentedToggle
-              options={[
-                { id: 'grid', label: 'Grid' },
-                { id: 'wrapped', label: 'Wrapped' }
-              ]}
-              value={layoutMode}
-              onChange={setLayoutMode}
-            />
-            <ModeChip
-              active={inverted}
-              disabled={layoutMode === 'wrapped'}
-              onClick={() =>
-                layoutMode === 'grid' && setInverted((v) => !v)
-              }
-            >
-              Inverted
-            </ModeChip>
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <SegmentedToggle
+            options={[
+              { id: 'grid', label: 'Grid' },
+              { id: 'wrapped', label: 'Wrapped' }
+            ]}
+            value={layoutMode}
+            onChange={setLayoutMode}
+          />
 
-          <div className="flex items-center gap-2 text-xs text-zinc-300">
-            <span>Season Avg.</span>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-300">
+            {/* Inverted con el mismo diseño que Season Avg (icono + switch) */}
+            <div className="flex items-center gap-1.5">
+              <ArrowUpDown className="w-3.5 h-3.5 opacity-80" />
+              <span>Inverted</span>
+            </div>
+            <Switch
+              checked={inverted}
+              disabled={layoutMode === 'wrapped'}
+              onChange={(v) => {
+                if (layoutMode === 'grid') {
+                  setInverted(v)
+                }
+              }}
+            />
+
+            {/* Season Avg a la izquierda con los demás */}
+            <div className="flex items-center gap-1.5 ml-3">
+              <BarChart3 className="w-3.5 h-3.5 opacity-80" />
+              <span>Season Avg.</span>
+            </div>
             <Switch
               checked={showSeasonAvg}
               onChange={setShowSeasonAvg}
@@ -819,47 +862,31 @@ export default function EpisodeRatingsGrid({
 
 // === Controles auxiliares ===
 
-function ModeChip({ active, disabled, onClick, children }) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`
-        px-3 py-1.5 rounded-md text-[11px] font-medium border
-        flex items-center gap-1
-        transition-colors
-        ${disabled
-          ? 'opacity-40 cursor-not-allowed border-zinc-700 bg-zinc-900 text-zinc-500'
-          : active
-            ? 'bg-zinc-100 text-black border-zinc-100 shadow-sm'
-            : 'bg-zinc-900/70 text-zinc-300 border-zinc-700 hover:bg-zinc-800'}
-      `}
-    >
-      {children}
-    </button>
-  )
-}
-
 function SegmentedToggle({ options, value, onChange }) {
   return (
-    <div className="inline-flex rounded-md bg-zinc-900/70 border border-zinc-700 p-0.5">
+    <div className="inline-flex items-center rounded-full bg-black/30 border border-white/10 p-0.5 backdrop-blur-sm shadow-[0_8px_20px_rgba(0,0,0,0.45)]">
       {options.map((opt) => {
         const active = opt.id === value
+        let Icon = null
+        if (opt.id === 'grid') Icon = LayoutGrid
+        if (opt.id === 'wrapped') Icon = WrapText
+
         return (
           <button
             key={opt.id}
             type="button"
             onClick={() => onChange(opt.id)}
             className={`
-              px-3 py-1.5 text-[11px] font-medium rounded-[6px]
+              px-3 py-1.5 text-[11px] font-medium rounded-full
+              inline-flex items-center gap-1.5
               transition-colors
               ${active
-                ? 'bg-zinc-100 text-black shadow-sm'
-                : 'text-zinc-300 hover:bg-zinc-800'}
+                ? 'bg-white text-black shadow-sm'
+                : 'text-zinc-200 hover:bg-white/5'}
             `}
           >
-            {opt.label}
+            {Icon && <Icon className="w-3.5 h-3.5" />}
+            <span>{opt.label}</span>
           </button>
         )
       })}
@@ -867,15 +894,20 @@ function SegmentedToggle({ options, value, onChange }) {
   )
 }
 
-function Switch({ checked, onChange }) {
+function Switch({ checked, onChange, disabled }) {
   return (
     <button
       type="button"
-      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!checked)}
       className={`
-        w-9 h-5 rounded-full flex items-center px-[3px]
-        transition-colors
-        ${checked ? 'bg-emerald-500' : 'bg-zinc-700'}
+        w-10 h-5 rounded-full flex items-center px-[3px]
+        transition-colors border
+        ${disabled
+          ? 'opacity-40 cursor-not-allowed bg-black/40 border-white/10'
+          : checked
+            ? 'bg-emerald-500 border-emerald-400'
+            : 'bg-black/40 border-white/15'}
       `}
       aria-pressed={checked}
     >
