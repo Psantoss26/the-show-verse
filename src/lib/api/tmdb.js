@@ -251,6 +251,60 @@ export async function fetchDramaTV() {
   return data?.results || []
 }
 
+export async function getWatchProviders(type, id, region = 'ES') {
+  if (!API_KEY) {
+    return { providers: [], link: null }
+  }
+
+  const res = await fetch(
+    `https://api.themoviedb.org/3/${type}/${id}/watch/providers?api_key=${API_KEY}`,
+    { next: { revalidate: 60 * 60 } } // opcional: cache 1h
+  )
+
+  if (!res.ok) {
+    console.error('Error watch/providers', await res.text())
+    return { providers: [], link: null }
+  }
+
+  const data = await res.json()
+
+  // Elegimos el país: primero region (ES), luego US, luego el primero que haya
+  const country =
+    data.results?.[region] ??
+    data.results?.US ??
+    Object.values(data.results || {})[0]
+
+  if (!country) return { providers: [], link: null }
+
+  const baseLink = country.link || null
+
+  // Juntamos todas las listas (streaming, alquiler, compra…)
+  const allLists = [
+    ...(country.flatrate || []),
+    ...(country.rent || []),
+    ...(country.buy || []),
+    ...(country.ads || []),
+    ...(country.free || [])
+  ]
+
+  // Evitar duplicados por provider_id
+  const byId = new Map()
+  for (const p of allLists) {
+    if (!byId.has(p.provider_id)) {
+      byId.set(p.provider_id, {
+        ...p,
+        link: baseLink // añadimos el enlace de TMDb a cada provider
+      })
+    }
+  }
+
+  const providers = Array.from(byId.values()).sort(
+    (a, b) => (a.display_priority ?? 9999) - (b.display_priority ?? 9999)
+  )
+
+  return { providers, link: baseLink }
+}
+
 /* -------------------- Detalles / Imágenes / IDs externos -------------------- */
 export async function getDetails(type, id) {
   const data = await tmdb(`/${type}/${id}`, { append_to_response: 'external_ids' })
