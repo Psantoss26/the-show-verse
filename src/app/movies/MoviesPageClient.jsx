@@ -13,7 +13,9 @@ import {
     HeartOff,
     BookmarkPlus,
     BookmarkMinus,
-    Loader2
+    Loader2,
+    Play,
+    X
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
@@ -82,6 +84,41 @@ const MOVIE_GENRES = {
     10752: 'Bélica',
     37: 'Western'
 }
+
+/* ========= Selección de imagen (MISMA lógica que Details) ========= */
+function pickBestImage(list) {
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    // 1) Prioridad absoluta: mayor número de votos
+    const maxVotes = list.reduce((max, img) => {
+        const vc = img.vote_count || 0
+        return vc > max ? vc : max
+    }, 0)
+
+    // Nos quedamos solo con las imágenes que tienen ese número máximo de votos
+    const withMaxVotes = list.filter(
+        (img) => (img.vote_count || 0) === maxVotes
+    )
+
+    const preferredLangs = new Set(['es', 'es-ES', 'en', 'en-US'])
+
+    // 2) Dentro del grupo de MÁS VOTOS, si hay ES/EN, las priorizamos
+    const preferred = withMaxVotes.filter(
+        (img) => img.iso_639_1 && preferredLangs.has(img.iso_639_1)
+    )
+
+    const candidates = preferred.length ? preferred : withMaxVotes
+
+    // 3) Entre esas candidatas, ordenamos por media de votos y tamaño
+    const sorted = [...candidates].sort((a, b) => {
+        const va = (b.vote_average || 0) - (a.vote_average || 0)
+        if (va !== 0) return va
+        return (b.width || 0) - (a.width || 0)
+    })
+
+    return sorted[0] || null
+}
+
 
 /* ========= Backdrop preferido (ES -> EN) ========= */
 async function fetchBackdropEsThenEn(movieId) {
@@ -184,9 +221,134 @@ function preloadImage(src) {
     })
 }
 
-/* =================== CACHÉS COMPARTIDOS (CLIENTE) =================== */
 const movieExtrasCache = new Map() // movie.id -> { runtime, awards, imdbRating }
 const movieBackdropCache = new Map() // movie.id -> backdrop file_path
+const movieImagesCache = new Map() // movie.id -> { posters, backdrops }
+
+// =================== TRAILERS (TMDb videos) ===================
+const movieTrailerCache = new Map()      // movieId -> { key, site, type } | null
+const movieTrailerInFlight = new Map()   // movieId -> Promise
+
+function pickBestTrailer(videos) {
+    if (!Array.isArray(videos) || videos.length === 0) return null
+
+    const yt = videos.filter((v) => v?.site === 'YouTube' && v?.key)
+    if (!yt.length) return null
+
+    const trailers = yt.filter((v) => v?.type === 'Trailer')
+    const teasers = yt.filter((v) => v?.type === 'Teaser')
+
+    const candidates = trailers.length ? trailers : teasers.length ? teasers : yt
+
+    const score = (v) => {
+        const official = v?.official ? 100 : 0
+        const typeScore = v?.type === 'Trailer' ? 50 : v?.type === 'Teaser' ? 20 : 0
+        const size = typeof v?.size === 'number' ? v.size : 0
+        return official + typeScore + size
+    }
+
+    return [...candidates].sort((a, b) => score(b) - score(a))[0] || null
+}
+
+async function fetchBestTrailer(movieId) {
+    try {
+        const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
+        if (!apiKey || !movieId) return null
+
+        const url =
+            `https://api.themoviedb.org/3/movie/${movieId}/videos` +
+            `?api_key=${apiKey}&language=en-US`
+
+        const r = await fetch(url, { cache: 'force-cache' })
+        if (!r.ok) return null
+
+        const j = await r.json()
+        const results = Array.isArray(j?.results) ? j.results : []
+        const best = pickBestTrailer(results)
+
+        if (!best?.key) return null
+        return { key: best.key, site: best.site, type: best.type }
+    } catch {
+        return null
+    }
+}
+
+async function getBestTrailerCached(movieId) {
+    if (movieTrailerCache.has(movieId)) return movieTrailerCache.get(movieId)
+
+    if (movieTrailerInFlight.has(movieId)) return movieTrailerInFlight.get(movieId)
+
+    const p = (async () => {
+        const t = await fetchBestTrailer(movieId)
+        movieTrailerCache.set(movieId, t || null)
+        movieTrailerInFlight.delete(movieId)
+        return t || null
+    })()
+
+    movieTrailerInFlight.set(movieId, p)
+    return p
+}
+
+/* ========= Cargar / cachear imágenes de TMDb (posters + backdrops) ========= */
+async function getMovieImages(movieId) {
+    if (movieImagesCache.has(movieId)) {
+        return movieImagesCache.get(movieId)
+    }
+
+    const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
+    if (!apiKey) {
+        const fallback = { posters: [], backdrops: [] }
+        movieImagesCache.set(movieId, fallback)
+        return fallback
+    }
+
+    try {
+        const url =
+            `https://api.themoviedb.org/3/movie/${movieId}/images` +
+            `?api_key=${apiKey}` +
+            `&include_image_language=en,en-US,es,es-ES,null`
+
+        const r = await fetch(url, { cache: 'force-cache' })
+        const j = await r.json()
+        const posters = Array.isArray(j?.posters) ? j.posters : []
+        const backdrops = Array.isArray(j?.backdrops) ? j.backdrops : []
+
+        const data = { posters, backdrops }
+        movieImagesCache.set(movieId, data)
+        return data
+    } catch {
+        const fallback = { posters: [], backdrops: [] }
+        movieImagesCache.set(movieId, fallback)
+        return fallback
+    }
+}
+
+/* ========= Poster preferido (misma lógica que Details) ========= */
+async function fetchBestPoster(movieId) {
+    const { posters } = await getMovieImages(movieId)
+    const best = pickBestImage(posters)
+    return best?.file_path || null
+}
+
+/* ========= Backdrop preferido (misma lógica que Details) ========= */
+async function fetchBestBackdrop(movieId) {
+    const { backdrops } = await getMovieImages(movieId)
+    if (!Array.isArray(backdrops) || backdrops.length === 0) return null
+
+    // 1) Intentar SIEMPRE primero con backdrops en inglés
+    const english = backdrops.filter(
+        (b) => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US'
+    )
+
+    if (english.length > 0) {
+        const bestEn = pickBestImage(english)
+        return bestEn?.file_path || null
+    }
+
+    // 2) Si no hay en inglés, usamos la lógica general (ES/EN/null)
+    const best = pickBestImage(backdrops)
+    return best?.file_path || null
+}
 
 /* ======== Preferencias de artwork guardadas en localStorage ======== */
 function getArtworkPreference(movieId) {
@@ -244,8 +406,9 @@ function PosterImage({ movie, cache, heightClass }) {
             }
 
             // 3) Lógica normal: mejor poster ES/EN
+            // 3) Lógica normal: mejor poster usando la MISMA lógica que Details
             setReady(false)
-            const preferred = await fetchPosterEsThenEn(movie.id)
+            const preferred = await fetchBestPoster(movie.id)
             const chosen =
                 preferred || movie.poster_path || movie.backdrop_path || null
             const url = chosen ? buildImg(chosen, 'w342') : null
@@ -303,6 +466,18 @@ function InlinePreviewCard({ movie, heightClass }) {
     const [updating, setUpdating] = useState(false)
     const [error, setError] = useState('')
 
+    // === TRAILER state ===
+    const [showTrailer, setShowTrailer] = useState(false)
+    const [trailer, setTrailer] = useState(null) // { key, site, type } | null
+    const [trailerLoading, setTrailerLoading] = useState(false)
+
+    // Reset de trailer al cambiar de película
+    useEffect(() => {
+        setShowTrailer(false)
+        setTrailer(null)
+        setTrailerLoading(false)
+    }, [movie?.id])
+
     // Estados de cuenta
     useEffect(() => {
         let cancel = false
@@ -351,7 +526,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                     setBackdropReady(true)
                 }
             } else {
-                // 2) Backdrop desde caché o TMDb
+                // 2) Backdrop desde caché o TMDb usando MISMA lógica que Details
                 const cachedBackdrop = movieBackdropCache.get(movie.id)
                 if (cachedBackdrop !== undefined) {
                     if (!abort) {
@@ -366,7 +541,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                     }
                 } else {
                     try {
-                        const preferred = await fetchBackdropEsThenEn(movie.id)
+                        const preferred = await fetchBestBackdrop(movie.id)
                         const chosen = preferred || movie.backdrop_path || null
                         movieBackdropCache.set(movie.id, chosen)
                         if (chosen) {
@@ -412,11 +587,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                         if (imdb) {
                             const omdb = await fetchOmdbByImdb(imdb)
                             const rawAwards = omdb?.Awards
-                            if (
-                                rawAwards &&
-                                typeof rawAwards === 'string' &&
-                                rawAwards.trim()
-                            ) {
+                            if (rawAwards && typeof rawAwards === 'string' && rawAwards.trim()) {
                                 awards = rawAwards.trim()
                             }
                             const r = omdb?.imdbRating
@@ -430,9 +601,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                     movieExtrasCache.set(movie.id, next)
                     if (!abort) setExtras(next)
                 } catch {
-                    if (!abort) {
-                        setExtras({ runtime: null, awards: null, imdbRating: null })
-                    }
+                    if (!abort) setExtras({ runtime: null, awards: null, imdbRating: null })
                 }
             }
         }
@@ -499,6 +668,40 @@ function InlinePreviewCard({ movie, heightClass }) {
         }
     }
 
+    const handleToggleTrailer = async (e) => {
+        e.stopPropagation()
+
+        // si ya está abierto, cerramos
+        if (showTrailer) {
+            setShowTrailer(false)
+            return
+        }
+
+        // carga lazy del trailer al primer click
+        try {
+            setTrailerLoading(true)
+            setError('')
+
+            const t = await getBestTrailerCached(movie.id)
+
+            if (!t?.key) {
+                setTrailer(null)
+                setShowTrailer(false)
+                setError('No hay trailer disponible para este título.')
+                return
+            }
+
+            setTrailer(t)
+            setShowTrailer(true)
+        } catch {
+            setTrailer(null)
+            setShowTrailer(false)
+            setError('No se pudo cargar el trailer.')
+        } finally {
+            setTrailerLoading(false)
+        }
+    }
+
     const resolvedBackdrop =
         backdropPath || movie.backdrop_path || movie.poster_path || null
     const bgSrc = resolvedBackdrop ? buildImg(resolvedBackdrop, 'w1280') : null
@@ -511,126 +714,166 @@ function InlinePreviewCard({ movie, heightClass }) {
         return names.slice(0, 3).join(' • ')
     })()
 
+    const trailerSrc =
+        trailer?.key
+            ? `https://www.youtube-nocookie.com/embed/${trailer.key}` +
+            `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
+            `&controls=0&iv_load_policy=3&disablekb=1&fs=0`
+            : null
+
     return (
         <div
-            className={`relative rounded-3xl overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} flex cursor-pointer`}
+            className={`rounded-3xl overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
             onClick={() => {
                 window.location.href = href
             }}
         >
-            {/* Fondo backdrop */}
-            <div className="absolute inset-0">
-                {!backdropReady && (
-                    <div className="w-full h-full bg-neutral-900 animate-pulse" />
+            {/* === FILA 1: Backdrop o Trailer === */}
+            <div className="relative w-full h-full bg-black">
+                {/* Skeleton si falta backdrop y no estamos en trailer */}
+                {!showTrailer && !backdropReady && (
+                    <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
                 )}
 
-                {backdropReady && bgSrc && (
+                {/* Backdrop */}
+                {!showTrailer && backdropReady && bgSrc && (
                     <img
                         src={bgSrc}
                         alt={movie.title || movie.name}
-                        className="w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-cover"
                         loading="lazy"
                         decoding="async"
                     />
                 )}
 
-                <div
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%]
-                 bg-gradient-to-t from-black/95 via-black/65 to-transparent"
-                />
+                {/* Trailer */}
+                {showTrailer && (
+                    <>
+                        {/* Skeleton mientras resuelve el trailer */}
+                        {(trailerLoading || !trailerSrc) && (
+                            <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
+                        )}
+
+                        {trailerSrc && (
+                            <div className="absolute inset-0 overflow-hidden">
+                                <iframe
+                                    key={trailer.key}
+                                    className="absolute left-1/2 top-1/2
+                 w-[160%] h-[160%]
+                 -translate-x-1/2 -translate-y-1/2
+                 pointer-events-none"
+                                    src={trailerSrc}
+                                    title={`Trailer - ${movie.title || movie.name}`}
+                                    allow="autoplay; encrypted-media; picture-in-picture"
+                                    allowFullScreen={false}
+                                />
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
 
-            {/* Contenido en franja inferior */}
-            <div className="relative z-10 flex-1 flex flex-col justify-end">
-                <div className="px-4 sm:px-6 lg:px-8 pb-4 sm:pb-5 lg:pb-6">
-                    <div className="flex items-end justify-between gap-4">
-                        <div className="min-w-0 flex-1 space-y-1">
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
-                                {yearOf(movie) && <span>{yearOf(movie)}</span>}
-                                {extras?.runtime && (
-                                    <span>• {formatRuntime(extras.runtime)}</span>
-                                )}
+            {/* === FILA 2: Propiedades + Acciones (sin título) === */}
+            <div className="w-full h-full bg-neutral-950/95 border-t border-neutral-800">
+                <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
+                    {/* Propiedades */}
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
+                            {yearOf(movie) && <span>{yearOf(movie)}</span>}
+                            {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
 
+                            <span className="inline-flex items-center gap-1.5">
+                                <img
+                                    src="/logo-TMDb.png"
+                                    alt="TMDb"
+                                    className="h-4 w-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                                <span className="font-medium">{ratingOf(movie)}</span>
+                            </span>
+
+                            {typeof extras?.imdbRating === 'number' && (
                                 <span className="inline-flex items-center gap-1.5">
                                     <img
-                                        src="/logo-TMDb.png"
-                                        alt="TMDb"
+                                        src="/logo-IMDb.png"
+                                        alt="IMDb"
                                         className="h-4 w-auto"
                                         loading="lazy"
                                         decoding="async"
                                     />
-                                    <span className="font-medium">{ratingOf(movie)}</span>
+                                    <span className="font-medium">{extras.imdbRating.toFixed(1)}</span>
                                 </span>
+                            )}
+                        </div>
 
-                                {typeof extras?.imdbRating === 'number' && (
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <img
-                                            src="/logo-IMDb.png"
-                                            alt="IMDb"
-                                            className="h-4 w-auto"
-                                            loading="lazy"
-                                            decoding="async"
-                                        />
-                                        <span className="font-medium">
-                                            {extras.imdbRating.toFixed(1)}
-                                        </span>
-                                    </span>
-                                )}
+                        {genres && (
+                            <div className="mt-1 text-[11px] sm:text-xs text-neutral-100/90 line-clamp-1">
+                                {genres}
                             </div>
+                        )}
 
-                            {genres && (
-                                <div className="text-[11px] sm:text-xs text-neutral-100/90 line-clamp-1 drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]">
-                                    {genres}
-                                </div>
-                            )}
+                        {extras?.awards && (
+                            <div className="mt-1 text-[11px] sm:text-xs text-emerald-300 line-clamp-1">
+                                {extras.awards}
+                            </div>
+                        )}
 
-                            {extras?.awards && (
-                                <div className="text-[11px] sm:text-xs text-emerald-300 line-clamp-2 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-                                    {extras.awards}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                            <button
-                                onClick={handleToggleFavorite}
-                                disabled={loadingStates || updating}
-                                title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 backdrop-blur-sm border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
-                            >
-                                {loadingStates || updating ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : favorite ? (
-                                    <HeartOff className="w-5 h-5" />
-                                ) : (
-                                    <Heart className="w-5 h-5" />
-                                )}
-                            </button>
-
-                            <button
-                                onClick={handleToggleWatchlist}
-                                disabled={loadingStates || updating}
-                                title={
-                                    watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'
-                                }
-                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 backdrop-blur-sm border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
-                            >
-                                {loadingStates || updating ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : watchlist ? (
-                                    <BookmarkMinus className="w-5 h-5" />
-                                ) : (
-                                    <BookmarkPlus className="w-5 h-5" />
-                                )}
-                            </button>
-                        </div>
+                        {error && (
+                            <p className="mt-1 text-[11px] text-red-400 line-clamp-1">{error}</p>
+                        )}
                     </div>
 
-                    {error && (
-                        <p className="mt-2 text-[11px] text-red-400 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-                            {error}
-                        </p>
-                    )}
+                    {/* Botones */}
+                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                        {/* Trailer */}
+                        <button
+                            onClick={handleToggleTrailer}
+                            disabled={trailerLoading}
+                            title={showTrailer ? 'Cerrar trailer' : 'Ver trailer'}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                        >
+                            {trailerLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : showTrailer ? (
+                                <X className="w-5 h-5" />
+                            ) : (
+                                <Play className="w-5 h-5" />
+                            )}
+                        </button>
+
+                        {/* Favoritos */}
+                        <button
+                            onClick={handleToggleFavorite}
+                            disabled={loadingStates || updating}
+                            title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                        >
+                            {loadingStates || updating ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : favorite ? (
+                                <HeartOff className="w-5 h-5" />
+                            ) : (
+                                <Heart className="w-5 h-5" />
+                            )}
+                        </button>
+
+                        {/* Pendientes */}
+                        <button
+                            onClick={handleToggleWatchlist}
+                            disabled={loadingStates || updating}
+                            title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                        >
+                            {loadingStates || updating ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : watchlist ? (
+                                <BookmarkMinus className="w-5 h-5" />
+                            ) : (
+                                <BookmarkPlus className="w-5 h-5" />
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -736,12 +979,12 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                             'relative flex-shrink-0 transition-all duration-300 ease-out'
 
                         const sizeClasses = isActive
-                            ? 'w-[390px] sm:w-[460px] md:w-[530px] xl:w-[600px] z-20'
+                            ? 'w-[320px] sm:w-[380px] md:w-[430px] xl:w-[480px] z-20'
                             : 'w-[140px] sm:w-[170px] md:w-[190px] xl:w-[210px] z-10'
 
                         const transformClass =
                             isActive && isLast
-                                ? '-translate-x-[250px] sm:-translate-x-[290px] md:-translate-x-[340px] xl:-translate-x-[390px]'
+                                ? '-translate-x-[190px] sm:-translate-x-[230px] md:-translate-x-[260px] xl:-translate-x-[290px]'
                                 : ''
 
                         const cardElement = (
@@ -859,7 +1102,7 @@ function GenreRows({ groups, isTouchDevice, posterCacheRef }) {
                 list?.length ? (
                     <Row
                         key={`genre-${gname}`}
-                        title={`Por género — ${gname}`}
+                        title={`${gname}`}
                         items={list}
                         isTouchDevice={isTouchDevice}
                         posterCacheRef={posterCacheRef}

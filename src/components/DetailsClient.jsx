@@ -80,75 +80,52 @@ async function fetchTVImages(showId) {
 function pickBestImage(list) {
   if (!Array.isArray(list) || list.length === 0) return null
 
-  // Orden básico: más votos -> mejor media -> más ancho
-  const sorted = [...list].sort((a, b) => {
-    const vc = (b.vote_count || 0) - (a.vote_count || 0)
-    if (vc !== 0) return vc
+  // 1) Prioridad absoluta: mayor número de votos
+  const maxVotes = list.reduce((max, img) => {
+    const vc = img.vote_count || 0
+    return vc > max ? vc : max
+  }, 0)
 
+  // Nos quedamos solo con las imágenes que tienen ese número máximo de votos
+  const withMaxVotes = list.filter(
+    (img) => (img.vote_count || 0) === maxVotes
+  )
+
+  const preferredLangs = new Set(['es', 'es-ES', 'en', 'en-US'])
+
+  // 2) Dentro del grupo de MÁS VOTOS, si hay ES/EN, las priorizamos
+  const preferred = withMaxVotes.filter(
+    (img) => img.iso_639_1 && preferredLangs.has(img.iso_639_1)
+  )
+
+  const candidates = preferred.length ? preferred : withMaxVotes
+
+  // 3) Entre esas candidatas, ordenamos por media de votos y tamaño
+  const sorted = [...candidates].sort((a, b) => {
     const va = (b.vote_average || 0) - (a.vote_average || 0)
     if (va !== 0) return va
-
     return (b.width || 0) - (a.width || 0)
   })
 
   return sorted[0] || null
 }
 
-// === POSTER (PORTADA) -> PRIORIDAD INGLÉS, LUEGO ESPAÑOL ===
-const pickBestPosterTV = (posters = []) => {
-  if (!Array.isArray(posters) || posters.length === 0) return null
-
-  const en = posters.filter(
-    (p) => p.iso_639_1 === 'en' || p.iso_639_1 === 'en-US'
-  )
-  const es = posters.filter(
-    (p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES'
-  )
-  const others = posters.filter(
-    (p) =>
-      !['en', 'en-US', 'es', 'es-ES'].includes(p.iso_639_1 || '')
-  )
-
-  const bestEn = pickBestImage(en)
-  if (bestEn?.file_path) return bestEn.file_path
-
-  const bestEs = pickBestImage(es)
-  if (bestEs?.file_path) return bestEs.file_path
-
-  const bestOther = pickBestImage(others)
-  return bestOther?.file_path || null
+// Poster para TV usando la función anterior
+const pickBestPosterTV = (posters) => {
+  const best = pickBestImage(posters || [])
+  return best?.file_path || null
 }
 
-// === BACKDROP "NORMAL" (por si lo usas en otras partes) ===
-// Aquí también damos preferencia a inglés, luego resto
-const pickBestBackdropTV = (backs = []) => {
-  if (!Array.isArray(backs) || backs.length === 0) return null
-
-  const en = backs.filter(
-    (b) => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US'
-  )
-  const others = backs.filter(
-    (b) => !(b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US')
-  )
-
-  const bestEn = pickBestImage(en)
-  if (bestEn?.file_path) return bestEn.file_path
-
-  const bestOther = pickBestImage(others)
-  return bestOther?.file_path || null
+// Backdrop principal
+const pickBestBackdropTV = (backs) => {
+  const best = pickBestImage(backs || [])
+  return best?.file_path || null
 }
 
-// === BACKDROP PARA FONDO DE DETALLE -> PRIORIDAD SIN IDIOMA (SIN TEXTO) ===
-const pickBestBackdropTVNeutralFirst = (backs = []) => {
-  if (!Array.isArray(backs) || backs.length === 0) return null
-
-  // 1) Preferimos SIEMPRE imágenes sin idioma (sin texto)
-  const neutral = backs.filter((b) => !b.iso_639_1)
-  const bestNeutral = pickBestImage(neutral)
-  if (bestNeutral?.file_path) return bestNeutral.file_path
-
-  // 2) Si no hay sin idioma, usamos la lógica normal (inglés primero)
-  return pickBestBackdropTV(backs)
+// Fondo de detalle (mismo criterio)
+const pickBestBackdropTVNeutralFirst = (backs) => {
+  const best = pickBestImage(backs || [])
+  return best?.file_path || null
 }
 
 // --- Helper para SeriesGraph (slug) ---
@@ -590,35 +567,52 @@ export default function DetailsClient({
   // ====== Cargar Imágenes Adicionales (Pelis) ======
   useEffect(() => {
     let abort = false
-    if (data?.images && !abort) {
+
+    // Reutilizamos esta función para aplicar posters/backdrops
+    const applyImages = (posters = [], backdrops = []) => {
+      if (abort) return
+
+      // Elegir mejor póster (misma lógica que TV / resto de páginas)
+      const bestPoster = pickBestImage(posters)
+      if (bestPoster?.file_path) {
+        setBasePosterPath(bestPoster.file_path)
+      }
+
       setImagesState((prev) => ({
-        posters: mergeUniqueImages(prev.posters, data.images.posters || []),
-        backdrops: mergeUniqueImages(prev.backdrops, data.images.backdrops || [])
+        posters: mergeUniqueImages(prev.posters, posters),
+        backdrops: mergeUniqueImages(prev.backdrops, backdrops)
       }))
+    }
+
+    // 1) Si getDetails ya trae imágenes embebidas (data.images), usamos esas
+    if (data?.images) {
+      applyImages(data.images.posters || [], data.images.backdrops || [])
       return
     }
+
+    // 2) Si no, solo para PELÍCULAS llamamos a /movie/{id}/images
     if (type !== 'movie' || !TMDB_API_KEY) return
+
     const fetchImages = async () => {
       try {
         setImagesLoading(true)
         setImagesError('')
+
         const url = `https://api.themoviedb.org/3/movie/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,null,es`
         const res = await fetch(url)
         const json = await res.json()
-        if (!res.ok) throw new Error(json?.status_message)
-        if (!abort) {
-          setImagesState((prev) => ({
-            posters: mergeUniqueImages(prev.posters, json.posters || []),
-            backdrops: mergeUniqueImages(prev.backdrops, json.backdrops || [])
-          }))
-        }
+        if (!res.ok) throw new Error(json?.status_message || 'Error al cargar imágenes')
+
+        applyImages(json.posters || [], json.backdrops || [])
       } catch (err) {
         if (!abort) setImagesError(err.message)
       } finally {
         if (!abort) setImagesLoading(false)
       }
     }
+
     fetchImages()
+
     return () => {
       abort = true
     }

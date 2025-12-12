@@ -13,7 +13,7 @@ import {
     HeartOff,
     BookmarkPlus,
     BookmarkMinus,
-    Loader2,
+    Loader2
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
@@ -22,7 +22,7 @@ import {
     markAsFavorite,
     markInWatchlist,
     getMovieDetails,
-    getExternalIds,
+    getExternalIds
 } from '@/lib/api/tmdb'
 
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
@@ -34,7 +34,9 @@ const anton = Anton({ weight: '400', subsets: ['latin'] })
 const useIsTouchDevice = () => {
     const [isTouch, setIsTouch] = useState(false)
     useEffect(() => {
-        const onTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+        const onTouch =
+            typeof window !== 'undefined' &&
+            ('ontouchstart' in window || navigator.maxTouchPoints > 0)
         setIsTouch(onTouch)
     }, [])
     return isTouch
@@ -63,18 +65,56 @@ const formatRuntime = (mins) => {
 const buildImg = (path, size = 'original') =>
     `https://image.tmdb.org/t/p/${size}${path}`
 
-/* ========= elegir mejor poster: ES -> EN, y por calidad ========= */
+const GENRES = {
+    28: 'Acción',
+    12: 'Aventura',
+    16: 'Animación',
+    35: 'Comedia',
+    80: 'Crimen',
+    99: 'Documental',
+    18: 'Drama',
+    10751: 'Familia',
+    14: 'Fantasía',
+    36: 'Historia',
+    27: 'Terror',
+    10402: 'Música',
+    9648: 'Misterio',
+    10749: 'Romance',
+    878: 'Ciencia ficción',
+    10770: 'TV Movie',
+    53: 'Thriller',
+    10752: 'Bélica',
+    37: 'Western',
+
+    // TV (útil también en dashboard si mezclas contenido)
+    10759: 'Acción y aventura',
+    10765: 'Ciencia ficción y fantasía',
+    10762: 'Infantil',
+    10763: 'Noticias',
+    10764: 'Reality',
+    10766: 'Telenovela',
+    10767: 'Talk show',
+    10768: 'Guerra y política'
+}
+
+/* ========= elegir mejor poster: EN -> ES, por votos/calidad ========= */
 async function fetchMoviePosterEsThenEn(movieId) {
     try {
+        const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
+        if (!apiKey || !movieId) return null
+
         const url =
             `https://api.themoviedb.org/3/movie/${movieId}/images` +
-            `?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}` +
-            `&language=es-ES&include_image_language=es,es-ES,en,en-US`
+            `?api_key=${apiKey}` +
+            `&include_image_language=es,es-ES,en,en-US`
+
         const r = await fetch(url, { cache: 'force-cache' })
+        if (!r.ok) throw new Error('TMDb movie images error')
+
         const j = await r.json()
         const posters = Array.isArray(j?.posters) ? j.posters : []
 
-        const pickBest = (arr) => {
+        const pickBestLang = (arr) => {
             if (!arr.length) return null
             const sorted = [...arr].sort((a, b) => {
                 const vc = (b.vote_count || 0) - (a.vote_count || 0)
@@ -83,24 +123,21 @@ async function fetchMoviePosterEsThenEn(movieId) {
                 if (va !== 0) return va
                 return (b.width || 0) - (a.width || 0)
             })
-            const topVote = sorted[0]?.vote_count || 0
-            const topSet = sorted.filter((x) => (x.vote_count || 0) === topVote)
-            topSet.sort((a, b) => (b.width || 0) - (a.width || 0))
-            return topSet[0] || sorted[0]
+            return sorted[0] || null
         }
 
-        const es = posters.filter(
-            (p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES'
-        )
         const en = posters.filter(
             (p) => p.iso_639_1 === 'en' || p.iso_639_1 === 'en-US'
         )
+        const es = posters.filter(
+            (p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES'
+        )
 
-        const bestES = pickBest(es)
-        if (bestES?.file_path) return bestES.file_path
+        const bestEn = pickBestLang(en)
+        if (bestEn?.file_path) return bestEn.file_path
 
-        const bestEN = pickBest(en)
-        if (bestEN?.file_path) return bestEN.file_path
+        const bestEs = pickBestLang(es)
+        if (bestEs?.file_path) return bestEs.file_path
 
         return null
     } catch {
@@ -108,19 +145,24 @@ async function fetchMoviePosterEsThenEn(movieId) {
     }
 }
 
-/* ========= elegir mejor backdrop: ES -> EN, y por calidad ========= */
+/* ========= elegir mejor backdrop: EN -> ES, por votos/calidad ========= */
 async function fetchBackdropEsThenEn(movieId) {
     try {
+        const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
+        if (!apiKey || !movieId) return null
+
         const url =
             `https://api.themoviedb.org/3/movie/${movieId}/images` +
-            `?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}` +
-            `&language=es-ES&include_image_language=es,es-ES,en,en-US`
+            `?api_key=${apiKey}` +
+            `&include_image_language=es,es-ES,en,en-US`
 
         const r = await fetch(url, { cache: 'force-cache' })
+        if (!r.ok) throw new Error('TMDb movie images error')
+
         const j = await r.json()
         const backs = Array.isArray(j?.backdrops) ? j.backdrops : []
 
-        const pickBest = (arr) => {
+        const pickBestLang = (arr) => {
             if (!arr.length) return null
             const sorted = [...arr].sort((a, b) => {
                 const vc = (b.vote_count || 0) - (a.vote_count || 0)
@@ -129,25 +171,23 @@ async function fetchBackdropEsThenEn(movieId) {
                 if (va !== 0) return va
                 return (b.width || 0) - (a.width || 0)
             })
-            const topVote = sorted[0]?.vote_count || 0
-            const topSet = sorted.filter((x) => (x.vote_count || 0) === topVote)
-            topSet.sort((a, b) => (b.width || 0) - (a.width || 0))
-            return topSet[0] || sorted[0]
+            return sorted[0] || null
         }
 
-        const es = backs.filter(
-            (b) => b.iso_639_1 === 'es' || b.iso_639_1 === 'es-ES'
-        )
         const en = backs.filter(
             (b) => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US'
         )
+        const es = backs.filter(
+            (b) => b.iso_639_1 === 'es' || b.iso_639_1 === 'es-ES'
+        )
 
-        const bestES = pickBest(es)
-        if (bestES?.file_path) return bestES.file_path
+        const bestEn = pickBestLang(en)
+        if (bestEn?.file_path) return bestEn.file_path
 
-        const bestEN = pickBest(en)
-        if (bestEN?.file_path) return bestEN.file_path
+        const bestEs = pickBestLang(es)
+        if (bestEs?.file_path) return bestEs.file_path
 
+        // si no hay EN/ES con idioma, devolvemos null y ya se usará el backdrop de TMDb
         return null
     } catch {
         return null
@@ -180,7 +220,7 @@ function getArtworkPreference(movieId) {
     const backdrop = window.localStorage.getItem(backdropKey)
     return {
         poster: poster || null,
-        backdrop: backdrop || null,
+        backdrop: backdrop || null
     }
 }
 
@@ -222,7 +262,7 @@ function PosterImage({ movie, cache, heightClass }) {
                 return
             }
 
-            // 3) Lógica normal: mejor poster ES/EN o fallback de TMDb
+            // 3) Lógica normal: mejor poster EN/ES o fallback de TMDb
             setReady(false)
             const preferred = await fetchMoviePosterEsThenEn(movie.id)
             const chosen =
@@ -275,7 +315,7 @@ function InlinePreviewCard({ movie, heightClass }) {
     const [extras, setExtras] = useState({
         runtime: null,
         awards: null,
-        imdbRating: null,
+        imdbRating: null
     })
     const [backdropPath, setBackdropPath] = useState(null)
     const [backdropReady, setBackdropReady] = useState(false)
@@ -334,7 +374,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                     setBackdropReady(true)
                 }
             } else {
-                // 2) Backdrop desde caché o TMDb (ES -> EN + votos)
+                // 2) Backdrop desde caché o TMDb (EN -> ES + votos)
                 const cachedBackdrop = movieBackdropCache.get(movie.id)
                 if (cachedBackdrop !== undefined) {
                     if (!abort) {
@@ -456,7 +496,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                 sessionId: session,
                 type: movie.media_type || 'movie',
                 mediaId: movie.id,
-                favorite: next,
+                favorite: next
             })
         } catch {
             setFavorite((v) => !v)
@@ -479,7 +519,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                 sessionId: session,
                 type: movie.media_type || 'movie',
                 mediaId: movie.id,
-                watchlist: next,
+                watchlist: next
             })
         } catch {
             setWatchlist((v) => !v)
@@ -491,124 +531,125 @@ function InlinePreviewCard({ movie, heightClass }) {
 
     const bgSrc = backdropPath ? buildImg(backdropPath, 'w1280') : null
 
+    const genres = (() => {
+        const ids =
+            movie.genre_ids ||
+            (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : [])
+        const names = ids.map((id) => GENRES[id]).filter(Boolean)
+        return names.slice(0, 3).join(' • ')
+    })()
+
     return (
         <div
-            className={`relative rounded-3xl overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} flex cursor-pointer`}
+            className={`rounded-3xl overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
             onClick={() => {
                 window.location.href = href
             }}
         >
-            {/* Fondo backdrop */}
-            <div className="absolute inset-0">
+            {/* === FILA 1: Backdrop a pantalla completa (sin huecos) === */}
+            <div className="relative w-full h-full bg-black">
                 {!backdropReady && (
-                    <div className="w-full h-full bg-neutral-900 animate-pulse" />
+                    <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
                 )}
 
                 {backdropReady && bgSrc && (
                     <img
                         src={bgSrc}
                         alt={movie.title || movie.name}
-                        className="w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-cover"
                         loading="lazy"
                         decoding="async"
                     />
                 )}
-
-                <div
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%]
-                 bg-gradient-to-t from-black/95 via-black/65 to-transparent"
-                />
             </div>
 
-            {/* Contenido en franja inferior */}
-            <div className="relative z-10 flex-1 flex flex-col justify-end">
-                <div className="px-4 sm:px-6 lg:px-8 pb-4 sm:pb-5 lg:pb-6">
-                    <div className="flex items-end justify-between gap-4">
-                        <div className="min-w-0 flex-1 space-y-1">
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
-                                {yearOf(movie) && <span>{yearOf(movie)}</span>}
-                                {extras?.runtime && (
-                                    <span>• {formatRuntime(extras.runtime)}</span>
-                                )}
+            {/* === FILA 2: Propiedades + Acciones (sin título) === */}
+            <div className="w-full h-full bg-neutral-950/95 border-t border-neutral-800">
+                <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
+                    {/* Propiedades */}
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
+                            {yearOf(movie) && <span>{yearOf(movie)}</span>}
+                            {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
 
+                            <span className="inline-flex items-center gap-1.5">
+                                <img
+                                    src="/logo-TMDb.png"
+                                    alt="TMDb"
+                                    className="h-4 w-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                                <span className="font-medium">{ratingOf(movie)}</span>
+                            </span>
+
+                            {typeof extras?.imdbRating === "number" && (
                                 <span className="inline-flex items-center gap-1.5">
                                     <img
-                                        src="/logo-TMDb.png"
-                                        alt="TMDb"
+                                        src="/logo-IMDb.png"
+                                        alt="IMDb"
                                         className="h-4 w-auto"
                                         loading="lazy"
                                         decoding="async"
                                     />
-                                    <span className="font-medium">{ratingOf(movie)}</span>
-                                </span>
-
-                                {typeof extras?.imdbRating === 'number' && (
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <img
-                                            src="/logo-IMDb.png"
-                                            alt="IMDb"
-                                            className="h-4 w-auto"
-                                            loading="lazy"
-                                            decoding="async"
-                                        />
-                                        <span className="font-medium">
-                                            {extras.imdbRating.toFixed(1)}
-                                        </span>
+                                    <span className="font-medium">
+                                        {extras.imdbRating.toFixed(1)}
                                     </span>
-                                )}
-                            </div>
-
-                            {extras?.awards && (
-                                <div className="text-[11px] sm:text-xs text-emerald-300 line-clamp-2 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-                                    {extras.awards}
-                                </div>
+                                </span>
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                            <button
-                                onClick={handleToggleFavorite}
-                                disabled={loadingStates || updating}
-                                title={
-                                    favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'
-                                }
-                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 backdrop-blur-sm border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
-                            >
-                                {loadingStates || updating ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : favorite ? (
-                                    <HeartOff className="w-5 h-5" />
-                                ) : (
-                                    <Heart className="w-5 h-5" />
-                                )}
-                            </button>
+                        {genres && (
+                            <div className="mt-1 text-[11px] sm:text-xs text-neutral-100/90 line-clamp-1">
+                                {genres}
+                            </div>
+                        )}
 
-                            <button
-                                onClick={handleToggleWatchlist}
-                                disabled={loadingStates || updating}
-                                title={
-                                    watchlist
-                                        ? 'Quitar de pendientes'
-                                        : 'Añadir a pendientes'
-                                }
-                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 backdrop-blur-sm border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
-                            >
-                                {loadingStates || updating ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : watchlist ? (
-                                    <BookmarkMinus className="w-5 h-5" />
-                                ) : (
-                                    <BookmarkPlus className="w-5 h-5" />
-                                )}
-                            </button>
-                        </div>
+                        {extras?.awards && (
+                            <div className="mt-1 text-[11px] sm:text-xs text-emerald-300 line-clamp-1">
+                                {extras.awards}
+                            </div>
+                        )}
+
+                        {error && (
+                            <p className="mt-1 text-[11px] text-red-400 line-clamp-1">
+                                {error}
+                            </p>
+                        )}
                     </div>
 
-                    {error && (
-                        <p className="mt-2 text-[11px] text-red-400 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-                            {error}
-                        </p>
-                    )}
+                    {/* Botones */}
+                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                        <button
+                            onClick={handleToggleFavorite}
+                            disabled={loadingStates || updating}
+                            title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                        >
+                            {loadingStates || updating ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : favorite ? (
+                                <HeartOff className="w-5 h-5" />
+                            ) : (
+                                <Heart className="w-5 h-5" />
+                            )}
+                        </button>
+
+                        <button
+                            onClick={handleToggleWatchlist}
+                            disabled={loadingStates || updating}
+                            title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                        >
+                            {loadingStates || updating ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : watchlist ? (
+                                <BookmarkMinus className="w-5 h-5" />
+                            ) : (
+                                <BookmarkPlus className="w-5 h-5" />
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -626,7 +667,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
     const [hoveredId, setHoveredId] = useState(null)
 
     const hasActivePreview = !!hoveredId
-    const heightClass = 'h-[210px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
+    const heightClass = 'h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
 
     const updateNav = (swiper) => {
         if (!swiper) return
@@ -699,16 +740,16 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         // A partir de sm volvemos al comportamiento anterior
                         640: {
                             slidesPerView: 'auto',
-                            spaceBetween: 14,
+                            spaceBetween: 14
                         },
                         1024: {
                             slidesPerView: 'auto',
-                            spaceBetween: 18,
+                            spaceBetween: 18
                         },
                         1280: {
                             slidesPerView: 'auto',
-                            spaceBetween: 20,
-                        },
+                            spaceBetween: 20
+                        }
                     }}
                 >
                     {items.map((m, i) => {
@@ -718,22 +759,18 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         const base =
                             'relative flex-shrink-0 transition-all duration-300 ease-out'
 
-                        // En móvil: w-full para ocupar todo el ancho del slide (Swiper ya lo divide en 3).
-                        // En sm+: tamaños antiguos para póster / preview.
+                        // En móvil: w-full para ocupar todo el ancho del slide.
                         const sizeClasses = isActive
-                            ? 'w-full sm:w-[390px] md:w-[530px] xl:w-[600px] sm:z-20'
+                            ? 'w-full sm:w-[320px] md:w-[430px] xl:w-[480px] sm:z-20'
                             : 'w-full sm:w-[140px] md:w-[190px] xl:w-[210px] sm:z-10'
 
                         const transformClass =
                             !isTouchDevice && isActive && isLast
-                                ? 'sm:-translate-x-[250px] md:-translate-x-[340px] xl:-translate-x-[390px]'
+                                ? 'sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]'
                                 : ''
 
                         return (
-                            <SwiperSlide
-                                key={m.id}
-                                className="!w-auto select-none"
-                            >
+                            <SwiperSlide key={m.id} className="!w-auto select-none">
                                 <div
                                     className={`${base} ${sizeClasses} ${heightClass} ${transformClass}`}
                                     onMouseEnter={() => {
@@ -830,7 +867,7 @@ function TopRatedHero({ items, isTouchDevice }) {
     const [canPrev, setCanPrev] = useState(false)
     const [canNext, setCanNext] = useState(false)
 
-    // mapa id -> backdrop definitivo (override o fallback)
+    // mapa id -> backdrop definitivo (override o mejor EN/ES)
     const [heroBackdrops, setHeroBackdrops] = useState({})
     const [heroLoaded, setHeroLoaded] = useState(false)
 
@@ -851,19 +888,47 @@ function TopRatedHero({ items, isTouchDevice }) {
                     return
                 }
 
-                const overrides = await fetchArtworkOverrides({
-                    type: 'movie',
-                    kind: 'backdrop',
-                    ids,
-                })
+                let overrides = {}
+                try {
+                    overrides = await fetchArtworkOverrides({
+                        type: 'movie',
+                        kind: 'backdrop',
+                        ids
+                    })
+                } catch (err) {
+                    console.error('Error cargando overrides de hero', err)
+                    overrides = {}
+                }
+
+                const entries = await Promise.all(
+                    items.map(async (movie) => {
+                        const id = movie.id
+                        if (!id) return [null, null]
+
+                        // 1) Override del backend
+                        const override = overrides?.[id] || null
+                        if (override) {
+                            return [id, override]
+                        }
+
+                        // 2) Mejor backdrop EN -> ES vía /images
+                        let chosen = await fetchBackdropEsThenEn(id)
+
+                        // 3) Fallback a lo que venga de TMDb
+                        if (!chosen) {
+                            chosen = movie.backdrop_path || movie.poster_path || null
+                        }
+
+                        return [id, chosen]
+                    })
+                )
 
                 if (canceled) return
 
                 const map = {}
-                for (const movie of items) {
-                    const override = overrides?.[movie.id] || null
-                    map[movie.id] =
-                        override || movie.backdrop_path || movie.poster_path || null
+                for (const [id, path] of entries) {
+                    if (!id) continue
+                    map[id] = path
                 }
 
                 setHeroBackdrops(map)
@@ -872,7 +937,7 @@ function TopRatedHero({ items, isTouchDevice }) {
                 if (canceled) return
                 console.error('Error cargando backdrops del hero', err)
 
-                // fallback: usamos solo lo que viene de TMDb
+                // fallback total: usamos solo lo que viene de TMDb
                 const map = {}
                 for (const movie of items) {
                     map[movie.id] = movie.backdrop_path || movie.poster_path || null
@@ -960,7 +1025,7 @@ function TopRatedHero({ items, isTouchDevice }) {
                             breakpoints={{
                                 0: { spaceBetween: 12 },
                                 640: { spaceBetween: 16 },
-                                1024: { spaceBetween: 20 },
+                                1024: { spaceBetween: 20 }
                             }}
                         >
                             {items.map((movie) => {
