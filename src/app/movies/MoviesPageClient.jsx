@@ -759,9 +759,9 @@ function InlinePreviewCard({ movie, heightClass }) {
                                 <iframe
                                     key={trailer.key}
                                     className="absolute left-1/2 top-1/2
-                 w-[160%] h-[160%]
-                 -translate-x-1/2 -translate-y-1/2
-                 pointer-events-none"
+                                        w-[160%] h-[160%]
+                                        -translate-x-1/2 -translate-y-1/2
+                                        pointer-events-none"
                                     src={trailerSrc}
                                     title={`Trailer - ${movie.title || movie.name}`}
                                     allow="autoplay; encrypted-media; picture-in-picture"
@@ -771,6 +771,11 @@ function InlinePreviewCard({ movie, heightClass }) {
                         )}
                     </>
                 )}
+                {/* Difuminado inferior para evitar “corte” con la zona de propiedades */}
+                <div
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-2
+                        bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95"
+                />
             </div>
 
             {/* === FILA 2: Propiedades + Acciones (sin título) === */}
