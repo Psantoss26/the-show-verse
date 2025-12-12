@@ -1,4 +1,3 @@
-// src/app/favorites/page.jsx
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
@@ -6,12 +5,174 @@ import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { fetchFavoritesForUser, getExternalIds } from '@/lib/api/tmdb'
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
-import {
-  Loader2,
-  Heart,
-  FilmIcon,
-  TvIcon
-} from 'lucide-react'
+import { Loader2, Heart, FilmIcon, TvIcon } from 'lucide-react'
+
+// ================== Posters "best EN" (Favoritas/Pendientes) ==================
+const posterChoiceCache = new Map() // key -> file_path|null
+const posterInFlight = new Map() // key -> Promise
+
+function buildImg(path, size = 'w500') {
+  return `https://image.tmdb.org/t/p/${size}${path}`
+}
+
+function preloadImage(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(false)
+    const img = new Image()
+    img.onload = () => resolve(true)
+    img.onerror = () => resolve(false)
+    img.src = src
+  })
+}
+
+function getPosterPreference(type, id) {
+  if (typeof window === 'undefined') return null
+  const key =
+    type === 'tv'
+      ? `showverse:tv:${id}:poster`
+      : `showverse:movie:${id}:poster`
+  return window.localStorage.getItem(key) || null
+}
+
+function pickBestPosterEN(posters) {
+  if (!Array.isArray(posters) || posters.length === 0) return null
+
+  // 1) Máximo vote_count (prioridad absoluta)
+  const maxVotes = posters.reduce((max, p) => {
+    const vc = p.vote_count || 0
+    return vc > max ? vc : max
+  }, 0)
+
+  const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes)
+  if (!withMaxVotes.length) return null
+
+  const preferredLangs = new Set(['en', 'en-US'])
+
+  // 2) Dentro del grupo de más votos: preferimos EN
+  const enGroup = withMaxVotes.filter(
+    (p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1)
+  )
+
+  // 3) Si no hay EN, aceptamos sin idioma (null) antes que otros idiomas
+  const nullLang = withMaxVotes.filter((p) => p.iso_639_1 === null)
+
+  const candidates = enGroup.length
+    ? enGroup
+    : nullLang.length
+      ? nullLang
+      : withMaxVotes
+
+  // 4) Orden final: vote_average desc, resolución (width) desc
+  const sorted = [...candidates].sort((a, b) => {
+    const va = (b.vote_average || 0) - (a.vote_average || 0)
+    if (va !== 0) return va
+    return (b.width || 0) - (a.width || 0)
+  })
+
+  return sorted[0] || null
+}
+
+async function fetchBestPosterEN(type, id) {
+  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
+  if (!apiKey || !type || !id) return null
+
+  try {
+    const url =
+      `https://api.themoviedb.org/3/${type}/${id}/images` +
+      `?api_key=${apiKey}` +
+      `&include_image_language=en,en-US,null`
+
+    const r = await fetch(url, { cache: 'force-cache' })
+    if (!r.ok) return null
+    const j = await r.json()
+    const posters = Array.isArray(j?.posters) ? j.posters : []
+    return pickBestPosterEN(posters)?.file_path || null
+  } catch {
+    return null
+  }
+}
+
+async function getBestPosterCached(type, id) {
+  const key = `${type}:${id}`
+  if (posterChoiceCache.has(key)) return posterChoiceCache.get(key)
+
+  if (posterInFlight.has(key)) return posterInFlight.get(key)
+
+  const p = (async () => {
+    const chosen = await fetchBestPosterEN(type, id)
+    posterChoiceCache.set(key, chosen || null)
+    posterInFlight.delete(key)
+    return chosen || null
+  })()
+
+  posterInFlight.set(key, p)
+  return p
+}
+
+function SmartPoster({ item, title }) {
+  const [src, setSrc] = useState(null)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    let abort = false
+
+    const load = async () => {
+      setReady(false)
+
+      const type = item.media_type || (item.title ? 'movie' : 'tv')
+
+      // 0) Preferencia del usuario (si existe)
+      const pref = getPosterPreference(type, item.id)
+      if (pref) {
+        const url = buildImg(pref, 'w500')
+        await preloadImage(url)
+        if (!abort) {
+          setSrc(url)
+          setReady(true)
+        }
+        return
+      }
+
+      // 1) Mejor EN (votos/calidad/resolución) cacheado
+      const best = await getBestPosterCached(type, item.id)
+
+      // 2) Fallbacks
+      const fallbackPath = best || item.poster_path || item.backdrop_path || null
+      const url = fallbackPath ? buildImg(fallbackPath, 'w500') : null
+      if (url) await preloadImage(url)
+
+      if (!abort) {
+        setSrc(url)
+        setReady(!!url)
+      }
+    }
+
+    load()
+    return () => {
+      abort = true
+    }
+  }, [item])
+
+  if (!ready || !src) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center text-neutral-600 p-4 text-center bg-neutral-800">
+        <FilmIcon className="w-12 h-12 mb-2 opacity-50" />
+        <span className="text-sm font-medium">{title}</span>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt={title}
+      loading="lazy"
+      decoding="async"
+      className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+    />
+  )
+}
+// ======================================================================
 
 // --- Helper para enriquecer con IMDb ---
 async function enrichItemsWithImdb(items, batchSize = 6) {
@@ -180,10 +341,8 @@ export default function FavoritesPage() {
       const dateB = isMovieB ? b.release_date : b.first_air_date
       const yearA = dateA ? parseInt(dateA.slice(0, 4)) : 0
       const yearB = dateB ? parseInt(dateB.slice(0, 4)) : 0
-      const ratingA =
-        typeof a.vote_average === 'number' ? a.vote_average : 0
-      const ratingB =
-        typeof b.vote_average === 'number' ? b.vote_average : 0
+      const ratingA = typeof a.vote_average === 'number' ? a.vote_average : 0
+      const ratingB = typeof b.vote_average === 'number' ? b.vote_average : 0
       const titleA = (isMovieA ? a.title : a.name || '').toLowerCase()
       const titleB = (isMovieB ? b.title : b.name || '').toLowerCase()
 
@@ -311,7 +470,6 @@ export default function FavoritesPage() {
 
         {/* Contenido / Grid / Estados */}
         {isInitialLoading ? (
-          // ÚNICO estado de carga previo al contenido
           <div className="flex items-center justify-center py-20 min-h-[50vh] gap-3">
             <Loader2 className="w-6 h-6 animate-spin text-yellow-500" />
             <span className="text-neutral-300 text-lg">
@@ -319,7 +477,6 @@ export default function FavoritesPage() {
             </span>
           </div>
         ) : error ? (
-          // Error
           <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-red-700 rounded-xl bg-red-950/20">
             <FilmIcon className="w-12 h-12 text-red-500 mb-3" />
             <p className="text-red-400 text-lg mb-2">{error}</p>
@@ -331,7 +488,6 @@ export default function FavoritesPage() {
             </button>
           </div>
         ) : processedItems.length === 0 ? (
-          // Sin resultados / sin favoritas
           <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-neutral-800 rounded-xl bg-neutral-900/20">
             <FilmIcon className="w-12 h-12 text-neutral-600 mb-3" />
             <p className="text-neutral-400 text-lg">
@@ -349,18 +505,11 @@ export default function FavoritesPage() {
             </button>
           </div>
         ) : (
-          // Grid de resultados
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
             {processedItems.map((item) => {
               const isMovie = item.media_type === 'movie'
               const href = `/details/${item.media_type || (isMovie ? 'movie' : 'tv')}/${item.id}`
               const title = isMovie ? item.title : item.name
-
-              const imagePath = item.poster_path
-                ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
-                : item.backdrop_path
-                  ? `https://image.tmdb.org/t/p/w500${item.backdrop_path}`
-                  : null
 
               return (
                 <Link
@@ -370,20 +519,8 @@ export default function FavoritesPage() {
                   title={title}
                 >
                   <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-neutral-900 shadow-xl group-hover:shadow-emerald-900/30 group-hover:shadow-2xl transition-all duration-500 ease-out group-hover:-translate-y-2 z-0 border border-white/5 group-hover:border-white/20">
-                    {/* Imagen */}
-                    {imagePath ? (
-                      <img
-                        src={imagePath}
-                        alt={title}
-                        loading="lazy"
-                        className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-neutral-600 p-4 text-center bg-neutral-800">
-                        <FilmIcon className="w-12 h-12 mb-2 opacity-50" />
-                        <span className="text-sm font-medium">{title}</span>
-                      </div>
-                    )}
+                    {/* Imagen (BEST EN + votos/calidad/resolución) */}
+                    <SmartPoster item={item} title={title} />
 
                     {/* Overlay sutil */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
