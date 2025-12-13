@@ -470,6 +470,7 @@ function InlinePreviewCard({ movie, heightClass }) {
     const [showTrailer, setShowTrailer] = useState(false)
     const [trailer, setTrailer] = useState(null) // { key, site, type } | null
     const [trailerLoading, setTrailerLoading] = useState(false)
+    const trailerIframeRef = useRef(null)
 
     // Reset de trailer al cambiar de película
     useEffect(() => {
@@ -718,7 +719,8 @@ function InlinePreviewCard({ movie, heightClass }) {
         trailer?.key
             ? `https://www.youtube-nocookie.com/embed/${trailer.key}` +
             `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
-            `&controls=0&iv_load_policy=3&disablekb=1&fs=0`
+            `&controls=0&iv_load_policy=3&disablekb=1&fs=0` +
+            `&enablejsapi=1&origin=${typeof window !== 'undefined' ? encodeURIComponent(window.location.origin) : ''}`
             : null
 
     return (
@@ -758,14 +760,34 @@ function InlinePreviewCard({ movie, heightClass }) {
                             <div className="absolute inset-0 overflow-hidden">
                                 <iframe
                                     key={trailer.key}
+                                    ref={trailerIframeRef}
                                     className="absolute left-1/2 top-1/2
-                                        w-[160%] h-[160%]
+                                        w-[140%] h-[180%]
                                         -translate-x-1/2 -translate-y-1/2
                                         pointer-events-none"
                                     src={trailerSrc}
                                     title={`Trailer - ${movie.title || movie.name}`}
                                     allow="autoplay; encrypted-media; picture-in-picture"
                                     allowFullScreen={false}
+                                    onLoad={() => {
+                                        try {
+                                            const win = trailerIframeRef.current?.contentWindow
+                                            if (!win) return
+
+                                            const target = 'https://www.youtube-nocookie.com'
+                                            const cmd = (func, args = []) =>
+                                                win.postMessage(
+                                                    JSON.stringify({ event: 'command', func, args }),
+                                                    target
+                                                )
+
+                                            // Pequeño delay para asegurar que el player acepta comandos
+                                            setTimeout(() => {
+                                                cmd('unMute')
+                                                cmd('setVolume', [30])
+                                            }, 120)
+                                        } catch { }
+                                    }}
                                 />
                             </div>
                         )}
