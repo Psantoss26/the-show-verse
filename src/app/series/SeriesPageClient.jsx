@@ -230,11 +230,7 @@ async function getShowImages(showId) {
  *  4) Opcional: filtra por minWidth si hay alternativas
  * ==================================================================== */
 function pickBestByLangThenResolutionFirst(list, opts = {}) {
-    const {
-        preferLangs = ['en', 'en-US'],
-        minWidth = 0
-    } = opts
-
+    const { preferLangs = ['en', 'en-US'], minWidth = 0 } = opts
     if (!Array.isArray(list) || list.length === 0) return null
 
     const lang = (img) => img?.iso_639_1 || null
@@ -245,14 +241,13 @@ function pickBestByLangThenResolutionFirst(list, opts = {}) {
     const pool0 = sizeFiltered.length ? sizeFiltered : list
 
     const hasPreferred = pool0.some((img) => preferLangs.includes(lang(img)))
-    const pool1 = hasPreferred ? pool0.filter((img) => preferLangs.includes(lang(img))) : pool0
+    const pool1 = hasPreferred
+        ? pool0.filter((img) => preferLangs.includes(lang(img)))
+        : pool0
 
     let maxArea = 0
     for (const img of pool1) maxArea = Math.max(maxArea, area(img))
-
-    for (const img of pool1) {
-        if (area(img) === maxArea) return img
-    }
+    for (const img of pool1) if (area(img) === maxArea) return img
 
     return pool1[0] || null
 }
@@ -285,8 +280,9 @@ async function fetchBestTVBackdrop(showId) {
 
 /* ====================================================================
  * Portada TV 2:3 con caché + preferencia usuario + NUEVO criterio
+ *  - En móvil usamos object-contain para NO recortar
  * ==================================================================== */
-function PosterImage({ show, cache, heightClass }) {
+function PosterImage({ show, cache, heightClass, fit = 'cover' }) {
     const [posterPath, setPosterPath] = useState(null)
     const [ready, setReady] = useState(false)
 
@@ -296,7 +292,6 @@ function PosterImage({ show, cache, heightClass }) {
         const resolvePoster = async () => {
             if (!show) return
 
-            // 1) Preferencia del usuario
             const { poster: userPoster } = getTVArtworkPreference(show.id)
             if (userPoster) {
                 const url = buildImg(userPoster, 'w342')
@@ -309,7 +304,6 @@ function PosterImage({ show, cache, heightClass }) {
                 return
             }
 
-            // 2) Cache en memoria
             const cached = cache.current.get(show.id)
             if (cached) {
                 const url = buildImg(cached, 'w342')
@@ -321,11 +315,9 @@ function PosterImage({ show, cache, heightClass }) {
                 return
             }
 
-            // 3) NUEVO criterio posters
             setReady(false)
             const preferred = await fetchBestTVPoster(show.id)
-            const chosen =
-                preferred || show.poster_path || show.backdrop_path || null
+            const chosen = preferred || show.poster_path || show.backdrop_path || null
 
             const url = chosen ? buildImg(chosen, 'w342') : null
             await preloadImage(url)
@@ -343,20 +335,133 @@ function PosterImage({ show, cache, heightClass }) {
         }
     }, [show, cache])
 
-    if (!ready || !posterPath) {
-        return (
-            <div className={`w-full ${heightClass} rounded-3xl bg-neutral-800 animate-pulse`} />
-        )
-    }
+    const objectClass = fit === 'contain' ? 'object-contain' : 'object-cover'
 
     return (
-        <img
-            src={buildImg(posterPath, 'w342')}
-            alt={show.name || show.title}
-            className={`w-full ${heightClass} object-cover rounded-3xl`}
-            loading="lazy"
-            decoding="async"
-        />
+        <>
+            {!ready && (
+                <div className={`w-full ${heightClass} rounded-3xl bg-neutral-800 animate-pulse`} />
+            )}
+
+            {ready && posterPath && (
+                <img
+                    src={buildImg(posterPath, 'w342')}
+                    alt={show.name || show.title}
+                    className={`w-full ${heightClass} ${objectClass} rounded-3xl`}
+                    loading="lazy"
+                    decoding="async"
+                />
+            )}
+        </>
+    )
+}
+
+/* ====================================================================
+ * TOP 10 (MÓVIL): Backdrop completo + número + 1 por vista
+ * ==================================================================== */
+function Top10MobileBackdropCardTV({ show, rank }) {
+    const [backdropPath, setBackdropPath] = useState(null)
+    const [ready, setReady] = useState(false)
+
+    useEffect(() => {
+        let abort = false
+
+        const load = async () => {
+            if (!show?.id) return
+
+            setReady(false)
+
+            const { backdrop: userBackdrop } = getTVArtworkPreference(show.id)
+            if (userBackdrop) {
+                tvBackdropCache.set(show.id, userBackdrop)
+                await preloadImage(buildImg(userBackdrop, 'w1280'))
+                if (!abort) {
+                    setBackdropPath(userBackdrop)
+                    setReady(true)
+                }
+                return
+            }
+
+            const cached = tvBackdropCache.get(show.id)
+            if (cached !== undefined) {
+                if (cached) await preloadImage(buildImg(cached, 'w1280'))
+                if (!abort) {
+                    setBackdropPath(cached || null)
+                    setReady(!!cached)
+                }
+                return
+            }
+
+            let chosen = null
+            try {
+                const preferred = await fetchBestTVBackdrop(show.id)
+                chosen = preferred || show.backdrop_path || show.poster_path || null
+            } catch {
+                chosen = show.backdrop_path || show.poster_path || null
+            }
+
+            tvBackdropCache.set(show.id, chosen)
+            if (chosen) await preloadImage(buildImg(chosen, 'w1280'))
+
+            if (!abort) {
+                setBackdropPath(chosen)
+                setReady(!!chosen)
+            }
+        }
+
+        load()
+        return () => {
+            abort = true
+        }
+    }, [show])
+
+    const href = `/details/tv/${show.id}`
+    const src = backdropPath ? buildImg(backdropPath, 'w1280') : null
+
+    return (
+        <Link href={href} className="block w-full">
+            <div className="relative w-full rounded-3xl overflow-hidden bg-neutral-900 aspect-[16/9]">
+                {!ready && <div className="absolute inset-0 bg-neutral-900 animate-pulse" />}
+
+                {ready && src && (
+                    <>
+                        {/* Fondo blur para rellenar sin recortar */}
+                        <img
+                            src={buildImg(backdropPath, 'w780')}
+                            alt=""
+                            aria-hidden="true"
+                            className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                        {/* Backdrop completo */}
+                        <img
+                            src={src}
+                            alt={show.name || show.title}
+                            className="absolute inset-0 w-full h-full object-contain"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </>
+                )}
+
+                {/* Número */}
+                <div className="absolute left-4 bottom-3 z-10 select-none">
+                    <div
+                        className="font-black leading-none
+              text-[72px]
+              bg-gradient-to-b from-blue-900/50 via-blue-600/35 to-blue-400/25
+              bg-clip-text text-transparent
+              drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]"
+                        style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                    >
+                        {rank}
+                    </div>
+                </div>
+
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+            </div>
+        </Link>
     )
 }
 
@@ -423,7 +528,6 @@ function InlinePreviewCard({ show, heightClass }) {
         if (!show) return
 
         const loadAll = async () => {
-            // === BACKDROP (nuevo criterio) ===
             const { backdrop: userBackdrop } = getTVArtworkPreference(show.id)
             const userPreferredBackdrop = userBackdrop || null
 
@@ -452,10 +556,7 @@ function InlinePreviewCard({ show, heightClass }) {
                     try {
                         const preferred = await fetchBestTVBackdrop(show.id)
                         const chosen =
-                            preferred ||
-                            show.backdrop_path ||
-                            show.poster_path ||
-                            null
+                            preferred || show.backdrop_path || show.poster_path || null
 
                         tvBackdropCache.set(show.id, chosen)
 
@@ -479,7 +580,6 @@ function InlinePreviewCard({ show, heightClass }) {
                 }
             }
 
-            // === EXTRAS ===
             const cachedExtras = tvExtrasCache.get(show.id)
             if (cachedExtras) {
                 if (!abort) setExtras(cachedExtras)
@@ -634,7 +734,8 @@ function InlinePreviewCard({ show, heightClass }) {
             `&controls=0&iv_load_policy=3&disablekb=1&fs=0` +
             `&enablejsapi=1&origin=${typeof window !== 'undefined'
                 ? encodeURIComponent(window.location.origin)
-                : ''}`
+                : ''
+            }`
             : null
 
     return (
@@ -671,9 +772,9 @@ function InlinePreviewCard({ show, heightClass }) {
                                     key={trailer.key}
                                     ref={trailerIframeRef}
                                     className="absolute left-1/2 top-1/2
-                                        w-[140%] h-[180%]
-                                        -translate-x-1/2 -translate-y-1/2
-                                        pointer-events-none"
+                      w-[140%] h-[180%]
+                      -translate-x-1/2 -translate-y-1/2
+                      pointer-events-none"
                                     src={trailerSrc}
                                     title={`Trailer - ${show.name || show.title}`}
                                     allow="autoplay; encrypted-media; picture-in-picture"
@@ -704,7 +805,7 @@ function InlinePreviewCard({ show, heightClass }) {
 
                 <div
                     className="pointer-events-none absolute inset-x-0 bottom-0 h-2
-                        bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95"
+            bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95"
                 />
             </div>
 
@@ -755,9 +856,7 @@ function InlinePreviewCard({ show, heightClass }) {
                         )}
 
                         {error && (
-                            <p className="mt-1 text-[11px] text-red-400 line-clamp-1">
-                                {error}
-                            </p>
+                            <p className="mt-1 text-[11px] text-red-400 line-clamp-1">{error}</p>
                         )}
                     </div>
 
@@ -823,9 +922,48 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
     const [canNext, setCanNext] = useState(false)
     const [hoveredId, setHoveredId] = useState(null)
 
-    const hasActivePreview = !!hoveredId
     const isTop10 = title === 'Top 10 hoy en España'
-    const heightClass = 'h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
+    const hasActivePreview = !!hoveredId
+
+    // ✅ móvil: posters 2:3 sin recorte / desktop: tu height original
+    const heightClass = isTouchDevice
+        ? 'aspect-[2/3]'
+        : 'h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
+
+    // ✅ TOP 10 SOLO MÓVIL: backdrop completo + 1 por vista (desktop intacto)
+    if (isTop10 && isTouchDevice) {
+        return (
+            <div className="relative group">
+                <h3 className="text-2xl sm:text-3xl md:text-4xl font-[730] text-primary-text mb-4 sm:text-left">
+                    <span
+                        className={`bg-gradient-to-b from-blue-600 via-blue-400 to-white bg-clip-text text-transparent tracking-widest uppercase ${anton.className}`}
+                    >
+                        {title}
+                    </span>
+                </h3>
+
+                <Swiper
+                    slidesPerView={1}
+                    spaceBetween={14}
+                    loop={false}
+                    watchOverflow={true}
+                    allowTouchMove={true}
+                    grabCursor={false}
+                    preventClicks={true}
+                    preventClicksPropagation={true}
+                    threshold={5}
+                    modules={[Navigation]}
+                    className="group relative"
+                >
+                    {items.map((s, i) => (
+                        <SwiperSlide key={s.id} className="select-none">
+                            <Top10MobileBackdropCardTV show={s} rank={i + 1} />
+                        </SwiperSlide>
+                    ))}
+                </Swiper>
+            </div>
+        )
+    }
 
     const updateNav = (swiper) => {
         if (!swiper) return
@@ -880,8 +1018,9 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                 }}
             >
                 <Swiper
+                    // ✅ móvil: 3 posters visibles / desktop: auto (como antes)
+                    slidesPerView={isTouchDevice ? 3 : 'auto'}
                     spaceBetween={isTop10 ? 24 : 16}
-                    slidesPerView="auto"
                     onSwiper={handleSwiper}
                     onSlideChange={updateNav}
                     onResize={updateNav}
@@ -897,35 +1036,41 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     modules={[Navigation]}
                     className="group relative"
                     breakpoints={{
-                        0: { spaceBetween: isTop10 ? 16 : 12 },
-                        640: { spaceBetween: isTop10 ? 20 : 14 },
-                        1024: { spaceBetween: isTop10 ? 28 : 18 },
-                        1280: { spaceBetween: isTop10 ? 32 : 20 }
+                        0: { slidesPerView: isTop10 ? 'auto' : 3, spaceBetween: isTop10 ? 16 : 12 },
+                        640: { slidesPerView: 'auto', spaceBetween: isTop10 ? 20 : 14 },
+                        1024: { slidesPerView: 'auto', spaceBetween: isTop10 ? 28 : 18 },
+                        1280: { slidesPerView: 'auto', spaceBetween: isTop10 ? 32 : 20 }
                     }}
                 >
                     {items.map((s, i) => {
-                        const isActive = hoveredId === s.id
+                        const isActive = !isTouchDevice && hoveredId === s.id
                         const isLast = i === items.length - 1
 
-                        const base =
-                            'relative flex-shrink-0 transition-all duration-300 ease-out'
+                        const base = 'relative flex-shrink-0 transition-all duration-300 ease-out'
 
-                        const sizeClasses = isActive
-                            ? 'w-[320px] sm:w-[380px] md:w-[430px] xl:w-[480px] z-20'
-                            : 'w-[140px] sm:w-[170px] md:w-[190px] xl:w-[210px] z-10'
+                        // ✅ móvil: ocupa el ancho del slide (1/3 viewport). Desktop: tus tamaños.
+                        const sizeClasses = isTouchDevice
+                            ? 'w-full z-10'
+                            : isActive
+                                ? 'w-[320px] sm:w-[380px] md:w-[430px] xl:w-[480px] z-20'
+                                : 'w-[140px] sm:w-[170px] md:w-[190px] xl:w-[210px] z-10'
 
                         const transformClass =
-                            isActive && isLast
+                            !isTouchDevice && isActive && isLast
                                 ? '-translate-x-[190px] sm:-translate-x-[230px] md:-translate-x-[260px] xl:-translate-x-[290px]'
                                 : ''
 
                         const cardElement = (
                             <div
                                 className={`${base} ${sizeClasses} ${heightClass} ${transformClass}`}
-                                onMouseEnter={() => setHoveredId(s.id)}
-                                onMouseLeave={() =>
-                                    setHoveredId((prev) => (prev === s.id ? null : prev))
-                                }
+                                onMouseEnter={() => {
+                                    if (!isTouchDevice) setHoveredId(s.id)
+                                }}
+                                onMouseLeave={() => {
+                                    if (!isTouchDevice) {
+                                        setHoveredId((prev) => (prev === s.id ? null : prev))
+                                    }
+                                }}
                             >
                                 <AnimatePresence initial={false} mode="wait">
                                     {isActive ? (
@@ -953,6 +1098,8 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                                     show={s}
                                                     cache={posterCacheRef}
                                                     heightClass={heightClass}
+                                                    // ✅ móvil: no recortar
+                                                    fit={isTouchDevice ? 'contain' : 'cover'}
                                                 />
                                             </Link>
                                         </motion.div>
@@ -962,13 +1109,16 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         )
 
                         return (
-                            <SwiperSlide key={s.id} className="!w-auto select-none">
+                            <SwiperSlide
+                                key={s.id}
+                                className={isTouchDevice ? 'select-none' : '!w-auto select-none'}
+                            >
                                 {isTop10 ? (
                                     <div className="flex items-center">
                                         <div
                                             className="text-[150px] sm:text-[180px] md:text-[220px] xl:text-[260px] font-black z-0 select-none
-                                    bg-gradient-to-b from-blue-900/40 via-blue-600/30 to-blue-400/20 bg-clip-text text-transparent
-                                    drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]"
+                        bg-gradient-to-b from-blue-900/40 via-blue-600/30 to-blue-400/20 bg-clip-text text-transparent
+                        drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]"
                                             style={{
                                                 fontFamily: 'system-ui, -apple-system, sans-serif',
                                                 lineHeight: 0.8,
@@ -993,10 +1143,10 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         type="button"
                         onClick={handlePrevClick}
                         className="absolute inset-y-0 left-0 w-28 z-30
-                           hidden sm:flex items-center justify-start
-                           bg-gradient-to-r from-black/80 via-black/55 to-transparent
-                           hover:from-black/95 hover:via-black/75
-                           transition-colors pointer-events-auto"
+              hidden sm:flex items-center justify-start
+              bg-gradient-to-r from-black/80 via-black/55 to-transparent
+              hover:from-black/95 hover:via-black/75
+              transition-colors pointer-events-auto"
                     >
                         <span className="ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ‹
@@ -1009,10 +1159,10 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         type="button"
                         onClick={handleNextClick}
                         className="absolute inset-y-0 right-0 w-28 z-30
-                           hidden sm:flex items-center justify-end
-                           bg-gradient-to-l from-black/80 via-black/55 to-transparent
-                           hover:from-black/95 hover:via-black/75
-                           transition-colors pointer-events-auto"
+              hidden sm:flex items-center justify-end
+              bg-gradient-to-l from-black/80 via-black/55 to-transparent
+              hover:from-black/95 hover:via-black/75
+              transition-colors pointer-events-auto"
                     >
                         <span className="mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ›
