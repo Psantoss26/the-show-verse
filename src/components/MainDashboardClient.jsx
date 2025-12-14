@@ -136,8 +136,8 @@ function getArtworkPreference(movieId) {
 function pickBestBackdropByLangResVotes(list, opts = {}) {
     const {
         preferLangs = ['en', 'en-US'],
-        resolutionWindow = 0.98, // 0.98 = permite empates “casi” máximos para desempatar por votos
-        minWidth = 1200 // descarta backdrops pequeños si hay alternativas
+        resolutionWindow = 0.98,
+        minWidth = 1200
     } = opts
 
     if (!Array.isArray(list) || list.length === 0) return null
@@ -145,20 +145,16 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
     const area = (img) => (img?.width || 0) * (img?.height || 0)
     const lang = (img) => img?.iso_639_1 || null
 
-    // 0) filtro opcional por ancho mínimo
     const sizeFiltered = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
     const pool0 = sizeFiltered.length ? sizeFiltered : list
 
-    // 1) idioma: si hay EN, compiten solo EN
     const hasPreferred = pool0.some((b) => preferLangs.includes(lang(b)))
     const pool1 = hasPreferred ? pool0.filter((b) => preferLangs.includes(lang(b))) : pool0
 
-    // 2) resolución: top (o casi top)
     const maxArea = Math.max(...pool1.map(area))
     const threshold = maxArea * (typeof resolutionWindow === 'number' ? resolutionWindow : 1.0)
     const pool2 = pool1.filter((b) => area(b) >= threshold)
 
-    // 3) desempate por votos/calidad
     const sorted = [...pool2].sort((a, b) => {
         const aA = area(a)
         const bA = area(b)
@@ -178,12 +174,12 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
  * MISMO CRITERIO QUE BACKDROPS, PERO PARA POSTERS:
  *  1) Idioma EN (si existe)
  *  2) Mejor resolución (área = width*height)
- *  3) Votos (vote_count, luego vote_average)
+ *  3) De las de máxima resolución => la PRIMERA (estable)
  * ==================================================================== */
 function pickBestPosterByLangThenResolution(list, opts = {}) {
     const {
         preferLangs = ['en', 'en-US'],
-        minWidth = 500 // opcional: descarta posters muy pequeños si hay alternativas
+        minWidth = 500
     } = opts
 
     if (!Array.isArray(list) || list.length === 0) return null
@@ -191,20 +187,16 @@ function pickBestPosterByLangThenResolution(list, opts = {}) {
     const area = (img) => (img?.width || 0) * (img?.height || 0)
     const lang = (img) => img?.iso_639_1 || null
 
-    // 0) filtro opcional por tamaño mínimo
     const sizeFiltered =
         minWidth > 0 ? list.filter((p) => (p?.width || 0) >= minWidth) : list
     const pool0 = sizeFiltered.length ? sizeFiltered : list
 
-    // 1) idioma: si hay EN, compiten solo EN
     const hasPreferred = pool0.some((p) => preferLangs.includes(lang(p)))
     const pool1 = hasPreferred ? pool0.filter((p) => preferLangs.includes(lang(p))) : pool0
 
-    // 2) resolución: quedarnos con el máximo área
     let maxArea = 0
     for (const p of pool1) maxArea = Math.max(maxArea, area(p))
 
-    // 3) entre las de max resolución, elegir la primera que aparece (orden original)
     for (const p of pool1) {
         if (area(p) === maxArea) return p
     }
@@ -271,50 +263,6 @@ async function fetchBestPoster(movieId) {
     return best?.file_path || null
 }
 
-/* ========= Poster: mantengo tu función actual (EN -> ES) ========= */
-async function fetchMoviePosterEsThenEn(movieId) {
-    try {
-        const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
-        if (!apiKey || !movieId) return null
-
-        const url =
-            `https://api.themoviedb.org/3/movie/${movieId}/images` +
-            `?api_key=${apiKey}` +
-            `&include_image_language=es,es-ES,en,en-US`
-
-        const r = await fetch(url, { cache: 'force-cache' })
-        if (!r.ok) throw new Error('TMDb movie images error')
-
-        const j = await r.json()
-        const posters = Array.isArray(j?.posters) ? j.posters : []
-
-        const pickBestLang = (arr) => {
-            if (!arr.length) return null
-            const sorted = [...arr].sort((a, b) => {
-                const vc = (b.vote_count || 0) - (a.vote_count || 0)
-                if (vc !== 0) return vc
-                const va = (b.vote_average || 0) - (a.vote_average || 0)
-                if (va !== 0) return va
-                return (b.width || 0) - (a.width || 0)
-            })
-            return sorted[0] || null
-        }
-
-        const en = posters.filter((p) => p.iso_639_1 === 'en' || p.iso_639_1 === 'en-US')
-        const es = posters.filter((p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES')
-
-        const bestEn = pickBestLang(en)
-        if (bestEn?.file_path) return bestEn.file_path
-
-        const bestEs = pickBestLang(es)
-        if (bestEs?.file_path) return bestEs.file_path
-
-        return null
-    } catch {
-        return null
-    }
-}
-
 /* =================== TRAILERS (TMDb videos) =================== */
 const movieTrailerCache = new Map() // movieId -> { key, site, type } | null
 const movieTrailerInFlight = new Map() // movieId -> Promise
@@ -325,7 +273,6 @@ function pickBestTrailer(videos) {
     const yt = videos.filter((v) => v?.site === 'YouTube' && v?.key)
     if (!yt.length) return null
 
-    // ✅ preferir EN para evitar audio ES
     const preferredLang = yt.filter(
         (v) =>
             v?.iso_639_1 === 'en' ||
@@ -387,9 +334,9 @@ async function getBestTrailerCached(movieId) {
 }
 
 /* ====================================================================
- * Portada normal (2:3) — arranca en skeleton para evitar salto
+ * Portada (2:3) — en móvil: “3 por fila” completas (sin recorte)
  * ==================================================================== */
-function PosterImage({ movie, cache, heightClass }) {
+function PosterImage({ movie, cache, heightClass, isTouchDevice }) {
     const [posterPath, setPosterPath] = useState(null)
     const [ready, setReady] = useState(false)
 
@@ -424,7 +371,7 @@ function PosterImage({ movie, cache, heightClass }) {
                 return
             }
 
-            // 3) Lógica normal: mejor poster EN/ES o fallback de TMDb
+            // 3) Lógica normal: mejor poster EN + máxima resolución (estable)
             setReady(false)
             const preferred = await fetchBestPoster(movie.id)
             const chosen =
@@ -449,25 +396,53 @@ function PosterImage({ movie, cache, heightClass }) {
         }
     }, [movie, cache])
 
+    // ✅ móvil: aspect 2/3 + object-contain (NO recortar)
+    const boxClass = isTouchDevice ? 'aspect-[2/3]' : heightClass
+
     if (!ready || !posterPath) {
         return (
-            <div className={`w-full ${heightClass} rounded-3xl bg-neutral-800 animate-pulse`} />
+            <div className={`w-full ${boxClass} rounded-3xl bg-neutral-800 animate-pulse`} />
         )
     }
 
+    if (!isTouchDevice) {
+        // Desktop/tablet: mantener tu estética actual
+        return (
+            <img
+                src={buildImg(posterPath, 'w342')}
+                alt={movie.title || movie.name}
+                className={`w-full ${boxClass} object-cover rounded-3xl`}
+                loading="lazy"
+                decoding="async"
+            />
+        )
+    }
+
+    // Móvil: poster completo con fondo blur
     return (
-        <img
-            src={buildImg(posterPath, 'w342')}
-            alt={movie.title || movie.name}
-            className={`w-full ${heightClass} object-cover rounded-3xl`}
-            loading="lazy"
-            decoding="async"
-        />
+        <div className={`relative w-full ${boxClass} rounded-3xl overflow-hidden bg-neutral-900`}>
+            <img
+                src={buildImg(posterPath, 'w342')}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-110"
+                loading="lazy"
+                decoding="async"
+            />
+            <img
+                src={buildImg(posterPath, 'w342')}
+                alt={movie.title || movie.name}
+                className="absolute inset-0 w-full h-full object-contain"
+                loading="lazy"
+                decoding="async"
+            />
+        </div>
     )
 }
 
 /* ====================================================================
  * Vista previa inline tipo Amazon (backdrop horizontal) + TRAILER
+ *  (se mantiene, pero se DESACTIVA en móvil desde Row)
  * ==================================================================== */
 function InlinePreviewCard({ movie, heightClass }) {
     const { session, account } = useAuth()
@@ -486,20 +461,17 @@ function InlinePreviewCard({ movie, heightClass }) {
     const [updating, setUpdating] = useState(false)
     const [error, setError] = useState('')
 
-    // === TRAILER state ===
     const [showTrailer, setShowTrailer] = useState(false)
     const [trailer, setTrailer] = useState(null)
     const [trailerLoading, setTrailerLoading] = useState(false)
     const trailerIframeRef = useRef(null)
 
-    // Reset trailer al cambiar de película
     useEffect(() => {
         setShowTrailer(false)
         setTrailer(null)
         setTrailerLoading(false)
     }, [movie?.id])
 
-    // Estados de cuenta
     useEffect(() => {
         let cancel = false
         const load = async () => {
@@ -528,13 +500,11 @@ function InlinePreviewCard({ movie, heightClass }) {
         }
     }, [movie, session, account])
 
-    // Backdrop + extras con caché y preferencia de usuario
     useEffect(() => {
         let abort = false
         if (!movie) return
 
         const loadAll = async () => {
-            // === BACKDROP ===
             const { backdrop: userBackdrop } = getArtworkPreference(movie.id)
             const userPreferredBackdrop = userBackdrop || null
 
@@ -591,7 +561,6 @@ function InlinePreviewCard({ movie, heightClass }) {
                 }
             }
 
-            // === EXTRAS ===
             const cachedExtras = movieExtrasCache.get(movie.id)
             if (cachedExtras) {
                 if (!abort) setExtras(cachedExtras)
@@ -757,7 +726,6 @@ function InlinePreviewCard({ movie, heightClass }) {
                 window.location.href = href
             }}
         >
-            {/* === FILA 1: Backdrop o Trailer === */}
             <div className="relative w-full h-full bg-black">
                 {!showTrailer && !backdropReady && (
                     <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
@@ -822,10 +790,8 @@ function InlinePreviewCard({ movie, heightClass }) {
                 />
             </div>
 
-            {/* === FILA 2: Propiedades + Acciones (sin título) === */}
             <div className="w-full h-full bg-neutral-950/95 border-t border-neutral-800">
                 <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
-                    {/* Propiedades */}
                     <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
                             {yearOf(movie) && <span>{yearOf(movie)}</span>}
@@ -877,9 +843,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                         )}
                     </div>
 
-                    {/* Botones */}
                     <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                        {/* Trailer */}
                         <button
                             onClick={handleToggleTrailer}
                             disabled={trailerLoading}
@@ -942,7 +906,8 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
     const [hoveredId, setHoveredId] = useState(null)
 
     const hasActivePreview = !!hoveredId
-    const heightClass = 'h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
+    const heightClassDesktop = 'h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
+    const posterBoxClass = isTouchDevice ? 'aspect-[2/3]' : heightClassDesktop
 
     const updateNav = (swiper) => {
         if (!swiper) return
@@ -994,6 +959,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                 }}
             >
                 <Swiper
+                    // ✅ móvil: 3 posters por “fila” visibles
                     slidesPerView={3}
                     spaceBetween={12}
                     onSwiper={handleSwiper}
@@ -1017,15 +983,18 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     }}
                 >
                     {items.map((m, i) => {
+                        // ✅ móvil: NUNCA preview (click directo a details)
                         const isActive = !isTouchDevice && hoveredId === m.id
                         const isLast = i === items.length - 1
 
-                        const base =
-                            'relative flex-shrink-0 transition-all duration-300 ease-out'
+                        const base = 'relative flex-shrink-0 transition-all duration-300 ease-out'
 
-                        const sizeClasses = isActive
-                            ? 'w-full sm:w-[320px] md:w-[430px] xl:w-[480px] sm:z-20'
-                            : 'w-full sm:w-[140px] md:w-[190px] xl:w-[210px] sm:z-10'
+                        // ✅ móvil: ancho “auto” del Swiper (1/3), en desktop mantenemos tamaños
+                        const sizeClasses = isTouchDevice
+                            ? 'w-full'
+                            : isActive
+                                ? 'w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20'
+                                : 'w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10'
 
                         const transformClass =
                             !isTouchDevice && isActive && isLast
@@ -1033,9 +1002,13 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                 : ''
 
                         return (
-                            <SwiperSlide key={m.id} className="!w-auto select-none">
+                            <SwiperSlide
+                                key={m.id}
+                                // ✅ móvil: no forzamos !w-auto para que quepan 3 exactas
+                                className={isTouchDevice ? 'select-none' : '!w-auto select-none'}
+                            >
                                 <div
-                                    className={`${base} ${sizeClasses} ${heightClass} ${transformClass}`}
+                                    className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass}`}
                                     onMouseEnter={() => {
                                         if (!isTouchDevice) setHoveredId(m.id)
                                     }}
@@ -1053,7 +1026,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                                 transition={{ duration: 0.18 }}
                                                 className="w-full h-full hidden sm:block"
                                             >
-                                                <InlinePreviewCard movie={m} heightClass={heightClass} />
+                                                <InlinePreviewCard movie={m} heightClass={heightClassDesktop} />
                                             </motion.div>
                                         ) : (
                                             <motion.div
@@ -1068,7 +1041,8 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                                     <PosterImage
                                                         movie={m}
                                                         cache={posterCacheRef}
-                                                        heightClass={heightClass}
+                                                        heightClass={posterBoxClass}
+                                                        isTouchDevice={isTouchDevice}
                                                     />
                                                 </Link>
                                             </motion.div>
@@ -1161,24 +1135,19 @@ function TopRatedHero({ items, isTouchDevice }) {
                         const id = movie.id
                         if (!id) return [null, null]
 
-                        // 1) Override del backend
                         const override = overrides?.[id] || null
                         if (override) {
                             await preloadImage(buildImg(override, 'w780'))
                             return [id, override]
                         }
 
-                        // 2) Preferencia local del usuario
                         const { backdrop: userBackdrop } = getArtworkPreference(id)
                         if (userBackdrop) {
                             await preloadImage(buildImg(userBackdrop, 'w780'))
                             return [id, userBackdrop]
                         }
 
-                        // 3) NUEVO criterio global
                         let chosen = await fetchBestBackdrop(id)
-
-                        // 4) Fallback a TMDb
                         if (!chosen) chosen = movie.backdrop_path || movie.poster_path || null
 
                         if (chosen) await preloadImage(buildImg(chosen, 'w780'))
@@ -1256,18 +1225,19 @@ function TopRatedHero({ items, isTouchDevice }) {
             >
                 {!heroLoaded ? (
                     <div className="flex gap-4 overflow-hidden">
-                        {items.slice(0, 3).map((movie) => (
+                        {items.slice(0, 1).map((movie) => (
                             <div
                                 key={movie.id}
-                                className="flex-1 rounded-3xl bg-neutral-900 aspect-[16/9] animate-pulse"
+                                className="w-full rounded-3xl bg-neutral-900 aspect-[16/9] animate-pulse"
                             />
                         ))}
                     </div>
                 ) : (
                     <>
                         <Swiper
-                            spaceBetween={20}
-                            slidesPerView="auto"
+                            // ✅ móvil: 1 backdrop completo por “fila”
+                            slidesPerView={isTouchDevice ? 1 : 'auto'}
+                            spaceBetween={isTouchDevice ? 12 : 20}
                             autoplay={{ delay: 5000 }}
                             onSwiper={handleSwiper}
                             onSlideChange={updateNav}
@@ -1284,19 +1254,23 @@ function TopRatedHero({ items, isTouchDevice }) {
                             modules={[Navigation, Autoplay]}
                             className="group relative"
                             breakpoints={{
-                                0: { spaceBetween: 12 },
-                                640: { spaceBetween: 16 },
-                                1024: { spaceBetween: 20 }
+                                0: { slidesPerView: 1, spaceBetween: 12 },
+                                640: { slidesPerView: 'auto', spaceBetween: 16 },
+                                1024: { slidesPerView: 'auto', spaceBetween: 20 }
                             }}
                         >
                             {items.map((movie) => {
                                 const heroBackdrop = heroBackdrops[movie.id] || null
 
+                                const slideClass = isTouchDevice
+                                    ? '!w-full select-none'
+                                    : '!w-[75%] sm:!w-[55%] lg:!w-[40%] xl:!w-[33%] select-none'
+
                                 if (!heroBackdrop) {
                                     return (
                                         <SwiperSlide
                                             key={movie.id}
-                                            className="!w-[75%] sm:!w-[55%] lg:!w-[40%] xl:!w-[33%] select-none"
+                                            className={slideClass}
                                         >
                                             <Link href={`/details/movie/${movie.id}`}>
                                                 <div className="relative rounded-3xl bg-neutral-900 aspect-[16/9]" />
@@ -1308,10 +1282,20 @@ function TopRatedHero({ items, isTouchDevice }) {
                                 return (
                                     <SwiperSlide
                                         key={movie.id}
-                                        className="!w-[75%] sm:!w-[55%] lg:!w-[40%] xl:!w-[33%] select-none"
+                                        className={slideClass}
                                     >
                                         <Link href={`/details/movie/${movie.id}`}>
-                                            <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9]">
+                                            <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9] bg-neutral-900">
+                                                {/* Fondo blur para rellenar si hay bandas */}
+                                                <img
+                                                    src={buildImg(heroBackdrop, 'w780')}
+                                                    alt=""
+                                                    aria-hidden="true"
+                                                    className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                />
+                                                {/* ✅ móvil: backdrop entero (contain). Desktop: cover */}
                                                 <img
                                                     src={buildImg(heroBackdrop, 'w1280')}
                                                     srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
@@ -1320,7 +1304,8 @@ function TopRatedHero({ items, isTouchDevice }) {
                                                     )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
                                                     sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
                                                     alt={movie.title || movie.name}
-                                                    className="absolute inset-0 w-full h-full object-cover rounded-3xl hover:scale-105 transition-transform duration-300"
+                                                    className={`absolute inset-0 w-full h-full rounded-3xl ${isTouchDevice ? 'object-contain' : 'object-cover hover:scale-105'
+                                                        } transition-transform duration-300`}
                                                     loading="lazy"
                                                     decoding="async"
                                                 />
@@ -1331,7 +1316,7 @@ function TopRatedHero({ items, isTouchDevice }) {
                             })}
                         </Swiper>
 
-                        {showPrev && (
+                        {showPrev && !isTouchDevice && (
                             <button
                                 type="button"
                                 onClick={handlePrevClick}
@@ -1347,7 +1332,7 @@ function TopRatedHero({ items, isTouchDevice }) {
                             </button>
                         )}
 
-                        {showNext && (
+                        {showNext && !isTouchDevice && (
                             <button
                                 type="button"
                                 onClick={handleNextClick}
