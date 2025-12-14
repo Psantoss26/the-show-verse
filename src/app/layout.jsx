@@ -26,7 +26,9 @@ export default function RootLayout({ children }) {
       <body className="bg-black text-white">
         <AuthProvider>
           <Navbar />
-          {children}
+          <div className="pb-16 lg:pb-0">
+            {children}
+          </div>
           <Analytics />
           <SpeedInsights />
         </AuthProvider>
@@ -34,3 +36,4 @@ export default function RootLayout({ children }) {
     </html>
   )
 }
+

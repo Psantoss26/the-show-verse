@@ -13,7 +13,9 @@ import {
     HeartOff,
     BookmarkPlus,
     BookmarkMinus,
-    Loader2
+    Loader2,
+    Play,
+    X
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
@@ -51,9 +53,6 @@ const ratingOf = (m) =>
         ? m.vote_average.toFixed(1)
         : '–'
 
-const short = (t = '', n = 420) =>
-    t.length > n ? t.slice(0, n - 1) + '…' : t
-
 const formatRuntime = (mins) => {
     if (!mins || typeof mins !== 'number') return null
     const h = Math.floor(mins / 60)
@@ -86,7 +85,7 @@ const GENRES = {
     10752: 'Bélica',
     37: 'Western',
 
-    // TV (útil también en dashboard si mezclas contenido)
+    // TV (por si mezclas contenido)
     10759: 'Acción y aventura',
     10765: 'Ciencia ficción y fantasía',
     10762: 'Infantil',
@@ -97,7 +96,182 @@ const GENRES = {
     10768: 'Guerra y política'
 }
 
-/* ========= elegir mejor poster: EN -> ES, por votos/calidad ========= */
+/* --------- precargar una imagen --------- */
+function preloadImage(src) {
+    return new Promise((resolve) => {
+        if (!src) return resolve(false)
+        const img = new Image()
+        img.onload = () => resolve(true)
+        img.onerror = () => resolve(false)
+        img.src = src
+    })
+}
+
+/* =================== CACHÉS COMPARTIDOS (cliente) =================== */
+const movieExtrasCache = new Map() // movie.id -> { runtime, awards, imdbRating }
+const movieBackdropCache = new Map() // movie.id -> backdrop file_path | null | undefined
+const movieImagesCache = new Map() // movie.id -> { posters, backdrops }
+
+/* ======== Preferencias de artwork guardadas en localStorage ======== */
+function getArtworkPreference(movieId) {
+    if (typeof window === 'undefined') {
+        return { poster: null, backdrop: null }
+    }
+    const posterKey = `showverse:movie:${movieId}:poster`
+    const backdropKey = `showverse:movie:${movieId}:backdrop`
+    const poster = window.localStorage.getItem(posterKey)
+    const backdrop = window.localStorage.getItem(backdropKey)
+    return {
+        poster: poster || null,
+        backdrop: backdrop || null
+    }
+}
+
+/* ====================================================================
+ * NUEVO CRITERIO BACKDROPS:
+ *  1) Idioma EN (si existe)
+ *  2) Mejor resolución (área)
+ *  3) Votos (vote_count, luego vote_average)
+ * ==================================================================== */
+function pickBestBackdropByLangResVotes(list, opts = {}) {
+    const {
+        preferLangs = ['en', 'en-US'],
+        resolutionWindow = 0.98, // 0.98 = permite empates “casi” máximos para desempatar por votos
+        minWidth = 1200 // descarta backdrops pequeños si hay alternativas
+    } = opts
+
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    const area = (img) => (img?.width || 0) * (img?.height || 0)
+    const lang = (img) => img?.iso_639_1 || null
+
+    // 0) filtro opcional por ancho mínimo
+    const sizeFiltered = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
+    const pool0 = sizeFiltered.length ? sizeFiltered : list
+
+    // 1) idioma: si hay EN, compiten solo EN
+    const hasPreferred = pool0.some((b) => preferLangs.includes(lang(b)))
+    const pool1 = hasPreferred ? pool0.filter((b) => preferLangs.includes(lang(b))) : pool0
+
+    // 2) resolución: top (o casi top)
+    const maxArea = Math.max(...pool1.map(area))
+    const threshold = maxArea * (typeof resolutionWindow === 'number' ? resolutionWindow : 1.0)
+    const pool2 = pool1.filter((b) => area(b) >= threshold)
+
+    // 3) desempate por votos/calidad
+    const sorted = [...pool2].sort((a, b) => {
+        const aA = area(a)
+        const bA = area(b)
+        if (bA !== aA) return bA - aA
+        const w = (b.width || 0) - (a.width || 0)
+        if (w !== 0) return w
+        const vc = (b.vote_count || 0) - (a.vote_count || 0)
+        if (vc !== 0) return vc
+        const va = (b.vote_average || 0) - (a.vote_average || 0)
+        return va
+    })
+
+    return sorted[0] || null
+}
+
+/* ====================================================================
+ * MISMO CRITERIO QUE BACKDROPS, PERO PARA POSTERS:
+ *  1) Idioma EN (si existe)
+ *  2) Mejor resolución (área = width*height)
+ *  3) Votos (vote_count, luego vote_average)
+ * ==================================================================== */
+function pickBestPosterByLangThenResolution(list, opts = {}) {
+    const {
+        preferLangs = ['en', 'en-US'],
+        minWidth = 500 // opcional: descarta posters muy pequeños si hay alternativas
+    } = opts
+
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    const area = (img) => (img?.width || 0) * (img?.height || 0)
+    const lang = (img) => img?.iso_639_1 || null
+
+    // 0) filtro opcional por tamaño mínimo
+    const sizeFiltered =
+        minWidth > 0 ? list.filter((p) => (p?.width || 0) >= minWidth) : list
+    const pool0 = sizeFiltered.length ? sizeFiltered : list
+
+    // 1) idioma: si hay EN, compiten solo EN
+    const hasPreferred = pool0.some((p) => preferLangs.includes(lang(p)))
+    const pool1 = hasPreferred ? pool0.filter((p) => preferLangs.includes(lang(p))) : pool0
+
+    // 2) resolución: quedarnos con el máximo área
+    let maxArea = 0
+    for (const p of pool1) maxArea = Math.max(maxArea, area(p))
+
+    // 3) entre las de max resolución, elegir la primera que aparece (orden original)
+    for (const p of pool1) {
+        if (area(p) === maxArea) return p
+    }
+
+    return null
+}
+
+/* ========= Cargar / cachear imágenes de TMDb (posters + backdrops) ========= */
+async function getMovieImages(movieId) {
+    if (movieImagesCache.has(movieId)) return movieImagesCache.get(movieId)
+
+    const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
+    if (!apiKey) {
+        const fallback = { posters: [], backdrops: [] }
+        movieImagesCache.set(movieId, fallback)
+        return fallback
+    }
+
+    try {
+        const url =
+            `https://api.themoviedb.org/3/movie/${movieId}/images` +
+            `?api_key=${apiKey}` +
+            `&include_image_language=en,en-US,es,es-ES,null`
+
+        const r = await fetch(url, { cache: 'force-cache' })
+        const j = await r.json()
+        const posters = Array.isArray(j?.posters) ? j.posters : []
+        const backdrops = Array.isArray(j?.backdrops) ? j.backdrops : []
+
+        const data = { posters, backdrops }
+        movieImagesCache.set(movieId, data)
+        return data
+    } catch {
+        const fallback = { posters: [], backdrops: [] }
+        movieImagesCache.set(movieId, fallback)
+        return fallback
+    }
+}
+
+/* ========= Backdrop preferido (NUEVO criterio: EN -> resolución -> votos) ========= */
+async function fetchBestBackdrop(movieId) {
+    const { backdrops } = await getMovieImages(movieId)
+    if (!Array.isArray(backdrops) || backdrops.length === 0) return null
+
+    const best = pickBestBackdropByLangResVotes(backdrops, {
+        preferLangs: ['en', 'en-US'],
+        resolutionWindow: 0.98,
+        minWidth: 1200
+    })
+
+    return best?.file_path || null
+}
+
+/* ========= Poster preferido (NUEVO criterio estable) ========= */
+async function fetchBestPoster(movieId) {
+    const { posters } = await getMovieImages(movieId)
+    if (!Array.isArray(posters) || posters.length === 0) return null
+
+    const best = pickBestPosterByLangThenResolution(posters, {
+        preferLangs: ['en', 'en-US'],
+        minWidth: 500
+    })
+
+    return best?.file_path || null
+}
+
+/* ========= Poster: mantengo tu función actual (EN -> ES) ========= */
 async function fetchMoviePosterEsThenEn(movieId) {
     try {
         const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
@@ -126,12 +300,8 @@ async function fetchMoviePosterEsThenEn(movieId) {
             return sorted[0] || null
         }
 
-        const en = posters.filter(
-            (p) => p.iso_639_1 === 'en' || p.iso_639_1 === 'en-US'
-        )
-        const es = posters.filter(
-            (p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES'
-        )
+        const en = posters.filter((p) => p.iso_639_1 === 'en' || p.iso_639_1 === 'en-US')
+        const es = posters.filter((p) => p.iso_639_1 === 'es' || p.iso_639_1 === 'es-ES')
 
         const bestEn = pickBestLang(en)
         if (bestEn?.file_path) return bestEn.file_path
@@ -145,83 +315,75 @@ async function fetchMoviePosterEsThenEn(movieId) {
     }
 }
 
-/* ========= elegir mejor backdrop: EN -> ES, por votos/calidad ========= */
-async function fetchBackdropEsThenEn(movieId) {
+/* =================== TRAILERS (TMDb videos) =================== */
+const movieTrailerCache = new Map() // movieId -> { key, site, type } | null
+const movieTrailerInFlight = new Map() // movieId -> Promise
+
+function pickBestTrailer(videos) {
+    if (!Array.isArray(videos) || videos.length === 0) return null
+
+    const yt = videos.filter((v) => v?.site === 'YouTube' && v?.key)
+    if (!yt.length) return null
+
+    // ✅ preferir EN para evitar audio ES
+    const preferredLang = yt.filter(
+        (v) =>
+            v?.iso_639_1 === 'en' ||
+            v?.iso_3166_1 === 'US' ||
+            v?.iso_3166_1 === 'GB'
+    )
+
+    const pool = preferredLang.length ? preferredLang : yt
+    const trailers = pool.filter((v) => v?.type === 'Trailer')
+    const teasers = pool.filter((v) => v?.type === 'Teaser')
+    const candidates = trailers.length ? trailers : teasers.length ? teasers : pool
+
+    const score = (v) => {
+        const official = v?.official ? 100 : 0
+        const typeScore = v?.type === 'Trailer' ? 50 : v?.type === 'Teaser' ? 20 : 0
+        const size = typeof v?.size === 'number' ? v.size : 0
+        return official + typeScore + size
+    }
+
+    return [...candidates].sort((a, b) => score(b) - score(a))[0] || null
+}
+
+async function fetchBestTrailer(movieId) {
     try {
         const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
         if (!apiKey || !movieId) return null
 
         const url =
-            `https://api.themoviedb.org/3/movie/${movieId}/images` +
-            `?api_key=${apiKey}` +
-            `&include_image_language=es,es-ES,en,en-US`
+            `https://api.themoviedb.org/3/movie/${movieId}/videos` +
+            `?api_key=${apiKey}&language=en-US`
 
         const r = await fetch(url, { cache: 'force-cache' })
-        if (!r.ok) throw new Error('TMDb movie images error')
+        if (!r.ok) return null
 
         const j = await r.json()
-        const backs = Array.isArray(j?.backdrops) ? j.backdrops : []
+        const results = Array.isArray(j?.results) ? j.results : []
+        const best = pickBestTrailer(results)
 
-        const pickBestLang = (arr) => {
-            if (!arr.length) return null
-            const sorted = [...arr].sort((a, b) => {
-                const vc = (b.vote_count || 0) - (a.vote_count || 0)
-                if (vc !== 0) return vc
-                const va = (b.vote_average || 0) - (a.vote_average || 0)
-                if (va !== 0) return va
-                return (b.width || 0) - (a.width || 0)
-            })
-            return sorted[0] || null
-        }
-
-        const en = backs.filter(
-            (b) => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US'
-        )
-        const es = backs.filter(
-            (b) => b.iso_639_1 === 'es' || b.iso_639_1 === 'es-ES'
-        )
-
-        const bestEn = pickBestLang(en)
-        if (bestEn?.file_path) return bestEn.file_path
-
-        const bestEs = pickBestLang(es)
-        if (bestEs?.file_path) return bestEs.file_path
-
-        // si no hay EN/ES con idioma, devolvemos null y ya se usará el backdrop de TMDb
-        return null
+        if (!best?.key) return null
+        return { key: best.key, site: best.site, type: best.type }
     } catch {
         return null
     }
 }
 
-/* --------- precargar una imagen y resolver tras onload --------- */
-function preloadImage(src) {
-    return new Promise((resolve) => {
-        if (!src) return resolve(false)
-        const img = new Image()
-        img.onload = () => resolve(true)
-        img.onerror = () => resolve(false)
-        img.src = src
-    })
-}
+async function getBestTrailerCached(movieId) {
+    if (movieTrailerCache.has(movieId)) return movieTrailerCache.get(movieId)
+    if (movieTrailerInFlight.has(movieId)) return movieTrailerInFlight.get(movieId)
 
-/* =================== CACHÉS COMPARTIDOS (cliente) =================== */
-const movieExtrasCache = new Map() // movie.id -> { runtime, awards, imdbRating }
-const movieBackdropCache = new Map() // movie.id -> backdrop file_path
+    const p = (async () => {
+        const t = await fetchBestTrailer(movieId)
+        movieTrailerCache.set(movieId, t || null)
+        movieTrailerInFlight.delete(movieId)
+        return t || null
+    })()
 
-/* ======== Preferencias de artwork guardadas en localStorage ======== */
-function getArtworkPreference(movieId) {
-    if (typeof window === 'undefined') {
-        return { poster: null, backdrop: null }
-    }
-    const posterKey = `showverse:movie:${movieId}:poster`
-    const backdropKey = `showverse:movie:${movieId}:backdrop`
-    const poster = window.localStorage.getItem(posterKey)
-    const backdrop = window.localStorage.getItem(backdropKey)
-    return {
-        poster: poster || null,
-        backdrop: backdrop || null
-    }
+    movieTrailerInFlight.set(movieId, p)
+    return p
 }
 
 /* ====================================================================
@@ -264,7 +426,7 @@ function PosterImage({ movie, cache, heightClass }) {
 
             // 3) Lógica normal: mejor poster EN/ES o fallback de TMDb
             setReady(false)
-            const preferred = await fetchMoviePosterEsThenEn(movie.id)
+            const preferred = await fetchBestPoster(movie.id)
             const chosen =
                 preferred ||
                 movie.poster_path ||
@@ -289,9 +451,7 @@ function PosterImage({ movie, cache, heightClass }) {
 
     if (!ready || !posterPath) {
         return (
-            <div
-                className={`w-full ${heightClass} rounded-3xl bg-neutral-800 animate-pulse`}
-            />
+            <div className={`w-full ${heightClass} rounded-3xl bg-neutral-800 animate-pulse`} />
         )
     }
 
@@ -307,7 +467,7 @@ function PosterImage({ movie, cache, heightClass }) {
 }
 
 /* ====================================================================
- * Vista previa inline tipo Amazon (backdrop horizontal) para películas
+ * Vista previa inline tipo Amazon (backdrop horizontal) + TRAILER
  * ==================================================================== */
 function InlinePreviewCard({ movie, heightClass }) {
     const { session, account } = useAuth()
@@ -325,6 +485,19 @@ function InlinePreviewCard({ movie, heightClass }) {
     const [watchlist, setWatchlist] = useState(false)
     const [updating, setUpdating] = useState(false)
     const [error, setError] = useState('')
+
+    // === TRAILER state ===
+    const [showTrailer, setShowTrailer] = useState(false)
+    const [trailer, setTrailer] = useState(null)
+    const [trailerLoading, setTrailerLoading] = useState(false)
+    const trailerIframeRef = useRef(null)
+
+    // Reset trailer al cambiar de película
+    useEffect(() => {
+        setShowTrailer(false)
+        setTrailer(null)
+        setTrailerLoading(false)
+    }, [movie?.id])
 
     // Estados de cuenta
     useEffect(() => {
@@ -361,7 +534,7 @@ function InlinePreviewCard({ movie, heightClass }) {
         if (!movie) return
 
         const loadAll = async () => {
-            // 1) Backdrop preferido por el usuario
+            // === BACKDROP ===
             const { backdrop: userBackdrop } = getArtworkPreference(movie.id)
             const userPreferredBackdrop = userBackdrop || null
 
@@ -374,7 +547,6 @@ function InlinePreviewCard({ movie, heightClass }) {
                     setBackdropReady(true)
                 }
             } else {
-                // 2) Backdrop desde caché o TMDb (EN -> ES + votos)
                 const cachedBackdrop = movieBackdropCache.get(movie.id)
                 if (cachedBackdrop !== undefined) {
                     if (!abort) {
@@ -389,7 +561,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                     }
                 } else {
                     try {
-                        const preferred = await fetchBackdropEsThenEn(movie.id)
+                        const preferred = await fetchBestBackdrop(movie.id)
                         const chosen =
                             preferred ||
                             movie.backdrop_path ||
@@ -419,7 +591,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                 }
             }
 
-            // 3) Extras (runtime, awards, imdbRating)
+            // === EXTRAS ===
             const cachedExtras = movieExtrasCache.get(movie.id)
             if (cachedExtras) {
                 if (!abort) setExtras(cachedExtras)
@@ -442,11 +614,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                         if (imdb) {
                             const omdb = await fetchOmdbByImdb(imdb)
                             const rawAwards = omdb?.Awards
-                            if (
-                                rawAwards &&
-                                typeof rawAwards === 'string' &&
-                                rawAwards.trim()
-                            ) {
+                            if (rawAwards && typeof rawAwards === 'string' && rawAwards.trim()) {
                                 awards = rawAwards.trim()
                             }
                             const r = omdb?.imdbRating
@@ -460,9 +628,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                     movieExtrasCache.set(movie.id, next)
                     if (!abort) setExtras(next)
                 } catch {
-                    if (!abort) {
-                        setExtras({ runtime: null, awards: null, imdbRating: null })
-                    }
+                    if (!abort) setExtras({ runtime: null, awards: null, imdbRating: null })
                 }
             }
         }
@@ -529,15 +695,60 @@ function InlinePreviewCard({ movie, heightClass }) {
         }
     }
 
-    const bgSrc = backdropPath ? buildImg(backdropPath, 'w1280') : null
+    const handleToggleTrailer = async (e) => {
+        e.stopPropagation()
+
+        if (showTrailer) {
+            setShowTrailer(false)
+            return
+        }
+
+        try {
+            setTrailerLoading(true)
+            setError('')
+
+            const t = await getBestTrailerCached(movie.id)
+
+            if (!t?.key) {
+                setTrailer(null)
+                setShowTrailer(false)
+                setError('No hay trailer disponible para este título.')
+                return
+            }
+
+            setTrailer(t)
+            setShowTrailer(true)
+        } catch {
+            setTrailer(null)
+            setShowTrailer(false)
+            setError('No se pudo cargar el trailer.')
+        } finally {
+            setTrailerLoading(false)
+        }
+    }
+
+    const resolvedBackdrop =
+        backdropPath || movie.backdrop_path || movie.poster_path || movie.profile_path || null
+    const bgSrc = resolvedBackdrop ? buildImg(resolvedBackdrop, 'w1280') : null
 
     const genres = (() => {
         const ids =
             movie.genre_ids ||
             (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : [])
         const names = ids.map((id) => GENRES[id]).filter(Boolean)
-        return names.slice(0, 3).join(' • ')
+        return names.slice(0, 2).join(' • ')
     })()
+
+    const trailerSrc =
+        trailer?.key
+            ? `https://www.youtube-nocookie.com/embed/${trailer.key}` +
+            `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
+            `&controls=0&iv_load_policy=3&disablekb=1&fs=0` +
+            `&enablejsapi=1&origin=${typeof window !== 'undefined'
+                ? encodeURIComponent(window.location.origin)
+                : ''
+            }`
+            : null
 
     return (
         <div
@@ -546,13 +757,13 @@ function InlinePreviewCard({ movie, heightClass }) {
                 window.location.href = href
             }}
         >
-            {/* === FILA 1: Backdrop a pantalla completa (sin huecos) === */}
+            {/* === FILA 1: Backdrop o Trailer === */}
             <div className="relative w-full h-full bg-black">
-                {!backdropReady && (
+                {!showTrailer && !backdropReady && (
                     <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
                 )}
 
-                {backdropReady && bgSrc && (
+                {!showTrailer && backdropReady && bgSrc && (
                     <img
                         src={bgSrc}
                         alt={movie.title || movie.name}
@@ -561,6 +772,54 @@ function InlinePreviewCard({ movie, heightClass }) {
                         decoding="async"
                     />
                 )}
+
+                {showTrailer && (
+                    <>
+                        {(trailerLoading || !trailerSrc) && (
+                            <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
+                        )}
+
+                        {trailerSrc && (
+                            <div className="absolute inset-0 overflow-hidden">
+                                <iframe
+                                    key={trailer.key}
+                                    ref={trailerIframeRef}
+                                    className="absolute left-1/2 top-1/2
+                                        w-[140%] h-[180%]
+                                        -translate-x-1/2 -translate-y-1/2
+                                        pointer-events-none"
+                                    src={trailerSrc}
+                                    title={`Trailer - ${movie.title || movie.name}`}
+                                    allow="autoplay; encrypted-media; picture-in-picture"
+                                    allowFullScreen={false}
+                                    onLoad={() => {
+                                        try {
+                                            const win = trailerIframeRef.current?.contentWindow
+                                            if (!win) return
+
+                                            const target = 'https://www.youtube-nocookie.com'
+                                            const cmd = (func, args = []) =>
+                                                win.postMessage(
+                                                    JSON.stringify({ event: 'command', func, args }),
+                                                    target
+                                                )
+
+                                            setTimeout(() => {
+                                                cmd('unMute')
+                                                cmd('setVolume', [30])
+                                            }, 120)
+                                        } catch { }
+                                    }}
+                                />
+                            </div>
+                        )}
+                    </>
+                )}
+
+                <div
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-2
+                        bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95"
+                />
             </div>
 
             {/* === FILA 2: Propiedades + Acciones (sin título) === */}
@@ -583,7 +842,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                                 <span className="font-medium">{ratingOf(movie)}</span>
                             </span>
 
-                            {typeof extras?.imdbRating === "number" && (
+                            {typeof extras?.imdbRating === 'number' && (
                                 <span className="inline-flex items-center gap-1.5">
                                     <img
                                         src="/logo-IMDb.png"
@@ -620,10 +879,26 @@ function InlinePreviewCard({ movie, heightClass }) {
 
                     {/* Botones */}
                     <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                        {/* Trailer */}
+                        <button
+                            onClick={handleToggleTrailer}
+                            disabled={trailerLoading}
+                            title={showTrailer ? 'Cerrar trailer' : 'Ver trailer'}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                        >
+                            {trailerLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : showTrailer ? (
+                                <X className="w-5 h-5" />
+                            ) : (
+                                <Play className="w-5 h-5" />
+                            )}
+                        </button>
+
                         <button
                             onClick={handleToggleFavorite}
                             disabled={loadingStates || updating}
-                            title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                            title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
                         >
                             {loadingStates || updating ? (
@@ -638,7 +913,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                         <button
                             onClick={handleToggleWatchlist}
                             disabled={loadingStates || updating}
-                            title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
+                            title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
                             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
                         >
                             {loadingStates || updating ? (
@@ -656,7 +931,7 @@ function InlinePreviewCard({ movie, heightClass }) {
     )
 }
 
-/* ---------- Fila reusable (mismo diseño que películas/series) ---------- */
+/* ---------- Fila reusable ---------- */
 function Row({ title, items, isTouchDevice, posterCacheRef }) {
     if (!items || items.length === 0) return null
 
@@ -719,7 +994,6 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                 }}
             >
                 <Swiper
-                    // En móvil: 3 portadas completas con separación
                     slidesPerView={3}
                     spaceBetween={12}
                     onSwiper={handleSwiper}
@@ -737,19 +1011,9 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     modules={[Navigation]}
                     className="group relative"
                     breakpoints={{
-                        // A partir de sm volvemos al comportamiento anterior
-                        640: {
-                            slidesPerView: 'auto',
-                            spaceBetween: 14
-                        },
-                        1024: {
-                            slidesPerView: 'auto',
-                            spaceBetween: 18
-                        },
-                        1280: {
-                            slidesPerView: 'auto',
-                            spaceBetween: 20
-                        }
+                        640: { slidesPerView: 'auto', spaceBetween: 14 },
+                        1024: { slidesPerView: 'auto', spaceBetween: 18 },
+                        1280: { slidesPerView: 'auto', spaceBetween: 20 }
                     }}
                 >
                     {items.map((m, i) => {
@@ -759,7 +1023,6 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         const base =
                             'relative flex-shrink-0 transition-all duration-300 ease-out'
 
-                        // En móvil: w-full para ocupar todo el ancho del slide.
                         const sizeClasses = isActive
                             ? 'w-full sm:w-[320px] md:w-[430px] xl:w-[480px] sm:z-20'
                             : 'w-full sm:w-[140px] md:w-[190px] xl:w-[210px] sm:z-10'
@@ -781,7 +1044,6 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                     }
                                 >
                                     <AnimatePresence initial={false} mode="wait">
-                                        {/* En móvil solo vemos póster (no preview grande) */}
                                         {isActive ? (
                                             <motion.div
                                                 key="preview"
@@ -791,10 +1053,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                                 transition={{ duration: 0.18 }}
                                                 className="w-full h-full hidden sm:block"
                                             >
-                                                <InlinePreviewCard
-                                                    movie={m}
-                                                    heightClass={heightClass}
-                                                />
+                                                <InlinePreviewCard movie={m} heightClass={heightClass} />
                                             </motion.div>
                                         ) : (
                                             <motion.div
@@ -821,7 +1080,6 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     })}
                 </Swiper>
 
-                {/* Flechas solo en escritorio (no en móvil/touch) */}
                 {showPrev && !isTouchDevice && (
                     <button
                         type="button"
@@ -867,11 +1125,9 @@ function TopRatedHero({ items, isTouchDevice }) {
     const [canPrev, setCanPrev] = useState(false)
     const [canNext, setCanNext] = useState(false)
 
-    // mapa id -> backdrop definitivo (override o mejor EN/ES)
     const [heroBackdrops, setHeroBackdrops] = useState({})
     const [heroLoaded, setHeroLoaded] = useState(false)
 
-    // Cargar overrides desde la API y calcular el backdrop final por película
     useEffect(() => {
         if (!items || items.length === 0) {
             setHeroLoaded(true)
@@ -908,17 +1164,24 @@ function TopRatedHero({ items, isTouchDevice }) {
                         // 1) Override del backend
                         const override = overrides?.[id] || null
                         if (override) {
+                            await preloadImage(buildImg(override, 'w780'))
                             return [id, override]
                         }
 
-                        // 2) Mejor backdrop EN -> ES vía /images
-                        let chosen = await fetchBackdropEsThenEn(id)
-
-                        // 3) Fallback a lo que venga de TMDb
-                        if (!chosen) {
-                            chosen = movie.backdrop_path || movie.poster_path || null
+                        // 2) Preferencia local del usuario
+                        const { backdrop: userBackdrop } = getArtworkPreference(id)
+                        if (userBackdrop) {
+                            await preloadImage(buildImg(userBackdrop, 'w780'))
+                            return [id, userBackdrop]
                         }
 
+                        // 3) NUEVO criterio global
+                        let chosen = await fetchBestBackdrop(id)
+
+                        // 4) Fallback a TMDb
+                        if (!chosen) chosen = movie.backdrop_path || movie.poster_path || null
+
+                        if (chosen) await preloadImage(buildImg(chosen, 'w780'))
                         return [id, chosen]
                     })
                 )
@@ -937,7 +1200,6 @@ function TopRatedHero({ items, isTouchDevice }) {
                 if (canceled) return
                 console.error('Error cargando backdrops del hero', err)
 
-                // fallback total: usamos solo lo que viene de TMDb
                 const map = {}
                 for (const movie of items) {
                     map[movie.id] = movie.backdrop_path || movie.poster_path || null
@@ -993,7 +1255,6 @@ function TopRatedHero({ items, isTouchDevice }) {
                 onMouseLeave={() => setIsHoveredHero(false)}
             >
                 {!heroLoaded ? (
-                    // Skeleton inicial para evitar mostrar backdrops "equivocados"
                     <div className="flex gap-4 overflow-hidden">
                         {items.slice(0, 3).map((movie) => (
                             <div
@@ -1006,7 +1267,7 @@ function TopRatedHero({ items, isTouchDevice }) {
                     <>
                         <Swiper
                             spaceBetween={20}
-                            slidesPerView="auto" // evita que el primer slide se ponga full-width al cargar
+                            slidesPerView="auto"
                             autoplay={{ delay: 5000 }}
                             onSwiper={handleSwiper}
                             onSlideChange={updateNav}
@@ -1053,16 +1314,10 @@ function TopRatedHero({ items, isTouchDevice }) {
                                             <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9]">
                                                 <img
                                                     src={buildImg(heroBackdrop, 'w1280')}
-                                                    srcSet={`${buildImg(
-                                                        heroBackdrop,
-                                                        'w780'
-                                                    )} 780w, ${buildImg(
+                                                    srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
                                                         heroBackdrop,
                                                         'w1280'
-                                                    )} 1280w, ${buildImg(
-                                                        heroBackdrop,
-                                                        'original'
-                                                    )} 2400w`}
+                                                    )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
                                                     sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
                                                     alt={movie.title || movie.name}
                                                     className="absolute inset-0 w-full h-full object-cover rounded-3xl hover:scale-105 transition-transform duration-300"
@@ -1076,7 +1331,6 @@ function TopRatedHero({ items, isTouchDevice }) {
                             })}
                         </Swiper>
 
-                        {/* Flecha izquierda hero */}
                         {showPrev && (
                             <button
                                 type="button"
@@ -1093,7 +1347,6 @@ function TopRatedHero({ items, isTouchDevice }) {
                             </button>
                         )}
 
-                        {/* Flecha derecha hero */}
                         {showNext && (
                             <button
                                 type="button"
@@ -1128,68 +1381,20 @@ export default function MainDashboardClient({ initialData }) {
 
     return (
         <div className="px-6 py-6 text-white bg-black">
-            <TopRatedHero
-                items={dashboardData.topRated || []}
-                isTouchDevice={isTouchDevice}
-            />
+            <TopRatedHero items={dashboardData.topRated || []} isTouchDevice={isTouchDevice} />
 
             <div className="space-y-12">
-                <Row
-                    title="Populares"
-                    items={dashboardData.popular}
-                    isTouchDevice={isTouchDevice}
-                    posterCacheRef={posterCacheRef}
-                />
-                <Row
-                    title="Tendencias semanales"
-                    items={dashboardData.trending}
-                    isTouchDevice={isTouchDevice}
-                    posterCacheRef={posterCacheRef}
-                />
-                <Row
-                    title="Guiones complejos"
-                    items={dashboardData.mind}
-                    isTouchDevice={isTouchDevice}
-                    posterCacheRef={posterCacheRef}
-                />
-                <Row
-                    title="Top acción"
-                    items={dashboardData.action}
-                    isTouchDevice={isTouchDevice}
-                    posterCacheRef={posterCacheRef}
-                />
-                <Row
-                    title="Populares en EE.UU."
-                    items={dashboardData.us}
-                    isTouchDevice={isTouchDevice}
-                    posterCacheRef={posterCacheRef}
-                />
-                <Row
-                    title="Películas de culto"
-                    items={dashboardData.cult}
-                    isTouchDevice={isTouchDevice}
-                    posterCacheRef={posterCacheRef}
-                />
-                <Row
-                    title="Infravaloradas"
-                    items={dashboardData.underrated}
-                    isTouchDevice={isTouchDevice}
-                    posterCacheRef={posterCacheRef}
-                />
-                <Row
-                    title="En ascenso"
-                    items={dashboardData.rising}
-                    isTouchDevice={isTouchDevice}
-                    posterCacheRef={posterCacheRef}
-                />
+                <Row title="Populares" items={dashboardData.popular} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
+                <Row title="Tendencias semanales" items={dashboardData.trending} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
+                <Row title="Guiones complejos" items={dashboardData.mind} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
+                <Row title="Top acción" items={dashboardData.action} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
+                <Row title="Populares en EE.UU." items={dashboardData.us} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
+                <Row title="Películas de culto" items={dashboardData.cult} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
+                <Row title="Infravaloradas" items={dashboardData.underrated} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
+                <Row title="En ascenso" items={dashboardData.rising} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
 
                 {dashboardData.recommended?.length > 0 && (
-                    <Row
-                        title="Recomendadas para ti"
-                        items={dashboardData.recommended}
-                        isTouchDevice={isTouchDevice}
-                        posterCacheRef={posterCacheRef}
-                    />
+                    <Row title="Recomendadas para ti" items={dashboardData.recommended} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
                 )}
             </div>
         </div>

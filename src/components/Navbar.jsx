@@ -1,6 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import '@/app/globals.css'
+import { useAuth } from '@/context/AuthContext'
+import UserAvatar from '@/components/auth/UserAvatar'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   FilmIcon,
   TvIcon,
@@ -9,15 +15,10 @@ import {
   Heart,
   Bookmark,
   Search as SearchIcon,
+  X as XIcon,
+  Menu as MenuIcon,
   HomeIcon,
-  XIcon,
 } from 'lucide-react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import '@/app/globals.css'
-import { useAuth } from '@/context/AuthContext'
-import UserAvatar from '@/components/auth/UserAvatar'
-import { AnimatePresence, motion } from 'framer-motion'
 
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
@@ -107,8 +108,7 @@ function SearchBar({ onResultClick }) {
                 <img
                   src={
                     item.poster_path || item.profile_path
-                      ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path
-                      }`
+                      ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
                       : '/default-poster.png'
                   }
                   alt={item.title || item.name || 'Resultado'}
@@ -138,13 +138,21 @@ function SearchBar({ onResultClick }) {
 }
 
 /* ====================================================================
- * Componente Principal de la Barra de Navegación
+ * Navbar principal
  * ==================================================================== */
 export default function Navbar() {
-  // 👇 ahora usamos también `hydrated`
   const { account, hydrated } = useAuth()
   const pathname = usePathname()
+
   const [showMobileSearch, setShowMobileSearch] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Mostrar/ocultar barras (móvil) según scroll
+  const [isMobile, setIsMobile] = useState(false)
+  const [barsVisible, setBarsVisible] = useState(true)
+
+  const lastYRef = useRef(0)
+  const tickingRef = useRef(false)
 
   const isActive = (href) =>
     pathname === href || (href !== '/' && pathname?.startsWith(href))
@@ -161,29 +169,92 @@ export default function Navbar() {
       : 'text-neutral-400 hover:text-white hover:bg-white/5'
     }`
 
-  const navLinkClassMobileTop = (href) =>
-    `text-base font-medium transition-colors ${isActive(href) ? 'text-white' : 'text-neutral-400 hover:text-white'
-    }`
-
   const navLinkClassMobileBottom = (href) =>
     `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${isActive(href) ? 'text-blue-400' : 'text-neutral-400 hover:text-white'
     }`
 
+  // Menú inferior fijo: 4 secciones. Si no hay sesión, fav/watchlist llevan a login.
+  const favHref = hydrated && account ? '/favorites' : '/login'
+  const watchHref = hydrated && account ? '/watchlist' : '/login'
+
+  // Detectar móvil (lg breakpoint)
   useEffect(() => {
-    if (showMobileSearch) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = 'auto'
+    const calc = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 1024)
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [])
+
+  // Bloquear scroll cuando overlays están abiertos
+  useEffect(() => {
+    const locked = showMobileSearch || mobileMenuOpen
+    document.body.style.overflow = locked ? 'hidden' : 'auto'
+    // Si hay overlay, forzamos barras visibles
+    if (locked) setBarsVisible(true)
+  }, [showMobileSearch, mobileMenuOpen])
+
+  // Scroll -> ocultar/mostrar (solo móvil)
+  useEffect(() => {
+    if (!isMobile) {
+      setBarsVisible(true)
+      return
     }
-  }, [showMobileSearch])
+
+    const THRESHOLD = 12
+    const TOP_LOCK = 40
+
+    lastYRef.current = window.scrollY || 0
+
+    const onScroll = () => {
+      if (showMobileSearch || mobileMenuOpen) return
+
+      const currentY = window.scrollY || 0
+      const delta = currentY - lastYRef.current
+
+      if (tickingRef.current) return
+      tickingRef.current = true
+
+      requestAnimationFrame(() => {
+        // Cerca del top, siempre visible
+        if (currentY <= TOP_LOCK) {
+          setBarsVisible(true)
+        } else if (Math.abs(delta) >= THRESHOLD) {
+          // Baja => ocultar, sube => mostrar
+          if (delta > 0) setBarsVisible(false)
+          else setBarsVisible(true)
+        }
+
+        lastYRef.current = currentY
+        tickingRef.current = false
+      })
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [isMobile, showMobileSearch, mobileMenuOpen])
+
+  // Animaciones top/bottom (solo móvil)
+  const topAnimate = useMemo(() => {
+    if (!isMobile) return { y: 0 }
+    return { y: barsVisible ? 0 : -80 }
+  }, [isMobile, barsVisible])
+
+  const bottomAnimate = useMemo(() => {
+    if (!isMobile) return { y: 0 }
+    return { y: barsVisible ? 0 : 90 }
+  }, [isMobile, barsVisible])
 
   return (
     <>
-      {/* --- BARRA DE NAVEGACIÓN PRINCIPAL --- */}
-      <nav className="relative sticky top-0 z-40 w-full bg-black/80 backdrop-blur-md border-b border-neutral-800">
-        {/* --- LAYOUT DESKTOP (lg:flex) --- */}
+      {/* ===================== TOP BAR ===================== */}
+      <motion.nav
+        animate={topAnimate}
+        transition={{ type: 'tween', duration: 0.18 }}
+        className="sticky top-0 z-40 w-full bg-black/80 backdrop-blur-md border-b border-neutral-800 will-change-transform"
+      >
+        {/* ---------------- Desktop ---------------- */}
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
-          {/* 1. IZQUIERDA (Desktop) */}
+          {/* Izquierda */}
           <div className="flex items-center gap-6 flex-shrink-0 pl-6 -ml-10">
             <Link href="/" className="block h-12 overflow-hidden flex-shrink-0">
               <div className="h-full w-[170px] flex items-center justify-center overflow-hidden">
@@ -196,59 +267,35 @@ export default function Navbar() {
             </Link>
 
             <div className="flex items-center gap-4">
-              <Link href="/" className={navLinkClass('/')}>
-                Inicio
-              </Link>
-              <Link href="/movies" className={navLinkClass('/movies')}>
-                Películas
-              </Link>
-              <Link href="/series" className={navLinkClass('/series')}>
-                Series
-              </Link>
+              <Link href="/" className={navLinkClass('/')}>Inicio</Link>
+              <Link href="/movies" className={navLinkClass('/movies')}>Películas</Link>
+              <Link href="/series" className={navLinkClass('/series')}>Series</Link>
             </div>
           </div>
 
-          {/* 3. DERECHA (Desktop) */}
+          {/* Derecha */}
           <div className="flex items-center gap-2 flex-shrink-0 pr-12">
             <div className="flex items-center gap-2">
-              <Link
-                href="/news"
-                className={iconLinkClass('/news')}
-                title="Noticias"
-              >
+              <Link href="/news" className={iconLinkClass('/news')} title="Noticias">
                 <NewspaperIcon className="w-5 h-5" />
               </Link>
-              <Link
-                href="/calendar"
-                className={iconLinkClass('/calendar')}
-                title="Calendario"
-              >
+              <Link href="/calendar" className={iconLinkClass('/calendar')} title="Calendario">
                 <CalendarDaysIcon className="w-5 h-5" />
               </Link>
 
               {hydrated && account && (
                 <>
-                  <Link
-                    href="/favorites"
-                    className={iconLinkClass('/favorites')}
-                    title="Favoritas"
-                  >
+                  <Link href="/favorites" className={iconLinkClass('/favorites')} title="Favoritas">
                     <Heart className="w-5 h-5" />
                   </Link>
-                  <Link
-                    href="/watchlist"
-                    className={iconLinkClass('/watchlist')}
-                    title="Pendientes"
-                  >
+                  <Link href="/watchlist" className={iconLinkClass('/watchlist')} title="Pendientes">
                     <Bookmark className="w-5 h-5" />
                   </Link>
                 </>
               )}
             </div>
 
-            {/* 👇 Zona login / avatar sin parpadeo */}
             {!hydrated ? (
-              // Skeleton mientras no sabemos si hay sesión
               <div className="ml-2 w-28 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
             ) : !account ? (
               <Link
@@ -262,50 +309,52 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* 2. CENTRO (Desktop - Absoluto) */}
+          {/* Centro */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg px-4 flex justify-center">
             <SearchBar />
           </div>
         </div>
 
-        {/* --- LAYOUT MÓVIL (lg:hidden) --- */}
-        <div className="lg:hidden relative flex items-center justify-between h-16">
-          {/* 1. IZQUIERDA (Móvil): Logo */}
-          <div className="flex-shrink-0 pl-2">
-            <Link href="/" className="block h-10 overflow-hidden -ml-6">
+        {/* ---------------- Mobile ---------------- */}
+        <div className="lg:hidden relative flex items-center justify-between h-16 px-2">
+          {/* Izquierda: menú */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-2 rounded-full text-neutral-300 hover:text-white hover:bg-white/5 transition-colors"
+              title="Menú"
+              aria-label="Abrir menú"
+            >
+              <MenuIcon className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Centro: logo */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <Link href="/" className="block h-10 overflow-hidden">
               <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
                 <img
                   src="/TheShowVerse2.png"
                   alt="The Show Verse"
-                  className="h-full w-auto object-contain scale-[2.2] origin-left"
+                  className="h-full w-auto object-contain scale-[2.2] origin-center"
                 />
               </div>
             </Link>
           </div>
 
-          {/* 2. CENTRO (Móvil - Absoluto) */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-5 -ml-1">
-            <Link href="/movies" className={navLinkClassMobileTop('/movies')}>
-              Películas
-            </Link>
-            <Link href="/series" className={navLinkClassMobileTop('/series')}>
-              Series
-            </Link>
-          </div>
-
-          {/* 3. DERECHA (Móvil): Búsqueda y Perfil */}
-          <div className="flex items-center gap-2 flex-shrink-0 pr-10">
+          {/* Derecha: búsqueda + perfil */}
+          <div className="flex items-center gap-2 flex-shrink-0 pr-1">
             <button
               onClick={() => setShowMobileSearch(true)}
-              className="p-2 rounded-full transition-colors text-neutral-400 hover:text-white hover:bg-white/5"
+              className="p-2 rounded-full transition-colors text-neutral-300 hover:text-white hover:bg-white/5"
               title="Buscar"
+              aria-label="Buscar"
             >
               <SearchIcon className="w-6 h-6" />
             </button>
 
             {!hydrated ? (
-              // Skeleton redondo mientras se hidrata auth
-              <div className="w-8 h-8 rounded-full bg-neutral-800/80 animate-pulse" />
+              <div className="w-9 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
             ) : !account ? (
               <Link
                 href="/login"
@@ -318,44 +367,159 @@ export default function Navbar() {
             )}
           </div>
         </div>
-      </nav>
+      </motion.nav>
 
-      {/* --- BARRA DE NAVEGACIÓN INFERIOR (MÓVIL) --- */}
-      <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black border-t border-neutral-800 flex justify-around items-center">
-        <Link href="/" className={navLinkClassMobileBottom('/')}>
-          <HomeIcon className="w-6 h-6" />
-          <span className="text-xs">Inicio</span>
-        </Link>
-        <Link href="/news" className={navLinkClassMobileBottom('/news')}>
-          <NewspaperIcon className="w-6 h-6" />
-          <span className="text-xs">Noticias</span>
-        </Link>
-        <Link href="/calendar" className={navLinkClassMobileBottom('/calendar')}>
-          <CalendarDaysIcon className="w-6 h-6" />
-          <span className="text-xs">Calendario</span>
+      {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
+      <motion.div
+        animate={bottomAnimate}
+        transition={{ type: 'tween', duration: 0.18 }}
+        className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black/95 backdrop-blur-md border-t border-neutral-800 flex items-center justify-around will-change-transform"
+      >
+        <Link href="/movies" className={navLinkClassMobileBottom('/movies')}>
+          <FilmIcon className="w-6 h-6" />
+          <span className="text-xs">Películas</span>
         </Link>
 
-        {hydrated && account && (
-          <>
-            <Link
-              href="/favorites"
-              className={navLinkClassMobileBottom('/favorites')}
+        <Link href="/series" className={navLinkClassMobileBottom('/series')}>
+          <TvIcon className="w-6 h-6" />
+          <span className="text-xs">Series</span>
+        </Link>
+
+        <Link href={favHref} className={navLinkClassMobileBottom('/favorites')}>
+          <Heart className="w-6 h-6" />
+          <span className="text-xs">Favoritas</span>
+        </Link>
+
+        <Link href={watchHref} className={navLinkClassMobileBottom('/watchlist')}>
+          <Bookmark className="w-6 h-6" />
+          <span className="text-xs">Pendientes</span>
+        </Link>
+      </motion.div>
+
+      {/* ===================== DRAWER MENÚ (MÓVIL) ===================== */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <motion.aside
+              initial={{ x: -320 }}
+              animate={{ x: 0 }}
+              exit={{ x: -320 }}
+              transition={{ type: 'tween', duration: 0.22 }}
+              className="h-full w-[280px] bg-[#0b0b0b] border-r border-neutral-800 p-4"
+              onClick={(e) => e.stopPropagation()}
             >
-              <Heart className="w-6 h-6" />
-              <span className="text-xs">Favoritas</span>
-            </Link>
-            <Link
-              href="/watchlist"
-              className={navLinkClassMobileBottom('/watchlist')}
-            >
-              <Bookmark className="w-6 h-6" />
-              <span className="text-xs">Pendientes</span>
-            </Link>
-          </>
+              <div className="flex items-center justify-between">
+                <Link
+                  href="/"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block h-10 overflow-hidden"
+                >
+                  <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
+                    <img
+                      src="/TheShowVerse2.png"
+                      alt="The Show Verse"
+                      className="h-full w-auto object-contain scale-[2.2] origin-center"
+                    />
+                  </div>
+                </Link>
+
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 rounded-full text-neutral-300 hover:text-white hover:bg-white/5 transition-colors"
+                  aria-label="Cerrar menú"
+                >
+                  <XIcon className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-2">
+                <Link
+                  href="/"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
+                    }`}
+                >
+                  <HomeIcon className="w-5 h-5" />
+                  <span>Inicio</span>
+                </Link>
+
+                <Link
+                  href="/movies"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/movies') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
+                    }`}
+                >
+                  <FilmIcon className="w-5 h-5" />
+                  <span>Películas</span>
+                </Link>
+
+                <Link
+                  href="/series"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/series') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
+                    }`}
+                >
+                  <TvIcon className="w-5 h-5" />
+                  <span>Series</span>
+                </Link>
+
+                <div className="my-3 h-px bg-neutral-800" />
+
+                <Link
+                  href={favHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/favorites') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
+                    }`}
+                >
+                  <Heart className="w-5 h-5" />
+                  <span>Favoritas</span>
+                </Link>
+
+                <Link
+                  href={watchHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/watchlist') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
+                    }`}
+                >
+                  <Bookmark className="w-5 h-5" />
+                  <span>Pendientes</span>
+                </Link>
+
+                {/* Extras opcionales (si quieres mantenerlos accesibles sin ocupar el bottom nav) */}
+                <div className="my-3 h-px bg-neutral-800" />
+
+                <Link
+                  href="/news"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/news') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
+                    }`}
+                >
+                  <NewspaperIcon className="w-5 h-5" />
+                  <span>Noticias</span>
+                </Link>
+
+                <Link
+                  href="/calendar"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/calendar') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
+                    }`}
+                >
+                  <CalendarDaysIcon className="w-5 h-5" />
+                  <span>Calendario</span>
+                </Link>
+              </div>
+            </motion.aside>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
 
-      {/* --- OVERLAY DE BÚSQUEDA (MÓVIL) --- */}
+      {/* ===================== OVERLAY BÚSQUEDA (MÓVIL) ===================== */}
       <AnimatePresence>
         {showMobileSearch && (
           <motion.div
@@ -367,6 +531,7 @@ export default function Navbar() {
             <button
               onClick={() => setShowMobileSearch(false)}
               className="absolute top-4 right-4 text-neutral-400 hover:text-white"
+              aria-label="Cerrar búsqueda"
             >
               <XIcon className="w-7 h-7" />
             </button>
