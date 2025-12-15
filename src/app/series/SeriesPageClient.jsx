@@ -793,7 +793,7 @@ function InlinePreviewCard({ show, heightClass }) {
 
                                             setTimeout(() => {
                                                 cmd('unMute')
-                                                cmd('setVolume', [30])
+                                                cmd('setVolume', [10])
                                             }, 120)
                                         } catch { }
                                     }}
