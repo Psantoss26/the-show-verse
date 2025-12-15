@@ -1,7 +1,7 @@
 // src/components/DetailsClient.jsx
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useLayoutEffect } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import 'swiper/swiper-bundle.css'
 import EpisodeRatingsGrid from '@/components/EpisodeRatingsGrid'
@@ -19,7 +19,6 @@ import {
   ImageIcon,
   ImageOff,
   Heart,
-  HeartOff,
   BookmarkPlus,
   BookmarkMinus,
   Loader2,
@@ -65,6 +64,16 @@ const mergeUniqueImages = (current, incoming) => {
 const buildOriginalImageUrl = (filePath) =>
   `https://image.tmdb.org/t/p/original${filePath}`
 
+const preloadTmdb = (filePath, size = 'w780') => {
+  if (!filePath || typeof window === 'undefined') return Promise.resolve()
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve()
+    img.onerror = () => resolve()
+    img.src = `https://image.tmdb.org/t/p/${size}${filePath}`
+  })
+}
+
 async function fetchTVImages(showId) {
   if (!TMDB_API_KEY) return { posters: [], backdrops: [] }
   const url = `https://api.themoviedb.org/3/tv/${showId}/images?api_key=${TMDB_API_KEY}`
@@ -86,10 +95,7 @@ function pickBestImage(list) {
     return vc > max ? vc : max
   }, 0)
 
-  // Nos quedamos solo con las imágenes que tienen ese número máximo de votos
-  const withMaxVotes = list.filter(
-    (img) => (img.vote_count || 0) === maxVotes
-  )
+  const withMaxVotes = list.filter((img) => (img.vote_count || 0) === maxVotes)
 
   const preferredLangs = new Set(['es', 'es-ES', 'en', 'en-US'])
 
@@ -110,36 +116,26 @@ function pickBestImage(list) {
   return sorted[0] || null
 }
 
-// Poster para TV usando la función anterior
 const pickBestPosterTV = (posters) => {
   const best = pickBestImage(posters || [])
   return best?.file_path || null
 }
 
-// Backdrop principal
-const pickBestBackdropTV = (backs) => {
-  const best = pickBestImage(backs || [])
-  return best?.file_path || null
-}
-
-// Fondo de detalle (mismo criterio)
 const pickBestBackdropTVNeutralFirst = (backs) => {
   const best = pickBestImage(backs || [])
   return best?.file_path || null
 }
 
-// --- Helper para SeriesGraph (slug) ---
 const slugifyForSeriesGraph = (name) => {
   if (!name) return ''
   return name
-    .normalize('NFD') // quitar acentos
+    .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-') // todo lo que no sea letra/número -> guion
-    .replace(/(^-|-$)+/g, '') // quitar guiones al principio/fin
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '')
 }
 
-// --- Componente UI para Títulos de Sección ---
 const SectionTitle = ({ title, icon: Icon }) => (
   <div className="flex items-center gap-3 mb-6 border-l-4 border-yellow-500 pl-4 py-1">
     {Icon && <Icon className="text-yellow-500 w-6 h-6" />}
@@ -149,7 +145,6 @@ const SectionTitle = ({ title, icon: Icon }) => (
   </div>
 )
 
-// --- Componente UI para Items de Metadatos ---
 const MetaItem = ({ icon: Icon, label, value, colorClass = 'text-gray-400' }) => {
   if (!value) return null
   return (
@@ -172,70 +167,6 @@ const MetaItem = ({ icon: Icon, label, value, colorClass = 'text-gray-400' }) =>
   )
 }
 
-// --- Botón redondo de enlace externo con animación previa al redirect ---
-const ExternalIconLink = ({
-  href,
-  title,
-  imgSrc,
-  imgAlt,
-  Icon,
-  bgClass = ''
-}) => {
-  const [pressed, setPressed] = useState(false)
-
-  const handleClick = (e) => {
-    e.preventDefault()
-    if (!href || pressed) return
-
-    setPressed(true)
-
-    // Pequeña animación y luego abrimos la pestaña nueva
-    setTimeout(() => {
-      window.open(href, '_blank', 'noopener,noreferrer')
-      setPressed(false)
-    }, 160)
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      title={title}
-      className={`
-        relative w-11 h-11 rounded-full
-        flex items-center justify-center
-        border border-white/15
-        bg-black/40 backdrop-blur-sm
-        shadow-md shadow-black/40
-        overflow-hidden
-        transform-gpu transition-all duration-200
-        hover:shadow-yellow-500/30 hover:border-yellow-400/70
-        hover:-translate-y-0.5
-        ${pressed ? 'scale-90' : 'hover:scale-105'}
-        ${bgClass}
-      `}
-    >
-      <span className="sr-only">{title}</span>
-
-      {imgSrc ? (
-        <img src={imgSrc} alt={imgAlt || title} className="h-5 w-auto" />
-      ) : Icon ? (
-        <Icon className="w-5 h-5 text-white" />
-      ) : null}
-
-      {/* “ripple” suave al pulsar */}
-      <span
-        className={`
-          pointer-events-none absolute inset-0 rounded-full
-          bg-white/40 opacity-0 scale-75
-          transition-transform transition-opacity duration-200
-          ${pressed ? 'opacity-40 scale-110' : ''}
-        `}
-      />
-    </button>
-  )
-}
-
 // =====================================================================
 
 export default function DetailsClient({
@@ -249,17 +180,14 @@ export default function DetailsClient({
   reviews
 }) {
   const title = data.title || data.name
-  // URL de la página de watch en TMDb (para JustWatch/deep links)
   const tmdbWatchUrl =
     watchLink ||
     (type && id ? `https://www.themoviedb.org/${type}/${id}/watch` : null)
 
-  // Estado para desplegable de imágenes admin
   const [showAdminImages, setShowAdminImages] = useState(false)
   const [reviewLimit, setReviewLimit] = useState(2)
   const [useBackdrop, setUseBackdrop] = useState(true)
 
-  // ====== ESTADOS DE CUENTA ======
   const { session, account } = useAuth()
   const isAdmin =
     account?.username === 'psantos26' || account?.name === 'psantos26'
@@ -269,7 +197,6 @@ export default function DetailsClient({
   const [favorite, setFavorite] = useState(false)
   const [watchlist, setWatchlist] = useState(false)
 
-  // Rating del usuario
   const [userRating, setUserRating] = useState(null)
   const [ratingLoading, setRatingLoading] = useState(false)
   const [ratingError, setRatingError] = useState('')
@@ -295,42 +222,115 @@ export default function DetailsClient({
   const [artworkInitialized, setArtworkInitialized] = useState(false)
 
   const [imagesState, setImagesState] = useState(() => ({
-    posters: data.poster_path
-      ? [{ file_path: data.poster_path, from: 'main' }]
-      : [],
-    backdrops: data.backdrop_path
-      ? [{ file_path: data.backdrop_path, from: 'main' }]
-      : []
+    posters: data.poster_path ? [{ file_path: data.poster_path, from: 'main' }] : [],
+    backdrops: data.backdrop_path ? [{ file_path: data.backdrop_path, from: 'main' }] : []
   }))
   const [imagesLoading, setImagesLoading] = useState(false)
   const [imagesError, setImagesError] = useState('')
   const [activeImagesTab, setActiveImagesTab] = useState('posters')
 
-  // Scroll horizontal imágenes
   const imagesScrollRef = useRef(null)
   const [isHoveredImages, setIsHoveredImages] = useState(false)
   const [canPrevImages, setCanPrevImages] = useState(false)
   const [canNextImages, setCanNextImages] = useState(false)
 
-  // ====== Inicializar artwork ======
+  /**
+   * ✅ FIX PRINCIPAL (flash de portada):
+   * Reset SINCRÓNICO al cambiar de id/type para que nunca se pinte
+   * la portada del item anterior.
+   *
+   * - Reinicia basePoster/baseBackdrop/imagesState a partir de "data" actual
+   * - Carga overrides de localStorage antes del primer paint
+   * - Deja artworkInitialized=false y luego initArtwork lo pone a true
+   */
+  useLayoutEffect(() => {
+    setArtworkInitialized(false)
+
+    // Reset base a lo que viene en data (para el nuevo item)
+    setBasePosterPath(data.poster_path || data.profile_path || null)
+    setBaseBackdropPath(data.backdrop_path || null)
+
+    setImagesState({
+      posters: data.poster_path ? [{ file_path: data.poster_path, from: 'main' }] : [],
+      backdrops: data.backdrop_path ? [{ file_path: data.backdrop_path, from: 'main' }] : []
+    })
+    setImagesLoading(false)
+    setImagesError('')
+    setActiveImagesTab('posters')
+
+    // Reset overrides
+    setSelectedPosterPath(null)
+    setSelectedPreviewBackdropPath(null)
+    setSelectedBackgroundPath(null)
+
+    // Cargar overrides (sync) antes del paint
+    if (typeof window !== 'undefined') {
+      try {
+        const savedPoster = window.localStorage.getItem(posterStorageKey)
+        const savedPreviewBackdrop = window.localStorage.getItem(previewBackdropStorageKey)
+        const savedBackground = window.localStorage.getItem(backgroundStorageKey)
+
+        if (savedPoster) setSelectedPosterPath(savedPoster)
+        if (savedPreviewBackdrop) setSelectedPreviewBackdropPath(savedPreviewBackdrop)
+
+        if (savedBackground) {
+          setSelectedBackgroundPath(savedBackground)
+        } else if (savedPreviewBackdrop) {
+          setSelectedBackgroundPath(savedPreviewBackdrop)
+          window.localStorage.setItem(backgroundStorageKey, savedPreviewBackdrop)
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [
+    id,
+    endpointType,
+    // por si Next actualiza data sin cambiar id (edge cases)
+    data?.poster_path,
+    data?.backdrop_path,
+    data?.profile_path
+  ])
+
+  // ====== Inicializar artwork (mejoras + preload para evitar flicker) ======
   useEffect(() => {
     let cancelled = false
+
     const initArtwork = async () => {
+      // ya venimos con reset sync, pero por seguridad:
+      setArtworkInitialized(false)
+
       let poster = data.poster_path || data.profile_path || null
       let backdrop = data.backdrop_path || null
 
+      // Si ya vienen imágenes embebidas, aplicamos mejor poster sin esperar red
+      if (data?.images) {
+        const bestPoster = pickBestImage(data.images.posters || [])
+        if (bestPoster?.file_path) poster = bestPoster.file_path
+
+        setImagesState((prev) => ({
+          posters: mergeUniqueImages(prev.posters, data.images.posters || []),
+          backdrops: mergeUniqueImages(prev.backdrops, data.images.backdrops || [])
+        }))
+      }
+
+      // TV: traer images y escoger mejor
       if (endpointType === 'tv' && TMDB_API_KEY) {
         try {
+          setImagesLoading(true)
+          setImagesError('')
+
           const { posters, backdrops } = await fetchTVImages(id)
           const bestPoster = pickBestPosterTV(posters)
-          const bestBackdropForBackground =
-            pickBestBackdropTVNeutralFirst(backdrops)
+          const bestBackdropForBackground = pickBestBackdropTVNeutralFirst(backdrops)
+
+          // Preload del póster candidato para evitar “cambio” brusco
+          if (bestPoster) await preloadTmdb(bestPoster, 'w780')
 
           if (!cancelled) {
             if (bestPoster) poster = bestPoster
             if (bestBackdropForBackground) backdrop = bestBackdropForBackground
-          }
-          if (!cancelled) {
+
             setImagesState((prev) => ({
               posters: mergeUniqueImages(prev.posters, posters),
               backdrops: mergeUniqueImages(prev.backdrops, backdrops)
@@ -338,41 +338,58 @@ export default function DetailsClient({
           }
         } catch (e) {
           if (!cancelled) console.error('Error cargando imágenes TV:', e)
+        } finally {
+          if (!cancelled) setImagesLoading(false)
+        }
+      }
+
+      // Movie: traer posters y escoger mejor (solo si no venían embebidas)
+      if (endpointType === 'movie' && !data?.images && TMDB_API_KEY) {
+        try {
+          setImagesLoading(true)
+          setImagesError('')
+
+          const url = `https://api.themoviedb.org/3/movie/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,null,es`
+          const res = await fetch(url)
+          const json = await res.json()
+          if (!res.ok) throw new Error(json?.status_message || 'Error al cargar imágenes')
+
+          const posters = json.posters || []
+          const backdrops = json.backdrops || []
+
+          const bestPoster = pickBestImage(posters)
+          if (bestPoster?.file_path) {
+            // Preload para evitar swap “cutre”
+            await preloadTmdb(bestPoster.file_path, 'w780')
+            poster = bestPoster.file_path
+          }
+
+          if (!cancelled) {
+            setImagesState((prev) => ({
+              posters: mergeUniqueImages(prev.posters, posters),
+              backdrops: mergeUniqueImages(prev.backdrops, backdrops)
+            }))
+          }
+        } catch (err) {
+          if (!cancelled) setImagesError(err.message)
+        } finally {
+          if (!cancelled) setImagesLoading(false)
         }
       }
 
       if (!cancelled) {
+        // Base final (si hay override, displayPosterPath seguirá usando selectedPosterPath)
         setBasePosterPath(poster)
         setBaseBackdropPath(backdrop)
+        setArtworkInitialized(true)
       }
-
-      if (typeof window !== 'undefined' && !cancelled) {
-        const savedPoster = window.localStorage.getItem(posterStorageKey)
-        const savedPreviewBackdrop = window.localStorage.getItem(
-          previewBackdropStorageKey
-        )
-        const savedBackground =
-          window.localStorage.getItem(backgroundStorageKey)
-
-        if (savedPoster) setSelectedPosterPath(savedPoster)
-        if (savedPreviewBackdrop)
-          setSelectedPreviewBackdropPath(savedPreviewBackdrop)
-        if (savedBackground) {
-          setSelectedBackgroundPath(savedBackground)
-        } else if (savedPreviewBackdrop) {
-          setSelectedBackgroundPath(savedPreviewBackdrop)
-          window.localStorage.setItem(backgroundStorageKey, savedPreviewBackdrop)
-        }
-      }
-
-      if (!cancelled) setArtworkInitialized(true)
     }
 
     initArtwork()
     return () => {
       cancelled = true
     }
-  }, [id, endpointType, data])
+  }, [id, endpointType, data?.images, data?.poster_path, data?.backdrop_path, data?.profile_path])
 
   const displayPosterPath = artworkInitialized
     ? selectedPosterPath || basePosterPath || data.profile_path || null
@@ -475,8 +492,7 @@ export default function DetailsClient({
   }
 
   const clearRating = async () => {
-    if (requireLogin() || ratingLoading || userRating == null || !TMDB_API_KEY)
-      return
+    if (requireLogin() || ratingLoading || userRating == null || !TMDB_API_KEY) return
     try {
       setRatingLoading(true)
       setRatingError('')
@@ -564,60 +580,6 @@ export default function DetailsClient({
     }
   }, [id, type])
 
-  // ====== Cargar Imágenes Adicionales (Pelis) ======
-  useEffect(() => {
-    let abort = false
-
-    // Reutilizamos esta función para aplicar posters/backdrops
-    const applyImages = (posters = [], backdrops = []) => {
-      if (abort) return
-
-      // Elegir mejor póster (misma lógica que TV / resto de páginas)
-      const bestPoster = pickBestImage(posters)
-      if (bestPoster?.file_path) {
-        setBasePosterPath(bestPoster.file_path)
-      }
-
-      setImagesState((prev) => ({
-        posters: mergeUniqueImages(prev.posters, posters),
-        backdrops: mergeUniqueImages(prev.backdrops, backdrops)
-      }))
-    }
-
-    // 1) Si getDetails ya trae imágenes embebidas (data.images), usamos esas
-    if (data?.images) {
-      applyImages(data.images.posters || [], data.images.backdrops || [])
-      return
-    }
-
-    // 2) Si no, solo para PELÍCULAS llamamos a /movie/{id}/images
-    if (type !== 'movie' || !TMDB_API_KEY) return
-
-    const fetchImages = async () => {
-      try {
-        setImagesLoading(true)
-        setImagesError('')
-
-        const url = `https://api.themoviedb.org/3/movie/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,null,es`
-        const res = await fetch(url)
-        const json = await res.json()
-        if (!res.ok) throw new Error(json?.status_message || 'Error al cargar imágenes')
-
-        applyImages(json.posters || [], json.backdrops || [])
-      } catch (err) {
-        if (!abort) setImagesError(err.message)
-      } finally {
-        if (!abort) setImagesLoading(false)
-      }
-    }
-
-    fetchImages()
-
-    return () => {
-      abort = true
-    }
-  }, [type, id, data?.images])
-
   // ====== Handlers Artwork ======
   const handleSelectPoster = (filePath) => {
     setSelectedPosterPath(filePath)
@@ -628,6 +590,7 @@ export default function DetailsClient({
     }
     saveArtworkOverride({ type: endpointType, id, kind: 'poster', filePath })
   }
+
   const handleSelectPreviewBackdrop = (filePath) => {
     setSelectedPreviewBackdropPath(filePath)
     if (typeof window !== 'undefined') {
@@ -637,6 +600,7 @@ export default function DetailsClient({
     }
     saveArtworkOverride({ type: endpointType, id, kind: 'backdrop', filePath })
   }
+
   const handleSelectBackground = (filePath) => {
     setSelectedBackgroundPath(filePath)
     if (typeof window !== 'undefined') {
@@ -646,6 +610,7 @@ export default function DetailsClient({
     }
     saveArtworkOverride({ type: endpointType, id, kind: 'background', filePath })
   }
+
   const handleResetArtwork = () => {
     setSelectedPosterPath(null)
     setSelectedPreviewBackdropPath(null)
@@ -655,25 +620,11 @@ export default function DetailsClient({
       window.localStorage.removeItem(previewBackdropStorageKey)
       window.localStorage.removeItem(backgroundStorageKey)
     }
-    saveArtworkOverride({
-      type: endpointType,
-      id,
-      kind: 'poster',
-      filePath: null
-    })
-    saveArtworkOverride({
-      type: endpointType,
-      id,
-      kind: 'backdrop',
-      filePath: null
-    })
-    saveArtworkOverride({
-      type: endpointType,
-      id,
-      kind: 'background',
-      filePath: null
-    })
+    saveArtworkOverride({ type: endpointType, id, kind: 'poster', filePath: null })
+    saveArtworkOverride({ type: endpointType, id, kind: 'backdrop', filePath: null })
+    saveArtworkOverride({ type: endpointType, id, kind: 'background', filePath: null })
   }
+
   const handleCopyImageUrl = async (filePath) => {
     const url = buildOriginalImageUrl(filePath)
     try {
@@ -725,22 +676,16 @@ export default function DetailsClient({
       )}`
       : null
 
-  // --- Extract Additional Metadata Helpers ---
   const directors =
     type === 'movie'
       ? data.credits?.crew?.filter((c) => c.job === 'Director') || []
       : data.created_by || []
   const production =
-    data.production_companies
-      ?.slice(0, 2)
-      .map((c) => c.name)
-      .join(', ') || null
+    data.production_companies?.slice(0, 2).map((c) => c.name).join(', ') || null
   const countries =
     data.production_countries?.map((c) => c.iso_3166_1).join(', ') || null
   const languages =
-    data.spoken_languages
-      ?.map((l) => l.english_name || l.name)
-      .join(', ') || null
+    data.spoken_languages?.map((l) => l.english_name || l.name).join(', ') || null
 
   // ====== IMDb para RECOMENDACIONES ======
   const [recImdbRatings, setRecImdbRatings] = useState({})
@@ -758,7 +703,6 @@ export default function DetailsClient({
         const entries = await Promise.all(
           recommendations.slice(0, 15).map(async (rec) => {
             try {
-              // 1) si ya viene la nota en el objeto de recomendación
               const raw =
                 rec.imdb_rating ?? rec.imdbRating ?? rec.imdbScore ?? null
               if (raw != null && raw !== 'N/A') {
@@ -766,7 +710,6 @@ export default function DetailsClient({
                 return [rec.id, Number.isFinite(n) ? n : null]
               }
 
-              // 2) si no, buscamos imdb_id en TMDb y luego OMDb
               const mediaType =
                 rec.media_type === 'movie' || rec.media_type === 'tv'
                   ? rec.media_type
@@ -859,7 +802,7 @@ export default function DetailsClient({
 
             {/* Plataformas */}
             {providers && providers.length > 0 && (
-              <div className="flex flex-wrap justifycenter lg:justify-start gap-3 p-1">
+              <div className="flex flex-wrap justify-center lg:justify-start gap-3 p-1">
                 {providers.map((p) => (
                   <a
                     key={p.provider_id}
@@ -910,6 +853,7 @@ export default function DetailsClient({
                     <Heart className="w-6 h-6" />
                   )}
                 </button>
+
                 <button
                   onClick={toggleWatchlist}
                   disabled={wlLoading}
@@ -949,6 +893,7 @@ export default function DetailsClient({
                   {data.vote_average?.toFixed(1)}
                 </span>
               </div>
+
               {extras.imdbRating && (
                 <div className="flex items-center gap-2 border-l border-white/10 pl-6">
                   <img src="/logo-IMDb.png" alt="IMDb" className="h-5 w-auto" />
@@ -957,6 +902,7 @@ export default function DetailsClient({
                   </span>
                 </div>
               )}
+
               {session && (
                 <div className="flex items-center gap-2 border-l border-white/10 pl-6">
                   <StarRating
@@ -967,6 +913,7 @@ export default function DetailsClient({
                   />
                 </div>
               )}
+
               {!session && (
                 <p className="ml-auto text-xs text-gray-400">
                   Inicia sesión para puntuar.
@@ -974,9 +921,7 @@ export default function DetailsClient({
               )}
             </div>
 
-            {ratingError && (
-              <p className="text-xs text-red-400 mt-1">{ratingError}</p>
-            )}
+            {ratingError && <p className="text-xs text-red-400 mt-1">{ratingError}</p>}
 
             {/* Tagline & Overview */}
             <div>
@@ -1057,7 +1002,6 @@ export default function DetailsClient({
 
             {/* METADATOS */}
             <div className="mt-4 space-y-3">
-              {/* FILA 1: datos generales */}
               <div className="flex flex-wrap gap-3">
                 {type === 'movie' && data.original_title && (
                   <MetaItem
@@ -1090,8 +1034,7 @@ export default function DetailsClient({
                   <MetaItem
                     icon={ClockIcon}
                     label="Duración"
-                    value={`${Math.floor(data.runtime / 60)}h ${data.runtime % 60
-                      }m`}
+                    value={`${Math.floor(data.runtime / 60)}h ${data.runtime % 60}m`}
                     colorClass="text-purple-400"
                   />
                 )}
@@ -1105,8 +1048,6 @@ export default function DetailsClient({
                   />
                 )}
 
-                {/* Para series ponemos País en la primera fila
-                    (para pelis va en la segunda junto a presupuesto/recaudación) */}
                 {type === 'tv' && countries && (
                   <MetaItem
                     icon={MapPin}
@@ -1117,9 +1058,6 @@ export default function DetailsClient({
                 )}
               </div>
 
-              {/* FILA 2:
-                  - Películas: País + Presupuesto + Recaudación
-                  - Series: Estado + Episodios + Temporadas */}
               <div className="flex flex-wrap gap-3">
                 {type === 'movie' ? (
                   <>
@@ -1174,7 +1112,6 @@ export default function DetailsClient({
                 )}
               </div>
 
-              {/* FILA 3 (última): Colección + Producción + Premios */}
               <div className="flex flex-wrap gap-3">
                 {data.belongs_to_collection && (
                   <MetaItem
@@ -1204,7 +1141,6 @@ export default function DetailsClient({
                 )}
               </div>
             </div>
-
           </div>
         </div>
 
@@ -1254,20 +1190,17 @@ export default function DetailsClient({
                 </div>
 
                 {imagesLoading && (
-                  <div className="text-gray-400	o flex items-center gap-2">
+                  <div className="text-gray-400 flex items-center gap-2">
                     <Loader2 className="animate-spin w-4 h-4" /> Cargando TMDb...
                   </div>
                 )}
-                {imagesError && (
-                  <p className="text-red-400 text-sm">{imagesError}</p>
-                )}
+                {imagesError && <p className="text-red-400 text-sm">{imagesError}</p>}
 
                 <div
                   className="relative group"
                   onMouseEnter={() => setIsHoveredImages(true)}
                   onMouseLeave={() => setIsHoveredImages(false)}
                 >
-                  {/* Flecha Izq */}
                   {showPrevImages && (
                     <button
                       onClick={handlePrevImagesClick}
@@ -1337,7 +1270,6 @@ export default function DetailsClient({
                     })}
                   </div>
 
-                  {/* Flecha Der */}
                   {showNextImages && (
                     <button
                       onClick={handleNextImagesClick}
@@ -1390,7 +1322,7 @@ export default function DetailsClient({
 
                       <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-70 group-hover:opacity-90 transition-opacity duration-300" />
                       <div className="absolute bottom-0 left-0 right-0 p-3">
-                        <p className="text-white	font-bold text-sm truncate leading-tight">
+                        <p className="text-white font-bold text-sm truncate leading-tight">
                           {actor.name}
                         </p>
                         <p className="text-gray-300 text-xs truncate">
@@ -1459,7 +1391,6 @@ export default function DetailsClient({
                       href={`/details/${rec.media_type || type}/${rec.id}`}
                       className="block group"
                     >
-                      {/* Tarjeta solo con la portada; margen top para que no se recorte al subir */}
                       <div className="mt-3 relative rounded-lg overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:scale-105 hover:-translate-y-1 bg-black/40">
                         <img
                           src={
@@ -1471,7 +1402,6 @@ export default function DetailsClient({
                           className="w-full h-full object-cover"
                         />
 
-                        {/* Badges TMDb + IMDb desde esquina inferior derecha hacia la izquierda */}
                         <div className="absolute bottom-2 right-2 flex flex-row-reverse items-center gap-1 transform-gpu opacity-0 translate-y-2 translate-x-2 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300 ease-out">
                           {tmdbScore && (
                             <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-emerald-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-75 group-hover:scale-110 group-hover:translate-y-0">
@@ -1512,10 +1442,7 @@ export default function DetailsClient({
         {reviews && reviews.length > 0 && (
           <section className="mb-8">
             <div className="flex items-center justify-between mb-6">
-              <SectionTitle
-                title="Críticas de Usuarios"
-                icon={MessageSquareIcon}
-              />
+              <SectionTitle title="Críticas de Usuarios" icon={MessageSquareIcon} />
               {reviewLimit < reviews.length && (
                 <button
                   onClick={() => setReviewLimit((prev) => prev + 2)}
@@ -1525,6 +1452,7 @@ export default function DetailsClient({
                 </button>
               )}
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {reviews.slice(0, reviewLimit).map((r) => {
                 const avatar = r.author_details?.avatar_path
@@ -1547,9 +1475,7 @@ export default function DetailsClient({
                       <div>
                         <h4 className="font-bold text-white">{r.author}</h4>
                         <div className="flex items-center gap-2 text-xs text-gray-400">
-                          <span>
-                            {new Date(r.created_at).toLocaleDateString()}
-                          </span>
+                          <span>{new Date(r.created_at).toLocaleDateString()}</span>
                           {r.author_details?.rating && (
                             <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
                               ★ {r.author_details.rating}
@@ -1558,11 +1484,11 @@ export default function DetailsClient({
                         </div>
                       </div>
                     </div>
+
                     <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
-                      "
-                      {r.content.replace(/<[^>]*>?/gm, '')}
-                      "
+                      "{r.content.replace(/<[^>]*>?/gm, '')}"
                     </div>
+
                     <a
                       href={r.url}
                       target="_blank"
