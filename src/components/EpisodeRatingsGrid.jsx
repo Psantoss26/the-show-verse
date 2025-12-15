@@ -1,15 +1,77 @@
 'use client'
 
-import { useMemo, useState, useRef, useEffect } from 'react'
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { LayoutGrid, WrapText, ArrowUpDown, BarChart3 } from 'lucide-react'
 
-// --- Tooltip flotante en portal (igual que antes) ---
-function TooltipPortal({ activeData, anchorRect }) {
+/* =======================
+   Hooks (perf / mobile)
+======================= */
+function useIsTouchLike() {
+  const [isTouch, setIsTouch] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const mqHoverNone = window.matchMedia?.('(hover: none)')
+    const mqCoarse = window.matchMedia?.('(pointer: coarse)')
+
+    const compute = () => {
+      const touch =
+        ('ontouchstart' in window) ||
+        (navigator?.maxTouchPoints || 0) > 0 ||
+        !!mqHoverNone?.matches ||
+        !!mqCoarse?.matches
+      setIsTouch(touch)
+    }
+
+    compute()
+
+    const onChange = () => compute()
+    mqHoverNone?.addEventListener?.('change', onChange)
+    mqCoarse?.addEventListener?.('change', onChange)
+
+    return () => {
+      mqHoverNone?.removeEventListener?.('change', onChange)
+      mqCoarse?.removeEventListener?.('change', onChange)
+    }
+  }, [])
+
+  return isTouch
+}
+
+function useInViewOnce(rootMargin = '300px') {
+  const ref = useRef(null)
+  const [inView, setInView] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el || inView) return
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries?.[0]?.isIntersecting) {
+          setInView(true)
+          io.disconnect()
+        }
+      },
+      { root: null, rootMargin, threshold: 0.01 }
+    )
+
+    io.observe(el)
+    return () => io.disconnect()
+  }, [inView, rootMargin])
+
+  return { ref, inView }
+}
+
+// --- Tooltip flotante en portal (igual que antes, pero desactivable) ---
+function TooltipPortal({ activeData, anchorRect, enabled }) {
   const tooltipRef = useRef(null)
   const [coords, setCoords] = useState({ top: 0, left: 0, placement: 'top' })
 
   useEffect(() => {
+    if (!enabled) return
     if (!anchorRect || !tooltipRef.current) return
 
     const tooltip = tooltipRef.current
@@ -23,9 +85,8 @@ function TooltipPortal({ activeData, anchorRect }) {
     let top = rTop - tH - GAP
     let placement = 'top'
 
-    if (left < VIEWPORT_PADDING) {
-      left = VIEWPORT_PADDING
-    } else if (left + tW > window.innerWidth - VIEWPORT_PADDING) {
+    if (left < VIEWPORT_PADDING) left = VIEWPORT_PADDING
+    else if (left + tW > window.innerWidth - VIEWPORT_PADDING) {
       left = window.innerWidth - tW - VIEWPORT_PADDING
     }
 
@@ -35,8 +96,9 @@ function TooltipPortal({ activeData, anchorRect }) {
     }
 
     setCoords({ top, left, placement })
-  }, [anchorRect])
+  }, [anchorRect, enabled])
 
+  if (!enabled) return null
   if (!activeData) return null
 
   return createPortal(
@@ -50,7 +112,6 @@ function TooltipPortal({ activeData, anchorRect }) {
       }}
     >
       <div className="bg-black text-white px-3 py-2 rounded-md shadow-2xl border border-white/10 max-w-[280px] sm:max-w-[320px]">
-        {/* Título episodio */}
         <div className="font-semibold text-[13px] mb-1 leading-snug text-balance">
           {activeData.titleText}
         </div>
@@ -60,7 +121,6 @@ function TooltipPortal({ activeData, anchorRect }) {
         </div>
 
         <div className="space-y-2">
-          {/* TMDb */}
           {activeData.tmdbVal != null && (
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
@@ -86,7 +146,6 @@ function TooltipPortal({ activeData, anchorRect }) {
             </div>
           )}
 
-          {/* IMDb */}
           {activeData.imdbVal != null && (
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
@@ -125,30 +184,37 @@ function TooltipPortal({ activeData, anchorRect }) {
 
 export default function EpisodeRatingsGrid({
   ratings,
-  initialSource = 'imdb', // ya no se usa, pero lo dejamos por compatibilidad
+  initialSource = 'imdb', // compat
   density = 'compact',
   fillMissingWithTmdb = true
 }) {
+  const isTouchLike = useIsTouchLike()
+  const { ref: inViewRef, inView } = useInViewOnce('450px')
+
   // Controles estilo SeriesGraph
   const [layoutMode, setLayoutMode] = useState('grid') // 'grid' | 'wrapped'
+  const userPickedLayoutRef = useRef(false)
+
   const [inverted, setInverted] = useState(false)
   const [showSeasonAvg, setShowSeasonAvg] = useState(false)
 
-  // Tooltip
+  // Tooltip (DESACTIVADO EN MÓVIL/TOUCH)
+  const tooltipEnabled = !isTouchLike
   const [hoveredEp, setHoveredEp] = useState(null)
   const [anchorRect, setAnchorRect] = useState(null)
 
-  const handleMouseEnter = (e, epData) => {
-    if (!epData) return
+  const handleMouseEnter = useCallback((e, epData) => {
+    if (!tooltipEnabled || !epData) return
     const rect = e.currentTarget.getBoundingClientRect()
     setAnchorRect(rect)
     setHoveredEp(epData)
-  }
+  }, [tooltipEnabled])
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
+    if (!tooltipEnabled) return
     setHoveredEp(null)
     setAnchorRect(null)
-  }
+  }, [tooltipEnabled])
 
   // tamaños
   const SIZES = {
@@ -169,10 +235,8 @@ export default function EpisodeRatingsGrid({
   const totalSeasonsEstimate =
     meta.totalSeasons ??
     (Array.isArray(ratings?.seasons) ? ratings.seasons.length : 0)
-  const totalEpisodesEstimate = meta.totalEpisodes ?? 0
 
   // helpers numéricos
-  // -> 0 ó valores <= 0 se consideran "sin nota" (null)
   const toRatingNumber = (value) => {
     if (value == null) return null
     if (typeof value === 'number') {
@@ -230,14 +294,11 @@ export default function EpisodeRatingsGrid({
                   : null
             if (episodeNumber == null) return null
 
-            // detectar episodios no emitidos
             const airDateStr = ep.air_date || ep.airDate || null
             let isUnaired = false
             if (airDateStr) {
               const d = new Date(airDateStr)
-              if (!Number.isNaN(d.getTime()) && d > new Date()) {
-                isUnaired = true
-              }
+              if (!Number.isNaN(d.getTime()) && d > new Date()) isUnaired = true
             }
 
             let tmdbRating = toRatingNumber(
@@ -246,11 +307,8 @@ export default function EpisodeRatingsGrid({
             let imdbRating = toRatingNumber(ep.imdbRating ?? ep.imdb)
 
             let displayRating = imdbRating
-            if (displayRating == null && fillMissingWithTmdb) {
-              displayRating = tmdbRating
-            }
+            if (displayRating == null && fillMissingWithTmdb) displayRating = tmdbRating
 
-            // si aún no ha salido, no hay nota (evitamos 0s) y luego mostraremos "?"
             if (isUnaired) {
               tmdbRating = null
               imdbRating = null
@@ -282,10 +340,7 @@ export default function EpisodeRatingsGrid({
           .filter(Boolean)
           .sort((a, b) => a.episodeNumber - b.episodeNumber)
 
-        return {
-          season_number: seasonNumber,
-          episodes
-        }
+        return { season_number: seasonNumber, episodes }
       })
       .filter(Boolean)
 
@@ -301,10 +356,7 @@ export default function EpisodeRatingsGrid({
         .forEach((s) => {
           s.episodes.forEach((ep) => {
             if (ep.displayRating == null) return
-            allEpisodes.push({
-              ...ep,
-              episodeNumber: counter++
-            })
+            allEpisodes.push({ ...ep, episodeNumber: counter++ })
           })
         })
 
@@ -367,71 +419,34 @@ export default function EpisodeRatingsGrid({
     return map
   }, [seasonsSorted])
 
+  const episodeNumbers = useMemo(() => {
+    return Array.from({ length: maxEpisodes }, (_, i) => i + 1)
+  }, [maxEpisodes])
+
   const format1 = (v) => {
     if (v == null) return null
     const num = Math.round(Number(v) * 10) / 10
     return Number.isInteger(num) ? num.toString() : num.toFixed(1)
   }
 
-  // Colores estilo SeriesGraph (Bad = rojo, Garbage = morado)
   const toneFor = (v) => {
     if (v == null)
-      return {
-        bg: 'bg-zinc-800',
-        text: 'text-zinc-400',
-        ring: 'ring-white/5'
-      }
-    if (v >= 9.5)
-      return {
-        bg: 'bg-teal-400',      // Absolute Cinema
-        text: 'text-black',
-        ring: 'ring-black/10'
-      }
-    if (v >= 9.0)
-      return {
-        bg: 'bg-emerald-700',   // Awesome
-        text: 'text-white/90',
-        ring: 'ring-black/10'
-      }
-    if (v >= 8.0)
-      return {
-        bg: 'bg-green-500',     // Great
-        text: 'text-black',
-        ring: 'ring-black/10'
-      }
-    if (v >= 7.0)
-      return {
-        bg: 'bg-yellow-300',    // Good
-        text: 'text-black',
-        ring: 'ring-black/10'
-      }
-    if (v >= 6.0)
-      return {
-        bg: 'bg-yellow-500',    // Average
-        text: 'text-black',
-        ring: 'ring-black/10'
-      }
-    if (v >= 5.0)
-      return {
-        bg: 'bg-red-500',       // Bad
-        text: 'text-white',
-        ring: 'ring-black/10'
-      }
-
-    return {
-      bg: 'bg-purple-700',      // Garbage
-      text: 'text-white',
-      ring: 'ring-white/10'
-    }
+      return { bg: 'bg-zinc-800', text: 'text-zinc-400', ring: 'ring-white/5' }
+    if (v >= 9.5) return { bg: 'bg-teal-400', text: 'text-black', ring: 'ring-black/10' }
+    if (v >= 9.0) return { bg: 'bg-emerald-700', text: 'text-white/90', ring: 'ring-black/10' }
+    if (v >= 8.0) return { bg: 'bg-green-500', text: 'text-black', ring: 'ring-black/10' }
+    if (v >= 7.0) return { bg: 'bg-yellow-300', text: 'text-black', ring: 'ring-black/10' }
+    if (v >= 6.0) return { bg: 'bg-yellow-500', text: 'text-black', ring: 'ring-black/10' }
+    if (v >= 5.0) return { bg: 'bg-red-500', text: 'text-white', ring: 'ring-black/10' }
+    return { bg: 'bg-purple-700', text: 'text-white', ring: 'ring-white/10' }
   }
 
-  // no mostramos tooltip para episodios futuros
   const buildTooltipData = (ep, seasonNumber, episodeNumber) => {
+    if (!tooltipEnabled) return null
     if (!ep || ep.isUnaired) return null
+
     const hasData =
-      ep.tmdbRating != null ||
-      ep.imdbRating != null ||
-      ep.displayRating != null
+      ep.tmdbRating != null || ep.imdbRating != null || ep.displayRating != null
     if (!hasData) return null
 
     const titleText = ep.name || `Episodio ${episodeNumber}`
@@ -461,93 +476,145 @@ export default function EpisodeRatingsGrid({
     }
   }
 
+  // ✅ Auto-optimización móvil:
+  // - si es touch y el grid es grande, cambiamos por defecto a Wrapped (sin impedir que el usuario elija Grid)
+  const gridSize = seasonsSorted.length * maxEpisodes
+  const isHeavyGrid = gridSize >= 420 // umbral razonable para móviles (ajustable)
+
+  useEffect(() => {
+    if (!isTouchLike) return
+    if (userPickedLayoutRef.current) return
+    if (layoutMode !== 'grid') return
+    if (isHeavyGrid) setLayoutMode('wrapped')
+  }, [isTouchLike, layoutMode, isHeavyGrid])
+
+  const setLayoutModeSafe = (mode) => {
+    userPickedLayoutRef.current = true
+    setLayoutMode(mode)
+    if (mode === 'wrapped') {
+      // limpiamos tooltip si venimos de grid
+      setHoveredEp(null)
+      setAnchorRect(null)
+    }
+  }
+
   if (!seasonsSorted.length || maxEpisodes === 0) return null
 
-  // === Render Grid normal (S columnas / E filas) ===
+  // =======================
+  //  Render GRID normal
+  //  (optim: menos blur/shadows en móvil + content-visibility)
+  // =======================
   const renderGrid = () => (
-    <div className="overflow-x-auto overflow-y-visible mt-2">
-      <table className="border-separate border-spacing-0">
+    <div
+      className="overflow-x-auto overflow-y-visible mt-2 [-webkit-overflow-scrolling:touch] overscroll-contain"
+      style={{
+        // ⚡ evita que el navegador “pinte todo” cuando está fuera de pantalla (gran mejora en scroll móvil)
+        contentVisibility: 'auto',
+        containIntrinsicSize: '900px 520px'
+      }}
+    >
+      <table className="border-separate border-spacing-0 [table-layout:fixed]">
         <thead>
           <tr>
             <th
-              className={`sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-left text-[11px] text-zinc-400 font-medium ${SZ.stickyCol}`}
+              className={`
+                sticky left-0 z-10
+                bg-black/70
+                md:bg-black/60 md:backdrop-blur
+                ${SZ.headerPad}
+                text-left text-[11px] text-zinc-400 font-medium
+                ${SZ.stickyCol}
+              `}
             />
             {seasonsSorted.map((s) => (
               <th
                 key={s.season_number}
-                className={`${SZ.headerPad} text-center text-xs text-zinc-200 font-semibold bg-black/60 backdrop-blur border-b border-white/10`}
+                className={`
+                  ${SZ.headerPad}
+                  text-center text-xs text-zinc-200 font-semibold
+                  bg-black/70
+                  md:bg-black/60 md:backdrop-blur
+                  border-b border-white/10
+                `}
               >
                 S{s.season_number}
               </th>
             ))}
           </tr>
         </thead>
+
         <tbody>
-          {Array.from({ length: maxEpisodes }).map((_, i) => {
-            const epNum = i + 1
-            return (
-              <tr key={`row-${epNum}`}>
-                <td
-                  className={`sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-[11px] text-zinc-300 font-medium ${SZ.stickyCol} border-r border-white/5`}
-                >
-                  E{epNum}
-                </td>
+          {episodeNumbers.map((epNum) => (
+            <tr key={`row-${epNum}`}>
+              <td
+                className={`
+                  sticky left-0 z-10
+                  bg-black/70
+                  md:bg-black/60 md:backdrop-blur
+                  ${SZ.headerPad}
+                  text-[11px] text-zinc-300 font-medium
+                  ${SZ.stickyCol}
+                  border-r border-white/5
+                `}
+              >
+                E{epNum}
+              </td>
 
-                {seasonsSorted.map((s) => {
-                  const ep = epIndexBySeason
-                    .get(s.season_number)
-                    ?.get(epNum)
+              {seasonsSorted.map((s) => {
+                const ep = epIndexBySeason.get(s.season_number)?.get(epNum)
+                const isUpcoming = ep?.isUnaired
+                const raw = isUpcoming ? null : ep?.displayRating ?? null
+                const val = isUpcoming ? '?' : format1(raw)
+                const spec = toneFor(raw)
 
-                  const isUpcoming = ep?.isUnaired
-                  const raw = isUpcoming ? null : ep?.displayRating ?? null
-                  const val = isUpcoming ? '?' : format1(raw)
-                  const spec = toneFor(raw)
-                  const bgClass = isUpcoming ? 'bg-zinc-400' : spec.bg
-                  const textClass = isUpcoming ? 'text-black' : spec.text
+                const bgClass = isUpcoming ? 'bg-zinc-400' : spec.bg
+                const textClass = isUpcoming ? 'text-black' : spec.text
 
-                  const tooltipData = isUpcoming
-                    ? null
-                    : buildTooltipData(
-                      ep,
-                      s.season_number,
-                      epNum
-                    )
+                const tooltipData = isUpcoming ? null : buildTooltipData(ep, s.season_number, epNum)
 
-                  return (
-                    <td key={`s${s.season_number}-e${epNum}`} className="p-1">
+                return (
+                  <td key={`s${s.season_number}-e${epNum}`} className="p-1">
+                    <div
+                      onMouseEnter={
+                        tooltipEnabled ? (e) => tooltipData && handleMouseEnter(e, tooltipData) : undefined
+                      }
+                      onMouseLeave={tooltipEnabled ? handleMouseLeave : undefined}
+                    >
                       <div
-                        onMouseEnter={(e) =>
-                          tooltipData && handleMouseEnter(e, tooltipData)
-                        }
-                        onMouseLeave={handleMouseLeave}
+                        className={`
+                          ${bgClass} ${textClass}
+                          ${SZ.cell}
+                          rounded-[6px]
+                          flex items-center justify-center
+                          text-[14px] md:text-[15px] lg:text-[22px]
+                          font-semibold
+                          [font-variant-numeric:tabular-nums]
+                          select-none
+                          cursor-default
+                          ${tooltipEnabled ? 'md:shadow-[0_0_0_2px_rgba(0,0,0,0.9)]' : 'shadow-none'}
+                        `}
                       >
-                        <div
-                          className={`
-                            ${bgClass} ${textClass}
-                            ${SZ.cell}
-                            rounded-[6px]
-                            flex items-center justify-center
-                            text-[14px] md:text-[15px] lg:text-[22px]
-                            font-semibold
-                            [font-variant-numeric:tabular-nums]
-                            shadow-[0_0_0_2px_rgba(0,0,0,0.9)]
-                            cursor-default select-none
-                          `}
-                        >
-                          {val ?? '—'}
-                        </div>
+                        {val ?? '—'}
                       </div>
-                    </td>
-                  )
-                })}
-              </tr>
-            )
-          })}
+                    </div>
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
 
           {showSeasonAvg && (
             <tr>
               <td
-                className={`sticky left-0 z-10 bg-black/80 backdrop-blur ${SZ.headerPad} text-[11px] text-zinc-100 font-semibold ${SZ.stickyCol} border-t border-white/10 border-r border-white/5`}
+                className={`
+                  sticky left-0 z-10
+                  bg-black/80
+                  md:backdrop-blur
+                  ${SZ.headerPad}
+                  text-[11px] text-zinc-100 font-semibold
+                  ${SZ.stickyCol}
+                  border-t border-white/10 border-r border-white/5
+                `}
               >
                 AVG
               </td>
@@ -563,25 +630,12 @@ export default function EpisodeRatingsGrid({
                     className="px-2 pt-3 pb-2 text-center align-bottom border-t border-white/10"
                   >
                     <div className="flex flex-col items-center gap-[2px] min-w-[40px]">
-                      {/* número */}
-                      <span
-                        className="
-                          text-sm md:text-base lg:text-lg
-                          font-semibold
-                          text-white
-                          [font-variant-numeric:tabular-nums]
-                        "
-                      >
+                      <span className="text-sm md:text-base lg:text-lg font-semibold text-white [font-variant-numeric:tabular-nums]">
                         {val ?? '—'}
                       </span>
-
-                      {/* barra de color */}
                       <span
                         className={`
-                          mt-[2px]
-                          h-[3px] md:h-[4px]
-                          w-8 md:w-10 lg:w-12
-                          rounded-full
+                          mt-[2px] h-[3px] md:h-[4px] w-8 md:w-10 lg:w-12 rounded-full
                           ${avg == null ? 'bg-zinc-700' : spec.bg}
                         `}
                       />
@@ -596,47 +650,79 @@ export default function EpisodeRatingsGrid({
     </div>
   )
 
-  // === Render Grid invertido (E columnas / S filas) ===
+  // =======================
+  //  Render GRID invertido
+  // =======================
   const renderGridInverted = () => (
-    <div className="overflow-x-auto overflow-y-visible mt-2">
-      <table className="border-separate border-spacing-0">
+    <div
+      className="overflow-x-auto overflow-y-visible mt-2 [-webkit-overflow-scrolling:touch] overscroll-contain"
+      style={{
+        contentVisibility: 'auto',
+        containIntrinsicSize: '900px 520px'
+      }}
+    >
+      <table className="border-separate border-spacing-0 [table-layout:fixed]">
         <thead>
           <tr>
             <th
-              className={`sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-left text-[11px] text-zinc-400 font-medium ${SZ.stickyCol}`}
-            >
-              {/* vacío */}
-            </th>
-            {Array.from({ length: maxEpisodes }).map((_, i) => (
+              className={`
+                sticky left-0 z-10
+                bg-black/70
+                md:bg-black/60 md:backdrop-blur
+                ${SZ.headerPad}
+                text-left text-[11px] text-zinc-400 font-medium
+                ${SZ.stickyCol}
+              `}
+            />
+            {episodeNumbers.map((epNum) => (
               <th
-                key={`eh-${i + 1}`}
-                className={`${SZ.headerPad} text-center text-xs text-zinc-200 font-semibold bg-black/60 backdrop-blur border-b border-white/10`}
+                key={`eh-${epNum}`}
+                className={`
+                  ${SZ.headerPad}
+                  text-center text-xs text-zinc-200 font-semibold
+                  bg-black/70
+                  md:bg-black/60 md:backdrop-blur
+                  border-b border-white/10
+                `}
               >
-                E{i + 1}
+                E{epNum}
               </th>
             ))}
             {showSeasonAvg && (
               <th
-                className={`${SZ.headerPad} text-center text-xs text-zinc-200 font-semibold bg-black/60 backdrop-blur border-b border-white/10`}
+                className={`
+                  ${SZ.headerPad}
+                  text-center text-xs text-zinc-200 font-semibold
+                  bg-black/70
+                  md:bg-black/60 md:backdrop-blur
+                  border-b border-white/10
+                `}
               >
                 AVG
               </th>
             )}
           </tr>
         </thead>
+
         <tbody>
           {seasonsSorted.map((s) => (
             <tr key={`row-s${s.season_number}`}>
               <td
-                className={`sticky left-0 z-10 bg-black/60 backdrop-blur ${SZ.headerPad} text-[11px] text-zinc-300 font-medium ${SZ.stickyCol} border-r border-white/5`}
+                className={`
+                  sticky left-0 z-10
+                  bg-black/70
+                  md:bg-black/60 md:backdrop-blur
+                  ${SZ.headerPad}
+                  text-[11px] text-zinc-300 font-medium
+                  ${SZ.stickyCol}
+                  border-r border-white/5
+                `}
               >
                 S{s.season_number}
               </td>
-              {Array.from({ length: maxEpisodes }).map((_, i) => {
-                const epNum = i + 1
-                const ep = epIndexBySeason
-                  .get(s.season_number)
-                  ?.get(epNum)
+
+              {episodeNumbers.map((epNum) => {
+                const ep = epIndexBySeason.get(s.season_number)?.get(epNum)
 
                 const isUpcoming = ep?.isUnaired
                 const raw = isUpcoming ? null : ep?.displayRating ?? null
@@ -644,43 +730,30 @@ export default function EpisodeRatingsGrid({
                 const spec = toneFor(raw)
                 const bgClass = isUpcoming ? 'bg-zinc-400' : spec.bg
                 const textClass = isUpcoming ? 'text-black' : spec.text
-                const tooltipData = isUpcoming
-                  ? null
-                  : buildTooltipData(
-                    ep,
-                    s.season_number,
-                    epNum
-                  )
+
+                const tooltipData = isUpcoming ? null : buildTooltipData(ep, s.season_number, epNum)
 
                 return (
-                  <td
-                    key={`s${s.season_number}-e${epNum}`}
-                    className="p-1"
-                  >
+                  <td key={`s${s.season_number}-e${epNum}`} className="p-1">
                     <div
-                      onMouseEnter={(e) =>
-                        tooltipData && handleMouseEnter(e, tooltipData)
+                      onMouseEnter={
+                        tooltipEnabled ? (e) => tooltipData && handleMouseEnter(e, tooltipData) : undefined
                       }
-                      onMouseLeave={handleMouseLeave}
+                      onMouseLeave={tooltipEnabled ? handleMouseLeave : undefined}
                     >
                       <div
                         className={`
                           ${bgClass} ${textClass} ring-1 ${spec.ring}
-                          rounded-[6px] md:rounded-[6px]
+                          rounded-[6px]
                           ${SZ.cell}
                           flex items-center justify-center
-                          font-semibold leading-none tracking-tight
+                          font-semibold
                           [font-variant-numeric:tabular-nums]
                           text-[15px] md:text-[16px] lg:text-[22px]
-                          shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]
-                          hover:brightness-[1.1] hover:scale-[1.1] hover:z-20
-                          transition duration-200
-                          cursor-default
-                          outline-none focus:ring-2 focus:ring-white/30
-                          select-none
+                          ${tooltipEnabled ? 'md:hover:brightness-[1.07]' : ''}
+                          transition duration-150
+                          cursor-default select-none
                         `}
-                        role="button"
-                        tabIndex={0}
                       >
                         {val ?? '—'}
                       </div>
@@ -692,29 +765,18 @@ export default function EpisodeRatingsGrid({
               {showSeasonAvg && (
                 <td className="px-2 pt-3 pb-2 text-center align-bottom border-l border-white/10">
                   {(() => {
-                    const avg =
-                      seasonAverages.get(s.season_number) ?? null
+                    const avg = seasonAverages.get(s.season_number) ?? null
                     const spec = toneFor(avg)
                     const val = format1(avg)
 
                     return (
                       <div className="flex flex-col items-center gap-[2px] min-w-[40px]">
-                        <span
-                          className="
-                            text-sm md:text-base lg:text-lg
-                            font-semibold
-                            text-white
-                            [font-variant-numeric:tabular-nums]
-                          "
-                        >
+                        <span className="text-sm md:text-base lg:text-lg font-semibold text-white [font-variant-numeric:tabular-nums]">
                           {val ?? '—'}
                         </span>
                         <span
                           className={`
-                            mt-[2px]
-                            h-[3px] md:h-[4px]
-                            w-8 md:w-10 lg:w-12
-                            rounded-full
+                            mt-[2px] h-[3px] md:h-[4px] w-8 md:w-10 lg:w-12 rounded-full
                             ${avg == null ? 'bg-zinc-700' : spec.bg}
                           `}
                         />
@@ -730,9 +792,11 @@ export default function EpisodeRatingsGrid({
     </div>
   )
 
-  // === Render Wrapped (cada temporada en un bloque) ===
+  // =======================
+  //  Render Wrapped
+  // =======================
   const renderWrapped = () => (
-    <div className="space-y-6 mt-2">
+    <div className="space-y-6 mt-2" style={{ contentVisibility: 'auto', containIntrinsicSize: '800px 520px' }}>
       {seasonsSorted.map((s) => {
         const avg = seasonAverages.get(s.season_number) ?? null
         return (
@@ -743,13 +807,11 @@ export default function EpisodeRatingsGrid({
               </span>
               {showSeasonAvg && avg != null && (
                 <span className="text-xs text-zinc-400">
-                  Avg{' '}
-                  <span className="font-semibold text-white">
-                    {format1(avg)}
-                  </span>
+                  Avg <span className="font-semibold text-white">{format1(avg)}</span>
                 </span>
               )}
             </div>
+
             <div className="flex flex-wrap gap-2">
               {s.episodes.map((ep) => {
                 const isUpcoming = ep.isUnaired
@@ -758,43 +820,37 @@ export default function EpisodeRatingsGrid({
                 const bgClass = isUpcoming ? 'bg-zinc-400' : spec.bg
                 const textClass = isUpcoming ? 'text-black' : spec.text
                 const val = isUpcoming ? '?' : format1(raw)
+
                 const tooltipData = isUpcoming
                   ? null
-                  : buildTooltipData(
-                    ep,
-                    s.season_number,
-                    ep.episodeNumber
-                  )
+                  : buildTooltipData(ep, s.season_number, ep.episodeNumber)
+
                 return (
                   <div
                     key={`wrap-s${s.season_number}-e${ep.episodeNumber}`}
                     className="flex flex-col items-center gap-1"
-                    onMouseEnter={(e) =>
-                      tooltipData && handleMouseEnter(e, tooltipData)
+                    onMouseEnter={
+                      tooltipEnabled ? (e) => tooltipData && handleMouseEnter(e, tooltipData) : undefined
                     }
-                    onMouseLeave={handleMouseLeave}
+                    onMouseLeave={tooltipEnabled ? handleMouseLeave : undefined}
                   >
                     <div
                       className={`
                         ${bgClass} ${textClass} ring-1 ${spec.ring}
-                        rounded-[6px] md:rounded-[6px]
+                        rounded-[6px]
                         ${SZ.cell}
                         flex items-center justify-center
-                        font-semibold leading-none tracking-tight
+                        font-semibold
                         [font-variant-numeric:tabular-nums]
                         text-[15px] md:text-[16px] lg:text-[22px]
-                        shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]
-                        hover:brightness-[1.1] hover:scale-[1.05]
-                        transition duration-200
-                        cursor-default
-                        select-none
+                        ${tooltipEnabled ? 'md:hover:brightness-[1.07]' : ''}
+                        transition duration-150
+                        cursor-default select-none
                       `}
                     >
                       {val ?? '—'}
                     </div>
-                    <span className="text-[10px] text-zinc-400">
-                      E{ep.episodeNumber}
-                    </span>
+                    <span className="text-[10px] text-zinc-400">E{ep.episodeNumber}</span>
                   </div>
                 )
               })}
@@ -805,10 +861,13 @@ export default function EpisodeRatingsGrid({
     </div>
   )
 
+  // ✅ En móvil, si el grid es pesado, no lo montamos hasta que el usuario lo elija (y esté cerca en viewport)
+  const shouldRenderHeavyGrid = layoutMode === 'grid' && (!isTouchLike || !isHeavyGrid) ? true : (layoutMode === 'grid' && inView)
+
   return (
     <>
-      <div className="space-y-3">
-        {/* Controles estilo SeriesGraph */}
+      <div ref={inViewRef} className="space-y-3">
+        {/* Controles */}
         <div className="flex flex-wrap items-center gap-3">
           <SegmentedToggle
             options={[
@@ -816,11 +875,10 @@ export default function EpisodeRatingsGrid({
               { id: 'wrapped', label: 'Wrapped' }
             ]}
             value={layoutMode}
-            onChange={setLayoutMode}
+            onChange={setLayoutModeSafe}
           />
 
           <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-300">
-            {/* Inverted con el mismo diseño que Season Avg (icono + switch) */}
             <div className="flex items-center gap-1.5">
               <ArrowUpDown className="w-3.5 h-3.5 opacity-80" />
               <span>Inverted</span>
@@ -829,38 +887,43 @@ export default function EpisodeRatingsGrid({
               checked={inverted}
               disabled={layoutMode === 'wrapped'}
               onChange={(v) => {
-                if (layoutMode === 'grid') {
-                  setInverted(v)
-                }
+                if (layoutMode === 'grid') setInverted(v)
               }}
             />
 
-            {/* Season Avg a la izquierda con los demás */}
             <div className="flex items-center gap-1.5 ml-3">
               <BarChart3 className="w-3.5 h-3.5 opacity-80" />
               <span>Season Avg.</span>
             </div>
-            <Switch
-              checked={showSeasonAvg}
-              onChange={setShowSeasonAvg}
-            />
+            <Switch checked={showSeasonAvg} onChange={setShowSeasonAvg} />
           </div>
         </div>
 
         <LegendSeriesGraph />
 
         {/* Layout */}
-        {layoutMode === 'grid'
-          ? (inverted ? renderGridInverted() : renderGrid())
-          : renderWrapped()}
+        {layoutMode === 'grid' ? (
+          shouldRenderHeavyGrid ? (
+            inverted ? renderGridInverted() : renderGrid()
+          ) : (
+            // placeholder ultra-ligero para evitar “parón” al llegar a la sección
+            <div className="mt-2 rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-zinc-300">
+              Cargando vista Grid…
+            </div>
+          )
+        ) : (
+          renderWrapped()
+        )}
       </div>
 
-      <TooltipPortal activeData={hoveredEp} anchorRect={anchorRect} />
+      <TooltipPortal activeData={hoveredEp} anchorRect={anchorRect} enabled={tooltipEnabled} />
     </>
   )
 }
 
-// === Controles auxiliares ===
+/* =======================
+   Controles auxiliares
+======================= */
 
 function SegmentedToggle({ options, value, onChange }) {
   return (
@@ -878,11 +941,8 @@ function SegmentedToggle({ options, value, onChange }) {
             onClick={() => onChange(opt.id)}
             className={`
               px-3 py-1.5 text-[11px] font-medium rounded-full
-              inline-flex items-center gap-1.5
-              transition-colors
-              ${active
-                ? 'bg-white text-black shadow-sm'
-                : 'text-zinc-200 hover:bg-white/5'}
+              inline-flex items-center gap-1.5 transition-colors
+              ${active ? 'bg-white text-black shadow-sm' : 'text-zinc-200 hover:bg-white/5'}
             `}
           >
             {Icon && <Icon className="w-3.5 h-3.5" />}
@@ -922,14 +982,13 @@ function Switch({ checked, onChange, disabled }) {
   )
 }
 
-// Leyenda con los mismos rangos / etiquetas que SeriesGraph
 function LegendSeriesGraph() {
   const items = [
     ['bg-teal-400', 'Absolute Cinema'],
-    ['bg-emerald-500', 'Awesome'],
+    ['bg-emerald-700', 'Awesome'],
     ['bg-green-500', 'Great'],
-    ['bg-lime-400', 'Good'],
-    ['bg-yellow-400', 'Average'],
+    ['bg-yellow-300', 'Good'],
+    ['bg-yellow-500', 'Average'],
     ['bg-red-500', 'Bad'],
     ['bg-purple-700', 'Garbage'],
     ['bg-zinc-800', 'Sin nota']
