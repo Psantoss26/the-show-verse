@@ -14,6 +14,7 @@ import {
   CalendarDaysIcon,
   Heart,
   Bookmark,
+  ListVideo,
   Search as SearchIcon,
   X as XIcon,
   Menu as MenuIcon,
@@ -276,8 +277,8 @@ export default function Navbar() {
           {/* Derecha */}
           <div className="flex items-center gap-2 flex-shrink-0 pr-12">
             <div className="flex items-center gap-2">
-              <Link href="/news" className={iconLinkClass('/news')} title="Noticias">
-                <NewspaperIcon className="w-5 h-5" />
+              <Link href="/lists" className={iconLinkClass('/lists')} title="Listas">
+                <ListVideo className="w-5 h-5" />
               </Link>
               <Link href="/calendar" className={iconLinkClass('/calendar')} title="Calendario">
                 <CalendarDaysIcon className="w-5 h-5" />
@@ -495,13 +496,13 @@ export default function Navbar() {
                 <div className="my-3 h-px bg-neutral-800" />
 
                 <Link
-                  href="/news"
+                  href="/lists"
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/news') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
                     }`}
                 >
-                  <NewspaperIcon className="w-5 h-5" />
-                  <span>Noticias</span>
+                  <ListVideo className="w-5 h-5" />
+                  <span>Listas</span>
                 </Link>
 
                 <Link
