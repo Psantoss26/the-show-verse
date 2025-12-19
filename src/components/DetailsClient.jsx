@@ -977,7 +977,7 @@ export default function DetailsClient({
                 className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
               >
                 <img
-                  src="/logo-filmaffinity.png"
+                  src="/logoFilmaffinity.png"
                   alt="FilmAffinity"
                   className="w-9 h-9 object-contain rounded-lg"
                 />
@@ -992,7 +992,7 @@ export default function DetailsClient({
                   className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
                 >
                   <img
-                    src="/logo-seriesgraph.png"
+                    src="/logoseriesgraph.png"
                     alt="SeriesGraph"
                     className="w-9 h-9 object-contain rounded-lg"
                   />
