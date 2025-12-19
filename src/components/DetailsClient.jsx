@@ -1308,6 +1308,72 @@ export default function DetailsClient({
           </section>
         )}
 
+        {/* CRÍTICAS */}
+        {reviews && reviews.length > 0 && (
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <SectionTitle title="Críticas de Usuarios" icon={MessageSquareIcon} />
+              {reviewLimit < reviews.length && (
+                <button
+                  onClick={() => setReviewLimit((prev) => prev + 2)}
+                  className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
+                >
+                  Ver más
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {reviews.slice(0, reviewLimit).map((r) => {
+                const avatar = r.author_details?.avatar_path
+                  ? r.author_details.avatar_path.startsWith('/https')
+                    ? r.author_details.avatar_path.slice(1)
+                    : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
+                  : `https://ui-avatars.com/api/?name=${r.author}&background=random`
+
+                return (
+                  <div
+                    key={r.id}
+                    className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
+                  >
+                    <div className="flex items-center gap-4">
+                      <img
+                        src={avatar}
+                        alt={r.author}
+                        className="w-12 h-12 rounded-full object-cover shadow-lg"
+                      />
+                      <div>
+                        <h4 className="font-bold text-white">{r.author}</h4>
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                          {r.author_details?.rating && (
+                            <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
+                              ★ {r.author_details.rating}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
+                      "{r.content.replace(/<[^>]*>?/gm, '')}"
+                    </div>
+
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
+                    >
+                      Leer review completa en TMDb &rarr;
+                    </a>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
         {/* === REPARTO PRINCIPAL (Cast) === */}
         {castData && castData.length > 0 && (
           <section className="mb-16">
@@ -1435,72 +1501,6 @@ export default function DetailsClient({
                 )
               })}
             </Swiper>
-          </section>
-        )}
-
-        {/* CRÍTICAS */}
-        {reviews && reviews.length > 0 && (
-          <section className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <SectionTitle title="Críticas de Usuarios" icon={MessageSquareIcon} />
-              {reviewLimit < reviews.length && (
-                <button
-                  onClick={() => setReviewLimit((prev) => prev + 2)}
-                  className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
-                >
-                  Ver más
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {reviews.slice(0, reviewLimit).map((r) => {
-                const avatar = r.author_details?.avatar_path
-                  ? r.author_details.avatar_path.startsWith('/https')
-                    ? r.author_details.avatar_path.slice(1)
-                    : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
-                  : `https://ui-avatars.com/api/?name=${r.author}&background=random`
-
-                return (
-                  <div
-                    key={r.id}
-                    className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <img
-                        src={avatar}
-                        alt={r.author}
-                        className="w-12 h-12 rounded-full object-cover shadow-lg"
-                      />
-                      <div>
-                        <h4 className="font-bold text-white">{r.author}</h4>
-                        <div className="flex items-center gap-2 text-xs text-gray-400">
-                          <span>{new Date(r.created_at).toLocaleDateString()}</span>
-                          {r.author_details?.rating && (
-                            <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
-                              ★ {r.author_details.rating}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
-                      "{r.content.replace(/<[^>]*>?/gm, '')}"
-                    </div>
-
-                    <a
-                      href={r.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
-                    >
-                      Leer review completa en TMDb &rarr;
-                    </a>
-                  </div>
-                )
-              })}
-            </div>
           </section>
         )}
       </div>
