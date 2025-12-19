@@ -33,12 +33,13 @@ import {
   Languages,
   Library,
   Trophy,
-  // ✅ NUEVO (Listas)
   ListPlus,
   Check,
   X,
   Plus,
-  Search
+  Search,
+  Play,
+  ExternalLink
 } from 'lucide-react'
 
 /* === cuenta / api === */
@@ -472,6 +473,179 @@ function AddToListModal({
 }
 
 // =====================================================================
+// ✅ VIDEOS / TRAILERS (TMDb) helpers + modal
+// =====================================================================
+
+const uniqBy = (arr, keyFn) => {
+  const seen = new Set()
+  const out = []
+  for (const item of arr || []) {
+    const k = keyFn(item)
+    if (!k || seen.has(k)) continue
+    seen.add(k)
+    out.push(item)
+  }
+  return out
+}
+
+const isPlayableVideo = (v) => v?.site === 'YouTube' || v?.site === 'Vimeo'
+
+const videoExternalUrl = (v) => {
+  if (!v?.key) return null
+  if (v.site === 'YouTube') return `https://www.youtube.com/watch?v=${v.key}`
+  if (v.site === 'Vimeo') return `https://vimeo.com/${v.key}`
+  return null
+}
+
+const videoEmbedUrl = (v, autoplay = true) => {
+  if (!v?.key) return null
+  if (v.site === 'YouTube') {
+    const ap = autoplay ? 1 : 0
+    return `https://www.youtube.com/embed/${v.key}?autoplay=${ap}&rel=0&modestbranding=1&playsinline=1`
+  }
+  if (v.site === 'Vimeo') {
+    const ap = autoplay ? 1 : 0
+    return `https://player.vimeo.com/video/${v.key}?autoplay=${ap}`
+  }
+  return null
+}
+
+const videoThumbUrl = (v) => {
+  if (!v?.key) return null
+  if (v.site === 'YouTube') return `https://img.youtube.com/vi/${v.key}/hqdefault.jpg`
+  return null
+}
+
+// Ranking: Trailer > Teaser > Clip > Featurette > resto; YouTube > Vimeo; ES > EN > resto; official primero
+const rankVideo = (v) => {
+  const typeRank = {
+    Trailer: 0,
+    Teaser: 1,
+    Clip: 2,
+    Featurette: 3,
+    'Behind the Scenes': 4
+  }
+  const lang = (v?.iso_639_1 || '').toLowerCase()
+  const langRank = lang === 'es' ? 0 : lang === 'en' ? 1 : 2
+  const siteRank = v?.site === 'YouTube' ? 0 : v?.site === 'Vimeo' ? 1 : 2
+  const tRank = typeRank[v?.type] ?? 9
+  const officialRank = v?.official ? 0 : 1
+
+  // menor = mejor
+  return (
+    officialRank * 1000 +
+    tRank * 100 +
+    siteRank * 10 +
+    langRank
+  )
+}
+
+const pickPreferredVideo = (videos) => {
+  const playable = (videos || []).filter(isPlayableVideo)
+  if (!playable.length) return null
+  const sorted = [...playable].sort((a, b) => rankVideo(a) - rankVideo(b))
+  return sorted[0] || null
+}
+
+function VideoModal({ open, onClose, video }) {
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  if (!open || !video) return null
+
+  const embed = videoEmbedUrl(video, true)
+  const ext = videoExternalUrl(video)
+
+  return (
+    <div className="fixed inset-0 z-[10000]">
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden">
+          <div className="p-5 border-b border-white/10 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-lg md:text-xl font-extrabold text-white truncate">
+                {video.name || 'Vídeo'}
+              </h3>
+              <p className="text-sm text-zinc-400 mt-1">
+                {video.type || 'Video'} · {video.site || '—'}
+                {video.iso_639_1 ? ` · ${video.iso_639_1.toUpperCase()}` : ''}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 w-10 h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition flex items-center justify-center"
+              title="Cerrar"
+            >
+              <X className="w-5 h-5 text-zinc-200" />
+            </button>
+          </div>
+
+          <div className="p-4 md:p-6">
+            <div className="w-full aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black">
+              {embed ? (
+                <iframe
+                  key={video.key}
+                  src={embed}
+                  title={video.name || 'Video'}
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                  No se puede reproducir este vídeo.
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="text-xs text-zinc-500">
+                {video.published_at
+                  ? `Publicado: ${new Date(video.published_at).toLocaleDateString()}`
+                  : ''}
+              </div>
+
+              {ext && (
+                <a
+                  href={ext}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-sm text-zinc-200"
+                  title="Abrir en una pestaña nueva"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Abrir en {video.site}
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =====================================================================
 
 export default function DetailsClient({
   type,
@@ -777,6 +951,91 @@ export default function DetailsClient({
       setCreatingList(false)
     }
   }
+
+  // =====================================================================
+  // ✅ VIDEOS / TRAILERS
+  // =====================================================================
+
+  const [videos, setVideos] = useState([])
+  const [videosLoading, setVideosLoading] = useState(false)
+  const [videosError, setVideosError] = useState('')
+  const [videoModalOpen, setVideoModalOpen] = useState(false)
+  const [activeVideo, setActiveVideo] = useState(null)
+
+  const preferredVideo = useMemo(() => pickPreferredVideo(videos), [videos])
+
+  const openVideo = (v) => {
+    if (!v) return
+    setActiveVideo(v)
+    setVideoModalOpen(true)
+  }
+
+  const closeVideo = () => {
+    setVideoModalOpen(false)
+    setActiveVideo(null)
+  }
+
+  // Cierra modal al cambiar de item
+  useEffect(() => {
+    setVideoModalOpen(false)
+    setActiveVideo(null)
+  }, [id, endpointType])
+
+  useEffect(() => {
+    let ignore = false
+
+    const safeFetchVideos = async (language) => {
+      if (!TMDB_API_KEY) return []
+      try {
+        const url = `https://api.themoviedb.org/3/${endpointType}/${id}/videos?api_key=${TMDB_API_KEY}&language=${language}`
+        const res = await fetch(url)
+        const json = await res.json()
+        if (!res.ok) return []
+        return Array.isArray(json?.results) ? json.results : []
+      } catch {
+        return []
+      }
+    }
+
+    const load = async () => {
+      if (!TMDB_API_KEY || !id) {
+        setVideos([])
+        setVideosError('')
+        setVideosLoading(false)
+        return
+      }
+
+      setVideosLoading(true)
+      setVideosError('')
+
+      try {
+        // ES + EN para no perder trailers que no estén localizados
+        const [es, en] = await Promise.all([
+          safeFetchVideos('es-ES'),
+          safeFetchVideos('en-US')
+        ])
+
+        if (ignore) return
+
+        const merged = uniqBy([...es, ...en], (v) => `${v.site}:${v.key}`)
+          .filter(isPlayableVideo)
+
+        // Ordena para que “lo mejor” esté primero
+        merged.sort((a, b) => rankVideo(a) - rankVideo(b))
+
+        setVideos(merged)
+      } catch (e) {
+        if (!ignore) setVideosError(e?.message || 'Error cargando vídeos')
+      } finally {
+        if (!ignore) setVideosLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      ignore = true
+    }
+  }, [id, endpointType])
 
   // =====================================================================
 
@@ -1291,15 +1550,6 @@ export default function DetailsClient({
         <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-80" />
       </div>
 
-      {/* --- BOTÓN TOGGLE BACKDROP --- */}
-      <button
-        onClick={() => setUseBackdrop(!useBackdrop)}
-        className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-black/40 hover:bg-black/90 backdrop-blur-md border border-white/20 transition-all text-white/80 hover:text-white shadow-lg"
-        title="Alternar fondo"
-      >
-        <ImageIcon className="w-5 h-5" />
-      </button>
-
       {/* --- CONTENIDO PRINCIPAL --- */}
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
         {/* HEADER HERO SECTION */}
@@ -1307,6 +1557,24 @@ export default function DetailsClient({
           {/* POSTER */}
           <div className="w-full lg:w-[350px] flex-shrink-0 flex flex-col gap-5">
             <div className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/60 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.95)] hover:border-yellow-500/60">
+              {/* --- BOTÓN TOGGLE BACKDROP --- */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setUseBackdrop((v) => !v)
+                }}
+                className={`absolute top-3 right-3 z-20 p-2.5 rounded-full backdrop-blur-md border transition-all shadow-lg
+                            opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto
+                            ${useBackdrop
+                    ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/30'
+                    : 'bg-black/40 border-white/20 text-white/80 hover:bg-black/80 hover:text-white'
+                  }`}
+                title={useBackdrop ? 'Desactivar fondo' : 'Activar fondo'}
+              >
+                <ImageIcon className="w-5 h-5" />
+              </button>
               {displayPosterPath ? (
                 <>
                   <img
@@ -1360,6 +1628,20 @@ export default function DetailsClient({
               </h1>
 
               <div className="flex items-center mt-3 gap-3 shrink-0">
+                {/* ✅ Trailer / Videos */}
+                <button
+                  onClick={() => openVideo(preferredVideo)}
+                  disabled={!preferredVideo}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu
+                    ${preferredVideo
+                      ? 'bg-yellow-500/15 border-yellow-500/50 text-yellow-300 hover:bg-yellow-500/25 hover:shadow-[0_0_25px_rgba(234,179,8,0.25)]'
+                      : 'bg-white/5 border-white/10 text-white/30 cursor-not-allowed'
+                    }`}
+                  title={preferredVideo ? 'Ver tráiler / vídeo' : 'No hay vídeos disponibles'}
+                >
+                  <Play className="w-6 h-6" />
+                </button>
+
                 {/* Favorito */}
                 <button
                   onClick={toggleFavorite}
@@ -1398,25 +1680,25 @@ export default function DetailsClient({
                   )}
                 </button>
 
-                {/* ✅ Listas */}
-                <button
-                  onClick={openListsModal}
-                  disabled={!canUseLists || listsPresenceLoading}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu
-                    ${!canUseLists
-                      ? 'bg-white/5 border-white/10 text-white/30 cursor-not-allowed'
-                      : inAnyList
+                {/* ✅ Listas (solo películas) */}
+                {canUseLists && (
+                  <button
+                    onClick={openListsModal}
+                    disabled={listsPresenceLoading}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu
+      ${inAnyList
                         ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 hover:bg-emerald-500/30 hover:shadow-[0_0_25px_rgba(16,185,129,0.35)]'
                         : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:shadow-lg'
-                    }`}
-                  title={!canUseLists ? 'Listas disponibles solo para películas' : 'Añadir a listas'}
-                >
-                  {listsPresenceLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <ListPlus className="w-6 h-6" />
-                  )}
-                </button>
+                      }`}
+                    title="Añadir a listas"
+                  >
+                    {listsPresenceLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ListPlus className="w-6 h-6" />
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1855,10 +2137,128 @@ export default function DetailsClient({
           </section>
         )}
 
+        {/* === TRÁILER Y VÍDEOS === */}
+        {TMDB_API_KEY && (
+          <section className="mt-6">
+            <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} />
+
+            <div className="rounded-2xl p-0 md:p-0 mb-10">
+              {videosLoading && (
+                <div className="text-sm text-zinc-400 inline-flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Cargando vídeos…
+                </div>
+              )}
+
+              {!!videosError && (
+                <div className="text-sm text-red-400">{videosError}</div>
+              )}
+
+              {!videosLoading && !videosError && videos.length === 0 && (
+                <div className="text-sm text-zinc-400">
+                  No hay tráileres o vídeos disponibles en TMDb para este título.
+                </div>
+              )}
+
+              {videos.length > 0 && (
+                <Swiper
+                  spaceBetween={16}
+                  slidesPerView={1.2}
+                  breakpoints={{
+                    640: { slidesPerView: 2.2 },
+                    1024: { slidesPerView: 3.2 },
+                    1280: { slidesPerView: 4.2 }
+                  }}
+                  className="pb-2"
+                >
+                  {videos.slice(0, 20).map((v) => {
+                    const thumb = videoThumbUrl(v)
+                    const fallbackPath = displayBackdropPath || displayPosterPath
+                    const fallback =
+                      fallbackPath
+                        ? `https://image.tmdb.org/t/p/w780${fallbackPath}`
+                        : '/placeholder.png'
+
+                    return (
+                      <SwiperSlide key={`${v.site}:${v.key}`} className="h-full">
+                        <button
+                          type="button"
+                          onClick={() => openVideo(v)}
+                          title={v.name || 'Ver vídeo'}
+                          className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
+      border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
+                        >
+                          {/* THUMBNAIL (sin chips encima) */}
+                          <div className="relative aspect-video overflow-hidden">
+                            <img
+                              src={thumb || fallback}
+                              alt={v.name || 'Video'}
+                              className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-14 h-14 rounded-full bg-black/55 border border-white/15 flex items-center justify-center transition-transform hover:scale-105">
+                                <Play className="w-7 h-7 text-yellow-300 translate-x-[1px]" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* ✅ CUERPO (misma altura en todas las cards) */}
+                          <div className="flex flex-col flex-1 p-4">
+                            {/* Chips reubicados */}
+                            <div className="flex items-center justify-between gap-3 mb-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {v.type && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
+                                    {v.type}
+                                  </span>
+                                )}
+                                {v.iso_639_1 && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
+                                    {v.iso_639_1.toUpperCase()}
+                                  </span>
+                                )}
+                                {v.official && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200">
+                                    Official
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* ✅ Título con altura reservada (aunque sea corto) */}
+                            <div className="min-h-[44px]">
+                              <div className="font-bold text-white line-clamp-2 leading-snug">
+                                {v.name || 'Vídeo'}
+                              </div>
+                            </div>
+
+                            {/* ✅ Meta abajo (siempre pegado al fondo) */}
+                            <div className="mt-auto pt-2 text-xs text-zinc-400 flex items-center gap-2">
+                              <span className="truncate">{v.site || '—'}</span>
+                              {v.published_at && (
+                                <>
+                                  <span className="text-zinc-600">·</span>
+                                  <span className="shrink-0">
+                                    {new Date(v.published_at).toLocaleDateString()}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      </SwiperSlide>
+                    )
+                  })}
+                </Swiper>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* CRÍTICAS */}
         {reviews && reviews.length > 0 && (
-          <section className="mb-8">
-            <div className="flex items-center justify-between mb-6">
+          <section className="mb-10">
+            <div className="flex items-center justify-between mb-2">
               <SectionTitle title="Críticas de Usuarios" icon={MessageSquareIcon} />
               {reviewLimit < reviews.length && (
                 <button
@@ -2051,6 +2451,9 @@ export default function DetailsClient({
           </section>
         )}
       </div>
+
+      {/* ✅ MODAL: Vídeos / Trailer */}
+      <VideoModal open={videoModalOpen} onClose={closeVideo} video={activeVideo} />
 
       {/* ✅ MODAL: Añadir a lista */}
       <AddToListModal
