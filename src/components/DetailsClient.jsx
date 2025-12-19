@@ -32,7 +32,12 @@ import {
   MapPin,
   Languages,
   Library,
-  Trophy
+  Trophy,
+  ListPlus,
+  Plus,
+  Check,
+  X,
+  Search
 } from 'lucide-react'
 
 /* === cuenta / api === */
@@ -46,6 +51,13 @@ import {
 } from '@/lib/api/tmdb'
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
 import StarRating from './StarRating'
+
+// ✅ Lists API (mismas funciones que usas en /lists)
+import {
+  fetchUserLists,
+  createUserList,
+  addMovieToList
+} from '@/lib/api/tmdbLists'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
@@ -203,6 +215,191 @@ export default function DetailsClient({
 
   const endpointType = type === 'tv' ? 'tv' : 'movie'
 
+  // ====== LISTAS (añadir peli a listas) ======
+  const isMovie = endpointType === 'movie'
+
+  const [listsOpen, setListsOpen] = useState(false)
+  const [listsLoading, setListsLoading] = useState(false)
+  const [listsError, setListsError] = useState('')
+  const [listsOk, setListsOk] = useState('')
+
+  const [userLists, setUserLists] = useState([])
+  const [listsPage, setListsPage] = useState(1)
+  const [listsTotalPages, setListsTotalPages] = useState(1)
+  const [listsQuery, setListsQuery] = useState('')
+
+  const [addingToListId, setAddingToListId] = useState(null)
+  const [addedTo, setAddedTo] = useState({}) // { [listId]: true }
+
+  const [createInlineOpen, setCreateInlineOpen] = useState(false)
+  const [newListName, setNewListName] = useState('')
+  const [newListDesc, setNewListDesc] = useState('')
+  const [creatingList, setCreatingList] = useState(false)
+
+  const addedSomewhere = Object.keys(addedTo || {}).length > 0
+
+  useEffect(() => {
+    // al cambiar de item, reset de feedback de listas
+    setAddedTo({})
+    setListsError('')
+    setListsOk('')
+  }, [id])
+
+  // bloquear scroll del body cuando el modal está abierto
+  useEffect(() => {
+    if (!listsOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [listsOpen])
+
+  // cerrar con ESC
+  useEffect(() => {
+    if (!listsOpen) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') closeListsModal()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listsOpen])
+
+  const requireLogin = () => {
+    if (!session || !account?.id) {
+      window.location.href = '/login'
+      return true
+    }
+    return false
+  }
+
+  const openListsModal = () => {
+    if (requireLogin()) return
+    if (!isMovie) return
+    setListsOpen(true)
+  }
+
+  const closeListsModal = () => {
+    setListsOpen(false)
+    setListsQuery('')
+    setListsOk('')
+    setListsError('')
+    setCreateInlineOpen(false)
+    setNewListName('')
+    setNewListDesc('')
+  }
+
+  const loadListsPage = async (page = 1, mode = 'replace') => {
+    if (!session || !account?.id) return
+
+    setListsLoading(true)
+    setListsError('')
+    try {
+      const json = await fetchUserLists({
+        accountId: account.id,
+        sessionId: session,
+        page
+      })
+
+      const results = Array.isArray(json?.results) ? json.results : []
+      setListsPage(json?.page || page)
+      setListsTotalPages(json?.total_pages || 1)
+      setUserLists((prev) => (mode === 'append' ? [...prev, ...results] : results))
+    } catch (e) {
+      setListsError(e?.message || 'Error cargando listas')
+      if (mode !== 'append') setUserLists([])
+    } finally {
+      setListsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    let ignore = false
+    if (!listsOpen) return
+
+      ; (async () => {
+        if (ignore) return
+        await loadListsPage(1, 'replace')
+      })()
+
+    return () => {
+      ignore = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listsOpen, session, account?.id])
+
+  const loadMoreLists = async () => {
+    if (listsLoading) return
+    if (listsPage >= listsTotalPages) return
+    await loadListsPage(listsPage + 1, 'append')
+  }
+
+  const handleAddToExistingList = async (listId) => {
+    if (requireLogin() || !isMovie) return
+    if (!listId) return
+    if (addedTo[listId]) return
+
+    setAddingToListId(listId)
+    setListsError('')
+    setListsOk('')
+
+    try {
+      await addMovieToList({
+        listId,
+        sessionId: session,
+        movieId: id
+      })
+      setAddedTo((prev) => ({ ...prev, [listId]: true }))
+      setListsOk('Película añadida a la lista.')
+    } catch (e) {
+      setListsError(e?.message || 'No se pudo añadir a la lista')
+    } finally {
+      setAddingToListId(null)
+    }
+  }
+
+  const handleCreateListAndAdd = async () => {
+    if (requireLogin() || !isMovie) return
+    const n = newListName.trim()
+    if (!n || creatingList) return
+
+    setCreatingList(true)
+    setListsError('')
+    setListsOk('')
+
+    try {
+      const created = await createUserList({
+        sessionId: session,
+        name: n,
+        description: newListDesc.trim(),
+        language: 'es'
+      })
+
+      const newId = created?.list_id || created?.id
+      if (!newId) throw new Error('No se pudo obtener el id de la lista')
+
+      await addMovieToList({
+        listId: newId,
+        sessionId: session,
+        movieId: id
+      })
+
+      setAddedTo((prev) => ({ ...prev, [newId]: true }))
+      setListsOk('Lista creada y película añadida.')
+
+      await loadListsPage(1, 'replace')
+
+      setCreateInlineOpen(false)
+      setNewListName('')
+      setNewListDesc('')
+    } catch (e) {
+      setListsError(e?.message || 'Error creando lista')
+    } finally {
+      setCreatingList(false)
+    }
+  }
+
   // ====== PREFERENCIAS DE IMÁGENES ======
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
   const previewBackdropStorageKey = `showverse:${endpointType}:${id}:backdrop`
@@ -238,10 +435,6 @@ export default function DetailsClient({
    * ✅ FIX PRINCIPAL (flash de portada):
    * Reset SINCRÓNICO al cambiar de id/type para que nunca se pinte
    * la portada del item anterior.
-   *
-   * - Reinicia basePoster/baseBackdrop/imagesState a partir de "data" actual
-   * - Carga overrides de localStorage antes del primer paint
-   * - Deja artworkInitialized=false y luego initArtwork lo pone a true
    */
   useLayoutEffect(() => {
     setArtworkInitialized(false)
@@ -286,7 +479,6 @@ export default function DetailsClient({
   }, [
     id,
     endpointType,
-    // por si Next actualiza data sin cambiar id (edge cases)
     data?.poster_path,
     data?.backdrop_path,
     data?.profile_path
@@ -297,7 +489,6 @@ export default function DetailsClient({
     let cancelled = false
 
     const initArtwork = async () => {
-      // ya venimos con reset sync, pero por seguridad:
       setArtworkInitialized(false)
 
       let poster = data.poster_path || data.profile_path || null
@@ -324,7 +515,6 @@ export default function DetailsClient({
           const bestPoster = pickBestPosterTV(posters)
           const bestBackdropForBackground = pickBestBackdropTVNeutralFirst(backdrops)
 
-          // Preload del póster candidato para evitar “cambio” brusco
           if (bestPoster) await preloadTmdb(bestPoster, 'w780')
 
           if (!cancelled) {
@@ -350,7 +540,7 @@ export default function DetailsClient({
           setImagesError('')
 
           const url = `https://api.themoviedb.org/3/movie/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,null,es`
-          const res = await fetch(url)
+          const res = await fetch(editUrl(url))
           const json = await res.json()
           if (!res.ok) throw new Error(json?.status_message || 'Error al cargar imágenes')
 
@@ -359,7 +549,6 @@ export default function DetailsClient({
 
           const bestPoster = pickBestImage(posters)
           if (bestPoster?.file_path) {
-            // Preload para evitar swap “cutre”
             await preloadTmdb(bestPoster.file_path, 'w780')
             poster = bestPoster.file_path
           }
@@ -378,7 +567,6 @@ export default function DetailsClient({
       }
 
       if (!cancelled) {
-        // Base final (si hay override, displayPosterPath seguirá usando selectedPosterPath)
         setBasePosterPath(poster)
         setBaseBackdropPath(backdrop)
         setArtworkInitialized(true)
@@ -422,14 +610,6 @@ export default function DetailsClient({
       cancel = true
     }
   }, [type, id, session, account])
-
-  const requireLogin = () => {
-    if (!session || !account?.id) {
-      window.location.href = '/login'
-      return true
-    }
-    return false
-  }
 
   const toggleFavorite = async () => {
     if (requireLogin() || favLoading) return
@@ -869,6 +1049,21 @@ export default function DetailsClient({
                   ) : (
                     <BookmarkPlus className="w-6 h-6" />
                   )}
+                </button>
+
+                {/* ✅ NUEVO: LISTAS */}
+                <button
+                  onClick={openListsModal}
+                  disabled={!isMovie}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu ${!isMovie
+                    ? 'bg-white/5 border-white/10 text-white/30 cursor-not-allowed'
+                    : addedSomewhere
+                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 hover:bg-emerald-500/30 hover:shadow-[0_0_25px_rgba(16,185,129,0.35)]'
+                      : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:shadow-lg'
+                    }`}
+                  title={!isMovie ? 'Listas disponibles solo para películas' : 'Añadir a lista'}
+                >
+                  <ListPlus className="w-6 h-6" />
                 </button>
               </div>
             </div>
@@ -1504,6 +1699,210 @@ export default function DetailsClient({
           </section>
         )}
       </div>
+
+      {/* ====== MODAL: Añadir a listas ====== */}
+      {listsOpen && (
+        <div className="fixed inset-0 z-[120]">
+          {/* overlay */}
+          <button
+            type="button"
+            onClick={closeListsModal}
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            aria-label="Cerrar"
+          />
+
+          {/* panel */}
+          <div className="relative mx-auto mt-20 w-[92vw] max-w-2xl rounded-3xl border border-white/10 bg-[#0f0f10]/95 shadow-2xl overflow-hidden">
+            <div className="p-5 md:p-6 border-b border-white/10">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="text-xl md:text-2xl font-extrabold text-white truncate">
+                    Añadir a lista
+                  </h3>
+                  <p className="text-sm text-zinc-400 mt-1">
+                    Selecciona una lista existente o crea una nueva.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeListsModal}
+                  className="p-2 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition"
+                  title="Cerrar"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Crear nueva */}
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setCreateInlineOpen((v) => !v)}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Crear nueva lista
+                </button>
+
+                {createInlineOpen && (
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <input
+                        value={newListName}
+                        onChange={(e) => setNewListName(e.target.value)}
+                        placeholder="Nombre (obligatorio)"
+                        maxLength={60}
+                        className="md:col-span-1 w-full rounded-2xl bg-black/40 border border-white/10 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                      />
+                      <input
+                        value={newListDesc}
+                        onChange={(e) => setNewListDesc(e.target.value)}
+                        placeholder="Descripción (opcional)"
+                        maxLength={120}
+                        className="md:col-span-2 w-full rounded-2xl bg-black/40 border border-white/10 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                      />
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleCreateListAndAdd}
+                        disabled={creatingList || !newListName.trim()}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl font-semibold transition ${creatingList || !newListName.trim()
+                          ? 'bg-yellow-500/40 text-black/60 cursor-not-allowed'
+                          : 'bg-yellow-500 text-black hover:brightness-110'
+                          }`}
+                      >
+                        {creatingList ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <ListPlus className="w-4 h-4" />
+                        )}
+                        Crear y añadir
+                      </button>
+
+                      {listsError && (
+                        <span className="text-sm text-red-400">{listsError}</span>
+                      )}
+                      {!listsError && listsOk && (
+                        <span className="text-sm text-emerald-300">{listsOk}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Buscar listas */}
+              <div className="mt-4 relative">
+                <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  value={listsQuery}
+                  onChange={(e) => setListsQuery(e.target.value)}
+                  placeholder="Buscar listas…"
+                  className="w-full rounded-2xl bg-black/40 border border-white/10 pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                />
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 md:p-6 max-h-[60vh] overflow-y-auto">
+              {listsLoading && (
+                <div className="text-sm text-zinc-400 inline-flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Cargando listas…
+                </div>
+              )}
+
+              {!listsLoading && (() => {
+                const q = listsQuery.trim().toLowerCase()
+                const filtered = q
+                  ? userLists.filter((l) => (l?.name || '').toLowerCase().includes(q))
+                  : userLists
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-400">
+                      No tienes listas (o no hay coincidencias).
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="space-y-2">
+                    {filtered.map((l) => {
+                      const isAdded = !!addedTo[l.id]
+                      const isBusy = addingToListId === l.id
+
+                      return (
+                        <div
+                          key={l.id}
+                          className="rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition p-3 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-white truncate">
+                              {l.name}
+                            </p>
+                            <p className="text-xs text-zinc-400 truncate">
+                              {l.description || 'Sin descripción'}
+                            </p>
+                            <p className="text-[11px] text-zinc-500 mt-1">
+                              {typeof l.item_count === 'number'
+                                ? `${l.item_count} items`
+                                : '—'}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleAddToExistingList(l.id)}
+                            disabled={isBusy || isAdded}
+                            className={`shrink-0 w-11 h-11 rounded-full border flex items-center justify-center transition ${isAdded
+                              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200 cursor-not-allowed'
+                              : isBusy
+                                ? 'bg-white/5 border-white/10 text-zinc-500 cursor-not-allowed'
+                                : 'bg-white/5 border-white/10 text-zinc-200 hover:bg-yellow-500/10 hover:border-yellow-500/40 hover:text-yellow-200'
+                              }`}
+                            title={isAdded ? 'Ya añadida (en esta sesión)' : 'Añadir a esta lista'}
+                          >
+                            {isBusy ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : isAdded ? (
+                              <Check className="w-5 h-5" />
+                            ) : (
+                              <Plus className="w-5 h-5" />
+                            )}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+
+              {/* Load more */}
+              {!listsLoading && listsPage < listsTotalPages && (
+                <div className="pt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={loadMoreLists}
+                    className="px-4 py-2 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-sm font-semibold text-zinc-200"
+                  >
+                    Cargar más
+                  </button>
+                </div>
+              )}
+
+              {/* feedback general */}
+              {!createInlineOpen && (listsError || listsOk) && (
+                <div className="pt-4 text-sm">
+                  {listsError && <p className="text-red-400">{listsError}</p>}
+                  {!listsError && listsOk && <p className="text-emerald-300">{listsOk}</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1528,3 +1927,9 @@ const UsersIconComponent = ({ size = 24, className }) => (
     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 )
+
+// NOTE: helper para evitar que un linter se queje si pegas/ajustas URLs.
+// Si no lo quieres, puedes eliminarlo y usar fetch(url) directamente.
+function editUrl(url) {
+  return url
+}
