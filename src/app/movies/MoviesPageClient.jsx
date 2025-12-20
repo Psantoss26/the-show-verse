@@ -1,4 +1,3 @@
-// /src/app/movies/MoviesPageClient.jsx
 'use client'
 
 import { useRef, useEffect, useState } from 'react'
@@ -31,16 +30,36 @@ import { fetchOmdbByImdb } from '@/lib/api/omdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
 
-/* --- Hook: detectar dispositivo táctil --- */
-const useIsTouchDevice = () => {
-    const [isTouch, setIsTouch] = useState(false)
+/* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
+const useIsMobileLayout = (breakpointPx = 768) => {
+    const [isMobile, setIsMobile] = useState(() => {
+        if (typeof window === 'undefined') return false
+        return window.matchMedia(`(max-width:${breakpointPx - 1}px)`).matches
+    })
+
     useEffect(() => {
-        const onTouch =
-            typeof window !== 'undefined' &&
-            ('ontouchstart' in window || navigator.maxTouchPoints > 0)
-        setIsTouch(onTouch)
-    }, [])
-    return isTouch
+        if (typeof window === 'undefined') return
+
+        const mq = window.matchMedia(`(max-width:${breakpointPx - 1}px)`)
+        const update = () => setIsMobile(mq.matches)
+        update()
+
+        if (mq.addEventListener) mq.addEventListener('change', update)
+        else mq.addListener(update)
+
+        window.addEventListener('orientationchange', update)
+        window.addEventListener('resize', update)
+
+        return () => {
+            if (mq.removeEventListener) mq.removeEventListener('change', update)
+            else mq.removeListener(update)
+
+            window.removeEventListener('orientationchange', update)
+            window.removeEventListener('resize', update)
+        }
+    }, [breakpointPx])
+
+    return isMobile
 }
 
 /* --- helpers de presentación --- */
@@ -116,11 +135,73 @@ function getArtworkPreference(movieId) {
     }
 }
 
+/* ====================================================================
+ * MISMO CRITERIO QUE MainDashboard:
+ *  - Backdrops: EN -> resolución -> votos
+ *  - Posters: EN -> máxima resolución (estable)
+ * ==================================================================== */
+function pickBestBackdropByLangResVotes(list, opts = {}) {
+    const {
+        preferLangs = ['en', 'en-US'],
+        resolutionWindow = 0.98,
+        minWidth = 1200
+    } = opts
+
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    const area = (img) => (img?.width || 0) * (img?.height || 0)
+    const lang = (img) => img?.iso_639_1 || null
+
+    const sizeFiltered = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
+    const pool0 = sizeFiltered.length ? sizeFiltered : list
+
+    const hasPreferred = pool0.some((b) => preferLangs.includes(lang(b)))
+    const pool1 = hasPreferred ? pool0.filter((b) => preferLangs.includes(lang(b))) : pool0
+
+    const maxArea = Math.max(...pool1.map(area))
+    const threshold = maxArea * (typeof resolutionWindow === 'number' ? resolutionWindow : 1.0)
+    const pool2 = pool1.filter((b) => area(b) >= threshold)
+
+    const sorted = [...pool2].sort((a, b) => {
+        const aA = area(a)
+        const bA = area(b)
+        if (bA !== aA) return bA - aA
+        const w = (b.width || 0) - (a.width || 0)
+        if (w !== 0) return w
+        const vc = (b.vote_count || 0) - (a.vote_count || 0)
+        if (vc !== 0) return vc
+        const va = (b.vote_average || 0) - (a.vote_average || 0)
+        return va
+    })
+
+    return sorted[0] || null
+}
+
+function pickBestPosterByLangThenResolution(list, opts = {}) {
+    const { preferLangs = ['en', 'en-US'], minWidth = 500 } = opts
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    const area = (img) => (img?.width || 0) * (img?.height || 0)
+    const lang = (img) => img?.iso_639_1 || null
+
+    const sizeFiltered = minWidth > 0 ? list.filter((p) => (p?.width || 0) >= minWidth) : list
+    const pool0 = sizeFiltered.length ? sizeFiltered : list
+
+    const hasPreferred = pool0.some((p) => preferLangs.includes(lang(p)))
+    const pool1 = hasPreferred ? pool0.filter((p) => preferLangs.includes(lang(p))) : pool0
+
+    let maxArea = 0
+    for (const p of pool1) maxArea = Math.max(maxArea, area(p))
+
+    for (const p of pool1) {
+        if (area(p) === maxArea) return p
+    }
+    return null
+}
+
 /* ========= Cargar / cachear imágenes de TMDb (posters + backdrops) ========= */
 async function getMovieImages(movieId) {
-    if (movieImagesCache.has(movieId)) {
-        return movieImagesCache.get(movieId)
-    }
+    if (movieImagesCache.has(movieId)) return movieImagesCache.get(movieId)
 
     const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
     if (!apiKey) {
@@ -150,59 +231,27 @@ async function getMovieImages(movieId) {
     }
 }
 
-/* ====================================================================
- * NUEVO CRITERIO (SIN VOTOS):
- *  1) Prioriza idioma EN si existe
- *  2) Elige la mayor resolución (área)
- *  3) Si empatan en resolución -> se queda con la PRIMERA (orden original)
- *  4) Opcional: filtra por minWidth si hay alternativas
- * ==================================================================== */
-function pickBestByLangThenResolutionFirst(list, opts = {}) {
-    const { preferLangs = ['en', 'en-US'], minWidth = 0 } = opts
-    if (!Array.isArray(list) || list.length === 0) return null
-
-    const lang = (img) => img?.iso_639_1 || null
-    const area = (img) => (img?.width || 0) * (img?.height || 0)
-
-    const sizeFiltered =
-        minWidth > 0 ? list.filter((img) => (img?.width || 0) >= minWidth) : list
-    const pool0 = sizeFiltered.length ? sizeFiltered : list
-
-    const hasPreferred = pool0.some((img) => preferLangs.includes(lang(img)))
-    const pool1 = hasPreferred
-        ? pool0.filter((img) => preferLangs.includes(lang(img)))
-        : pool0
-
-    let maxArea = 0
-    for (const img of pool1) maxArea = Math.max(maxArea, area(img))
-
-    for (const img of pool1) {
-        if (area(img) === maxArea) return img
-    }
-
-    return pool1[0] || null
-}
-
-/* ========= Poster preferido (EN -> mejor resolución -> primera) ========= */
+/* ========= Poster preferido ========= */
 async function fetchBestPoster(movieId) {
     const { posters } = await getMovieImages(movieId)
     if (!Array.isArray(posters) || posters.length === 0) return null
 
-    const best = pickBestByLangThenResolutionFirst(posters, {
+    const best = pickBestPosterByLangThenResolution(posters, {
         preferLangs: ['en', 'en-US'],
-        minWidth: 0
+        minWidth: 500
     })
 
     return best?.file_path || null
 }
 
-/* ========= Backdrop preferido (EN -> mejor resolución -> primera) ========= */
+/* ========= Backdrop preferido ========= */
 async function fetchBestBackdrop(movieId) {
     const { backdrops } = await getMovieImages(movieId)
     if (!Array.isArray(backdrops) || backdrops.length === 0) return null
 
-    const best = pickBestByLangThenResolutionFirst(backdrops, {
+    const best = pickBestBackdropByLangResVotes(backdrops, {
         preferLangs: ['en', 'en-US'],
+        resolutionWindow: 0.98,
         minWidth: 1200
     })
 
@@ -219,9 +268,17 @@ function pickBestTrailer(videos) {
     const yt = videos.filter((v) => v?.site === 'YouTube' && v?.key)
     if (!yt.length) return null
 
-    const trailers = yt.filter((v) => v?.type === 'Trailer')
-    const teasers = yt.filter((v) => v?.type === 'Teaser')
-    const candidates = trailers.length ? trailers : teasers.length ? teasers : yt
+    const preferredLang = yt.filter(
+        (v) =>
+            v?.iso_639_1 === 'en' ||
+            v?.iso_3166_1 === 'US' ||
+            v?.iso_3166_1 === 'GB'
+    )
+
+    const pool = preferredLang.length ? preferredLang : yt
+    const trailers = pool.filter((v) => v?.type === 'Trailer')
+    const teasers = pool.filter((v) => v?.type === 'Teaser')
+    const candidates = trailers.length ? trailers : teasers.length ? teasers : pool
 
     const score = (v) => {
         const official = v?.official ? 100 : 0
@@ -272,10 +329,11 @@ async function getBestTrailerCached(movieId) {
 }
 
 /* ====================================================================
- * Portada normal (2:3) — usa NUEVO criterio de posters
- *  - En móvil usamos object-contain para NO recortar
+ * Portada (igual que MainDashboard):
+ *  - <md: poster completo (contain) + blur
+ *  - >=md: cover (estética desktop)
  * ==================================================================== */
-function PosterImage({ movie, cache, heightClass, fit = 'cover' }) {
+function PosterImage({ movie, cache }) {
     const [posterPath, setPosterPath] = useState(null)
     const [ready, setReady] = useState(false)
 
@@ -285,6 +343,7 @@ function PosterImage({ movie, cache, heightClass, fit = 'cover' }) {
         const load = async () => {
             if (!movie) return
 
+            // 1) Preferencia usuario
             const { poster: userPoster } = getArtworkPreference(movie.id)
             if (userPoster) {
                 const url = buildImg(userPoster, 'w342')
@@ -297,6 +356,7 @@ function PosterImage({ movie, cache, heightClass, fit = 'cover' }) {
                 return
             }
 
+            // 2) Cache en memoria
             const cached = cache.current.get(movie.id)
             if (cached) {
                 const url = buildImg(cached, 'w342')
@@ -308,6 +368,7 @@ function PosterImage({ movie, cache, heightClass, fit = 'cover' }) {
                 return
             }
 
+            // 3) Mejor poster (EN + máxima resolución)
             setReady(false)
             const preferred = await fetchBestPoster(movie.id)
             const chosen = preferred || movie.poster_path || movie.backdrop_path || null
@@ -328,23 +389,39 @@ function PosterImage({ movie, cache, heightClass, fit = 'cover' }) {
         }
     }, [movie, cache])
 
-    const objectClass = fit === 'contain' ? 'object-contain' : 'object-cover'
+    if (!ready || !posterPath) {
+        return <div className="w-full h-full rounded-3xl bg-neutral-800 animate-pulse" />
+    }
 
     return (
         <>
-            {!ready && (
-                <div className={`w-full ${heightClass} rounded-3xl bg-neutral-800 animate-pulse`} />
-            )}
+            {/* Desktop / tablet */}
+            <img
+                src={buildImg(posterPath, 'w342')}
+                alt={movie.title || movie.name}
+                className="hidden md:block w-full h-full object-cover rounded-3xl"
+                loading="lazy"
+                decoding="async"
+            />
 
-            {ready && posterPath && (
+            {/* Mobile: contain + blur */}
+            <div className="relative w-full h-full rounded-3xl overflow-hidden bg-neutral-900 md:hidden">
                 <img
                     src={buildImg(posterPath, 'w342')}
-                    alt={movie.title || movie.name}
-                    className={`w-full ${heightClass} ${objectClass} rounded-3xl`}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-110"
                     loading="lazy"
                     decoding="async"
                 />
-            )}
+                <img
+                    src={buildImg(posterPath, 'w342')}
+                    alt={movie.title || movie.name}
+                    className="absolute inset-0 w-full h-full object-contain"
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
         </>
     )
 }
@@ -418,7 +495,6 @@ function Top10MobileBackdropCard({ movie, rank }) {
 
                 {ready && src && (
                     <>
-                        {/* Fondo blur para rellenar sin recortar */}
                         <img
                             src={buildImg(backdropPath, 'w780')}
                             alt=""
@@ -427,7 +503,6 @@ function Top10MobileBackdropCard({ movie, rank }) {
                             loading="lazy"
                             decoding="async"
                         />
-                        {/* Backdrop completo */}
                         <img
                             src={src}
                             alt={movie.title || movie.name}
@@ -438,11 +513,9 @@ function Top10MobileBackdropCard({ movie, rank }) {
                     </>
                 )}
 
-                {/* Número */}
                 <div className="absolute left-4 bottom-3 z-10 select-none">
                     <div
-                        className="font-black leading-none
-              text-[72px]
+                        className="font-black leading-none text-[72px]
               bg-gradient-to-b from-blue-900/50 via-blue-600/35 to-blue-400/25
               bg-clip-text text-transparent
               drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]"
@@ -737,9 +810,7 @@ function InlinePreviewCard({ movie, heightClass }) {
     return (
         <div
             className={`rounded-3xl overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
-            onClick={() => {
-                window.location.href = href
-            }}
+            onClick={() => { window.location.href = href }}
         >
             <div className="relative w-full h-full bg-black">
                 {!showTrailer && !backdropReady && (
@@ -767,10 +838,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                                 <iframe
                                     key={trailer.key}
                                     ref={trailerIframeRef}
-                                    className="absolute left-1/2 top-1/2
-                      w-[140%] h-[180%]
-                      -translate-x-1/2 -translate-y-1/2
-                      pointer-events-none"
+                                    className="absolute left-1/2 top-1/2 w-[140%] h-[180%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
                                     src={trailerSrc}
                                     title={`Trailer - ${movie.title || movie.name}`}
                                     allow="autoplay; encrypted-media; picture-in-picture"
@@ -779,13 +847,9 @@ function InlinePreviewCard({ movie, heightClass }) {
                                         try {
                                             const win = trailerIframeRef.current?.contentWindow
                                             if (!win) return
-
                                             const target = 'https://www.youtube-nocookie.com'
                                             const cmd = (func, args = []) =>
-                                                win.postMessage(
-                                                    JSON.stringify({ event: 'command', func, args }),
-                                                    target
-                                                )
+                                                win.postMessage(JSON.stringify({ event: 'command', func, args }), target)
 
                                             setTimeout(() => {
                                                 cmd('unMute')
@@ -799,10 +863,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                     </>
                 )}
 
-                <div
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-2
-            bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95"
-                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2 bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95" />
             </div>
 
             <div className="w-full h-full bg-neutral-950/95 border-t border-neutral-800">
@@ -813,28 +874,14 @@ function InlinePreviewCard({ movie, heightClass }) {
                             {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
 
                             <span className="inline-flex items-center gap-1.5">
-                                <img
-                                    src="/logo-TMDb.png"
-                                    alt="TMDb"
-                                    className="h-4 w-auto"
-                                    loading="lazy"
-                                    decoding="async"
-                                />
+                                <img src="/logo-TMDb.png" alt="TMDb" className="h-4 w-auto" loading="lazy" decoding="async" />
                                 <span className="font-medium">{ratingOf(movie)}</span>
                             </span>
 
                             {typeof extras?.imdbRating === 'number' && (
                                 <span className="inline-flex items-center gap-1.5">
-                                    <img
-                                        src="/logo-IMDb.png"
-                                        alt="IMDb"
-                                        className="h-4 w-auto"
-                                        loading="lazy"
-                                        decoding="async"
-                                    />
-                                    <span className="font-medium">
-                                        {extras.imdbRating.toFixed(1)}
-                                    </span>
+                                    <img src="/logo-IMDb.png" alt="IMDb" className="h-4 w-auto" loading="lazy" decoding="async" />
+                                    <span className="font-medium">{extras.imdbRating.toFixed(1)}</span>
                                 </span>
                             )}
                         </div>
@@ -863,13 +910,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                             title={showTrailer ? 'Cerrar trailer' : 'Ver trailer'}
                             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
                         >
-                            {trailerLoading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : showTrailer ? (
-                                <X className="w-5 h-5" />
-                            ) : (
-                                <Play className="w-5 h-5" />
-                            )}
+                            {trailerLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : showTrailer ? <X className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                         </button>
 
                         <button
@@ -878,13 +919,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                             title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
                         >
-                            {loadingStates || updating ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : favorite ? (
-                                <HeartOff className="w-5 h-5" />
-                            ) : (
-                                <Heart className="w-5 h-5" />
-                            )}
+                            {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : favorite ? <HeartOff className="w-5 h-5" /> : <Heart className="w-5 h-5" />}
                         </button>
 
                         <button
@@ -893,13 +928,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                             title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
                             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
                         >
-                            {loadingStates || updating ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : watchlist ? (
-                                <BookmarkMinus className="w-5 h-5" />
-                            ) : (
-                                <BookmarkPlus className="w-5 h-5" />
-                            )}
+                            {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : watchlist ? <BookmarkMinus className="w-5 h-5" /> : <BookmarkPlus className="w-5 h-5" />}
                         </button>
                     </div>
                 </div>
@@ -909,7 +938,7 @@ function InlinePreviewCard({ movie, heightClass }) {
 }
 
 /* ---------- Sección reusable (cada fila) ---------- */
-function Row({ title, items, isTouchDevice, posterCacheRef }) {
+function Row({ title, items, isMobile, posterCacheRef }) {
     if (!items || items.length === 0) return null
 
     const swiperRef = useRef(null)
@@ -921,13 +950,12 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
     const isTop10 = title === 'Top 10 hoy en España'
     const hasActivePreview = !!hoveredId
 
-    // ✅ móvil: posters en ratio 2:3 sin recorte / desktop: tu height original
-    const heightClass = isTouchDevice
-        ? 'aspect-[2/3]'
-        : 'h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
+    // ✅ alturas SOLO desde md (tablet/desktop). <md = móvil (aspect 2/3)
+    const heightClassDesktop = 'md:h-[220px] lg:h-[260px] xl:h-[300px] 2xl:h-[340px]'
+    const posterBoxClass = `aspect-[2/3] md:aspect-auto ${heightClassDesktop}`
 
-    // ✅ TOP 10 SOLO MÓVIL: backdrop completo + 1 por vista (desktop intacto)
-    if (isTop10 && isTouchDevice) {
+    // ✅ TOP 10 SOLO MÓVIL (<768)
+    if (isTop10 && isMobile) {
         return (
             <div className="relative group">
                 <h3 className="text-2xl sm:text-3xl md:text-4xl font-[730] text-primary-text mb-4 sm:text-left">
@@ -995,6 +1023,14 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
     const showPrev = (isHoveredRow || hasActivePreview) && canPrev
     const showNext = (isHoveredRow || hasActivePreview) && canNext
 
+    const breakpointsRow = {
+        0: { slidesPerView: 3, spaceBetween: isTop10 ? 16 : 12 },
+        640: { slidesPerView: 4, spaceBetween: isTop10 ? 18 : 14 },
+        768: { slidesPerView: 'auto', spaceBetween: isTop10 ? 24 : 14 },
+        1024: { slidesPerView: 'auto', spaceBetween: isTop10 ? 28 : 18 },
+        1280: { slidesPerView: 'auto', spaceBetween: isTop10 ? 32 : 20 }
+    }
+
     return (
         <div className="relative group">
             <h3 className="text-2xl sm:text-3xl md:text-4xl font-[730] text-primary-text mb-4 sm:text-left">
@@ -1014,9 +1050,8 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                 }}
             >
                 <Swiper
-                    // ✅ móvil: 3 posters visibles / desktop: auto (como antes)
-                    slidesPerView={isTouchDevice ? 3 : 'auto'}
-                    spaceBetween={isTop10 ? 24 : 16}
+                    slidesPerView={3}
+                    spaceBetween={isTop10 ? 16 : 12}
                     onSwiper={handleSwiper}
                     onSlideChange={updateNav}
                     onResize={updateNav}
@@ -1024,48 +1059,38 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     onReachEnd={updateNav}
                     loop={false}
                     watchOverflow={true}
-                    grabCursor={!isTouchDevice}
+                    grabCursor={!isMobile}
                     allowTouchMove={true}
                     preventClicks={true}
                     preventClicksPropagation={true}
                     threshold={5}
                     modules={[Navigation]}
                     className="group relative"
-                    breakpoints={{
-                        0: { slidesPerView: isTop10 ? 'auto' : 3, spaceBetween: isTop10 ? 16 : 12 },
-                        640: { slidesPerView: 'auto', spaceBetween: isTop10 ? 20 : 14 },
-                        1024: { slidesPerView: 'auto', spaceBetween: isTop10 ? 28 : 18 },
-                        1280: { slidesPerView: 'auto', spaceBetween: isTop10 ? 32 : 20 }
-                    }}
+                    breakpoints={breakpointsRow}
                 >
                     {items.map((m, i) => {
-                        const isActive = !isTouchDevice && hoveredId === m.id
+                        const isActive = !isMobile && hoveredId === m.id
                         const isLast = i === items.length - 1
 
                         const base = 'relative flex-shrink-0 transition-all duration-300 ease-out'
 
-                        // ✅ móvil: ocupa el ancho del slide (1/3 de viewport). Desktop: tus tamaños.
-                        const sizeClasses = isTouchDevice
-                            ? 'w-full z-10'
-                            : isActive
-                                ? 'w-[320px] sm:w-[380px] md:w-[430px] xl:w-[480px] z-20'
-                                : 'w-[140px] sm:w-[170px] md:w-[190px] xl:w-[210px] z-10'
+                        const sizeClasses = isActive
+                            ? 'w-full md:w-[320px] lg:w-[380px] xl:w-[430px] 2xl:w-[480px] z-20'
+                            : 'w-full md:w-[140px] lg:w-[170px] xl:w-[190px] 2xl:w-[210px] z-10'
 
                         const transformClass =
-                            !isTouchDevice && isActive && isLast
-                                ? '-translate-x-[190px] sm:-translate-x-[230px] md:-translate-x-[260px] xl:-translate-x-[290px]'
+                            !isMobile && isActive && isLast
+                                ? 'md:-translate-x-[190px] lg:-translate-x-[230px] xl:-translate-x-[260px] 2xl:-translate-x-[290px]'
                                 : ''
 
                         const cardElement = (
                             <div
-                                className={`${base} ${sizeClasses} ${heightClass} ${transformClass}`}
+                                className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass}`}
                                 onMouseEnter={() => {
-                                    if (!isTouchDevice) setHoveredId(m.id)
+                                    if (!isMobile) setHoveredId(m.id)
                                 }}
                                 onMouseLeave={() => {
-                                    if (!isTouchDevice) {
-                                        setHoveredId((prev) => (prev === m.id ? null : prev))
-                                    }
+                                    if (!isMobile) setHoveredId((prev) => (prev === m.id ? null : prev))
                                 }}
                             >
                                 <AnimatePresence initial={false} mode="wait">
@@ -1076,9 +1101,9 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                             animate={{ opacity: 1, scale: 1 }}
                                             exit={{ opacity: 0, scale: 0.98 }}
                                             transition={{ duration: 0.18 }}
-                                            className="w-full h-full"
+                                            className="w-full h-full hidden md:block"
                                         >
-                                            <InlinePreviewCard movie={m} heightClass={heightClass} />
+                                            <InlinePreviewCard movie={m} heightClass={heightClassDesktop} />
                                         </motion.div>
                                     ) : (
                                         <motion.div
@@ -1089,14 +1114,8 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                             transition={{ duration: 0.15 }}
                                             className="w-full h-full"
                                         >
-                                            <Link href={`/details/movie/${m.id}`}>
-                                                <PosterImage
-                                                    movie={m}
-                                                    cache={posterCacheRef}
-                                                    heightClass={heightClass}
-                                                    // ✅ móvil: no recortar
-                                                    fit={isTouchDevice ? 'contain' : 'cover'}
-                                                />
+                                            <Link href={`/details/movie/${m.id}`} className="block w-full h-full">
+                                                <PosterImage movie={m} cache={posterCacheRef} />
                                             </Link>
                                         </motion.div>
                                     )}
@@ -1105,14 +1124,11 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         )
 
                         return (
-                            <SwiperSlide
-                                key={m.id}
-                                className={isTouchDevice ? 'select-none' : '!w-auto select-none'}
-                            >
+                            <SwiperSlide key={m.id} className="select-none md:!w-auto">
                                 {isTop10 ? (
                                     <div className="flex items-center">
                                         <div
-                                            className="text-[150px] sm:text-[180px] md:text-[220px] xl:text-[260px] font-black z-0 select-none
+                                            className="hidden md:block text-[150px] lg:text-[180px] xl:text-[220px] 2xl:text-[260px] font-black z-0 select-none
                         bg-gradient-to-b from-blue-900/40 via-blue-600/30 to-blue-400/20 bg-clip-text text-transparent
                         drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]"
                                             style={{
@@ -1134,7 +1150,8 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     })}
                 </Swiper>
 
-                {showPrev && (
+                {/* Flechas: solo tablet/desktop (como MainDashboard) */}
+                {showPrev && !isMobile && (
                     <button
                         type="button"
                         onClick={handlePrevClick}
@@ -1150,7 +1167,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     </button>
                 )}
 
-                {showNext && (
+                {showNext && !isMobile && (
                     <button
                         type="button"
                         onClick={handleNextClick}
@@ -1170,7 +1187,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
     )
 }
 
-function GenreRows({ groups, isTouchDevice, posterCacheRef }) {
+function GenreRows({ groups, isMobile, posterCacheRef }) {
     if (!groups) return null
     return (
         <>
@@ -1180,7 +1197,7 @@ function GenreRows({ groups, isTouchDevice, posterCacheRef }) {
                         key={`genre-${gname}`}
                         title={`${gname}`}
                         items={list}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 ) : null
@@ -1193,7 +1210,9 @@ function GenreRows({ groups, isTouchDevice, posterCacheRef }) {
  * Componente Principal (CLIENTE): recibe datos ya cargados en servidor
  * ==================================================================== */
 export default function MoviesPageClient({ initialData }) {
-    const isTouchDevice = useIsTouchDevice()
+    // ✅ Igual que MainDashboard: móvil SOLO por anchura. Tablet = desktop layout.
+    const isMobile = useIsMobileLayout(768)
+
     const posterCacheRef = useRef(new Map())
     const dashboardData = initialData || {}
 
@@ -1202,13 +1221,13 @@ export default function MoviesPageClient({ initialData }) {
     }
 
     return (
-        <div className="px-8 py-2 text-white bg-black">
-            <div className="space-y-12 pt-10">
+        <div className="px-6 py-6 text-white bg-black">
+            <div className="space-y-12 pt-6">
                 {dashboardData['Top 10 hoy en España']?.length ? (
                     <Row
                         title="Top 10 hoy en España"
                         items={dashboardData['Top 10 hoy en España']}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 ) : null}
@@ -1217,7 +1236,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Tendencias ahora mismo"
                         items={dashboardData.popular}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 )}
@@ -1226,7 +1245,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Imprescindibles según IMDb"
                         items={dashboardData.top_imdb}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 )}
@@ -1235,7 +1254,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Taquillazos que no puedes perderte"
                         items={dashboardData['Superéxito']}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 ) : null}
@@ -1244,7 +1263,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Premiadas y nominadas"
                         items={dashboardData['Premiadas']}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 ) : null}
@@ -1253,7 +1272,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Acción taquillera"
                         items={dashboardData.action}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 )}
@@ -1262,7 +1281,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Ciencia ficción espectacular"
                         items={dashboardData.scifi}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 )}
@@ -1271,7 +1290,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Thrillers intensos"
                         items={dashboardData.thrillers}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 )}
@@ -1280,7 +1299,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Historias de venganza"
                         items={dashboardData.vengeance}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 )}
@@ -1289,7 +1308,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Clásicos de los 90"
                         items={dashboardData['Década de 1990']}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 ) : null}
@@ -1298,7 +1317,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Favoritas de los 2000"
                         items={dashboardData['Década de 2000']}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 ) : null}
@@ -1307,7 +1326,7 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Hits de los 2010"
                         items={dashboardData['Década de 2010']}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 ) : null}
@@ -1316,14 +1335,14 @@ export default function MoviesPageClient({ initialData }) {
                     <Row
                         title="Lo mejor de los 2020"
                         items={dashboardData['Década de 2020']}
-                        isTouchDevice={isTouchDevice}
+                        isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
                     />
                 ) : null}
 
                 <GenreRows
                     groups={dashboardData['Por género']}
-                    isTouchDevice={isTouchDevice}
+                    isMobile={isMobile}
                     posterCacheRef={posterCacheRef}
                 />
             </div>
