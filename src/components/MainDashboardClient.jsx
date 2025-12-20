@@ -940,6 +940,20 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
     const showPrev = (isHoveredRow || hasActivePreview) && canPrev
     const showNext = (isHoveredRow || hasActivePreview) && canNext
 
+    const breakpointsRow = isTouchDevice
+        ? {
+            0: { slidesPerView: 3, spaceBetween: 12 },
+            640: { slidesPerView: 4, spaceBetween: 14 },
+            768: { slidesPerView: 5, spaceBetween: 16 },
+            1024: { slidesPerView: 6, spaceBetween: 18 },
+            1280: { slidesPerView: 7, spaceBetween: 20 }
+        }
+        : {
+            640: { slidesPerView: 'auto', spaceBetween: 14 },
+            1024: { slidesPerView: 'auto', spaceBetween: 18 },
+            1280: { slidesPerView: 'auto', spaceBetween: 20 }
+        }
+
     return (
         <div className="relative group">
             <h3 className="text-2xl sm:text-3xl md:text-4xl font-[730] text-primary-text mb-4 sm:text-left">
@@ -959,9 +973,8 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                 }}
             >
                 <Swiper
-                    // ✅ móvil: 3 posters por “fila” visibles
-                    slidesPerView={3}
-                    spaceBetween={12}
+                    slidesPerView={isTouchDevice ? 3 : 'auto'}
+                    spaceBetween={isTouchDevice ? 12 : 18}
                     onSwiper={handleSwiper}
                     onSlideChange={updateNav}
                     onResize={updateNav}
@@ -976,11 +989,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     threshold={5}
                     modules={[Navigation]}
                     className="group relative"
-                    breakpoints={{
-                        640: { slidesPerView: 'auto', spaceBetween: 14 },
-                        1024: { slidesPerView: 'auto', spaceBetween: 18 },
-                        1280: { slidesPerView: 'auto', spaceBetween: 20 }
-                    }}
+                    breakpoints={breakpointsRow}
                 >
                     {items.map((m, i) => {
                         // ✅ móvil: NUNCA preview (click directo a details)
