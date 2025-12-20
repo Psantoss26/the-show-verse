@@ -38,6 +38,7 @@ import {
   X,
   Plus,
   Search,
+  RotateCcw,
   Play,
   ExternalLink
 } from 'lucide-react'
@@ -2154,13 +2155,17 @@ export default function DetailsClient({
                   </button>
                 ))}
               </div>
-
               <button
                 type="button"
                 onClick={handleResetArtwork}
-                className="text-xs text-red-400 hover:text-red-300 hover:underline sm:ml-auto w-fit"
+                className="sm:ml-auto inline-flex items-center justify-center w-10 h-10 rounded-full
+                          border border-red-500/25 bg-red-500/10 text-red-400
+                          hover:bg-red-500/15 hover:text-red-300 hover:border-red-500/40
+                          transition"
+                title="Restaurar valores por defecto"
+                aria-label="Restaurar valores por defecto"
               >
-                Restaurar valores por defecto
+                <RotateCcw className="w-5 h-5" />
               </button>
             </div>
 
@@ -2170,11 +2175,6 @@ export default function DetailsClient({
               </div>
             )}
             {!!imagesError && <div className="text-sm text-red-400 mb-3">{imagesError}</div>}
-
-            <p className="text-xs text-zinc-400 mb-4">
-              Selecciona la portada y el fondo que prefieras (se guarda en este dispositivo).
-            </p>
-
             {(() => {
               const list =
                 activeImagesTab === 'posters' ? imagesState.posters : imagesState.backdrops
@@ -2186,7 +2186,7 @@ export default function DetailsClient({
               // ✅ móvil: 3 posters completos visibles (con gap-3 => 2 gaps = 1.5rem)
               const cardWidth = isPoster
                 ? 'w-[calc((100%-1.5rem)/3)] min-w-[calc((100%-1.5rem)/3)] sm:w-[140px] sm:min-w-[140px] md:w-[160px] md:min-w-[160px] lg:w-[170px] lg:min-w-[170px]'
-                : 'w-[86vw] min-w-[86vw] sm:w-[380px] sm:min-w-[380px] md:w-[440px] md:min-w-[440px] lg:w-[520px] lg:min-w-[520px]'
+                : 'w-[calc((100%-1.5rem)/3)] min-w-[calc((100%-1.5rem)/3)]'
 
               if (!Array.isArray(list) || list.length === 0) {
                 return (
@@ -2197,7 +2197,27 @@ export default function DetailsClient({
               }
 
               return (
-                <div className="flex gap-3 overflow-x-auto overflow-y-visible scroll-smooth no-scrollbar pb-2">
+                <Swiper
+                  key={activeImagesTab} // 🔑 fuerza recalcular al cambiar de tab
+                  spaceBetween={12}
+                  slidesPerView={isPoster ? 3 : 1}
+                  breakpoints={
+                    isPoster
+                      ? {
+                        640: { slidesPerView: 4, spaceBetween: 14 },
+                        768: { slidesPerView: 5, spaceBetween: 16 },
+                        1024: { slidesPerView: 6, spaceBetween: 18 },
+                        1280: { slidesPerView: 7, spaceBetween: 18 } // Posters (como te gusta)
+                      }
+                      : {
+                        640: { slidesPerView: 2, spaceBetween: 14 },
+                        768: { slidesPerView: 3, spaceBetween: 16 },
+                        1024: { slidesPerView: 4, spaceBetween: 18 }, // ✅ Backdrops: 4 completos en desktop
+                        1280: { slidesPerView: 4, spaceBetween: 18 }
+                      }
+                  }
+                  className="pb-2"
+                >
                   {list.map((img, idx) => {
                     const filePath = img?.file_path
                     if (!filePath) return null
@@ -2210,60 +2230,71 @@ export default function DetailsClient({
                           : displayBackdropPath === filePath
 
                     return (
-                      <div
-                        key={filePath + idx}
-                        onClick={() => {
-                          if (activeImagesTab === 'posters') handleSelectPoster(filePath)
-                          else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(filePath)
-                          else handleSelectBackground(filePath)
-                        }}
-                        className={`group relative flex-shrink-0 ${cardWidth} rounded-2xl overflow-hidden border transition-all transform-gpu cursor-pointer
-                  hover:scale-[1.02] hover:-translate-y-0.5
-                  ${isActive
-                            ? 'border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]'
-                            : 'border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30'
-                          }`}
-                        title="Seleccionar"
-                      >
-                        <div className={`w-full ${aspect} bg-black/40`}>
-                          <img
-                            src={`https://image.tmdb.org/t/p/${size}${filePath}`}
-                            alt="option"
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        </div>
-
-                        {isActive && (
-                          <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
-                        )}
-
-                        {/* copiar URL (sin nested button) */}
+                      <SwiperSlide key={filePath + idx} className="h-full">
                         <div
                           role="button"
                           tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleCopyImageUrl(filePath)
+                          onClick={() => {
+                            if (activeImagesTab === 'posters') handleSelectPoster(filePath)
+                            else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(filePath)
+                            else handleSelectBackground(filePath)
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
                               e.preventDefault()
-                              e.stopPropagation()
-                              handleCopyImageUrl(filePath)
+                              if (activeImagesTab === 'posters') handleSelectPoster(filePath)
+                              else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(filePath)
+                              else handleSelectBackground(filePath)
                             }
                           }}
-                          className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
-                    opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
-                          title="Copiar URL"
+                          className={`group relative w-full rounded-2xl overflow-hidden border transition-all transform-gpu cursor-pointer
+              hover:scale-[1.02] hover:-translate-y-0.5
+              ${isActive
+                              ? 'border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]'
+                              : 'border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30'
+                            }`}
+                          title="Seleccionar"
                         >
-                          <LinkIcon size={14} />
+                          <div className={`w-full ${aspect} bg-black/40`}>
+                            <img
+                              src={`https://image.tmdb.org/t/p/${size}${filePath}`}
+                              alt="option"
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </div>
+
+                          {isActive && (
+                            <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
+                          )}
+
+                          {/* copiar URL */}
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCopyImageUrl(filePath)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleCopyImageUrl(filePath)
+                              }
+                            }}
+                            className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
+                opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
+                            title="Copiar URL"
+                          >
+                            <LinkIcon size={14} />
+                          </div>
                         </div>
-                      </div>
+                      </SwiperSlide>
                     )
                   })}
-                </div>
+                </Swiper>
               )
             })()}
           </section>
@@ -2310,11 +2341,12 @@ export default function DetailsClient({
               {videos.length > 0 && (
                 <Swiper
                   spaceBetween={12}
-                  slidesPerView={2} // ✅ móvil: 2 completos por fila
+                  slidesPerView={2} // ✅ móvil: 2 completos
                   breakpoints={{
-                    640: { slidesPerView: 2.2, spaceBetween: 16 },
-                    1024: { slidesPerView: 3.2, spaceBetween: 16 },
-                    1280: { slidesPerView: 4.2, spaceBetween: 16 }
+                    640: { slidesPerView: 2, spaceBetween: 16 },
+                    768: { slidesPerView: 3, spaceBetween: 16 },
+                    1024: { slidesPerView: 4, spaceBetween: 16 }, // ✅ desktop: 4 completos
+                    1280: { slidesPerView: 4, spaceBetween: 16 }  // ✅ mantiene 4 completos
                   }}
                   className="pb-2"
                 >
