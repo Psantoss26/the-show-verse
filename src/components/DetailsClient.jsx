@@ -4,6 +4,7 @@
 import { useRef, useState, useEffect, useLayoutEffect, useMemo } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import 'swiper/swiper-bundle.css'
+import { AnimatePresence, motion } from 'framer-motion'
 import EpisodeRatingsGrid from '@/components/EpisodeRatingsGrid'
 import { saveArtworkOverride } from '@/lib/artworkApi'
 
@@ -11,7 +12,6 @@ import {
   CalendarIcon,
   ClockIcon,
   FilmIcon,
-  GlobeIcon,
   StarIcon,
   MessageSquareIcon,
   BadgeDollarSignIcon,
@@ -139,6 +139,19 @@ const slugifyForSeriesGraph = (name) => {
     .replace(/(^-|-$)+/g, '')
 }
 
+const formatDateEs = (iso) => {
+  if (!iso) return null
+  try {
+    return new Date(iso).toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    })
+  } catch {
+    return iso
+  }
+}
+
 const SectionTitle = ({ title, icon: Icon }) => (
   <div className="flex items-center gap-3 mb-6 border-l-4 border-yellow-500 pl-4 py-1">
     {Icon && <Icon className="text-yellow-500 w-6 h-6" />}
@@ -148,10 +161,19 @@ const SectionTitle = ({ title, icon: Icon }) => (
   </div>
 )
 
-const MetaItem = ({ icon: Icon, label, value, colorClass = 'text-gray-400' }) => {
+const MetaItem = ({
+  icon: Icon,
+  label,
+  value,
+  colorClass = 'text-gray-400',
+  className = ''
+}) => {
   if (!value) return null
   return (
-    <div className="flex-grow basis-[190px] max-w-full flex items-center gap-3 bg-neutral-800/40 p-3 rounded-xl border border-neutral-700/50 hover:bg-neutral-800 transition-colors h-[72px]">
+    <div
+      className={`min-w-0 max-w-full flex items-center gap-3 bg-neutral-800/40 p-3 rounded-xl
+      border border-neutral-700/50 hover:bg-neutral-800 transition-colors h-[68px] md:h-[72px] ${className}`}
+    >
       <div className={`p-2 rounded-lg bg-neutral-900/80 shrink-0 ${colorClass}`}>
         <Icon size={18} />
       </div>
@@ -181,7 +203,7 @@ async function tmdbFetchAllUserLists({ accountId, sessionId, language = 'es-ES' 
   const all = []
   let page = 1
   let totalPages = 1
-  const maxPages = 5 // por seguridad (normalmente sobra)
+  const maxPages = 5
 
   while (page <= totalPages && page <= maxPages) {
     const url = `https://api.themoviedb.org/3/account/${accountId}/lists?api_key=${TMDB_API_KEY}&session_id=${sessionId}&language=${language}&page=${page}`
@@ -201,7 +223,6 @@ async function tmdbListItemStatus({ listId, movieId, sessionId }) {
   if (!TMDB_API_KEY) throw new Error('Falta NEXT_PUBLIC_TMDB_API_KEY')
   if (!listId || !movieId) return false
 
-  // session_id para cubrir listas privadas (y consistencia)
   const url = `https://api.themoviedb.org/3/list/${listId}/item_status?api_key=${TMDB_API_KEY}&movie_id=${movieId}${sessionId ? `&session_id=${sessionId}` : ''}`
   const res = await fetch(url)
   const json = await res.json()
@@ -221,20 +242,16 @@ async function tmdbAddMovieToList({ listId, movieId, sessionId }) {
   })
   const json = await res.json()
 
-  // TMDb suele devolver status_code aunque res.ok sea false/true según caso
   if (!res.ok) {
-    // Duplicate entry
     if (json?.status_code === 8) return { ok: true, duplicate: true, json }
     throw new Error(json?.status_message || 'Error añadiendo a la lista')
   }
 
-  // éxito típico: status_code 12 (updated successfully)
   if (json?.success === true || json?.status_code === 12 || json?.status_code === 1) {
     return { ok: true, duplicate: false, json }
   }
 
   if (json?.status_code === 8) return { ok: true, duplicate: true, json }
-
   throw new Error(json?.status_message || 'Error añadiendo a la lista')
 }
 
@@ -301,13 +318,9 @@ function AddToListModal({
 
   return (
     <div className="fixed inset-0 z-[9999]">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden">
-          {/* Header */}
           <div className="p-5 border-b border-white/10 flex items-start justify-between gap-4">
             <div>
               <h3 className="text-xl font-extrabold text-white">Añadir a lista</h3>
@@ -327,7 +340,6 @@ function AddToListModal({
           </div>
 
           <div className="p-5 space-y-4">
-            {/* Create toggle */}
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
@@ -369,7 +381,11 @@ function AddToListModal({
                         : 'bg-yellow-500 text-black hover:brightness-110'
                       }`}
                   >
-                    {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    {creating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
                     Crear y añadir
                   </button>
 
@@ -384,7 +400,6 @@ function AddToListModal({
               </div>
             )}
 
-            {/* Search */}
             <div className="relative">
               <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -395,18 +410,13 @@ function AddToListModal({
               />
             </div>
 
-            {/* Content */}
             {loading && (
               <div className="text-sm text-zinc-400 inline-flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" /> Cargando listas…
               </div>
             )}
 
-            {!!error && (
-              <div className="text-sm text-red-400">
-                {error}
-              </div>
-            )}
+            {!!error && <div className="text-sm text-red-400">{error}</div>}
 
             {!loading && filtered.length === 0 && (
               <div className="text-sm text-zinc-400 rounded-xl border border-white/10 bg-white/5 p-4">
@@ -433,9 +443,7 @@ function AddToListModal({
                     title={present ? 'Ya está en la lista' : 'Añadir a esta lista'}
                   >
                     <div className="min-w-0">
-                      <div className="font-bold text-white truncate">
-                        {l.name}
-                      </div>
+                      <div className="font-bold text-white truncate">{l.name}</div>
                       <div className="text-xs text-zinc-400 mt-1 line-clamp-2">
                         {l.description || 'Sin descripción'}
                       </div>
@@ -516,7 +524,6 @@ const videoThumbUrl = (v) => {
   return null
 }
 
-// Ranking: Trailer > Teaser > Clip > Featurette > resto; YouTube > Vimeo; ES > EN > resto; official primero
 const rankVideo = (v) => {
   const typeRank = {
     Trailer: 0,
@@ -531,13 +538,7 @@ const rankVideo = (v) => {
   const tRank = typeRank[v?.type] ?? 9
   const officialRank = v?.official ? 0 : 1
 
-  // menor = mejor
-  return (
-    officialRank * 1000 +
-    tRank * 100 +
-    siteRank * 10 +
-    langRank
-  )
+  return officialRank * 1000 + tRank * 100 + siteRank * 10 + langRank
 }
 
 const pickPreferredVideo = (videos) => {
@@ -573,10 +574,7 @@ function VideoModal({ open, onClose, video }) {
 
   return (
     <div className="fixed inset-0 z-[10000]">
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden">
           <div className="p-5 border-b border-white/10 flex items-start justify-between gap-4">
@@ -658,17 +656,18 @@ export default function DetailsClient({
   reviews
 }) {
   const title = data.title || data.name
+  const endpointType = type === 'tv' ? 'tv' : 'movie'
+  const yearIso = (data.release_date || data.first_air_date || '')?.slice(0, 4)
+
   const tmdbWatchUrl =
-    watchLink ||
-    (type && id ? `https://www.themoviedb.org/${type}/${id}/watch` : null)
+    watchLink || (type && id ? `https://www.themoviedb.org/${type}/${id}/watch` : null)
 
   const [showAdminImages, setShowAdminImages] = useState(false)
   const [reviewLimit, setReviewLimit] = useState(2)
   const [useBackdrop, setUseBackdrop] = useState(true)
 
   const { session, account } = useAuth()
-  const isAdmin =
-    account?.username === 'psantos26' || account?.name === 'psantos26'
+  const isAdmin = account?.username === 'psantos26' || account?.name === 'psantos26'
 
   const [favLoading, setFavLoading] = useState(false)
   const [wlLoading, setWlLoading] = useState(false)
@@ -679,7 +678,8 @@ export default function DetailsClient({
   const [ratingLoading, setRatingLoading] = useState(false)
   const [ratingError, setRatingError] = useState('')
 
-  const endpointType = type === 'tv' ? 'tv' : 'movie'
+  // ✅ Resumen plegable (por defecto oculto)
+  const [overviewOpen, setOverviewOpen] = useState(false)
 
   // ====== PREFERENCIAS DE IMÁGENES ======
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
@@ -687,16 +687,11 @@ export default function DetailsClient({
   const backgroundStorageKey = `showverse:${endpointType}:${id}:background`
 
   const [selectedPosterPath, setSelectedPosterPath] = useState(null)
-  const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] =
-    useState(null)
+  const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] = useState(null)
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null)
 
-  const [basePosterPath, setBasePosterPath] = useState(
-    data.poster_path || data.profile_path || null
-  )
-  const [baseBackdropPath, setBaseBackdropPath] = useState(
-    data.backdrop_path || null
-  )
+  const [basePosterPath, setBasePosterPath] = useState(data.poster_path || data.profile_path || null)
+  const [baseBackdropPath, setBaseBackdropPath] = useState(data.backdrop_path || null)
   const [artworkInitialized, setArtworkInitialized] = useState(false)
 
   const [imagesState, setImagesState] = useState(() => ({
@@ -724,12 +719,10 @@ export default function DetailsClient({
   const [userLists, setUserLists] = useState([])
   const [listQuery, setListQuery] = useState('')
 
-  // listId -> boolean (si esta película ya está en esa lista)
   const [membershipMap, setMembershipMap] = useState({})
   const [listsPresenceLoading, setListsPresenceLoading] = useState(false)
   const [busyListId, setBusyListId] = useState(null)
 
-  // crear lista desde modal
   const [createOpen, setCreateOpen] = useState(false)
   const [creatingList, setCreatingList] = useState(false)
   const [newListName, setNewListName] = useState('')
@@ -756,8 +749,6 @@ export default function DetailsClient({
   const loadListsIfNeeded = async ({ abortRef } = {}) => {
     if (!session || !account?.id) return []
     if (!canUseLists) return []
-
-    // si ya las tenemos en memoria, no recargamos
     if (Array.isArray(userLists) && userLists.length > 0) return userLists
 
     const lists = await tmdbFetchAllUserLists({
@@ -783,7 +774,6 @@ export default function DetailsClient({
       const base = Array.isArray(lists) && lists.length ? lists : await loadListsIfNeeded({ abortRef })
       if (abortRef?.current) return
 
-      // Concurrencia limitada
       const ids = base.map((l) => l?.id).filter(Boolean)
       const concurrency = 5
       let idx = 0
@@ -793,23 +783,15 @@ export default function DetailsClient({
         while (!abortRef?.current && idx < ids.length) {
           const listId = ids[idx++]
           try {
-            const present = await tmdbListItemStatus({
-              listId,
-              movieId,
-              sessionId: session
-            })
+            const present = await tmdbListItemStatus({ listId, movieId, sessionId: session })
             nextMap[listId] = present
           } catch {
-            // si falla, asumimos false para no bloquear UI
             nextMap[listId] = false
           }
         }
       }
 
-      await Promise.all(
-        Array.from({ length: Math.min(concurrency, ids.length) }, () => worker())
-      )
-
+      await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, () => worker()))
       if (abortRef?.current) return
       setMembershipMap(nextMap)
     } catch (e) {
@@ -822,7 +804,6 @@ export default function DetailsClient({
     }
   }
 
-  // ✅ Auto-detección para pintar el botón verde (sin abrir el modal)
   useEffect(() => {
     const abortRef = { current: false }
     if (!session || !account?.id || !canUseLists || !movieId) {
@@ -843,7 +824,6 @@ export default function DetailsClient({
     if (!canUseLists) return
     setListModalOpen(true)
 
-    // refrescamos presencia (por si cambió algo)
     const abortRef = { current: false }
     setListsLoading(true)
     setListsError('')
@@ -881,16 +861,9 @@ export default function DetailsClient({
     setListsError('')
 
     try {
-      const res = await tmdbAddMovieToList({
-        listId,
-        movieId,
-        sessionId: session
-      })
-
-      // Si era duplicate o éxito: marcamos presente
+      const res = await tmdbAddMovieToList({ listId, movieId, sessionId: session })
       setMembershipMap((prev) => ({ ...prev, [listId]: true }))
 
-      // actualizar item_count en UI (optimista)
       setUserLists((prev) =>
         (prev || []).map((l) =>
           l.id === listId
@@ -922,7 +895,6 @@ export default function DetailsClient({
         language: 'es'
       })
 
-      // refrescamos listas
       const lists = await tmdbFetchAllUserLists({
         accountId: account.id,
         sessionId: session,
@@ -930,10 +902,8 @@ export default function DetailsClient({
       })
       setUserLists(lists)
 
-      // añadimos película a la nueva
       await tmdbAddMovieToList({ listId, movieId, sessionId: session })
 
-      // marcamos presencia y actualizamos
       setMembershipMap((prev) => ({ ...prev, [listId]: true }))
       setUserLists((prev) =>
         (prev || []).map((l) =>
@@ -941,7 +911,6 @@ export default function DetailsClient({
         )
       )
 
-      // UI reset
       setCreateOpen(false)
       setNewListName('')
       setNewListDesc('')
@@ -975,7 +944,6 @@ export default function DetailsClient({
     setActiveVideo(null)
   }
 
-  // Cierra modal al cambiar de item
   useEffect(() => {
     setVideoModalOpen(false)
     setActiveVideo(null)
@@ -1009,20 +977,13 @@ export default function DetailsClient({
       setVideosError('')
 
       try {
-        // ES + EN para no perder trailers que no estén localizados
-        const [es, en] = await Promise.all([
-          safeFetchVideos('es-ES'),
-          safeFetchVideos('en-US')
-        ])
-
+        const [es, en] = await Promise.all([safeFetchVideos('es-ES'), safeFetchVideos('en-US')])
         if (ignore) return
 
         const merged = uniqBy([...es, ...en], (v) => `${v.site}:${v.key}`)
           .filter(isPlayableVideo)
 
-        // Ordena para que “lo mejor” esté primero
         merged.sort((a, b) => rankVideo(a) - rankVideo(b))
-
         setVideos(merged)
       } catch (e) {
         if (!ignore) setVideosError(e?.message || 'Error cargando vídeos')
@@ -1039,11 +1000,6 @@ export default function DetailsClient({
 
   // =====================================================================
 
-  /**
-   * ✅ FIX PRINCIPAL (flash de portada):
-   * Reset SINCRÓNICO al cambiar de id/type para que nunca se pinte
-   * la portada del item anterior.
-   */
   useLayoutEffect(() => {
     setArtworkInitialized(false)
 
@@ -1061,6 +1017,9 @@ export default function DetailsClient({
     setSelectedPosterPath(null)
     setSelectedPreviewBackdropPath(null)
     setSelectedBackgroundPath(null)
+
+    // ✅ Resumen vuelve a estar plegado al cambiar de item
+    setOverviewOpen(false)
 
     if (typeof window !== 'undefined') {
       try {
@@ -1081,15 +1040,8 @@ export default function DetailsClient({
         // ignore
       }
     }
-  }, [
-    id,
-    endpointType,
-    data?.poster_path,
-    data?.backdrop_path,
-    data?.profile_path
-  ])
+  }, [id, endpointType, data?.poster_path, data?.backdrop_path, data?.profile_path])
 
-  // ====== Inicializar artwork (mejoras + preload para evitar flicker) ======
   useEffect(() => {
     let cancelled = false
 
@@ -1185,9 +1137,7 @@ export default function DetailsClient({
     ? selectedPosterPath || basePosterPath || data.profile_path || null
     : null
 
-  const displayBackdropPath = artworkInitialized
-    ? selectedBackgroundPath || baseBackdropPath || null
-    : null
+  const displayBackdropPath = artworkInitialized ? selectedBackgroundPath || baseBackdropPath || null : null
 
   // ====== Account States ======
   useEffect(() => {
@@ -1200,9 +1150,7 @@ export default function DetailsClient({
           setFavorite(!!st.favorite)
           setWatchlist(!!st.watchlist)
           const ratedValue =
-            st?.rated && typeof st.rated.value === 'number'
-              ? st.rated.value
-              : null
+            st?.rated && typeof st.rated.value === 'number' ? st.rated.value : null
           setUserRating(ratedValue)
         }
       } catch { }
@@ -1318,13 +1266,9 @@ export default function DetailsClient({
         }
         const omdb = await fetchOmdbByImdb(imdb)
         const rating =
-          omdb?.imdbRating && omdb.imdbRating !== 'N/A'
-            ? Number(omdb.imdbRating)
-            : null
+          omdb?.imdbRating && omdb.imdbRating !== 'N/A' ? Number(omdb.imdbRating) : null
         const awards =
-          typeof omdb?.Awards === 'string' && omdb.Awards.trim()
-            ? omdb.Awards.trim()
-            : null
+          typeof omdb?.Awards === 'string' && omdb.Awards.trim() ? omdb.Awards.trim() : null
         if (!abort) setExtras({ imdbRating: rating, awards })
       } catch {
         if (!abort) setExtras({ imdbRating: null, awards: null })
@@ -1458,16 +1402,106 @@ export default function DetailsClient({
       )}`
       : null
 
-  const directors =
+  // ====== Datos meta / características (reorganizadas) ======
+  const directorsOrCreators =
     type === 'movie'
       ? data.credits?.crew?.filter((c) => c.job === 'Director') || []
       : data.created_by || []
+
+  const directorNames =
+    type === 'movie' && directorsOrCreators.length
+      ? directorsOrCreators.map((d) => d.name).join(', ')
+      : null
+
+  const createdByNames =
+    type === 'tv' && directorsOrCreators.length
+      ? directorsOrCreators.map((d) => d.name).join(', ')
+      : null
+
   const production =
-    data.production_companies?.slice(0, 2).map((c) => c.name).join(', ') || null
-  const countries =
-    data.production_countries?.map((c) => c.iso_3166_1).join(', ') || null
+    data.production_companies?.slice(0, 3).map((c) => c.name).join(', ') || null
+
+  const countries = (() => {
+    const pc = Array.isArray(data.production_countries) ? data.production_countries : []
+    if (pc.length) return pc.map((c) => c.iso_3166_1).filter(Boolean).join(', ') || null
+    const oc = Array.isArray(data.origin_country) ? data.origin_country : []
+    return oc.length ? oc.join(', ') : null
+  })()
+
   const languages =
-    data.spoken_languages?.map((l) => l.english_name || l.name).join(', ') || null
+    data.spoken_languages?.map((l) => l.english_name || l.name).filter(Boolean).join(', ') ||
+    (Array.isArray(data.languages) ? data.languages.join(', ') : null)
+
+  const network =
+    type === 'tv'
+      ? (data.networks?.[0]?.name || data.networks?.[0]?.original_name || null)
+      : null
+
+  const releaseDateLabel =
+    type === 'movie' ? 'Estreno' : 'Primera emisión'
+
+  const releaseDateValue =
+    type === 'movie' ? formatDateEs(data.release_date) : formatDateEs(data.first_air_date)
+
+  const lastAirDateValue = type === 'tv' ? formatDateEs(data.last_air_date) : null
+
+  const runtimeValue =
+    type === 'movie' && data.runtime
+      ? `${Math.floor(data.runtime / 60)}h ${data.runtime % 60}m`
+      : null
+
+  const budgetValue = type === 'movie' && data.budget > 0
+    ? `$${(data.budget / 1_000_000).toFixed(1)}M`
+    : null
+
+  const revenueValue = type === 'movie' && data.revenue > 0
+    ? `$${(data.revenue / 1_000_000).toFixed(1)}M`
+    : null
+
+  // ✅ Director (movie) — fallback si data no trae credits
+  const [movieDirector, setMovieDirector] = useState(null)
+
+  useEffect(() => {
+    let ignore = false
+
+    const loadDirector = async () => {
+      if (type !== 'movie' || !id) {
+        setMovieDirector(null)
+        return
+      }
+
+      // 1) Si ya vienen credits en data, úsalo
+      const crew = data?.credits?.crew
+      if (Array.isArray(crew) && crew.length) {
+        const dirs = crew.filter((c) => c?.job === 'Director').map((d) => d?.name).filter(Boolean)
+        if (!ignore) setMovieDirector(dirs.length ? dirs.join(', ') : null)
+        return
+      }
+
+      // 2) Si NO vienen credits, pide /credits a TMDb
+      try {
+        if (!TMDB_API_KEY) return
+        const url = `https://api.themoviedb.org/3/movie/${id}/credits?api_key=${TMDB_API_KEY}`
+        const res = await fetch(url)
+        const json = await res.json()
+        if (!res.ok) return
+
+        const dirs = (json?.crew || [])
+          .filter((c) => c?.job === 'Director')
+          .map((d) => d?.name)
+          .filter(Boolean)
+
+        if (!ignore) setMovieDirector(dirs.length ? dirs.join(', ') : null)
+      } catch {
+        if (!ignore) setMovieDirector(null)
+      }
+    }
+
+    loadDirector()
+    return () => {
+      ignore = true
+    }
+  }, [type, id, data?.credits])
 
   // ====== IMDb para RECOMENDACIONES ======
   const [recImdbRatings, setRecImdbRatings] = useState({})
@@ -1485,8 +1519,7 @@ export default function DetailsClient({
         const entries = await Promise.all(
           recommendations.slice(0, 15).map(async (rec) => {
             try {
-              const raw =
-                rec.imdb_rating ?? rec.imdbRating ?? rec.imdbScore ?? null
+              const raw = rec.imdb_rating ?? rec.imdbRating ?? rec.imdbScore ?? null
               if (raw != null && raw !== 'N/A') {
                 const n = Number(raw)
                 return [rec.id, Number.isFinite(n) ? n : null]
@@ -1532,6 +1565,8 @@ export default function DetailsClient({
     }
   }, [recommendations, type])
 
+  const limitedProviders = Array.isArray(providers) ? providers.slice(0, 7) : []
+
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
       {/* --- BACKGROUND & OVERLAY --- */}
@@ -1557,7 +1592,6 @@ export default function DetailsClient({
           {/* POSTER */}
           <div className="w-full lg:w-[350px] flex-shrink-0 flex flex-col gap-5">
             <div className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/60 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.95)] hover:border-yellow-500/60">
-              {/* --- BOTÓN TOGGLE BACKDROP --- */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -1566,8 +1600,8 @@ export default function DetailsClient({
                   setUseBackdrop((v) => !v)
                 }}
                 className={`absolute top-3 right-3 z-20 p-2.5 rounded-full backdrop-blur-md border transition-all shadow-lg
-                            opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto
-                            ${useBackdrop
+                  opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto
+                  ${useBackdrop
                     ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/30'
                     : 'bg-black/40 border-white/20 text-white/80 hover:bg-black/80 hover:text-white'
                   }`}
@@ -1575,6 +1609,7 @@ export default function DetailsClient({
               >
                 <ImageIcon className="w-5 h-5" />
               </button>
+
               {displayPosterPath ? (
                 <>
                   <img
@@ -1591,22 +1626,22 @@ export default function DetailsClient({
               )}
             </div>
 
-            {/* Plataformas */}
-            {providers && providers.length > 0 && (
-              <div className="flex flex-wrap justify-center lg:justify-start gap-3 p-1">
-                {providers.map((p) => (
+            {/* Plataformas (máx 7 + una sola fila) */}
+            {limitedProviders && limitedProviders.length > 0 && (
+              <div className="flex items-center justify-center lg:justify-start gap-2 flex-nowrap overflow-hidden">
+                {limitedProviders.map((p) => (
                   <a
                     key={p.provider_id}
                     href={tmdbWatchUrl || '#'}
                     target={tmdbWatchUrl ? '_blank' : undefined}
                     rel={tmdbWatchUrl ? 'noreferrer' : undefined}
                     title={p.provider_name}
-                    className="flex items-center justify-center"
+                    className="flex items-center justify-center shrink-0"
                   >
                     <img
                       src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
                       alt={p.provider_name}
-                      className="w-10 h-10 rounded-lg object-contain hover:scale-110 hover:-translate-y-0.5 transition-transform cursor-pointer"
+                      className="w-9 h-9 md:w-10 md:h-10 rounded-lg object-contain hover:scale-110 hover:-translate-y-0.5 transition-transform cursor-pointer"
                     />
                   </a>
                 ))}
@@ -1620,15 +1655,14 @@ export default function DetailsClient({
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white leading-tight drop-shadow-lg tracking-tight">
                 {title}
-                {data.release_date && (
+                {yearIso && (
                   <span className="text-2xl md:text-3xl font-light text-gray-400 ml-3">
-                    ({data.release_date.split('-')[0]})
+                    ({yearIso})
                   </span>
                 )}
               </h1>
 
               <div className="flex items-center mt-3 gap-3 shrink-0">
-                {/* ✅ Trailer / Videos */}
                 <button
                   onClick={() => openVideo(preferredVideo)}
                   disabled={!preferredVideo}
@@ -1642,7 +1676,6 @@ export default function DetailsClient({
                   <Play className="w-6 h-6" />
                 </button>
 
-                {/* Favorito */}
                 <button
                   onClick={toggleFavorite}
                   disabled={favLoading}
@@ -1661,7 +1694,6 @@ export default function DetailsClient({
                   )}
                 </button>
 
-                {/* Watchlist */}
                 <button
                   onClick={toggleWatchlist}
                   disabled={wlLoading}
@@ -1680,13 +1712,12 @@ export default function DetailsClient({
                   )}
                 </button>
 
-                {/* ✅ Listas (solo películas) */}
                 {canUseLists && (
                   <button
                     onClick={openListsModal}
                     disabled={listsPresenceLoading}
                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu
-      ${inAnyList
+                      ${inAnyList
                         ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 hover:bg-emerald-500/30 hover:shadow-[0_0_25px_rgba(16,185,129,0.35)]'
                         : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:shadow-lg'
                       }`}
@@ -1715,8 +1746,8 @@ export default function DetailsClient({
             </div>
 
             {/* RATINGS BADGES */}
-            <div className="flex items-center gap-6 py-2 border-y border-white/10">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-4 md:gap-6 py-2 border-y border-white/10">
+              <div className="flex items-center gap-2 ml-4">
                 <img src="/logo-TMDb.png" alt="TMDb" className="h-5 w-auto" />
                 <span className="text-xl font-bold text-emerald-400">
                   {data.vote_average?.toFixed(1)}
@@ -1724,7 +1755,7 @@ export default function DetailsClient({
               </div>
 
               {extras.imdbRating && (
-                <div className="flex items-center gap-2 border-l border-white/10 pl-6">
+                <div className="flex items-center gap-2 border-l border-white/10 pl-4 md:pl-6">
                   <img src="/logo-IMDb.png" alt="IMDb" className="h-5 w-auto" />
                   <span className="text-xl font-bold text-yellow-400">
                     {extras.imdbRating}
@@ -1733,7 +1764,7 @@ export default function DetailsClient({
               )}
 
               {session && (
-                <div className="flex items-center gap-2 border-l border-white/10 pl-6">
+                <div className="flex items-center gap-2 border-l border-white/10 pl-4 md:pl-6">
                   <StarRating
                     rating={userRating}
                     onRating={sendRating}
@@ -1752,20 +1783,57 @@ export default function DetailsClient({
 
             {ratingError && <p className="text-xs text-red-400 mt-1">{ratingError}</p>}
 
-            {/* Tagline & Overview */}
-            <div>
-              {data.tagline && (
-                <p className="text-xl text-gray-400 italic font-light mb-3">
-                  "{data.tagline}"
-                </p>
-              )}
-              <p className="text-gray-300 text-lg leading-relaxed text-justify md:text-left">
-                {data.overview}
-              </p>
+            {/* ✅ Resumen plegable (oculto por defecto) */}
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setOverviewOpen((v) => !v)}
+                className="w-full flex items-center justify-between gap-4 px-4 py-3 rounded-2xl
+                  bg-white/5 border border-white/10 hover:bg-white/10 transition"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-black/25 border border-white/10 flex items-center justify-center shrink-0">
+                    <MessageSquareIcon className="w-5 h-5 text-zinc-200" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-extrabold text-white truncate">Resumen</div>
+                    <div className="text-[11px] text-zinc-400 truncate">
+                      {overviewOpen ? 'Ocultar sinopsis' : 'Mostrar sinopsis'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="shrink-0 text-zinc-300">
+                  {overviewOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                </div>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {overviewOpen && (
+                  <motion.div
+                    key="overview"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pt-3">
+                      {data.overview ? (
+                        <p className="text-gray-300 text-sm sm:text-base md:text-lg leading-relaxed text-justify md:text-left">
+                          {data.overview}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-zinc-400">No hay resumen disponible.</p>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* Links Externos – solo icono */}
-            <div className="flex gap-2 flex-wrap">
+            {/* Links Externos */}
+            <div className="flex gap-2 flex-wrap mt-1">
               {data.homepage && (
                 <a
                   href={data.homepage}
@@ -1829,146 +1897,225 @@ export default function DetailsClient({
               )}
             </div>
 
-            {/* METADATOS */}
-            <div className="mt-4 space-y-3">
-              <div className="flex flex-wrap gap-3">
-                {type === 'movie' && data.original_title && (
-                  <MetaItem
-                    icon={FilmIcon}
-                    label="Título Original"
-                    value={data.original_title}
-                    colorClass="text-blue-400"
-                  />
-                )}
+            {/* ✅ METADATOS / CARACTERÍSTICAS (reorganizadas y agrupadas) */}
+            <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* Movie */}
+              {type === 'movie' ? (
+                <>
+                  {data.original_title && (
+                    <MetaItem
+                      icon={FilmIcon}
+                      label="Título original"
+                      value={data.original_title}
+                      colorClass="text-blue-400"
+                      className="col-span-2 md:col-span-2"
+                    />
+                  )}
 
-                {type === 'tv' && data.original_name && (
-                  <MetaItem
-                    icon={FilmIcon}
-                    label="Título Original"
-                    value={data.original_name}
-                    colorClass="text-blue-400"
-                  />
-                )}
+                  {movieDirector && (
+                    <MetaItem
+                      icon={Users}
+                      label="Director"
+                      value={movieDirector}
+                      colorClass="text-rose-400"
+                      className="col-span-2 md:col-span-2"
+                    />
+                  )}
 
-                {directors.length > 0 && (
-                  <MetaItem
-                    icon={Users}
-                    label={type === 'movie' ? 'Director' : 'Creado por'}
-                    value={directors.map((d) => d.name).join(', ')}
-                    colorClass="text-rose-400"
-                  />
-                )}
-
-                {type === 'movie' && data.runtime && (
-                  <MetaItem
-                    icon={ClockIcon}
-                    label="Duración"
-                    value={`${Math.floor(data.runtime / 60)}h ${data.runtime % 60}m`}
-                    colorClass="text-purple-400"
-                  />
-                )}
-
-                {languages && (
-                  <MetaItem
-                    icon={Languages}
-                    label="Idiomas"
-                    value={languages}
-                    colorClass="text-indigo-400"
-                  />
-                )}
-
-                {type === 'tv' && countries && (
-                  <MetaItem
-                    icon={MapPin}
-                    label="País"
-                    value={countries}
-                    colorClass="text-red-400"
-                  />
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                {type === 'movie' ? (
-                  <>
-                    {countries && (
-                      <MetaItem
-                        icon={MapPin}
-                        label="País"
-                        value={countries}
-                        colorClass="text-red-400"
-                      />
-                    )}
-
-                    {data.budget > 0 && (
-                      <MetaItem
-                        icon={BadgeDollarSignIcon}
-                        label="Presupuesto"
-                        value={`$${(data.budget / 1_000_000).toFixed(1)}M`}
-                        colorClass="text-yellow-500"
-                      />
-                    )}
-
-                    {data.revenue > 0 && (
-                      <MetaItem
-                        icon={TrendingUp}
-                        label="Recaudación"
-                        value={`$${(data.revenue / 1_000_000).toFixed(1)}M`}
-                        colorClass="text-emerald-500"
-                      />
-                    )}
-                  </>
-                ) : (
-                  <>
+                  {releaseDateValue && (
                     <MetaItem
                       icon={CalendarIcon}
+                      label={releaseDateLabel}
+                      value={releaseDateValue}
+                      colorClass="text-blue-300"
+                      className="col-span-1"
+                    />
+                  )}
+
+                  {runtimeValue && (
+                    <MetaItem
+                      icon={ClockIcon}
+                      label="Duración"
+                      value={runtimeValue}
+                      colorClass="text-purple-400"
+                      className="col-span-1"
+                    />
+                  )}
+
+                  {directorNames && (
+                    <MetaItem
+                      icon={Users}
+                      label="Director"
+                      value={directorNames}
+                      colorClass="text-rose-400"
+                      className="col-span-2 md:col-span-2"
+                    />
+                  )}
+
+                  {budgetValue && (
+                    <MetaItem
+                      icon={BadgeDollarSignIcon}
+                      label="Presupuesto"
+                      value={budgetValue}
+                      colorClass="text-yellow-500"
+                      className="col-span-1"
+                    />
+                  )}
+
+                  {revenueValue && (
+                    <MetaItem
+                      icon={TrendingUp}
+                      label="Recaudación"
+                      value={revenueValue}
+                      colorClass="text-emerald-500"
+                      className="col-span-1"
+                    />
+                  )}
+
+                  {production && (
+                    <MetaItem
+                      icon={Building2}
+                      label="Producción"
+                      value={production}
+                      colorClass="text-zinc-400"
+                      className="col-span-2 md:col-span-2"
+                    />
+                  )}
+
+                  {extras.awards && (
+                    <MetaItem
+                      icon={Trophy}
+                      label="Premios"
+                      value={extras.awards}
+                      colorClass="text-yellow-500"
+                      className="col-span-2 md:col-span-2"
+                    />
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* TV */}
+                  {data.original_name && (
+                    <MetaItem
+                      icon={FilmIcon}
+                      label="Título original"
+                      value={data.original_name}
+                      colorClass="text-blue-400"
+                      className="col-span-2 md:col-span-2"
+                    />
+                  )}
+
+                  {createdByNames && (
+                    <MetaItem
+                      icon={Users}
+                      label="Creado por"
+                      value={createdByNames}
+                      colorClass="text-rose-400"
+                      className="col-span-2 md:col-span-2"
+                    />
+                  )}
+
+                  {releaseDateValue && (
+                    <MetaItem
+                      icon={CalendarIcon}
+                      label="Primera emisión"
+                      value={releaseDateValue}
+                      colorClass="text-blue-300"
+                      className="col-span-1"
+                    />
+                  )}
+
+                  {lastAirDateValue && (
+                    <MetaItem
+                      icon={CalendarIcon}
+                      label="Última emisión"
+                      value={lastAirDateValue}
+                      colorClass="text-blue-300"
+                      className="col-span-1"
+                    />
+                  )}
+
+                  {data.status && (
+                    <MetaItem
+                      icon={StarIcon}
                       label="Estado"
                       value={data.status}
-                      colorClass="text-blue-300"
+                      colorClass="text-yellow-400"
+                      className="col-span-1"
                     />
+                  )}
+
+                  {network && (
                     <MetaItem
-                      icon={MonitorPlay}
-                      label="Episodios"
-                      value={`${data.number_of_episodes} Episodios`}
-                      colorClass="text-pink-400"
+                      icon={Building2}
+                      label="Canal"
+                      value={network}
+                      colorClass="text-zinc-300"
+                      className="col-span-1"
                     />
+                  )}
+
+                  {typeof data.number_of_seasons === 'number' && (
                     <MetaItem
                       icon={Layers}
                       label="Temporadas"
-                      value={`${data.number_of_seasons} Temporadas`}
+                      value={`${data.number_of_seasons}`}
                       colorClass="text-orange-400"
+                      className="col-span-1"
                     />
-                  </>
-                )}
-              </div>
+                  )}
 
-              <div className="flex flex-wrap gap-3">
-                {data.belongs_to_collection && (
-                  <MetaItem
-                    icon={Library}
-                    label="Colección"
-                    value={data.belongs_to_collection.name}
-                    colorClass="text-teal-400"
-                  />
-                )}
+                  {typeof data.number_of_episodes === 'number' && (
+                    <MetaItem
+                      icon={MonitorPlay}
+                      label="Episodios"
+                      value={`${data.number_of_episodes}`}
+                      colorClass="text-pink-400"
+                      className="col-span-1"
+                    />
+                  )}
 
-                {production && (
-                  <MetaItem
-                    icon={Building2}
-                    label="Producción"
-                    value={production}
-                    colorClass="text-zinc-400"
-                  />
-                )}
+                  {languages && (
+                    <MetaItem
+                      icon={Languages}
+                      label="Idiomas"
+                      value={languages}
+                      colorClass="text-indigo-400"
+                      className="col-span-1"
+                    />
+                  )}
 
-                {extras.awards && (
-                  <MetaItem
-                    icon={Trophy}
-                    label="Premios"
-                    value={extras.awards}
-                    colorClass="text-yellow-500"
-                  />
-                )}
-              </div>
+                  {countries && (
+                    <MetaItem
+                      icon={MapPin}
+                      label="País"
+                      value={countries}
+                      colorClass="text-red-400"
+                      className="col-span-1"
+                    />
+                  )}
+
+                  {production && (
+                    <MetaItem
+                      icon={Building2}
+                      label="Producción"
+                      value={production}
+                      colorClass="text-zinc-400"
+                      className="col-span-2 md:col-span-2"
+                    />
+                  )}
+
+                  {extras.awards && (
+                    <MetaItem
+                      icon={Trophy}
+                      label="Premios"
+                      value={extras.awards}
+                      colorClass="text-yellow-500"
+                      className="col-span-2 md:col-span-2"
+                    />
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -2066,10 +2213,8 @@ export default function DetailsClient({
                         <div
                           key={img.file_path + idx}
                           onClick={() => {
-                            if (activeImagesTab === 'posters')
-                              handleSelectPoster(img.file_path)
-                            else if (activeImagesTab === 'backdrops')
-                              handleSelectPreviewBackdrop(img.file_path)
+                            if (activeImagesTab === 'posters') handleSelectPoster(img.file_path)
+                            else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(img.file_path)
                             else handleSelectBackground(img.file_path)
                           }}
                           className={`relative flex-shrink-0 cursor-pointer rounded-lg overflow-hidden border-2 transition-all transform-gpu hover:scale-105 hover:-translate-y-1 ${isActive
@@ -2127,11 +2272,7 @@ export default function DetailsClient({
                 <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
               )}
               {!ratingsError && (
-                <EpisodeRatingsGrid
-                  ratings={ratings}
-                  initialSource="avg"
-                  density="compact"
-                />
+                <EpisodeRatingsGrid ratings={ratings} initialSource="avg" density="compact" />
               )}
             </div>
           </section>
@@ -2142,16 +2283,14 @@ export default function DetailsClient({
           <section className="mt-6">
             <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} />
 
-            <div className="rounded-2xl p-0 md:p-0 mb-10">
+            <div className="rounded-2xl p-0 mb-10">
               {videosLoading && (
                 <div className="text-sm text-zinc-400 inline-flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" /> Cargando vídeos…
                 </div>
               )}
 
-              {!!videosError && (
-                <div className="text-sm text-red-400">{videosError}</div>
-              )}
+              {!!videosError && <div className="text-sm text-red-400">{videosError}</div>}
 
               {!videosLoading && !videosError && videos.length === 0 && (
                 <div className="text-sm text-zinc-400">
@@ -2161,22 +2300,21 @@ export default function DetailsClient({
 
               {videos.length > 0 && (
                 <Swiper
-                  spaceBetween={16}
-                  slidesPerView={1.2}
+                  spaceBetween={12}
+                  slidesPerView={2} // ✅ móvil: 2 completos por fila
                   breakpoints={{
-                    640: { slidesPerView: 2.2 },
-                    1024: { slidesPerView: 3.2 },
-                    1280: { slidesPerView: 4.2 }
+                    640: { slidesPerView: 2.2, spaceBetween: 16 },
+                    1024: { slidesPerView: 3.2, spaceBetween: 16 },
+                    1280: { slidesPerView: 4.2, spaceBetween: 16 }
                   }}
                   className="pb-2"
                 >
                   {videos.slice(0, 20).map((v) => {
                     const thumb = videoThumbUrl(v)
                     const fallbackPath = displayBackdropPath || displayPosterPath
-                    const fallback =
-                      fallbackPath
-                        ? `https://image.tmdb.org/t/p/w780${fallbackPath}`
-                        : '/placeholder.png'
+                    const fallback = fallbackPath
+                      ? `https://image.tmdb.org/t/p/w780${fallbackPath}`
+                      : '/placeholder.png'
 
                     return (
                       <SwiperSlide key={`${v.site}:${v.key}`} className="h-full">
@@ -2185,9 +2323,8 @@ export default function DetailsClient({
                           onClick={() => openVideo(v)}
                           title={v.name || 'Ver vídeo'}
                           className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
-      border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
+                            border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
                         >
-                          {/* THUMBNAIL (sin chips encima) */}
                           <div className="relative aspect-video overflow-hidden">
                             <img
                               src={thumb || fallback}
@@ -2202,9 +2339,7 @@ export default function DetailsClient({
                             </div>
                           </div>
 
-                          {/* ✅ CUERPO (misma altura en todas las cards) */}
                           <div className="flex flex-col flex-1 p-4">
-                            {/* Chips reubicados */}
                             <div className="flex items-center justify-between gap-3 mb-2">
                               <div className="flex items-center gap-2 flex-wrap">
                                 {v.type && (
@@ -2225,14 +2360,12 @@ export default function DetailsClient({
                               </div>
                             </div>
 
-                            {/* ✅ Título con altura reservada (aunque sea corto) */}
                             <div className="min-h-[44px]">
                               <div className="font-bold text-white line-clamp-2 leading-snug">
                                 {v.name || 'Vídeo'}
                               </div>
                             </div>
 
-                            {/* ✅ Meta abajo (siempre pegado al fondo) */}
                             <div className="mt-auto pt-2 text-xs text-zinc-400 flex items-center gap-2">
                               <span className="truncate">{v.site || '—'}</span>
                               {v.published_at && (
@@ -2324,15 +2457,15 @@ export default function DetailsClient({
         {/* === REPARTO PRINCIPAL (Cast) === */}
         {castData && castData.length > 0 && (
           <section className="mb-16">
-            <SectionTitle title="Reparto Principal" icon={UsersIconComponent} />
+            <SectionTitle title="Reparto Principal" icon={Users} />
             <Swiper
-              spaceBetween={20}
-              slidesPerView={2}
+              spaceBetween={12}
+              slidesPerView={3} // ✅ móvil: 3 completos por fila
               breakpoints={{
-                500: { slidesPerView: 3 },
-                768: { slidesPerView: 4 },
-                1024: { slidesPerView: 5 },
-                1280: { slidesPerView: 6 }
+                500: { slidesPerView: 3, spaceBetween: 14 },
+                768: { slidesPerView: 4, spaceBetween: 16 },
+                1024: { slidesPerView: 5, spaceBetween: 18 },
+                1280: { slidesPerView: 6, spaceBetween: 20 }
               }}
               className="pb-8"
             >
@@ -2347,7 +2480,7 @@ export default function DetailsClient({
                         <img
                           src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                           alt={actor.name}
-                          className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.12] group-hover:-translate-y-1 group-hover:rotate-[0.5deg] group-hover:grayscale-0 grayscale-[20%]"
+                          className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
                         />
                       ) : (
                         <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
@@ -2355,12 +2488,14 @@ export default function DetailsClient({
                         </div>
                       )}
 
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-70 group-hover:opacity-90 transition-opacity duration-300" />
-                      <div className="absolute bottom-0 left-0 right-0 p-3">
-                        <p className="text-white font-bold text-sm truncate leading-tight">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
+
+                      {/* ✅ Ajuste móvil: nombre y personaje más compactos */}
+                      <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
+                        <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
                           {actor.name}
                         </p>
-                        <p className="text-gray-300 text-xs truncate">
+                        <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
                           {actor.character}
                         </p>
                       </div>
@@ -2378,13 +2513,13 @@ export default function DetailsClient({
             <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
 
             <Swiper
-              spaceBetween={16}
-              slidesPerView={2}
+              spaceBetween={12}
+              slidesPerView={3} // ✅ móvil: 3 completos por fila
               breakpoints={{
-                500: { slidesPerView: 3 },
-                768: { slidesPerView: 4 },
-                1024: { slidesPerView: 5 },
-                1280: { slidesPerView: 6 }
+                500: { slidesPerView: 3, spaceBetween: 14 },
+                768: { slidesPerView: 4, spaceBetween: 16 },
+                1024: { slidesPerView: 5, spaceBetween: 18 },
+                1280: { slidesPerView: 6, spaceBetween: 20 }
               }}
             >
               {recommendations.slice(0, 15).map((rec) => {
@@ -2394,17 +2529,12 @@ export default function DetailsClient({
                     : null
 
                 const imdbScore =
-                  recImdbRatings[rec.id] != null
-                    ? recImdbRatings[rec.id]
-                    : undefined
+                  recImdbRatings[rec.id] != null ? recImdbRatings[rec.id] : undefined
 
                 return (
                   <SwiperSlide key={rec.id}>
-                    <a
-                      href={`/details/${rec.media_type || type}/${rec.id}`}
-                      className="block group"
-                    >
-                      <div className="mt-3 relative rounded-lg overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:scale-105 hover:-translate-y-1 bg-black/40">
+                    <a href={`/details/${rec.media_type || type}/${rec.id}`} className="block group">
+                      <div className="mt-3 relative rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:scale-105 hover:-translate-y-1 bg-black/40 aspect-[2/3]">
                         <img
                           src={
                             rec.poster_path
@@ -2418,11 +2548,7 @@ export default function DetailsClient({
                         <div className="absolute bottom-2 right-2 flex flex-row-reverse items-center gap-1 transform-gpu opacity-0 translate-y-2 translate-x-2 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300 ease-out">
                           {tmdbScore && (
                             <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-emerald-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-75 group-hover:scale-110 group-hover:translate-y-0">
-                              <img
-                                src="/logo-TMDb.png"
-                                alt="TMDb"
-                                className="w-auto h-3"
-                              />
+                              <img src="/logo-TMDb.png" alt="TMDb" className="w-auto h-3" />
                               <span className="text-emerald-400 text-[10px] font-bold font-mono">
                                 {tmdbScore.toFixed(1)}
                               </span>
@@ -2431,11 +2557,7 @@ export default function DetailsClient({
 
                           {imdbScore && (
                             <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-yellow-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-150 group-hover:scale-110 group-hover:translate-y-0">
-                              <img
-                                src="/logo-IMDb.png"
-                                alt="IMDb"
-                                className="w-auto h-3"
-                              />
+                              <img src="/logo-IMDb.png" alt="IMDb" className="w-auto h-3" />
                               <span className="text-yellow-400 text-[10px] font-bold font-mono">
                                 {Number(imdbScore).toFixed(1)}
                               </span>
