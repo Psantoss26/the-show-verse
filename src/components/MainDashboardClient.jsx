@@ -44,6 +44,31 @@ const useIsTouchDevice = () => {
     return isTouch
 }
 
+/* ✅ NUEVO: layout móvil SOLO por ancho (Tailwind sm = 640px) */
+const useIsMobileViewport = (maxWidth = 639) => {
+    const [isMobile, setIsMobile] = useState(false)
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+
+        const mq = window.matchMedia(`(max-width: ${maxWidth}px)`)
+
+        const update = () => setIsMobile(!!mq.matches)
+        update()
+
+        // Safari/old Android compatibility
+        if (mq.addEventListener) mq.addEventListener('change', update)
+        else mq.addListener(update)
+
+        return () => {
+            if (mq.removeEventListener) mq.removeEventListener('change', update)
+            else mq.removeListener(update)
+        }
+    }, [maxWidth])
+
+    return isMobile
+}
+
 /* ---------- helpers ---------- */
 const yearOf = (m) =>
     m?.release_date?.slice(0, 4) || m?.first_air_date?.slice(0, 4) || ''
@@ -85,7 +110,7 @@ const GENRES = {
     10752: 'Bélica',
     37: 'Western',
 
-    // TV (por si mezclas contenido)
+    // TV
     10759: 'Acción y aventura',
     10765: 'Ciencia ficción y fantasía',
     10762: 'Infantil',
@@ -334,9 +359,10 @@ async function getBestTrailerCached(movieId) {
 }
 
 /* ====================================================================
- * Portada (2:3) — en móvil: “3 por fila” completas (sin recorte)
+ * Portada (2:3)
+ * ✅ Mobile layout SOLO en pantallas pequeñas (no por touch)
  * ==================================================================== */
-function PosterImage({ movie, cache, heightClass, isTouchDevice }) {
+function PosterImage({ movie, cache, heightClass, isMobile }) {
     const [posterPath, setPosterPath] = useState(null)
     const [ready, setReady] = useState(false)
 
@@ -371,7 +397,7 @@ function PosterImage({ movie, cache, heightClass, isTouchDevice }) {
                 return
             }
 
-            // 3) Lógica normal: mejor poster EN + máxima resolución (estable)
+            // 3) Lógica normal
             setReady(false)
             const preferred = await fetchBestPoster(movie.id)
             const chosen =
@@ -396,8 +422,8 @@ function PosterImage({ movie, cache, heightClass, isTouchDevice }) {
         }
     }, [movie, cache])
 
-    // ✅ móvil: aspect 2/3 + object-contain (NO recortar)
-    const boxClass = isTouchDevice ? 'aspect-[2/3]' : heightClass
+    // ✅ Layout mobile SOLO si isMobile
+    const boxClass = isMobile ? 'aspect-[2/3]' : heightClass
 
     if (!ready || !posterPath) {
         return (
@@ -405,8 +431,8 @@ function PosterImage({ movie, cache, heightClass, isTouchDevice }) {
         )
     }
 
-    if (!isTouchDevice) {
-        // Desktop/tablet: mantener tu estética actual
+    // Desktop/tablet: estética normal
+    if (!isMobile) {
         return (
             <img
                 src={buildImg(posterPath, 'w342')}
@@ -418,7 +444,7 @@ function PosterImage({ movie, cache, heightClass, isTouchDevice }) {
         )
     }
 
-    // Móvil: poster completo con fondo blur
+    // Mobile: poster completo con fondo blur
     return (
         <div className={`relative w-full ${boxClass} rounded-3xl overflow-hidden bg-neutral-900`}>
             <img
@@ -442,7 +468,6 @@ function PosterImage({ movie, cache, heightClass, isTouchDevice }) {
 
 /* ====================================================================
  * Vista previa inline tipo Amazon (backdrop horizontal) + TRAILER
- *  (se mantiene, pero se DESACTIVA en móvil desde Row)
  * ==================================================================== */
 function InlinePreviewCard({ movie, heightClass }) {
     const { session, account } = useAuth()
@@ -751,17 +776,17 @@ function InlinePreviewCard({ movie, heightClass }) {
                             <div className="absolute inset-0 overflow-hidden">
                                 <iframe
                                     key={trailer.key}
-                                    ref={trailerIframeRef}
                                     className="absolute left-1/2 top-1/2
-                                        w-[140%] h-[180%]
-                                        -translate-x-1/2 -translate-y-1/2
-                                        pointer-events-none"
+                    w-[140%] h-[180%]
+                    -translate-x-1/2 -translate-y-1/2
+                    pointer-events-none"
                                     src={trailerSrc}
                                     title={`Trailer - ${movie.title || movie.name}`}
                                     allow="autoplay; encrypted-media; picture-in-picture"
                                     allowFullScreen={false}
                                     onLoad={() => {
                                         try {
+                                            // Mantengo tu lógica existente
                                             const win = trailerIframeRef.current?.contentWindow
                                             if (!win) return
 
@@ -778,6 +803,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                                             }, 120)
                                         } catch { }
                                     }}
+                                    ref={trailerIframeRef}
                                 />
                             </div>
                         )}
@@ -786,7 +812,7 @@ function InlinePreviewCard({ movie, heightClass }) {
 
                 <div
                     className="pointer-events-none absolute inset-x-0 bottom-0 h-2
-                        bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95"
+            bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95"
                 />
             </div>
 
@@ -896,7 +922,7 @@ function InlinePreviewCard({ movie, heightClass }) {
 }
 
 /* ---------- Fila reusable ---------- */
-function Row({ title, items, isTouchDevice, posterCacheRef }) {
+function Row({ title, items, isTouchDevice, isMobile, posterCacheRef }) {
     if (!items || items.length === 0) return null
 
     const swiperRef = useRef(null)
@@ -907,7 +933,9 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
 
     const hasActivePreview = !!hoveredId
     const heightClassDesktop = 'h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
-    const posterBoxClass = isTouchDevice ? 'aspect-[2/3]' : heightClassDesktop
+
+    // ✅ Mobile layout SOLO si isMobile (no por touch)
+    const posterBoxClass = isMobile ? 'aspect-[2/3]' : heightClassDesktop
 
     const updateNav = (swiper) => {
         if (!swiper) return
@@ -940,14 +968,9 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
     const showPrev = (isHoveredRow || hasActivePreview) && canPrev
     const showNext = (isHoveredRow || hasActivePreview) && canNext
 
-    const breakpointsRow = isTouchDevice
-        ? {
-            0: { slidesPerView: 3, spaceBetween: 12 },
-            640: { slidesPerView: 4, spaceBetween: 14 },
-            768: { slidesPerView: 5, spaceBetween: 16 },
-            1024: { slidesPerView: 6, spaceBetween: 18 },
-            1280: { slidesPerView: 7, spaceBetween: 20 }
-        }
+    // ✅ Tablet/desktop (>=640): siempre comportamiento "ordenador" (auto)
+    const breakpointsRow = isMobile
+        ? { 0: { slidesPerView: 3, spaceBetween: 12 } }
         : {
             640: { slidesPerView: 'auto', spaceBetween: 14 },
             1024: { slidesPerView: 'auto', spaceBetween: 18 },
@@ -973,8 +996,8 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                 }}
             >
                 <Swiper
-                    slidesPerView={isTouchDevice ? 3 : 'auto'}
-                    spaceBetween={isTouchDevice ? 12 : 18}
+                    slidesPerView={isMobile ? 3 : 'auto'}
+                    spaceBetween={isMobile ? 12 : 18}
                     onSwiper={handleSwiper}
                     onSlideChange={updateNav}
                     onResize={updateNav}
@@ -992,34 +1015,33 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                     breakpoints={breakpointsRow}
                 >
                     {items.map((m, i) => {
-                        // ✅ móvil: NUNCA preview (click directo a details)
-                        const isActive = !isTouchDevice && hoveredId === m.id
+                        // ✅ Preview solo en "modo ordenador" y con hover real
+                        const isActive = !isMobile && !isTouchDevice && hoveredId === m.id
                         const isLast = i === items.length - 1
 
                         const base = 'relative flex-shrink-0 transition-all duration-300 ease-out'
 
-                        // ✅ móvil: ancho “auto” del Swiper (1/3), en desktop mantenemos tamaños
-                        const sizeClasses = isTouchDevice
+                        // ✅ En mobile: 3 por fila. En tablet/desktop: tus tamaños de siempre
+                        const sizeClasses = isMobile
                             ? 'w-full'
                             : isActive
                                 ? 'w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20'
                                 : 'w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10'
 
                         const transformClass =
-                            !isTouchDevice && isActive && isLast
+                            !isMobile && !isTouchDevice && isActive && isLast
                                 ? 'sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]'
                                 : ''
 
                         return (
                             <SwiperSlide
                                 key={m.id}
-                                // ✅ móvil: no forzamos !w-auto para que quepan 3 exactas
-                                className={isTouchDevice ? 'select-none' : '!w-auto select-none'}
+                                className={isMobile ? 'select-none' : '!w-auto select-none'}
                             >
                                 <div
                                     className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass}`}
                                     onMouseEnter={() => {
-                                        if (!isTouchDevice) setHoveredId(m.id)
+                                        if (!isMobile && !isTouchDevice) setHoveredId(m.id)
                                     }}
                                     onMouseLeave={() =>
                                         setHoveredId((prev) => (prev === m.id ? null : prev))
@@ -1051,7 +1073,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                                                         movie={m}
                                                         cache={posterCacheRef}
                                                         heightClass={posterBoxClass}
-                                                        isTouchDevice={isTouchDevice}
+                                                        isMobile={isMobile}
                                                     />
                                                 </Link>
                                             </motion.div>
@@ -1068,10 +1090,10 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         type="button"
                         onClick={handlePrevClick}
                         className="absolute inset-y-0 left-0 w-28 z-30
-                       hidden sm:flex items-center justify-start
-                       bg-gradient-to-r from-black/80 via-black/55 to-transparent
-                       hover:from-black/95 hover:via-black/75
-                       transition-colors pointer-events-auto"
+              hidden sm:flex items-center justify-start
+              bg-gradient-to-r from-black/80 via-black/55 to-transparent
+              hover:from-black/95 hover:via-black/75
+              transition-colors pointer-events-auto"
                     >
                         <span className="ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ‹
@@ -1084,10 +1106,10 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
                         type="button"
                         onClick={handleNextClick}
                         className="absolute inset-y-0 right-0 w-28 z-30
-                       hidden sm:flex items-center justify-end
-                       bg-gradient-to-l from-black/80 via-black/55 to-transparent
-                       hover:from-black/95 hover:via-black/75
-                       transition-colors pointer-events-auto"
+              hidden sm:flex items-center justify-end
+              bg-gradient-to-l from-black/80 via-black/55 to-transparent
+              hover:from-black/95 hover:via-black/75
+              transition-colors pointer-events-auto"
                     >
                         <span className="mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ›
@@ -1100,7 +1122,7 @@ function Row({ title, items, isTouchDevice, posterCacheRef }) {
 }
 
 /* ---------- Carrusel hero (backdrops) ---------- */
-function TopRatedHero({ items, isTouchDevice }) {
+function TopRatedHero({ items, isTouchDevice, isMobile }) {
     if (!items || items.length === 0) return null
 
     const swiperRef = useRef(null)
@@ -1244,9 +1266,8 @@ function TopRatedHero({ items, isTouchDevice }) {
                 ) : (
                     <>
                         <Swiper
-                            // ✅ móvil: 1 backdrop completo por “fila”
-                            slidesPerView={isTouchDevice ? 1 : 'auto'}
-                            spaceBetween={isTouchDevice ? 12 : 20}
+                            slidesPerView={isTouchDevice ? 1 : 3}
+                            spaceBetween={isTouchDevice ? 12 : 16}
                             autoplay={{ delay: 5000 }}
                             onSwiper={handleSwiper}
                             onSlideChange={updateNav}
@@ -1264,16 +1285,14 @@ function TopRatedHero({ items, isTouchDevice }) {
                             className="group relative"
                             breakpoints={{
                                 0: { slidesPerView: 1, spaceBetween: 12 },
-                                640: { slidesPerView: 'auto', spaceBetween: 16 },
-                                1024: { slidesPerView: 'auto', spaceBetween: 20 }
+                                768: { slidesPerView: isTouchDevice ? 1 : 3, spaceBetween: 14 },
+                                1024: { slidesPerView: isTouchDevice ? 1 : 3, spaceBetween: 16 }
                             }}
                         >
                             {items.map((movie) => {
                                 const heroBackdrop = heroBackdrops[movie.id] || null
 
-                                const slideClass = isTouchDevice
-                                    ? '!w-full select-none'
-                                    : '!w-[75%] sm:!w-[55%] lg:!w-[40%] xl:!w-[33%] select-none'
+                                const slideClass = isTouchDevice ? '!w-full select-none' : 'select-none'
 
                                 if (!heroBackdrop) {
                                     return (
@@ -1295,7 +1314,7 @@ function TopRatedHero({ items, isTouchDevice }) {
                                     >
                                         <Link href={`/details/movie/${movie.id}`}>
                                             <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9] bg-neutral-900">
-                                                {/* Fondo blur para rellenar si hay bandas */}
+                                                {/* Fondo blur */}
                                                 <img
                                                     src={buildImg(heroBackdrop, 'w780')}
                                                     alt=""
@@ -1304,7 +1323,8 @@ function TopRatedHero({ items, isTouchDevice }) {
                                                     loading="lazy"
                                                     decoding="async"
                                                 />
-                                                {/* ✅ móvil: backdrop entero (contain). Desktop: cover */}
+
+                                                {/* ✅ Mobile: contain. Tablet/desktop: cover */}
                                                 <img
                                                     src={buildImg(heroBackdrop, 'w1280')}
                                                     srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
@@ -1313,7 +1333,7 @@ function TopRatedHero({ items, isTouchDevice }) {
                                                     )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
                                                     sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
                                                     alt={movie.title || movie.name}
-                                                    className={`absolute inset-0 w-full h-full rounded-3xl ${isTouchDevice ? 'object-contain' : 'object-cover hover:scale-105'
+                                                    className={`absolute inset-0 w-full h-full rounded-3xl ${isMobile ? 'object-contain' : 'object-cover hover:scale-105'
                                                         } transition-transform duration-300`}
                                                     loading="lazy"
                                                     decoding="async"
@@ -1330,10 +1350,10 @@ function TopRatedHero({ items, isTouchDevice }) {
                                 type="button"
                                 onClick={handlePrevClick}
                                 className="absolute inset-y-0 left-0 w-32 z-20
-                           hidden sm:flex items-center justify-start
-                           bg-gradient-to-r from-black/75 via-black/45 to-transparent
-                           hover:from-black/90 hover:via-black/65
-                           transition-colors pointer-events-auto"
+                  hidden sm:flex items-center justify-start
+                  bg-gradient-to-r from-black/75 via-black/45 to-transparent
+                  hover:from-black/90 hover:via-black/65
+                  transition-colors pointer-events-auto"
                             >
                                 <span className="ml-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                                     ‹
@@ -1346,10 +1366,10 @@ function TopRatedHero({ items, isTouchDevice }) {
                                 type="button"
                                 onClick={handleNextClick}
                                 className="absolute inset-y-0 right-0 w-32 z-20
-                           hidden sm:flex items-center justify-end
-                           bg-gradient-to-l from-black/75 via-black/45 to-transparent
-                           hover:from-black/90 hover:via-black/65
-                           transition-colors pointer-events-auto"
+                  hidden sm:flex items-center justify-end
+                  bg-gradient-to-l from-black/75 via-black/45 to-transparent
+                  hover:from-black/90 hover:via-black/65
+                  transition-colors pointer-events-auto"
                             >
                                 <span className="mr-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                                     ›
@@ -1366,6 +1386,7 @@ function TopRatedHero({ items, isTouchDevice }) {
 /* =================== MainDashboard (CLIENTE) =================== */
 export default function MainDashboardClient({ initialData }) {
     const isTouchDevice = useIsTouchDevice()
+    const isMobile = useIsMobileViewport(639) // ✅ solo < 640px será "móvil"
     const posterCacheRef = useRef(new Map())
     const dashboardData = initialData || {}
 
@@ -1375,20 +1396,20 @@ export default function MainDashboardClient({ initialData }) {
 
     return (
         <div className="px-6 py-6 text-white bg-black">
-            <TopRatedHero items={dashboardData.topRated || []} isTouchDevice={isTouchDevice} />
+            <TopRatedHero items={dashboardData.topRated || []} isTouchDevice={isTouchDevice} isMobile={isMobile} />
 
             <div className="space-y-12">
-                <Row title="Populares" items={dashboardData.popular} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
-                <Row title="Tendencias semanales" items={dashboardData.trending} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
-                <Row title="Guiones complejos" items={dashboardData.mind} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
-                <Row title="Top acción" items={dashboardData.action} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
-                <Row title="Populares en EE.UU." items={dashboardData.us} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
-                <Row title="Películas de culto" items={dashboardData.cult} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
-                <Row title="Infravaloradas" items={dashboardData.underrated} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
-                <Row title="En ascenso" items={dashboardData.rising} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
+                <Row title="Populares" items={dashboardData.popular} isTouchDevice={isTouchDevice} isMobile={isMobile} posterCacheRef={posterCacheRef} />
+                <Row title="Tendencias semanales" items={dashboardData.trending} isTouchDevice={isTouchDevice} isMobile={isMobile} posterCacheRef={posterCacheRef} />
+                <Row title="Guiones complejos" items={dashboardData.mind} isTouchDevice={isTouchDevice} isMobile={isMobile} posterCacheRef={posterCacheRef} />
+                <Row title="Top acción" items={dashboardData.action} isTouchDevice={isTouchDevice} isMobile={isMobile} posterCacheRef={posterCacheRef} />
+                <Row title="Populares en EE.UU." items={dashboardData.us} isTouchDevice={isTouchDevice} isMobile={isMobile} posterCacheRef={posterCacheRef} />
+                <Row title="Películas de culto" items={dashboardData.cult} isTouchDevice={isTouchDevice} isMobile={isMobile} posterCacheRef={posterCacheRef} />
+                <Row title="Infravaloradas" items={dashboardData.underrated} isTouchDevice={isTouchDevice} isMobile={isMobile} posterCacheRef={posterCacheRef} />
+                <Row title="En ascenso" items={dashboardData.rising} isTouchDevice={isTouchDevice} isMobile={isMobile} posterCacheRef={posterCacheRef} />
 
                 {dashboardData.recommended?.length > 0 && (
-                    <Row title="Recomendadas para ti" items={dashboardData.recommended} isTouchDevice={isTouchDevice} posterCacheRef={posterCacheRef} />
+                    <Row title="Recomendadas para ti" items={dashboardData.recommended} isTouchDevice={isTouchDevice} isMobile={isMobile} posterCacheRef={posterCacheRef} />
                 )}
             </div>
         </div>
