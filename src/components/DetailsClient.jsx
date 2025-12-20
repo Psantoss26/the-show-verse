@@ -1588,7 +1588,7 @@ export default function DetailsClient({
       {/* --- CONTENIDO PRINCIPAL --- */}
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
         {/* HEADER HERO SECTION */}
-        <div className="flex flex-col lg:flex-row gap-10 mb-10 animate-in fade-in duration-700 slide-in-from-bottom-4">
+        <div className="flex flex-col lg:flex-row gap-10 mb-16 animate-in fade-in duration-700 slide-in-from-bottom-4">
           {/* POSTER */}
           <div className="w-full lg:w-[350px] flex-shrink-0 flex flex-col gap-5">
             <div className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/60 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.95)] hover:border-yellow-500/60">
@@ -2128,144 +2128,145 @@ export default function DetailsClient({
           </div>
         </div>
 
-        {/* ADMIN: SELECCIÓN DE IMÁGENES */}
-        {(type === 'movie' || type === 'tv') && isAdmin && (
-          <div className="mb-10 border border-neutral-800 bg-neutral-900/40 rounded-xl overflow-hidden">
-            <button
-              onClick={() => setShowAdminImages(!showAdminImages)}
-              className="w-full flex items-center justify-between p-4 px-6 hover:bg-white/5 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <ImageIcon className="text-yellow-500" />
-                <span className="font-bold text-gray-200">
-                  Administrar Portadas y Fondos
-                </span>
-              </div>
-              {showAdminImages ? (
-                <ChevronUp className="text-gray-400" />
-              ) : (
-                <ChevronDown className="text-gray-400" />
-              )}
-            </button>
+        {/* ✅ PORTADAS Y FONDOS (PERMANENTE, visible para todo el mundo) */}
+        {(type === 'movie' || type === 'tv') && (
+          <section className="mb-10">
+            <SectionTitle title="Portadas y fondos" icon={ImageIcon} />
 
-            {showAdminImages && (
-              <div className="p-6 border-t border-neutral-800 animate-in slide-in-from-top-2">
-                <div className="flex flex-wrap items-center gap-4 mb-6">
-                  <div className="flex bg-neutral-950 rounded-lg p-1 border border-neutral-800">
-                    {['posters', 'backdrops', 'background'].map((tab) => (
-                      <button
-                        key={tab}
-                        onClick={() => setActiveImagesTab(tab)}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeImagesTab === tab
-                          ? 'bg-neutral-800 text-white shadow'
-                          : 'text-gray-400 hover:text-gray-200'
-                          }`}
-                      >
-                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                      </button>
-                    ))}
-                  </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+              <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
+                {['posters', 'backdrops', 'background'].map((tab) => (
                   <button
-                    onClick={handleResetArtwork}
-                    className="text-xs text-red-400 hover:text-red-300 hover:underline ml-auto"
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveImagesTab(tab)}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all
+              ${activeImagesTab === tab
+                        ? 'bg-white/10 text-white shadow'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
                   >
-                    Restaurar valores por defecto
+                    {tab === 'posters'
+                      ? 'Posters'
+                      : tab === 'backdrops'
+                        ? 'Backdrops'
+                        : 'Background'}
                   </button>
-                </div>
+                ))}
+              </div>
 
-                {imagesLoading && (
-                  <div className="text-gray-400 flex items-center gap-2">
-                    <Loader2 className="animate-spin w-4 h-4" /> Cargando TMDb...
-                  </div>
-                )}
-                {imagesError && <p className="text-red-400 text-sm">{imagesError}</p>}
+              <button
+                type="button"
+                onClick={handleResetArtwork}
+                className="text-xs text-red-400 hover:text-red-300 hover:underline sm:ml-auto w-fit"
+              >
+                Restaurar valores por defecto
+              </button>
+            </div>
 
-                <div
-                  className="relative group"
-                  onMouseEnter={() => setIsHoveredImages(true)}
-                  onMouseLeave={() => setIsHoveredImages(false)}
-                >
-                  {showPrevImages && (
-                    <button
-                      onClick={handlePrevImagesClick}
-                      className="absolute left-0 top-0 bottom-0 z-20 w-16 bg-gradient-to-r from-black to-transparent flex items-center justify-start pl-2 text-white hover:text-yellow-400 transition-colors"
-                    >
-                      <div className="bg-black/50 rounded-full p-1">
-                        <ChevronDown className="rotate-90 w-8 h-8" />
-                      </div>
-                    </button>
-                  )}
-
-                  <div
-                    ref={imagesScrollRef}
-                    onScroll={handleImagesScroll}
-                    className="flex gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth"
-                  >
-                    {(activeImagesTab === 'posters'
-                      ? imagesState.posters
-                      : imagesState.backdrops
-                    ).map((img, idx) => {
-                      const isActive =
-                        activeImagesTab === 'posters'
-                          ? displayPosterPath === img.file_path
-                          : activeImagesTab === 'backdrops'
-                            ? selectedPreviewBackdropPath === img.file_path
-                            : displayBackdropPath === img.file_path
-
-                      const aspectClass =
-                        activeImagesTab === 'posters'
-                          ? 'w-[140px] aspect-[2/3]'
-                          : 'w-[280px] aspect-[16/9]'
-
-                      return (
-                        <div
-                          key={img.file_path + idx}
-                          onClick={() => {
-                            if (activeImagesTab === 'posters') handleSelectPoster(img.file_path)
-                            else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(img.file_path)
-                            else handleSelectBackground(img.file_path)
-                          }}
-                          className={`relative flex-shrink-0 cursor-pointer rounded-lg overflow-hidden border-2 transition-all transform-gpu hover:scale-105 hover:-translate-y-1 ${isActive
-                            ? 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]'
-                            : 'border-transparent hover:border-white/30'
-                            }`}
-                        >
-                          <img
-                            src={`https://image.tmdb.org/t/p/w300${img.file_path}`}
-                            className={`${aspectClass} object-cover`}
-                            alt="option"
-                          />
-                          {isActive && (
-                            <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleCopyImageUrl(img.file_path)
-                            }}
-                            className="absolute bottom-2 right-2 p-1 bg-black/60 rounded text-white opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
-                          >
-                            <LinkIcon size={12} />
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {showNextImages && (
-                    <button
-                      onClick={handleNextImagesClick}
-                      className="absolute right-0 top-0 bottom-0 z-20 w-16 bg-gradient-to-l from-black to-transparent flex items-center justify-end pr-2 text-white hover:text-yellow-400 transition-colors"
-                    >
-                      <div className="bg-black/50 rounded-full p-1">
-                        <ChevronDown className="-rotate-90 w-8 h-8" />
-                      </div>
-                    </button>
-                  )}
-                </div>
+            {imagesLoading && (
+              <div className="text-sm text-zinc-400 inline-flex items-center gap-2 mb-3">
+                <Loader2 className="w-4 h-4 animate-spin" /> Cargando imágenes…
               </div>
             )}
-          </div>
+            {!!imagesError && <div className="text-sm text-red-400 mb-3">{imagesError}</div>}
+
+            <p className="text-xs text-zinc-400 mb-4">
+              Selecciona la portada y el fondo que prefieras (se guarda en este dispositivo).
+            </p>
+
+            {(() => {
+              const list =
+                activeImagesTab === 'posters' ? imagesState.posters : imagesState.backdrops
+
+              const isPoster = activeImagesTab === 'posters'
+              const aspect = isPoster ? 'aspect-[2/3]' : 'aspect-[16/9]'
+              const size = isPoster ? 'w342' : 'w780'
+
+              // ✅ móvil: 3 posters completos visibles (con gap-3 => 2 gaps = 1.5rem)
+              const cardWidth = isPoster
+                ? 'w-[calc((100%-1.5rem)/3)] min-w-[calc((100%-1.5rem)/3)] sm:w-[140px] sm:min-w-[140px] md:w-[160px] md:min-w-[160px] lg:w-[170px] lg:min-w-[170px]'
+                : 'w-[86vw] min-w-[86vw] sm:w-[380px] sm:min-w-[380px] md:w-[440px] md:min-w-[440px] lg:w-[520px] lg:min-w-[520px]'
+
+              if (!Array.isArray(list) || list.length === 0) {
+                return (
+                  <div className="text-sm text-zinc-400">
+                    No hay imágenes disponibles para este título.
+                  </div>
+                )
+              }
+
+              return (
+                <div className="flex gap-3 overflow-x-auto overflow-y-visible scroll-smooth no-scrollbar pb-2">
+                  {list.map((img, idx) => {
+                    const filePath = img?.file_path
+                    if (!filePath) return null
+
+                    const isActive =
+                      isPoster
+                        ? displayPosterPath === filePath
+                        : activeImagesTab === 'backdrops'
+                          ? selectedPreviewBackdropPath === filePath
+                          : displayBackdropPath === filePath
+
+                    return (
+                      <div
+                        key={filePath + idx}
+                        onClick={() => {
+                          if (activeImagesTab === 'posters') handleSelectPoster(filePath)
+                          else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(filePath)
+                          else handleSelectBackground(filePath)
+                        }}
+                        className={`group relative flex-shrink-0 ${cardWidth} rounded-2xl overflow-hidden border transition-all transform-gpu cursor-pointer
+                  hover:scale-[1.02] hover:-translate-y-0.5
+                  ${isActive
+                            ? 'border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]'
+                            : 'border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30'
+                          }`}
+                        title="Seleccionar"
+                      >
+                        <div className={`w-full ${aspect} bg-black/40`}>
+                          <img
+                            src={`https://image.tmdb.org/t/p/${size}${filePath}`}
+                            alt="option"
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        </div>
+
+                        {isActive && (
+                          <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
+                        )}
+
+                        {/* copiar URL (sin nested button) */}
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleCopyImageUrl(filePath)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleCopyImageUrl(filePath)
+                            }
+                          }}
+                          className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
+                    opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
+                          title="Copiar URL"
+                        >
+                          <LinkIcon size={14} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </section>
         )}
 
         {/* EPISODIOS (TV) */}
