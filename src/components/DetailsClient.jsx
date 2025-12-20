@@ -2137,34 +2137,39 @@ export default function DetailsClient({
           <section className="mb-10">
             <SectionTitle title="Portadas y fondos" icon={ImageIcon} />
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-              <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
-                {['posters', 'backdrops', 'background'].map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveImagesTab(tab)}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all
-              ${activeImagesTab === tab
-                        ? 'bg-white/10 text-white shadow'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                      }`}
-                  >
-                    {tab === 'posters'
-                      ? 'Posters'
-                      : tab === 'backdrops'
-                        ? 'Backdrops'
-                        : 'Background'}
-                  </button>
-                ))}
+            <div className="relative mb-4">
+              {/* Menú (más pequeño) */}
+              <div className="flex items-center gap-3 pr-12">
+                <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
+                  {['posters', 'backdrops', 'background'].map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setActiveImagesTab(tab)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
+            ${activeImagesTab === tab
+                          ? 'bg-white/10 text-white shadow'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                    >
+                      {tab === 'posters'
+                        ? 'Posters'
+                        : tab === 'backdrops'
+                          ? 'Backdrops'
+                          : 'Background'}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Reset: esquina superior derecha */}
               <button
                 type="button"
                 onClick={handleResetArtwork}
-                className="sm:ml-auto inline-flex items-center justify-center w-10 h-10 rounded-full
-                          border border-red-500/25 bg-red-500/10 text-red-400
-                          hover:bg-red-500/15 hover:text-red-300 hover:border-red-500/40
-                          transition"
+                className="absolute right-0 top-0 inline-flex items-center justify-center
+      w-10 h-10 rounded-xl border border-red-500/30 bg-red-500/10
+      text-red-400 hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45
+      transition"
                 title="Restaurar valores por defecto"
                 aria-label="Restaurar valores por defecto"
               >
