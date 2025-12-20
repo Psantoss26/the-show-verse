@@ -1588,7 +1588,7 @@ export default function DetailsClient({
       {/* --- CONTENIDO PRINCIPAL --- */}
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
         {/* HEADER HERO SECTION */}
-        <div className="flex flex-col lg:flex-row gap-10 mb-16 animate-in fade-in duration-700 slide-in-from-bottom-4">
+        <div className="flex flex-col lg:flex-row gap-10 mb-10 animate-in fade-in duration-700 slide-in-from-bottom-4">
           {/* POSTER */}
           <div className="w-full lg:w-[350px] flex-shrink-0 flex flex-col gap-5">
             <div className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/60 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.95)] hover:border-yellow-500/60">
@@ -1626,9 +1626,8 @@ export default function DetailsClient({
               )}
             </div>
 
-            {/* Plataformas (máx 7 + una sola fila) */}
             {limitedProviders && limitedProviders.length > 0 && (
-              <div className="flex items-center justify-center lg:justify-start gap-2 flex-nowrap overflow-hidden">
+              <div className="grid grid-cols-7 gap-2 place-items-center overflow-visible py-1">
                 {limitedProviders.map((p) => (
                   <a
                     key={p.provider_id}
@@ -1636,12 +1635,14 @@ export default function DetailsClient({
                     target={tmdbWatchUrl ? '_blank' : undefined}
                     rel={tmdbWatchUrl ? 'noreferrer' : undefined}
                     title={p.provider_name}
-                    className="flex items-center justify-center shrink-0"
+                    className="relative overflow-visible hover:z-10"
                   >
                     <img
                       src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
                       alt={p.provider_name}
-                      className="w-9 h-9 md:w-10 md:h-10 rounded-lg object-contain hover:scale-110 hover:-translate-y-0.5 transition-transform cursor-pointer"
+                      className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg object-contain cursor-pointer
+                     transform-gpu will-change-transform
+                     hover:scale-110 hover:-translate-y-0.5 transition-transform"
                     />
                   </a>
                 ))}
@@ -1783,55 +1784,6 @@ export default function DetailsClient({
 
             {ratingError && <p className="text-xs text-red-400 mt-1">{ratingError}</p>}
 
-            {/* ✅ Resumen plegable (oculto por defecto) */}
-            <div className="mt-2">
-              <button
-                type="button"
-                onClick={() => setOverviewOpen((v) => !v)}
-                className="w-full flex items-center justify-between gap-4 px-4 py-3 rounded-2xl
-                  bg-white/5 border border-white/10 hover:bg-white/10 transition"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-black/25 border border-white/10 flex items-center justify-center shrink-0">
-                    <MessageSquareIcon className="w-5 h-5 text-zinc-200" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-extrabold text-white truncate">Resumen</div>
-                    <div className="text-[11px] text-zinc-400 truncate">
-                      {overviewOpen ? 'Ocultar sinopsis' : 'Mostrar sinopsis'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="shrink-0 text-zinc-300">
-                  {overviewOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                </div>
-              </button>
-
-              <AnimatePresence initial={false}>
-                {overviewOpen && (
-                  <motion.div
-                    key="overview"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.25, ease: 'easeOut' }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-4 pt-3">
-                      {data.overview ? (
-                        <p className="text-gray-300 text-sm sm:text-base md:text-lg leading-relaxed text-justify md:text-left">
-                          {data.overview}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-zinc-400">No hay resumen disponible.</p>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
             {/* Links Externos */}
             <div className="flex gap-2 flex-wrap mt-1">
               {data.homepage && (
@@ -1897,8 +1849,64 @@ export default function DetailsClient({
               )}
             </div>
 
+            {/* ✅ Resumen plegable (oculto por defecto) */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setOverviewOpen((v) => !v)}
+                className="w-full flex items-center justify-between gap-4 px-4 py-3 rounded-2xl
+                  bg-white/5 border border-white/10 hover:bg-white/10 transition"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-black/25 border border-white/10 flex items-center justify-center shrink-0">
+                    <MessageSquareIcon className="w-5 h-5 text-zinc-200" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-extrabold text-white truncate">Resumen</div>
+                    <div className="text-[11px] text-zinc-400 truncate">
+                      {overviewOpen ? 'Ocultar sinopsis' : 'Mostrar sinopsis'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="shrink-0 text-zinc-300">
+                  {overviewOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                </div>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {overviewOpen && (
+                  <motion.div
+                    key="overview"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pt-4 pb-4">
+                      {/* ✅ Tagline dentro del desplegable */}
+                      {data?.tagline && (
+                        <p className="text-gray-300/70 text-[20px] sm:text-[20px] italic mb-4">
+                          “{data.tagline}”
+                        </p>
+                      )}
+
+                      {data?.overview ? (
+                        <p className="text-gray-300 text-sm sm:text-base md:text-lg leading-relaxed text-justify md:text-left">
+                          {data.overview}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-zinc-400">No hay resumen disponible.</p>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* ✅ METADATOS / CARACTERÍSTICAS (reorganizadas y agrupadas) */}
-            <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {/* Movie */}
               {type === 'movie' ? (
                 <>
@@ -2122,7 +2130,7 @@ export default function DetailsClient({
 
         {/* ADMIN: SELECCIÓN DE IMÁGENES */}
         {(type === 'movie' || type === 'tv') && isAdmin && (
-          <div className="mb-12 border border-neutral-800 bg-neutral-900/40 rounded-xl overflow-hidden">
+          <div className="mb-10 border border-neutral-800 bg-neutral-900/40 rounded-xl overflow-hidden">
             <button
               onClick={() => setShowAdminImages(!showAdminImages)}
               className="w-full flex items-center justify-between p-4 px-6 hover:bg-white/5 transition-colors"
