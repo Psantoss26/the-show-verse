@@ -1422,6 +1422,9 @@ export default function DetailsClient({
   const production =
     data.production_companies?.slice(0, 3).map((c) => c.name).join(', ') || null
 
+  const hasProduction = !!production
+  const hasAwards = !!extras?.awards
+
   const countries = (() => {
     const pc = Array.isArray(data.production_countries) ? data.production_countries : []
     if (pc.length) return pc.map((c) => c.iso_3166_1).filter(Boolean).join(', ') || null
@@ -1987,7 +1990,7 @@ export default function DetailsClient({
                       label="Producción"
                       value={production}
                       colorClass="text-zinc-400"
-                      className="col-span-2 md:col-span-2"
+                      className={hasAwards ? 'col-span-2 md:col-span-2' : 'col-span-2 md:col-span-4'}
                     />
                   )}
 
@@ -1997,7 +2000,7 @@ export default function DetailsClient({
                       label="Premios"
                       value={extras.awards}
                       colorClass="text-yellow-500"
-                      className="col-span-2 md:col-span-2"
+                      className={hasProduction ? 'col-span-2 md:col-span-2' : 'col-span-2 md:col-span-4'}
                     />
                   )}
                 </>
@@ -2110,7 +2113,7 @@ export default function DetailsClient({
                       label="Producción"
                       value={production}
                       colorClass="text-zinc-400"
-                      className="col-span-2 md:col-span-2"
+                      className={hasAwards ? 'col-span-2 md:col-span-2' : 'col-span-2 md:col-span-4'}
                     />
                   )}
 
@@ -2120,7 +2123,7 @@ export default function DetailsClient({
                       label="Premios"
                       value={extras.awards}
                       colorClass="text-yellow-500"
-                      className="col-span-2 md:col-span-2"
+                      className={hasProduction ? 'col-span-2 md:col-span-2' : 'col-span-2 md:col-span-4'}
                     />
                   )}
                 </>
