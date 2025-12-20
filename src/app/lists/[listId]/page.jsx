@@ -426,7 +426,6 @@ export default function ListDetailsPage() {
                         className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition"
                     >
                         <ArrowLeft className="w-4 h-4" />
-                        <span className="text-sm">Volver</span>
                     </Link>
 
                     <div className="flex items-center gap-2">
