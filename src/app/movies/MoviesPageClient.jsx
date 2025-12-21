@@ -1241,15 +1241,6 @@ export default function MoviesPageClient({ initialData }) {
                     />
                 )}
 
-                {dashboardData.top_imdb?.length > 0 && (
-                    <Row
-                        title="Imprescindibles según IMDb"
-                        items={dashboardData.top_imdb}
-                        isMobile={isMobile}
-                        posterCacheRef={posterCacheRef}
-                    />
-                )}
-
                 {dashboardData['Superéxito']?.length ? (
                     <Row
                         title="Taquillazos que no puedes perderte"
