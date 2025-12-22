@@ -1,7 +1,7 @@
 // src/components/DetailsClient.jsx
 'use client'
 
-import { useRef, useState, useEffect, useLayoutEffect, useMemo } from 'react'
+import { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import 'swiper/swiper-bundle.css'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -48,13 +48,56 @@ import {
   getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
-  getExternalIds,
-  getMovieDetails
+  getExternalIds
 } from '@/lib/api/tmdb'
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
 import StarRating from './StarRating'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
+
+// =====================================================
+// ✅ Helpers (IMDB cache + idle scheduling)
+// =====================================================
+
+const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+const readOmdbCache = (imdbId) => {
+  if (!imdbId || typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(`showverse:omdb:${imdbId}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const t = Number(parsed?.t || 0)
+    const fresh = Number.isFinite(t) && Date.now() - t < OMDB_CACHE_TTL_MS
+    return { ...parsed, fresh }
+  } catch {
+    return null
+  }
+}
+
+const writeOmdbCache = (imdbId, patch) => {
+  if (!imdbId || typeof window === 'undefined') return
+  try {
+    const prev = readOmdbCache(imdbId) || {}
+    const next = {
+      t: Date.now(),
+      imdbRating: patch?.imdbRating ?? prev?.imdbRating ?? null,
+      imdbVotes: patch?.imdbVotes ?? prev?.imdbVotes ?? null,
+      awards: patch?.awards ?? prev?.awards ?? null
+    }
+    window.sessionStorage.setItem(`showverse:omdb:${imdbId}`, JSON.stringify(next))
+  } catch {
+    // ignore
+  }
+}
+
+const runIdle = (cb) => {
+  if (typeof window === 'undefined') return
+  if (typeof window.requestIdleCallback === 'function') {
+    return window.requestIdleCallback(() => cb?.(), { timeout: 1200 })
+  }
+  return window.setTimeout(() => cb?.(), 250)
+}
 
 // --- Helpers de Imágenes ---
 const mergeUniqueImages = (current, incoming) => {
@@ -1032,7 +1075,6 @@ export default function DetailsClient({
     setSelectedPreviewBackdropPath(null)
     setSelectedBackgroundPath(null)
 
-    // ✅ Resumen vuelve a estar plegado al cambiar de item
     setOverviewOpen(false)
 
     if (typeof window !== 'undefined') {
@@ -1151,7 +1193,9 @@ export default function DetailsClient({
     ? selectedPosterPath || basePosterPath || data.profile_path || null
     : null
 
-  const displayBackdropPath = artworkInitialized ? selectedBackgroundPath || baseBackdropPath || null : null
+  const displayBackdropPath = artworkInitialized
+    ? selectedBackgroundPath || baseBackdropPath || null
+    : null
 
   // ====== Account States ======
   useEffect(() => {
@@ -1254,110 +1298,102 @@ export default function DetailsClient({
     }
   }
 
-  // =====================================================================
-  // ✅ IMDb (DETALLES): LAZY LOAD SOLO AL HOVER DE LA PORTADA
-  //   - Evita peticiones automáticas
-  //   - Arregla el bug de variables rating/votes/awards undefined
-  // =====================================================================
+  // =====================================================
+  // ✅ Extras: IMDb rating rápido + votos/premios en idle
+  // =====================================================
 
   const [extras, setExtras] = useState({ imdbRating: null, imdbVotes: null, awards: null })
-  const [extrasLoading, setExtrasLoading] = useState(false)
-  const extrasLoadedRef = useRef(false)
-  const extrasInFlightRef = useRef(false)
-  const imdbHoverTimerRef = useRef(null)
+  const [imdbVotesLoading, setImdbVotesLoading] = useState(false)
 
   useEffect(() => {
-    // reset cuando cambias de item
-    extrasLoadedRef.current = false
-    extrasInFlightRef.current = false
-    setExtrasLoading(false)
-    setExtras({ imdbRating: null, imdbVotes: null, awards: null })
-  }, [id, type])
+    let abort = false
 
-  useEffect(() => {
-    return () => {
-      if (imdbHoverTimerRef.current) clearTimeout(imdbHoverTimerRef.current)
+    const resolveImdbId = async () => {
+      const direct = data?.imdb_id || data?.external_ids?.imdb_id || null
+      if (direct) return direct
+
+      try {
+        const ext = await getExternalIds(endpointType, id)
+        return ext?.imdb_id || null
+      } catch {
+        return null
+      }
     }
-  }, [])
 
-  const loadImdbExtrasOnDemand = async () => {
-    if (extrasLoadedRef.current || extrasInFlightRef.current) return
-    extrasInFlightRef.current = true
-    setExtrasLoading(true)
+    const run = async () => {
+      try {
+        // reset “suave” al cambiar de título
+        setExtras({ imdbRating: null, imdbVotes: null, awards: null })
+        setImdbVotesLoading(false)
 
-    try {
-      let imdb = data?.imdb_id || null
+        const imdbId = await resolveImdbId()
+        if (abort || !imdbId) return
 
-      // Si no viene en data, lo resolvemos solo en este momento (hover)
-      if (!imdb) {
-        if (type === 'movie') {
-          try {
-            const details = await getMovieDetails(id)
-            imdb = details?.imdb_id || null
-          } catch {
-            // ignore
-          }
-          if (!imdb) {
-            const ext = await getExternalIds('movie', id)
-            imdb = ext?.imdb_id || null
-          }
-        } else {
-          const ext = await getExternalIds('tv', id)
-          imdb = ext?.imdb_id || null
+        // ✅ cache instantáneo
+        const cached = readOmdbCache(imdbId)
+        if (cached?.imdbRating != null) {
+          setExtras((prev) => ({ ...prev, imdbRating: cached.imdbRating }))
+        }
+        if (cached?.imdbVotes != null) {
+          setExtras((prev) => ({ ...prev, imdbVotes: cached.imdbVotes }))
+        }
+        if (cached?.awards) {
+          setExtras((prev) => ({ ...prev, awards: cached.awards }))
+        }
+
+        // si el cache está fresco y ya hay rating/votos, no hace falta pedir nada
+        if (cached?.fresh && cached?.imdbRating != null && cached?.imdbVotes != null) return
+
+        // ✅ pide OMDb (rating primero)
+        const omdb = await fetchOmdbByImdb(imdbId)
+        if (abort) return
+
+        const rating =
+          omdb?.imdbRating && omdb.imdbRating !== 'N/A' ? Number(omdb.imdbRating) : null
+
+        // set rating lo antes posible
+        setExtras((prev) => ({ ...prev, imdbRating: Number.isFinite(rating) ? rating : null }))
+        writeOmdbCache(imdbId, { imdbRating: Number.isFinite(rating) ? rating : null })
+
+        // votos/premios en idle (no “compiten” con el render)
+        setImdbVotesLoading(true)
+        runIdle(() => {
+          if (abort) return
+
+          const votes =
+            omdb?.imdbVotes && omdb.imdbVotes !== 'N/A'
+              ? Number(String(omdb.imdbVotes).replace(/,/g, ''))
+              : null
+
+          const awards =
+            typeof omdb?.Awards === 'string' && omdb.Awards.trim() ? omdb.Awards.trim() : null
+
+          setExtras((prev) => ({
+            ...prev,
+            imdbVotes: Number.isFinite(votes) ? votes : null,
+            awards
+          }))
+
+          writeOmdbCache(imdbId, {
+            imdbVotes: Number.isFinite(votes) ? votes : null,
+            awards
+          })
+
+          setImdbVotesLoading(false)
+        })
+      } catch {
+        if (!abort) {
+          setExtras({ imdbRating: null, imdbVotes: null, awards: null })
+          setImdbVotesLoading(false)
         }
       }
-
-      if (!imdb) {
-        // no imdb_id -> no extras
-        setExtras({ imdbRating: null, imdbVotes: null, awards: null })
-        extrasLoadedRef.current = true
-        return
-      }
-
-      const omdb = await fetchOmdbByImdb(imdb)
-
-      const rating =
-        omdb?.imdbRating && omdb.imdbRating !== 'N/A' ? Number(omdb.imdbRating) : null
-
-      const votes =
-        omdb?.imdbVotes && omdb.imdbVotes !== 'N/A'
-          ? Number(String(omdb.imdbVotes).replace(/,/g, ''))
-          : null
-
-      const awards =
-        typeof omdb?.Awards === 'string' && omdb.Awards.trim() ? omdb.Awards.trim() : null
-
-      setExtras({
-        imdbRating: Number.isFinite(rating) ? rating : null,
-        imdbVotes: Number.isFinite(votes) ? votes : null,
-        awards
-      })
-
-      extrasLoadedRef.current = true
-    } catch {
-      setExtras({ imdbRating: null, imdbVotes: null, awards: null })
-      extrasLoadedRef.current = true
-    } finally {
-      extrasInFlightRef.current = false
-      setExtrasLoading(false)
     }
-  }
 
-  const armImdbHoverFetch = () => {
-    if (extrasLoadedRef.current || extrasInFlightRef.current) return
-    if (imdbHoverTimerRef.current) clearTimeout(imdbHoverTimerRef.current)
-    // pequeño delay para evitar disparos accidentales al pasar rápido el ratón
-    imdbHoverTimerRef.current = setTimeout(() => {
-      loadImdbExtrasOnDemand()
-    }, 140)
-  }
-
-  const disarmImdbHoverFetch = () => {
-    if (imdbHoverTimerRef.current) {
-      clearTimeout(imdbHoverTimerRef.current)
-      imdbHoverTimerRef.current = null
+    run()
+    return () => {
+      abort = true
     }
-  }
+  }, [type, id, data?.imdb_id, data?.external_ids?.imdb_id, endpointType])
 
   // ====== Ratings Episodios (TV) ======
   const [ratings, setRatings] = useState(null)
@@ -1552,7 +1588,6 @@ export default function DetailsClient({
         return
       }
 
-      // 1) Si ya vienen credits en data, úsalo
       const crew = data?.credits?.crew
       if (Array.isArray(crew) && crew.length) {
         const dirs = crew.filter((c) => c?.job === 'Director').map((d) => d?.name).filter(Boolean)
@@ -1560,7 +1595,6 @@ export default function DetailsClient({
         return
       }
 
-      // 2) Si NO vienen credits, pide /credits a TMDb
       try {
         if (!TMDB_API_KEY) return
         const url = `https://api.themoviedb.org/3/movie/${id}/credits?api_key=${TMDB_API_KEY}`
@@ -1585,103 +1619,88 @@ export default function DetailsClient({
     }
   }, [type, id, data?.credits])
 
-  // =====================================================================
-  // ✅ IMDb para RECOMENDACIONES: LAZY LOAD SOLO AL HOVER DE CADA PORTADA
-  //   - Elimina el useEffect que precargaba 15 y disparaba muchas peticiones
-  // =====================================================================
-
+  // =====================================================
+  // ✅ IMDb para RECOMENDACIONES: SOLO HOVER (no auto)
+  // =====================================================
   const [recImdbRatings, setRecImdbRatings] = useState({})
+  const recImdbRatingsRef = useRef({})
   const recImdbInFlightRef = useRef(new Set())
-  const recImdbHoverTimersRef = useRef({})
+  const recImdbTimersRef = useRef({})
+  const recImdbIdCacheRef = useRef({})
 
   useEffect(() => {
-    // reset si cambia el bloque de recomendaciones / item
+    recImdbRatingsRef.current = recImdbRatings
+  }, [recImdbRatings])
+
+  useEffect(() => {
+    // reset al cambiar de item
     setRecImdbRatings({})
     recImdbInFlightRef.current = new Set()
-    recImdbHoverTimersRef.current = {}
-  }, [id, type, recommendations])
+    recImdbTimersRef.current = {}
+    recImdbIdCacheRef.current = {}
+  }, [id, type])
 
-  useEffect(() => {
-    return () => {
-      const timers = recImdbHoverTimersRef.current || {}
-      for (const k of Object.keys(timers)) clearTimeout(timers[k])
-    }
-  }, [])
-
-  const loadImdbForRecNow = async (rec) => {
+  const prefetchRecImdb = useCallback((rec) => {
     if (!rec?.id) return
+    if (typeof window === 'undefined') return
+
     const rid = rec.id
-
-    // ya lo tengo (incluye null como valor cacheado)
-    if (Object.prototype.hasOwnProperty.call(recImdbRatings, rid)) return
-
+    // si ya está (aunque sea null) no vuelvas a pedir
+    if (recImdbRatingsRef.current?.[rid] !== undefined) return
     if (recImdbInFlightRef.current.has(rid)) return
-    recImdbInFlightRef.current.add(rid)
 
-    try {
-      // si viene ya precalculado (por si en algún endpoint lo traes), úsalo:
-      const raw = rec.imdb_rating ?? rec.imdbRating ?? rec.imdbScore ?? null
-      if (raw != null && raw !== 'N/A') {
-        const n = Number(raw)
-        setRecImdbRatings((prev) => ({ ...prev, [rid]: Number.isFinite(n) ? n : null }))
-        return
-      }
+    // pequeño delay para evitar peticiones al pasar el ratón rápido
+    if (recImdbTimersRef.current[rid]) return
+    recImdbTimersRef.current[rid] = window.setTimeout(async () => {
+      recImdbInFlightRef.current.add(rid)
 
-      const mediaType =
-        rec.media_type === 'movie' || rec.media_type === 'tv'
-          ? rec.media_type
-          : type === 'tv'
-            ? 'tv'
-            : 'movie'
+      try {
+        const mediaType =
+          rec.media_type === 'movie' || rec.media_type === 'tv'
+            ? rec.media_type
+            : type === 'tv'
+              ? 'tv'
+              : 'movie'
 
-      const ext = await getExternalIds(mediaType, rid)
-      const imdbId = ext?.imdb_id
-      if (!imdbId) {
+        let imdbId = recImdbIdCacheRef.current?.[rid] || null
+        if (!imdbId) {
+          const ext = await getExternalIds(mediaType, rid)
+          imdbId = ext?.imdb_id || null
+          if (imdbId) recImdbIdCacheRef.current[rid] = imdbId
+        }
+
+        if (!imdbId) {
+          setRecImdbRatings((prev) => ({ ...prev, [rid]: null }))
+          return
+        }
+
+        // cache
+        const cached = readOmdbCache(imdbId)
+        if (cached?.imdbRating != null) {
+          setRecImdbRatings((prev) => ({ ...prev, [rid]: cached.imdbRating }))
+          if (cached?.fresh) return
+        }
+
+        const omdb = await fetchOmdbByImdb(imdbId)
+        const r =
+          omdb?.imdbRating && omdb.imdbRating !== 'N/A'
+            ? Number(omdb.imdbRating)
+            : null
+
+        const safe = Number.isFinite(r) ? r : null
+        setRecImdbRatings((prev) => ({ ...prev, [rid]: safe }))
+        writeOmdbCache(imdbId, { imdbRating: safe })
+      } catch {
         setRecImdbRatings((prev) => ({ ...prev, [rid]: null }))
-        return
+      } finally {
+        recImdbInFlightRef.current.delete(rid)
+        if (recImdbTimersRef.current[rid]) {
+          window.clearTimeout(recImdbTimersRef.current[rid])
+          delete recImdbTimersRef.current[rid]
+        }
       }
-
-      const omdb = await fetchOmdbByImdb(imdbId)
-      const r =
-        omdb?.imdbRating && omdb.imdbRating !== 'N/A'
-          ? Number(omdb.imdbRating)
-          : null
-
-      setRecImdbRatings((prev) => ({ ...prev, [rid]: Number.isFinite(r) ? r : null }))
-    } catch {
-      setRecImdbRatings((prev) => ({ ...prev, [rid]: null }))
-    } finally {
-      recImdbInFlightRef.current.delete(rid)
-    }
-  }
-
-  const armImdbRecHoverFetch = (rec) => {
-    if (!rec?.id) return
-    const rid = rec.id
-
-    if (Object.prototype.hasOwnProperty.call(recImdbRatings, rid)) return
-    if (recImdbInFlightRef.current.has(rid)) return
-
-    const timers = recImdbHoverTimersRef.current || {}
-    if (timers[rid]) clearTimeout(timers[rid])
-
-    timers[rid] = setTimeout(() => {
-      loadImdbForRecNow(rec)
-    }, 160)
-
-    recImdbHoverTimersRef.current = timers
-  }
-
-  const disarmImdbRecHoverFetch = (rec) => {
-    if (!rec?.id) return
-    const rid = rec.id
-    const timers = recImdbHoverTimersRef.current || {}
-    if (timers[rid]) {
-      clearTimeout(timers[rid])
-      delete timers[rid]
-    }
-    recImdbHoverTimersRef.current = timers
-  }
+    }, 180)
+  }, [type])
 
   const limitedProviders = Array.isArray(providers) ? providers.slice(0, 7) : []
 
@@ -1691,10 +1710,11 @@ export default function DetailsClient({
       <div className="fixed inset-0 z-0">
         {useBackdrop && artworkInitialized && displayBackdropPath ? (
           <div
-            className="absolute inset-0 bg-cover bg-top transition-opacity duration-1000"
+            className="absolute inset-0 bg-cover transition-opacity duration-1000"
             style={{
               backgroundImage: `url(https://image.tmdb.org/t/p/original${displayBackdropPath})`,
-              backgroundPosition: 'center top' // ✅ muestra la parte superior correctamente
+              backgroundPosition: 'center top',
+              transform: 'scale(1.06)' // o quítalo si no quieres zoom
             }}
           />
         ) : (
@@ -1710,15 +1730,7 @@ export default function DetailsClient({
         <div className="flex flex-col lg:flex-row gap-10 mb-16 animate-in fade-in duration-700 slide-in-from-bottom-4">
           {/* POSTER */}
           <div className="w-full lg:w-[350px] flex-shrink-0 flex flex-col gap-5">
-            <div
-              className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/60 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.95)] hover:border-yellow-500/60"
-              onMouseEnter={armImdbHoverFetch}
-              onMouseLeave={disarmImdbHoverFetch}
-              onFocus={armImdbHoverFetch}
-              onBlur={disarmImdbHoverFetch}
-              onTouchStart={armImdbHoverFetch}
-              title="Pasa el cursor para cargar IMDb"
-            >
+            <div className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/60 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.95)] hover:border-yellow-500/60">
               <button
                 type="button"
                 onClick={(e) => {
@@ -1891,24 +1903,23 @@ export default function DetailsClient({
                 </div>
               </div>
 
-              {(extrasLoading || extras.imdbRating) && (
+              {extras.imdbRating != null && (
                 <div className="flex items-center gap-2 border-l border-white/10 pl-4 md:pl-6">
                   <img src="/logo-IMDb.png" alt="IMDb" className="h-5 w-auto" />
 
                   <div className="flex items-baseline gap-2">
-                    {extrasLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-yellow-300" />
-                    ) : (
-                      <span className="text-xl font-bold text-yellow-400">
-                        {extras.imdbRating}
-                      </span>
-                    )}
+                    <span className="text-xl font-bold text-yellow-400">
+                      {extras.imdbRating}
+                    </span>
 
-                    {!extrasLoading && formatVoteCount(extras.imdbVotes) && (
+                    {/* votos: independientes (idle), con loader sutil */}
+                    {formatVoteCount(extras.imdbVotes) ? (
                       <span className="text-[11px] text-zinc-400">
                         {formatVoteCount(extras.imdbVotes)}
                       </span>
-                    )}
+                    ) : imdbVotesLoading ? (
+                      <span className="text-[11px] text-zinc-500">…</span>
+                    ) : null}
                   </div>
                 </div>
               )}
@@ -2034,7 +2045,6 @@ export default function DetailsClient({
                     className="overflow-hidden"
                   >
                     <div className="px-4 pt-4 pb-4">
-                      {/* ✅ Tagline dentro del desplegable */}
                       {data?.tagline && (
                         <p className="text-gray-300/70 text-[20px] sm:text-[20px] italic mb-4">
                           “{data.tagline}”
@@ -2054,9 +2064,8 @@ export default function DetailsClient({
               </AnimatePresence>
             </div>
 
-            {/* ✅ METADATOS / CARACTERÍSTICAS (reorganizadas y agrupadas) */}
+            {/* ✅ METADATOS / CARACTERÍSTICAS */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {/* Movie */}
               {type === 'movie' ? (
                 <>
                   {data.original_title && (
@@ -2151,7 +2160,6 @@ export default function DetailsClient({
                 </>
               ) : (
                 <>
-                  {/* TV */}
                   {data.original_name && (
                     <MetaItem
                       icon={FilmIcon}
@@ -2277,13 +2285,12 @@ export default function DetailsClient({
           </div>
         </div>
 
-        {/* ✅ PORTADAS Y FONDOS (PERMANENTE, visible para todo el mundo) */}
+        {/* ✅ PORTADAS Y FONDOS */}
         {(type === 'movie' || type === 'tv') && (
           <section className="mb-10">
             <SectionTitle title="Portadas y fondos" icon={ImageIcon} />
 
             <div className="relative mb-4">
-              {/* Menú (más pequeño) */}
               <div className="flex items-center gap-3 pr-12">
                 <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
                   {['posters', 'backdrops', 'background'].map((tab) => (
@@ -2307,7 +2314,6 @@ export default function DetailsClient({
                 </div>
               </div>
 
-              {/* Reset: esquina superior derecha */}
               <button
                 type="button"
                 onClick={handleResetArtwork}
@@ -2417,7 +2423,6 @@ export default function DetailsClient({
                             <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
                           )}
 
-                          {/* copiar URL */}
                           <div
                             role="button"
                             tabIndex={0}
@@ -2717,22 +2722,16 @@ export default function DetailsClient({
                     : null
 
                 const imdbScore =
-                  Object.prototype.hasOwnProperty.call(recImdbRatings, rec.id)
-                    ? recImdbRatings[rec.id]
-                    : undefined
+                  recImdbRatings[rec.id] != null ? recImdbRatings[rec.id] : undefined
 
                 return (
                   <SwiperSlide key={rec.id}>
-                    <a
-                      href={`/details/${rec.media_type || type}/${rec.id}`}
-                      className="block group"
-                      onMouseEnter={() => armImdbRecHoverFetch(rec)}
-                      onMouseLeave={() => disarmImdbRecHoverFetch(rec)}
-                      onFocus={() => armImdbRecHoverFetch(rec)}
-                      onBlur={() => disarmImdbRecHoverFetch(rec)}
-                      onTouchStart={() => armImdbRecHoverFetch(rec)}
-                    >
-                      <div className="mt-3 relative rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:scale-105 hover:-translate-y-1 bg-black/40 aspect-[2/3]">
+                    <a href={`/details/${rec.media_type || type}/${rec.id}`} className="block group">
+                      <div
+                        className="mt-3 relative rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:scale-105 hover:-translate-y-1 bg-black/40 aspect-[2/3]"
+                        onMouseEnter={() => prefetchRecImdb(rec)}  // ✅ SOLO HOVER
+                        onFocus={() => prefetchRecImdb(rec)}       // ✅ accesibilidad
+                      >
                         <img
                           src={
                             rec.poster_path
@@ -2753,7 +2752,7 @@ export default function DetailsClient({
                             </div>
                           )}
 
-                          {imdbScore != null && imdbScore !== 0 && (
+                          {imdbScore != null && (
                             <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-yellow-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-150 group-hover:scale-110 group-hover:translate-y-0">
                               <img src="/logo-IMDb.png" alt="IMDb" className="w-auto h-3" />
                               <span className="text-yellow-400 text-[10px] font-bold font-mono">
