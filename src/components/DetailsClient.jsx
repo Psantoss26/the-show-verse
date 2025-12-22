@@ -2533,40 +2533,41 @@ export default function DetailsClient({
                             </div>
                           </div>
 
-                          <div className="flex flex-col flex-1 p-4">
-                            <div className="flex items-center justify-between gap-3 mb-2">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {v.type && (
-                                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
-                                    {v.type}
-                                  </span>
-                                )}
-                                {v.iso_639_1 && (
-                                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
-                                    {v.iso_639_1.toUpperCase()}
-                                  </span>
-                                )}
-                                {v.official && (
-                                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200">
-                                    Official
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="min-h-[44px]">
-                              <div className="font-bold text-white line-clamp-2 leading-snug">
+                          <div className="flex flex-col flex-1 p-4 items-start">
+                            {/* ✅ Título arriba (1 línea siempre) */}
+                            <div className="w-full min-h-[22px]">
+                              <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
                                 {v.name || 'Vídeo'}
                               </div>
                             </div>
 
-                            <div className="mt-auto pt-2 text-xs text-zinc-400 flex items-center gap-2">
-                              <span className="truncate">{v.site || '—'}</span>
+                            {/* ✅ Propiedades debajo, alineadas a la izquierda */}
+                            <div className="mt-3 flex flex-wrap items-center gap-1.5 ml-[-4px]">
+                              {v.type && (
+                                <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
+                                  {v.type}
+                                </span>
+                              )}
+                              {v.iso_639_1 && (
+                                <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
+                                  {v.iso_639_1.toUpperCase()}
+                                </span>
+                              )}
+                              {v.official && (
+                                <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200">
+                                  Official
+                                </span>
+                              )}
+                            </div>
+
+                            {/* ✅ Fuente y fecha abajo, mismo margen izquierdo */}
+                            <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
+                              <span className="font-semibold text-zinc-200">{v.site || '—'}</span>
                               {v.published_at && (
                                 <>
                                   <span className="text-zinc-600">·</span>
                                   <span className="shrink-0">
-                                    {new Date(v.published_at).toLocaleDateString()}
+                                    {new Date(v.published_at).toLocaleDateString('es-ES')}
                                   </span>
                                 </>
                               )}
