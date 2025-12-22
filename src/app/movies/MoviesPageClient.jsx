@@ -1315,7 +1315,7 @@ export default function MoviesPageClient({ initialData }) {
 
                 {dashboardData['Década de 2010']?.length ? (
                     <Row
-                        title="Hits de los 2010"
+                        title="Hits de 2010"
                         items={dashboardData['Década de 2010']}
                         isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
@@ -1324,7 +1324,7 @@ export default function MoviesPageClient({ initialData }) {
 
                 {dashboardData['Década de 2020']?.length ? (
                     <Row
-                        title="Lo mejor de los 2020"
+                        title="Lo mejor de 2020"
                         items={dashboardData['Década de 2020']}
                         isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
