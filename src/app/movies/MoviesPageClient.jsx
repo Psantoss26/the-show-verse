@@ -1243,7 +1243,7 @@ export default function MoviesPageClient({ initialData }) {
 
                 {dashboardData['Superéxito']?.length ? (
                     <Row
-                        title="Taquillazos que no puedes perderte"
+                        title="Taquillazos imprescindibles"
                         items={dashboardData['Superéxito']}
                         isMobile={isMobile}
                         posterCacheRef={posterCacheRef}
