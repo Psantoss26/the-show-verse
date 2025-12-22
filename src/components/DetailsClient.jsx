@@ -2305,10 +2305,10 @@ export default function DetailsClient({
                         }`}
                     >
                       {tab === 'posters'
-                        ? 'Posters'
+                        ? 'Portada'
                         : tab === 'backdrops'
-                          ? 'Backdrops'
-                          : 'Background'}
+                          ? 'Vista previa'
+                          : 'Fondo'}
                     </button>
                   ))}
                 </div>
