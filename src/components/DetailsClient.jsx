@@ -2299,7 +2299,7 @@ export default function DetailsClient({
                       type="button"
                       onClick={() => setActiveImagesTab(tab)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-            ${activeImagesTab === tab
+                ${activeImagesTab === tab
                           ? 'bg-white/10 text-white shadow'
                           : 'text-zinc-400 hover:text-zinc-200'
                         }`}
@@ -2318,9 +2318,9 @@ export default function DetailsClient({
                 type="button"
                 onClick={handleResetArtwork}
                 className="absolute right-0 top-0 inline-flex items-center justify-center
-      w-10 h-10 rounded-xl border border-red-500/30 bg-red-500/10
-      text-red-400 hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45
-      transition"
+          w-10 h-10 rounded-xl border border-red-500/30 bg-red-500/10
+          text-red-400 hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45
+          transition"
                 title="Restaurar valores por defecto"
                 aria-label="Restaurar valores por defecto"
               >
@@ -2334,6 +2334,7 @@ export default function DetailsClient({
               </div>
             )}
             {!!imagesError && <div className="text-sm text-red-400 mb-3">{imagesError}</div>}
+
             {(() => {
               const list =
                 activeImagesTab === 'posters' ? imagesState.posters : imagesState.backdrops
@@ -2370,7 +2371,8 @@ export default function DetailsClient({
                         1280: { slidesPerView: 4, spaceBetween: 18 }
                       }
                   }
-                  className="pb-2"
+                  // ✅ Igual que en Reparto: padding inferior para sombras/hover
+                  className="pb-8"
                 >
                   {list.map((img, idx) => {
                     const filePath = img?.file_path
@@ -2384,26 +2386,30 @@ export default function DetailsClient({
                           : displayBackdropPath === filePath
 
                     return (
-                      <SwiperSlide key={filePath + idx} className="h-full">
+                      // ✅ CLAVE: “aire” dentro del slide (arriba y abajo)
+                      <SwiperSlide key={filePath + idx} className="h-full pt-3 pb-3">
                         <div
                           role="button"
                           tabIndex={0}
                           onClick={() => {
                             if (activeImagesTab === 'posters') handleSelectPoster(filePath)
-                            else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(filePath)
+                            else if (activeImagesTab === 'backdrops')
+                              handleSelectPreviewBackdrop(filePath)
                             else handleSelectBackground(filePath)
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
                               e.preventDefault()
                               if (activeImagesTab === 'posters') handleSelectPoster(filePath)
-                              else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(filePath)
+                              else if (activeImagesTab === 'backdrops')
+                                handleSelectPreviewBackdrop(filePath)
                               else handleSelectBackground(filePath)
                             }
                           }}
-                          className={`group relative w-full rounded-2xl overflow-hidden border transition-all transform-gpu cursor-pointer
-              hover:scale-[1.02] hover:-translate-y-0.5
-              ${isActive
+                          className={`group relative w-full rounded-2xl overflow-hidden border cursor-pointer
+                    transition-all duration-300 transform-gpu
+                    hover:-translate-y-1 hover:scale-[1.02]
+                    ${isActive
                               ? 'border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]'
                               : 'border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30'
                             }`}
@@ -2423,6 +2429,7 @@ export default function DetailsClient({
                             <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
                           )}
 
+                          {/* copiar URL */}
                           <div
                             role="button"
                             tabIndex={0}
@@ -2438,7 +2445,7 @@ export default function DetailsClient({
                               }
                             }}
                             className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
-                opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
+                      opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
                             title="Copiar URL"
                           >
                             <LinkIcon size={14} />
