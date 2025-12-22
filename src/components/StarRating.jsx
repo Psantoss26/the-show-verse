@@ -2,7 +2,7 @@
 'use client'
 
 import { useState } from 'react'
-import { StarIcon, XIcon } from 'lucide-react'
+import { StarIcon, Eraser } from 'lucide-react'
 
 export default function StarRating({
   rating,
@@ -20,7 +20,7 @@ export default function StarRating({
 
   return (
     <div
-      className={`flex items-center flex-nowrap gap-2 sm:gap-3 ${disabled ? 'opacity-60' : ''
+      className={`flex items-center flex-nowrap gap-2 sm:gap-3 whitespace-nowrap ${disabled ? 'opacity-60' : ''
         }`}
     >
       <div
@@ -69,19 +69,26 @@ export default function StarRating({
       </div>
 
       {typeof rating === 'number' && (
-        <span className="font-semibold text-white text-base sm:text-lg whitespace-nowrap">
+        <span className="font-semibold text-white text-base sm:text-lg shrink-0">
           {rating.toFixed(1).replace(/\.0$/, '')}
         </span>
       )}
 
       {typeof rating === 'number' && !disabled && (
         <button
+          type="button"
           onClick={handleClear}
           disabled={disabled}
-          title="Quitar nota"
-          className="p-0.5 sm:p-1 rounded-full text-gray-400 hover:text-red-400 hover:bg-neutral-700 transition-colors shrink-0"
+          title="Borrar puntuación"
+          aria-label="Borrar puntuación"
+          className={`ml-1 inline-flex items-center justify-center
+            w-8 h-8 sm:w-9 sm:h-9 rounded-full border transition shrink-0
+            ${disabled
+              ? 'bg-white/5 border-white/10 text-white/30 cursor-not-allowed'
+              : 'bg-white/5 border-white/15 text-zinc-200 hover:bg-white/10 hover:border-red-500/40 hover:text-red-300'
+            }`}
         >
-          <XIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+          <Eraser className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
         </button>
       )}
     </div>
