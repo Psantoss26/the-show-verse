@@ -1955,13 +1955,13 @@ export default function DetailsClient({
         )}
 
         {/* ✅ Sombreado superior + laterales (sin “marcos”) */}
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/45 via-transparent to-transparent" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-transparent" />
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
 
         {/* Tus overlays originales */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/40 to-black/20 backdrop-blur-[1px]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20 backdrop-blur-[2px]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
       </div>
 
       {/* --- CONTENIDO PRINCIPAL --- */}
