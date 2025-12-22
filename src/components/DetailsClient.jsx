@@ -172,6 +172,38 @@ function pickBestImage(list) {
   return sorted[0] || null
 }
 
+function pickBestNeutralPosterByResVotes(list, opts = {}) {
+  const { resolutionWindow = 0.98, minWidth = 600 } = opts
+  if (!Array.isArray(list) || list.length === 0) return null
+
+  const area = (img) => (img?.width || 0) * (img?.height || 0)
+
+  // solo portadas sin idioma (iso_639_1 null/undefined/'')
+  const neutral = list.filter((p) => p?.file_path && !p?.iso_639_1)
+  const pool0 = neutral.length ? neutral : list.filter((p) => p?.file_path)
+
+  const sizeFiltered = minWidth > 0 ? pool0.filter((p) => (p?.width || 0) >= minWidth) : pool0
+  const pool1 = sizeFiltered.length ? sizeFiltered : pool0
+
+  const maxArea = Math.max(...pool1.map(area))
+  const threshold = maxArea * (typeof resolutionWindow === 'number' ? resolutionWindow : 1.0)
+  const pool2 = pool1.filter((p) => area(p) >= threshold)
+
+  const sorted = [...pool2].sort((a, b) => {
+    const aA = area(a)
+    const bA = area(b)
+    if (bA !== aA) return bA - aA
+    const w = (b.width || 0) - (a.width || 0)
+    if (w !== 0) return w
+    const vc = (b.vote_count || 0) - (a.vote_count || 0)
+    if (vc !== 0) return vc
+    const va = (b.vote_average || 0) - (a.vote_average || 0)
+    return va
+  })
+
+  return sorted[0] || pool1[0] || null
+}
+
 /* ====================================================================
  * MISMO CRITERIO QUE MainDashboard:
  *  - Backdrops: EN -> resolución -> votos
@@ -847,6 +879,55 @@ export default function DetailsClient({
   const [newListName, setNewListName] = useState('')
   const [newListDesc, setNewListDesc] = useState('')
 
+  const ratingWrapRef = useRef(null)
+
+  const [supportsHover, setSupportsHover] = useState(false)
+  const [mobileClearOpen, setMobileClearOpen] = useState(false)
+
+  const [isMobileViewport, setIsMobileViewport] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    // hover/puntero fino => desktop
+    const mqHover = window.matchMedia('(hover: hover) and (pointer: fine)')
+    const updateHover = () => setSupportsHover(!!mqHover.matches)
+    updateHover()
+    if (mqHover.addEventListener) mqHover.addEventListener('change', updateHover)
+    else mqHover.addListener(updateHover)
+
+    // viewport móvil (ajusta breakpoint si quieres)
+    const mqMobile = window.matchMedia('(max-width: 640px)')
+    const updateMobile = () => setIsMobileViewport(!!mqMobile.matches)
+    updateMobile()
+    if (mqMobile.addEventListener) mqMobile.addEventListener('change', updateMobile)
+    else mqMobile.addListener(updateMobile)
+
+    return () => {
+      if (mqHover.removeEventListener) mqHover.removeEventListener('change', updateHover)
+      else mqHover.removeListener(updateHover)
+
+      if (mqMobile.removeEventListener) mqMobile.removeEventListener('change', updateMobile)
+      else mqMobile.removeListener(updateMobile)
+    }
+  }, [])
+
+  useEffect(() => {
+    // si pasamos a desktop, cerramos el modo móvil del botón
+    if (supportsHover) setMobileClearOpen(false)
+  }, [supportsHover])
+
+  useEffect(() => {
+    // cerrar al tocar fuera en móvil
+    if (supportsHover || !mobileClearOpen) return
+    const onDown = (e) => {
+      if (!ratingWrapRef.current) return
+      if (!ratingWrapRef.current.contains(e.target)) setMobileClearOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [supportsHover, mobileClearOpen])
+
   const movieId = useMemo(() => {
     const n = Number(id)
     return Number.isFinite(n) ? n : null
@@ -1293,6 +1374,35 @@ export default function DetailsClient({
   const displayBackdropPath = artworkInitialized
     ? selectedBackgroundPath || baseBackdropPath || null
     : null
+
+  const mobileNeutralPosterPath = useMemo(() => {
+    const best = pickBestNeutralPosterByResVotes(imagesState?.posters || [])?.file_path || null
+    if (best) return best
+    // fallback: primera sin idioma si no hay metadata de tamaños/votos
+    return (
+      (imagesState?.posters || []).find((p) => p?.file_path && !p?.iso_639_1)?.file_path ||
+      null
+    )
+  }, [imagesState?.posters])
+
+  const heroBackgroundPath = (() => {
+    if (!useBackdrop || !artworkInitialized) return null
+
+    // desktop: tu lógica actual
+    const desktop = displayBackdropPath
+
+    // móvil: si NO hay override, preferimos poster sin idioma
+    const mobile =
+      selectedBackgroundPath || // si el usuario eligió un fondo manual, respétalo
+      mobileNeutralPosterPath ||
+      basePosterPath ||
+      data.poster_path ||
+      data.profile_path ||
+      desktop ||
+      null
+
+    return isMobileViewport ? mobile : desktop
+  })()
 
   // ====== Account States ======
   useEffect(() => {
@@ -1817,13 +1927,13 @@ export default function DetailsClient({
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
       {/* --- BACKGROUND & OVERLAY --- */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a]">
-        {useBackdrop && artworkInitialized && displayBackdropPath ? (
+        {useBackdrop && artworkInitialized && heroBackgroundPath ? (
           <>
             {/* ✅ Capa base: SIEMPRE cubre (evita marcos laterales) */}
             <div
               className="absolute inset-0 bg-cover bg-center"
               style={{
-                backgroundImage: `url(https://image.tmdb.org/t/p/original${displayBackdropPath})`,
+                backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 transform: 'scale(1)',
                 filter: 'blur(14px) brightness(0.65) saturate(1.05)'
               }}
@@ -1833,7 +1943,7 @@ export default function DetailsClient({
             <div
               className="absolute inset-0 bg-cover transition-opacity duration-1000"
               style={{
-                backgroundImage: `url(https://image.tmdb.org/t/p/original${displayBackdropPath})`,
+                backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 backgroundPosition: 'center top',
                 transform: 'scale(1)',
                 transformOrigin: 'center top'
@@ -2081,12 +2191,66 @@ export default function DetailsClient({
                   <div className="flex items-center px-3 shrink-0 whitespace-nowrap">
                     {/* Compacta un poco en móvil para que quepa */}
                     <div className="origin-left scale-[0.90] sm:scale-100">
-                      <StarRating
-                        rating={userRating}
-                        onRating={sendRating}
-                        onClearRating={clearRating}
-                        disabled={ratingLoading}
-                      />
+                      {(() => {
+                        const canClear = userRating != null && !ratingLoading
+
+                        const clearBtnBase =
+                          'ml-1 inline-flex items-center justify-center rounded-lg border bg-white/5 text-zinc-200 transition-all duration-200 overflow-hidden'
+
+                        const clearHidden =
+                          'opacity-0 max-w-0 w-0 p-0 border-transparent pointer-events-none'
+
+                        const clearShown =
+                          'opacity-100 max-w-[32px] w-[32px] p-1.5 border-white/10 pointer-events-auto hover:bg-white/10'
+
+                        return (
+                          <div
+                            ref={ratingWrapRef}
+                            className="inline-flex items-center whitespace-nowrap group"
+                            onPointerDownCapture={() => {
+                              // móvil: mostrar/ocultar al pulsar la puntuación
+                              if (supportsHover) return
+                              if (!canClear) return
+                              setMobileClearOpen((v) => !v)
+                            }}
+                          >
+                            <StarRating
+                              rating={userRating}
+                              onRating={sendRating}
+                              // ⛔️ no pasamos onClearRating para que StarRating NO pinte su propio botón
+                              disabled={ratingLoading}
+                            />
+
+                            {canClear && (
+                              <button
+                                type="button"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  clearRating()
+                                  setMobileClearOpen(false)
+                                }}
+                                title="Borrar puntuación"
+                                aria-label="Borrar puntuación"
+                                className={[
+                                  clearBtnBase,
+                                  supportsHover
+                                    ? [
+                                      clearHidden,
+                                      'group-hover:opacity-100 group-hover:max-w-[32px] group-hover:w-[32px] group-hover:p-1.5',
+                                      'group-hover:border-white/10 group-hover:pointer-events-auto'
+                                    ].join(' ')
+                                    : mobileClearOpen
+                                      ? clearShown
+                                      : clearHidden
+                                ].join(' ')}
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   </div>
                 )}
@@ -2221,7 +2385,7 @@ export default function DetailsClient({
               </AnimatePresence>
             </div>
 
-            {/* ✅ METADATOS / CARACTERÍSTICAS */}
+            {/* METADATOS / CARACTERÍSTICAS */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {type === 'movie' ? (
                 <>
@@ -2595,7 +2759,7 @@ export default function DetailsClient({
 
               // ✅ Activas separadas (fix: Vista previa ya NO marca el fondo)
               const currentPosterActive =
-                (selectedPosterPath || basePosterPath || data.poster_path || data.profile_path) ?? nulL
+                (selectedPosterPath || basePosterPath || data.poster_path || data.profile_path) ?? null
 
               // ✅ si hay un selectedPreviewBackdropPath guardado pero NO es ES/EN, lo ignoramos
               const selectedPreviewObj = selectedPreviewBackdropPath
