@@ -10,5 +10,11 @@
     "poster": "/78lPtwv72eTNqFW9COBYI0dWDJa.jpg",
     "backdrop": "/A1m5BJznmmsDyj25AnhDyFbBSJJ.jpg"
   },
-  "movie:680": {}
+  "movie:680": {},
+  "tv:1399": {
+    "backdrop": "/mufG2RtiUrWew3HkTnKetAcXDyl.jpg"
+  },
+  "movie:120": {
+    "background": "/x2RS3uTcsJJ9IfjNPcgDmukoEcQ.jpg"
+  }
 }

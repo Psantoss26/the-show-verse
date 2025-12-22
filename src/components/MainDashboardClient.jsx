@@ -1,7 +1,7 @@
 // /src/components/MainDashboardClient.jsx
 'use client'
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useMemo } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Navigation, Autoplay } from 'swiper'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -32,22 +32,18 @@ import { fetchArtworkOverrides } from '@/lib/artworkApi'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
 
-/* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
+/* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch)
+   ✅ FIX hydration: SSR y 1er render cliente deben coincidir => inicial false, y medir en useEffect
+--- */
 const useIsMobileLayout = (breakpointPx = 768) => {
-    const [isMobile, setIsMobile] = useState(() => {
-        if (typeof window === 'undefined') return false
-        return window.matchMedia(`(max-width:${breakpointPx - 1}px)`).matches
-    })
+    const [isMobile, setIsMobile] = useState(false)
 
     useEffect(() => {
-        if (typeof window === 'undefined') return
-
         const mq = window.matchMedia(`(max-width:${breakpointPx - 1}px)`)
 
         const update = () => setIsMobile(mq.matches)
         update()
 
-        // Safari old fallback
         if (mq.addEventListener) mq.addEventListener('change', update)
         else mq.addListener(update)
 
@@ -106,8 +102,6 @@ const GENRES = {
     53: 'Thriller',
     10752: 'Bélica',
     37: 'Western',
-
-    // TV (por si mezclas contenido)
     10759: 'Acción y aventura',
     10765: 'Ciencia ficción y fantasía',
     10762: 'Infantil',
@@ -130,9 +124,9 @@ function preloadImage(src) {
 }
 
 /* =================== CACHÉS COMPARTIDOS (cliente) =================== */
-const movieExtrasCache = new Map() // movie.id -> { runtime, awards, imdbRating }
-const movieBackdropCache = new Map() // movie.id -> backdrop file_path | null | undefined
-const movieImagesCache = new Map() // movie.id -> { posters, backdrops }
+const movieExtrasCache = new Map()
+const movieBackdropCache = new Map()
+const movieImagesCache = new Map()
 
 /* ======== Preferencias de artwork guardadas en localStorage ======== */
 function getArtworkPreference(movieId) {
@@ -149,12 +143,6 @@ function getArtworkPreference(movieId) {
     }
 }
 
-/* ====================================================================
- * NUEVO CRITERIO BACKDROPS:
- *  1) Idioma EN (si existe)
- *  2) Mejor resolución (área)
- *  3) Votos (vote_count, luego vote_average)
- * ==================================================================== */
 function pickBestBackdropByLangResVotes(list, opts = {}) {
     const {
         preferLangs = ['en', 'en-US'],
@@ -192,12 +180,6 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
     return sorted[0] || null
 }
 
-/* ====================================================================
- * MISMO CRITERIO QUE BACKDROPS, PERO PARA POSTERS:
- *  1) Idioma EN (si existe)
- *  2) Mejor resolución (área = width*height)
- *  3) De las de máxima resolución => la PRIMERA (estable)
- * ==================================================================== */
 function pickBestPosterByLangThenResolution(list, opts = {}) {
     const {
         preferLangs = ['en', 'en-US'],
@@ -226,7 +208,6 @@ function pickBestPosterByLangThenResolution(list, opts = {}) {
     return null
 }
 
-/* ========= Cargar / cachear imágenes de TMDb (posters + backdrops) ========= */
 async function getMovieImages(movieId) {
     if (movieImagesCache.has(movieId)) return movieImagesCache.get(movieId)
 
@@ -258,7 +239,6 @@ async function getMovieImages(movieId) {
     }
 }
 
-/* ========= Backdrop preferido (NUEVO criterio: EN -> resolución -> votos) ========= */
 async function fetchBestBackdrop(movieId) {
     const { backdrops } = await getMovieImages(movieId)
     if (!Array.isArray(backdrops) || backdrops.length === 0) return null
@@ -272,7 +252,6 @@ async function fetchBestBackdrop(movieId) {
     return best?.file_path || null
 }
 
-/* ========= Poster preferido (NUEVO criterio estable) ========= */
 async function fetchBestPoster(movieId) {
     const { posters } = await getMovieImages(movieId)
     if (!Array.isArray(posters) || posters.length === 0) return null
@@ -286,8 +265,8 @@ async function fetchBestPoster(movieId) {
 }
 
 /* =================== TRAILERS (TMDb videos) =================== */
-const movieTrailerCache = new Map() // movieId -> { key, site, type } | null
-const movieTrailerInFlight = new Map() // movieId -> Promise
+const movieTrailerCache = new Map()
+const movieTrailerInFlight = new Map()
 
 function pickBestTrailer(videos) {
     if (!Array.isArray(videos) || videos.length === 0) return null
@@ -358,7 +337,7 @@ async function getBestTrailerCached(movieId) {
 /* ====================================================================
  * Portada (2:3) — SOLO en móvil: “3 por fila” completas (sin recorte)
  * ==================================================================== */
-function PosterImage({ movie, cache, heightClass, isMobile }) {
+function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
     const [posterPath, setPosterPath] = useState(null)
     const [ready, setReady] = useState(false)
 
@@ -368,7 +347,6 @@ function PosterImage({ movie, cache, heightClass, isMobile }) {
         const load = async () => {
             if (!movie) return
 
-            // 1) Preferencia del usuario (poster)
             const { poster: userPoster } = getArtworkPreference(movie.id)
             if (userPoster) {
                 const url = buildImg(userPoster, 'w342')
@@ -381,7 +359,17 @@ function PosterImage({ movie, cache, heightClass, isMobile }) {
                 return
             }
 
-            // 2) Cache en memoria
+            if (posterOverride) {
+                const url = buildImg(posterOverride, 'w342')
+                await preloadImage(url)
+                if (!abort) {
+                    cache.current.set(movie.id, posterOverride)
+                    setPosterPath(posterOverride)
+                    setReady(true)
+                }
+                return
+            }
+
             const cached = cache.current.get(movie.id)
             if (cached) {
                 const url = buildImg(cached, 'w342')
@@ -393,7 +381,6 @@ function PosterImage({ movie, cache, heightClass, isMobile }) {
                 return
             }
 
-            // 3) Lógica normal: mejor poster EN + máxima resolución (estable)
             setReady(false)
             const preferred = await fetchBestPoster(movie.id)
             const chosen =
@@ -416,9 +403,8 @@ function PosterImage({ movie, cache, heightClass, isMobile }) {
         return () => {
             abort = true
         }
-    }, [movie, cache])
+    }, [movie, cache, posterOverride])
 
-    // ✅ móvil: aspect 2/3 + object-contain (NO recortar)
     const boxClass = isMobile ? 'aspect-[2/3]' : heightClass
 
     if (!ready || !posterPath) {
@@ -428,7 +414,6 @@ function PosterImage({ movie, cache, heightClass, isMobile }) {
     }
 
     if (!isMobile) {
-        // Desktop/tablet: estética original (cover)
         return (
             <img
                 src={buildImg(posterPath, 'w342')}
@@ -440,7 +425,6 @@ function PosterImage({ movie, cache, heightClass, isMobile }) {
         )
     }
 
-    // Móvil: poster completo con fondo blur
     return (
         <div className={`relative w-full ${boxClass} rounded-3xl overflow-hidden bg-neutral-900`}>
             <img
@@ -464,9 +448,8 @@ function PosterImage({ movie, cache, heightClass, isMobile }) {
 
 /* ====================================================================
  * Vista previa inline tipo Amazon (backdrop horizontal) + TRAILER
- *  (se mantiene, pero se DESACTIVA en móvil desde Row)
  * ==================================================================== */
-function InlinePreviewCard({ movie, heightClass }) {
+function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     const { session, account } = useAuth()
 
     const [extras, setExtras] = useState({
@@ -528,14 +511,20 @@ function InlinePreviewCard({ movie, heightClass }) {
 
         const loadAll = async () => {
             const { backdrop: userBackdrop } = getArtworkPreference(movie.id)
-            const userPreferredBackdrop = userBackdrop || null
-
-            if (userPreferredBackdrop) {
-                movieBackdropCache.set(movie.id, userPreferredBackdrop)
-                const url = buildImg(userPreferredBackdrop, 'w1280')
+            if (userBackdrop) {
+                movieBackdropCache.set(movie.id, userBackdrop)
+                const url = buildImg(userBackdrop, 'w1280')
                 await preloadImage(url)
                 if (!abort) {
-                    setBackdropPath(userPreferredBackdrop)
+                    setBackdropPath(userBackdrop)
+                    setBackdropReady(true)
+                }
+            } else if (backdropOverride) {
+                movieBackdropCache.set(movie.id, backdropOverride)
+                const url = buildImg(backdropOverride, 'w1280')
+                await preloadImage(url)
+                if (!abort) {
+                    setBackdropPath(backdropOverride)
                     setBackdropReady(true)
                 }
             } else {
@@ -628,7 +617,7 @@ function InlinePreviewCard({ movie, heightClass }) {
         return () => {
             abort = true
         }
-    }, [movie])
+    }, [movie, backdropOverride])
 
     const href = `/details/movie/${movie.id}`
 
@@ -918,7 +907,7 @@ function InlinePreviewCard({ movie, heightClass }) {
 }
 
 /* ---------- Fila reusable ---------- */
-function Row({ title, items, isMobile, posterCacheRef }) {
+function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides, backdropOverrides }) {
     if (!items || items.length === 0) return null
 
     const swiperRef = useRef(null)
@@ -988,95 +977,104 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                     setHoveredId(null)
                 }}
             >
-                <Swiper
-                    slidesPerView={3}
-                    spaceBetween={12}
-                    onSwiper={handleSwiper}
-                    onSlideChange={updateNav}
-                    onResize={updateNav}
-                    onReachBeginning={updateNav}
-                    onReachEnd={updateNav}
-                    loop={false}
-                    watchOverflow={true}
-                    grabCursor={!isMobile}
-                    allowTouchMove={true}
-                    preventClicks={true}
-                    preventClicksPropagation={true}
-                    threshold={5}
-                    modules={[Navigation]}
-                    className="group relative"
-                    breakpoints={breakpointsRow}
-                >
-                    {items.map((m, i) => {
-                        // ✅ móvil: NUNCA preview (click directo a details)
-                        const isActive = !isMobile && hoveredId === m.id
-                        const isLast = i === items.length - 1
+                {/* ✅ Evita que el usuario toque/deslice durante hidratación (Swiper no muta DOM “a destiempo”) */}
+                <div className={!hydrated ? 'pointer-events-none touch-none' : ''}>
+                    <Swiper
+                        slidesPerView={3}
+                        spaceBetween={12}
+                        onSwiper={handleSwiper}
+                        onSlideChange={updateNav}
+                        onResize={updateNav}
+                        onReachBeginning={updateNav}
+                        onReachEnd={updateNav}
+                        loop={false}
+                        watchOverflow={true}
+                        grabCursor={hydrated && !isMobile}
+                        allowTouchMove={hydrated}
+                        preventClicks={true}
+                        preventClicksPropagation={true}
+                        threshold={5}
+                        modules={[Navigation]}
+                        className="group relative"
+                        breakpoints={breakpointsRow}
+                    >
+                        {items.map((m, i) => {
+                            const isActive = hydrated && !isMobile && hoveredId === m.id
+                            const isLast = i === items.length - 1
 
-                        const base = 'relative flex-shrink-0 transition-all duration-300 ease-out'
+                            const base = 'relative flex-shrink-0 transition-all duration-300 ease-out'
 
-                        // ✅ móvil: ancho “w-full” dentro de su 1/3. Desktop: tus tamaños.
-                        const sizeClasses = isMobile
-                            ? 'w-full'
-                            : isActive
-                                ? 'w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20'
-                                : 'w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10'
+                            const sizeClasses = isMobile
+                                ? 'w-full'
+                                : isActive
+                                    ? 'w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20'
+                                    : 'w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10'
 
-                        const transformClass =
-                            !isMobile && isActive && isLast
-                                ? 'sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]'
-                                : ''
+                            const transformClass =
+                                !isMobile && isActive && isLast
+                                    ? 'sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]'
+                                    : ''
 
-                        return (
-                            <SwiperSlide
-                                key={m.id}
-                                className={isMobile ? 'select-none' : '!w-auto select-none'}
-                            >
-                                <div
-                                    className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass}`}
-                                    onMouseEnter={() => {
-                                        if (!isMobile) setHoveredId(m.id)
-                                    }}
-                                    onMouseLeave={() =>
-                                        setHoveredId((prev) => (prev === m.id ? null : prev))
-                                    }
+                            const posterOverride = posterOverrides?.[m.id] || null
+                            const backdropOverride = backdropOverrides?.[m.id] || null
+
+                            return (
+                                <SwiperSlide
+                                    key={m.id}
+                                    className={isMobile ? 'select-none' : '!w-auto select-none'}
                                 >
-                                    <AnimatePresence initial={false} mode="wait">
-                                        {isActive ? (
-                                            <motion.div
-                                                key="preview"
-                                                initial={{ opacity: 0, scale: 0.98 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.98 }}
-                                                transition={{ duration: 0.18 }}
-                                                className="w-full h-full hidden sm:block"
-                                            >
-                                                <InlinePreviewCard movie={m} heightClass={heightClassDesktop} />
-                                            </motion.div>
-                                        ) : (
-                                            <motion.div
-                                                key="poster"
-                                                initial={{ opacity: 0, scale: 0.98 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.98 }}
-                                                transition={{ duration: 0.15 }}
-                                                className="w-full h-full"
-                                            >
-                                                <Link href={`/details/movie/${m.id}`}>
-                                                    <PosterImage
+                                    <div
+                                        className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass}`}
+                                        onMouseEnter={() => {
+                                            if (!isMobile) setHoveredId(m.id)
+                                        }}
+                                        onMouseLeave={() =>
+                                            setHoveredId((prev) => (prev === m.id ? null : prev))
+                                        }
+                                    >
+                                        <AnimatePresence initial={false} mode="wait">
+                                            {isActive ? (
+                                                <motion.div
+                                                    key="preview"
+                                                    initial={{ opacity: 0, scale: 0.98 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.98 }}
+                                                    transition={{ duration: 0.18 }}
+                                                    className="w-full h-full hidden sm:block"
+                                                >
+                                                    <InlinePreviewCard
                                                         movie={m}
-                                                        cache={posterCacheRef}
-                                                        heightClass={posterBoxClass}
-                                                        isMobile={isMobile}
+                                                        heightClass={heightClassDesktop}
+                                                        backdropOverride={backdropOverride}
                                                     />
-                                                </Link>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            </SwiperSlide>
-                        )
-                    })}
-                </Swiper>
+                                                </motion.div>
+                                            ) : (
+                                                <motion.div
+                                                    key="poster"
+                                                    initial={{ opacity: 0, scale: 0.98 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.98 }}
+                                                    transition={{ duration: 0.15 }}
+                                                    className="w-full h-full"
+                                                >
+                                                    <Link href={`/details/movie/${m.id}`}>
+                                                        <PosterImage
+                                                            movie={m}
+                                                            cache={posterCacheRef}
+                                                            heightClass={posterBoxClass}
+                                                            isMobile={isMobile}
+                                                            posterOverride={posterOverride}
+                                                        />
+                                                    </Link>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                </SwiperSlide>
+                            )
+                        })}
+                    </Swiper>
+                </div>
 
                 {showPrev && !isMobile && (
                     <button
@@ -1115,7 +1113,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 }
 
 /* ---------- Carrusel hero (backdrops) ---------- */
-function TopRatedHero({ items, isMobile }) {
+function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
     if (!items || items.length === 0) return null
 
     const swiperRef = useRef(null)
@@ -1136,30 +1134,12 @@ function TopRatedHero({ items, isMobile }) {
 
         const load = async () => {
             try {
-                const ids = items.map((m) => m.id).filter(Boolean)
-                if (!ids.length) {
-                    if (!canceled) setHeroLoaded(true)
-                    return
-                }
-
-                let overrides = {}
-                try {
-                    overrides = await fetchArtworkOverrides({
-                        type: 'movie',
-                        kind: 'backdrop',
-                        ids
-                    })
-                } catch (err) {
-                    console.error('Error cargando overrides de hero', err)
-                    overrides = {}
-                }
-
                 const entries = await Promise.all(
                     items.map(async (movie) => {
-                        const id = movie.id
+                        const id = movie?.id
                         if (!id) return [null, null]
 
-                        const override = overrides?.[id] || null
+                        const override = backdropOverrides?.[id] || null
                         if (override) {
                             await preloadImage(buildImg(override, 'w780'))
                             return [id, override]
@@ -1171,9 +1151,14 @@ function TopRatedHero({ items, isMobile }) {
                             return [id, userBackdrop]
                         }
 
-                        let chosen = await fetchBestBackdrop(id)
-                        if (!chosen) chosen = movie.backdrop_path || movie.poster_path || null
+                        let chosen = movie?.backdrop_path || movie?.poster_path || null
+                        if (chosen) {
+                            await preloadImage(buildImg(chosen, 'w780'))
+                            return [id, chosen]
+                        }
 
+                        chosen = await fetchBestBackdrop(id)
+                        if (!chosen) chosen = movie?.backdrop_path || movie?.poster_path || null
                         if (chosen) await preloadImage(buildImg(chosen, 'w780'))
                         return [id, chosen]
                     })
@@ -1207,7 +1192,7 @@ function TopRatedHero({ items, isMobile }) {
         return () => {
             canceled = true
         }
-    }, [items])
+    }, [items, backdropOverrides])
 
     const updateNav = (swiper) => {
         if (!swiper) return
@@ -1258,77 +1243,77 @@ function TopRatedHero({ items, isMobile }) {
                     </div>
                 ) : (
                     <>
-                        <Swiper
-                            // ✅ móvil: 1 backdrop; tablet/desktop: 3 backdrops completos
-                            slidesPerView={isMobile ? 1 : 3}
-                            spaceBetween={isMobile ? 12 : 16}
-                            autoplay={{ delay: 5000 }}
-                            onSwiper={handleSwiper}
-                            onSlideChange={updateNav}
-                            onResize={updateNav}
-                            onReachBeginning={updateNav}
-                            onReachEnd={updateNav}
-                            loop={false}
-                            watchOverflow={true}
-                            grabCursor={!isMobile}
-                            allowTouchMove={true}
-                            preventClicks={true}
-                            preventClicksPropagation={true}
-                            threshold={5}
-                            modules={[Navigation, Autoplay]}
-                            className="group relative"
-                            breakpoints={{
-                                0: { slidesPerView: 1, spaceBetween: 12 },
-                                1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 }
-                            }}
-                        >
-                            {items.map((movie) => {
-                                const heroBackdrop = heroBackdrops[movie.id] || null
-                                const slideClass = isMobile ? '!w-full select-none' : 'select-none'
+                        {/* ✅ Evita swipe durante hidratación */}
+                        <div className={!hydrated ? 'pointer-events-none touch-none' : ''}>
+                            <Swiper
+                                slidesPerView={isMobile ? 1 : 3}
+                                spaceBetween={isMobile ? 12 : 16}
+                                autoplay={{ delay: 5000 }}
+                                onSwiper={handleSwiper}
+                                onSlideChange={updateNav}
+                                onResize={updateNav}
+                                onReachBeginning={updateNav}
+                                onReachEnd={updateNav}
+                                loop={false}
+                                watchOverflow={true}
+                                grabCursor={hydrated && !isMobile}
+                                allowTouchMove={hydrated}
+                                preventClicks={true}
+                                preventClicksPropagation={true}
+                                threshold={5}
+                                modules={[Navigation, Autoplay]}
+                                className="group relative"
+                                breakpoints={{
+                                    0: { slidesPerView: 1, spaceBetween: 12 },
+                                    1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 }
+                                }}
+                            >
+                                {items.map((movie) => {
+                                    const heroBackdrop = heroBackdrops[movie.id] || null
+                                    const slideClass = isMobile ? '!w-full select-none' : 'select-none'
 
-                                if (!heroBackdrop) {
+                                    if (!heroBackdrop) {
+                                        return (
+                                            <SwiperSlide key={movie.id} className={slideClass}>
+                                                <Link href={`/details/movie/${movie.id}`}>
+                                                    <div className="relative rounded-3xl bg-neutral-900 aspect-[16/9]" />
+                                                </Link>
+                                            </SwiperSlide>
+                                        )
+                                    }
+
                                     return (
                                         <SwiperSlide key={movie.id} className={slideClass}>
                                             <Link href={`/details/movie/${movie.id}`}>
-                                                <div className="relative rounded-3xl bg-neutral-900 aspect-[16/9]" />
+                                                <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9] bg-neutral-900">
+                                                    <img
+                                                        src={buildImg(heroBackdrop, 'w780')}
+                                                        alt=""
+                                                        aria-hidden="true"
+                                                        className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                    />
+                                                    <img
+                                                        src={buildImg(heroBackdrop, 'w1280')}
+                                                        srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
+                                                            heroBackdrop,
+                                                            'w1280'
+                                                        )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
+                                                        sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
+                                                        alt={movie.title || movie.name}
+                                                        className={`absolute inset-0 w-full h-full rounded-3xl ${isMobile ? 'object-contain' : 'object-cover hover:scale-105'
+                                                            } transition-transform duration-300`}
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                    />
+                                                </div>
                                             </Link>
                                         </SwiperSlide>
                                     )
-                                }
-
-                                return (
-                                    <SwiperSlide key={movie.id} className={slideClass}>
-                                        <Link href={`/details/movie/${movie.id}`}>
-                                            <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9] bg-neutral-900">
-                                                {/* Fondo blur para rellenar si hay bandas */}
-                                                <img
-                                                    src={buildImg(heroBackdrop, 'w780')}
-                                                    alt=""
-                                                    aria-hidden="true"
-                                                    className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
-                                                    loading="lazy"
-                                                    decoding="async"
-                                                />
-                                                {/* ✅ móvil: contain. Tablet/desktop: cover */}
-                                                <img
-                                                    src={buildImg(heroBackdrop, 'w1280')}
-                                                    srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
-                                                        heroBackdrop,
-                                                        'w1280'
-                                                    )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
-                                                    sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
-                                                    alt={movie.title || movie.name}
-                                                    className={`absolute inset-0 w-full h-full rounded-3xl ${isMobile ? 'object-contain' : 'object-cover hover:scale-105'
-                                                        } transition-transform duration-300`}
-                                                    loading="lazy"
-                                                    decoding="async"
-                                                />
-                                            </div>
-                                        </Link>
-                                    </SwiperSlide>
-                                )
-                            })}
-                        </Swiper>
+                                })}
+                            </Swiper>
+                        </div>
 
                         {showPrev && !isMobile && (
                             <button
@@ -1370,11 +1355,62 @@ function TopRatedHero({ items, isMobile }) {
 
 /* =================== MainDashboard (CLIENTE) =================== */
 export default function MainDashboardClient({ initialData }) {
-    // ✅ SOLO móvil por viewport. Tablet = desktop layout.
     const isMobile = useIsMobileLayout(768)
+
+    // ✅ hidración lista: bloquea interacción antes de tiempo (evita mismatch si el user desliza al cargar)
+    const [hydrated, setHydrated] = useState(false)
+    useEffect(() => setHydrated(true), [])
 
     const posterCacheRef = useRef(new Map())
     const dashboardData = initialData || {}
+
+    const allMovieIds = useMemo(() => {
+        const keys = ['topRated', 'popular', 'trending', 'mind', 'action', 'us', 'cult', 'underrated', 'rising', 'recommended']
+        const set = new Set()
+        for (const k of keys) {
+            const arr = dashboardData?.[k] || []
+            for (const m of arr) if (m?.id) set.add(m.id)
+        }
+        return Array.from(set).sort((a, b) => a - b)
+    }, [dashboardData])
+
+    const [posterOverrides, setPosterOverrides] = useState({})
+    const [backdropOverrides, setBackdropOverrides] = useState({})
+
+    useEffect(() => {
+        let cancelled = false
+
+        const loadOverrides = async () => {
+            if (!allMovieIds.length) {
+                if (!cancelled) {
+                    setPosterOverrides({})
+                    setBackdropOverrides({})
+                }
+                return
+            }
+
+            try {
+                const [posters, backdrops] = await Promise.all([
+                    fetchArtworkOverrides({ type: 'movie', kind: 'poster', ids: allMovieIds }).catch(() => ({})),
+                    fetchArtworkOverrides({ type: 'movie', kind: 'backdrop', ids: allMovieIds }).catch(() => ({})),
+                ])
+
+                if (cancelled) return
+                setPosterOverrides(posters || {})
+                setBackdropOverrides(backdrops || {})
+            } catch (err) {
+                if (cancelled) return
+                console.error('Error cargando overrides (dashboard)', err)
+                setPosterOverrides({})
+                setBackdropOverrides({})
+            }
+        }
+
+        loadOverrides()
+        return () => {
+            cancelled = true
+        }
+    }, [allMovieIds])
 
     if (!dashboardData || Object.keys(dashboardData).length === 0) {
         return <div className="h-screen bg-black" />
@@ -1382,20 +1418,25 @@ export default function MainDashboardClient({ initialData }) {
 
     return (
         <div className="px-6 py-6 text-white bg-black">
-            <TopRatedHero items={dashboardData.topRated || []} isMobile={isMobile} />
+            <TopRatedHero
+                items={dashboardData.topRated || []}
+                isMobile={isMobile}
+                hydrated={hydrated}
+                backdropOverrides={backdropOverrides}
+            />
 
             <div className="space-y-12">
-                <Row title="Populares" items={dashboardData.popular} isMobile={isMobile} posterCacheRef={posterCacheRef} />
-                <Row title="Tendencias semanales" items={dashboardData.trending} isMobile={isMobile} posterCacheRef={posterCacheRef} />
-                <Row title="Guiones complejos" items={dashboardData.mind} isMobile={isMobile} posterCacheRef={posterCacheRef} />
-                <Row title="Top acción" items={dashboardData.action} isMobile={isMobile} posterCacheRef={posterCacheRef} />
-                <Row title="Populares en EE.UU." items={dashboardData.us} isMobile={isMobile} posterCacheRef={posterCacheRef} />
-                <Row title="Películas de culto" items={dashboardData.cult} isMobile={isMobile} posterCacheRef={posterCacheRef} />
-                <Row title="Infravaloradas" items={dashboardData.underrated} isMobile={isMobile} posterCacheRef={posterCacheRef} />
-                <Row title="En ascenso" items={dashboardData.rising} isMobile={isMobile} posterCacheRef={posterCacheRef} />
+                <Row title="Populares" items={dashboardData.popular} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
+                <Row title="Tendencias semanales" items={dashboardData.trending} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
+                <Row title="Guiones complejos" items={dashboardData.mind} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
+                <Row title="Top acción" items={dashboardData.action} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
+                <Row title="Populares en EE.UU." items={dashboardData.us} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
+                <Row title="Películas de culto" items={dashboardData.cult} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
+                <Row title="Infravaloradas" items={dashboardData.underrated} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
+                <Row title="En ascenso" items={dashboardData.rising} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
 
                 {dashboardData.recommended?.length > 0 && (
-                    <Row title="Recomendadas para ti" items={dashboardData.recommended} isMobile={isMobile} posterCacheRef={posterCacheRef} />
+                    <Row title="Recomendadas para ti" items={dashboardData.recommended} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
                 )}
             </div>
         </div>
