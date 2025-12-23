@@ -724,9 +724,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
             ? `https://www.youtube-nocookie.com/embed/${trailer.key}` +
             `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
             `&controls=0&iv_load_policy=3&disablekb=1&fs=0` +
-            `&enablejsapi=1&origin=${typeof window !== 'undefined'
-                ? encodeURIComponent(window.location.origin)
-                : ''
+            `&enablejsapi=1&origin=${typeof window !== 'undefined' ? encodeURIComponent(window.location.origin) : ''
             }`
             : null
 
@@ -778,10 +776,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
 
                                             const target = 'https://www.youtube-nocookie.com'
                                             const cmd = (func, args = []) =>
-                                                win.postMessage(
-                                                    JSON.stringify({ event: 'command', func, args }),
-                                                    target
-                                                )
+                                                win.postMessage(JSON.stringify({ event: 'command', func, args }), target)
 
                                             setTimeout(() => {
                                                 cmd('unMute')
@@ -828,9 +823,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                                         loading="lazy"
                                         decoding="async"
                                     />
-                                    <span className="font-medium">
-                                        {extras.imdbRating.toFixed(1)}
-                                    </span>
+                                    <span className="font-medium">{extras.imdbRating.toFixed(1)}</span>
                                 </span>
                             )}
                         </div>
@@ -847,11 +840,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                             </div>
                         )}
 
-                        {error && (
-                            <p className="mt-1 text-[11px] text-red-400 line-clamp-1">
-                                {error}
-                            </p>
-                        )}
+                        {error && <p className="mt-1 text-[11px] text-red-400 line-clamp-1">{error}</p>}
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
@@ -959,6 +948,9 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
         1280: { slidesPerView: 'auto', spaceBetween: 20 }
     }
 
+    // ✅ Remount cuando cambia hydrated/isMobile para evitar estados enganchados (especialmente allowTouchMove)
+    const swiperKey = `${title}-${hydrated ? 'h' : 's'}-${isMobile ? 'm' : 'd'}`
+
     return (
         <div className="relative group">
             <h3 className="text-2xl sm:text-3xl md:text-4xl font-[730] text-primary-text mb-4 sm:text-left">
@@ -977,9 +969,10 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                     setHoveredId(null)
                 }}
             >
-                {/* ✅ Evita que el usuario toque/deslice durante hidratación (Swiper no muta DOM “a destiempo”) */}
+                {/* ✅ Bloquea interacción hasta que React haya hidratado */}
                 <div className={!hydrated ? 'pointer-events-none touch-none' : ''}>
                     <Swiper
+                        key={swiperKey}
                         slidesPerView={3}
                         spaceBetween={12}
                         onSwiper={handleSwiper}
@@ -989,8 +982,9 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                         onReachEnd={updateNav}
                         loop={false}
                         watchOverflow={true}
-                        grabCursor={hydrated && !isMobile}
-                        allowTouchMove={hydrated}
+                        grabCursor={!isMobile}
+                        // ✅ SIEMPRE true (Swiper puede quedarse “enganchado” si se inicializa con false)
+                        allowTouchMove={true}
                         preventClicks={true}
                         preventClicksPropagation={true}
                         threshold={5}
@@ -1019,18 +1013,13 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                             const backdropOverride = backdropOverrides?.[m.id] || null
 
                             return (
-                                <SwiperSlide
-                                    key={m.id}
-                                    className={isMobile ? 'select-none' : '!w-auto select-none'}
-                                >
+                                <SwiperSlide key={m.id} className={isMobile ? 'select-none' : '!w-auto select-none'}>
                                     <div
                                         className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass}`}
                                         onMouseEnter={() => {
                                             if (!isMobile) setHoveredId(m.id)
                                         }}
-                                        onMouseLeave={() =>
-                                            setHoveredId((prev) => (prev === m.id ? null : prev))
-                                        }
+                                        onMouseLeave={() => setHoveredId((prev) => (prev === m.id ? null : prev))}
                                     >
                                         <AnimatePresence initial={false} mode="wait">
                                             {isActive ? (
@@ -1225,6 +1214,8 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
     const showPrev = isHoveredHero && canPrev
     const showNext = isHoveredHero && canNext
 
+    const heroKey = `hero-${hydrated ? 'h' : 's'}-${isMobile ? 'm' : 'd'}`
+
     return (
         <div className="relative group mb-10 sm:mb-14">
             <div
@@ -1243,12 +1234,13 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                     </div>
                 ) : (
                     <>
-                        {/* ✅ Evita swipe durante hidratación */}
+                        {/* ✅ Bloquea interacción hasta que React haya hidratado */}
                         <div className={!hydrated ? 'pointer-events-none touch-none' : ''}>
                             <Swiper
+                                key={heroKey}
                                 slidesPerView={isMobile ? 1 : 3}
                                 spaceBetween={isMobile ? 12 : 16}
-                                autoplay={{ delay: 5000 }}
+                                autoplay={hydrated ? { delay: 5000 } : false}
                                 onSwiper={handleSwiper}
                                 onSlideChange={updateNav}
                                 onResize={updateNav}
@@ -1256,8 +1248,9 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                 onReachEnd={updateNav}
                                 loop={false}
                                 watchOverflow={true}
-                                grabCursor={hydrated && !isMobile}
-                                allowTouchMove={hydrated}
+                                grabCursor={!isMobile}
+                                // ✅ SIEMPRE true (mismo motivo que en Row)
+                                allowTouchMove={true}
                                 preventClicks={true}
                                 preventClicksPropagation={true}
                                 threshold={5}
@@ -1357,7 +1350,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
 export default function MainDashboardClient({ initialData }) {
     const isMobile = useIsMobileLayout(768)
 
-    // ✅ hidración lista: bloquea interacción antes de tiempo (evita mismatch si el user desliza al cargar)
+    // ✅ hidración lista: bloquea interacción antes de tiempo
     const [hydrated, setHydrated] = useState(false)
     useEffect(() => setHydrated(true), [])
 
