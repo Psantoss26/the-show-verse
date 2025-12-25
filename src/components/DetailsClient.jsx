@@ -2217,20 +2217,90 @@ export default function DetailsClient({
 
             {/* RATINGS BADGES */}
             <div className="py-2 border-y border-white/10">
+              {/* ✅ MÓVIL: una sola fila, compacto, sin scroll (oculta Metacritic) */}
+              <div className="sm:hidden grid grid-flow-col auto-cols-fr items-center -ml-2 mr-2">
+                {/* TMDb */}
+                <div className="flex items-center justify-center gap-1 min-w-0">
+                  <img src="/logo-TMDb.png" alt="TMDb" className="h-3 w-auto opacity-90" />
+                  <span className="text-[13px] font-extrabold text-emerald-400 leading-none">
+                    {data.vote_average?.toFixed(1)}
+                  </span>
+                </div>
+
+                {/* IMDb */}
+                {extras.imdbRating && (
+                  <div className="flex items-center justify-center gap-1 min-w-0">
+                    <img src="/logo-IMDb.png" alt="IMDb" className="h-3.5 w-auto opacity-90" />
+                    <span className="text-[13px] font-extrabold text-yellow-400 leading-none">
+                      {Number(extras.imdbRating).toFixed(1)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Rotten Tomatoes (✅ se mantiene en móvil) */}
+                {extras.rtScore != null && (
+                  <div className="flex items-center justify-center gap-1 min-w-0">
+                    <img
+                      src="/logo-RottenTomatoes.png"
+                      alt="Rotten Tomatoes"
+                      className="h-3.5 w-auto opacity-90"
+                    />
+                    <span className="text-[13px] font-extrabold text-rose-300 leading-none">
+                      {Math.round(extras.rtScore)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Metacritic (✅ móvil: solo número, sin /100 para que quepa) */}
+                {extras.mcScore != null && (
+                  <div className="flex items-center justify-center gap-1 min-w-0">
+                    <img
+                      src="/logo-Metacritic.png"
+                      alt="Metacritic"
+                      className="h-3.5 w-auto opacity-90"
+                    />
+                    <span className="text-[13px] font-extrabold text-lime-200 leading-none">
+                      {Math.round(extras.mcScore)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Usuario */}
+                <div className="flex items-center justify-center min-w-0">
+                  {session ? (
+                    accountStatesLoading ? (
+                      <div className="inline-flex items-center justify-center px-2 py-1 rounded-xl border border-white/10 bg-white/5">
+                        <Loader2 className="w-4 h-4 animate-spin text-zinc-300" />
+                      </div>
+                    ) : (
+                      <div className="scale-[0.85] origin-center">
+                        <StarRating
+                          rating={userRating}
+                          onRating={sendRating}
+                          onClearRating={clearRating}
+                          disabled={ratingLoading}
+                        />
+                      </div>
+                    )
+                  ) : (
+                    <span className="text-[11px] font-semibold text-gray-400">Login</span>
+                  )}
+                </div>
+              </div>
+
+              {/* ✅ DESKTOP/TABLET: tu diseño original intacto */}
               <div
-                className="flex items-center flex-nowrap overflow-x-auto pr-2
+                className="hidden sm:flex items-center flex-nowrap overflow-x-auto pr-2
       [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
       divide-x divide-white/10"
               >
                 {/* TMDb */}
                 <div className="flex items-center gap-2 pr-3 shrink-0 whitespace-nowrap">
                   <img src="/logo-TMDb.png" alt="TMDb" className="h-3.5 sm:h-3.5 w-auto" />
-
                   <div className="flex items-baseline gap-1.5 sm:gap-2">
                     <span className="text-lg sm:text-xl font-bold text-emerald-400">
                       {data.vote_average?.toFixed(1)}
                     </span>
-
                     {formatVoteCount(data.vote_count) && (
                       <span className="text-[10px] sm:text-[11px] text-zinc-400">
                         {formatVoteCount(data.vote_count)}
@@ -2243,12 +2313,10 @@ export default function DetailsClient({
                 {extras.imdbRating && (
                   <div className="flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
                     <img src="/logo-IMDb.png" alt="IMDb" className="h-4.5 sm:h-5 w-auto" />
-
                     <div className="flex items-baseline gap-1.5 sm:gap-2">
                       <span className="text-lg sm:text-xl font-bold text-yellow-400">
                         {extras.imdbRating}
                       </span>
-
                       {formatVoteCount(extras.imdbVotes) && (
                         <span className="text-[10px] sm:text-[11px] text-zinc-400">
                           {formatVoteCount(extras.imdbVotes)}
@@ -2258,15 +2326,14 @@ export default function DetailsClient({
                   </div>
                 )}
 
-                {/* Rotten Tomatoes (oculto en móvil) */}
+                {/* Rotten Tomatoes */}
                 {extras.rtScore != null && (
-                  <div className="hidden sm:flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
+                  <div className="flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
                     <img
                       src="/logo-RottenTomatoes.png"
                       alt="Rotten Tomatoes"
                       className="h-4.5 sm:h-5 w-auto"
                     />
-
                     <div className="flex items-baseline gap-1.5 sm:gap-2">
                       <span className="text-lg sm:text-xl font-bold text-rose-300">
                         {Math.round(extras.rtScore)}
@@ -2276,15 +2343,14 @@ export default function DetailsClient({
                   </div>
                 )}
 
-                {/* Metacritic (oculto en móvil) */}
+                {/* Metacritic (✅ solo desktop) */}
                 {extras.mcScore != null && (
-                  <div className="hidden sm:flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
+                  <div className="flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
                     <img
                       src="/logo-Metacritic.png"
                       alt="Metacritic"
                       className="h-4.5 sm:h-5 w-auto"
                     />
-
                     <div className="flex items-baseline gap-1.5 sm:gap-2">
                       <span className="text-lg sm:text-xl font-bold text-lime-200">
                         {Math.round(extras.mcScore)}
@@ -2306,7 +2372,7 @@ export default function DetailsClient({
                         rating={userRating}
                         onRating={sendRating}
                         onClearRating={clearRating}
-                        disabled={ratingLoading}  // (accountStatesLoading ya es false aquí)
+                        disabled={ratingLoading}
                       />
                     )}
                   </div>
