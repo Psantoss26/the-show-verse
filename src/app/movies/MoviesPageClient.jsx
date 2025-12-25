@@ -874,7 +874,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                             {extras?.runtime && <span>• {formatRuntime(extras.runtime)}</span>}
 
                             <span className="inline-flex items-center gap-1.5">
-                                <img src="/logo-TMDb.png" alt="TMDb" className="h-4 w-auto" loading="lazy" decoding="async" />
+                                <img src="/logo-TMDb.png" alt="TMDb" className="h-3 w-auto" loading="lazy" decoding="async" />
                                 <span className="font-medium">{ratingOf(movie)}</span>
                             </span>
 
