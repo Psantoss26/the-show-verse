@@ -2258,9 +2258,9 @@ export default function DetailsClient({
                   </div>
                 )}
 
-                {/* Rotten Tomatoes */}
+                {/* Rotten Tomatoes (oculto en móvil) */}
                 {extras.rtScore != null && (
-                  <div className="flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
+                  <div className="hidden sm:flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
                     <img
                       src="/logo-RottenTomatoes.png"
                       alt="Rotten Tomatoes"
@@ -2276,9 +2276,9 @@ export default function DetailsClient({
                   </div>
                 )}
 
-                {/* Metacritic */}
+                {/* Metacritic (oculto en móvil) */}
                 {extras.mcScore != null && (
-                  <div className="flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
+                  <div className="hidden sm:flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
                     <img
                       src="/logo-Metacritic.png"
                       alt="Metacritic"

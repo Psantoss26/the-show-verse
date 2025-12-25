@@ -56,6 +56,14 @@ function posterSrc(item) {
     return p ? `${IMG}/w500${p}` : '/placeholder-poster.png'
 }
 
+function isAbortError(e) {
+    return (
+        e?.name === 'AbortError' ||
+        e?.code === 20 || // algunos navegadores
+        String(e?.message || '').toLowerCase().includes('aborted')
+    )
+}
+
 /* =========================
    UI Bits
 ========================= */
@@ -577,6 +585,7 @@ export default function DiscoverClient() {
                     setCertsAll([...certSet.values()].sort((a, b) => String(a).localeCompare(String(b))))
                 }
             } catch (e) {
+                if (isAbortError(e) || ac.signal.aborted) return
                 console.error(e)
             }
         }
@@ -655,6 +664,7 @@ export default function DiscoverClient() {
                     if (!cancelled) setRatedTvIds(ids)
                 }
             } catch (e) {
+                if (isAbortError(e) || ac.signal.aborted) return
                 console.error(e)
                 if (!cancelled) {
                     if (ratedMovieIds === null) setRatedMovieIds(new Set())
@@ -780,7 +790,7 @@ export default function DiscoverClient() {
                 if (cancelled) return
                 setItems((prev) => (page === 1 ? list : [...prev, ...list]))
             } catch (e) {
-                if (cancelled) return
+                if (isAbortError(e) || ac.signal.aborted) return
                 console.error(e)
                 setError(e?.message || 'No se han podido cargar resultados.')
                 if (page === 1) setItems([])
