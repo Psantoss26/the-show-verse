@@ -2126,7 +2126,7 @@ export default function DetailsClient({
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white leading-tight drop-shadow-lg tracking-tight">
                 {title}
                 {yearIso && (
-                  <span className="text-2xl md:text-3xl font-light text-gray-400 ml-3">
+                  <span className="text-2xl md:text-2xl font-light text-gray-400 ml-3">
                     ({yearIso})
                   </span>
                 )}
