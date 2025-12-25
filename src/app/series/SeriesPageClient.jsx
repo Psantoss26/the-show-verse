@@ -876,7 +876,7 @@ function InlinePreviewCard({ show, heightClass }) {
                                 <img
                                     src="/logo-TMDb.png"
                                     alt="TMDb"
-                                    className="h-4 w-auto"
+                                    className="h-3 w-auto"
                                     loading="lazy"
                                     decoding="async"
                                 />

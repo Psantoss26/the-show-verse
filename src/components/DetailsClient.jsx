@@ -83,7 +83,9 @@ const writeOmdbCache = (imdbId, patch) => {
       t: Date.now(),
       imdbRating: patch?.imdbRating ?? prev?.imdbRating ?? null,
       imdbVotes: patch?.imdbVotes ?? prev?.imdbVotes ?? null,
-      awards: patch?.awards ?? prev?.awards ?? null
+      awards: patch?.awards ?? prev?.awards ?? null,
+      rtScore: patch?.rtScore ?? prev?.rtScore ?? null,     // ✅ NEW
+      mcScore: patch?.mcScore ?? prev?.mcScore ?? null      // ✅ NEW
     }
     window.sessionStorage.setItem(`showverse:omdb:${imdbId}`, JSON.stringify(next))
   } catch {
@@ -97,6 +99,34 @@ const runIdle = (cb) => {
     return window.requestIdleCallback(() => cb?.(), { timeout: 1200 })
   }
   return window.setTimeout(() => cb?.(), 250)
+}
+
+const omdbGetRatingValue = (omdb, source) => {
+  const arr = Array.isArray(omdb?.Ratings) ? omdb.Ratings : []
+  const hit = arr.find(
+    (r) => String(r?.Source || '').toLowerCase() === String(source || '').toLowerCase()
+  )
+  return typeof hit?.Value === 'string' ? hit.Value.trim() : null
+}
+
+const parseOmdbScore0to100 = (value) => {
+  if (!value || value === 'N/A') return null
+  const s = String(value).trim() // "73%" | "74/100" | "74"
+  const m = s.match(/(\d+(\.\d+)?)/)
+  if (!m) return null
+  const n = Number(m[1])
+  return Number.isFinite(n) ? n : null
+}
+
+const extractOmdbExtraScores = (omdb) => {
+  const rtRaw = omdbGetRatingValue(omdb, 'Rotten Tomatoes') // "73%"
+  const mcRaw = omdbGetRatingValue(omdb, 'Metacritic')      // "74/100"
+  const metaRaw = typeof omdb?.Metascore === 'string' ? omdb.Metascore : null // "74" o "N/A"
+
+  const rtScore = parseOmdbScore0to100(rtRaw)
+  const mcScore = parseOmdbScore0to100(mcRaw && mcRaw !== 'N/A' ? mcRaw : metaRaw)
+
+  return { rtScore, mcScore }
 }
 
 // --- Helpers de Imágenes ---
@@ -810,6 +840,9 @@ export default function DetailsClient({
   const endpointType = type === 'tv' ? 'tv' : 'movie'
   const yearIso = (data.release_date || data.first_air_date || '')?.slice(0, 4)
 
+  const tmdbDetailUrl =
+    type && id ? `https://www.themoviedb.org/${type}/${id}` : null
+
   const tmdbWatchUrl =
     watchLink || (type && id ? `https://www.themoviedb.org/${type}/${id}/watch` : null)
 
@@ -828,6 +861,8 @@ export default function DetailsClient({
   const [userRating, setUserRating] = useState(null)
   const [ratingLoading, setRatingLoading] = useState(false)
   const [ratingError, setRatingError] = useState('')
+
+  const [accountStatesLoading, setAccountStatesLoading] = useState(false)
 
   // ✅ Resumen plegable (por defecto oculto)
   const [overviewOpen, setOverviewOpen] = useState(false)
@@ -1407,24 +1442,38 @@ export default function DetailsClient({
   // ====== Account States ======
   useEffect(() => {
     let cancel = false
+
     const load = async () => {
+      // si no hay sesión, no hay nada que cargar para “tu puntuación”
+      if (!session || !account?.id) {
+        setAccountStatesLoading(false)
+        return
+      }
+
+      setAccountStatesLoading(true)
+
       try {
-        if (!session || !account?.id) return
         const st = await getMediaAccountStates(type, id, session)
-        if (!cancel) {
-          setFavorite(!!st.favorite)
-          setWatchlist(!!st.watchlist)
-          const ratedValue =
-            st?.rated && typeof st.rated.value === 'number' ? st.rated.value : null
-          setUserRating(ratedValue)
-        }
-      } catch { }
+        if (cancel) return
+
+        setFavorite(!!st.favorite)
+        setWatchlist(!!st.watchlist)
+
+        const ratedValue =
+          st?.rated && typeof st.rated.value === 'number' ? st.rated.value : null
+        setUserRating(ratedValue)
+      } catch {
+        // si falla, al menos dejamos de “cargar” para no bloquear la UI
+      } finally {
+        if (!cancel) setAccountStatesLoading(false)
+      }
     }
+
     load()
     return () => {
       cancel = true
     }
-  }, [type, id, session, account])
+  }, [type, id, session, account?.id])
 
   const toggleFavorite = async () => {
     if (requireLogin() || favLoading) return
@@ -1509,7 +1558,13 @@ export default function DetailsClient({
   // ✅ Extras: IMDb rating rápido + votos/premios en idle
   // =====================================================
 
-  const [extras, setExtras] = useState({ imdbRating: null, imdbVotes: null, awards: null })
+  const [extras, setExtras] = useState({
+    imdbRating: null,
+    imdbVotes: null,
+    awards: null,
+    rtScore: null,
+    mcScore: null
+  })
   const [imdbVotesLoading, setImdbVotesLoading] = useState(false)
 
   useEffect(() => {
@@ -1530,7 +1585,7 @@ export default function DetailsClient({
     const run = async () => {
       try {
         // reset “suave” al cambiar de título
-        setExtras({ imdbRating: null, imdbVotes: null, awards: null })
+        setExtras({ imdbRating: null, imdbVotes: null, awards: null, rtScore: null, mcScore: null })
         setImdbVotesLoading(false)
 
         const imdbId = await resolveImdbId()
@@ -1547,7 +1602,12 @@ export default function DetailsClient({
         if (cached?.awards) {
           setExtras((prev) => ({ ...prev, awards: cached.awards }))
         }
-
+        if (cached?.rtScore != null) {
+          setExtras((prev) => ({ ...prev, rtScore: cached.rtScore }))
+        }
+        if (cached?.mcScore != null) {
+          setExtras((prev) => ({ ...prev, mcScore: cached.mcScore }))
+        }
         // si el cache está fresco y ya hay rating/votos, no hace falta pedir nada
         if (cached?.fresh && cached?.imdbRating != null && cached?.imdbVotes != null) return
 
@@ -1555,14 +1615,26 @@ export default function DetailsClient({
         const omdb = await fetchOmdbByImdb(imdbId)
         if (abort) return
 
-        const rating =
+        const imdbRating =
           omdb?.imdbRating && omdb.imdbRating !== 'N/A' ? Number(omdb.imdbRating) : null
 
-        // set rating lo antes posible
-        setExtras((prev) => ({ ...prev, imdbRating: Number.isFinite(rating) ? rating : null }))
-        writeOmdbCache(imdbId, { imdbRating: Number.isFinite(rating) ? rating : null })
+        const { rtScore, mcScore } = extractOmdbExtraScores(omdb)
 
-        // votos/premios en idle (no “compiten” con el render)
+        // ✅ pinta lo “rápido” cuanto antes (IMDb + RT + MC)
+        setExtras((prev) => ({
+          ...prev,
+          imdbRating: Number.isFinite(imdbRating) ? imdbRating : null,
+          rtScore,
+          mcScore
+        }))
+
+        writeOmdbCache(imdbId, {
+          imdbRating: Number.isFinite(imdbRating) ? imdbRating : null,
+          rtScore,
+          mcScore
+        })
+
+        // votos/premios en idle (como ya lo tenías)
         setImdbVotesLoading(true)
         runIdle(() => {
           if (abort) return
@@ -2152,7 +2224,7 @@ export default function DetailsClient({
               >
                 {/* TMDb */}
                 <div className="flex items-center gap-2 pr-3 shrink-0 whitespace-nowrap">
-                  <img src="/logo-TMDb.png" alt="TMDb" className="h-4.5 sm:h-5 w-auto" />
+                  <img src="/logo-TMDb.png" alt="TMDb" className="h-3.5 sm:h-3.5 w-auto" />
 
                   <div className="flex items-baseline gap-1.5 sm:gap-2">
                     <span className="text-lg sm:text-xl font-bold text-emerald-400">
@@ -2186,72 +2258,57 @@ export default function DetailsClient({
                   </div>
                 )}
 
+                {/* Rotten Tomatoes */}
+                {extras.rtScore != null && (
+                  <div className="flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
+                    <img
+                      src="/logo-RottenTomatoes.png"
+                      alt="Rotten Tomatoes"
+                      className="h-4.5 sm:h-5 w-auto"
+                    />
+
+                    <div className="flex items-baseline gap-1.5 sm:gap-2">
+                      <span className="text-lg sm:text-xl font-bold text-rose-300">
+                        {Math.round(extras.rtScore)}
+                        <span className="text-[10px] sm:text-[11px] text-zinc-400 ml-1">%</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Metacritic */}
+                {extras.mcScore != null && (
+                  <div className="flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
+                    <img
+                      src="/logo-Metacritic.png"
+                      alt="Metacritic"
+                      className="h-4.5 sm:h-5 w-auto"
+                    />
+
+                    <div className="flex items-baseline gap-1.5 sm:gap-2">
+                      <span className="text-lg sm:text-xl font-bold text-lime-200">
+                        {Math.round(extras.mcScore)}
+                      </span>
+                      <span className="text-[10px] sm:text-[11px] text-zinc-400">/100</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Usuario */}
                 {session && (
                   <div className="flex items-center px-3 shrink-0 whitespace-nowrap">
-                    {/* Compacta un poco en móvil para que quepa */}
-                    <div className="origin-left scale-[0.90] sm:scale-100">
-                      {(() => {
-                        const canClear = userRating != null && !ratingLoading
-
-                        const clearBtnBase =
-                          'ml-1 inline-flex items-center justify-center rounded-lg border bg-white/5 text-zinc-200 transition-all duration-200 overflow-hidden'
-
-                        const clearHidden =
-                          'opacity-0 max-w-0 w-0 p-0 border-transparent pointer-events-none'
-
-                        const clearShown =
-                          'opacity-100 max-w-[32px] w-[32px] p-1.5 border-white/10 pointer-events-auto hover:bg-white/10'
-
-                        return (
-                          <div
-                            ref={ratingWrapRef}
-                            className="inline-flex items-center whitespace-nowrap group"
-                            onPointerDownCapture={() => {
-                              // móvil: mostrar/ocultar al pulsar la puntuación
-                              if (supportsHover) return
-                              if (!canClear) return
-                              setMobileClearOpen((v) => !v)
-                            }}
-                          >
-                            <StarRating
-                              rating={userRating}
-                              onRating={sendRating}
-                              // ⛔️ no pasamos onClearRating para que StarRating NO pinte su propio botón
-                              disabled={ratingLoading}
-                            />
-
-                            {canClear && (
-                              <button
-                                type="button"
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  clearRating()
-                                  setMobileClearOpen(false)
-                                }}
-                                title="Borrar puntuación"
-                                aria-label="Borrar puntuación"
-                                className={[
-                                  clearBtnBase,
-                                  supportsHover
-                                    ? [
-                                      clearHidden,
-                                      'group-hover:opacity-100 group-hover:max-w-[32px] group-hover:w-[32px] group-hover:p-1.5',
-                                      'group-hover:border-white/10 group-hover:pointer-events-auto'
-                                    ].join(' ')
-                                    : mobileClearOpen
-                                      ? clearShown
-                                      : clearHidden
-                                ].join(' ')}
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </div>
+                    {accountStatesLoading ? (
+                      <div className="inline-flex items-center justify-center px-2.5 py-2 rounded-xl border border-white/10 bg-white/5">
+                        <Loader2 className="w-4 h-4 animate-spin text-zinc-300" />
+                      </div>
+                    ) : (
+                      <StarRating
+                        rating={userRating}
+                        onRating={sendRating}
+                        onClearRating={clearRating}
+                        disabled={ratingLoading}  // (accountStatesLoading ya es false aquí)
+                      />
+                    )}
                   </div>
                 )}
 
@@ -2278,6 +2335,22 @@ export default function DetailsClient({
                   <img
                     src="/logo-Web.png"
                     alt="Web oficial"
+                    className="w-9 h-9 object-contain rounded-lg"
+                  />
+                </a>
+              )}
+
+              {tmdbDetailUrl && (
+                <a
+                  href={tmdbDetailUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="The Movie Database"
+                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
+                >
+                  <img
+                    src="/logo-TMDb.png"
+                    alt="TMDb"
                     className="w-9 h-9 object-contain rounded-lg"
                   />
                 </a>
