@@ -10,7 +10,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   FilmIcon,
   TvIcon,
-  NewspaperIcon,
   CalendarDaysIcon,
   Heart,
   Bookmark,
@@ -19,6 +18,7 @@ import {
   X as XIcon,
   Menu as MenuIcon,
   HomeIcon,
+  Compass, // ✅ NUEVO
 } from 'lucide-react'
 
 /* ====================================================================
@@ -216,11 +216,9 @@ export default function Navbar() {
       tickingRef.current = true
 
       requestAnimationFrame(() => {
-        // Cerca del top, siempre visible
         if (currentY <= TOP_LOCK) {
           setBarsVisible(true)
         } else if (Math.abs(delta) >= THRESHOLD) {
-          // Baja => ocultar, sube => mostrar
           if (delta > 0) setBarsVisible(false)
           else setBarsVisible(true)
         }
@@ -271,6 +269,8 @@ export default function Navbar() {
               <Link href="/" className={navLinkClass('/')}>Inicio</Link>
               <Link href="/movies" className={navLinkClass('/movies')}>Películas</Link>
               <Link href="/series" className={navLinkClass('/series')}>Series</Link>
+              {/* ✅ NUEVO */}
+              <Link href="/discover" className={navLinkClass('/discover')}>Descubrir</Link>
             </div>
           </div>
 
@@ -470,6 +470,17 @@ export default function Navbar() {
                   <span>Series</span>
                 </Link>
 
+                {/* ✅ NUEVO: DESCUBRIR */}
+                <Link
+                  href="/discover"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/discover') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
+                    }`}
+                >
+                  <Compass className="w-5 h-5" />
+                  <span>Descubrir</span>
+                </Link>
+
                 <div className="my-3 h-px bg-neutral-800" />
 
                 <Link
@@ -492,13 +503,12 @@ export default function Navbar() {
                   <span>Pendientes</span>
                 </Link>
 
-                {/* Extras opcionales (si quieres mantenerlos accesibles sin ocupar el bottom nav) */}
                 <div className="my-3 h-px bg-neutral-800" />
 
                 <Link
                   href="/lists"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/news') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/lists') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
                     }`}
                 >
                   <ListVideo className="w-5 h-5" />
