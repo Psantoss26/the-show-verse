@@ -39,7 +39,9 @@ import {
   Search,
   RotateCcw,
   Play,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 
 /* === cuenta / api === */
@@ -52,6 +54,16 @@ import {
 } from '@/lib/api/tmdb'
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
 import StarRating from './StarRating'
+import TraktWatchedControl from '@/components/trakt/TraktWatchedControl'
+import TraktWatchedModal from '@/components/trakt/TraktWatchedModal'
+import {
+  traktGetItemStatus,
+  traktSetWatched,
+  traktAddWatchPlay,
+  traktUpdateWatchPlay,
+  traktRemoveWatchPlay
+} from '@/lib/api/traktClient'
+
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
@@ -1528,6 +1540,10 @@ export default function DetailsClient({
         body: JSON.stringify({ value })
       })
       if (!res.ok) throw new Error('Error al guardar puntuación')
+      if (syncTrakt && trakt.connected) {
+        // Trakt: 1..10 entero
+        await setTraktRatingSafe(value)
+      }
     } catch (err) {
       setRatingError(err.message)
     } finally {
@@ -1547,10 +1563,165 @@ export default function DetailsClient({
         headers: { 'Content-Type': 'application/json;charset=utf-8' }
       })
       if (!res.ok) throw new Error('Error al borrar puntuación')
+      if (syncTrakt && trakt.connected) {
+        // Trakt: 1..10 entero
+        await setTraktRatingSafe(null)
+      }
     } catch (err) {
       setRatingError(err.message)
     } finally {
       setRatingLoading(false)
+    }
+  }
+
+  const traktType = endpointType === 'tv' ? 'show' : 'movie'
+
+  const [trakt, setTrakt] = useState({
+    loading: false,
+    connected: false,
+    found: false,
+    traktUrl: null,
+    watched: false,
+    plays: 0,
+    lastWatchedAt: null,
+    rating: null,
+    inWatchlist: false,
+    progress: null,
+    history: [],
+    error: ''
+  })
+
+  const [traktBusy, setTraktBusy] = useState('') // 'watched' | 'watchlist' | 'history' | ''
+  const [traktWatchedOpen, setTraktWatchedOpen] = useState(false)
+
+  const [syncTrakt, setSyncTrakt] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const v = window.localStorage.getItem('showverse:trakt:sync') === '1'
+      setSyncTrakt(v)
+    } catch { }
+  }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem('showverse:trakt:sync', syncTrakt ? '1' : '0')
+    } catch { }
+  }, [syncTrakt])
+
+  const reloadTraktStatus = async () => {
+    setTrakt((p) => ({ ...p, loading: true, error: '' }))
+    const json = await traktGetItemStatus({ type: traktType, tmdbId: id })
+
+    setTrakt({
+      loading: false,
+      connected: !!json.connected,
+      found: !!json.found,
+      traktUrl: json.traktUrl || null,
+      watched: !!json.watched,
+      plays: Number(json.plays || 0),
+      lastWatchedAt: json.lastWatchedAt || null,
+      rating: typeof json.rating === 'number' ? json.rating : null, // si no usas rating, pon null
+      inWatchlist: !!json.inWatchlist,
+      progress: json.progress || null,
+      history: Array.isArray(json.history) ? json.history : [],
+      error: ''
+    })
+  }
+
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      setTrakt((p) => ({ ...p, loading: true, error: '' }))
+      try {
+        const json = await traktGetItemStatus({ type: traktType, tmdbId: id })
+        if (ignore) return
+
+        setTrakt({
+          loading: false,
+          connected: !!json.connected,
+          found: !!json.found,
+          traktUrl: json.traktUrl || null,
+          watched: !!json.watched,
+          plays: Number(json.plays || 0),
+          lastWatchedAt: json.lastWatchedAt || null,
+          rating: typeof json.rating === 'number' ? json.rating : null, // si no usas rating, pon null
+          inWatchlist: !!json.inWatchlist,
+          progress: json.progress || null,
+          history: Array.isArray(json.history) ? json.history : [],
+          error: ''
+        })
+      } catch (e) {
+        if (ignore) return
+        setTrakt((p) => ({ ...p, loading: false, error: e?.message || 'Error cargando Trakt' }))
+      }
+    }
+
+    load()
+    return () => {
+      ignore = true
+    }
+  }, [id, traktType])
+
+  const toggleTraktWatched = async () => {
+    if (!trakt.connected || traktBusy) return
+    setTraktBusy('watched')
+    try {
+      const next = !trakt.watched
+      await traktSetWatched({ type: traktType, tmdbId: id, watched: next })
+      setTrakt((p) => ({
+        ...p,
+        watched: next,
+        lastWatchedAt: next ? new Date().toISOString() : null,
+        plays: next ? Math.max(1, p.plays || 0) : 0
+      }))
+    } finally {
+      setTraktBusy('')
+    }
+  }
+
+  const handleTraktAddPlay = async (yyyyMmDd) => {
+    if (!trakt.connected || traktBusy) return
+    setTraktBusy('history')
+    try {
+      await traktAddWatchPlay({ type: traktType, tmdbId: id, watchedAt: yyyyMmDd })
+      await reloadTraktStatus()
+    } finally {
+      setTraktBusy('')
+    }
+  }
+
+  const handleTraktUpdatePlay = async (historyId, yyyyMmDd) => {
+    if (!trakt.connected || traktBusy) return
+    setTraktBusy('history')
+    try {
+      await traktUpdateWatchPlay({ type: traktType, tmdbId: id, historyId, watchedAt: yyyyMmDd })
+      await reloadTraktStatus()
+    } finally {
+      setTraktBusy('')
+    }
+  }
+
+  const handleTraktRemovePlay = async (historyId) => {
+    if (!trakt.connected || traktBusy) return
+    setTraktBusy('history')
+    try {
+      await traktRemoveWatchPlay({ historyId })
+      await reloadTraktStatus()
+    } finally {
+      setTraktBusy('')
+    }
+  }
+
+  const setTraktRatingSafe = async (valueOrNull) => {
+    if (!trakt.connected || traktBusy) return
+    setTraktBusy('rating')
+    try {
+      await traktSetRating({ type: traktType, tmdbId: id, rating: valueOrNull })
+      setTrakt((p) => ({ ...p, rating: valueOrNull == null ? null : Math.round(valueOrNull) }))
+    } finally {
+      setTraktBusy('')
     }
   }
 
@@ -2146,6 +2317,14 @@ export default function DetailsClient({
                   <Play className="w-6 h-6" />
                 </button>
 
+                <TraktWatchedControl
+                  connected={trakt.connected}
+                  watched={trakt.watched}
+                  plays={trakt.plays}
+                  busy={!!traktBusy}
+                  onOpen={() => setTraktWatchedOpen(true)}
+                />
+
                 <button
                   onClick={toggleFavorite}
                   disabled={favLoading}
@@ -2262,6 +2441,94 @@ export default function DetailsClient({
                     <span className="text-[13px] font-extrabold text-lime-200 leading-none">
                       {Math.round(extras.mcScore)}
                     </span>
+                  </div>
+                )}
+
+                {trakt.connected && (
+                  <div className="mt-3 flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTraktWatchedOpen(true)}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-zinc-200
+             hover:bg-white/10 transition"
+                        title="Ver historial de visionados (Trakt)"
+                      >
+                        <img src="/logo-Trakt.png" alt="Trakt" className="h-3.5 w-auto opacity-90" />
+                        <span className="font-semibold">Trakt</span>
+
+                        <span className={trakt.watched ? 'text-emerald-300' : 'text-zinc-400'}>
+                          {trakt.watched ? 'Visto' : 'No visto'}
+                        </span>
+
+                        {/* veces vistas */}
+                        {Number(trakt.plays || 0) > 0 && (
+                          <span className="text-zinc-400">· {trakt.plays}×</span>
+                        )}
+
+                        {/* últimas fechas (si tienes history). Ajusta watched_at -> watchedAt si tu API lo devuelve así */}
+                        {Array.isArray(trakt.history) && trakt.history.length > 0 ? (
+                          <span className="text-zinc-500">
+                            · Últ.: {new Date(trakt.history[0].watched_at).toLocaleDateString('es-ES')}
+                            {trakt.history[1]?.watched_at
+                              ? `, ${new Date(trakt.history[1].watched_at).toLocaleDateString('es-ES')}`
+                              : ''}
+                          </span>
+                        ) : trakt.lastWatchedAt ? (
+                          <span className="text-zinc-500">
+                            · Últ.: {new Date(trakt.lastWatchedAt).toLocaleDateString('es-ES')}
+                          </span>
+                        ) : null}
+
+                        <span className="ml-1 inline-flex items-center justify-center w-6 h-6 rounded-lg bg-black/25 border border-white/10">
+                          <Eye className="w-3.5 h-3.5" />
+                        </span>
+                      </button>
+
+                      <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-zinc-200 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          className="accent-yellow-500"
+                          checked={syncTrakt}
+                          onChange={(e) => setSyncTrakt(e.target.checked)}
+                        />
+                        Sincronizar con Trakt (nota + watchlist)
+                      </label>
+
+                      {/* Si quieres también el botón de watchlist Trakt “manual” (opcional) */}
+                      {/* <button onClick={toggleTraktWatchlist} ...>...</button> */}
+                    </div>
+
+                    {endpointType === 'tv' && trakt.progress && (
+                      <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="text-sm font-bold text-white">
+                            Progreso en Trakt
+                            {typeof trakt.progress.percentage === 'number' ? (
+                              <span className="text-zinc-400 font-semibold ml-2">
+                                {Math.round(trakt.progress.percentage)}%
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {trakt.progress.next_episode && (
+                            <div className="text-xs text-zinc-300">
+                              S{trakt.progress.next_episode.season}E{trakt.progress.next_episode.number}
+                              {trakt.progress.next_episode.title ? ` · ${trakt.progress.next_episode.title}` : ''}
+                            </div>
+                          )}
+                        </div>
+
+                        {typeof trakt.progress.percentage === 'number' && (
+                          <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500/70"
+                              style={{ width: `${Math.max(0, Math.min(100, trakt.progress.percentage))}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3407,6 +3674,18 @@ export default function DetailsClient({
 
       {/* ✅ MODAL: Vídeos / Trailer */}
       <VideoModal open={videoModalOpen} onClose={closeVideo} video={activeVideo} />
+
+      <TraktWatchedModal
+        open={traktWatchedOpen}
+        onClose={() => setTraktWatchedOpen(false)}
+        traktUrl={trakt.traktUrl}
+        plays={trakt.plays}
+        history={trakt.history || []}
+        onAddPlay={handleTraktAddPlay}
+        onUpdatePlay={handleTraktUpdatePlay}
+        onRemovePlay={handleTraktRemovePlay}
+        busy={!!traktBusy}
+      />
 
       {/* ✅ MODAL: Añadir a lista */}
       <AddToListModal
