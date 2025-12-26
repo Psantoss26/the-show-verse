@@ -191,6 +191,9 @@ export async function traktFetch(path, { token, method = 'GET', body } = {}) {
     return { ok: res.ok, status: res.status, json }
 }
 
+// ✅ Alias para compatibilidad con rutas antiguas (history/add|remove|update)
+export const traktApi = traktFetch
+
 export async function traktGetUserSettings(token) {
     const r = await traktFetch('/users/settings', { token })
     if (!r.ok) throw new Error('Trakt auth check failed')
