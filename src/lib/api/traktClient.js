@@ -118,3 +118,22 @@ export async function traktUpdateWatchPlay({ type, tmdbId, historyId, watchedAt 
 export async function traktRemoveWatchPlay({ historyId }) {
     return traktHistoryOp({ op: 'remove', historyId })
 }
+
+/**
+ * ✅ NUEVO: Historial global (movies + shows)
+ * type: 'all' | 'movies' | 'shows'
+ * from/to: 'YYYY-MM-DD'
+ */
+export async function traktGetHistory({ type = 'all', from, to, page = 1, limit = 200 } = {}) {
+    const qs = new URLSearchParams()
+    qs.set('type', type)
+    qs.set('page', String(page))
+    qs.set('limit', String(limit))
+    if (from) qs.set('from', from)
+    if (to) qs.set('to', to)
+
+    const res = await fetch(`/api/trakt/history?${qs.toString()}`, { cache: 'no-store' })
+    const json = await safeJson(res)
+    if (!res.ok) throw new Error(json?.error || `Trakt history HTTP ${res.status}`)
+    return json
+}

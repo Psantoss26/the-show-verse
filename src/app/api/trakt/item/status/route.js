@@ -1,134 +1,96 @@
+// src/app/api/trakt/item/status/route.js
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-
 import {
-    readTraktCookies,
-    tokenIsExpired,
-    refreshAccessToken,
+    getValidTraktToken,
     setTraktCookies,
-    traktGetUserSettings,
+    clearTraktCookies,
+    traktApi,
     traktSearchByTmdb,
     traktGetHistoryForItem,
     computeHistorySummary,
-    mapHistoryEntries,
+    mapHistoryEntries
 } from '@/lib/trakt/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-async function getValidTokenAndMaybeRefresh() {
-    const store = await cookies()
-    const { accessToken, refreshToken, expiresAtMs } = readTraktCookies(store)
+export async function GET(request) {
+    const type = request.nextUrl.searchParams.get('type') // movie | show
+    const tmdbId = request.nextUrl.searchParams.get('tmdbId')
 
-    if (!accessToken) {
-        return { token: null, refreshed: null }
-    }
-
-    // si no expira, ok
-    if (!tokenIsExpired(expiresAtMs)) {
-        return { token: accessToken, refreshed: null }
-    }
-
-    // expira y no hay refresh
-    if (!refreshToken) {
-        return { token: accessToken, refreshed: null }
-    }
-
-    // refresh
-    try {
-        const refreshed = await refreshAccessToken(refreshToken)
-        return { token: refreshed.access_token, refreshed }
-    } catch {
-        // si falla refresh, devolvemos el viejo (el handler hará 401 si no sirve)
-        return { token: accessToken, refreshed: null }
-    }
-}
-
-export async function GET(req) {
-    const { searchParams } = new URL(req.url)
-    const type = searchParams.get('type') // 'movie' | 'show'
-    const tmdbId = searchParams.get('tmdbId')
-
-    if (!type || !tmdbId) {
-        return NextResponse.json({ error: 'Missing type or tmdbId' }, { status: 400 })
-    }
     if (type !== 'movie' && type !== 'show') {
-        return NextResponse.json({ error: 'Invalid type (expected movie|show)' }, { status: 400 })
+        return NextResponse.json({ error: 'Invalid type. Use movie|show.' }, { status: 400 })
+    }
+    if (!tmdbId) {
+        return NextResponse.json({ error: 'Missing tmdbId' }, { status: 400 })
     }
 
-    const { token, refreshed } = await getValidTokenAndMaybeRefresh()
+    const cookieStore = request.cookies
+    let token = null
+    let refreshedTokens = null
+    let shouldClear = false
 
-    // no conectado
-    if (!token) {
-        return NextResponse.json({
-            connected: false,
-            found: false,
-            traktUrl: null,
-            watched: false,
-            plays: 0,
-            lastWatchedAt: null,
-            history: [],
-        })
-    }
-
-    // valida token (si falla -> 401 y connected false)
     try {
-        await traktGetUserSettings(token)
-    } catch {
-        return NextResponse.json(
-            {
-                connected: false,
+        const t = await getValidTraktToken(cookieStore)
+        token = t.token
+        refreshedTokens = t.refreshedTokens
+        shouldClear = t.shouldClear
+
+        if (!token) {
+            const res = NextResponse.json({ connected: false })
+            if (shouldClear) clearTraktCookies(res)
+            return res
+        }
+
+        // ✅ auth check: si 401/403 => desconectado + limpiar cookies
+        const auth = await traktApi('/users/settings', { token })
+        if (!auth.ok) {
+            const res = NextResponse.json({ connected: false })
+            clearTraktCookies(res)
+            return res
+        }
+
+        const hit = await traktSearchByTmdb(token, { type, tmdbId })
+
+        if (!hit) {
+            const res = NextResponse.json({
+                connected: true,
                 found: false,
                 traktUrl: null,
                 watched: false,
                 plays: 0,
                 lastWatchedAt: null,
-                history: [],
-                error: 'Trakt auth check failed',
-            },
-            { status: 401 }
-        )
-    }
-
-    let searchHit = null
-    let historyRaw = []
-
-    try {
-        searchHit = await traktSearchByTmdb(token, { type, tmdbId })
-
-        if (searchHit) {
-            const obj = type === 'movie' ? searchHit.movie : searchHit.show
-            const traktId = obj?.ids?.trakt || null
-
-            if (traktId) {
-                // sube el límite para que el modal tenga “últimos” de verdad
-                historyRaw = await traktGetHistoryForItem(token, { type, traktId, limit: 25 })
-            }
+                history: []
+            })
+            if (refreshedTokens) setTraktCookies(res, refreshedTokens)
+            return res
         }
+
+        const obj = type === 'movie' ? hit.movie : hit.show
+        const traktId = obj?.ids?.trakt
+
+        let history = []
+        if (traktId) {
+            history = await traktGetHistoryForItem(token, { type, traktId, limit: 30 })
+        }
+
+        const summary = computeHistorySummary({ searchHit: hit, history, type })
+
+        const res = NextResponse.json({
+            connected: true,
+            ...summary,
+            history: mapHistoryEntries(history)
+        })
+
+        if (refreshedTokens) setTraktCookies(res, refreshedTokens)
+        return res
     } catch (e) {
-        return NextResponse.json(
-            { error: e?.message || 'Trakt status failed' },
+        const res = NextResponse.json(
+            { connected: false, error: e?.message || 'Trakt status failed' },
             { status: 500 }
         )
+        // si refrescó antes de fallar, guardamos cookies igualmente
+        if (refreshedTokens) setTraktCookies(res, refreshedTokens)
+        return res
     }
-
-    const summary = computeHistorySummary({ searchHit, history: historyRaw, type })
-    const history = mapHistoryEntries(historyRaw) // ✅ ESTO ES LO QUE TE FALTA
-
-    const res = NextResponse.json({
-        connected: true,
-        ...summary,
-        history, // ✅ YA llega al modal
-        // si tu UI espera estos campos, los dejamos:
-        inWatchlist: false,
-        rating: null,
-        progress: null,
-    })
-
-    // si hubo refresh, actualiza cookies
-    if (refreshed) {
-        setTraktCookies(res, refreshed)
-    }
-
-    return res
 }
