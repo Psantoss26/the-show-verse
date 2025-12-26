@@ -32,7 +32,7 @@ import {
   MapPin,
   Languages,
   Trophy,
-  ListPlus,
+  ListVideo,
   Check,
   X,
   Plus,
@@ -984,6 +984,8 @@ export default function DetailsClient({
     const vals = Object.values(membershipMap || {})
     return vals.some(Boolean)
   }, [membershipMap])
+
+  const listActive = !listsPresenceLoading && inAnyList
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -2479,19 +2481,22 @@ export default function DetailsClient({
 
                 {canUseLists && (
                   <button
+                    type="button"
                     onClick={openListsModal}
                     disabled={listsPresenceLoading}
                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu
-                      ${inAnyList
-                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 hover:bg-emerald-500/30 hover:shadow-[0_0_25px_rgba(16,185,129,0.35)]'
+      ${listActive
+                        ? 'bg-purple-500/22 border-purple-500/70 text-purple-200 hover:bg-purple-500/30 hover:shadow-[0_0_22px_rgba(168,85,247,0.25)]'
                         : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:shadow-lg'
-                      }`}
+                      }
+      ${listsPresenceLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
                     title="Añadir a listas"
                   >
                     {listsPresenceLoading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
-                      <ListPlus className="w-6 h-6" />
+                      // ✅ aquí pon el MISMO icono que en el navbar (si es otro, sustitúyelo)
+                      <ListVideo className="w-6 h-6" />
                     )}
                   </button>
                 )}
