@@ -1,3 +1,4 @@
+// src/app/api/trakt/show/watched/route.js
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import {
@@ -6,8 +7,10 @@ import {
     refreshAccessToken,
     setTraktCookies,
     traktSearchByTmdb,
-    traktGetWatchedForShow,
-    mapWatchedEpisodesBySeason
+
+    // ✅ CAMBIO: progress watched
+    traktGetProgressWatchedForShow,
+    mapProgressWatchedBySeason,
 } from '@/lib/trakt/server'
 
 export const runtime = 'nodejs'
@@ -35,16 +38,16 @@ export async function GET(request) {
         }
 
         const hit = await traktSearchByTmdb(token, { type: 'show', tmdbId })
+        const traktId = hit?.show?.ids?.trakt
 
-        if (!hit?.show?.ids?.trakt) {
+        if (!traktId) {
             const res = NextResponse.json({ connected: true, found: false, watchedBySeason: {} })
             if (refreshedTokens) setTraktCookies(res, refreshedTokens)
             return res
         }
 
-        const traktId = hit.show.ids.trakt
-        const watchedPayload = await traktGetWatchedForShow(token, { traktId })
-        const watchedBySeason = mapWatchedEpisodesBySeason(watchedPayload)
+        const progress = await traktGetProgressWatchedForShow(token, { traktId })
+        const watchedBySeason = mapProgressWatchedBySeason(progress)
 
         const res = NextResponse.json({ connected: true, found: true, traktId, watchedBySeason })
         if (refreshedTokens) setTraktCookies(res, refreshedTokens)

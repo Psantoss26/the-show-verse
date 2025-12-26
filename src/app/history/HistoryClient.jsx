@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
     CalendarDays,
+    CalendarClock,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
@@ -12,7 +13,10 @@ import {
     Loader2,
     RotateCcw,
     Search,
-    Tv2
+    Trash2,
+    Tv2,
+    Check,
+    X
 } from 'lucide-react'
 
 import { traktAuthStatus, traktGetHistory } from '@/lib/api/traktClient'
@@ -28,6 +32,22 @@ function ymdLocal(date) {
     const d = date instanceof Date ? date : new Date(date)
     if (Number.isNaN(d.getTime())) return null
     return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+function toLocalDatetimeInput(iso) {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(
+        d.getMinutes()
+    )}`
+}
+
+function fromLocalDatetimeInput(value) {
+    if (!value) return null
+    const d = new Date(value) // local -> ISO
+    if (Number.isNaN(d.getTime())) return null
+    return d.toISOString()
 }
 
 function formatDateHeader(date, mode = 'day') {
@@ -54,30 +74,104 @@ function formatWatchedLine(iso) {
 }
 
 function getItemType(entry) {
-    // soporta: entry.type o entry.movie/show
     const t = entry?.type
     if (t === 'movie' || t === 'show') return t
+
+    // Trakt suele devolver 'episode' para series en history
+    if (t === 'episode' || t === 'episodes') return 'show'
+
     if (entry?.movie) return 'movie'
     if (entry?.show) return 'show'
-    // si tu API devuelve 'movies'/'shows'
+
     if (t === 'movies') return 'movie'
     if (t === 'shows') return 'show'
     return null
 }
 
-function getTitle(entry) {
-    // ✅ prioriza español si existe
+function isEpisodeEntry(entry) {
+    const t = entry?.type
+    if (t === 'episode' || t === 'episodes') return true
+    if (entry?.episode) return true
+
+    // ✅ soportar season/number como string
+    const season =
+        entry?.season ??
+        entry?.season_number ??
+        entry?.seasonNumber ??
+        entry?.episodeSeason ??
+        entry?.episode?.season ??
+        null
+
+    const number =
+        entry?.number ??
+        entry?.episode_number ??
+        entry?.episodeNumber ??
+        entry?.episode?.number ??
+        null
+
+    if (season != null && number != null && Number.isFinite(Number(season)) && Number.isFinite(Number(number))) return true
+    return false
+}
+
+function getShowTitle(entry) {
     return (
+        entry?.show?.title ||
+        entry?.show?.name ||
+        entry?.show?.title_es ||
+        entry?.show?.titleEs ||
         entry?.title_es ||
         entry?.titleEs ||
         entry?.titleES ||
         entry?.title ||
-        entry?.movie?.title ||
-        entry?.show?.title ||
-        entry?.show?.name ||
         entry?.name ||
         'Sin título'
     )
+}
+
+function getMovieTitle(entry) {
+    return (
+        entry?.title_es ||
+        entry?.titleEs ||
+        entry?.titleES ||
+        entry?.movie?.title ||
+        entry?.movie?.name ||
+        entry?.title ||
+        entry?.name ||
+        'Sin título'
+    )
+}
+
+function getMainTitle(entry) {
+    const t = getItemType(entry)
+    return t === 'movie' ? getMovieTitle(entry) : getShowTitle(entry)
+}
+
+function getEpisodeMeta(entry) {
+    const season =
+        entry?.episode?.season ??
+        entry?.season ??
+        entry?.season_number ??
+        entry?.seasonNumber ??
+        entry?.episodeSeason ??
+        null
+
+    const episode =
+        entry?.episode?.number ??
+        entry?.episode_number ??
+        entry?.number ??
+        entry?.episodeNumber ??
+        null
+
+    const title =
+        entry?.episode?.title ??
+        entry?.episodeTitle ??
+        entry?.episode_name ??
+        entry?.episodeName ??
+        entry?.episode?.name ??
+        null
+
+    const hasNums = Number.isFinite(Number(season)) && Number.isFinite(Number(episode))
+    return hasNums ? { season: Number(season), episode: Number(episode), title: title || null } : null
 }
 
 function getYear(entry) {
@@ -94,20 +188,67 @@ function getTmdbId(entry) {
     )
 }
 
+function getHistoryId(entry) {
+    return entry?.id || entry?.history_id || entry?.historyId || null
+}
+
 /**
- * ✅ Ruta de detalles (ajusta si tu app usa otras rutas)
+ * ✅ target para update fecha:
+ * - movie: trakt movie id
+ * - episode: trakt episode id (si viene)
+ * - show_episode (fallback): trakt show id + season + episode
+ */
+function getTraktIdForUpdate(entry) {
+    const itemType = getItemType(entry)
+
+    // movie trakt id
+    const movieTrakt =
+        entry?.movie?.ids?.trakt || entry?.ids?.trakt || entry?.traktId || entry?.movieTraktId || null
+    if (itemType === 'movie' && movieTrakt) return { kind: 'movie', traktId: Number(movieTrakt) }
+
+    // episode trakt id (si existe)
+    const epTrakt =
+        entry?.episode?.ids?.trakt ||
+        entry?.episode?.ids?.trakt_id ||
+        entry?.episodeTraktId ||
+        entry?.traktEpisodeId ||
+        null
+
+    if (isEpisodeEntry(entry) && epTrakt) return { kind: 'episode', traktId: Number(epTrakt) }
+
+    // ✅ fallback: show trakt id + season/episode
+    const showTrakt =
+        entry?.show?.ids?.trakt ||
+        entry?.showTraktId ||
+        entry?.traktShowId ||
+        entry?.show?.traktId ||
+        null
+
+    const meta = getEpisodeMeta(entry)
+    if (isEpisodeEntry(entry) && showTrakt && meta) {
+        return {
+            kind: 'show_episode',
+            traktId: Number(showTrakt),
+            season: meta.season,
+            episode: meta.episode
+        }
+    }
+
+    return null
+}
+
+/**
+ * ✅ Ruta de detalles
  */
 function getDetailsHref(entry) {
-    const type = getItemType(entry) // 'movie' | 'show'
+    const type = getItemType(entry)
     const tmdbId = getTmdbId(entry)
     if (!type || !tmdbId) return null
-
     const mediaType = type === 'movie' ? 'movie' : 'tv'
     return `/details/${mediaType}/${tmdbId}`
 }
 
 function normalizeHistoryResponse(json) {
-    // soporta varias formas: {items:[]}, {history:[]}, [] ...
     if (Array.isArray(json)) return { items: json }
     if (Array.isArray(json?.items)) return { items: json.items, meta: json.meta }
     if (Array.isArray(json?.history)) return { items: json.history, meta: json.meta }
@@ -130,7 +271,7 @@ async function mapLimit(arr, limit, fn) {
 // ----------------------------
 // TMDb minimal cache (client)
 // ----------------------------
-const tmdbCache = new Map() // key => { poster_path, backdrop_path, title_es, year }
+const tmdbCache = new Map()
 const tmdbInflight = new Map()
 
 async function fetchTmdbPoster({ type, tmdbId }) {
@@ -142,9 +283,7 @@ async function fetchTmdbPoster({ type, tmdbId }) {
     const p = (async () => {
         if (!TMDB_API_KEY || !tmdbId) return null
         try {
-            const url = `https://api.themoviedb.org/3/${t}/${encodeURIComponent(
-                tmdbId
-            )}?api_key=${TMDB_API_KEY}&language=es-ES`
+            const url = `https://api.themoviedb.org/3/${t}/${encodeURIComponent(tmdbId)}?api_key=${TMDB_API_KEY}&language=es-ES`
             const res = await fetch(url, { cache: 'no-store' })
             const json = await res.json()
             if (!res.ok) return null
@@ -173,13 +312,25 @@ async function fetchTmdbPoster({ type, tmdbId }) {
 }
 
 // ----------------------------
+// API helpers
+// ----------------------------
+async function apiPost(url, body) {
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.message || json?.error || 'Error')
+    return json
+}
+
+// ----------------------------
 // UI atoms
 // ----------------------------
 function Pill({ children, className = '' }) {
     return (
-        <span
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-xs text-zinc-200 ${className}`}
-        >
+        <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-xs text-zinc-200 ${className}`}>
             {children}
         </span>
     )
@@ -191,6 +342,18 @@ function FancyButton({ children, className = '', ...props }) {
             {...props}
             className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5
       hover:bg-white/10 hover:border-white/15 transition text-sm font-semibold text-zinc-200 ${className}`}
+        >
+            {children}
+        </button>
+    )
+}
+
+function IconButton({ children, className = '', ...props }) {
+    return (
+        <button
+            {...props}
+            className={`w-11 h-11 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/15 transition
+      flex items-center justify-center text-zinc-200 ${className}`}
         >
             {children}
         </button>
@@ -213,11 +376,7 @@ function Dropdown({ label, valueLabel, children, className = '' }) {
 
     return (
         <div ref={ref} className={`relative ${className}`}>
-            {label && (
-                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">
-                    {label}
-                </div>
-            )}
+            {label && <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">{label}</div>}
 
             <button
                 type="button"
@@ -264,9 +423,9 @@ function DropdownItem({ active, onClick, children }) {
 // ----------------------------
 // Calendar view
 // ----------------------------
-function buildMonthGrid(year, month /* 0-11 */, weekStartsOn = 1 /* 1=lunes */) {
+function buildMonthGrid(year, month, weekStartsOn = 1) {
     const first = new Date(year, month, 1)
-    const firstDow = first.getDay() // 0=domingo
+    const firstDow = first.getDay()
     const offset = (firstDow - weekStartsOn + 7) % 7
     const start = new Date(year, month, 1 - offset)
 
@@ -283,14 +442,7 @@ function buildMonthGrid(year, month /* 0-11 */, weekStartsOn = 1 /* 1=lunes */) 
     return weeks
 }
 
-function CalendarPanel({
-    monthDate,
-    onPrev,
-    onNext,
-    countsByDay,
-    selectedYmd,
-    onSelectYmd
-}) {
+function CalendarPanel({ monthDate, onPrev, onNext, countsByDay, selectedYmd, onSelectYmd }) {
     const year = monthDate.getFullYear()
     const month = monthDate.getMonth()
     const weeks = useMemo(() => buildMonthGrid(year, month, 1), [year, month])
@@ -433,37 +585,114 @@ function Poster({ entry }) {
 
     return (
         <div className="w-14 h-20 sm:w-16 sm:h-24 rounded-2xl overflow-hidden border border-white/10 bg-black/40 shrink-0">
-            <img
-                src={src}
-                alt="poster"
-                className="w-full h-full object-cover"
-                loading="lazy"
-                decoding="async"
-            />
+            <img src={src} alt="poster" className="w-full h-full object-cover" loading="lazy" decoding="async" />
         </div>
     )
 }
 
-function HistoryItemCard({ entry }) {
-    const type = getItemType(entry)
-    const title = getTitle(entry)
+function HistoryItemCard({ entry, busy, onUpdateWatchedAt, onRemoveFromHistory }) {
+    const type = getItemType(entry) // movie | show
+    const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
+
+    const title = getMainTitle(entry)
     const year = getYear(entry)
     const watchedAt = entry?.watched_at || entry?.watchedAt || entry?.watchedAtIso || null
 
     const href = useMemo(() => getDetailsHref(entry), [entry])
+    const historyId = getHistoryId(entry)
+    const updateTarget = getTraktIdForUpdate(entry)
+    const canEdit = !!watchedAt && !!historyId && !!updateTarget
 
-    // contenido visual (lo reutilizamos para Link / fallback)
+    const [editing, setEditing] = useState(false)
+    const [editValue, setEditValue] = useState('')
+    const [confirmDel, setConfirmDel] = useState(false)
+
+    const actionsRef = useRef(null)
+
+    useEffect(() => {
+        setEditing(false)
+        setConfirmDel(false)
+        setEditValue(watchedAt ? toLocalDatetimeInput(watchedAt) : '')
+    }, [historyId, watchedAt])
+
+    // ✅ cerrar popovers al clicar fuera
+    useEffect(() => {
+        if (!editing && !confirmDel) return
+        const onDown = (e) => {
+            if (!actionsRef.current) return
+            if (!actionsRef.current.contains(e.target)) {
+                setEditing(false)
+                setConfirmDel(false)
+            }
+        }
+        document.addEventListener('pointerdown', onDown)
+        return () => document.removeEventListener('pointerdown', onDown)
+    }, [editing, confirmDel])
+
+    const stopLink = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+    }
+
+    const onStartEdit = (e) => {
+        stopLink(e)
+        if (!canEdit || busy) return
+        setEditValue(watchedAt ? toLocalDatetimeInput(watchedAt) : '')
+        setEditing(true)
+        setConfirmDel(false)
+    }
+
+    const onCancelEdit = (e) => {
+        stopLink(e)
+        setEditing(false)
+        setEditValue(watchedAt ? toLocalDatetimeInput(watchedAt) : '')
+    }
+
+    const onSaveEdit = async (e) => {
+        stopLink(e)
+        if (!canEdit || busy) return
+        const iso = fromLocalDatetimeInput(editValue)
+        if (!iso) return
+        await onUpdateWatchedAt?.(entry, { historyId, target: updateTarget, watchedAtIso: iso })
+        setEditing(false)
+    }
+
+    const onAskDelete = (e) => {
+        stopLink(e)
+        if (busy) return
+        setConfirmDel(true)
+        setEditing(false)
+    }
+
+    const onCancelDelete = (e) => {
+        stopLink(e)
+        setConfirmDel(false)
+    }
+
+    const onConfirmDelete = async (e) => {
+        stopLink(e)
+        if (!historyId || busy) return
+        await onRemoveFromHistory?.(entry, { historyId })
+        setConfirmDel(false)
+    }
+
+    const epBadge = (type === 'show' && epMeta)
+        ? `T${epMeta.season} · E${epMeta.episode}`
+        : null
+
     const Inner = (
-        <div className="w-full text-left flex items-center justify-between gap-4 p-4 sm:p-5 border-t border-white/10
-                        hover:bg-white/[0.03] transition focus:outline-none focus:ring-2 focus:ring-yellow-500/30">
-            <div className="flex items-center gap-4 min-w-0">
+        <div
+            className={`w-full text-left flex items-stretch justify-between gap-4 p-4 sm:p-5 border-t border-white/10
+      hover:bg-white/[0.03] transition focus:outline-none focus:ring-2 focus:ring-yellow-500/30 ${busy ? 'opacity-80' : ''}`}
+        >
+            <div className="flex items-start gap-4 min-w-0 flex-1">
                 <Poster entry={entry} />
 
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                         <span
                             className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-bold border
-                            ${type === 'movie'
+              ${type === 'movie'
                                     ? 'bg-sky-500/10 border-sky-500/25 text-sky-200'
                                     : 'bg-violet-500/10 border-violet-500/25 text-violet-200'
                                 }`}
@@ -472,33 +701,158 @@ function HistoryItemCard({ entry }) {
                             {type === 'movie' ? 'Película' : 'Serie'}
                         </span>
 
-                        <div className="text-white font-extrabold truncate">
-                            {title}
-                            {year ? <span className="text-zinc-400 font-semibold"> ({year})</span> : null}
+                        <div className="text-white font-extrabold truncate flex items-center gap-2 min-w-0">
+                            <span className="truncate">{title}</span>
+                            {year ? <span className="text-zinc-400 font-semibold">({year})</span> : null}
+
+                            {/* ✅ badge S/E junto al título */}
+                            {epBadge && (
+                                <span className="shrink-0 text-[11px] font-extrabold px-2 py-0.5 rounded-full border border-white/10 bg-white/5 text-zinc-200">
+                                    {epBadge}
+                                </span>
+                            )}
                         </div>
                     </div>
 
+                    {/* ✅ título del episodio si existe */}
+                    {type === 'show' && epMeta?.title && (
+                        <div className="mt-1 text-xs text-zinc-400 truncate">
+                            {epMeta.title}
+                        </div>
+                    )}
+
                     {watchedAt && (
-                        <div className="mt-1 text-xs text-zinc-400">
+                        <div className="mt-2 text-xs text-zinc-400">
                             Visto:{' '}
-                            <span className="text-zinc-200 font-semibold">
-                                {formatWatchedLine(watchedAt)}
-                            </span>
+                            <span className="text-zinc-200 font-semibold">{formatWatchedLine(watchedAt)}</span>
                         </div>
                     )}
                 </div>
             </div>
 
-            <div className="shrink-0 w-11 h-11 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center">
-                <ChevronRight className="w-5 h-5 text-zinc-300" />
+            {/* Right actions + popovers (no rompen layout) */}
+            <div
+                ref={actionsRef}
+                className="relative shrink-0 flex items-center gap-2"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+            >
+                {/* Popover editar */}
+                {editing && (
+                    <div
+                        className="absolute right-0 top-full mt-2 z-30 w-[320px] rounded-2xl border border-white/10 bg-[#0f0f0f]/95 shadow-2xl backdrop-blur p-3"
+                        onClick={stopLink}
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        <div className="text-xs font-extrabold text-zinc-200 mb-2 flex items-center gap-2">
+                            <CalendarClock className="w-4 h-4 text-zinc-400" />
+                            Editar fecha de visto
+                        </div>
+
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
+                            <input
+                                type="datetime-local"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className="w-full bg-transparent outline-none text-sm text-zinc-200"
+                            />
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={onCancelEdit}
+                                disabled={busy}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10 transition text-sm font-bold disabled:opacity-70"
+                            >
+                                <X className="w-4 h-4" />
+                                Cancelar
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={onSaveEdit}
+                                disabled={busy}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-500/25 bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/18 transition text-sm font-bold disabled:opacity-70"
+                            >
+                                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                Guardar
+                            </button>
+                        </div>
+
+                        {!canEdit && (
+                            <div className="mt-2 text-[11px] text-zinc-500">
+                                No se puede editar esta entrada (faltan IDs Trakt).
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Popover borrar */}
+                {confirmDel && (
+                    <div
+                        className="absolute right-0 top-full mt-2 z-30 w-[280px] rounded-2xl border border-white/10 bg-[#0f0f0f]/95 shadow-2xl backdrop-blur p-3"
+                        onClick={stopLink}
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        <div className="text-sm font-bold text-zinc-200">¿Borrar esta entrada?</div>
+                        <div className="text-xs text-zinc-500 mt-1">Se eliminará del historial de Trakt.</div>
+
+                        <div className="mt-3 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={onCancelDelete}
+                                disabled={busy}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10 transition text-sm font-bold disabled:opacity-70"
+                            >
+                                Cancelar
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={onConfirmDelete}
+                                disabled={busy}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-red-500/25 bg-red-500/12 text-red-200 hover:bg-red-500/18 transition text-sm font-bold disabled:opacity-70"
+                            >
+                                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                Borrar
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Botón editar fecha */}
+                <IconButton
+                    type="button"
+                    onClick={onStartEdit}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    disabled={!canEdit || busy}
+                    className={`${!canEdit ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    title={canEdit ? 'Editar fecha' : 'No se puede editar (faltan IDs Trakt)'}
+                >
+                    <CalendarClock className="w-5 h-5" />
+                </IconButton>
+
+                {/* Botón borrar */}
+                <IconButton
+                    type="button"
+                    onClick={onAskDelete}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    disabled={busy}
+                    title="Borrar del historial"
+                >
+                    <Trash2 className="w-5 h-5" />
+                </IconButton>
+
+                {/* Flecha navegar */}
+                <div className="shrink-0 w-11 h-11 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center">
+                    <ChevronRight className="w-5 h-5 text-zinc-300" />
+                </div>
             </div>
         </div>
     )
 
-    // si por algún motivo falta href, no hacemos Link
-    if (!href) {
-        return <div className="opacity-80">{Inner}</div>
-    }
+    if (!href) return <div className="opacity-80">{Inner}</div>
 
     return (
         <Link href={href} className="block" title={title} prefetch={false}>
@@ -515,6 +869,10 @@ export default function HistoryClient() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [raw, setRaw] = useState([])
+
+    // mutating (edit/delete)
+    const [mutatingId, setMutatingId] = useState('')
+    const [mutErr, setMutErr] = useState('')
 
     // UI
     const [viewMode, setViewMode] = useState('list') // list | calendar
@@ -548,14 +906,13 @@ export default function HistoryClient() {
             const json = await traktGetHistory({ type: 'all', from: from || undefined, to: to || undefined, page: 1, limit: 200 })
             const { items } = normalizeHistoryResponse(json)
 
-            // sort desc
             const sorted = [...items].sort((a, b) => {
                 const ta = new Date(a?.watched_at || a?.watchedAt || 0).getTime()
                 const tb = new Date(b?.watched_at || b?.watchedAt || 0).getTime()
                 return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0)
             })
 
-            // ✅ Enriquecer con TMDB (título ES + poster + year) para mostrar y buscar en español
+            // enrich TMDB
             const enriched = await mapLimit(sorted, 10, async (e) => {
                 const t = getItemType(e)
                 const id = getTmdbId(e)
@@ -594,6 +951,40 @@ export default function HistoryClient() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [auth.loading, auth.connected])
 
+    // ✅ borrar (optimista)
+    const removeFromHistory = useCallback(async (_entry, { historyId }) => {
+        if (!historyId) return
+        setMutErr('')
+        setMutatingId(`del:${historyId}`)
+        try {
+            await apiPost('/api/trakt/history/remove', { ids: [historyId] })
+            setRaw((prev) => (prev || []).filter((x) => String(getHistoryId(x)) !== String(historyId)))
+        } catch (e) {
+            setMutErr(e?.message || 'No se pudo borrar del historial')
+        } finally {
+            setMutatingId('')
+        }
+    }, [])
+
+    // ✅ editar fecha (remove + add) y recargar
+    const updateWatchedAt = useCallback(async (_entry, { historyId, target, watchedAtIso }) => {
+        if (!historyId || !target?.kind || !target?.traktId || !watchedAtIso) return
+        setMutErr('')
+        setMutatingId(`edit:${historyId}`)
+        try {
+            await apiPost('/api/trakt/history/update', {
+                historyId,
+                watchedAt: watchedAtIso,
+                target
+            })
+            await loadHistory()
+        } catch (e) {
+            setMutErr(e?.message || 'No se pudo actualizar la fecha')
+        } finally {
+            setMutatingId('')
+        }
+    }, [loadHistory])
+
     // derived
     const filtered = useMemo(() => {
         const needle = (q || '').trim().toLowerCase()
@@ -606,14 +997,13 @@ export default function HistoryClient() {
             const d = watchedAt ? new Date(watchedAt) : null
             if (!d || Number.isNaN(d.getTime())) return false
 
-            // calendar day filter
             if (selectedDay) {
                 const key = ymdLocal(d)
                 if (key !== selectedDay) return false
             }
 
             if (needle) {
-                const title = getTitle(e).toLowerCase()
+                const title = (getMainTitle(e) || '').toLowerCase()
                 if (!title.includes(needle)) return false
             }
             return true
@@ -629,7 +1019,7 @@ export default function HistoryClient() {
             const t = getItemType(e)
             if (t === 'movie') movies++
             if (t === 'show') shows++
-            const id = getTmdbId(e) || `${t}:${getTitle(e)}:${getYear(e) || ''}`
+            const id = getTmdbId(e) || `${t}:${getMainTitle(e)}:${getYear(e) || ''}`
             uniqSet.add(String(id))
         }
         return { plays, unique: uniqSet.size, movies, shows }
@@ -664,7 +1054,6 @@ export default function HistoryClient() {
             map.get(key).push(e)
         }
 
-        // sort groups desc
         const keys = Array.from(map.keys()).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
         return keys.map((k) => ({ key: k, date: new Date(k), items: map.get(k) || [] }))
     }, [filtered, groupBy])
@@ -674,7 +1063,6 @@ export default function HistoryClient() {
     // ----------------------------
     return (
         <div className="min-h-screen bg-[#0b0b0b] text-zinc-100">
-            {/* background glow */}
             <div className="pointer-events-none fixed inset-0">
                 <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[920px] h-[920px] rounded-full blur-3xl opacity-25 bg-yellow-500/20" />
                 <div className="absolute top-40 -left-40 w-[760px] h-[760px] rounded-full blur-3xl opacity-20 bg-emerald-500/15" />
@@ -729,7 +1117,6 @@ export default function HistoryClient() {
                             </div>
                         </div>
 
-                        {/* Not connected */}
                         {!auth.loading && !auth.connected && (
                             <div className="mt-6 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
                                 <div className="text-sm text-zinc-200 font-semibold">
@@ -745,7 +1132,6 @@ export default function HistoryClient() {
                             </div>
                         )}
 
-                        {/* Filters */}
                         {auth.connected && (
                             <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -778,9 +1164,7 @@ export default function HistoryClient() {
                                     </Dropdown>
 
                                     <div>
-                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">
-                                            Desde
-                                        </div>
+                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Desde</div>
                                         <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
                                             <CalendarDays className="w-4 h-4 text-zinc-400" />
                                             <input
@@ -793,9 +1177,7 @@ export default function HistoryClient() {
                                     </div>
 
                                     <div>
-                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">
-                                            Hasta
-                                        </div>
+                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Hasta</div>
                                         <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
                                             <CalendarDays className="w-4 h-4 text-zinc-400" />
                                             <input
@@ -818,7 +1200,6 @@ export default function HistoryClient() {
                                     />
                                 </div>
 
-                                {/* calendar quick day filter hint */}
                                 {viewMode === 'calendar' && (
                                     <div className="mt-3 text-xs text-zinc-500">
                                         Tip: en la vista calendario puedes seleccionar un día para filtrar la lista.
@@ -829,7 +1210,6 @@ export default function HistoryClient() {
                     </div>
                 </div>
 
-                {/* Loading / error */}
                 {auth.connected && (
                     <div className="mt-6">
                         {loading && (
@@ -838,13 +1218,12 @@ export default function HistoryClient() {
                             </div>
                         )}
                         {!!error && <div className="text-sm text-red-400 mt-2">{error}</div>}
+                        {!!mutErr && <div className="text-sm text-red-400 mt-2">{mutErr}</div>}
                     </div>
                 )}
 
-                {/* Main content */}
                 {auth.connected && (
                     <div className="mt-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
-                        {/* Calendar */}
                         <AnimatePresence initial={false}>
                             {viewMode === 'calendar' && (
                                 <motion.div
@@ -867,7 +1246,6 @@ export default function HistoryClient() {
                             )}
                         </AnimatePresence>
 
-                        {/* List */}
                         <div className={viewMode === 'calendar' ? 'xl:col-span-7' : 'xl:col-span-12'}>
                             {filtered.length === 0 && !loading && (
                                 <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-zinc-400">
@@ -877,10 +1255,7 @@ export default function HistoryClient() {
 
                             <div className="space-y-5">
                                 {grouped.map((g) => (
-                                    <div
-                                        key={g.key}
-                                        className="rounded-3xl border border-white/10 bg-white/[0.03] overflow-hidden"
-                                    >
+                                    <div key={g.key} className="rounded-3xl border border-white/10 bg-white/[0.03] overflow-hidden">
                                         <div className="p-4 sm:p-5 flex items-center justify-between gap-3 border-b border-white/10">
                                             <div className="min-w-0">
                                                 <div className="text-white font-extrabold capitalize truncate">
@@ -904,18 +1279,24 @@ export default function HistoryClient() {
                                         </div>
 
                                         <div>
-                                            {g.items.map((entry) => (
-                                                <HistoryItemCard
-                                                    key={entry?.id || `${getItemType(entry)}:${getTmdbId(entry)}:${entry?.watched_at || entry?.watchedAt || Math.random()}`}
-                                                    entry={entry}
-                                                />
-                                            ))}
+                                            {g.items.map((entry) => {
+                                                const hid = getHistoryId(entry)
+                                                const busyRow = !!mutatingId && (mutatingId === `del:${hid}` || mutatingId === `edit:${hid}`)
+                                                return (
+                                                    <HistoryItemCard
+                                                        key={hid || `${getItemType(entry)}:${getTmdbId(entry)}:${entry?.watched_at || entry?.watchedAt || Math.random()}`}
+                                                        entry={entry}
+                                                        busy={busyRow}
+                                                        onUpdateWatchedAt={updateWatchedAt}
+                                                        onRemoveFromHistory={removeFromHistory}
+                                                    />
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            {/* little footer */}
                             {filtered.length > 0 && (
                                 <div className="mt-6 text-xs text-zinc-500">
                                     Mostrando <span className="text-zinc-200 font-semibold">{filtered.length}</span> entradas (máx. 200 por carga).

@@ -8,13 +8,7 @@ async function safeJson(res) {
 
 /**
  * Normaliza watchedAt para enviar al backend de forma consistente.
- * Acepta:
- *  - "YYYY-MM-DD" (input type="date")
- *  - "DD/MM/YYYY" o "DD-MM-YYYY"
- *  - Date
- *  - ISO
- * Devuelve:
- *  - "YYYY-MM-DD" (preferido) o null
+ * Devuelve "YYYY-MM-DD" o null
  */
 function normalizeWatchedAtForApi(input) {
     if (input == null) return null
@@ -26,10 +20,8 @@ function normalizeWatchedAtForApi(input) {
     const s = String(input).trim()
     if (!s) return null
 
-    // ya viene perfecto
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
 
-    // dd/mm/yyyy o dd-mm-yyyy
     const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
     if (m) {
         const dd = String(parseInt(m[1], 10)).padStart(2, '0')
@@ -39,7 +31,6 @@ function normalizeWatchedAtForApi(input) {
         return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : null
     }
 
-    // ISO u otras fechas parseables → pasamos a YYYY-MM-DD
     const d = new Date(s)
     if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10)
 
@@ -71,7 +62,6 @@ export async function traktSetWatched({ type, tmdbId, watched, watchedAt }) {
     const watchedAtYmd = normalizeWatchedAtForApi(watchedAt)
 
     const payload = { type, tmdbId, watched }
-    // solo lo mandamos si existe (evita que el backend “pise” con hoy)
     if (watchedAtYmd) payload.watchedAt = watchedAtYmd
 
     const res = await fetch('/api/trakt/item/watched', {
@@ -87,8 +77,6 @@ export async function traktSetWatched({ type, tmdbId, watched, watchedAt }) {
 
 export async function traktHistoryOp({ op, type, tmdbId, watchedAt, historyId }) {
     const payload = { op }
-
-    // ✅ solo añadimos campos si vienen definidos (remove no necesita type/tmdbId)
     if (type != null) payload.type = type
     if (tmdbId != null) payload.tmdbId = tmdbId
     if (historyId != null) payload.historyId = historyId
@@ -120,9 +108,7 @@ export async function traktRemoveWatchPlay({ historyId }) {
 }
 
 /**
- * ✅ NUEVO: Historial global (movies + shows)
- * type: 'all' | 'movies' | 'shows'
- * from/to: 'YYYY-MM-DD'
+ * Historial global
  */
 export async function traktGetHistory({ type = 'all', from, to, page = 1, limit = 200 } = {}) {
     const qs = new URLSearchParams()
@@ -138,23 +124,30 @@ export async function traktGetHistory({ type = 'all', from, to, page = 1, limit 
     return json
 }
 
+/** ✅ NUEVO/CLAVE: carga episodios vistos por show (SIN especiales) */
 export async function traktGetShowWatched({ tmdbId }) {
     const res = await fetch(`/api/trakt/show/watched?tmdbId=${encodeURIComponent(tmdbId)}`, {
         cache: 'no-store'
     })
     const json = await safeJson(res)
     if (!res.ok) throw new Error(json?.error || `Trakt show watched HTTP ${res.status}`)
-    return json
+    return json // { watchedBySeason }
 }
 
+/** ✅ Toggle episodio + devuelve watchedBySeason actualizado */
 export async function traktSetEpisodeWatched({ tmdbId, season, episode, watched, watchedAt }) {
+    const watchedAtYmd = normalizeWatchedAtForApi(watchedAt)
+
+    const payload = { tmdbId, season, episode, watched }
+    if (watchedAtYmd) payload.watchedAt = watchedAtYmd
+
     const res = await fetch('/api/trakt/episode/watched', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tmdbId, season, episode, watched, watchedAt })
+        body: JSON.stringify(payload)
     })
+
     const json = await safeJson(res)
     if (!res.ok) throw new Error(json?.error || `Trakt episode watched HTTP ${res.status}`)
-    return json
+    return json // { watchedBySeason }
 }
-

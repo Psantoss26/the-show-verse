@@ -460,3 +460,33 @@ export async function traktRemoveEpisodeFromHistory(token, { showTmdbId, season,
     if (!r.ok) throw new Error(`Trakt remove episode history failed (${r.status})`)
     return r.json
 }
+
+// ✅ progress/watched por show (mejor que sync/watched para pintar UI)
+export async function traktGetProgressWatchedForShow(token, { traktId }) {
+    // specials=false y count_specials=false para ignorar especiales
+    const r = await traktFetch(
+        `/shows/${encodeURIComponent(traktId)}/progress/watched?hidden=false&specials=false&count_specials=false`,
+        { token }
+    )
+    if (!r.ok) throw new Error(`Trakt show progress watched failed (${r.status})`)
+    return r.json
+}
+
+// ✅ Mapea progress -> { [seasonNumber>=1]: [episodeNumber...] }
+export function mapProgressWatchedBySeason(progressPayload) {
+    const seasons = Array.isArray(progressPayload?.seasons) ? progressPayload.seasons : []
+    const out = {}
+
+    for (const s of seasons) {
+        const sn = Number(s?.number)
+        if (!Number.isFinite(sn) || sn < 1) continue // 🚫 quita especiales y basura
+
+        const eps = Array.isArray(s?.episodes) ? s.episodes : []
+        out[sn] = eps
+            .filter((e) => e?.completed === true)
+            .map((e) => Number(e?.number))
+            .filter((n) => Number.isFinite(n) && n > 0)
+    }
+
+    return out
+}

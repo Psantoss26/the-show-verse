@@ -1,3 +1,4 @@
+// src/app/api/trakt/episode/watched/route.js
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import {
@@ -7,7 +8,12 @@ import {
     setTraktCookies,
     normalizeWatchedAt,
     traktAddEpisodeToHistory,
-    traktRemoveEpisodeFromHistory
+    traktRemoveEpisodeFromHistory,
+
+    // ✅ AÑADIR ESTOS 3:
+    traktSearchByTmdb,
+    traktGetProgressWatchedForShow,
+    mapProgressWatchedBySeason,
 } from '@/lib/trakt/server'
 
 export const runtime = 'nodejs'
@@ -40,8 +46,9 @@ export async function POST(request) {
             token = refreshedTokens.access_token
         }
 
+        // ✅ Persistir en Trakt
         if (watched) {
-            const watchedAtIso = normalizeWatchedAt(watchedAt) // admite YYYY-MM-DD / DD-MM-YYYY / ISO
+            const watchedAtIso = normalizeWatchedAt(watchedAt)
             await traktAddEpisodeToHistory(token, {
                 showTmdbId: tmdbId,
                 season: sn,
@@ -56,7 +63,28 @@ export async function POST(request) {
             })
         }
 
-        const res = NextResponse.json({ connected: true, ok: true, watched: !!watched })
+        // ✅ IMPORTANTÍSIMO: devolver el estado actualizado
+        let watchedBySeason = {}
+        let traktId = null
+        let found = false
+
+        const hit = await traktSearchByTmdb(token, { type: 'show', tmdbId })
+        traktId = hit?.show?.ids?.trakt || null
+        found = !!traktId
+
+        if (traktId) {
+            const progress = await traktGetProgressWatchedForShow(token, { traktId })
+            watchedBySeason = mapProgressWatchedBySeason(progress) // ya filtra sn>=1
+        }
+
+        const res = NextResponse.json({
+            connected: true,
+            ok: true,
+            watched: !!watched,
+            found,
+            traktId,
+            watchedBySeason
+        })
         if (refreshedTokens) setTraktCookies(res, refreshedTokens)
         return res
     } catch (e) {
