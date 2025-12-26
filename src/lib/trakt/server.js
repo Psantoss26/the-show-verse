@@ -395,3 +395,68 @@ export async function getValidTraktToken(cookieStore) {
     return { token: refreshedTokens.access_token, refreshedTokens, shouldClear: false }
 }
 
+// ✅ Watched progress por show (episodios vistos)
+export async function traktGetWatchedForShow(token, { traktId }) {
+    const r = await traktFetch(`/sync/watched/shows/${encodeURIComponent(traktId)}`, { token })
+    if (!r.ok) throw new Error(`Trakt watched show failed (${r.status})`)
+    return r.json
+}
+
+// ✅ Mapea -> { [seasonNumber]: [episodeNumber, ...] }
+export function mapWatchedEpisodesBySeason(watchedPayload) {
+    const obj = Array.isArray(watchedPayload) ? watchedPayload[0] : watchedPayload
+    const seasons = Array.isArray(obj?.seasons) ? obj.seasons : []
+
+    const out = {}
+    for (const s of seasons) {
+        const sn = Number(s?.number)
+        if (!Number.isFinite(sn)) continue
+        const eps = Array.isArray(s?.episodes) ? s.episodes : []
+        out[sn] = eps
+            .map((e) => Number(e?.number))
+            .filter((n) => Number.isFinite(n) && n > 0)
+    }
+    return out
+}
+
+// ✅ Toggle episodio: add play
+export async function traktAddEpisodeToHistory(token, { showTmdbId, season, episode, watchedAtIso }) {
+    const body = {
+        shows: [
+            {
+                ids: { tmdb: Number(showTmdbId) },
+                seasons: [
+                    {
+                        number: Number(season),
+                        episodes: [{ number: Number(episode), watched_at: watchedAtIso }]
+                    }
+                ]
+            }
+        ]
+    }
+
+    const r = await traktFetch('/sync/history', { token, method: 'POST', body })
+    if (!r.ok) throw new Error(`Trakt add episode history failed (${r.status})`)
+    return r.json
+}
+
+// ✅ Toggle episodio: remove plays (borra el episodio del historial)
+export async function traktRemoveEpisodeFromHistory(token, { showTmdbId, season, episode }) {
+    const body = {
+        shows: [
+            {
+                ids: { tmdb: Number(showTmdbId) },
+                seasons: [
+                    {
+                        number: Number(season),
+                        episodes: [{ number: Number(episode) }]
+                    }
+                ]
+            }
+        ]
+    }
+
+    const r = await traktFetch('/sync/history/remove', { token, method: 'POST', body })
+    if (!r.ok) throw new Error(`Trakt remove episode history failed (${r.status})`)
+    return r.json
+}

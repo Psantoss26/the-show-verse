@@ -137,3 +137,24 @@ export async function traktGetHistory({ type = 'all', from, to, page = 1, limit 
     if (!res.ok) throw new Error(json?.error || `Trakt history HTTP ${res.status}`)
     return json
 }
+
+export async function traktGetShowWatched({ tmdbId }) {
+    const res = await fetch(`/api/trakt/show/watched?tmdbId=${encodeURIComponent(tmdbId)}`, {
+        cache: 'no-store'
+    })
+    const json = await safeJson(res)
+    if (!res.ok) throw new Error(json?.error || `Trakt show watched HTTP ${res.status}`)
+    return json
+}
+
+export async function traktSetEpisodeWatched({ tmdbId, season, episode, watched, watchedAt }) {
+    const res = await fetch('/api/trakt/episode/watched', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tmdbId, season, episode, watched, watchedAt })
+    })
+    const json = await safeJson(res)
+    if (!res.ok) throw new Error(json?.error || `Trakt episode watched HTTP ${res.status}`)
+    return json
+}
+

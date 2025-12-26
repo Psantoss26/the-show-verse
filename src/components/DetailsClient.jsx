@@ -56,14 +56,16 @@ import { fetchOmdbByImdb } from '@/lib/api/omdb'
 import StarRating from './StarRating'
 import TraktWatchedControl from '@/components/trakt/TraktWatchedControl'
 import TraktWatchedModal from '@/components/trakt/TraktWatchedModal'
+import TraktEpisodesWatchedModal from '@/components/trakt/TraktEpisodesWatchedModal'
 import {
   traktGetItemStatus,
   traktSetWatched,
   traktAddWatchPlay,
   traktUpdateWatchPlay,
-  traktRemoveWatchPlay
+  traktRemoveWatchPlay,
+  traktGetShowWatched,
+  traktSetEpisodeWatched
 } from '@/lib/api/traktClient'
-
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
@@ -1593,6 +1595,10 @@ export default function DetailsClient({
 
   const [traktBusy, setTraktBusy] = useState('') // 'watched' | 'watchlist' | 'history' | ''
   const [traktWatchedOpen, setTraktWatchedOpen] = useState(false)
+  const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false)
+  // ✅ EPISODIOS VISTOS (solo TV)
+  const [watchedBySeason, setWatchedBySeason] = useState({}) // { [seasonNumber]: [episodeNumber...] }
+  const [episodeBusyKey, setEpisodeBusyKey] = useState('')   // "S1E3" etc
 
   const [syncTrakt, setSyncTrakt] = useState(false)
   useEffect(() => {
@@ -1664,6 +1670,29 @@ export default function DetailsClient({
     }
   }, [id, traktType])
 
+  useEffect(() => {
+    let ignore = false
+
+    const loadEpisodeWatched = async () => {
+      if (type !== 'tv') return
+      if (!trakt?.connected) {
+        setWatchedBySeason({})
+        return
+      }
+
+      try {
+        const r = await traktGetShowWatched({ tmdbId: id })
+        if (ignore) return
+        setWatchedBySeason(r?.watchedBySeason || {})
+      } catch {
+        if (!ignore) setWatchedBySeason({})
+      }
+    }
+
+    loadEpisodeWatched()
+    return () => { ignore = true }
+  }, [type, id, trakt?.connected])
+
   const toggleTraktWatched = async () => {
     if (!trakt.connected || traktBusy) return
     setTraktBusy('watched')
@@ -1722,6 +1751,46 @@ export default function DetailsClient({
       setTrakt((p) => ({ ...p, rating: valueOrNull == null ? null : Math.round(valueOrNull) }))
     } finally {
       setTraktBusy('')
+    }
+  }
+
+  const toggleEpisodeWatched = async (seasonNumber, episodeNumber) => {
+    if (type !== 'tv') return
+    if (!trakt?.connected) return
+    if (episodeBusyKey) return
+
+    const key = `S${seasonNumber}E${episodeNumber}`
+    setEpisodeBusyKey(key)
+
+    const currentlyWatched = !!(watchedBySeason?.[seasonNumber]?.includes(episodeNumber))
+    const next = !currentlyWatched
+
+    // ✅ optimista
+    setWatchedBySeason((prev) => {
+      const cur = new Set(prev?.[seasonNumber] || [])
+      if (next) cur.add(episodeNumber)
+      else cur.delete(episodeNumber)
+      return { ...prev, [seasonNumber]: Array.from(cur).sort((a, b) => a - b) }
+    })
+
+    try {
+      await traktSetEpisodeWatched({
+        tmdbId: id,
+        season: seasonNumber,
+        episode: episodeNumber,
+        watched: next,
+        watchedAt: null
+      })
+    } catch {
+      // rollback si falla
+      setWatchedBySeason((prev) => {
+        const cur = new Set(prev?.[seasonNumber] || [])
+        if (!next) cur.add(episodeNumber)
+        else cur.delete(episodeNumber)
+        return { ...prev, [seasonNumber]: Array.from(cur).sort((a, b) => a - b) }
+      })
+    } finally {
+      setEpisodeBusyKey('')
     }
   }
 
@@ -2322,7 +2391,12 @@ export default function DetailsClient({
                   watched={trakt.watched}
                   plays={trakt.plays}
                   busy={!!traktBusy}
-                  onOpen={() => setTraktWatchedOpen(true)}
+                  onOpen={() => {
+                    // ✅ Para series: abrir tabla episodios
+                    if (endpointType === 'tv') setTraktEpisodesOpen(true)
+                    // ✅ Para pelis: mantener tu modal actual de plays/historial
+                    else setTraktWatchedOpen(true)
+                  }}
                 />
 
                 <button
@@ -3296,7 +3370,15 @@ export default function DetailsClient({
                 <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
               )}
               {!ratingsError && (
-                <EpisodeRatingsGrid ratings={ratings} initialSource="avg" density="compact" />
+                <EpisodeRatingsGrid
+                  ratings={ratings}
+                  initialSource="avg"
+                  density="compact"
+                  traktConnected={trakt.connected}
+                  watchedBySeason={watchedBySeason}
+                  episodeBusyKey={episodeBusyKey}
+                  onToggleEpisodeWatched={toggleEpisodeWatched}
+                />
               )}
             </div>
           </section>
@@ -3606,16 +3688,16 @@ export default function DetailsClient({
       {/* ✅ MODAL: Vídeos / Trailer */}
       <VideoModal open={videoModalOpen} onClose={closeVideo} video={activeVideo} />
 
-      <TraktWatchedModal
-        open={traktWatchedOpen}
-        onClose={() => setTraktWatchedOpen(false)}
-        traktUrl={trakt.traktUrl}
-        plays={trakt.plays}
-        history={trakt.history || []}
-        onAddPlay={handleTraktAddPlay}
-        onUpdatePlay={handleTraktUpdatePlay}
-        onRemovePlay={handleTraktRemovePlay}
-        busy={!!traktBusy}
+      <TraktEpisodesWatchedModal
+        open={traktEpisodesOpen}
+        onClose={() => setTraktEpisodesOpen(false)}
+        tmdbId={id}
+        title={title}
+        connected={trakt.connected}
+        seasons={data?.seasons || []}
+        watchedBySeason={watchedBySeason}
+        busyKey={episodeBusyKey}
+        onToggleEpisodeWatched={toggleEpisodeWatched}
       />
 
       {/* ✅ MODAL: Añadir a lista */}

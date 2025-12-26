@@ -1,13 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
     CalendarDays,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
-    ExternalLink,
     Film,
     Loader2,
     RotateCcw,
@@ -66,7 +66,11 @@ function getItemType(entry) {
 }
 
 function getTitle(entry) {
+    // ✅ prioriza español si existe
     return (
+        entry?.title_es ||
+        entry?.titleEs ||
+        entry?.titleES ||
         entry?.title ||
         entry?.movie?.title ||
         entry?.show?.title ||
@@ -90,17 +94,16 @@ function getTmdbId(entry) {
     )
 }
 
-function getTraktUrl(entry) {
-    if (entry?.traktUrl) return entry.traktUrl
-    const type = getItemType(entry)
-    const slug =
-        entry?.slug ||
-        entry?.ids?.slug ||
-        entry?.movie?.ids?.slug ||
-        entry?.show?.ids?.slug ||
-        null
-    if (!slug || (type !== 'movie' && type !== 'show')) return null
-    return `https://trakt.tv/${type === 'movie' ? 'movies' : 'shows'}/${slug}`
+/**
+ * ✅ Ruta de detalles (ajusta si tu app usa otras rutas)
+ */
+function getDetailsHref(entry) {
+    const type = getItemType(entry) // 'movie' | 'show'
+    const tmdbId = getTmdbId(entry)
+    if (!type || !tmdbId) return null
+
+    const mediaType = type === 'movie' ? 'movie' : 'tv'
+    return `/details/${mediaType}/${tmdbId}`
 }
 
 function normalizeHistoryResponse(json) {
@@ -111,10 +114,23 @@ function normalizeHistoryResponse(json) {
     return { items: [], meta: null }
 }
 
+async function mapLimit(arr, limit, fn) {
+    const out = new Array(arr.length)
+    let i = 0
+    const workers = Array.from({ length: Math.max(1, limit) }, async () => {
+        while (i < arr.length) {
+            const idx = i++
+            out[idx] = await fn(arr[idx], idx)
+        }
+    })
+    await Promise.all(workers)
+    return out
+}
+
 // ----------------------------
 // TMDb minimal cache (client)
 // ----------------------------
-const tmdbCache = new Map() // key => { poster_path, backdrop_path }
+const tmdbCache = new Map() // key => { poster_path, backdrop_path, title_es, year }
 const tmdbInflight = new Map()
 
 async function fetchTmdbPoster({ type, tmdbId }) {
@@ -133,9 +149,15 @@ async function fetchTmdbPoster({ type, tmdbId }) {
             const json = await res.json()
             if (!res.ok) return null
 
+            const title_es = t === 'movie' ? (json?.title || null) : (json?.name || null)
+            const date = t === 'movie' ? json?.release_date : json?.first_air_date
+            const year = date ? String(date).slice(0, 4) : null
+
             const out = {
                 poster_path: json?.poster_path || null,
-                backdrop_path: json?.backdrop_path || null
+                backdrop_path: json?.backdrop_path || null,
+                title_es,
+                year
             }
             tmdbCache.set(key, out)
             return out
@@ -383,15 +405,19 @@ function CalendarPanel({
 // ----------------------------
 // History row with poster
 // ----------------------------
-function Poster({ type, tmdbId, entry }) {
+function Poster({ entry }) {
     const [posterPath, setPosterPath] = useState(entry?.poster_path || entry?.posterPath || null)
+
+    useEffect(() => {
+        setPosterPath(entry?.poster_path || entry?.posterPath || null)
+    }, [entry?.poster_path, entry?.posterPath])
 
     useEffect(() => {
         let ignore = false
         const run = async () => {
             if (posterPath) return
-            const t = getItemType(entry) || type
-            const id = getTmdbId(entry) || tmdbId
+            const t = getItemType(entry)
+            const id = getTmdbId(entry)
             if (!t || !id) return
 
             const r = await fetchTmdbPoster({ type: t, tmdbId: id })
@@ -399,11 +425,9 @@ function Poster({ type, tmdbId, entry }) {
             if (r?.poster_path) setPosterPath(r.poster_path)
         }
         run()
-        return () => {
-            ignore = true
-        }
+        return () => { ignore = true }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [type, tmdbId])
+    }, [posterPath, entry])
 
     const src = posterPath ? `https://image.tmdb.org/t/p/w342${posterPath}` : '/placeholder-poster.png'
 
@@ -425,10 +449,13 @@ function HistoryItemCard({ entry }) {
     const title = getTitle(entry)
     const year = getYear(entry)
     const watchedAt = entry?.watched_at || entry?.watchedAt || entry?.watchedAtIso || null
-    const traktUrl = getTraktUrl(entry)
 
-    return (
-        <div className="flex items-center justify-between gap-4 p-4 sm:p-5 border-t border-white/10">
+    const href = useMemo(() => getDetailsHref(entry), [entry])
+
+    // contenido visual (lo reutilizamos para Link / fallback)
+    const Inner = (
+        <div className="w-full text-left flex items-center justify-between gap-4 p-4 sm:p-5 border-t border-white/10
+                        hover:bg-white/[0.03] transition focus:outline-none focus:ring-2 focus:ring-yellow-500/30">
             <div className="flex items-center gap-4 min-w-0">
                 <Poster entry={entry} />
 
@@ -436,7 +463,7 @@ function HistoryItemCard({ entry }) {
                     <div className="flex items-center gap-2 flex-wrap">
                         <span
                             className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-bold border
-              ${type === 'movie'
+                            ${type === 'movie'
                                     ? 'bg-sky-500/10 border-sky-500/25 text-sky-200'
                                     : 'bg-violet-500/10 border-violet-500/25 text-violet-200'
                                 }`}
@@ -453,31 +480,30 @@ function HistoryItemCard({ entry }) {
 
                     {watchedAt && (
                         <div className="mt-1 text-xs text-zinc-400">
-                            Visto: <span className="text-zinc-200 font-semibold">{formatWatchedLine(watchedAt)}</span>
+                            Visto:{' '}
+                            <span className="text-zinc-200 font-semibold">
+                                {formatWatchedLine(watchedAt)}
+                            </span>
                         </div>
                     )}
                 </div>
             </div>
 
-            <div className="shrink-0">
-                {traktUrl ? (
-                    <a
-                        href={traktUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-white/10 bg-white/5
-    hover:bg-white/10 hover:border-white/15 transition"
-                        title="Abrir en Trakt"
-                    >
-                        <img src="/logo-Trakt.png" alt="Trakt" className="h-5 w-auto" />
-                    </a>
-                ) : (
-                    <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-white/10 bg-white/5 opacity-70">
-                        <img src="/logo-Trakt.png" alt="Trakt" className="h-5 w-auto" />
-                    </div>
-                )}
+            <div className="shrink-0 w-11 h-11 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center">
+                <ChevronRight className="w-5 h-5 text-zinc-300" />
             </div>
         </div>
+    )
+
+    // si por algún motivo falta href, no hacemos Link
+    if (!href) {
+        return <div className="opacity-80">{Inner}</div>
+    }
+
+    return (
+        <Link href={href} className="block" title={title} prefetch={false}>
+            {Inner}
+        </Link>
     )
 }
 
@@ -521,13 +547,36 @@ export default function HistoryClient() {
         try {
             const json = await traktGetHistory({ type: 'all', from: from || undefined, to: to || undefined, page: 1, limit: 200 })
             const { items } = normalizeHistoryResponse(json)
+
             // sort desc
             const sorted = [...items].sort((a, b) => {
                 const ta = new Date(a?.watched_at || a?.watchedAt || 0).getTime()
                 const tb = new Date(b?.watched_at || b?.watchedAt || 0).getTime()
                 return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0)
             })
-            setRaw(sorted)
+
+            // ✅ Enriquecer con TMDB (título ES + poster + year) para mostrar y buscar en español
+            const enriched = await mapLimit(sorted, 10, async (e) => {
+                const t = getItemType(e)
+                const id = getTmdbId(e)
+                if (!t || !id) return e
+
+                const r = await fetchTmdbPoster({ type: t, tmdbId: id })
+                if (!r) return e
+
+                const title_es = e?.title_es || e?.titleEs || r?.title_es || null
+                const year = e?.year || r?.year || getYear(e) || null
+
+                return {
+                    ...e,
+                    title_es,
+                    year,
+                    poster_path: e?.poster_path || e?.posterPath || r?.poster_path || null,
+                    backdrop_path: e?.backdrop_path || e?.backdropPath || r?.backdrop_path || null
+                }
+            })
+
+            setRaw(enriched)
         } catch (e) {
             setError(e?.message || 'Error cargando historial')
             setRaw([])

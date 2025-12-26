@@ -166,11 +166,50 @@ export default function Navbar() {
       : 'text-neutral-400 hover:text-white hover:bg-white/5'
     }`
 
-  const iconLinkClass = (href) =>
-    `p-2 rounded-full transition-colors ${isActive(href)
-      ? 'text-white bg-white/10'
-      : 'text-neutral-400 hover:text-white hover:bg-white/5'
-    }`
+  const iconLinkClass = (href, tone = 'neutral') => {
+    const active = isActive(href)
+
+    const base =
+      'group p-2 rounded-full transition-all duration-200 ' +
+      'text-neutral-400 ' +
+      'hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 ' +
+      'focus:outline-none'
+
+    const ringBase = 'ring-1 ring-transparent'
+
+    const tones = {
+      red: {
+        hover: 'hover:text-red-300 hover:bg-red-500/10 hover:ring-red-500/30 hover:shadow-[0_0_18px_rgba(239,68,68,0.16)]',
+        active: 'text-red-200 bg-red-500/15 ring-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.20)]',
+        focus: 'focus-visible:ring-2 focus-visible:ring-red-500/30'
+      },
+      blue: {
+        hover: 'hover:text-sky-300 hover:bg-sky-500/10 hover:ring-sky-500/30 hover:shadow-[0_0_18px_rgba(14,165,233,0.16)]',
+        active: 'text-sky-200 bg-sky-500/15 ring-sky-500/35 shadow-[0_0_18px_rgba(14,165,233,0.20)]',
+        focus: 'focus-visible:ring-2 focus-visible:ring-sky-500/30'
+      },
+      purple: {
+        hover: 'hover:text-fuchsia-300 hover:bg-fuchsia-500/10 hover:ring-fuchsia-500/30 hover:shadow-[0_0_18px_rgba(217,70,239,0.16)]',
+        active: 'text-fuchsia-200 bg-fuchsia-500/15 ring-fuchsia-500/35 shadow-[0_0_18px_rgba(217,70,239,0.20)]',
+        focus: 'focus-visible:ring-2 focus-visible:ring-fuchsia-500/30'
+      },
+      green: {
+        hover: 'hover:text-emerald-300 hover:bg-emerald-500/10 hover:ring-emerald-500/30 hover:shadow-[0_0_18px_rgba(16,185,129,0.16)]',
+        active: 'text-emerald-200 bg-emerald-500/15 ring-emerald-500/35 shadow-[0_0_18px_rgba(16,185,129,0.20)]',
+        focus: 'focus-visible:ring-2 focus-visible:ring-emerald-500/30'
+      },
+      amber: {
+        hover: 'hover:text-amber-300 hover:bg-amber-500/10 hover:ring-amber-500/30 hover:shadow-[0_0_18px_rgba(245,158,11,0.16)]',
+        active: 'text-amber-200 bg-amber-500/15 ring-amber-500/35 shadow-[0_0_18px_rgba(245,158,11,0.20)]',
+        focus: 'focus-visible:ring-2 focus-visible:ring-amber-500/30'
+      }
+    }
+
+    const t = tones[tone] || tones.amber
+    const toneClass = active ? t.active : t.hover
+
+    return `${base} ${ringBase} ${toneClass} ${t.focus}`
+  }
 
   const navLinkClassMobileBottom = (href) =>
     `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${isActive(href) ? 'text-blue-400' : 'text-neutral-400 hover:text-white'
@@ -279,20 +318,25 @@ export default function Navbar() {
           {/* Derecha */}
           <div className="flex items-center gap-2 flex-shrink-0 pr-12">
             <div className="flex items-center gap-2">
-              <Link href="/lists" className={iconLinkClass('/lists')} title="Listas">
-                <ListVideo className="w-5 h-5" />
+              <Link href="/lists" className={iconLinkClass('/lists', 'purple')} title="Listas">
+                <ListVideo className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
               </Link>
-              <Link href="/calendar" className={iconLinkClass('/calendar')} title="Calendario">
-                <CalendarDaysIcon className="w-5 h-5" />
+
+              <Link href="/calendar" className={iconLinkClass('/calendar', 'amber')} title="Calendario">
+                <CalendarDaysIcon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
               </Link>
+
+              {/* History (verde) ya estandarizado dentro del componente */}
               <TraktHistoryNavButton />
+
               {hydrated && account && (
                 <>
-                  <Link href="/favorites" className={iconLinkClass('/favorites')} title="Favoritas">
-                    <Heart className="w-5 h-5" />
+                  <Link href="/favorites" className={iconLinkClass('/favorites', 'red')} title="Favoritas">
+                    <Heart className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
                   </Link>
-                  <Link href="/watchlist" className={iconLinkClass('/watchlist')} title="Pendientes">
-                    <Bookmark className="w-5 h-5" />
+
+                  <Link href="/watchlist" className={iconLinkClass('/watchlist', 'blue')} title="Pendientes">
+                    <Bookmark className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
                   </Link>
                 </>
               )}
