@@ -18,7 +18,8 @@ import {
   X as XIcon,
   Menu as MenuIcon,
   HomeIcon,
-  Compass, // ✅ NUEVO
+  Compass,
+  Activity
 } from 'lucide-react'
 
 /* ====================================================================
@@ -269,8 +270,8 @@ export default function Navbar() {
               <Link href="/" className={navLinkClass('/')}>Inicio</Link>
               <Link href="/movies" className={navLinkClass('/movies')}>Películas</Link>
               <Link href="/series" className={navLinkClass('/series')}>Series</Link>
-              {/* ✅ NUEVO */}
               <Link href="/discover" className={navLinkClass('/discover')}>Descubrir</Link>
+              <Link href="/trakt" className={navLinkClass('/trakt')}>Trakt</Link>
             </div>
           </div>
 
@@ -470,7 +471,6 @@ export default function Navbar() {
                   <span>Series</span>
                 </Link>
 
-                {/* ✅ NUEVO: DESCUBRIR */}
                 <Link
                   href="/discover"
                   onClick={() => setMobileMenuOpen(false)}
@@ -479,6 +479,18 @@ export default function Navbar() {
                 >
                   <Compass className="w-5 h-5" />
                   <span>Descubrir</span>
+                </Link>
+
+                <Link
+                  href="/trakt"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/trakt')
+                    ? 'bg-white/10 text-white'
+                    : 'text-neutral-300 hover:bg-white/5'
+                    }`}
+                >
+                  <Activity className="w-5 h-5" />
+                  <span>Trakt</span>
                 </Link>
 
                 <div className="my-3 h-px bg-neutral-800" />
