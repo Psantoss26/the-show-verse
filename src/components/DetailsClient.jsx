@@ -39,9 +39,7 @@ import {
   Search,
   RotateCcw,
   Play,
-  ExternalLink,
-  Eye,
-  EyeOff
+  ExternalLink
 } from 'lucide-react'
 
 /* === cuenta / api === */
@@ -1636,6 +1634,19 @@ export default function DetailsClient({
   }
 
   useEffect(() => {
+    setTraktWatchedOpen(false)
+    setTraktEpisodesOpen(false)
+    setEpisodeBusyKey('')
+    setTraktBusy('')
+  }, [id, endpointType])
+
+  useEffect(() => {
+    if (!traktWatchedOpen) return
+    reloadTraktStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traktWatchedOpen])
+
+  useEffect(() => {
     let ignore = false
 
     const load = async () => {
@@ -1692,6 +1703,28 @@ export default function DetailsClient({
     loadEpisodeWatched()
     return () => { ignore = true }
   }, [type, id, trakt?.connected])
+
+  // ✅ Refrescar episodios vistos al ABRIR el modal (evita que se quede en 0 o desincronizado)
+  useEffect(() => {
+    let ignore = false
+
+    const refreshOnOpen = async () => {
+      if (!traktEpisodesOpen) return
+      if (type !== 'tv') return
+      if (!trakt?.connected) return
+
+      try {
+        const r = await traktGetShowWatched({ tmdbId: id })
+        if (ignore) return
+        setWatchedBySeason(r?.watchedBySeason || {})
+      } catch {
+        // no machacamos a {} aquí para no “borrar” UI si falla el refresh
+      }
+    }
+
+    refreshOnOpen()
+    return () => { ignore = true }
+  }, [traktEpisodesOpen, type, id, trakt?.connected])
 
   const toggleTraktWatched = async () => {
     if (!trakt.connected || traktBusy) return
@@ -1774,13 +1807,22 @@ export default function DetailsClient({
     })
 
     try {
-      await traktSetEpisodeWatched({
+      const r = await traktSetEpisodeWatched({
         tmdbId: id,
         season: seasonNumber,
         episode: episodeNumber,
         watched: next,
         watchedAt: null
       })
+
+      // ✅ Si el endpoint ya devuelve watchedBySeason (con el fix del backend), úsalo
+      if (r?.watchedBySeason) {
+        setWatchedBySeason(r.watchedBySeason)
+      } else {
+        // ✅ Fallback robusto: refetch del estado real
+        const fresh = await traktGetShowWatched({ tmdbId: id })
+        setWatchedBySeason(fresh?.watchedBySeason || {})
+      }
     } catch {
       // rollback si falla
       setWatchedBySeason((prev) => {
@@ -3688,9 +3730,33 @@ export default function DetailsClient({
       {/* ✅ MODAL: Vídeos / Trailer */}
       <VideoModal open={videoModalOpen} onClose={closeVideo} video={activeVideo} />
 
+      <TraktWatchedModal
+        open={traktWatchedOpen}
+        onClose={() => {
+          setTraktWatchedOpen(false)
+          setTraktBusy('')
+        }}
+        title={title}
+        connected={trakt.connected}
+        found={trakt.found}
+        traktUrl={trakt.traktUrl}
+        watched={trakt.watched}
+        plays={trakt.plays}
+        lastWatchedAt={trakt.lastWatchedAt}
+        history={trakt.history}
+        busyKey={traktBusy}
+        onToggleWatched={toggleTraktWatched}
+        onAddPlay={handleTraktAddPlay}
+        onUpdatePlay={handleTraktUpdatePlay}
+        onRemovePlay={handleTraktRemovePlay}
+      />
+
       <TraktEpisodesWatchedModal
         open={traktEpisodesOpen}
-        onClose={() => setTraktEpisodesOpen(false)}
+        onClose={() => {
+          setTraktEpisodesOpen(false)
+          setEpisodeBusyKey('')
+        }}
         tmdbId={id}
         title={title}
         connected={trakt.connected}

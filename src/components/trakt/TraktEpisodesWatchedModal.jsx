@@ -7,6 +7,22 @@ import { Check, Eye, EyeOff, Loader2, X, Search } from 'lucide-react'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
+const pad2 = (n) => String(n).padStart(2, '0')
+
+const toLocalDatetimeInput = (iso) => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+const fromLocalDatetimeInput = (value) => {
+    if (!value) return null
+    const d = new Date(value) // local -> ISO
+    if (Number.isNaN(d.getTime())) return null
+    return d.toISOString()
+}
+
 const formatDate = (iso) => {
     if (!iso) return '—'
     try {
@@ -20,40 +36,58 @@ const formatDate = (iso) => {
     }
 }
 
-const seasonLabel = (sn, name) => {
+const seasonLabelText = (sn, name) => {
     if (name) return name
     return sn === 0 ? 'Especiales' : `Temporada ${sn}`
 }
 
 const MAX_EPISODES_RENDER = 120 // para temporadas raras enormes (Especiales). Puedes subirlo.
+const MOVIE_BUSY_KEY = 'MOVIE'
 
 export default function TraktEpisodesWatchedModal({
     open,
     onClose,
+
+    // ✅ nuevo: tipo de contenido
+    mediaType = 'tv', // 'tv' | 'movie'
+
+    // tv
     tmdbId,
     title,
     connected,
     seasons = [],
     watchedBySeason = {}, // { [seasonNumber]: [episodeNumber...] }
-    busyKey = '', // "S1E3"
-    onToggleEpisodeWatched // (seasonNumber, episodeNumber) => void
+    busyKey = '', // "S1E3" o "MOVIE"
+    onToggleEpisodeWatched, // (seasonNumber, episodeNumber) => void
+
+    // ✅ nuevo: movie
+    movieWatchedAt = null, // ISO string si está marcada como vista
+    onToggleMovieWatched // (watchedAtIsoOrNull) => void   (null => quitar de vistos)
 }) {
-    // ===== Hooks SIEMPRE arriba (evita error Rules of Hooks) =====
+    // ===== Hooks SIEMPRE arriba =====
     const [activeSeason, setActiveSeason] = useState(null)
+    const [displaySeason, setDisplaySeason] = useState(null)
+
     const [onlyUnwatched, setOnlyUnwatched] = useState(false)
     const [viewMode, setViewMode] = useState('list') // 'list' | 'table'
     const [query, setQuery] = useState('')
-    const [expandedSeason, setExpandedSeason] = useState({}) // { [sn]: true }
+    const [expandedSeason, setExpandedSeason] = useState({})
 
-    // cache por temporada (TMDb season details) para vista LISTA
-    const [seasonCache, setSeasonCache] = useState({}) // { [sn]: { loading, error, episodes } }
+    const [seasonCache, setSeasonCache] = useState({})
+
+    // ✅ movie state
+    const [movieEditValue, setMovieEditValue] = useState('')
 
     const panelRef = useRef(null)
+
+    const isMovie = mediaType === 'movie'
+    const movieWatched = !!movieWatchedAt
+    const busyMovie = busyKey === MOVIE_BUSY_KEY
 
     const usableSeasons = useMemo(() => {
         const list = Array.isArray(seasons) ? seasons : []
         return [...list]
-            .filter((s) => s && typeof s.season_number === 'number')
+            .filter((s) => s && typeof s.season_number === 'number' && s.season_number >= 1) // fuera especiales
             .sort((a, b) => (a.season_number ?? 0) - (b.season_number ?? 0))
     }, [seasons])
 
@@ -70,16 +104,43 @@ export default function TraktEpisodesWatchedModal({
         return { totalEpisodes, watchedEpisodes }
     }, [usableSeasons, watchedBySeason])
 
-    // Default season al abrir
+    const progressPct = useMemo(() => {
+        const total = Number(totals?.totalEpisodes || 0)
+        const watched = Number(totals?.watchedEpisodes || 0)
+        if (!total) return 0
+        return Math.min(100, Math.max(0, Math.round((watched / total) * 100)))
+    }, [totals])
+
+    const tmdbImg = (path, size = 'w300') => {
+        if (!path) return null
+        return `https://image.tmdb.org/t/p/${size}${path}`
+    }
+
+    // ✅ Default state al abrir
     useEffect(() => {
         if (!open) return
+
+        // movie: inicializa datetime
+        if (isMovie) {
+            // si ya estaba marcada, mostramos su fecha; si no, ahora.
+            const fallbackIso = movieWatchedAt || new Date().toISOString()
+            setMovieEditValue(toLocalDatetimeInput(fallbackIso))
+            setQuery('')
+            return
+        }
+
+        // tv: tu comportamiento original
         const first =
             usableSeasons.find((s) => (s?.season_number ?? 0) >= 1) || usableSeasons[0] || null
-        setActiveSeason(first?.season_number ?? null)
+
+        const sn = first?.season_number ?? null
+        setActiveSeason(sn)
+        setDisplaySeason(sn)
+
         setOnlyUnwatched(false)
         setViewMode('list')
         setQuery('')
-    }, [open, usableSeasons])
+    }, [open, usableSeasons, isMovie, movieWatchedAt])
 
     // Escape to close
     useEffect(() => {
@@ -103,7 +164,7 @@ export default function TraktEpisodesWatchedModal({
 
     const loadSeason = async (sn) => {
         if (!TMDB_API_KEY || !tmdbId || sn == null) return
-        if (seasonCache?.[sn]?.episodes) return
+        if (Array.isArray(seasonCache?.[sn]?.episodes)) return
         if (seasonCache?.[sn]?.loading) return
 
         setSeasonCache((p) => ({
@@ -130,34 +191,68 @@ export default function TraktEpisodesWatchedModal({
         }
     }
 
-    // Cargar season details SOLO en vista LISTA (para títulos/fechas/overview)
+    // ✅ Cargar season details SOLO en TV + vista LISTA
     useEffect(() => {
         if (!open) return
+        if (isMovie) return
         if (viewMode !== 'list') return
         if (activeSeason == null) return
         loadSeason(activeSeason)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, viewMode, activeSeason, tmdbId])
+    }, [open, isMovie, viewMode, activeSeason, tmdbId])
 
-    // ===== Derivados vista LISTA =====
-    const active = useMemo(
+    // ✅ Promover a displaySeason cuando haya episodes
+    useEffect(() => {
+        if (!open) return
+        if (isMovie) return
+        if (viewMode !== 'list') return
+        if (activeSeason == null) return
+
+        const c = seasonCache?.[activeSeason]
+        if (Array.isArray(c?.episodes)) {
+            setDisplaySeason(activeSeason)
+        }
+    }, [open, isMovie, viewMode, activeSeason, seasonCache])
+
+    // ===== Derivados TV LISTA =====
+    const selectedSeasonObj = useMemo(
         () => usableSeasons.find((s) => s?.season_number === activeSeason) || null,
         [usableSeasons, activeSeason]
     )
 
-    const activeSn = active?.season_number ?? null
-    const cache = activeSn != null ? seasonCache?.[activeSn] : null
-    const loading = !!cache?.loading
-    const error = cache?.error || ''
-    const episodes = Array.isArray(cache?.episodes) ? cache.episodes : []
+    const displaySeasonObj = useMemo(() => {
+        const sn = displaySeason ?? activeSeason
+        return usableSeasons.find((s) => s?.season_number === sn) || null
+    }, [usableSeasons, displaySeason, activeSeason])
+
+    const selectedSn = selectedSeasonObj?.season_number ?? null
+    const displaySn = displaySeasonObj?.season_number ?? null
+
+    const selectedCache = selectedSn != null ? seasonCache?.[selectedSn] : null
+    const displayCache = displaySn != null ? seasonCache?.[displaySn] : null
+
+    const selectedLoading = !!selectedCache?.loading && !Array.isArray(selectedCache?.episodes)
+
+    const isSwitchingSeason =
+        selectedSn != null &&
+        displaySn != null &&
+        selectedSn !== displaySn &&
+        selectedLoading
+
+    const loading = !!selectedCache?.loading
+    const error = selectedCache?.error || ''
+
+    const episodes = Array.isArray(displayCache?.episodes) ? displayCache.episodes : []
 
     const watchedSet = useMemo(() => {
-        return new Set(watchedBySeason?.[activeSn] || [])
-    }, [watchedBySeason, activeSn])
+        return new Set(watchedBySeason?.[displaySn] || [])
+    }, [watchedBySeason, displaySn])
 
     const filteredEpisodes = useMemo(() => {
         const q = (query || '').trim().toLowerCase()
-        const base = onlyUnwatched ? episodes.filter((ep) => !watchedSet.has(ep.episode_number)) : episodes
+        const base = onlyUnwatched
+            ? episodes.filter((ep) => !watchedSet.has(ep.episode_number))
+            : episodes
         if (!q) return base
 
         return base.filter((ep) => {
@@ -168,13 +263,13 @@ export default function TraktEpisodesWatchedModal({
         })
     }, [episodes, onlyUnwatched, watchedSet, query])
 
-    // ===== Derivados vista TABLA =====
+    // ===== Derivados TV TABLA =====
     const seasonsFilteredForTable = useMemo(() => {
         const q = (query || '').trim().toLowerCase()
         if (!q) return usableSeasons
         return usableSeasons.filter((s) => {
             const sn = s?.season_number
-            const name = seasonLabel(sn, s?.name).toLowerCase()
+            const name = seasonLabelText(sn, s?.name).toLowerCase()
             return name.includes(q) || String(sn) === q
         })
     }, [usableSeasons, query])
@@ -188,9 +283,143 @@ export default function TraktEpisodesWatchedModal({
         return { nums, hasMore, remaining: c - limit }
     }
 
-    // ===== Render (ojo: return null AL FINAL, después de hooks) =====
     if (!open) return null
 
+    // =========================
+    // RENDER MOVIE
+    // =========================
+    if (isMovie) {
+        const onSaveMovie = () => {
+            if (!connected) return
+            if (busyMovie) return
+            const iso = fromLocalDatetimeInput(movieEditValue) || new Date().toISOString()
+            onToggleMovieWatched?.(iso)
+        }
+
+        const onRemoveMovie = () => {
+            if (!connected) return
+            if (busyMovie) return
+            onToggleMovieWatched?.(null)
+        }
+
+        return (
+            <div className="fixed inset-0 z-[10050]">
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+
+                <div className="absolute inset-0 flex items-center justify-center p-4">
+                    <motion.div
+                        ref={panelRef}
+                        initial={{ opacity: 0, y: 14, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 14, scale: 0.98 }}
+                        transition={{ duration: 0.16, ease: 'easeOut' }}
+                        className="w-full max-w-xl rounded-3xl border border-white/10 bg-[#0f0f0f]/95 shadow-2xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-6 border-b border-white/10 flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-2xl font-extrabold text-white truncate">Marcar como visto</h3>
+                                <p className="mt-1 text-sm text-zinc-400 truncate">{title || 'Película'}</p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="shrink-0 w-11 h-11 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition flex items-center justify-center"
+                                title="Cerrar"
+                            >
+                                <X className="w-5 h-5 text-zinc-200" />
+                            </button>
+                        </div>
+
+                        {!connected ? (
+                            <div className="p-6">
+                                <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                    <div className="text-white font-bold">Trakt no está conectado</div>
+                                    <div className="text-sm text-zinc-400 mt-1">
+                                        Conecta Trakt para marcar películas vistas.
+                                    </div>
+                                    <Link
+                                        href="/trakt"
+                                        className="inline-flex mt-4 items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20 transition text-sm font-semibold"
+                                    >
+                                        Ir a Trakt
+                                    </Link>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-6 space-y-4">
+                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                    <div className="text-sm font-bold text-zinc-200">Fecha y hora de visto</div>
+                                    <div className="text-xs text-zinc-500 mt-1">
+                                        Igual que en Trakt: puedes ajustar el momento exacto.
+                                    </div>
+
+                                    <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-2xl bg-black/40 border border-white/10">
+                                        <input
+                                            type="datetime-local"
+                                            value={movieEditValue}
+                                            onChange={(e) => setMovieEditValue(e.target.value)}
+                                            className="w-full bg-transparent outline-none text-sm text-zinc-200"
+                                        />
+                                    </div>
+
+                                    {movieWatchedAt && (
+                                        <div className="mt-3 text-xs text-zinc-400">
+                                            Actualmente marcada como vista:{' '}
+                                            <span className="text-zinc-200 font-semibold">
+                                                {new Date(movieWatchedAt).toLocaleString('es-ES')}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        disabled={busyMovie}
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10 transition text-sm font-bold disabled:opacity-70"
+                                    >
+                                        <X className="w-4 h-4" />
+                                        Cancelar
+                                    </button>
+
+                                    {movieWatched ? (
+                                        <button
+                                            type="button"
+                                            onClick={onRemoveMovie}
+                                            disabled={busyMovie}
+                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10 transition text-sm font-bold disabled:opacity-70"
+                                            title="Quitar de vistos"
+                                        >
+                                            {busyMovie ? <Loader2 className="w-4 h-4 animate-spin" /> : <EyeOff className="w-4 h-4" />}
+                                            Quitar
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={onSaveMovie}
+                                            disabled={busyMovie}
+                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-emerald-500/25 bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/18 transition text-sm font-bold disabled:opacity-70"
+                                            title="Marcar como visto"
+                                        >
+                                            {busyMovie ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                                            Marcar visto
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </motion.div>
+                </div>
+            </div>
+        )
+    }
+
+    // =========================
+    // RENDER TV (TU UI ORIGINAL)
+    // =========================
     return (
         <div className="fixed inset-0 z-[10050]">
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
@@ -207,19 +436,22 @@ export default function TraktEpisodesWatchedModal({
                 >
                     {/* Header */}
                     <div className="p-6 border-b border-white/10 flex items-start justify-between gap-4">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                             <h3 className="text-2xl font-extrabold text-white truncate">Episodios vistos</h3>
-                            <div className="mt-1 flex items-center gap-2 flex-wrap">
-                                <p className="text-sm text-zinc-400 truncate">
-                                    {title || 'Serie'} · marca episodios uno a uno en Trakt
-                                </p>
+                            <p className="mt-1 text-sm text-zinc-400 truncate">{title || 'Serie'}</p>
 
-                                {Number.isFinite(totals.totalEpisodes) && totals.totalEpisodes > 0 && (
-                                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
-                                        {totals.watchedEpisodes} / {totals.totalEpisodes} vistos
-                                    </span>
-                                )}
-                            </div>
+                            {Number.isFinite(totals.totalEpisodes) && totals.totalEpisodes > 0 && (
+                                <div className="mt-3">
+                                    <div className="flex items-center justify-between max-w-[260px]">
+                                        <span className="text-xs text-zinc-400">Progreso</span>
+                                        <span className="text-xs font-bold text-zinc-200">{progressPct}%</span>
+                                    </div>
+
+                                    <div className="mt-2 h-2 rounded-full bg-white/10 overflow-hidden w-full max-w-[260px]">
+                                        <div className="h-full bg-emerald-500/80" style={{ width: `${progressPct}%` }} />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <button
@@ -239,16 +471,14 @@ export default function TraktEpisodesWatchedModal({
                                 <button
                                     type="button"
                                     onClick={() => setViewMode('list')}
-                                    className={`px-3 py-1.5 rounded-xl text-sm font-bold transition ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/5'
-                                        }`}
+                                    className={`px-3 py-1.5 rounded-xl text-sm font-bold transition ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
                                 >
                                     Lista
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setViewMode('table')}
-                                    className={`px-3 py-1.5 rounded-xl text-sm font-bold transition ${viewMode === 'table' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/5'
-                                        }`}
+                                    className={`px-3 py-1.5 rounded-xl text-sm font-bold transition ${viewMode === 'table' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
                                 >
                                     Tabla
                                 </button>
@@ -265,6 +495,16 @@ export default function TraktEpisodesWatchedModal({
                             >
                                 {onlyUnwatched ? 'Solo no vistos' : 'Todos'}
                             </button>
+
+                            {Number.isFinite(totals.totalEpisodes) && totals.totalEpisodes > 0 && (
+                                <div className="ml-2 inline-flex items-center h-9 px-3 rounded-2xl border border-white/10 bg-white/5 text-zinc-200"
+                                    title="Episodios vistos / episodios totales">
+                                    <span className="text-[11px] font-semibold text-zinc-400 mr-2">Vistos</span>
+                                    <span className="text-sm font-extrabold tabular-nums">
+                                        {totals.watchedEpisodes}/{totals.totalEpisodes}
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="relative w-full md:w-[340px]">
@@ -296,16 +536,11 @@ export default function TraktEpisodesWatchedModal({
                             </div>
                         </div>
                     ) : viewMode === 'list' ? (
-                        // =========================
-                        // VISTA LISTA (como la tuya)
-                        // =========================
                         <div className="p-5 grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4">
                             {/* Left: seasons */}
                             <div className="rounded-3xl border border-white/10 bg-white/5 overflow-hidden">
                                 <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-                                    <div className="text-xs font-bold tracking-wider uppercase text-zinc-400">
-                                        Temporadas
-                                    </div>
+                                    <div className="text-xs font-bold tracking-wider uppercase text-zinc-400">Temporadas</div>
                                     <div className="text-xs font-bold px-2 py-1 rounded-full bg-black/30 border border-white/10 text-zinc-200">
                                         {usableSeasons.length}
                                     </div>
@@ -314,7 +549,7 @@ export default function TraktEpisodesWatchedModal({
                                 <div className="max-h-[60vh] overflow-auto sv-scroll">
                                     {usableSeasons.map((s) => {
                                         const sn = s?.season_number
-                                        const name = seasonLabel(sn, s?.name)
+                                        const name = seasonLabelText(sn, s?.name)
                                         const epCount = typeof s?.episode_count === 'number' ? s.episode_count : null
 
                                         const watchedCount = (watchedBySeason?.[sn] || []).length
@@ -324,7 +559,12 @@ export default function TraktEpisodesWatchedModal({
                                             <button
                                                 key={sn}
                                                 type="button"
-                                                onClick={() => setActiveSeason(sn)}
+                                                onClick={() => {
+                                                    setActiveSeason(sn)
+                                                    if (Array.isArray(seasonCache?.[sn]?.episodes)) {
+                                                        setDisplaySeason(sn)
+                                                    }
+                                                }}
                                                 className={`w-full text-left px-4 py-3 border-b border-white/5 transition flex items-center justify-between gap-3
                           ${isActive ? 'bg-white/10' : 'hover:bg-white/5'}`}
                                             >
@@ -357,7 +597,7 @@ export default function TraktEpisodesWatchedModal({
                                 <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
                                     <div className="min-w-0">
                                         <div className="text-white font-extrabold truncate">
-                                            {active?.name || (activeSn != null ? seasonLabel(activeSn) : '—')}
+                                            {selectedSeasonObj?.name || (selectedSn != null ? seasonLabelText(selectedSn) : '—')}
                                         </div>
                                         <div className="text-xs text-zinc-400 mt-0.5">
                                             Pulsa el ojo para marcar visto/no visto
@@ -372,65 +612,87 @@ export default function TraktEpisodesWatchedModal({
                                     )}
                                 </div>
 
-                                {error ? (
+                                {error && !selectedLoading && selectedSn === displaySn ? (
                                     <div className="p-4 text-sm text-red-400">{error}</div>
                                 ) : (
-                                    <div className="max-h-[60vh] overflow-auto sv-scroll p-3 space-y-2">
-                                        {filteredEpisodes.map((ep) => {
-                                            const en = ep?.episode_number
-                                            const epTitle = ep?.name || `Episodio ${en}`
-                                            const watched = watchedSet.has(en)
-                                            const key = `S${activeSn}E${en}`
-                                            const busy = busyKey === key
+                                    <div className="relative">
+                                        <div className={`max-h-[60vh] overflow-auto sv-scroll p-3 space-y-2 ${isSwitchingSeason ? 'pointer-events-none opacity-60' : ''}`}>
+                                            {filteredEpisodes.map((ep) => {
+                                                const en = ep?.episode_number
+                                                const epTitle = ep?.name || `Episodio ${en}`
+                                                const watched = watchedSet.has(en)
 
-                                            return (
-                                                <div
-                                                    key={en}
-                                                    className="rounded-2xl border border-white/10 bg-black/20 hover:bg-black/25 transition p-3 flex items-start gap-3"
-                                                >
-                                                    <div className="shrink-0 w-9 h-9 rounded-full border border-white/10 bg-white/5 flex items-center justify-center font-extrabold text-zinc-200">
-                                                        {en}
-                                                    </div>
+                                                const key = `S${displaySn}E${en}`
+                                                const busy = busyKey === key
 
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="text-white font-bold truncate">{epTitle}</div>
-                                                        {ep?.overview ? (
-                                                            <div className="text-xs text-zinc-400 mt-1 line-clamp-2">
-                                                                {ep.overview}
-                                                            </div>
-                                                        ) : null}
-                                                        <div className="text-xs text-zinc-500 mt-2">
-                                                            {formatDate(ep?.air_date)}
-                                                        </div>
-                                                    </div>
+                                                const stillUrl = tmdbImg(ep?.still_path, 'w300')
 
-                                                    <button
-                                                        type="button"
-                                                        disabled={busy || activeSn == null || en == null}
-                                                        onClick={() => onToggleEpisodeWatched?.(activeSn, en)}
-                                                        className={`shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-2xl border transition
-                              ${watched
-                                                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20'
-                                                                : 'bg-white/5 border-white/10 text-zinc-200 hover:bg-white/10 hover:border-white/15'
-                                                            }
-                              ${busy ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                                        title={watched ? 'Marcar como no visto' : 'Marcar como visto'}
+                                                return (
+                                                    <div
+                                                        key={en}
+                                                        className="rounded-2xl border border-white/10 bg-black/20 hover:bg-black/25 transition p-3 flex items-start gap-3"
                                                     >
-                                                        {busy ? (
-                                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                                        ) : watched ? (
-                                                            <Eye className="w-4 h-4" />
-                                                        ) : (
-                                                            <EyeOff className="w-4 h-4" />
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            )
-                                        })}
+                                                        <div className="shrink-0 w-[96px] h-[54px] rounded-xl overflow-hidden border border-white/10 bg-black/40">
+                                                            {stillUrl ? (
+                                                                <img src={stillUrl} alt={epTitle} className="w-full h-full object-cover" loading="lazy" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-[11px] text-zinc-500">
+                                                                    Sin imagen
+                                                                </div>
+                                                            )}
+                                                        </div>
 
-                                        {!loading && filteredEpisodes.length === 0 && (
-                                            <div className="px-2 py-6 text-sm text-zinc-400">
-                                                No hay episodios para mostrar con este filtro.
+                                                        <div className="shrink-0 w-9 h-9 rounded-full border border-white/10 bg-white/5 flex items-center justify-center font-extrabold text-zinc-200">
+                                                            {en}
+                                                        </div>
+
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="text-white font-bold truncate">{epTitle}</div>
+                                                            {ep?.overview ? (
+                                                                <div className="text-xs text-zinc-400 mt-1 line-clamp-2">
+                                                                    {ep.overview}
+                                                                </div>
+                                                            ) : null}
+                                                            <div className="text-xs text-zinc-500 mt-2">{formatDate(ep?.air_date)}</div>
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            disabled={busy || displaySn == null || en == null || isSwitchingSeason}
+                                                            onClick={() => onToggleEpisodeWatched?.(displaySn, en)}
+                                                            className={`shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-2xl border transition
+                                ${watched
+                                                                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20'
+                                                                    : 'bg-white/5 border-white/10 text-zinc-200 hover:bg-white/10 hover:border-white/15'
+                                                                }
+                                ${busy ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                                            title={watched ? 'Marcar como no visto' : 'Marcar como visto'}
+                                                        >
+                                                            {busy ? (
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                            ) : watched ? (
+                                                                <Eye className="w-4 h-4" />
+                                                            ) : (
+                                                                <EyeOff className="w-4 h-4" />
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                )
+                                            })}
+
+                                            {!selectedLoading && !isSwitchingSeason && filteredEpisodes.length === 0 && (
+                                                <div className="px-2 py-6 text-sm text-zinc-400">
+                                                    No hay episodios para mostrar con este filtro.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {isSwitchingSeason && (
+                                            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/35 backdrop-blur-[1px]">
+                                                <div className="inline-flex items-center gap-2 text-sm text-zinc-200">
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    Cargando temporada…
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -438,9 +700,7 @@ export default function TraktEpisodesWatchedModal({
                             </div>
                         </div>
                     ) : (
-                        // =========================
-                        // VISTA TABLA (1 temporada = 1 fila con TODOS sus episodios)
-                        // =========================
+                        // TABLA (tu vista original)
                         <div className="p-5">
                             <div className="rounded-3xl border border-white/10 bg-white/5 overflow-hidden">
                                 <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between gap-3">
@@ -457,7 +717,6 @@ export default function TraktEpisodesWatchedModal({
                                 </div>
 
                                 <div className="max-h-[62vh] overflow-auto sv-scroll">
-                                    {/* header “visual” */}
                                     <div className="grid grid-cols-[220px_1fr] gap-3 px-5 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500 border-b border-white/5">
                                         <div>Temporada</div>
                                         <div>Episodios</div>
@@ -466,25 +725,20 @@ export default function TraktEpisodesWatchedModal({
                                     <div className="divide-y divide-white/5">
                                         {seasonsFilteredForTable.map((s) => {
                                             const sn = s?.season_number
-                                            const name = seasonLabel(sn, s?.name)
+                                            const name = seasonLabelText(sn, s?.name)
                                             const epCount = typeof s?.episode_count === 'number' ? s.episode_count : 0
 
                                             const watchedArr = watchedBySeason?.[sn] || []
                                             const watchedLocal = new Set(watchedArr)
                                             const watchedCount = watchedArr.length
 
-                                            // aplica filtro "solo no vistos" en tabla:
-                                            // si está activo, ocultamos temporadas completamente vistas
-                                            if (onlyUnwatched && epCount > 0 && watchedCount >= epCount) {
-                                                return null
-                                            }
+                                            if (onlyUnwatched && epCount > 0 && watchedCount >= epCount) return null
 
                                             const { nums, hasMore, remaining } = buildEpisodeNumbers(sn, epCount)
                                             const expanded = !!expandedSeason?.[sn]
 
                                             return (
                                                 <div key={sn} className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-3 px-5 py-4">
-                                                    {/* Left */}
                                                     <div className="min-w-0">
                                                         <div className="flex items-center gap-2">
                                                             <div className="font-extrabold text-white truncate">{name}</div>
@@ -497,10 +751,9 @@ export default function TraktEpisodesWatchedModal({
                                                         </div>
                                                     </div>
 
-                                                    {/* Episodes row (horizontal scroll) */}
                                                     <div className="min-w-0">
-                                                        <div className="overflow-x-auto sv-scroll">
-                                                            <div className="flex items-center gap-2 min-w-max pr-3 pb-1">
+                                                        <div className="overflow-x-auto overflow-y-visible sv-scroll pt-2">
+                                                            <div className="flex items-center gap-2 min-w-max pr-3 pb-2">
                                                                 {nums.map((en) => {
                                                                     const watched = watchedLocal.has(en)
                                                                     const key = `S${sn}E${en}`
@@ -512,7 +765,7 @@ export default function TraktEpisodesWatchedModal({
                                                                             type="button"
                                                                             disabled={busy}
                                                                             onClick={() => onToggleEpisodeWatched?.(sn, en)}
-                                                                            className={`relative inline-flex items-center justify-center w-10 h-10 rounded-xl border font-extrabold text-sm transition
+                                                                            className={`relative overflow-visible inline-flex items-center justify-center w-10 h-10 rounded-xl border font-extrabold text-sm transition
                                         ${watched
                                                                                     ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20'
                                                                                     : 'bg-white/5 border-white/10 text-zinc-200 hover:bg-white/10 hover:border-white/15'
@@ -521,9 +774,8 @@ export default function TraktEpisodesWatchedModal({
                                                                             title={watched ? `S${sn}E${en} · visto` : `S${sn}E${en} · no visto`}
                                                                         >
                                                                             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : en}
-                                                                            {/* pequeño “tick” */}
                                                                             {watched && !busy && (
-                                                                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 shadow" />
+                                                                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 shadow ring-2 ring-black/60" />
                                                                             )}
                                                                         </button>
                                                                     )
@@ -532,9 +784,7 @@ export default function TraktEpisodesWatchedModal({
                                                                 {hasMore && (
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() =>
-                                                                            setExpandedSeason((p) => ({ ...p, [sn]: true }))
-                                                                        }
+                                                                        onClick={() => setExpandedSeason((p) => ({ ...p, [sn]: true }))}
                                                                         className="inline-flex items-center justify-center h-10 px-3 rounded-xl border border-white/10 bg-black/30 text-zinc-200 hover:bg-white/10 transition font-bold"
                                                                         title="Mostrar todos los episodios"
                                                                     >
@@ -545,9 +795,7 @@ export default function TraktEpisodesWatchedModal({
                                                                 {expanded && epCount > MAX_EPISODES_RENDER && (
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() =>
-                                                                            setExpandedSeason((p) => ({ ...p, [sn]: false }))
-                                                                        }
+                                                                        onClick={() => setExpandedSeason((p) => ({ ...p, [sn]: false }))}
                                                                         className="inline-flex items-center justify-center h-10 px-3 rounded-xl border border-white/10 bg-black/30 text-zinc-200 hover:bg-white/10 transition font-bold"
                                                                         title="Contraer"
                                                                     >
@@ -571,7 +819,8 @@ export default function TraktEpisodesWatchedModal({
                             </div>
 
                             <div className="mt-3 text-xs text-zinc-500 px-1">
-                                Tip: si una temporada tiene muchos episodios (p. ej. Especiales), usa “+X más” para renderizar todos.
+                                Tip: si una temporada tiene muchos episodios (p. ej. Especiales), usa “+X más”
+                                para renderizar todos.
                             </div>
                         </div>
                     )}
