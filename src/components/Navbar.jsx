@@ -21,6 +21,7 @@ import {
   Compass,
   Activity
 } from 'lucide-react'
+import TraktHistoryNavButton from '@/components/trakt/TraktHistoryNavButton'
 
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
@@ -284,7 +285,7 @@ export default function Navbar() {
               <Link href="/calendar" className={iconLinkClass('/calendar')} title="Calendario">
                 <CalendarDaysIcon className="w-5 h-5" />
               </Link>
-
+              <TraktHistoryNavButton />
               {hydrated && account && (
                 <>
                   <Link href="/favorites" className={iconLinkClass('/favorites')} title="Favoritas">

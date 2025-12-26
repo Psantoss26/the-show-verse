@@ -357,10 +357,41 @@ export async function traktRemoveHistoryEntries(token, { ids = [] }) {
 
 export function mapHistoryEntries(history = []) {
     // ✅ UI: solo id + watched_at, ordenado desc
+    // ✅ Añadimos watchedAt como alias por compatibilidad con UI
     return sortHistoryDesc(history || [])
-        .map((h) => ({
-            id: h?.id ?? null,
-            watched_at: h?.watched_at ?? null
-        }))
-        .filter((x) => x.id && x.watched_at)
+        .map((h) => {
+            const id = h?.id ?? null
+            const watched_at = h?.watched_at ?? null
+            if (!id || !watched_at) return null
+            return {
+                id,
+                watched_at,
+                watchedAt: watched_at
+            }
+        })
+        .filter(Boolean)
 }
+
+export async function getValidTraktToken(cookieStore) {
+    const { accessToken, refreshToken, expiresAtMs } = readTraktCookies(cookieStore)
+
+    // no hay nada
+    if (!accessToken && !refreshToken) {
+        return { token: null, refreshedTokens: null, shouldClear: false }
+    }
+
+    // access válido
+    if (accessToken && !tokenIsExpired(expiresAtMs)) {
+        return { token: accessToken, refreshedTokens: null, shouldClear: false }
+    }
+
+    // expirado y no hay refresh => limpiar
+    if (!refreshToken) {
+        return { token: null, refreshedTokens: null, shouldClear: true }
+    }
+
+    // refresh
+    const refreshedTokens = await refreshAccessToken(refreshToken)
+    return { token: refreshedTokens.access_token, refreshedTokens, shouldClear: false }
+}
+

@@ -2444,94 +2444,6 @@ export default function DetailsClient({
                   </div>
                 )}
 
-                {trakt.connected && (
-                  <div className="mt-3 flex flex-col gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setTraktWatchedOpen(true)}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-zinc-200
-             hover:bg-white/10 transition"
-                        title="Ver historial de visionados (Trakt)"
-                      >
-                        <img src="/logo-Trakt.png" alt="Trakt" className="h-3.5 w-auto opacity-90" />
-                        <span className="font-semibold">Trakt</span>
-
-                        <span className={trakt.watched ? 'text-emerald-300' : 'text-zinc-400'}>
-                          {trakt.watched ? 'Visto' : 'No visto'}
-                        </span>
-
-                        {/* veces vistas */}
-                        {Number(trakt.plays || 0) > 0 && (
-                          <span className="text-zinc-400">· {trakt.plays}×</span>
-                        )}
-
-                        {/* últimas fechas (si tienes history). Ajusta watched_at -> watchedAt si tu API lo devuelve así */}
-                        {Array.isArray(trakt.history) && trakt.history.length > 0 ? (
-                          <span className="text-zinc-500">
-                            · Últ.: {new Date(trakt.history[0].watched_at).toLocaleDateString('es-ES')}
-                            {trakt.history[1]?.watched_at
-                              ? `, ${new Date(trakt.history[1].watched_at).toLocaleDateString('es-ES')}`
-                              : ''}
-                          </span>
-                        ) : trakt.lastWatchedAt ? (
-                          <span className="text-zinc-500">
-                            · Últ.: {new Date(trakt.lastWatchedAt).toLocaleDateString('es-ES')}
-                          </span>
-                        ) : null}
-
-                        <span className="ml-1 inline-flex items-center justify-center w-6 h-6 rounded-lg bg-black/25 border border-white/10">
-                          <Eye className="w-3.5 h-3.5" />
-                        </span>
-                      </button>
-
-                      <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-zinc-200 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          className="accent-yellow-500"
-                          checked={syncTrakt}
-                          onChange={(e) => setSyncTrakt(e.target.checked)}
-                        />
-                        Sincronizar con Trakt (nota + watchlist)
-                      </label>
-
-                      {/* Si quieres también el botón de watchlist Trakt “manual” (opcional) */}
-                      {/* <button onClick={toggleTraktWatchlist} ...>...</button> */}
-                    </div>
-
-                    {endpointType === 'tv' && trakt.progress && (
-                      <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                          <div className="text-sm font-bold text-white">
-                            Progreso en Trakt
-                            {typeof trakt.progress.percentage === 'number' ? (
-                              <span className="text-zinc-400 font-semibold ml-2">
-                                {Math.round(trakt.progress.percentage)}%
-                              </span>
-                            ) : null}
-                          </div>
-
-                          {trakt.progress.next_episode && (
-                            <div className="text-xs text-zinc-300">
-                              S{trakt.progress.next_episode.season}E{trakt.progress.next_episode.number}
-                              {trakt.progress.next_episode.title ? ` · ${trakt.progress.next_episode.title}` : ''}
-                            </div>
-                          )}
-                        </div>
-
-                        {typeof trakt.progress.percentage === 'number' && (
-                          <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
-                            <div
-                              className="h-full bg-emerald-500/70"
-                              style={{ width: `${Math.max(0, Math.min(100, trakt.progress.percentage))}%` }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Usuario */}
                 <div className="flex items-center justify-center min-w-0">
                   {session ? (
@@ -2715,6 +2627,25 @@ export default function DetailsClient({
                 <img
                   src="/logoFilmaffinity.png"
                   alt="FilmAffinity"
+                  className="w-9 h-9 object-contain rounded-lg"
+                />
+              </a>
+
+              {/* Trakt */}
+              <a
+                href={
+                  trakt?.traktUrl
+                    ? trakt.traktUrl
+                    : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
+                }
+                target="_blank"
+                rel="noreferrer"
+                title="Trakt"
+                className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
+              >
+                <img
+                  src="/logo-Trakt.png"
+                  alt="Trakt"
                   className="w-9 h-9 object-contain rounded-lg"
                 />
               </a>
