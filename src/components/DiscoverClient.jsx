@@ -1,4 +1,3 @@
-// src/components/DiscoverClient.jsx
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -14,15 +13,28 @@ import {
     X,
     Check,
     Search as SearchIcon,
+    Calendar,
+    Star,
+    Clock
 } from 'lucide-react'
 
 /* =========================
-   Helpers
+   Helpers & Hooks
 ========================= */
 const TMDB = 'https://api.themoviedb.org/3'
 const IMG = 'https://image.tmdb.org/t/p'
 const REGION = 'ES'
 const LANG = 'es-ES'
+
+// Hook Debounce para evitar llamadas excesivas
+function useDebounce(value, delay) {
+    const [debouncedValue, setDebouncedValue] = useState(value)
+    useEffect(() => {
+        const handler = setTimeout(() => { setDebouncedValue(value) }, delay)
+        return () => clearTimeout(handler)
+    }, [value, delay])
+    return debouncedValue
+}
 
 function formatDateDMY(dateStr) {
     if (!dateStr || typeof dateStr !== 'string') return ''
@@ -59,39 +71,38 @@ function posterSrc(item) {
 function isAbortError(e) {
     return (
         e?.name === 'AbortError' ||
-        e?.code === 20 || // algunos navegadores
+        e?.code === 20 ||
         String(e?.message || '').toLowerCase().includes('aborted')
     )
 }
 
 /* =========================
-   UI Bits
+   UI Components
 ========================= */
+
 function Section({ title, right, children, defaultOpen = false, overflowVisible = false }) {
     const [open, setOpen] = useState(!!defaultOpen)
-
-    useEffect(() => {
-        setOpen(!!defaultOpen)
-    }, [defaultOpen])
+    useEffect(() => { setOpen(!!defaultOpen) }, [defaultOpen])
 
     return (
         <details
             open={open}
             onToggle={(e) => setOpen(e.currentTarget.open)}
             className={[
-                'rounded-2xl bg-neutral-900/60 border border-white/5 shadow-[0_14px_40px_rgba(0,0,0,0.35)]',
+                'group border-b border-white/5 last:border-0',
                 overflowVisible ? 'overflow-visible' : 'overflow-hidden',
             ].join(' ')}
         >
-            <summary className="cursor-pointer select-none px-4 py-3 flex items-center justify-between">
-                <div className="text-white font-bold">{title}</div>
-                <div className="flex items-center gap-2 text-white/70">
+            <summary className="cursor-pointer select-none py-4 flex items-center justify-between hover:text-white transition-colors text-zinc-300">
+                <div className="font-semibold text-sm tracking-wide">{title}</div>
+                <div className="flex items-center gap-2">
                     {right}
-                    <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${open ? 'rotate-180 text-white' : 'text-zinc-500'}`} />
                 </div>
             </summary>
-
-            <div className="px-4 pb-4">{children}</div>
+            <div className="pb-6 pt-1 animate-in slide-in-from-top-2 duration-200">
+                {children}
+            </div>
         </details>
     )
 }
@@ -101,10 +112,10 @@ function Chip({ active, children, onClick, className = '' }) {
         <button
             type="button"
             onClick={onClick}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold transition
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border
         ${active
-                    ? 'bg-white/10 border-white/20 text-white'
-                    : 'bg-black/10 border-white/10 text-white/70 hover:text-white hover:border-white/20'
+                    ? 'bg-yellow-500 text-black border-yellow-500 font-bold shadow-[0_0_10px_rgba(234,179,8,0.3)]'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
                 } ${className}`}
         >
             {children}
@@ -114,7 +125,11 @@ function Chip({ active, children, onClick, className = '' }) {
 
 function RadioRow({ name, value, checked, onChange, children, disabled = false }) {
     return (
-        <label className={`flex items-center gap-3 py-1.5 ${disabled ? 'opacity-50' : ''}`}>
+        <label className={`flex items-center gap-3 py-2 cursor-pointer group ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors
+                ${checked ? 'border-yellow-500' : 'border-zinc-600 group-hover:border-zinc-400'}`}>
+                {checked && <div className="w-2 h-2 rounded-full bg-yellow-500" />}
+            </div>
             <input
                 type="radio"
                 name={name}
@@ -122,9 +137,11 @@ function RadioRow({ name, value, checked, onChange, children, disabled = false }
                 checked={checked}
                 onChange={() => !disabled && onChange(value)}
                 disabled={disabled}
-                className="accent-yellow-500"
+                className="hidden"
             />
-            <span className="text-sm text-white/80">{children}</span>
+            <span className={`text-sm transition-colors ${checked ? 'text-white font-medium' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
+                {children}
+            </span>
         </label>
     )
 }
@@ -138,48 +155,59 @@ function DualRange({ min, max, valueMin, valueMax, onChange, step = 1, label }) 
         setB(valueMax)
     }, [valueMin, valueMax])
 
-    const clamp = (x) => Math.max(min, Math.min(max, x))
-    const commit = (na, nb) => {
-        const lo = Math.min(na, nb)
-        const hi = Math.max(na, nb)
-        onChange([clamp(lo), clamp(hi)])
+    const minVal = Math.min(a, b)
+    const maxVal = Math.max(a, b)
+    const minPercent = ((minVal - min) / (max - min)) * 100
+    const maxPercent = ((maxVal - min) / (max - min)) * 100
+
+    const commit = (valA, valB) => {
+        const sorted = [valA, valB].sort((x, y) => x - y)
+        onChange(sorted)
     }
 
     return (
-        <div className="mt-2">
-            <div className="flex items-center justify-between text-xs text-white/70">
+        <div className="mt-1 group">
+            <div className="flex items-center justify-between text-xs text-zinc-500 mb-3 font-medium group-hover:text-zinc-400 transition-colors">
                 <span>{label}</span>
-                <span className="font-mono text-white/80">
-                    {a} – {b}
+                <span className="font-mono text-yellow-500 font-bold tracking-tight">
+                    {minVal} - {maxVal}
                 </span>
             </div>
 
-            <div className="relative mt-2 h-10">
+            <div className="relative h-5 w-full">
+                {/* Track Fondo */}
+                <div className="absolute top-1/2 left-0 w-full h-1 bg-zinc-800 rounded-full -translate-y-1/2" />
+
+                {/* Track Activo */}
+                <div
+                    className="absolute top-1/2 h-1 bg-yellow-500 rounded-full -translate-y-1/2 transition-all duration-75"
+                    style={{ left: `${minPercent}%`, width: `${maxPercent - minPercent}%` }}
+                />
+
+                {/* Input A */}
                 <input
                     type="range"
-                    min={min}
-                    max={max}
-                    step={step}
+                    min={min} max={max} step={step}
                     value={a}
                     onChange={(e) => {
-                        const na = Number(e.target.value)
-                        setA(na)
-                        commit(na, b)
+                        const v = Number(e.target.value)
+                        setA(v)
+                        commit(v, b)
                     }}
-                    className="absolute inset-0 w-full opacity-70"
+                    className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none z-20 range-thumb-interactive"
                 />
+
+                {/* Input B */}
                 <input
                     type="range"
-                    min={min}
-                    max={max}
-                    step={step}
+                    min={min} max={max} step={step}
                     value={b}
                     onChange={(e) => {
-                        const nb = Number(e.target.value)
-                        setB(nb)
-                        commit(a, nb)
+                        const v = Number(e.target.value)
+                        setB(v)
+                        commit(a, v)
                     }}
-                    className="absolute inset-0 w-full opacity-70"
+                    className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none z-20 range-thumb-interactive"
                 />
             </div>
         </div>
@@ -187,28 +215,36 @@ function DualRange({ min, max, valueMin, valueMax, onChange, step = 1, label }) 
 }
 
 function SingleRange({ min, max, value, onChange, step = 1, label }) {
+    const percent = ((value - min) / (max - min)) * 100
+
     return (
-        <div className="mt-2">
-            <div className="flex items-center justify-between text-xs text-white/70">
+        <div className="mt-1 group">
+            <div className="flex items-center justify-between text-xs text-zinc-500 mb-3 font-medium group-hover:text-zinc-400 transition-colors">
                 <span>{label}</span>
-                <span className="font-mono text-white/80">{value}</span>
+                <span className="font-mono text-yellow-500 font-bold">{value}</span>
             </div>
-            <input
-                type="range"
-                min={min}
-                max={max}
-                step={step}
-                value={value}
-                onChange={(e) => onChange(Number(e.target.value))}
-                className="w-full mt-2 opacity-80"
-            />
+            <div className="relative h-5 w-full flex items-center">
+                <div className="absolute inset-x-0 h-1 bg-zinc-800 rounded-full"></div>
+                <div
+                    className="absolute h-1 bg-yellow-500 rounded-full left-0"
+                    style={{ width: `${percent}%` }}
+                ></div>
+                <input
+                    type="range"
+                    min={min} max={max} step={step}
+                    value={value}
+                    onChange={(e) => onChange(Number(e.target.value))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <div
+                    className="absolute h-3 w-3 bg-yellow-500 rounded-full pointer-events-none shadow-lg transition-all duration-75 group-hover:scale-125"
+                    style={{ left: `${percent}%`, transform: 'translateX(-50%)' }}
+                />
+            </div>
         </div>
     )
 }
 
-/* =========================
-   Custom Sort Menu
-========================= */
 const SORT_OPTIONS = [
     { id: 'pop_desc', label: 'Popularidad descendente', hint: 'Tendencia primero' },
     { id: 'pop_asc', label: 'Popularidad ascendente', hint: 'Menos populares primero' },
@@ -221,17 +257,10 @@ const SORT_OPTIONS = [
 function SortMenu({ value, onChange }) {
     const [open, setOpen] = useState(false)
     const ref = useRef(null)
-
-    const current = useMemo(
-        () => SORT_OPTIONS.find((o) => o.id === value) || SORT_OPTIONS[0],
-        [value]
-    )
+    const current = useMemo(() => SORT_OPTIONS.find((o) => o.id === value) || SORT_OPTIONS[0], [value])
 
     useEffect(() => {
-        const onDown = (e) => {
-            if (!ref.current) return
-            if (!ref.current.contains(e.target)) setOpen(false)
-        }
+        const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
         document.addEventListener('mousedown', onDown)
         return () => document.removeEventListener('mousedown', onDown)
     }, [])
@@ -241,90 +270,52 @@ function SortMenu({ value, onChange }) {
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className="w-full h-11 px-3 rounded-xl bg-black/20 border border-white/10 text-white focus:outline-none focus:border-white/25 hover:border-white/20 hover:bg-white/5 transition flex items-center justify-between"
-                aria-expanded={open}
-                aria-haspopup="menu"
+                className="w-full h-10 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-200 hover:border-zinc-600 transition flex items-center justify-between group"
             >
-                <div className="min-w-0">
-                    <div className="text-sm font-semibold truncate">{current.label}</div>
-                    <div className="text-[11px] text-white/45 -mt-0.5 truncate">{current.hint}</div>
-                </div>
-                <ChevronDown
-                    className={`w-4 h-4 text-white/70 transition-transform ${open ? 'rotate-180' : ''}`}
-                />
+                <span className="text-sm font-medium truncate">{current.label}</span>
+                <ChevronDown className={`w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
-
             {open && (
-                <div
-                    role="menu"
-                    className="absolute z-[80] mt-2 w-full rounded-2xl border border-white/10 bg-[#0f0f0f]/95 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.65)] overflow-hidden"
-                >
-                    <div className="p-2">
-                        {SORT_OPTIONS.map((opt) => {
-                            const active = opt.id === value
-                            return (
-                                <button
-                                    key={opt.id}
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={() => {
-                                        onChange(opt.id)
-                                        setOpen(false)
-                                    }}
-                                    className={`w-full text-left px-3 py-2 rounded-xl transition flex items-start justify-between gap-3
-                    ${active ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5'}`}
-                                >
-                                    <div className="min-w-0">
-                                        <div className="text-sm font-semibold truncate">{opt.label}</div>
-                                        <div className="text-[11px] text-white/45 truncate">{opt.hint}</div>
-                                    </div>
-                                    <div className="shrink-0 pt-0.5">
-                                        {active ? (
-                                            <Check className="w-4 h-4 text-emerald-400" />
-                                        ) : (
-                                            <div className="w-4 h-4" />
-                                        )}
-                                    </div>
-                                </button>
-                            )
-                        })}
-                    </div>
+                <div className="absolute z-[80] mt-1 w-full rounded-lg border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden py-1">
+                    {SORT_OPTIONS.map((opt) => {
+                        const active = opt.id === value
+                        return (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => { onChange(opt.id); setOpen(false) }}
+                                className={`w-full text-left px-3 py-2 transition flex items-center justify-between gap-3
+                                    ${active ? 'bg-zinc-800 text-yellow-500' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
+                            >
+                                <span className="text-sm">{opt.label}</span>
+                                {active && <Check className="w-3.5 h-3.5" />}
+                            </button>
+                        )
+                    })}
                 </div>
             )}
         </div>
     )
 }
 
-/* =========================
-   Rating badge + Card (overlay on hover)
-========================= */
 function RatingBadge({ percent }) {
     const p = Math.max(0, Math.min(100, Math.round(percent || 0)))
-    const r = 12
+    let stroke = 'rgba(250, 204, 21, 1)' // Yellow
+    if (p >= 70) stroke = 'rgba(16, 185, 129, 1)' // Green
+    if (p < 40) stroke = 'rgba(239, 68, 68, 1)' // Red
+
+    const r = 14
     const c = 2 * Math.PI * r
     const dash = (p / 100) * c
 
     return (
-        <div className="inline-flex items-center gap-2 rounded-full bg-black/70 backdrop-blur-md px-2.5 py-1.5 border border-white/12 shadow-[0_10px_30px_rgba(0,0,0,0.55)]">
-            <div className="relative w-7 h-7">
-                <svg viewBox="0 0 32 32" className="w-7 h-7 -rotate-90">
-                    <circle cx="16" cy="16" r={r} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="4" />
-                    <circle
-                        cx="16"
-                        cy="16"
-                        r={r}
-                        fill="none"
-                        stroke="rgba(16,185,129,0.95)"
-                        strokeWidth="4"
-                        strokeLinecap="round"
-                        strokeDasharray={`${dash} ${c}`}
-                    />
-                </svg>
-            </div>
-
-            <div className="leading-none">
-                <div className="text-[12px] font-extrabold text-white tracking-wide">{p}%</div>
-                <div className="text-[10px] text-white/65 -mt-0.5">score</div>
+        <div className="relative w-9 h-9 flex items-center justify-center bg-black/80 rounded-full backdrop-blur-sm border border-white/5 shadow-xl">
+            <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90 p-0.5">
+                <circle cx="18" cy="18" r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
+                <circle cx="18" cy="18" r={r} fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${dash} ${c}`} />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
+                {p}<span className="text-[7px] align-top mt-[2px]">%</span>
             </div>
         </div>
     )
@@ -334,70 +325,48 @@ function DiscoverCard({ item }) {
     const isMovie = item.media_type === 'movie'
     const title = isMovie ? item.title : item.name
     const rawDate = isMovie ? item.release_date : item.first_air_date
-    const date = formatDateDMY(rawDate)
+    const year = rawDate ? rawDate.split('-')[0] : ''
     const percent = (item.vote_average || 0) * 10
     const href = `/details/${item.media_type}/${item.id}`
 
     return (
-        <Link href={href} className="group block relative" title={title}>
-            <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-neutral-900 border border-white/5 shadow-xl transition-all duration-500 ease-out group-hover:shadow-2xl group-hover:-translate-y-2">
+        <Link href={href} className="group relative flex flex-col w-full h-full" title={title}>
+            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md ring-1 ring-white/5 transition-all duration-300 group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] group-hover:ring-white/20 group-hover:scale-[1.03] z-0 group-hover:z-10">
                 <img
                     src={posterSrc(item)}
                     alt={title}
-                    className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
+                    className="w-full h-full object-cover transition-transform duration-500"
                     loading="lazy"
                     decoding="async"
                 />
 
-                {/* Overlay: only on hover/focus */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300">
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/10" />
-                    <div className="absolute inset-0 [box-shadow:inset_0_-110px_140px_rgba(0,0,0,0.75)]" />
-
-                    {/* Type */}
-                    <div className="absolute top-3 right-3 z-10">
-                        <div className="inline-flex items-center gap-2 rounded-full bg-black/70 backdrop-blur-md border border-white/12 px-2.5 py-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-                            {isMovie ? (
-                                <FilmIcon className="w-4 h-4 text-white/85" />
-                            ) : (
-                                <TvIcon className="w-4 h-4 text-white/85" />
-                            )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+                    <div className="absolute top-2 right-2 translate-y-[-10px] group-hover:translate-y-0 transition-transform duration-300 delay-75">
+                        <div className="rounded-md bg-black/60 backdrop-blur-md px-1.5 py-1 border border-white/10 text-white">
+                            {isMovie ? <FilmIcon className="w-3.5 h-3.5" /> : <TvIcon className="w-3.5 h-3.5" />}
                         </div>
                     </div>
 
-                    {/* Score */}
                     {percent > 0 && (
-                        <div className="absolute top-3 left-3 z-10">
+                        <div className="absolute top-2 left-2 translate-y-[-10px] group-hover:translate-y-0 transition-transform duration-300 delay-75">
                             <RatingBadge percent={percent} />
                         </div>
                     )}
 
-                    {/* Bottom info */}
-                    <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-                        <div className="rounded-xl bg-black/60 backdrop-blur-md border border-white/12 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.60)]">
-                            <div className="text-white font-extrabold text-sm sm:text-[15px] leading-snug line-clamp-2">
-                                {title}
-                            </div>
-
-                            {!!date && (
-                                <div className="mt-1 text-[11px] text-white/75 font-medium tracking-wide">
-                                    {date}
-                                </div>
-                            )}
-                        </div>
+                    <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                        <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 mb-1">
+                            {title}
+                        </h3>
+                        <p className="text-yellow-500 font-medium text-xs">
+                            {year || 'N/A'}
+                        </p>
                     </div>
                 </div>
-
-                <div className="absolute inset-0 pointer-events-none ring-0 group-focus-within:ring-2 ring-yellow-500/50 rounded-2xl" />
             </div>
         </Link>
     )
 }
 
-/* =========================
-   Providers: icon-only + search
-   ✅ FIX: badge no se recorta (sin overflow-hidden en el wrapper)
-========================= */
 function ProviderIcon({ provider, active, onToggle }) {
     const logo = provider?.logo_path ? `${IMG}/w92${provider.logo_path}` : null
 
@@ -406,31 +375,23 @@ function ProviderIcon({ provider, active, onToggle }) {
             type="button"
             onClick={onToggle}
             title={provider.provider_name}
-            aria-pressed={active}
-            className={`relative w-full aspect-square rounded-2xl overflow-hidden border transition shadow-sm
+            className={`relative w-full aspect-square rounded-xl overflow-hidden transition-all duration-200 group
         ${active
-                    ? 'bg-white/10 border-emerald-500/45 ring-2 ring-emerald-500/20'
-                    : 'bg-black/20 border-white/10 hover:border-white/20 hover:bg-white/5'
+                    ? 'ring-2 ring-emerald-500 scale-95 opacity-100' // Verde
+                    : 'opacity-60 hover:opacity-100 hover:scale-105 ring-1 ring-white/10'
                 }`}
         >
             {logo ? (
-                <img
-                    src={logo}
-                    alt={provider.provider_name}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                />
+                <img src={logo} alt={provider.provider_name} className="w-full h-full object-cover" loading="lazy" />
             ) : (
-                <div className="w-full h-full flex items-center justify-center text-white/50 text-xs font-bold">
-                    {provider.provider_name?.slice(0, 2)?.toUpperCase() || 'TV'}
+                <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-500">
+                    {provider.provider_name?.slice(0, 2)}
                 </div>
             )}
 
-            {/* Check dentro (sin recortes) */}
             {active && (
-                <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500/90 border border-black/40 flex items-center justify-center shadow-lg">
-                    <Check className="w-4 h-4 text-black" />
+                <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center backdrop-blur-[1px]">
+                    <Check className="w-6 h-6 text-emerald-500 drop-shadow-md stroke-[3]" />
                 </div>
             )}
         </button>
@@ -438,42 +399,41 @@ function ProviderIcon({ provider, active, onToggle }) {
 }
 
 /* =========================
-   DiscoverClient
+   DiscoverClient Main
 ========================= */
 export default function DiscoverClient() {
     const { session, account, hydrated } = useAuth()
 
-    const [content, setContent] = useState('movie') // movie | tv | all
+    // --- State Filters ---
+    const [content, setContent] = useState('movie')
     const [sortPreset, setSortPreset] = useState('pop_desc')
-
     const [providersAll, setProvidersAll] = useState([])
     const [selectedProviders, setSelectedProviders] = useState([])
     const [providerQuery, setProviderQuery] = useState('')
-
-    const [seenMode, setSeenMode] = useState('all') // all | unseen | seen
+    const [seenMode, setSeenMode] = useState('all')
     const [ratedMovieIds, setRatedMovieIds] = useState(null)
     const [ratedTvIds, setRatedTvIds] = useState(null)
-
     const [dateFrom, setDateFrom] = useState('')
     const [dateTo, setDateTo] = useState('')
-
     const [genresAll, setGenresAll] = useState([])
     const [selectedGenres, setSelectedGenres] = useState([])
-
     const [certsAll, setCertsAll] = useState([])
     const [selectedCerts, setSelectedCerts] = useState([])
-
     const [lang, setLang] = useState('')
 
+    // ✅ Sliders States + Debounce
     const [scoreRange, setScoreRange] = useState([0, 10])
     const [minVotes, setMinVotes] = useState(0)
     const [runtimeRange, setRuntimeRange] = useState([0, 360])
+
+    const debouncedScoreRange = useDebounce(scoreRange, 500)
+    const debouncedMinVotes = useDebounce(minVotes, 500)
+    const debouncedRuntimeRange = useDebounce(runtimeRange, 500)
 
     const [keywordQuery, setKeywordQuery] = useState('')
     const [keywordOptions, setKeywordOptions] = useState([])
     const [selectedKeywords, setSelectedKeywords] = useState([])
     const keywordTimer = useRef(null)
-
     const [items, setItems] = useState([])
     const [page, setPage] = useState(1)
     const [loading, setLoading] = useState(true)
@@ -504,62 +464,38 @@ export default function DiscoverClient() {
     function sortByFor(type) {
         const isMovie = type === 'movie'
         switch (sortPreset) {
-            case 'pop_asc':
-                return 'popularity.asc'
-            case 'rating_desc':
-                return 'vote_average.desc'
-            case 'rating_asc':
-                return 'vote_average.asc'
-            case 'date_desc':
-                return isMovie ? 'primary_release_date.desc' : 'first_air_date.desc'
-            case 'date_asc':
-                return isMovie ? 'primary_release_date.asc' : 'first_air_date.asc'
+            case 'pop_asc': return 'popularity.asc'
+            case 'rating_desc': return 'vote_average.desc'
+            case 'rating_asc': return 'vote_average.asc'
+            case 'date_desc': return isMovie ? 'primary_release_date.desc' : 'first_air_date.desc'
+            case 'date_asc': return isMovie ? 'primary_release_date.asc' : 'first_air_date.asc'
             case 'pop_desc':
-            default:
-                return 'popularity.desc'
+            default: return 'popularity.desc'
         }
     }
 
-    // Meta loaders
+    // --- Meta Loader ---
     useEffect(() => {
         let cancelled = false
         const ac = new AbortController()
-
         async function loadMeta() {
             try {
-                const [gm, gt] = await Promise.all([
+                const [gm, gt, pm, pt, cm, ct] = await Promise.all([
                     tmdbFetch('/genre/movie/list', {}, ac.signal),
                     tmdbFetch('/genre/tv/list', {}, ac.signal),
-                ])
-
-                const [pm, pt] = await Promise.all([
                     tmdbFetch('/watch/providers/movie', { watch_region: REGION }, ac.signal),
                     tmdbFetch('/watch/providers/tv', { watch_region: REGION }, ac.signal),
-                ])
-
-                const [cm, ct] = await Promise.all([
                     tmdbFetch('/certification/movie/list', {}, ac.signal),
                     tmdbFetch('/certification/tv/list', {}, ac.signal),
                 ])
-
                 if (cancelled) return
 
                 const movieGenres = gm?.genres || []
                 const tvGenres = gt?.genres || []
-
-                const movieProviders = (pm?.results || []).sort((a, b) =>
-                    (a?.provider_name || '').localeCompare(b?.provider_name || '')
-                )
-                const tvProviders = (pt?.results || []).sort((a, b) =>
-                    (a?.provider_name || '').localeCompare(b?.provider_name || '')
-                )
-
-                const movieCerts = (cm?.certifications?.[REGION] || [])
-                    .map((c) => c.certification)
-                    .filter(Boolean)
-                const tvCerts = (ct?.certifications?.[REGION] || [])
-                    .map((c) => c.certification)
-                    .filter(Boolean)
+                const movieProviders = (pm?.results || []).sort((a, b) => (a?.provider_name || '').localeCompare(b?.provider_name || ''))
+                const tvProviders = (pt?.results || []).sort((a, b) => (a?.provider_name || '').localeCompare(b?.provider_name || ''))
+                const movieCerts = (cm?.certifications?.[REGION] || []).map((c) => c.certification).filter(Boolean)
+                const tvCerts = (ct?.certifications?.[REGION] || []).map((c) => c.certification).filter(Boolean)
 
                 if (content === 'movie') {
                     setGenresAll(movieGenres)
@@ -570,90 +506,55 @@ export default function DiscoverClient() {
                     setProvidersAll(tvProviders)
                     setCertsAll(tvCerts)
                 } else {
-                    const genreMap = new Map()
-                    for (const g of [...movieGenres, ...tvGenres]) genreMap.set(g.id, g)
-
-                    const provMap = new Map()
-                    for (const p of [...movieProviders, ...tvProviders]) provMap.set(p.provider_id, p)
-
+                    const genreMap = new Map();[...movieGenres, ...tvGenres].forEach(g => genreMap.set(g.id, g))
+                    const provMap = new Map();[...movieProviders, ...tvProviders].forEach(p => provMap.set(p.provider_id, p))
                     const certSet = new Set([...movieCerts, ...tvCerts])
-
                     setGenresAll([...genreMap.values()].sort((a, b) => a.name.localeCompare(b.name)))
-                    setProvidersAll(
-                        [...provMap.values()].sort((a, b) => a.provider_name.localeCompare(b.provider_name))
-                    )
+                    setProvidersAll([...provMap.values()].sort((a, b) => a.provider_name.localeCompare(b.provider_name)))
                     setCertsAll([...certSet.values()].sort((a, b) => String(a).localeCompare(String(b))))
                 }
-            } catch (e) {
-                if (isAbortError(e) || ac.signal.aborted) return
-                console.error(e)
-            }
+            } catch (e) { if (!isAbortError(e) && !ac.signal.aborted) console.error(e) }
         }
-
         loadMeta()
-        return () => {
-            cancelled = true
-            ac.abort()
-        }
+        return () => { cancelled = true; ac.abort() }
     }, [content])
 
-    // Keyword search (debounced)
+    // --- Keyword Search ---
     useEffect(() => {
         if (keywordTimer.current) clearTimeout(keywordTimer.current)
-
         const q = keywordQuery.trim()
-        if (!q) {
-            setKeywordOptions([])
-            return
-        }
-
+        if (!q) { setKeywordOptions([]); return }
         const ac = new AbortController()
         keywordTimer.current = setTimeout(async () => {
             try {
                 const data = await tmdbFetch('/search/keyword', { query: q }, ac.signal)
                 setKeywordOptions((data?.results || []).slice(0, 10))
-            } catch {
-                // ignore
-            }
+            } catch { }
         }, 280)
-
-        return () => {
-            clearTimeout(keywordTimer.current)
-            ac.abort()
-        }
+        return () => { clearTimeout(keywordTimer.current); ac.abort() }
     }, [keywordQuery])
 
-    // Rated IDs loader (lazy when seen/unseen)
+    // --- Rated IDs ---
     useEffect(() => {
         let cancelled = false
         const ac = new AbortController()
-
         async function loadRatedIds(type) {
             if (!hasSession) return new Set()
-
             const base = `/account/${account.id}/rated/${type}`
             const ids = new Set()
             let p = 1
-            let totalPages = 1
             const MAX_PAGES = 10
-
-            while (!cancelled && p <= totalPages && p <= MAX_PAGES) {
-                const data = await tmdbFetch(
-                    base,
-                    { session_id: session, page: p, sort_by: 'created_at.desc' },
-                    ac.signal
-                )
-                totalPages = data?.total_pages || 1
-                for (const it of data?.results || []) if (it?.id) ids.add(it.id)
+            while (!cancelled && p <= MAX_PAGES) {
+                const data = await tmdbFetch(base, { session_id: session, page: p, sort_by: 'created_at.desc' }, ac.signal)
+                if (!data?.results?.length) break
+                for (const it of data.results) if (it?.id) ids.add(it.id)
+                if (p >= (data.total_pages || 1)) break
                 p++
             }
-
             return ids
         }
-
         async function runIfNeeded() {
             if (seenMode === 'all') return
-
             try {
                 if ((content === 'movie' || content === 'all') && ratedMovieIds === null) {
                     const ids = await loadRatedIds('movies')
@@ -664,23 +565,17 @@ export default function DiscoverClient() {
                     if (!cancelled) setRatedTvIds(ids)
                 }
             } catch (e) {
-                if (isAbortError(e) || ac.signal.aborted) return
-                console.error(e)
-                if (!cancelled) {
+                if (!isAbortError(e) && !cancelled) {
                     if (ratedMovieIds === null) setRatedMovieIds(new Set())
                     if (ratedTvIds === null) setRatedTvIds(new Set())
                 }
             }
         }
-
         runIfNeeded()
-        return () => {
-            cancelled = true
-            ac.abort()
-        }
+        return () => { cancelled = true; ac.abort() }
     }, [seenMode, content, hasSession, account, session, ratedMovieIds, ratedTvIds])
 
-    /* ✅ params con claves string */
+    // --- Params (Using Debounced values) ---
     const discoverParams = useMemo(() => {
         const base = {
             sort_by: sortByFor(content === 'tv' ? 'tv' : 'movie'),
@@ -688,24 +583,16 @@ export default function DiscoverClient() {
             page,
             watch_region: REGION,
         }
-
         if (selectedProviders.length) base.with_watch_providers = selectedProviders.join('|')
         if (selectedGenres.length) base.with_genres = selectedGenres.join(',')
-
-        if (selectedCerts.length) {
-            base.certification_country = REGION
-            base.certification = selectedCerts.join('|')
-        }
-
+        if (selectedCerts.length) { base.certification_country = REGION; base.certification = selectedCerts.join('|') }
         if (lang) base.with_original_language = lang
 
-        base['vote_average.gte'] = String(scoreRange[0])
-        base['vote_average.lte'] = String(scoreRange[1])
-
-        if (minVotes > 0) base['vote_count.gte'] = String(minVotes)
-
-        if (runtimeRange[0] > 0) base['with_runtime.gte'] = String(runtimeRange[0])
-        if (runtimeRange[1] < 360) base['with_runtime.lte'] = String(runtimeRange[1])
+        base['vote_average.gte'] = String(debouncedScoreRange[0])
+        base['vote_average.lte'] = String(debouncedScoreRange[1])
+        if (debouncedMinVotes > 0) base['vote_count.gte'] = String(debouncedMinVotes)
+        if (debouncedRuntimeRange[0] > 0) base['with_runtime.gte'] = String(debouncedRuntimeRange[0])
+        if (debouncedRuntimeRange[1] < 360) base['with_runtime.lte'] = String(debouncedRuntimeRange[1])
 
         if (selectedKeywords.length) base.with_keywords = selectedKeywords.join('|')
 
@@ -716,53 +603,25 @@ export default function DiscoverClient() {
             if (dateFrom) base['first_air_date.gte'] = dateFrom
             if (dateTo) base['first_air_date.lte'] = dateTo
         }
-
         return base
     }, [
-        content,
-        sortPreset,
-        selectedProviders,
-        selectedGenres,
-        selectedCerts,
-        lang,
-        scoreRange,
-        minVotes,
-        runtimeRange,
-        selectedKeywords,
-        dateFrom,
-        dateTo,
-        page,
+        content, sortPreset, selectedProviders, selectedGenres, selectedCerts, lang,
+        debouncedScoreRange, debouncedMinVotes, debouncedRuntimeRange,
+        selectedKeywords, dateFrom, dateTo, page
     ])
 
-    // Fetch discover
+    // --- Fetch Items ---
     useEffect(() => {
         let cancelled = false
         const ac = new AbortController()
-
         async function fetchDiscoverForType(type) {
             const params = { ...discoverParams, sort_by: sortByFor(type) }
-
-            if (content === 'all') {
-                if (type === 'movie') {
-                    if (dateFrom) params['primary_release_date.gte'] = dateFrom
-                    if (dateTo) params['primary_release_date.lte'] = dateTo
-                } else {
-                    if (dateFrom) params['first_air_date.gte'] = dateFrom
-                    if (dateTo) params['first_air_date.lte'] = dateTo
-                }
-            }
-
             const data = await tmdbFetch(`/discover/${type}`, params, ac.signal)
             return (data?.results || []).map((it) => ({ ...it, media_type: type }))
         }
-
         function applySeenFilter(list) {
-            if (seenMode === 'all') return list
-            if (!hasSession) return list
-
-            const mSet = ratedMovieIds
-            const tSet = ratedTvIds
-
+            if (seenMode === 'all' || !hasSession) return list
+            const mSet = ratedMovieIds; const tSet = ratedTvIds
             return list.filter((it) => {
                 const set = it.media_type === 'movie' ? mSet : tSet
                 if (!(set instanceof Set)) return true
@@ -770,12 +629,10 @@ export default function DiscoverClient() {
                 return seenMode === 'seen' ? has : !has
             })
         }
-
         async function run() {
             try {
                 setError(null)
-                if (page === 1) setLoading(true)
-                else setLoadingMore(true)
+                if (page === 1) setLoading(true); else setLoadingMore(true)
 
                 let list = []
                 if (content === 'movie') list = await fetchDiscoverForType('movie')
@@ -784,55 +641,30 @@ export default function DiscoverClient() {
                     const [m, t] = await Promise.all([fetchDiscoverForType('movie'), fetchDiscoverForType('tv')])
                     list = [...m, ...t].sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
                 }
-
                 list = applySeenFilter(list)
 
                 if (cancelled) return
                 setItems((prev) => (page === 1 ? list : [...prev, ...list]))
             } catch (e) {
-                if (isAbortError(e) || ac.signal.aborted) return
-                console.error(e)
-                setError(e?.message || 'No se han podido cargar resultados.')
-                if (page === 1) setItems([])
-            } finally {
-                if (!cancelled) {
-                    setLoading(false)
-                    setLoadingMore(false)
+                if (!isAbortError(e) && !ac.signal.aborted) {
+                    console.error(e)
+                    setError(e?.message || 'Error cargando.')
+                    // NO limpiar items aquí si es un error temporal
                 }
+            } finally {
+                if (!cancelled) { setLoading(false); setLoadingMore(false) }
             }
         }
-
         run()
-        return () => {
-            cancelled = true
-            ac.abort()
-        }
+        return () => { cancelled = true; ac.abort() }
     }, [content, discoverParams, page, seenMode, hasSession, ratedMovieIds, ratedTvIds, dateFrom, dateTo])
 
-    // Cambios en filtros => reset page
-    useEffect(() => {
-        setPage(1)
-    }, [
-        content,
-        sortPreset,
-        selectedProviders,
-        selectedGenres,
-        selectedCerts,
-        lang,
-        scoreRange,
-        minVotes,
-        runtimeRange,
-        selectedKeywords,
-        dateFrom,
-        dateTo,
-        seenMode,
+    // Reset page on filter change
+    useEffect(() => { setPage(1) }, [
+        content, sortPreset, selectedProviders, selectedGenres, selectedCerts, lang,
+        debouncedScoreRange, debouncedMinVotes, debouncedRuntimeRange,
+        selectedKeywords, dateFrom, dateTo, seenMode
     ])
-
-    const sortLabel = useMemo(() => {
-        return (SORT_OPTIONS.find((o) => o.id === sortPreset) || SORT_OPTIONS[0]).label
-    }, [sortPreset])
-
-    const watchedDisabled = !hasSession
 
     const providersFiltered = useMemo(() => {
         const q = providerQuery.trim().toLowerCase()
@@ -842,458 +674,243 @@ export default function DiscoverClient() {
 
     const selectedProvidersSet = useMemo(() => new Set(selectedProviders), [selectedProviders])
 
+    // --- Render ---
     return (
-        <div className="min-h-screen bg-[#0b0b0b] text-white">
-            <div className="max-w-[1600px] mx-auto px-4 pt-10 pb-24">
-                <div className="flex items-start gap-4 mb-8">
-                    <div className="w-12 h-12 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
-                        <SlidersHorizontal className="w-6 h-6 text-yellow-400" />
+        <div className="min-h-screen bg-black text-zinc-100 font-sans">
+            <div className="max-w-[1800px] mx-auto p-4 lg:p-8">
+                <header className="mb-8 flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+                        <SlidersHorizontal className="w-5 h-5 text-yellow-500" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-extrabold tracking-tight">Descubrir</h1>
-                        <p className="text-white/60 text-sm mt-1">
-                            Filtra y busca grupos de películas y/o series con criterios avanzados.
-                        </p>
+                        <h1 className="text-3xl font-extrabold tracking-tight text-white">Descubrir</h1>
+                        <p className="text-zinc-500 text-sm">Filtra y busca grupos de películas y/o series con criterios avanzados.</p>
                     </div>
-                </div>
+                </header>
 
-                <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-7">
-                    <aside className="space-y-4">
-                        <div className="rounded-2xl bg-neutral-900/60 border border-white/5 shadow-[0_14px_40px_rgba(0,0,0,0.35)] p-4">
-                            <div className="text-[10px] uppercase tracking-wider text-white/50 font-semibold mb-3">
-                                Contenido
+                <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8">
+                    {/* --- Sidebar --- */}
+                    <aside className="space-y-6">
+                        {/* Contenido / Reset */}
+                        <div className="bg-[#121212] border border-zinc-800 rounded-xl p-4 shadow-sm">
+                            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">Contenido</h3>
+                            <div className="flex bg-zinc-900 rounded-lg p-1 mb-4 border border-zinc-800">
+                                {['movie', 'tv', 'all'].map((type) => {
+                                    const labels = { movie: 'Películas', tv: 'Series', all: 'Todo' }
+                                    const active = content === type
+                                    return (
+                                        <button
+                                            key={type} onClick={() => setContent(type)}
+                                            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200
+                                                ${active ? 'bg-zinc-700 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                        >
+                                            {labels[type]}
+                                        </button>
+                                    )
+                                })}
                             </div>
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setContent('movie')}
-                                    className={`flex-1 py-2 rounded-xl text-sm font-bold border transition
-                    ${content === 'movie'
-                                            ? 'bg-white/10 border-white/20 text-white'
-                                            : 'bg-black/10 border-white/10 text-white/70 hover:text-white hover:border-white/20'
-                                        }`}
-                                >
-                                    Películas
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setContent('tv')}
-                                    className={`flex-1 py-2 rounded-xl text-sm font-bold border transition
-                    ${content === 'tv'
-                                            ? 'bg-white/10 border-white/20 text-white'
-                                            : 'bg-black/10 border-white/10 text-white/70 hover:text-white hover:border-white/20'
-                                        }`}
-                                >
-                                    Series
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setContent('all')}
-                                    className={`flex-1 py-2 rounded-xl text-sm font-bold border transition
-                    ${content === 'all'
-                                            ? 'bg-white/10 border-white/20 text-white'
-                                            : 'bg-black/10 border-white/10 text-white/70 hover:text-white hover:border-white/20'
-                                        }`}
-                                >
-                                    Todo
-                                </button>
-                            </div>
-
-                            <div className="mt-4 flex items-center justify-between">
-                                <button
-                                    type="button"
-                                    onClick={resetFilters}
-                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-black/20 border border-white/10 hover:border-white/20 hover:bg-white/5 transition text-sm font-semibold"
-                                >
-                                    <RotateCcw className="w-4 h-4" />
-                                    Reset filtros
-                                </button>
-
-                                <div className="text-xs text-white/50">{hasSession ? 'Sesión activa' : 'Sin sesión'}</div>
-                            </div>
+                            <button onClick={resetFilters} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-zinc-800 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors">
+                                <RotateCcw className="w-3 h-3" /> Reset filtros
+                            </button>
                         </div>
 
-                        <Section
-                            title="Ordenar"
-                            defaultOpen
-                            overflowVisible
-                            right={<span className="text-xs text-white/50">{sortLabel}</span>}
-                        >
-                            <div className="text-xs text-white/50 mb-2">Ordenar resultados por</div>
-                            <SortMenu value={sortPreset} onChange={setSortPreset} />
-                        </Section>
+                        {/* Filtros Accordions */}
+                        <div className="bg-[#121212] border border-zinc-800 rounded-xl p-4 shadow-sm space-y-1">
+                            <Section title="Ordenar" defaultOpen right={<span className="text-[10px] text-zinc-500">{SORT_OPTIONS.find(o => o.id === sortPreset)?.label.split(' ')[0]}</span>} overflowVisible>
+                                <div className="text-xs text-zinc-500 mb-2">Ordenar resultados por</div>
+                                <SortMenu value={sortPreset} onChange={setSortPreset} />
+                            </Section>
 
-                        {/* ✅ overflowVisible aquí también para evitar cualquier recorte raro */}
-                        <Section
-                            title="Dónde se puede ver"
-                            overflowVisible
-                            right={
-                                <span className="text-xs text-white/50">
-                                    {selectedProviders.length ? `${selectedProviders.length} sel.` : `${providersAll.length || 0}`}
-                                </span>
-                            }
-                        >
-                            <div className="flex items-center gap-2 mb-3">
-                                <div className="relative w-full">
-                                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
-                                    <input
-                                        value={providerQuery}
-                                        onChange={(e) => setProviderQuery(e.target.value)}
-                                        placeholder="Buscar plataforma…"
-                                        className="w-full h-11 pl-9 pr-3 rounded-xl bg-black/20 border border-white/10 text-white placeholder:text-white/35 focus:outline-none focus:border-white/25"
-                                    />
-                                </div>
-
-                                {selectedProviders.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelectedProviders([])}
-                                        className="h-11 px-3 rounded-xl bg-black/20 border border-white/10 hover:border-white/20 hover:bg-white/5 transition text-xs font-semibold text-white/80"
-                                        title="Limpiar plataformas"
-                                    >
-                                        Limpiar
-                                    </button>
-                                )}
-                            </div>
-
-                            {providersAll.length === 0 ? (
-                                <div className="text-sm text-white/50">Cargando plataformas…</div>
-                            ) : (
-                                <>
+                            <Section title="Dónde se puede ver" right={<span className="text-[10px] text-zinc-500">{selectedProviders.length > 0 ? selectedProviders.length : ''}</span>}>
+                                <div className="space-y-3">
+                                    <div className="relative">
+                                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                                        <input value={providerQuery} onChange={(e) => setProviderQuery(e.target.value)} placeholder="Buscar plataforma..." className="w-full h-9 pl-9 pr-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:outline-none focus:border-zinc-600 placeholder:text-zinc-600" />
+                                    </div>
                                     {selectedProviders.length > 0 && (
-                                        <div className="mb-3">
-                                            <div className="text-[11px] text-white/55 mb-2">Seleccionadas (región {REGION})</div>
-
-                                            {/* ✅ sin recortes */}
-                                            <div className="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-6 gap-2">
-                                                {providersAll
-                                                    .filter((p) => selectedProvidersSet.has(p.provider_id))
-                                                    .slice(0, 24)
-                                                    .map((p) => (
-                                                        <ProviderIcon
-                                                            key={`sel-${p.provider_id}`}
-                                                            provider={p}
-                                                            active
-                                                            onToggle={() => {
-                                                                setSelectedProviders((prev) => prev.filter((id) => id !== p.provider_id))
-                                                            }}
-                                                        />
-                                                    ))}
-                                            </div>
+                                        <div className="flex flex-wrap gap-2 pb-2 border-b border-zinc-800/50">
+                                            {providersAll.filter(p => selectedProvidersSet.has(p.provider_id)).map(p => (
+                                                <div key={p.provider_id} className="w-8 h-8">
+                                                    <ProviderIcon provider={p} active onToggle={() => setSelectedProviders(prev => prev.filter(id => id !== p.provider_id))} />
+                                                </div>
+                                            ))}
+                                            <button onClick={() => setSelectedProviders([])} className="text-[10px] text-red-400 hover:underline px-1">Borrar</button>
                                         </div>
                                     )}
-
-                                    <div className="text-[11px] text-white/55 mb-2">
-                                        Plataformas (solo iconos) — región {REGION}
+                                    <div className="grid grid-cols-5 gap-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+                                        {providersFiltered.length === 0 ? <div className="col-span-5 text-center text-xs text-zinc-600 py-2">Sin resultados</div> :
+                                            providersFiltered.map(p => {
+                                                const active = selectedProvidersSet.has(p.provider_id)
+                                                return <ProviderIcon key={p.provider_id} provider={p} active={active} onToggle={() => setSelectedProviders(prev => active ? prev.filter(id => id !== p.provider_id) : [...prev, p.provider_id])} />
+                                            })}
                                     </div>
+                                </div>
+                            </Section>
 
-                                    <div className="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-6 gap-2 max-h-[270px] overflow-auto pr-1 no-scrollbar">
-                                        {providersFiltered.map((p) => {
-                                            const active = selectedProvidersSet.has(p.provider_id)
-                                            return (
-                                                <ProviderIcon
-                                                    key={p.provider_id}
-                                                    provider={p}
-                                                    active={active}
-                                                    onToggle={() => {
-                                                        setSelectedProviders((prev) =>
-                                                            active ? prev.filter((id) => id !== p.provider_id) : [...prev, p.provider_id]
-                                                        )
-                                                    }}
-                                                />
-                                            )
-                                        })}
-                                    </div>
+                            <Section title="Filtros" defaultOpen>
+                                <div className="space-y-1">
+                                    <div className="text-[10px] font-bold text-zinc-600 uppercase mb-2">Muéstrame</div>
+                                    <RadioRow name="seenMode" value="all" checked={seenMode === 'all'} onChange={setSeenMode}>Todo</RadioRow>
+                                    <RadioRow name="seenMode" value="unseen" checked={seenMode === 'unseen'} onChange={setSeenMode} disabled={!hasSession}>
+                                        {content === 'tv' ? 'Series por ver' : 'Películas por ver'}
+                                    </RadioRow>
+                                    <RadioRow name="seenMode" value="seen" checked={seenMode === 'seen'} onChange={setSeenMode} disabled={!hasSession}>
+                                        {content === 'tv' ? 'Series vistas' : 'Películas vistas'}
+                                    </RadioRow>
+                                </div>
+                            </Section>
 
-                                    {providersFiltered.length === 0 && (
-                                        <div className="mt-3 text-sm text-white/50">
-                                            No hay plataformas que coincidan con la búsqueda.
+                            <Section title="Fechas de estreno">
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] text-zinc-500">Desde</label>
+                                        <div className="relative">
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                                            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full h-9 pl-9 pr-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:border-zinc-600 outline-none" />
                                         </div>
-                                    )}
-                                </>
-                            )}
-                        </Section>
-
-                        <Section title="Filtros" defaultOpen>
-                            <div className="text-[10px] uppercase tracking-wider text-white/50 font-semibold mb-2">
-                                Muéstrame ({content === 'tv' ? 'series' : content === 'movie' ? 'películas' : 'todo'})
-                            </div>
-
-                            <RadioRow name="seenMode" value="all" checked={seenMode === 'all'} onChange={setSeenMode}>
-                                Todo
-                            </RadioRow>
-
-                            <RadioRow
-                                name="seenMode"
-                                value="unseen"
-                                checked={seenMode === 'unseen'}
-                                onChange={setSeenMode}
-                                disabled={watchedDisabled}
-                            >
-                                {content === 'tv' ? 'Series que no he visto' : 'Películas que no he visto'}
-                            </RadioRow>
-
-                            <RadioRow
-                                name="seenMode"
-                                value="seen"
-                                checked={seenMode === 'seen'}
-                                onChange={setSeenMode}
-                                disabled={watchedDisabled}
-                            >
-                                {content === 'tv' ? 'Series que he visto' : 'Películas que he visto'}
-                            </RadioRow>
-
-                            {!hasSession && (
-                                <div className="mt-2 text-xs text-white/45">
-                                    Inicia sesión para filtrar por visto/no visto (se basa en tus valoraciones).
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] text-zinc-500">Hasta</label>
+                                        <div className="relative">
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                                            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full h-9 pl-9 pr-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:border-zinc-600 outline-none" />
+                                        </div>
+                                    </div>
                                 </div>
-                            )}
-                        </Section>
+                            </Section>
 
-                        <Section title="Fechas de estreno">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <div className="text-[11px] text-white/60 mb-1">desde</div>
-                                    <input
-                                        type="date"
-                                        value={dateFrom}
-                                        onChange={(e) => setDateFrom(e.target.value)}
-                                        className="w-full h-11 px-3 rounded-xl bg-black/20 border border-white/10 text-white focus:outline-none focus:border-white/25"
-                                    />
-                                </div>
-                                <div>
-                                    <div className="text-[11px] text-white/60 mb-1">hasta</div>
-                                    <input
-                                        type="date"
-                                        value={dateTo}
-                                        onChange={(e) => setDateTo(e.target.value)}
-                                        className="w-full h-11 px-3 rounded-xl bg-black/20 border border-white/10 text-white focus:outline-none focus:border-white/25"
-                                    />
-                                </div>
-                            </div>
-                        </Section>
-
-                        <Section title="Géneros">
-                            {genresAll.length === 0 ? (
-                                <div className="text-sm text-white/50">Cargando géneros…</div>
-                            ) : (
+                            <Section title="Géneros" right={<span className="text-[10px] text-zinc-500">{selectedGenres.length > 0 ? selectedGenres.length : ''}</span>}>
                                 <div className="flex flex-wrap gap-2">
-                                    {genresAll.map((g) => {
-                                        const active = selectedGenres.includes(g.id)
-                                        return (
-                                            <Chip
-                                                key={g.id}
-                                                active={active}
-                                                onClick={() =>
-                                                    setSelectedGenres((prev) =>
-                                                        active ? prev.filter((x) => x !== g.id) : [...prev, g.id]
-                                                    )
-                                                }
-                                            >
-                                                {g.name}
-                                            </Chip>
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </Section>
-
-                        <Section title="Certificación">
-                            {certsAll.length === 0 ? (
-                                <div className="text-sm text-white/50">Cargando certificaciones…</div>
-                            ) : (
-                                <div className="flex flex-wrap gap-2">
-                                    {certsAll.map((c) => {
-                                        const active = selectedCerts.includes(c)
-                                        return (
-                                            <Chip
-                                                key={c}
-                                                active={active}
-                                                onClick={() =>
-                                                    setSelectedCerts((prev) => (active ? prev.filter((x) => x !== c) : [...prev, c]))
-                                                }
-                                            >
-                                                {c}
-                                            </Chip>
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </Section>
-
-                        <Section title="Idioma">
-                            <select
-                                value={lang}
-                                onChange={(e) => setLang(e.target.value)}
-                                className="w-full h-11 px-3 rounded-xl bg-black/20 border border-white/10 text-white focus:outline-none focus:border-white/25"
-                            >
-                                <option value="">Ninguno seleccionado</option>
-                                <option value="en">Inglés</option>
-                                <option value="es">Español</option>
-                                <option value="fr">Francés</option>
-                                <option value="de">Alemán</option>
-                                <option value="it">Italiano</option>
-                                <option value="ja">Japonés</option>
-                                <option value="ko">Coreano</option>
-                            </select>
-                        </Section>
-
-                        <Section title="Puntuación de los usuarios">
-                            <DualRange
-                                min={0}
-                                max={10}
-                                step={0.5}
-                                valueMin={scoreRange[0]}
-                                valueMax={scoreRange[1]}
-                                onChange={setScoreRange}
-                                label="Puntuación (0 – 10)"
-                            />
-                        </Section>
-
-                        <Section title="Votos mínimos de los usuarios">
-                            <SingleRange
-                                min={0}
-                                max={500}
-                                step={10}
-                                value={minVotes}
-                                onChange={setMinVotes}
-                                label="Mínimo de votos"
-                            />
-                        </Section>
-
-                        <Section title="Duración">
-                            <DualRange
-                                min={0}
-                                max={360}
-                                step={10}
-                                valueMin={runtimeRange[0]}
-                                valueMax={runtimeRange[1]}
-                                onChange={setRuntimeRange}
-                                label="Minutos"
-                            />
-                        </Section>
-
-                        <Section title="Palabras clave">
-                            <input
-                                type="text"
-                                value={keywordQuery}
-                                onChange={(e) => setKeywordQuery(e.target.value)}
-                                placeholder="Escribe para buscar..."
-                                className="w-full h-11 px-3 rounded-xl bg-black/20 border border-white/10 text-white placeholder:text-white/35 focus:outline-none focus:border-white/25"
-                            />
-
-                            {keywordOptions.length > 0 && (
-                                <div className="mt-2 rounded-xl border border-white/10 bg-black/20 overflow-hidden">
-                                    {keywordOptions.map((k) => {
-                                        const active = selectedKeywords.includes(k.id)
-                                        return (
-                                            <button
-                                                key={k.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    setSelectedKeywords((prev) =>
-                                                        active ? prev.filter((x) => x !== k.id) : [...prev, k.id]
-                                                    )
-                                                    setKeywordQuery('')
-                                                    setKeywordOptions([])
-                                                }}
-                                                className="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-white/5 flex items-center justify-between"
-                                            >
-                                                <span className="truncate">{k.name}</span>
-                                                {active ? <Check className="w-4 h-4 text-emerald-400" /> : null}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            )}
-
-                            {selectedKeywords.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    {selectedKeywords.map((id) => (
-                                        <span
-                                            key={id}
-                                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-white/85"
-                                        >
-                                            #{id}
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelectedKeywords((prev) => prev.filter((x) => x !== id))}
-                                                className="text-white/70 hover:text-white"
-                                                aria-label="Quitar keyword"
-                                            >
-                                                <X className="w-3.5 h-3.5" />
-                                            </button>
-                                        </span>
+                                    {genresAll.map(g => (
+                                        <Chip key={g.id} active={selectedGenres.includes(g.id)} onClick={() => setSelectedGenres(prev => prev.includes(g.id) ? prev.filter(x => x !== g.id) : [...prev, g.id])}>{g.name}</Chip>
                                     ))}
                                 </div>
-                            )}
-                        </Section>
+                            </Section>
+
+                            <Section title="Certificación">
+                                <div className="flex flex-wrap gap-2">
+                                    {certsAll.map(c => (
+                                        <Chip key={c} active={selectedCerts.includes(c)} onClick={() => setSelectedCerts(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])}>{c}</Chip>
+                                    ))}
+                                </div>
+                            </Section>
+
+                            <Section title="Puntuación" right={<Star className="w-3 h-3 text-yellow-500" />}>
+                                <DualRange label="Puntuación (0-10)" min={0} max={10} step={0.5} valueMin={scoreRange[0]} valueMax={scoreRange[1]} onChange={setScoreRange} />
+                                <div className="mt-4"><SingleRange label="Mínimo de votos" min={0} max={500} step={10} value={minVotes} onChange={setMinVotes} /></div>
+                            </Section>
+
+                            <Section title="Duración" right={<Clock className="w-3 h-3 text-zinc-500" />}>
+                                <DualRange label="Minutos" min={0} max={360} step={15} valueMin={runtimeRange[0]} valueMax={runtimeRange[1]} onChange={setRuntimeRange} />
+                            </Section>
+
+                            <Section title="Keywords">
+                                <input value={keywordQuery} onChange={e => setKeywordQuery(e.target.value)} placeholder="Buscar keyword..." className="w-full h-9 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:border-zinc-600 outline-none mb-2" />
+                                {keywordOptions.length > 0 && (
+                                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden mb-2">
+                                        {keywordOptions.map(k => (
+                                            <button key={k.id} onClick={() => { setSelectedKeywords(p => p.includes(k.id) ? p : [...p, k.id]); setKeywordQuery(''); setKeywordOptions([]) }} className="w-full text-left px-3 py-2 text-xs hover:bg-zinc-800 text-zinc-300">{k.name}</button>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="flex flex-wrap gap-2">
+                                    {selectedKeywords.map(id => (
+                                        <div key={id} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-zinc-800 text-[10px] text-zinc-300 border border-zinc-700">
+                                            #{id} <button onClick={() => setSelectedKeywords(p => p.filter(x => x !== id))}><X className="w-3 h-3 hover:text-white" /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Section>
+                        </div>
                     </aside>
 
-                    <main>
-                        {error && (
-                            <div className="mb-5 rounded-2xl border border-red-500/25 bg-red-950/20 px-4 py-3 text-red-300">
-                                {error}
+                    {/* --- Main Grid --- */}
+                    <main className="relative min-h-[60vh]">
+                        {/* 1. Loader inicial (solo si NO hay items previos) */}
+                        {loading && items.length === 0 && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <Loader2 className="w-8 h-8 animate-spin text-yellow-500 mb-4" />
+                                <p className="text-zinc-500 text-sm">Buscando títulos...</p>
                             </div>
                         )}
 
-                        {loading ? (
-                            <div className="min-h-[55vh] flex items-center justify-center gap-3 text-white/70">
-                                <Loader2 className="w-6 h-6 animate-spin text-yellow-500" />
-                                Cargando resultados…
+                        {/* 2. Error (solo si NO hay items) */}
+                        {error && items.length === 0 && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="p-4 rounded-xl bg-red-900/20 border border-red-900/50 text-red-200 text-sm">{error}</div>
                             </div>
-                        ) : items.length === 0 ? (
-                            <div className="min-h-[55vh] flex flex-col items-center justify-center text-center rounded-2xl border border-white/10 bg-white/5 p-10">
-                                <div className="text-white font-bold text-lg">Sin resultados</div>
-                                <div className="text-white/55 text-sm mt-2">
-                                    Prueba a cambiar filtros o ampliar los rangos.
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={resetFilters}
-                                    className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/20 border border-white/10 hover:border-white/20 hover:bg-white/5 transition text-sm font-semibold"
-                                >
-                                    <RotateCcw className="w-4 h-4" />
-                                    Reset filtros
-                                </button>
+                        )}
+
+                        {/* 3. Empty State (sin resultados) */}
+                        {!loading && !error && items.length === 0 && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 h-fit my-auto">
+                                <FilmIcon className="w-12 h-12 text-zinc-700 mb-4" />
+                                <h3 className="text-lg font-bold text-zinc-300">No se encontraron resultados</h3>
+                                <p className="text-zinc-500 text-sm mt-2 max-w-xs mx-auto">Intenta ajustar tus filtros o limpiar la búsqueda.</p>
+                                <button onClick={resetFilters} className="mt-6 text-yellow-500 hover:underline text-sm">Limpiar todos los filtros</button>
                             </div>
-                        ) : (
-                            <>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-6">
-                                    {items.map((it) => (
-                                        <DiscoverCard key={`${it.media_type}-${it.id}`} item={it} />
+                        )}
+
+                        {/* 4. Grid de resultados (persiste con opacidad al recargar) */}
+                        {items.length > 0 && (
+                            <div className={`transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-4 gap-y-8">
+                                    {items.map(item => (
+                                        <DiscoverCard key={`${item.media_type}-${item.id}`} item={item} />
                                     ))}
                                 </div>
 
-                                <div className="mt-10 flex items-center justify-center">
+                                <div className="mt-12 flex justify-center pb-8">
                                     <button
-                                        type="button"
-                                        onClick={() => setPage((p) => p + 1)}
+                                        onClick={() => setPage(p => p + 1)}
                                         disabled={loadingMore}
-                                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full border text-sm font-bold transition
-                      ${loadingMore
-                                                ? 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
-                                                : 'bg-black/20 border-white/15 text-white/80 hover:text-white hover:border-white/25 hover:bg-white/5'
-                                            }`}
+                                        className="px-8 py-3 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                     >
-                                        {loadingMore ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                Cargando…
-                                            </>
-                                        ) : (
-                                            <>Cargar más</>
-                                        )}
+                                        {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                        {loadingMore ? 'Cargando...' : 'Cargar más resultados'}
                                     </button>
                                 </div>
-                            </>
+                            </div>
+                        )}
+
+                        {/* 5. Loader superpuesto discreto (cuando recarga filtros sobre datos existentes) */}
+                        {loading && items.length > 0 && (
+                            <div className="absolute top-10 left-1/2 -translate-x-1/2 z-50">
+                                <div className="bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-full flex items-center gap-3 shadow-2xl border border-white/10">
+                                    <Loader2 className="w-4 h-4 animate-spin text-yellow-500" />
+                                    <span className="text-xs font-medium">Actualizando...</span>
+                                </div>
+                            </div>
                         )}
                     </main>
                 </div>
             </div>
+            {/* Custom Styles */}
+            <style jsx global>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #52525b; }
+                
+                .range-thumb-interactive::-webkit-slider-thumb {
+                    pointer-events: auto;
+                    width: 14px; height: 14px;
+                    background: #eab308;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    -webkit-appearance: none;
+                    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+                }
+                .range-thumb-interactive::-moz-range-thumb {
+                    pointer-events: auto;
+                    width: 14px; height: 14px;
+                    background: #eab308;
+                    border: none;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+                }
+            `}</style>
         </div>
     )
 }

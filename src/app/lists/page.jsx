@@ -385,9 +385,8 @@ export default function ListsPage() {
                 </div>
 
                 {/* Listado */}
-                <div className="space-y-3">
+                <div>
                     <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-bold">Tus listas</h2>
                         {loading && (
                             <div className="text-sm text-zinc-400 inline-flex items-center gap-2">
                                 <Loader2 className="w-4 h-4 animate-spin" /> Cargando…
