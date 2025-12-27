@@ -13,8 +13,14 @@ import {
     RotateCcw,
     Search,
     Trash2,
-    Tv2,
-    SlidersHorizontal
+    Tv,
+    LayoutList,
+    Calendar as CalendarIcon,
+    LayoutGrid, // Nuevo icono para vista cuadrícula
+    Filter,
+    X,
+    CheckCircle2,
+    History
 } from 'lucide-react'
 
 import { traktAuthStatus, traktGetHistory } from '@/lib/api/traktClient'
@@ -22,7 +28,7 @@ import { traktAuthStatus, traktGetHistory } from '@/lib/api/traktClient'
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
 // ----------------------------
-// utils
+// UTILS
 // ----------------------------
 const pad2 = (n) => String(n).padStart(2, '0')
 
@@ -52,19 +58,15 @@ function formatWatchedLine(iso) {
     if (Number.isNaN(d.getTime())) return ''
     const dd = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d)
     const hh = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' }).format(d)
-    return `${dd}, ${hh}`
+    return { date: dd, time: hh }
 }
 
 function getItemType(entry) {
     const t = entry?.type
     if (t === 'movie' || t === 'show') return t
-
-    // Trakt suele devolver 'episode' para series en history
     if (t === 'episode' || t === 'episodes') return 'show'
-
     if (entry?.movie) return 'movie'
     if (entry?.show) return 'show'
-
     if (t === 'movies') return 'movie'
     if (t === 'shows') return 'show'
     return null
@@ -74,52 +76,18 @@ function isEpisodeEntry(entry) {
     const t = entry?.type
     if (t === 'episode' || t === 'episodes') return true
     if (entry?.episode) return true
-
-    const season =
-        entry?.season ??
-        entry?.season_number ??
-        entry?.seasonNumber ??
-        entry?.episodeSeason ??
-        entry?.episode?.season ??
-        null
-
-    const number =
-        entry?.number ??
-        entry?.episode_number ??
-        entry?.episodeNumber ??
-        entry?.episode?.number ??
-        null
-
+    const season = entry?.season ?? entry?.season_number ?? entry?.seasonNumber ?? entry?.episodeSeason ?? entry?.episode?.season ?? null
+    const number = entry?.number ?? entry?.episode_number ?? entry?.episodeNumber ?? entry?.episode?.number ?? null
     if (season != null && number != null && Number.isFinite(Number(season)) && Number.isFinite(Number(number))) return true
     return false
 }
 
 function getShowTitle(entry) {
-    return (
-        entry?.show?.title ||
-        entry?.show?.name ||
-        entry?.show?.title_es ||
-        entry?.show?.titleEs ||
-        entry?.title_es ||
-        entry?.titleEs ||
-        entry?.titleES ||
-        entry?.title ||
-        entry?.name ||
-        'Sin título'
-    )
+    return entry?.show?.title || entry?.show?.name || entry?.show?.title_es || entry?.show?.titleEs || entry?.title_es || entry?.title || entry?.name || 'Sin título'
 }
 
 function getMovieTitle(entry) {
-    return (
-        entry?.title_es ||
-        entry?.titleEs ||
-        entry?.titleES ||
-        entry?.movie?.title ||
-        entry?.movie?.name ||
-        entry?.title ||
-        entry?.name ||
-        'Sin título'
-    )
+    return entry?.title_es || entry?.titleEs || entry?.movie?.title || entry?.movie?.name || entry?.title || entry?.name || 'Sin título'
 }
 
 function getMainTitle(entry) {
@@ -128,29 +96,9 @@ function getMainTitle(entry) {
 }
 
 function getEpisodeMeta(entry) {
-    const season =
-        entry?.episode?.season ??
-        entry?.season ??
-        entry?.season_number ??
-        entry?.seasonNumber ??
-        entry?.episodeSeason ??
-        null
-
-    const episode =
-        entry?.episode?.number ??
-        entry?.episode_number ??
-        entry?.number ??
-        entry?.episodeNumber ??
-        null
-
-    const title =
-        entry?.episode?.title ??
-        entry?.episodeTitle ??
-        entry?.episode_name ??
-        entry?.episodeName ??
-        entry?.episode?.name ??
-        null
-
+    const season = entry?.episode?.season ?? entry?.season ?? entry?.season_number ?? entry?.seasonNumber ?? null
+    const episode = entry?.episode?.number ?? entry?.episode_number ?? entry?.number ?? entry?.episodeNumber ?? null
+    const title = entry?.episode?.title ?? entry?.episodeTitle ?? entry?.episode_name ?? entry?.episode?.name ?? null
     const hasNums = Number.isFinite(Number(season)) && Number.isFinite(Number(episode))
     return hasNums ? { season: Number(season), episode: Number(episode), title: title || null } : null
 }
@@ -167,7 +115,6 @@ function getHistoryId(entry) {
     return entry?.id || entry?.history_id || entry?.historyId || null
 }
 
-/** ✅ Ruta de detalles */
 function getDetailsHref(entry) {
     const type = getItemType(entry)
     const tmdbId = getTmdbId(entry)
@@ -197,7 +144,7 @@ async function mapLimit(arr, limit, fn) {
 }
 
 // ----------------------------
-// TMDb minimal cache (client)
+// TMDb cache
 // ----------------------------
 const tmdbCache = new Map()
 const tmdbInflight = new Map()
@@ -239,9 +186,6 @@ async function fetchTmdbPoster({ type, tmdbId }) {
     return p
 }
 
-// ----------------------------
-// API helpers
-// ----------------------------
 async function apiPost(url, body) {
     const res = await fetch(url, {
         method: 'POST',
@@ -254,37 +198,18 @@ async function apiPost(url, body) {
 }
 
 // ----------------------------
-// UI atoms
+// UI COMPONENTS
 // ----------------------------
-function Pill({ children, className = '' }) {
-    return (
-        <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-xs text-zinc-200 ${className}`}>
-            {children}
-        </span>
-    )
-}
 
-function FancyButton({ children, className = '', ...props }) {
+function StatCard({ label, value, icon: Icon, colorClass = "text-white" }) {
     return (
-        <button
-            {...props}
-            className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5
-      hover:bg-white/10 hover:border-white/15 transition text-sm font-semibold text-zinc-200 ${className}`}
-        >
-            {children}
-        </button>
-    )
-}
-
-function IconButton({ children, className = '', ...props }) {
-    return (
-        <button
-            {...props}
-            className={`w-11 h-11 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/15 transition
-      flex items-center justify-center text-zinc-200 ${className}`}
-        >
-            {children}
-        </button>
+        <div className="flex-1 min-w-[140px] bg-zinc-900/50 border border-white/5 rounded-2xl p-5 flex flex-col items-center justify-center gap-1.5 backdrop-blur-sm shadow-sm transition hover:bg-zinc-900/70">
+            <div className={`p-2.5 rounded-full bg-white/5 mb-1 ${colorClass}`}>
+                <Icon className="w-5 h-5" />
+            </div>
+            <div className="text-3xl font-black text-white tracking-tight">{value}</div>
+            <div className="text-[11px] uppercase font-bold text-zinc-500 tracking-wider">{label}</div>
+        </div>
     )
 }
 
@@ -303,17 +228,15 @@ function Dropdown({ label, valueLabel, children, className = '' }) {
     }, [open])
 
     return (
-        <div ref={ref} className={`relative z-50 ${className}`}>
-            {label && <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">{label}</div>}
-
+        <div ref={ref} className={`relative z-30 ${className}`}>
+            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1">{label}</div>
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className="w-full min-w-[190px] inline-flex items-center justify-between gap-3 px-3 py-2 rounded-xl
-          bg-black/35 border border-white/10 hover:bg-black/45 hover:border-white/15 transition"
+                className="w-full h-[42px] inline-flex items-center justify-between gap-3 px-3.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300"
             >
-                <span className="text-sm font-semibold text-zinc-100 truncate">{valueLabel}</span>
-                <ChevronDown className={`w-4 h-4 text-zinc-300 transition-transform ${open ? 'rotate-180' : ''}`} />
+                <span className="font-semibold text-white truncate">{valueLabel}</span>
+                <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
 
             <AnimatePresence>
@@ -323,10 +246,9 @@ function Dropdown({ label, valueLabel, children, className = '' }) {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.98 }}
                         transition={{ duration: 0.14, ease: 'easeOut' }}
-                        className="absolute left-0 top-full z-[100000] mt-2 w-full rounded-2xl border border-white/10
-              bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
+                        className="absolute left-0 top-full z-[1000] mt-2 w-full min-w-[160px] rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden"
                     >
-                        <div className="p-2 space-y-1">{children({ close: () => setOpen(false) })}</div>
+                        <div className="p-1.5 space-y-0.5">{children({ close: () => setOpen(false) })}</div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -339,24 +261,23 @@ function DropdownItem({ active, onClick, children }) {
         <button
             type="button"
             onClick={onClick}
-            className={`w-full px-3 py-2 rounded-xl text-left text-sm transition flex items-center justify-between
-        ${active ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
+            className={`w-full px-3 py-2 rounded-lg text-left text-sm transition flex items-center justify-between
+        ${active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
         >
-            <span className="font-semibold">{children}</span>
-            {active && <span className="text-[10px] text-emerald-300 font-bold">✓</span>}
+            <span className="font-medium">{children}</span>
+            {active && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
         </button>
     )
 }
 
 // ----------------------------
-// Calendar view
+// Calendar Panel
 // ----------------------------
 function buildMonthGrid(year, month, weekStartsOn = 1) {
     const first = new Date(year, month, 1)
     const firstDow = first.getDay()
     const offset = (firstDow - weekStartsOn + 7) % 7
     const start = new Date(year, month, 1 - offset)
-
     const weeks = []
     for (let w = 0; w < 6; w++) {
         const week = []
@@ -374,126 +295,71 @@ function CalendarPanel({ monthDate, onPrev, onNext, countsByDay, selectedYmd, on
     const year = monthDate.getFullYear()
     const month = monthDate.getMonth()
     const weeks = useMemo(() => buildMonthGrid(year, month, 1), [year, month])
-
-    const monthLabel = useMemo(() => {
-        return new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(monthDate)
-    }, [monthDate])
-
+    const monthLabel = useMemo(() => new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(monthDate), [monthDate])
     const dow = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
     return (
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-2xl border border-white/10 bg-black/30 flex items-center justify-center">
-                        <CalendarDays className="w-5 h-5 text-yellow-300" />
-                    </div>
-                    <div className="min-w-0">
-                        <div className="text-white font-extrabold truncate capitalize">{monthLabel}</div>
-                        <div className="text-xs text-zinc-400">Pulsa un día para filtrar</div>
-                    </div>
+        <div className="bg-zinc-900/40 border border-white/5 rounded-3xl p-6 backdrop-blur-sm sticky top-6 shadow-xl">
+            <div className="flex items-center justify-between mb-8">
+                <div>
+                    <h3 className="text-white font-bold capitalize text-xl tracking-tight">{monthLabel}</h3>
+                    <p className="text-xs text-zinc-500 mt-1 font-medium">Historial por día</p>
                 </div>
-
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={onPrev}
-                        className="w-10 h-10 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition flex items-center justify-center"
-                        title="Mes anterior"
-                    >
-                        <ChevronLeft className="w-5 h-5 text-zinc-200" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onNext}
-                        className="w-10 h-10 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition flex items-center justify-center"
-                        title="Mes siguiente"
-                    >
-                        <ChevronRight className="w-5 h-5 text-zinc-200" />
-                    </button>
+                <div className="flex gap-1 bg-zinc-800/80 rounded-lg p-1 border border-white/5">
+                    <button onClick={onPrev} className="p-2 hover:bg-white/10 rounded-md transition text-zinc-300"><ChevronLeft className="w-4 h-4" /></button>
+                    <button onClick={onNext} className="p-2 hover:bg-white/10 rounded-md transition text-zinc-300"><ChevronRight className="w-4 h-4" /></button>
                 </div>
             </div>
 
-            <div className="p-3 sm:p-5">
-                <div className="grid grid-cols-7 gap-2 text-[11px] font-bold text-zinc-500 mb-2">
-                    {dow.map((d) => (
-                        <div key={d} className="text-center">
-                            {d}
-                        </div>
-                    ))}
-                </div>
+            <div className="grid grid-cols-7 gap-2 mb-3">
+                {dow.map(d => <div key={d} className="text-center text-[11px] font-bold text-zinc-500 uppercase tracking-wider">{d}</div>)}
+            </div>
 
-                <div className="grid grid-cols-7 gap-2">
-                    {weeks.flat().map((d) => {
-                        const inMonth = d.getMonth() === month
-                        const key = ymdLocal(d)
-                        const count = key ? (countsByDay[key] || 0) : 0
-                        const selected = key && selectedYmd === key
+            <div className="grid grid-cols-7 gap-2">
+                {weeks.flat().map((d) => {
+                    const inMonth = d.getMonth() === month
+                    const key = ymdLocal(d)
+                    const count = key ? (countsByDay[key] || 0) : 0
+                    const selected = key && selectedYmd === key
+                    const isToday = ymdLocal(new Date()) === key
 
-                        return (
-                            <button
-                                key={d.toISOString()}
-                                type="button"
-                                onClick={() => key && onSelectYmd(selected ? null : key)}
-                                className={`relative aspect-square rounded-2xl border transition flex flex-col items-center justify-center
-                  ${inMonth ? 'bg-black/20' : 'bg-black/10'}
-                  ${selected
-                                        ? 'border-yellow-500/50 bg-yellow-500/10 shadow-[0_0_18px_rgba(234,179,8,0.15)]'
-                                        : 'border-white/10 hover:bg-white/5 hover:border-white/15'
-                                    }`}
-                                title={key || ''}
-                            >
-                                <div className={`text-sm font-extrabold ${inMonth ? 'text-zinc-100' : 'text-zinc-500'}`}>
-                                    {d.getDate()}
-                                </div>
-
-                                {count > 0 && (
-                                    <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full
-                    bg-emerald-500/12 border border-emerald-500/25 text-emerald-200"
-                                    >
-                                        {count} {count === 1 ? 'visto' : 'vistos'}
-                                    </div>
-                                )}
-                            </button>
-                        )
-                    })}
-                </div>
-
-                <div className="mt-4 flex items-center justify-between gap-2 flex-wrap">
-                    <div className="text-xs text-zinc-400">
-                        {selectedYmd ? (
-                            <span>
-                                Filtrando por: <span className="text-zinc-200 font-semibold">{selectedYmd}</span>
-                            </span>
-                        ) : (
-                            <span>Sin filtro por día</span>
-                        )}
-                    </div>
-
-                    {selectedYmd && (
+                    return (
                         <button
-                            type="button"
-                            onClick={() => onSelectYmd(null)}
-                            className="text-xs font-bold uppercase tracking-wider text-yellow-300 hover:text-yellow-200"
+                            key={d.toISOString()}
+                            onClick={() => key && onSelectYmd(selected ? null : key)}
+                            className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all duration-200 text-sm font-medium
+                                ${!inMonth ? 'opacity-20 hover:opacity-50 text-zinc-500' : 'text-zinc-300'}
+                                ${selected ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20 font-bold scale-105 z-10'
+                                    : isToday ? 'bg-zinc-800 text-white border border-zinc-600'
+                                        : 'bg-zinc-900/50 hover:bg-zinc-800 hover:text-white'}`}
                         >
-                            Limpiar día
+                            <span className="z-10">{d.getDate()}</span>
+                            {count > 0 && (
+                                <div className={`absolute bottom-1.5 w-1.5 h-1.5 rounded-full ${selected ? 'bg-black' : 'bg-emerald-500'}`} />
+                            )}
                         </button>
-                    )}
-                </div>
+                    )
+                })}
             </div>
+
+            {selectedYmd && (
+                <button
+                    onClick={() => onSelectYmd(null)}
+                    className="mt-8 w-full py-2.5 text-xs font-bold text-yellow-500 hover:text-yellow-400 flex items-center justify-center gap-2 border-t border-white/5 uppercase tracking-wide transition-colors"
+                >
+                    <RotateCcw className="w-3.5 h-3.5" /> Ver todo el mes
+                </button>
+            )}
         </div>
     )
 }
 
 // ----------------------------
-// History row with poster
+// History Item Component
 // ----------------------------
-function Poster({ entry }) {
+function Poster({ entry, className = "" }) {
     const [posterPath, setPosterPath] = useState(entry?.poster_path || entry?.posterPath || null)
-
-    useEffect(() => {
-        setPosterPath(entry?.poster_path || entry?.posterPath || null)
-    }, [entry?.poster_path, entry?.posterPath])
+    useEffect(() => { setPosterPath(entry?.poster_path || entry?.posterPath || null) }, [entry?.poster_path, entry?.posterPath])
 
     useEffect(() => {
         let ignore = false
@@ -502,220 +368,249 @@ function Poster({ entry }) {
             const t = getItemType(entry)
             const id = getTmdbId(entry)
             if (!t || !id) return
-
             const r = await fetchTmdbPoster({ type: t, tmdbId: id })
             if (ignore) return
             if (r?.poster_path) setPosterPath(r.poster_path)
         }
         run()
-        return () => {
-            ignore = true
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        return () => { ignore = true }
     }, [posterPath, entry])
 
-    const src = posterPath ? `https://image.tmdb.org/t/p/w342${posterPath}` : '/placeholder-poster.png'
+    const src = posterPath ? `https://image.tmdb.org/t/p/w342${posterPath}` : null
 
     return (
-        <div className="w-14 h-20 sm:w-16 sm:h-24 rounded-2xl overflow-hidden border border-white/10 bg-black/40 shrink-0">
-            <img src={src} alt="poster" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+        <div className={`overflow-hidden bg-zinc-800 border border-white/5 shrink-0 relative shadow-lg ${className}`}>
+            {src ? (
+                <img src={src} alt="poster" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+            ) : (
+                <div className="w-full h-full flex items-center justify-center text-zinc-600"><Film className="w-6 h-6" /></div>
+            )}
         </div>
     )
 }
 
 function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
-    const type = getItemType(entry) // movie | show
+    const type = getItemType(entry)
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
-
     const title = getMainTitle(entry)
     const year = getYear(entry)
-    const watchedAt = entry?.watched_at || entry?.watchedAt || entry?.watchedAtIso || null
-
+    const watchedAtIso = entry?.watched_at || entry?.watchedAt || entry?.watchedAtIso
+    const { date: watchedDate, time: watchedTime } = formatWatchedLine(watchedAtIso)
     const href = useMemo(() => getDetailsHref(entry), [entry])
     const historyId = getHistoryId(entry)
-
     const [confirmDel, setConfirmDel] = useState(false)
-    const actionsRef = useRef(null)
 
-    useEffect(() => {
-        setConfirmDel(false)
-    }, [historyId, watchedAt])
+    const isDeleting = busy
 
-    useEffect(() => {
-        if (!confirmDel) return
-        const onDown = (e) => {
-            if (!actionsRef.current) return
-            if (!actionsRef.current.contains(e.target)) setConfirmDel(false)
-        }
-        document.addEventListener('pointerdown', onDown)
-        return () => document.removeEventListener('pointerdown', onDown)
-    }, [confirmDel])
-
-    const stopLink = (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-    }
-
-    const onAskDelete = (e) => {
-        stopLink(e)
-        if (busy) return
+    const handleDeleteClick = (e) => {
+        e.preventDefault(); e.stopPropagation()
         setConfirmDel(true)
     }
 
-    const onCancelDelete = (e) => {
-        stopLink(e)
-        setConfirmDel(false)
+    const handleConfirm = async (e) => {
+        e.preventDefault(); e.stopPropagation()
+        if (!historyId || isDeleting) return
+        await onRemoveFromHistory?.(entry, { historyId })
     }
 
-    const onConfirmDelete = async (e) => {
-        stopLink(e)
-        if (!historyId || busy) return
-        await onRemoveFromHistory?.(entry, { historyId })
+    const handleCancel = (e) => {
+        e.preventDefault(); e.stopPropagation()
         setConfirmDel(false)
     }
 
     const epBadge = type === 'show' && epMeta ? `T${epMeta.season} · E${epMeta.episode}` : null
 
-    const Inner = (
-        <div
-            className={`w-full text-left flex items-stretch justify-between gap-3 sm:gap-4 p-4 sm:p-5 border-t border-white/10
-        hover:bg-white/[0.03] transition focus:outline-none focus:ring-2 focus:ring-yellow-500/30 ${busy ? 'opacity-80' : ''}`}
-        >
-            <div className="flex items-start gap-4 min-w-0 flex-1">
-                <Poster entry={entry} />
+    const CardContent = (
+        <div className={`relative flex items-center gap-4 p-3 pr-12 transition-all ${isDeleting ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+            <Poster entry={entry} className="w-[60px] sm:w-[70px] aspect-[2/3] rounded-md" />
 
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                            className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-bold border
-                ${type === 'movie'
-                                    ? 'bg-sky-500/10 border-sky-500/25 text-sky-200'
-                                    : 'bg-violet-500/10 border-violet-500/25 text-violet-200'
-                                }`}
-                        >
-                            {type === 'movie' ? <Film className="w-3.5 h-3.5" /> : <Tv2 className="w-3.5 h-3.5" />}
-                            {type === 'movie' ? 'Película' : 'Serie'}
-                        </span>
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                <div className="flex items-center gap-2">
+                    <h4 className="text-white font-bold text-sm sm:text-base leading-tight truncate">{title}</h4>
+                    {epBadge && <span className="text-[10px] font-bold text-zinc-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/5 shrink-0">{epBadge}</span>}
+                </div>
 
-                        <div className="text-white font-extrabold truncate flex items-center gap-2 min-w-0">
-                            <span className="truncate">{title}</span>
-                            {year ? <span className="text-zinc-400 font-semibold shrink-0">({year})</span> : null}
-                            {epBadge && (
-                                <span className="shrink-0 text-[11px] font-extrabold px-2 py-0.5 rounded-full border border-white/10 bg-white/5 text-zinc-200">
-                                    {epBadge}
-                                </span>
-                            )}
-                        </div>
-                    </div>
+                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                    <span className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${type === 'movie' ? 'bg-sky-500/10 text-sky-500' : 'bg-purple-500/10 text-purple-500'}`}>
+                        {type === 'movie' ? 'PELÍCULA' : 'SERIE'}
+                    </span>
+                    <span>•</span>
+                    <span className="truncate max-w-[200px]">{type === 'show' && epMeta?.title ? epMeta.title : year}</span>
+                </div>
 
-                    {type === 'show' && epMeta?.title && <div className="mt-1 text-xs text-zinc-400 truncate">{epMeta.title}</div>}
-
-                    {watchedAt && (
-                        <div className="mt-2 text-xs text-zinc-400">
-                            Visto: <span className="text-zinc-200 font-semibold">{formatWatchedLine(watchedAt)}</span>
-                        </div>
-                    )}
+                <div className="text-[11px] text-zinc-600 flex items-center gap-1.5 mt-0.5 font-mono">
+                    <RotateCcw className="w-3 h-3" />
+                    {watchedTime}
                 </div>
             </div>
 
-            <div
-                ref={actionsRef}
-                className="relative shrink-0 flex items-center"
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-            >
+            {!confirmDel && (
+                <button
+                    onClick={handleDeleteClick}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors z-10 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    title="Borrar del historial"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+            )}
+
+            <AnimatePresence>
                 {confirmDel && (
-                    <div
-                        className="absolute right-0 top-full mt-2 z-[100000] w-[280px] rounded-2xl border border-white/10 bg-[#0f0f0f]/95 shadow-2xl backdrop-blur p-3"
-                        onClick={stopLink}
-                        onPointerDown={(e) => e.stopPropagation()}
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-black/95 backdrop-blur-md z-20 flex items-center justify-end px-4 gap-4 rounded-xl"
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="text-sm font-bold text-zinc-200">¿Borrar esta entrada?</div>
-                        <div className="text-xs text-zinc-500 mt-1">Se eliminará del historial de Trakt.</div>
-
-                        <div className="mt-3 flex items-center justify-end gap-2">
-                            <button
-                                type="button"
-                                onClick={onCancelDelete}
-                                disabled={busy}
-                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10 transition text-sm font-bold disabled:opacity-70"
-                            >
-                                Cancelar
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={onConfirmDelete}
-                                disabled={busy}
-                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-red-500/25 bg-red-500/12 text-red-200 hover:bg-red-500/18 transition text-sm font-bold disabled:opacity-70"
-                            >
-                                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                Borrar
-                            </button>
-                        </div>
-                    </div>
+                        <span className="text-red-200 text-xs font-medium mr-auto">¿Eliminar?</span>
+                        <button onClick={handleCancel} className="text-zinc-400 hover:text-white text-xs font-bold px-2 py-1">Cancelar</button>
+                        <button onClick={handleConfirm} className="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors">
+                            {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                            Borrar
+                        </button>
+                    </motion.div>
                 )}
-
-                <IconButton type="button" onClick={onAskDelete} disabled={busy} title="Borrar del historial">
-                    <Trash2 className="w-5 h-5" />
-                </IconButton>
-            </div>
+            </AnimatePresence>
         </div>
     )
 
-    if (!href) return <div className="opacity-80">{Inner}</div>
+    if (!href) return <div className="bg-zinc-900/30 border border-white/5 rounded-xl">{CardContent}</div>
 
     return (
-        <Link href={href} className="block" title={title} prefetch={false}>
-            {Inner}
+        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0, marginBottom: 0 }} transition={{ duration: 0.2 }}>
+            <Link href={href} className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-white/10 hover:bg-zinc-900/60 transition-colors group overflow-hidden">
+                {CardContent}
+            </Link>
+        </motion.div>
+    )
+}
+
+// ✅ NUEVO: Tarjeta para vista GRID
+function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
+    const type = getItemType(entry)
+    const title = getMainTitle(entry)
+    const watchedAtIso = entry?.watched_at || entry?.watchedAt || entry?.watchedAtIso
+    const { date: watchedDate } = formatWatchedLine(watchedAtIso)
+    const href = useMemo(() => getDetailsHref(entry), [entry])
+    const historyId = getHistoryId(entry)
+    const [confirmDel, setConfirmDel] = useState(false)
+
+    const isDeleting = busy
+
+    const handleDeleteClick = (e) => {
+        e.preventDefault(); e.stopPropagation()
+        setConfirmDel(true)
+    }
+
+    const handleConfirm = async (e) => {
+        e.preventDefault(); e.stopPropagation()
+        if (!historyId || isDeleting) return
+        await onRemoveFromHistory?.(entry, { historyId })
+    }
+
+    const handleCancel = (e) => {
+        e.preventDefault(); e.stopPropagation()
+        setConfirmDel(false)
+    }
+
+    const CardInner = (
+        <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md hover:shadow-xl transition-all">
+            <Poster entry={entry} className="w-full h-full" />
+
+            {/* Hover Overlay */}
+            <div className={`absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 ${confirmDel ? 'opacity-0 pointer-events-none' : ''}`}>
+                <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${type === 'movie' ? 'bg-sky-500/20 text-sky-300' : 'bg-purple-500/20 text-purple-300'}`}>
+                            {type === 'movie' ? 'Película' : 'Serie'}
+                        </span>
+                        <span className="text-[10px] text-zinc-400">{watchedDate}</span>
+                    </div>
+                    <h5 className="text-white font-bold text-sm leading-tight line-clamp-2" title={title}>{title}</h5>
+                </div>
+
+                <button
+                    onClick={handleDeleteClick}
+                    className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-red-600 text-white rounded-full transition-colors backdrop-blur-sm"
+                    title="Borrar"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
+
+            {/* Confirm Overlay */}
+            <AnimatePresence>
+                {confirmDel && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-black/95 z-20 flex flex-col items-center justify-center p-4 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-red-200 text-xs font-bold mb-3">¿Borrar del historial?</p>
+                        <div className="flex gap-2 w-full">
+                            <button onClick={handleCancel} className="flex-1 py-1.5 rounded bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-700">No</button>
+                            <button onClick={handleConfirm} className="flex-1 py-1.5 rounded bg-red-600 text-white text-xs font-bold hover:bg-red-500 flex items-center justify-center">
+                                {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Sí'}
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {isDeleting && !confirmDel && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-white" />
+                </div>
+            )}
+        </div>
+    )
+
+    if (!href) return <div>{CardInner}</div>
+
+    return (
+        <Link href={href} className="block">
+            {CardInner}
         </Link>
     )
 }
 
 // ----------------------------
-// Main
+// MAIN PAGE
 // ----------------------------
 export default function HistoryClient() {
     const [auth, setAuth] = useState({ loading: true, connected: false })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [raw, setRaw] = useState([])
-
-    // mutating (delete)
     const [mutatingId, setMutatingId] = useState('')
     const [mutErr, setMutErr] = useState('')
 
-    // UI
-    const [viewMode, setViewMode] = useState('list') // list | calendar
-    const [groupBy, setGroupBy] = useState('day') // day | month | year
-    const [typeFilter, setTypeFilter] = useState('all') // all | movies | shows
+    // UI States
+    const [viewMode, setViewMode] = useState('list') // 'list' | 'grid' | 'calendar'
+    const [groupBy, setGroupBy] = useState('day')
+    const [typeFilter, setTypeFilter] = useState('all')
     const [from, setFrom] = useState('')
     const [to, setTo] = useState('')
     const [q, setQ] = useState('')
-
-    // calendar
-    const [monthDate, setMonthDate] = useState(() => {
-        const d = new Date()
-        d.setDate(1)
-        return d
-    })
-    const [selectedDay, setSelectedDay] = useState(null) // YYYY-MM-DD
-
-    // ✅ mobile-only filters accordion
+    const [monthDate, setMonthDate] = useState(() => { const d = new Date(); d.setDate(1); return d })
+    const [selectedDay, setSelectedDay] = useState(null)
     const [isMobile, setIsMobile] = useState(false)
     const [filtersOpen, setFiltersOpen] = useState(true)
 
+    // ✅ Auto-switch logic
     useEffect(() => {
-        const mq = window.matchMedia('(max-width: 767px)') // < md
+        if (groupBy === 'day') {
+            setViewMode('calendar')
+        } else {
+            setViewMode('grid')
+        }
+    }, [groupBy])
+
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 1024px)')
         const apply = () => {
             const mobile = !!mq.matches
             setIsMobile(mobile)
-            setFiltersOpen((prev) => {
-                // si cambiamos a móvil por primera vez, colapsa por defecto
-                if (mobile) return false
-                // en desktop siempre abierto
-                return true
-            })
+            setFiltersOpen(!mobile)
         }
         apply()
         mq.addEventListener?.('change', apply)
@@ -723,83 +618,37 @@ export default function HistoryClient() {
     }, [])
 
     const loadAuth = useCallback(async () => {
-        try {
-            const st = await traktAuthStatus()
-            setAuth({ loading: false, connected: !!st?.connected })
-        } catch {
-            setAuth({ loading: false, connected: false })
-        }
+        try { const st = await traktAuthStatus(); setAuth({ loading: false, connected: !!st?.connected }) } catch { setAuth({ loading: false, connected: false }) }
     }, [])
 
     const loadHistory = useCallback(async () => {
-        setLoading(true)
-        setError('')
+        setLoading(true); setError('')
         try {
-            const json = await traktGetHistory({
-                type: 'all',
-                from: from || undefined,
-                to: to || undefined,
-                page: 1,
-                limit: 200
-            })
+            const json = await traktGetHistory({ type: 'all', from: from || undefined, to: to || undefined, page: 1, limit: 200 })
             const { items } = normalizeHistoryResponse(json)
-
-            const sorted = [...items].sort((a, b) => {
-                const ta = new Date(a?.watched_at || a?.watchedAt || 0).getTime()
-                const tb = new Date(b?.watched_at || b?.watchedAt || 0).getTime()
-                return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0)
-            })
+            const sorted = [...items].sort((a, b) => new Date(b?.watched_at || b?.watchedAt || 0) - new Date(a?.watched_at || a?.watchedAt || 0))
 
             const enriched = await mapLimit(sorted, 10, async (e) => {
-                const t = getItemType(e)
-                const id = getTmdbId(e)
+                const t = getItemType(e); const id = getTmdbId(e)
                 if (!t || !id) return e
-
                 const r = await fetchTmdbPoster({ type: t, tmdbId: id })
                 if (!r) return e
-
-                const title_es = e?.title_es || e?.titleEs || r?.title_es || null
-                const year = e?.year || r?.year || getYear(e) || null
-
-                return {
-                    ...e,
-                    title_es,
-                    year,
-                    poster_path: e?.poster_path || e?.posterPath || r?.poster_path || null,
-                    backdrop_path: e?.backdrop_path || e?.backdropPath || r?.backdrop_path || null
-                }
+                return { ...e, title_es: e?.title_es || r?.title_es || null, year: e?.year || r?.year || getYear(e) || null, poster_path: e?.poster_path || r?.poster_path || null, backdrop_path: e?.backdrop_path || r?.backdrop_path || null }
             })
-
             setRaw(enriched)
-        } catch (e) {
-            setError(e?.message || 'Error cargando historial')
-            setRaw([])
-        } finally {
-            setLoading(false)
-        }
+        } catch (e) { setError(e?.message || 'Error cargando historial'); setRaw([]) } finally { setLoading(false) }
     }, [from, to])
 
-    useEffect(() => {
-        loadAuth()
-    }, [loadAuth])
-
-    useEffect(() => {
-        if (!auth.loading && auth.connected) loadHistory()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [auth.loading, auth.connected])
+    useEffect(() => { loadAuth() }, [loadAuth])
+    useEffect(() => { if (!auth.loading && auth.connected) loadHistory() }, [auth.loading, auth.connected, loadHistory])
 
     const removeFromHistory = useCallback(async (_entry, { historyId }) => {
         if (!historyId) return
-        setMutErr('')
         setMutatingId(`del:${historyId}`)
         try {
             await apiPost('/api/trakt/history/remove', { ids: [historyId] })
             setRaw((prev) => (prev || []).filter((x) => String(getHistoryId(x)) !== String(historyId)))
-        } catch (e) {
-            setMutErr(e?.message || 'No se pudo borrar del historial')
-        } finally {
-            setMutatingId('')
-        }
+        } catch (e) { setMutErr(e?.message || 'Error al borrar') } finally { setMutatingId('') }
     }, [])
 
     const filtered = useMemo(() => {
@@ -808,35 +657,20 @@ export default function HistoryClient() {
             const t = getItemType(e)
             if (typeFilter === 'movies' && t !== 'movie') return false
             if (typeFilter === 'shows' && t !== 'show') return false
-
             const watchedAt = e?.watched_at || e?.watchedAt
             const d = watchedAt ? new Date(watchedAt) : null
             if (!d || Number.isNaN(d.getTime())) return false
-
-            if (selectedDay) {
-                const key = ymdLocal(d)
-                if (key !== selectedDay) return false
-            }
-
-            if (needle) {
-                const title = (getMainTitle(e) || '').toLowerCase()
-                if (!title.includes(needle)) return false
-            }
+            if (selectedDay) { if (ymdLocal(d) !== selectedDay) return false }
+            if (needle) { const title = (getMainTitle(e) || '').toLowerCase(); if (!title.includes(needle)) return false }
             return true
         })
     }, [raw, q, typeFilter, selectedDay])
 
     const stats = useMemo(() => {
-        const plays = filtered.length
-        const uniqSet = new Set()
-        let movies = 0
-        let shows = 0
+        const plays = filtered.length; const uniqSet = new Set(); let movies = 0; let shows = 0
         for (const e of filtered) {
-            const t = getItemType(e)
-            if (t === 'movie') movies++
-            if (t === 'show') shows++
-            const id = getTmdbId(e) || `${t}:${getMainTitle(e)}:${getYear(e) || ''}`
-            uniqSet.add(String(id))
+            const t = getItemType(e); if (t === 'movie') movies++; if (t === 'show') shows++
+            const id = getTmdbId(e) || `${t}:${getMainTitle(e)}`; uniqSet.add(String(id))
         }
         return { plays, unique: uniqSet.size, movies, shows }
     }, [filtered])
@@ -844,11 +678,9 @@ export default function HistoryClient() {
     const countsByDay = useMemo(() => {
         const m = {}
         for (const e of raw || []) {
-            const watchedAt = e?.watched_at || e?.watchedAt
-            if (!watchedAt) continue
-            const key = ymdLocal(new Date(watchedAt))
-            if (!key) continue
-            m[key] = (m[key] || 0) + 1
+            const w = e?.watched_at || e?.watchedAt; if (!w) continue
+            const k = ymdLocal(new Date(w)); if (!k) continue
+            m[k] = (m[k] || 0) + 1
         }
         return m
     }, [raw])
@@ -856,357 +688,225 @@ export default function HistoryClient() {
     const grouped = useMemo(() => {
         const map = new Map()
         for (const e of filtered) {
-            const watchedAt = e?.watched_at || e?.watchedAt
-            const d = new Date(watchedAt)
-            if (Number.isNaN(d.getTime())) continue
-
-            let key
-            if (groupBy === 'year') key = `${d.getFullYear()}-01-01`
-            else if (groupBy === 'month') key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01`
-            else key = ymdLocal(d)
-
-            if (!key) continue
-            if (!map.has(key)) map.set(key, [])
+            const w = e?.watched_at || e?.watchedAt; const d = new Date(w); if (Number.isNaN(d.getTime())) continue
+            let key; if (groupBy === 'year') key = `${d.getFullYear()}-01-01`; else if (groupBy === 'month') key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01`; else key = ymdLocal(d)
+            if (!key) continue; if (!map.has(key)) map.set(key, [])
             map.get(key).push(e)
         }
-
         const keys = Array.from(map.keys()).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
         return keys.map((k) => ({ key: k, date: new Date(k), items: map.get(k) || [] }))
     }, [filtered, groupBy])
 
-    // ----------------------------
-    // RENDER
-    // ----------------------------
+    // ✅ CHECK DE CARGA INICIAL PARA EVITAR PARPADEO
+    if (auth.loading) {
+        return (
+            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
+            </div>
+        )
+    }
+
     return (
-        <div className="min-h-screen bg-[#0b0b0b] text-zinc-100">
-            <div className="pointer-events-none fixed inset-0">
-                <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[920px] h-[920px] rounded-full blur-3xl opacity-25 bg-yellow-500/20" />
-                <div className="absolute top-40 -left-40 w-[760px] h-[760px] rounded-full blur-3xl opacity-20 bg-emerald-500/15" />
+        <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-emerald-500/30">
+            {/* Ambient Background */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-yellow-500/5 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[150px]" />
             </div>
 
-            <div className="relative z-10 max-w-7xl mx-auto px-4 py-8 lg:py-12">
-                {/* Header (⚠️ sin overflow-hidden para que los dropdowns no queden cortados) */}
-                <div className="rounded-3xl border border-white/10 bg-white/[0.03]">
-                    <div className="p-5 sm:p-7">
-                        <div className="flex items-start justify-between gap-4 flex-wrap">
-                            <div className="min-w-0">
-                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">Historial · Vistos</h1>
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    <Pill>
-                                        Plays: <span className="font-extrabold text-white">{stats.plays}</span>
-                                    </Pill>
-                                    <Pill>
-                                        Únicos: <span className="font-extrabold text-white">{stats.unique}</span>
-                                    </Pill>
-                                    <Pill>
-                                        Películas: <span className="font-extrabold text-white">{stats.movies}</span>
-                                    </Pill>
-                                    <Pill>
-                                        Series: <span className="font-extrabold text-white">{stats.shows}</span>
-                                    </Pill>
-                                </div>
-                            </div>
+            <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
 
-                            <div className="flex items-center gap-2">
-                                <div className="flex rounded-2xl border border-white/10 bg-black/25 p-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => setViewMode('list')}
-                                        className={`px-3 py-2 rounded-xl text-sm font-extrabold transition
-                      ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
-                                    >
-                                        Lista
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setViewMode('calendar')}
-                                        className={`px-3 py-2 rounded-xl text-sm font-extrabold transition
-                      ${viewMode === 'calendar' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
-                                    >
-                                        Calendario
-                                    </button>
+                {/* Header Section */}
+                <header className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                        <div>
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="p-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                                    <History className="w-6 h-6 text-yellow-500" />
                                 </div>
-
-                                <FancyButton
-                                    onClick={() => loadHistory()}
-                                    disabled={loading || auth.loading || !auth.connected}
-                                    className={`${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                    title="Actualizar"
-                                >
-                                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-                                    Actualizar
-                                </FancyButton>
+                                <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">
+                                    Historial
+                                </h1>
                             </div>
+                            <p className="text-zinc-400 text-sm ml-12">Tu registro completo de visualizaciones.</p>
                         </div>
 
-                        {!auth.loading && !auth.connected && (
-                            <div className="mt-6 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
-                                <div className="text-sm text-zinc-200 font-semibold">
-                                    No estás conectado a Trakt. Conéctate para ver tu registro por días, meses y años.
+                        {auth.connected && (
+                            <button
+                                onClick={() => loadHistory()}
+                                disabled={loading}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-white text-black hover:bg-zinc-200 rounded-full text-sm font-bold transition disabled:opacity-50 shadow-lg shadow-white/5"
+                            >
+                                <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                {loading ? 'Sincronizando...' : 'Sincronizar Trakt'}
+                            </button>
+                        )}
+                    </div>
+
+                    {auth.connected && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <StatCard label="Visualizaciones" value={stats.plays} icon={CheckCircle2} colorClass="text-emerald-400 bg-emerald-500/10" />
+                            <StatCard label="Títulos Únicos" value={stats.unique} icon={LayoutList} colorClass="text-purple-400 bg-purple-500/10" />
+                            <StatCard label="Películas" value={stats.movies} icon={Film} colorClass="text-sky-400 bg-sky-500/10" />
+                            <StatCard label="Series" value={stats.shows} icon={Tv} colorClass="text-pink-400 bg-pink-500/10" />
+                        </div>
+                    )}
+                </header>
+
+                {/* Main Content Grid */}
+                <div className={`grid grid-cols-1 ${viewMode === 'calendar' && auth.connected ? 'lg:grid-cols-[1fr_360px]' : 'lg:grid-cols-1'} gap-8 items-start`}>
+
+                    {/* Left Column: List & Filters */}
+                    <div className="space-y-6 min-w-0">
+                        {/* Toolbar Search & View Toggle */}
+                        {auth.connected && (
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                                    <input
+                                        value={q}
+                                        onChange={(e) => setQ(e.target.value)}
+                                        placeholder="Buscar en tu historial..."
+                                        className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-yellow-500/50 transition-all placeholder:text-zinc-600"
+                                    />
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => window.location.assign('/api/trakt/auth/start?next=/history')}
-                                    className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-yellow-500/15 border border-yellow-500/40 pointer-events-auto"
-                                    title="Conectar con Trakt"
-                                >
-                                    <img src="/logo-Trakt.png" alt="Trakt" className="h-6 w-auto" />
+                                <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 shrink-0">
+                                    <button onClick={() => setViewMode('list')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === 'list' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                        <LayoutList className="w-4 h-4" /> Lista
+                                    </button>
+                                    <button onClick={() => setViewMode('grid')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === 'grid' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                        <LayoutGrid className="w-4 h-4" /> Grid
+                                    </button>
+                                    <button onClick={() => setViewMode('calendar')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === 'calendar' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                        <CalendarIcon className="w-4 h-4" /> Calendario
+                                    </button>
+                                </div>
+                                <button onClick={() => setFiltersOpen(!filtersOpen)} className={`lg:hidden w-11 h-11 flex items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-400 ${filtersOpen ? 'text-yellow-500 border-yellow-500/50' : ''}`}>
+                                    <Filter className="w-5 h-5" />
                                 </button>
                             </div>
                         )}
 
-                        {auth.connected && (
-                            <>
-                                {/* ✅ Toggle filtros SOLO móvil */}
-                                <div className="mt-6 md:hidden">
-                                    <button
-                                        type="button"
-                                        onClick={() => setFiltersOpen((v) => !v)}
-                                        className="w-full inline-flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border border-white/10 bg-black/20 hover:bg-black/25 transition"
-                                    >
-                                        <div className="inline-flex items-center gap-2 text-sm font-extrabold text-zinc-100">
-                                            <SlidersHorizontal className="w-4 h-4 text-zinc-300" />
-                                            Filtros
-                                        </div>
-                                        <ChevronDown className={`w-5 h-5 text-zinc-300 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
-                                    </button>
-                                </div>
-
-                                {/* ✅ Filtros: siempre visibles en desktop, colapsables en móvil */}
-                                <AnimatePresence initial={false}>
-                                    {(!isMobile || filtersOpen) && (
-                                        <motion.div
-                                            key="filters"
-                                            initial={isMobile ? { height: 0, opacity: 0 } : false}
-                                            animate={isMobile ? { height: 'auto', opacity: 1 } : false}
-                                            exit={isMobile ? { height: 0, opacity: 0 } : false}
-                                            transition={{ duration: 0.18, ease: 'easeOut' }}
-                                            className="mt-4 md:mt-6 overflow-visible"
-                                        >
-                                            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5 relative z-40 overflow-visible">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                                                    <Dropdown
-                                                        label="Agrupar por"
-                                                        valueLabel={groupBy === 'day' ? 'Día' : groupBy === 'month' ? 'Mes' : 'Año'}
-                                                        className="w-full"
-                                                    >
-                                                        {({ close }) => (
-                                                            <>
-                                                                <DropdownItem
-                                                                    active={groupBy === 'day'}
-                                                                    onClick={() => {
-                                                                        setGroupBy('day')
-                                                                        close()
-                                                                    }}
-                                                                >
-                                                                    Día
-                                                                </DropdownItem>
-                                                                <DropdownItem
-                                                                    active={groupBy === 'month'}
-                                                                    onClick={() => {
-                                                                        setGroupBy('month')
-                                                                        close()
-                                                                    }}
-                                                                >
-                                                                    Mes
-                                                                </DropdownItem>
-                                                                <DropdownItem
-                                                                    active={groupBy === 'year'}
-                                                                    onClick={() => {
-                                                                        setGroupBy('year')
-                                                                        close()
-                                                                    }}
-                                                                >
-                                                                    Año
-                                                                </DropdownItem>
-                                                            </>
-                                                        )}
-                                                    </Dropdown>
-
-                                                    <Dropdown
-                                                        label="Tipo"
-                                                        valueLabel={typeFilter === 'all' ? 'Todo' : typeFilter === 'movies' ? 'Películas' : 'Series'}
-                                                        className="w-full"
-                                                    >
-                                                        {({ close }) => (
-                                                            <>
-                                                                <DropdownItem
-                                                                    active={typeFilter === 'all'}
-                                                                    onClick={() => {
-                                                                        setTypeFilter('all')
-                                                                        close()
-                                                                    }}
-                                                                >
-                                                                    Todo
-                                                                </DropdownItem>
-                                                                <DropdownItem
-                                                                    active={typeFilter === 'movies'}
-                                                                    onClick={() => {
-                                                                        setTypeFilter('movies')
-                                                                        close()
-                                                                    }}
-                                                                >
-                                                                    Películas
-                                                                </DropdownItem>
-                                                                <DropdownItem
-                                                                    active={typeFilter === 'shows'}
-                                                                    onClick={() => {
-                                                                        setTypeFilter('shows')
-                                                                        close()
-                                                                    }}
-                                                                >
-                                                                    Series
-                                                                </DropdownItem>
-                                                            </>
-                                                        )}
-                                                    </Dropdown>
-
-                                                    <div>
-                                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Desde</div>
-                                                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
-                                                            <CalendarDays className="w-4 h-4 text-zinc-400" />
-                                                            <input
-                                                                type="date"
-                                                                value={from}
-                                                                onChange={(e) => setFrom(e.target.value)}
-                                                                className="w-full bg-transparent outline-none text-sm text-zinc-200"
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    <div>
-                                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Hasta</div>
-                                                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
-                                                            <CalendarDays className="w-4 h-4 text-zinc-400" />
-                                                            <input
-                                                                type="date"
-                                                                value={to}
-                                                                onChange={(e) => setTo(e.target.value)}
-                                                                className="w-full bg-transparent outline-none text-sm text-zinc-200"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
-                                                    <Search className="w-4 h-4 text-zinc-400" />
-                                                    <input
-                                                        value={q}
-                                                        onChange={(e) => setQ(e.target.value)}
-                                                        placeholder="Buscar por título…"
-                                                        className="w-full bg-transparent outline-none text-sm text-zinc-200 placeholder:text-zinc-500"
-                                                    />
-                                                </div>
-
-                                                {viewMode === 'calendar' && (
-                                                    <div className="mt-3 text-xs text-zinc-500">
-                                                        Tip: en la vista calendario puedes seleccionar un día para filtrar la lista.
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                {auth.connected && (
-                    <div className="mt-6">
-                        {loading && (
-                            <div className="text-sm text-zinc-400 inline-flex items-center gap-2">
-                                <Loader2 className="w-4 h-4 animate-spin" /> Cargando historial…
-                            </div>
-                        )}
-                        {!!error && <div className="text-sm text-red-400 mt-2">{error}</div>}
-                        {!!mutErr && <div className="text-sm text-red-400 mt-2">{mutErr}</div>}
-                    </div>
-                )}
-
-                {auth.connected && (
-                    <div className="mt-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
-                        <AnimatePresence initial={false}>
-                            {viewMode === 'calendar' && (
+                        {/* Filters Row */}
+                        <AnimatePresence>
+                            {auth.connected && filtersOpen && (
                                 <motion.div
-                                    key="calendar"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: 10 }}
-                                    transition={{ duration: 0.18, ease: 'easeOut' }}
-                                    className="xl:col-span-5"
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-visible"
                                 >
-                                    <CalendarPanel
-                                        monthDate={monthDate}
-                                        onPrev={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-                                        onNext={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-                                        countsByDay={countsByDay}
-                                        selectedYmd={selectedDay}
-                                        onSelectYmd={setSelectedDay}
-                                    />
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-1">
+                                        <Dropdown label="Agrupar por" valueLabel={groupBy === 'day' ? 'Día' : groupBy === 'month' ? 'Mes' : 'Año'}>
+                                            {({ close }) => (
+                                                <>
+                                                    <DropdownItem active={groupBy === 'day'} onClick={() => { setGroupBy('day'); close() }}>Día</DropdownItem>
+                                                    <DropdownItem active={groupBy === 'month'} onClick={() => { setGroupBy('month'); close() }}>Mes</DropdownItem>
+                                                    <DropdownItem active={groupBy === 'year'} onClick={() => { setGroupBy('year'); close() }}>Año</DropdownItem>
+                                                </>
+                                            )}
+                                        </Dropdown>
 
-                        <div className={viewMode === 'calendar' ? 'xl:col-span-7' : 'xl:col-span-12'}>
-                            {filtered.length === 0 && !loading && (
-                                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-zinc-400">
-                                    No hay entradas con los filtros actuales.
-                                </div>
-                            )}
+                                        <Dropdown label="Tipo contenido" valueLabel={typeFilter === 'all' ? 'Todo' : typeFilter === 'movies' ? 'Películas' : 'Series'}>
+                                            {({ close }) => (
+                                                <>
+                                                    <DropdownItem active={typeFilter === 'all'} onClick={() => { setTypeFilter('all'); close() }}>Todo</DropdownItem>
+                                                    <DropdownItem active={typeFilter === 'movies'} onClick={() => { setTypeFilter('movies'); close() }}>Películas</DropdownItem>
+                                                    <DropdownItem active={typeFilter === 'shows'} onClick={() => { setTypeFilter('shows'); close() }}>Series</DropdownItem>
+                                                </>
+                                            )}
+                                        </Dropdown>
 
-                            <div className="space-y-5">
-                                {grouped.map((g) => (
-                                    <div key={g.key} className="rounded-3xl border border-white/10 bg-white/[0.03] overflow-hidden">
-                                        <div className="p-4 sm:p-5 flex items-center justify-between gap-3 border-b border-white/10">
-                                            <div className="min-w-0">
-                                                <div className="text-white font-extrabold capitalize truncate">{formatDateHeader(g.date, groupBy)}</div>
-                                                <div className="text-xs text-zinc-500 mt-1">
-                                                    {g.items.length} {g.items.length === 1 ? 'entrada' : 'entradas'}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-2">
-                                                <Pill className="hidden sm:inline-flex">
-                                                    <Film className="w-3.5 h-3.5" />
-                                                    {(g.items || []).filter((x) => getItemType(x) === 'movie').length}
-                                                </Pill>
-                                                <Pill className="hidden sm:inline-flex">
-                                                    <Tv2 className="w-3.5 h-3.5" />
-                                                    {(g.items || []).filter((x) => getItemType(x) === 'show').length}
-                                                </Pill>
+                                        <div>
+                                            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1">Desde</div>
+                                            <div className="relative">
+                                                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                                                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-full h-[42px] bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 text-sm text-zinc-300 focus:border-zinc-600 outline-none" />
                                             </div>
                                         </div>
 
                                         <div>
-                                            {g.items.map((entry) => {
-                                                const hid = getHistoryId(entry)
-                                                const busyRow = !!mutatingId && mutatingId === `del:${hid}`
-                                                return (
-                                                    <HistoryItemCard
-                                                        key={
-                                                            hid ||
-                                                            `${getItemType(entry)}:${getTmdbId(entry)}:${entry?.watched_at || entry?.watchedAt || Math.random()}`
-                                                        }
-                                                        entry={entry}
-                                                        busy={busyRow}
-                                                        onRemoveFromHistory={removeFromHistory}
-                                                    />
-                                                )
-                                            })}
+                                            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1">Hasta</div>
+                                            <div className="relative">
+                                                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                                                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-full h-[42px] bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 text-sm text-zinc-300 focus:border-zinc-600 outline-none" />
+                                            </div>
                                         </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* List Content */}
+                        {!auth.connected ? (
+                            <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed">
+                                <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-900/30 mb-6">
+                                    <img src="/logo-Trakt.png" alt="" className="w-10 h-10 brightness-0 invert" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-white mb-2">Conecta tu cuenta de Trakt</h2>
+                                <p className="text-zinc-400 max-w-sm mb-8 text-sm">Para ver tu historial de visualizaciones sincronizado, necesitas iniciar sesión.</p>
+                                <button onClick={() => window.location.assign('/api/trakt/auth/start?next=/history')} className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10">
+                                    Conectar ahora
+                                </button>
+                            </div>
+                        ) : filtered.length === 0 && !loading ? (
+                            <div className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
+                                <LayoutList className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
+                                <p className="text-zinc-500 font-medium">No se encontraron resultados en el historial.</p>
+                                {(from || to || q) && <button onClick={() => { setFrom(''); setTo(''); setQ('') }} className="mt-4 text-yellow-500 text-sm font-bold hover:underline">Limpiar filtros</button>}
+                            </div>
+                        ) : (
+                            <div className="space-y-8">
+                                {grouped.map((g) => (
+                                    <div key={g.key} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <div className="flex items-center gap-4 mb-4">
+                                            <h3 className="text-lg font-bold text-white capitalize">{formatDateHeader(g.date, groupBy)}</h3>
+                                            <div className="h-px bg-zinc-800 flex-1" />
+                                            <span className="text-[10px] font-bold text-zinc-500 bg-zinc-900 px-2 py-1 rounded-md border border-zinc-800">{g.items.length} vistos</span>
+                                        </div>
+
+                                        {viewMode === 'grid' ? (
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                                                {g.items.map((entry) => {
+                                                    const hid = getHistoryId(entry)
+                                                    return (
+                                                        <HistoryGridCard
+                                                            key={hid || Math.random()}
+                                                            entry={entry}
+                                                            busy={!!mutatingId && mutatingId === `del:${hid}`}
+                                                            onRemoveFromHistory={removeFromHistory}
+                                                        />
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {g.items.map((entry) => {
+                                                    const hid = getHistoryId(entry)
+                                                    return <HistoryItemCard key={hid || Math.random()} entry={entry} busy={!!mutatingId && mutatingId === `del:${hid}`} onRemoveFromHistory={removeFromHistory} />
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
-
-                            {filtered.length > 0 && (
-                                <div className="mt-6 text-xs text-zinc-500">
-                                    Mostrando <span className="text-zinc-200 font-semibold">{filtered.length}</span> entradas (máx. 200 por carga).
-                                </div>
-                            )}
-                        </div>
+                        )}
                     </div>
-                )}
+
+                    {/* Right Column: Calendar Sidebar (Solo visible en modo calendario Y conectado) */}
+                    {auth.connected && viewMode === 'calendar' && (
+                        <div className="hidden lg:block space-y-6">
+                            <CalendarPanel
+                                monthDate={monthDate}
+                                onPrev={() => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+                                onNext={() => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+                                countsByDay={countsByDay}
+                                selectedYmd={selectedDay}
+                                onSelectYmd={setSelectedDay}
+                            />
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     )
