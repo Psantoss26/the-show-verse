@@ -1122,13 +1122,14 @@ export default function HistoryClient() {
                                 <div className="text-sm text-zinc-200 font-semibold">
                                     No estás conectado a Trakt. Conéctate para ver tu registro por días, meses y años.
                                 </div>
-                                <a
-                                    href="/api/trakt/auth/start"
-                                    className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-yellow-500/15 border border-yellow-500/40"
+                                <button
+                                    type="button"
+                                    onClick={() => window.location.assign("/api/trakt/auth/start?next=/history")}
+                                    className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-yellow-500/15 border border-yellow-500/40 pointer-events-auto"
                                     title="Conectar con Trakt"
                                 >
                                     <img src="/logo-Trakt.png" alt="Trakt" className="h-6 w-auto" />
-                                </a>
+                                </button>
                             </div>
                         )}
 
