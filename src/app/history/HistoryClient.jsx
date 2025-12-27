@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
     CalendarDays,
-    CalendarClock,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
@@ -15,8 +14,7 @@ import {
     Search,
     Trash2,
     Tv2,
-    Check,
-    X
+    SlidersHorizontal
 } from 'lucide-react'
 
 import { traktAuthStatus, traktGetHistory } from '@/lib/api/traktClient'
@@ -32,22 +30,6 @@ function ymdLocal(date) {
     const d = date instanceof Date ? date : new Date(date)
     if (Number.isNaN(d.getTime())) return null
     return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-}
-
-function toLocalDatetimeInput(iso) {
-    if (!iso) return ''
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return ''
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(
-        d.getMinutes()
-    )}`
-}
-
-function fromLocalDatetimeInput(value) {
-    if (!value) return null
-    const d = new Date(value) // local -> ISO
-    if (Number.isNaN(d.getTime())) return null
-    return d.toISOString()
 }
 
 function formatDateHeader(date, mode = 'day') {
@@ -93,7 +75,6 @@ function isEpisodeEntry(entry) {
     if (t === 'episode' || t === 'episodes') return true
     if (entry?.episode) return true
 
-    // ✅ soportar season/number como string
     const season =
         entry?.season ??
         entry?.season_number ??
@@ -179,67 +160,14 @@ function getYear(entry) {
 }
 
 function getTmdbId(entry) {
-    return (
-        entry?.tmdbId ||
-        entry?.ids?.tmdb ||
-        entry?.movie?.ids?.tmdb ||
-        entry?.show?.ids?.tmdb ||
-        null
-    )
+    return entry?.tmdbId || entry?.ids?.tmdb || entry?.movie?.ids?.tmdb || entry?.show?.ids?.tmdb || null
 }
 
 function getHistoryId(entry) {
     return entry?.id || entry?.history_id || entry?.historyId || null
 }
 
-/**
- * ✅ target para update fecha:
- * - movie: trakt movie id
- * - episode: trakt episode id (si viene)
- * - show_episode (fallback): trakt show id + season + episode
- */
-function getTraktIdForUpdate(entry) {
-    const itemType = getItemType(entry)
-
-    // movie trakt id
-    const movieTrakt =
-        entry?.movie?.ids?.trakt || entry?.ids?.trakt || entry?.traktId || entry?.movieTraktId || null
-    if (itemType === 'movie' && movieTrakt) return { kind: 'movie', traktId: Number(movieTrakt) }
-
-    // episode trakt id (si existe)
-    const epTrakt =
-        entry?.episode?.ids?.trakt ||
-        entry?.episode?.ids?.trakt_id ||
-        entry?.episodeTraktId ||
-        entry?.traktEpisodeId ||
-        null
-
-    if (isEpisodeEntry(entry) && epTrakt) return { kind: 'episode', traktId: Number(epTrakt) }
-
-    // ✅ fallback: show trakt id + season/episode
-    const showTrakt =
-        entry?.show?.ids?.trakt ||
-        entry?.showTraktId ||
-        entry?.traktShowId ||
-        entry?.show?.traktId ||
-        null
-
-    const meta = getEpisodeMeta(entry)
-    if (isEpisodeEntry(entry) && showTrakt && meta) {
-        return {
-            kind: 'show_episode',
-            traktId: Number(showTrakt),
-            season: meta.season,
-            episode: meta.episode
-        }
-    }
-
-    return null
-}
-
-/**
- * ✅ Ruta de detalles
- */
+/** ✅ Ruta de detalles */
 function getDetailsHref(entry) {
     const type = getItemType(entry)
     const tmdbId = getTmdbId(entry)
@@ -375,7 +303,7 @@ function Dropdown({ label, valueLabel, children, className = '' }) {
     }, [open])
 
     return (
-        <div ref={ref} className={`relative ${className}`}>
+        <div ref={ref} className={`relative z-50 ${className}`}>
             {label && <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">{label}</div>}
 
             <button
@@ -395,7 +323,7 @@ function Dropdown({ label, valueLabel, children, className = '' }) {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.98 }}
                         transition={{ duration: 0.14, ease: 'easeOut' }}
-                        className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl border border-white/10
+                        className="absolute left-0 top-full z-[100000] mt-2 w-full rounded-2xl border border-white/10
               bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
                     >
                         <div className="p-2 space-y-1">{children({ close: () => setOpen(false) })}</div>
@@ -489,7 +417,9 @@ function CalendarPanel({ monthDate, onPrev, onNext, countsByDay, selectedYmd, on
             <div className="p-3 sm:p-5">
                 <div className="grid grid-cols-7 gap-2 text-[11px] font-bold text-zinc-500 mb-2">
                     {dow.map((d) => (
-                        <div key={d} className="text-center">{d}</div>
+                        <div key={d} className="text-center">
+                            {d}
+                        </div>
                     ))}
                 </div>
 
@@ -519,7 +449,8 @@ function CalendarPanel({ monthDate, onPrev, onNext, countsByDay, selectedYmd, on
 
                                 {count > 0 && (
                                     <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full
-                    bg-emerald-500/12 border border-emerald-500/25 text-emerald-200">
+                    bg-emerald-500/12 border border-emerald-500/25 text-emerald-200"
+                                    >
                                         {count} {count === 1 ? 'visto' : 'vistos'}
                                     </div>
                                 )}
@@ -577,7 +508,9 @@ function Poster({ entry }) {
             if (r?.poster_path) setPosterPath(r.poster_path)
         }
         run()
-        return () => { ignore = true }
+        return () => {
+            ignore = true
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [posterPath, entry])
 
@@ -590,7 +523,7 @@ function Poster({ entry }) {
     )
 }
 
-function HistoryItemCard({ entry, busy, onUpdateWatchedAt, onRemoveFromHistory }) {
+function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
     const type = getItemType(entry) // movie | show
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
 
@@ -600,68 +533,33 @@ function HistoryItemCard({ entry, busy, onUpdateWatchedAt, onRemoveFromHistory }
 
     const href = useMemo(() => getDetailsHref(entry), [entry])
     const historyId = getHistoryId(entry)
-    const updateTarget = getTraktIdForUpdate(entry)
-    const canEdit = !!watchedAt && !!historyId && !!updateTarget
 
-    const [editing, setEditing] = useState(false)
-    const [editValue, setEditValue] = useState('')
     const [confirmDel, setConfirmDel] = useState(false)
-
     const actionsRef = useRef(null)
 
     useEffect(() => {
-        setEditing(false)
         setConfirmDel(false)
-        setEditValue(watchedAt ? toLocalDatetimeInput(watchedAt) : '')
     }, [historyId, watchedAt])
 
-    // ✅ cerrar popovers al clicar fuera
     useEffect(() => {
-        if (!editing && !confirmDel) return
+        if (!confirmDel) return
         const onDown = (e) => {
             if (!actionsRef.current) return
-            if (!actionsRef.current.contains(e.target)) {
-                setEditing(false)
-                setConfirmDel(false)
-            }
+            if (!actionsRef.current.contains(e.target)) setConfirmDel(false)
         }
         document.addEventListener('pointerdown', onDown)
         return () => document.removeEventListener('pointerdown', onDown)
-    }, [editing, confirmDel])
+    }, [confirmDel])
 
     const stopLink = (e) => {
         e.preventDefault()
         e.stopPropagation()
     }
 
-    const onStartEdit = (e) => {
-        stopLink(e)
-        if (!canEdit || busy) return
-        setEditValue(watchedAt ? toLocalDatetimeInput(watchedAt) : '')
-        setEditing(true)
-        setConfirmDel(false)
-    }
-
-    const onCancelEdit = (e) => {
-        stopLink(e)
-        setEditing(false)
-        setEditValue(watchedAt ? toLocalDatetimeInput(watchedAt) : '')
-    }
-
-    const onSaveEdit = async (e) => {
-        stopLink(e)
-        if (!canEdit || busy) return
-        const iso = fromLocalDatetimeInput(editValue)
-        if (!iso) return
-        await onUpdateWatchedAt?.(entry, { historyId, target: updateTarget, watchedAtIso: iso })
-        setEditing(false)
-    }
-
     const onAskDelete = (e) => {
         stopLink(e)
         if (busy) return
         setConfirmDel(true)
-        setEditing(false)
     }
 
     const onCancelDelete = (e) => {
@@ -676,14 +574,12 @@ function HistoryItemCard({ entry, busy, onUpdateWatchedAt, onRemoveFromHistory }
         setConfirmDel(false)
     }
 
-    const epBadge = (type === 'show' && epMeta)
-        ? `T${epMeta.season} · E${epMeta.episode}`
-        : null
+    const epBadge = type === 'show' && epMeta ? `T${epMeta.season} · E${epMeta.episode}` : null
 
     const Inner = (
         <div
-            className={`w-full text-left flex items-stretch justify-between gap-4 p-4 sm:p-5 border-t border-white/10
-      hover:bg-white/[0.03] transition focus:outline-none focus:ring-2 focus:ring-yellow-500/30 ${busy ? 'opacity-80' : ''}`}
+            className={`w-full text-left flex items-stretch justify-between gap-3 sm:gap-4 p-4 sm:p-5 border-t border-white/10
+        hover:bg-white/[0.03] transition focus:outline-none focus:ring-2 focus:ring-yellow-500/30 ${busy ? 'opacity-80' : ''}`}
         >
             <div className="flex items-start gap-4 min-w-0 flex-1">
                 <Poster entry={entry} />
@@ -692,7 +588,7 @@ function HistoryItemCard({ entry, busy, onUpdateWatchedAt, onRemoveFromHistory }
                     <div className="flex items-center gap-2 flex-wrap">
                         <span
                             className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-bold border
-              ${type === 'movie'
+                ${type === 'movie'
                                     ? 'bg-sky-500/10 border-sky-500/25 text-sky-200'
                                     : 'bg-violet-500/10 border-violet-500/25 text-violet-200'
                                 }`}
@@ -703,9 +599,7 @@ function HistoryItemCard({ entry, busy, onUpdateWatchedAt, onRemoveFromHistory }
 
                         <div className="text-white font-extrabold truncate flex items-center gap-2 min-w-0">
                             <span className="truncate">{title}</span>
-                            {year ? <span className="text-zinc-400 font-semibold">({year})</span> : null}
-
-                            {/* ✅ badge S/E junto al título */}
+                            {year ? <span className="text-zinc-400 font-semibold shrink-0">({year})</span> : null}
                             {epBadge && (
                                 <span className="shrink-0 text-[11px] font-extrabold px-2 py-0.5 rounded-full border border-white/10 bg-white/5 text-zinc-200">
                                     {epBadge}
@@ -714,84 +608,25 @@ function HistoryItemCard({ entry, busy, onUpdateWatchedAt, onRemoveFromHistory }
                         </div>
                     </div>
 
-                    {/* ✅ título del episodio si existe */}
-                    {type === 'show' && epMeta?.title && (
-                        <div className="mt-1 text-xs text-zinc-400 truncate">
-                            {epMeta.title}
-                        </div>
-                    )}
+                    {type === 'show' && epMeta?.title && <div className="mt-1 text-xs text-zinc-400 truncate">{epMeta.title}</div>}
 
                     {watchedAt && (
                         <div className="mt-2 text-xs text-zinc-400">
-                            Visto:{' '}
-                            <span className="text-zinc-200 font-semibold">{formatWatchedLine(watchedAt)}</span>
+                            Visto: <span className="text-zinc-200 font-semibold">{formatWatchedLine(watchedAt)}</span>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Right actions + popovers (no rompen layout) */}
             <div
                 ref={actionsRef}
-                className="relative shrink-0 flex items-center gap-2"
+                className="relative shrink-0 flex items-center"
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
             >
-                {/* Popover editar */}
-                {editing && (
-                    <div
-                        className="absolute right-0 top-full mt-2 z-30 w-[320px] rounded-2xl border border-white/10 bg-[#0f0f0f]/95 shadow-2xl backdrop-blur p-3"
-                        onClick={stopLink}
-                        onPointerDown={(e) => e.stopPropagation()}
-                    >
-                        <div className="text-xs font-extrabold text-zinc-200 mb-2 flex items-center gap-2">
-                            <CalendarClock className="w-4 h-4 text-zinc-400" />
-                            Editar fecha de visto
-                        </div>
-
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
-                            <input
-                                type="datetime-local"
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                className="w-full bg-transparent outline-none text-sm text-zinc-200"
-                            />
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-end gap-2">
-                            <button
-                                type="button"
-                                onClick={onCancelEdit}
-                                disabled={busy}
-                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10 transition text-sm font-bold disabled:opacity-70"
-                            >
-                                <X className="w-4 h-4" />
-                                Cancelar
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={onSaveEdit}
-                                disabled={busy}
-                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-500/25 bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/18 transition text-sm font-bold disabled:opacity-70"
-                            >
-                                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                Guardar
-                            </button>
-                        </div>
-
-                        {!canEdit && (
-                            <div className="mt-2 text-[11px] text-zinc-500">
-                                No se puede editar esta entrada (faltan IDs Trakt).
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Popover borrar */}
                 {confirmDel && (
                     <div
-                        className="absolute right-0 top-full mt-2 z-30 w-[280px] rounded-2xl border border-white/10 bg-[#0f0f0f]/95 shadow-2xl backdrop-blur p-3"
+                        className="absolute right-0 top-full mt-2 z-[100000] w-[280px] rounded-2xl border border-white/10 bg-[#0f0f0f]/95 shadow-2xl backdrop-blur p-3"
                         onClick={stopLink}
                         onPointerDown={(e) => e.stopPropagation()}
                     >
@@ -821,33 +656,9 @@ function HistoryItemCard({ entry, busy, onUpdateWatchedAt, onRemoveFromHistory }
                     </div>
                 )}
 
-                {/* Botón editar fecha */}
-                <IconButton
-                    type="button"
-                    onClick={onStartEdit}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    disabled={!canEdit || busy}
-                    className={`${!canEdit ? 'opacity-40 cursor-not-allowed' : ''}`}
-                    title={canEdit ? 'Editar fecha' : 'No se puede editar (faltan IDs Trakt)'}
-                >
-                    <CalendarClock className="w-5 h-5" />
-                </IconButton>
-
-                {/* Botón borrar */}
-                <IconButton
-                    type="button"
-                    onClick={onAskDelete}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    disabled={busy}
-                    title="Borrar del historial"
-                >
+                <IconButton type="button" onClick={onAskDelete} disabled={busy} title="Borrar del historial">
                     <Trash2 className="w-5 h-5" />
                 </IconButton>
-
-                {/* Flecha navegar */}
-                <div className="shrink-0 w-11 h-11 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center">
-                    <ChevronRight className="w-5 h-5 text-zinc-300" />
-                </div>
             </div>
         </div>
     )
@@ -870,7 +681,7 @@ export default function HistoryClient() {
     const [error, setError] = useState('')
     const [raw, setRaw] = useState([])
 
-    // mutating (edit/delete)
+    // mutating (delete)
     const [mutatingId, setMutatingId] = useState('')
     const [mutErr, setMutErr] = useState('')
 
@@ -890,6 +701,27 @@ export default function HistoryClient() {
     })
     const [selectedDay, setSelectedDay] = useState(null) // YYYY-MM-DD
 
+    // ✅ mobile-only filters accordion
+    const [isMobile, setIsMobile] = useState(false)
+    const [filtersOpen, setFiltersOpen] = useState(true)
+
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 767px)') // < md
+        const apply = () => {
+            const mobile = !!mq.matches
+            setIsMobile(mobile)
+            setFiltersOpen((prev) => {
+                // si cambiamos a móvil por primera vez, colapsa por defecto
+                if (mobile) return false
+                // en desktop siempre abierto
+                return true
+            })
+        }
+        apply()
+        mq.addEventListener?.('change', apply)
+        return () => mq.removeEventListener?.('change', apply)
+    }, [])
+
     const loadAuth = useCallback(async () => {
         try {
             const st = await traktAuthStatus()
@@ -903,7 +735,13 @@ export default function HistoryClient() {
         setLoading(true)
         setError('')
         try {
-            const json = await traktGetHistory({ type: 'all', from: from || undefined, to: to || undefined, page: 1, limit: 200 })
+            const json = await traktGetHistory({
+                type: 'all',
+                from: from || undefined,
+                to: to || undefined,
+                page: 1,
+                limit: 200
+            })
             const { items } = normalizeHistoryResponse(json)
 
             const sorted = [...items].sort((a, b) => {
@@ -912,7 +750,6 @@ export default function HistoryClient() {
                 return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0)
             })
 
-            // enrich TMDB
             const enriched = await mapLimit(sorted, 10, async (e) => {
                 const t = getItemType(e)
                 const id = getTmdbId(e)
@@ -951,7 +788,6 @@ export default function HistoryClient() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [auth.loading, auth.connected])
 
-    // ✅ borrar (optimista)
     const removeFromHistory = useCallback(async (_entry, { historyId }) => {
         if (!historyId) return
         setMutErr('')
@@ -966,26 +802,6 @@ export default function HistoryClient() {
         }
     }, [])
 
-    // ✅ editar fecha (remove + add) y recargar
-    const updateWatchedAt = useCallback(async (_entry, { historyId, target, watchedAtIso }) => {
-        if (!historyId || !target?.kind || !target?.traktId || !watchedAtIso) return
-        setMutErr('')
-        setMutatingId(`edit:${historyId}`)
-        try {
-            await apiPost('/api/trakt/history/update', {
-                historyId,
-                watchedAt: watchedAtIso,
-                target
-            })
-            await loadHistory()
-        } catch (e) {
-            setMutErr(e?.message || 'No se pudo actualizar la fecha')
-        } finally {
-            setMutatingId('')
-        }
-    }, [loadHistory])
-
-    // derived
     const filtered = useMemo(() => {
         const needle = (q || '').trim().toLowerCase()
         return (raw || []).filter((e) => {
@@ -1069,19 +885,25 @@ export default function HistoryClient() {
             </div>
 
             <div className="relative z-10 max-w-7xl mx-auto px-4 py-8 lg:py-12">
-                {/* Header */}
-                <div className="rounded-3xl border border-white/10 bg-white/[0.03] overflow-hidden">
+                {/* Header (⚠️ sin overflow-hidden para que los dropdowns no queden cortados) */}
+                <div className="rounded-3xl border border-white/10 bg-white/[0.03]">
                     <div className="p-5 sm:p-7">
                         <div className="flex items-start justify-between gap-4 flex-wrap">
                             <div className="min-w-0">
-                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
-                                    Historial · Vistos
-                                </h1>
+                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">Historial · Vistos</h1>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    <Pill>Plays: <span className="font-extrabold text-white">{stats.plays}</span></Pill>
-                                    <Pill>Únicos: <span className="font-extrabold text-white">{stats.unique}</span></Pill>
-                                    <Pill>Películas: <span className="font-extrabold text-white">{stats.movies}</span></Pill>
-                                    <Pill>Series: <span className="font-extrabold text-white">{stats.shows}</span></Pill>
+                                    <Pill>
+                                        Plays: <span className="font-extrabold text-white">{stats.plays}</span>
+                                    </Pill>
+                                    <Pill>
+                                        Únicos: <span className="font-extrabold text-white">{stats.unique}</span>
+                                    </Pill>
+                                    <Pill>
+                                        Películas: <span className="font-extrabold text-white">{stats.movies}</span>
+                                    </Pill>
+                                    <Pill>
+                                        Series: <span className="font-extrabold text-white">{stats.shows}</span>
+                                    </Pill>
                                 </div>
                             </div>
 
@@ -1124,7 +946,7 @@ export default function HistoryClient() {
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => window.location.assign("/api/trakt/auth/start?next=/history")}
+                                    onClick={() => window.location.assign('/api/trakt/auth/start?next=/history')}
                                     className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-yellow-500/15 border border-yellow-500/40 pointer-events-auto"
                                     title="Conectar con Trakt"
                                 >
@@ -1134,79 +956,158 @@ export default function HistoryClient() {
                         )}
 
                         {auth.connected && (
-                            <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                                    <Dropdown
-                                        label="Agrupar por"
-                                        valueLabel={groupBy === 'day' ? 'Día' : groupBy === 'month' ? 'Mes' : 'Año'}
-                                        className="w-full"
+                            <>
+                                {/* ✅ Toggle filtros SOLO móvil */}
+                                <div className="mt-6 md:hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFiltersOpen((v) => !v)}
+                                        className="w-full inline-flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border border-white/10 bg-black/20 hover:bg-black/25 transition"
                                     >
-                                        {({ close }) => (
-                                            <>
-                                                <DropdownItem active={groupBy === 'day'} onClick={() => { setGroupBy('day'); close() }}>Día</DropdownItem>
-                                                <DropdownItem active={groupBy === 'month'} onClick={() => { setGroupBy('month'); close() }}>Mes</DropdownItem>
-                                                <DropdownItem active={groupBy === 'year'} onClick={() => { setGroupBy('year'); close() }}>Año</DropdownItem>
-                                            </>
-                                        )}
-                                    </Dropdown>
-
-                                    <Dropdown
-                                        label="Tipo"
-                                        valueLabel={typeFilter === 'all' ? 'Todo' : typeFilter === 'movies' ? 'Películas' : 'Series'}
-                                        className="w-full"
-                                    >
-                                        {({ close }) => (
-                                            <>
-                                                <DropdownItem active={typeFilter === 'all'} onClick={() => { setTypeFilter('all'); close() }}>Todo</DropdownItem>
-                                                <DropdownItem active={typeFilter === 'movies'} onClick={() => { setTypeFilter('movies'); close() }}>Películas</DropdownItem>
-                                                <DropdownItem active={typeFilter === 'shows'} onClick={() => { setTypeFilter('shows'); close() }}>Series</DropdownItem>
-                                            </>
-                                        )}
-                                    </Dropdown>
-
-                                    <div>
-                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Desde</div>
-                                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
-                                            <CalendarDays className="w-4 h-4 text-zinc-400" />
-                                            <input
-                                                type="date"
-                                                value={from}
-                                                onChange={(e) => setFrom(e.target.value)}
-                                                className="w-full bg-transparent outline-none text-sm text-zinc-200"
-                                            />
+                                        <div className="inline-flex items-center gap-2 text-sm font-extrabold text-zinc-100">
+                                            <SlidersHorizontal className="w-4 h-4 text-zinc-300" />
+                                            Filtros
                                         </div>
-                                    </div>
-
-                                    <div>
-                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Hasta</div>
-                                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
-                                            <CalendarDays className="w-4 h-4 text-zinc-400" />
-                                            <input
-                                                type="date"
-                                                value={to}
-                                                onChange={(e) => setTo(e.target.value)}
-                                                className="w-full bg-transparent outline-none text-sm text-zinc-200"
-                                            />
-                                        </div>
-                                    </div>
+                                        <ChevronDown className={`w-5 h-5 text-zinc-300 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+                                    </button>
                                 </div>
 
-                                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
-                                    <Search className="w-4 h-4 text-zinc-400" />
-                                    <input
-                                        value={q}
-                                        onChange={(e) => setQ(e.target.value)}
-                                        placeholder="Buscar por título…"
-                                        className="w-full bg-transparent outline-none text-sm text-zinc-200 placeholder:text-zinc-500"
-                                    />
-                                </div>
+                                {/* ✅ Filtros: siempre visibles en desktop, colapsables en móvil */}
+                                <AnimatePresence initial={false}>
+                                    {(!isMobile || filtersOpen) && (
+                                        <motion.div
+                                            key="filters"
+                                            initial={isMobile ? { height: 0, opacity: 0 } : false}
+                                            animate={isMobile ? { height: 'auto', opacity: 1 } : false}
+                                            exit={isMobile ? { height: 0, opacity: 0 } : false}
+                                            transition={{ duration: 0.18, ease: 'easeOut' }}
+                                            className="mt-4 md:mt-6 overflow-visible"
+                                        >
+                                            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5 relative z-40 overflow-visible">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                                    <Dropdown
+                                                        label="Agrupar por"
+                                                        valueLabel={groupBy === 'day' ? 'Día' : groupBy === 'month' ? 'Mes' : 'Año'}
+                                                        className="w-full"
+                                                    >
+                                                        {({ close }) => (
+                                                            <>
+                                                                <DropdownItem
+                                                                    active={groupBy === 'day'}
+                                                                    onClick={() => {
+                                                                        setGroupBy('day')
+                                                                        close()
+                                                                    }}
+                                                                >
+                                                                    Día
+                                                                </DropdownItem>
+                                                                <DropdownItem
+                                                                    active={groupBy === 'month'}
+                                                                    onClick={() => {
+                                                                        setGroupBy('month')
+                                                                        close()
+                                                                    }}
+                                                                >
+                                                                    Mes
+                                                                </DropdownItem>
+                                                                <DropdownItem
+                                                                    active={groupBy === 'year'}
+                                                                    onClick={() => {
+                                                                        setGroupBy('year')
+                                                                        close()
+                                                                    }}
+                                                                >
+                                                                    Año
+                                                                </DropdownItem>
+                                                            </>
+                                                        )}
+                                                    </Dropdown>
 
-                                {viewMode === 'calendar' && (
-                                    <div className="mt-3 text-xs text-zinc-500">
-                                        Tip: en la vista calendario puedes seleccionar un día para filtrar la lista.
-                                    </div>
-                                )}
-                            </div>
+                                                    <Dropdown
+                                                        label="Tipo"
+                                                        valueLabel={typeFilter === 'all' ? 'Todo' : typeFilter === 'movies' ? 'Películas' : 'Series'}
+                                                        className="w-full"
+                                                    >
+                                                        {({ close }) => (
+                                                            <>
+                                                                <DropdownItem
+                                                                    active={typeFilter === 'all'}
+                                                                    onClick={() => {
+                                                                        setTypeFilter('all')
+                                                                        close()
+                                                                    }}
+                                                                >
+                                                                    Todo
+                                                                </DropdownItem>
+                                                                <DropdownItem
+                                                                    active={typeFilter === 'movies'}
+                                                                    onClick={() => {
+                                                                        setTypeFilter('movies')
+                                                                        close()
+                                                                    }}
+                                                                >
+                                                                    Películas
+                                                                </DropdownItem>
+                                                                <DropdownItem
+                                                                    active={typeFilter === 'shows'}
+                                                                    onClick={() => {
+                                                                        setTypeFilter('shows')
+                                                                        close()
+                                                                    }}
+                                                                >
+                                                                    Series
+                                                                </DropdownItem>
+                                                            </>
+                                                        )}
+                                                    </Dropdown>
+
+                                                    <div>
+                                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Desde</div>
+                                                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
+                                                            <CalendarDays className="w-4 h-4 text-zinc-400" />
+                                                            <input
+                                                                type="date"
+                                                                value={from}
+                                                                onChange={(e) => setFrom(e.target.value)}
+                                                                className="w-full bg-transparent outline-none text-sm text-zinc-200"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Hasta</div>
+                                                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
+                                                            <CalendarDays className="w-4 h-4 text-zinc-400" />
+                                                            <input
+                                                                type="date"
+                                                                value={to}
+                                                                onChange={(e) => setTo(e.target.value)}
+                                                                className="w-full bg-transparent outline-none text-sm text-zinc-200"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-black/35 border border-white/10 hover:border-white/15 transition">
+                                                    <Search className="w-4 h-4 text-zinc-400" />
+                                                    <input
+                                                        value={q}
+                                                        onChange={(e) => setQ(e.target.value)}
+                                                        placeholder="Buscar por título…"
+                                                        className="w-full bg-transparent outline-none text-sm text-zinc-200 placeholder:text-zinc-500"
+                                                    />
+                                                </div>
+
+                                                {viewMode === 'calendar' && (
+                                                    <div className="mt-3 text-xs text-zinc-500">
+                                                        Tip: en la vista calendario puedes seleccionar un día para filtrar la lista.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </>
                         )}
                     </div>
                 </div>
@@ -1259,9 +1160,7 @@ export default function HistoryClient() {
                                     <div key={g.key} className="rounded-3xl border border-white/10 bg-white/[0.03] overflow-hidden">
                                         <div className="p-4 sm:p-5 flex items-center justify-between gap-3 border-b border-white/10">
                                             <div className="min-w-0">
-                                                <div className="text-white font-extrabold capitalize truncate">
-                                                    {formatDateHeader(g.date, groupBy)}
-                                                </div>
+                                                <div className="text-white font-extrabold capitalize truncate">{formatDateHeader(g.date, groupBy)}</div>
                                                 <div className="text-xs text-zinc-500 mt-1">
                                                     {g.items.length} {g.items.length === 1 ? 'entrada' : 'entradas'}
                                                 </div>
@@ -1282,13 +1181,15 @@ export default function HistoryClient() {
                                         <div>
                                             {g.items.map((entry) => {
                                                 const hid = getHistoryId(entry)
-                                                const busyRow = !!mutatingId && (mutatingId === `del:${hid}` || mutatingId === `edit:${hid}`)
+                                                const busyRow = !!mutatingId && mutatingId === `del:${hid}`
                                                 return (
                                                     <HistoryItemCard
-                                                        key={hid || `${getItemType(entry)}:${getTmdbId(entry)}:${entry?.watched_at || entry?.watchedAt || Math.random()}`}
+                                                        key={
+                                                            hid ||
+                                                            `${getItemType(entry)}:${getTmdbId(entry)}:${entry?.watched_at || entry?.watchedAt || Math.random()}`
+                                                        }
                                                         entry={entry}
                                                         busy={busyRow}
-                                                        onUpdateWatchedAt={updateWatchedAt}
                                                         onRemoveFromHistory={removeFromHistory}
                                                     />
                                                 )
