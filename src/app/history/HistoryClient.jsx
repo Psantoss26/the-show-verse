@@ -1124,8 +1124,8 @@ export default function HistoryClient() {
                                 </div>
                                 <a
                                     href="/api/trakt/auth/start"
-                                    className="mt-3 inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-yellow-500 text-black hover:brightness-110 transition"
-                                    title="Conectar Trakt"
+                                    className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-yellow-500/15 border border-yellow-500/40"
+                                    title="Conectar con Trakt"
                                 >
                                     <img src="/logo-Trakt.png" alt="Trakt" className="h-6 w-auto" />
                                 </a>
