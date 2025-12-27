@@ -1,4 +1,3 @@
-// /src/app/api/trakt/history/route.js
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import {

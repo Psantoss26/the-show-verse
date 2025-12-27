@@ -1,6 +1,5 @@
-// /src/app/api/trakt/auth/start/route.js
 import { NextResponse } from "next/server"
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -26,7 +25,13 @@ export async function GET() {
     const redirectUri = `${origin}/api/trakt/auth/callback`
 
     const state = randomState()
-    const secure = process.env.NODE_ENV === "production"
+    cookies().set("trakt_oauth_state", state, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: origin.startsWith("https://"),
+        path: "/",
+        maxAge: 10 * 60,
+    })
 
     const url =
         `https://trakt.tv/oauth/authorize` +
@@ -35,13 +40,5 @@ export async function GET() {
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&state=${encodeURIComponent(state)}`
 
-    const res = NextResponse.redirect(url)
-    res.cookies.set("trakt_oauth_state", state, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure,
-        path: "/",
-        maxAge: 10 * 60,
-    })
-    return res
+    return NextResponse.redirect(url)
 }
