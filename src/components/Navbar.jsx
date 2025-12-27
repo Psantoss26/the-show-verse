@@ -19,7 +19,8 @@ import {
   Menu as MenuIcon,
   HomeIcon,
   Compass,
-  Activity
+  Activity,
+  History
 } from 'lucide-react'
 import TraktHistoryNavButton from '@/components/trakt/TraktHistoryNavButton'
 
@@ -537,6 +538,11 @@ export default function Navbar() {
                   <Activity className="w-5 h-5" />
                   <span>Trakt</span>
                 </Link>
+
+                <TraktHistoryNavButton
+                  variant="drawer"
+                  onClick={() => setMobileMenuOpen(false)}
+                />
 
                 <div className="my-3 h-px bg-neutral-800" />
 
