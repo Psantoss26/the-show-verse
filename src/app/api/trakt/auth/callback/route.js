@@ -1,6 +1,6 @@
 // /src/app/api/trakt/auth/callback/route.js
 import { NextResponse } from "next/server"
-import { cookies, headers } from "next/headers"
+import { headers } from "next/headers"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -9,7 +9,7 @@ function cleanOrigin(s) {
     return String(s || "").replace(/\/+$/, "")
 }
 
-function originFromRequest(req) {
+async function originFromRequest(req) {
     const forced =
         process.env.TRAKT_APP_ORIGIN ||
         process.env.NEXT_PUBLIC_APP_URL ||
@@ -20,11 +20,20 @@ function originFromRequest(req) {
     const nextOrigin = req?.nextUrl?.origin
     if (nextOrigin && nextOrigin !== "null") return cleanOrigin(nextOrigin)
 
-    const h = headers()
+    const h = await headers()
     const proto = (h.get("x-forwarded-proto") || "http").split(",")[0].trim()
     const host = (h.get("x-forwarded-host") || h.get("host") || "").split(",")[0].trim()
-    if (!host && process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
-    return `${proto}://${host}`
+
+    if (host) return `${proto}://${host}`
+    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+
+    return "http://localhost:3000"
+}
+
+function sanitizeNextPath(nextPath) {
+    if (!nextPath || typeof nextPath !== "string") return "/history"
+    if (!nextPath.startsWith("/")) return "/history"
+    return nextPath
 }
 
 export async function GET(req) {
@@ -38,12 +47,15 @@ export async function GET(req) {
     const code = searchParams.get("code")
     const state = searchParams.get("state")
 
-    const expected = cookies().get("trakt_oauth_state")?.value
+    const expected = req.cookies.get("trakt_oauth_state")?.value || null
+    const nextCookie = req.cookies.get("trakt_oauth_next")?.value || "/history"
+    const nextPath = sanitizeNextPath(nextCookie)
+
     if (!code || !state || !expected || state !== expected) {
         return NextResponse.json({ error: "Invalid OAuth state" }, { status: 400 })
     }
 
-    const origin = originFromRequest(req)
+    const origin = await originFromRequest(req)
     const redirectUri = `${origin}/api/trakt/auth/callback`
 
     const tokenRes = await fetch("https://api.trakt.tv/oauth/token", {
@@ -67,15 +79,15 @@ export async function GET(req) {
         )
     }
 
-    // ✅ Cookies que espera tu backend actual (/auth/status, /item/watched, /history...)
     const createdAtSec = Number(tokenJson?.created_at || 0)
     const expiresInSec = Number(tokenJson?.expires_in || 0)
     const expiresAtMs = (createdAtSec + expiresInSec) * 1000
 
     const secure = origin.startsWith("https://")
 
-    const res = NextResponse.redirect(`${origin}/history`)
+    const res = NextResponse.redirect(new URL(nextPath, origin))
 
+    // ✅ cookies que usa tu /auth/status y el resto de rutas
     res.cookies.set("trakt_access_token", tokenJson.access_token, {
         httpOnly: true,
         sameSite: "lax",
@@ -97,23 +109,9 @@ export async function GET(req) {
         path: "/",
     })
 
-    // ✅ Compatibilidad (por si alguna parte tuya aún usa trakt_tokens)
-    res.cookies.set("trakt_tokens", Buffer.from(JSON.stringify(tokenJson)).toString("base64"), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure,
-        path: "/",
-        maxAge: 60 * 60 * 24 * 365,
-    })
-
-    // limpiar state
-    res.cookies.set("trakt_oauth_state", "", {
-        httpOnly: true,
-        sameSite: "lax",
-        secure,
-        path: "/",
-        maxAge: 0,
-    })
+    // Limpieza
+    res.cookies.set("trakt_oauth_state", "", { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: 0 })
+    res.cookies.set("trakt_oauth_next", "", { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: 0 })
 
     return res
 }
