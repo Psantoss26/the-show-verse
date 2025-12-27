@@ -2436,6 +2436,10 @@ export default function DetailsClient({
                   plays={trakt.plays}
                   busy={!!traktBusy}
                   onOpen={() => {
+                    if (!trakt.connected) {
+                      window.location.href = "/api/trakt/auth/start"
+                      return
+                    }
                     // ✅ Para series: abrir tabla episodios
                     if (endpointType === 'tv') setTraktEpisodesOpen(true)
                     // ✅ Para pelis: mantener tu modal actual de plays/historial

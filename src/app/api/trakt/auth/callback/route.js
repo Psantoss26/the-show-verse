@@ -1,43 +1,67 @@
-// src/app/api/trakt/auth/callback/route.js
-import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import {
-    buildRedirectUri,
-    readOAuthStateCookie,
-    exchangeCodeForTokens,
-    setTraktCookies,
-} from '@/lib/trakt/server'
+import { NextResponse } from "next/server"
+import { cookies, headers } from "next/headers"
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
-export async function GET(request) {
-    const cookieStore = await cookies()
+function originFromHeaders() {
+    const h = headers()
+    const proto = h.get("x-forwarded-proto") || "http"
+    const host = h.get("x-forwarded-host") || h.get("host")
+    return `${proto}://${host}`
+}
 
-    const code = request.nextUrl.searchParams.get('code')
-    const state = request.nextUrl.searchParams.get('state')
-    const storedState = readOAuthStateCookie(cookieStore)
-
-    if (!code) {
-        return NextResponse.redirect(new URL('/settings/trakt?error=missing_code', request.nextUrl.origin))
+export async function GET(req) {
+    const clientId = process.env.TRAKT_CLIENT_ID
+    const clientSecret = process.env.TRAKT_CLIENT_SECRET
+    if (!clientId || !clientSecret) {
+        return NextResponse.json({ error: "Missing TRAKT_CLIENT_ID/SECRET" }, { status: 500 })
     }
 
-    if (!storedState || !state || storedState !== state) {
-        return NextResponse.redirect(new URL('/settings/trakt?error=bad_state', request.nextUrl.origin))
+    const { searchParams } = new URL(req.url)
+    const code = searchParams.get("code")
+    const state = searchParams.get("state")
+
+    const expected = cookies().get("trakt_oauth_state")?.value
+    if (!code || !state || !expected || state !== expected) {
+        return NextResponse.json({ error: "Invalid OAuth state" }, { status: 400 })
     }
 
-    try {
-        const redirectUri = buildRedirectUri(request.nextUrl.origin)
-        const tokens = await exchangeCodeForTokens({ code, redirectUri })
+    const origin = originFromHeaders()
+    const redirectUri = `${origin}/api/trakt/auth/callback`
 
-        const res = NextResponse.redirect(new URL('/settings/trakt?connected=1', request.nextUrl.origin))
-        setTraktCookies(res, tokens)
-        // borramos el state
-        res.cookies.set('trakt_oauth_state', '', { path: '/', maxAge: 0 })
-        return res
-    } catch (e) {
-        return NextResponse.redirect(
-            new URL(`/settings/trakt?error=${encodeURIComponent(e?.message || 'exchange_failed')}`, request.nextUrl.origin)
+    const tokenRes = await fetch("https://trakt.tv/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            code,
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: redirectUri,
+            grant_type: "authorization_code",
+        }),
+    })
+
+    const tokenJson = await tokenRes.json()
+    if (!tokenRes.ok) {
+        return NextResponse.json(
+            { error: "Token exchange failed", details: tokenJson },
+            { status: 500 }
         )
     }
+
+    // Guardamos tokens en cookie (simple y funciona en Vercel).
+    // Si ya lo haces distinto, adapta pero NO uses filesystem.
+    cookies().set("trakt_tokens", Buffer.from(JSON.stringify(tokenJson)).toString("base64"), {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: origin.startsWith("https://"),
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+    })
+
+    cookies().delete("trakt_oauth_state")
+
+    // Vuelve a Historial (o donde quieras)
+    return NextResponse.redirect(`${origin}/history`)
 }
