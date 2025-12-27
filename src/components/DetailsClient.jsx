@@ -3068,6 +3068,32 @@ export default function DetailsClient({
           </div>
         </div>
 
+        {/* EPISODIOS (TV) */}
+        {type === 'tv' && ratings && (
+          <section className="mb-10">
+            <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
+            <div className="p-2">
+              {ratingsLoading && (
+                <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
+              )}
+              {ratingsError && (
+                <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
+              )}
+              {!ratingsError && (
+                <EpisodeRatingsGrid
+                  ratings={ratings}
+                  initialSource="avg"
+                  density="compact"
+                  traktConnected={trakt.connected}
+                  watchedBySeason={watchedBySeason}
+                  episodeBusyKey={episodeBusyKey}
+                  onToggleEpisodeWatched={toggleEpisodeWatched}
+                />
+              )}
+            </div>
+          </section>
+        )}
+
         {/* ✅ PORTADAS Y FONDOS */}
         {(type === 'movie' || type === 'tv') && (
           <section className="mb-10">
@@ -3406,32 +3432,6 @@ export default function DetailsClient({
                 </div>
               )
             })()}
-          </section>
-        )}
-
-        {/* EPISODIOS (TV) */}
-        {type === 'tv' && ratings && (
-          <section className="mb-16">
-            <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
-            <div className="p-6">
-              {ratingsLoading && (
-                <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
-              )}
-              {ratingsError && (
-                <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
-              )}
-              {!ratingsError && (
-                <EpisodeRatingsGrid
-                  ratings={ratings}
-                  initialSource="avg"
-                  density="compact"
-                  traktConnected={trakt.connected}
-                  watchedBySeason={watchedBySeason}
-                  episodeBusyKey={episodeBusyKey}
-                  onToggleEpisodeWatched={toggleEpisodeWatched}
-                />
-              )}
-            </div>
           </section>
         )}
 
