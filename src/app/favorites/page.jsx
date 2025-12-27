@@ -2,14 +2,26 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { fetchFavoritesForUser, getExternalIds } from '@/lib/api/tmdb'
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
-import { Loader2, Heart, FilmIcon, TvIcon } from 'lucide-react'
+import {
+  Loader2,
+  Heart,
+  Film,
+  Tv,
+  FilterX,
+  ChevronDown,
+  CheckCircle2,
+  Calendar,
+  ArrowUpDown
+} from 'lucide-react'
 
-// ================== Posters "best EN" (Favoritas/Pendientes) ==================
-const posterChoiceCache = new Map() // key -> file_path|null
-const posterInFlight = new Map() // key -> Promise
+// ================== UTILS & CACHE ==================
+const posterChoiceCache = new Map()
+const posterInFlight = new Map()
+const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 function buildImg(path, size = 'w500') {
   return `https://image.tmdb.org/t/p/${size}${path}`
@@ -27,79 +39,50 @@ function preloadImage(src) {
 
 function getPosterPreference(type, id) {
   if (typeof window === 'undefined') return null
-  const key =
-    type === 'tv'
-      ? `showverse:tv:${id}:poster`
-      : `showverse:movie:${id}:poster`
+  const key = type === 'tv' ? `showverse:tv:${id}:poster` : `showverse:movie:${id}:poster`
   return window.localStorage.getItem(key) || null
 }
 
 function pickBestPosterEN(posters) {
   if (!Array.isArray(posters) || posters.length === 0) return null
-
-  const maxVotes = posters.reduce((max, p) => {
-    const vc = p.vote_count || 0
-    return vc > max ? vc : max
-  }, 0)
-
+  const maxVotes = posters.reduce((max, p) => (p.vote_count || 0) > max ? p.vote_count : max, 0)
   const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes)
   if (!withMaxVotes.length) return null
 
   const preferredLangs = new Set(['en', 'en-US'])
-
-  const enGroup = withMaxVotes.filter(
-    (p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1)
-  )
-
+  const enGroup = withMaxVotes.filter((p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1))
   const nullLang = withMaxVotes.filter((p) => p.iso_639_1 === null)
+  const candidates = enGroup.length ? enGroup : nullLang.length ? nullLang : withMaxVotes
 
-  const candidates = enGroup.length
-    ? enGroup
-    : nullLang.length
-      ? nullLang
-      : withMaxVotes
-
-  const sorted = [...candidates].sort((a, b) => {
+  return [...candidates].sort((a, b) => {
     const va = (b.vote_average || 0) - (a.vote_average || 0)
     if (va !== 0) return va
     return (b.width || 0) - (a.width || 0)
-  })
-
-  return sorted[0] || null
+  })[0] || null
 }
 
 async function fetchBestPosterEN(type, id) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
   if (!apiKey || !type || !id) return null
-
   try {
-    const url =
-      `https://api.themoviedb.org/3/${type}/${id}/images` +
-      `?api_key=${apiKey}` +
-      `&include_image_language=en,en-US,null`
-
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`
     const r = await fetch(url, { cache: 'force-cache' })
     if (!r.ok) return null
     const j = await r.json()
-    const posters = Array.isArray(j?.posters) ? j.posters : []
-    return pickBestPosterEN(posters)?.file_path || null
-  } catch {
-    return null
-  }
+    return pickBestPosterEN(j?.posters)?.file_path || null
+  } catch { return null }
 }
 
 async function getBestPosterCached(type, id) {
   const key = `${type}:${id}`
   if (posterChoiceCache.has(key)) return posterChoiceCache.get(key)
   if (posterInFlight.has(key)) return posterInFlight.get(key)
-
   const p = (async () => {
     const chosen = await fetchBestPosterEN(type, id)
     posterChoiceCache.set(key, chosen || null)
     posterInFlight.delete(key)
     return chosen || null
   })()
-
   posterInFlight.set(key, p)
   return p
 }
@@ -110,46 +93,32 @@ function SmartPoster({ item, title }) {
 
   useEffect(() => {
     let abort = false
-
     const load = async () => {
       setReady(false)
-
       const type = item.media_type || (item.title ? 'movie' : 'tv')
 
       const pref = getPosterPreference(type, item.id)
       if (pref) {
         const url = buildImg(pref, 'w500')
         await preloadImage(url)
-        if (!abort) {
-          setSrc(url)
-          setReady(true)
-        }
+        if (!abort) { setSrc(url); setReady(true) }
         return
       }
 
       const best = await getBestPosterCached(type, item.id)
-
       const fallbackPath = best || item.poster_path || item.backdrop_path || null
       const url = fallbackPath ? buildImg(fallbackPath, 'w500') : null
       if (url) await preloadImage(url)
-
-      if (!abort) {
-        setSrc(url)
-        setReady(!!url)
-      }
+      if (!abort) { setSrc(url); setReady(!!url) }
     }
-
     load()
-    return () => {
-      abort = true
-    }
+    return () => { abort = true }
   }, [item])
 
   if (!ready || !src) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center text-neutral-600 p-4 text-center bg-neutral-800">
-        <FilmIcon className="w-12 h-12 mb-2 opacity-50" />
-        <span className="text-sm font-medium">{title}</span>
+      <div className="w-full h-full flex flex-col items-center justify-center text-neutral-700 bg-neutral-800 animate-pulse">
+        <Film className="w-8 h-8 opacity-50" />
       </div>
     )
   }
@@ -160,14 +129,10 @@ function SmartPoster({ item, title }) {
       alt={title}
       loading="lazy"
       decoding="async"
-      className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+      className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
     />
   )
 }
-// ======================================================================
-
-// ================== IMDb (OMDb) lazy por HOVER ==================
-const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 const readOmdbCache = (imdbId) => {
   if (!imdbId || typeof window === 'undefined') return null
@@ -175,44 +140,89 @@ const readOmdbCache = (imdbId) => {
     const raw = window.sessionStorage.getItem(`showverse:omdb:${imdbId}`)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    const t = Number(parsed?.t || 0)
-    const fresh = Number.isFinite(t) && Date.now() - t < OMDB_CACHE_TTL_MS
-    return { ...parsed, fresh }
-  } catch {
-    return null
-  }
+    return { ...parsed, fresh: (Date.now() - (parsed?.t || 0)) < OMDB_CACHE_TTL_MS }
+  } catch { return null }
 }
-
 const writeOmdbCache = (imdbId, patch) => {
   if (!imdbId || typeof window === 'undefined') return
   try {
     const prev = readOmdbCache(imdbId) || {}
-    const next = {
-      t: Date.now(),
-      imdbRating: patch?.imdbRating ?? prev?.imdbRating ?? null
-    }
+    const next = { t: Date.now(), imdbRating: patch?.imdbRating ?? prev?.imdbRating ?? null }
     window.sessionStorage.setItem(`showverse:omdb:${imdbId}`, JSON.stringify(next))
-  } catch {
-    // ignore
-  }
+  } catch { }
 }
-// ======================================================================
 
+// --- UI COMPONENTS ---
+function Dropdown({ label, valueLabel, icon: Icon, children, className = '' }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [open])
+
+  return (
+    <div ref={ref} className={`relative z-30 ${className}`}>
+      <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">{label}</div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full h-10 inline-flex items-center justify-between gap-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300"
+      >
+        <div className="flex items-center gap-2 truncate">
+          {Icon && <Icon className="w-4 h-4 text-zinc-500" />}
+          <span className="font-medium text-white truncate">{valueLabel}</span>
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
+            className="absolute left-0 top-full z-[1000] mt-2 w-full min-w-[160px] rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden"
+          >
+            <div className="p-1 space-y-0.5">{children({ close: () => setOpen(false) })}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function DropdownItem({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between
+        ${active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
+    >
+      <span className="font-medium">{children}</span>
+      {active && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+    </button>
+  )
+}
+
+// --- MAIN PAGE ---
 export default function FavoritesPage() {
-  const { session, account } = useAuth()
-
-  // 'checking' | 'anonymous' | 'authenticated'
+  // ✅ Extraemos 'hydrated' para saber si la sesión ya terminó de cargar
+  const { session, account, hydrated } = useAuth()
   const [authStatus, setAuthStatus] = useState('checking')
-
   const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true) // carga de favoritas
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const [typeFilter, setTypeFilter] = useState('all')
   const [yearFilter, setYearFilter] = useState('')
   const [sortBy, setSortBy] = useState('rating_desc')
 
-  // ✅ ratings lazy
   const [imdbRatings, setImdbRatings] = useState({})
   const imdbRatingsRef = useRef({})
   const imdbInFlightRef = useRef(new Set())
@@ -220,313 +230,215 @@ export default function FavoritesPage() {
   const imdbIdCacheRef = useRef({})
   const unmountedRef = useRef(false)
 
-  useEffect(() => {
-    imdbRatingsRef.current = imdbRatings
-  }, [imdbRatings])
-
+  useEffect(() => { imdbRatingsRef.current = imdbRatings }, [imdbRatings])
   useEffect(() => {
     unmountedRef.current = false
     return () => {
       unmountedRef.current = true
-      // limpiar timers
-      try {
-        Object.values(imdbTimersRef.current || {}).forEach((t) => window.clearTimeout(t))
-      } catch { }
-      imdbTimersRef.current = {}
-      imdbInFlightRef.current = new Set()
+      Object.values(imdbTimersRef.current).forEach((t) => window.clearTimeout(t))
     }
   }, [])
 
-  // === Estado de autenticación (sin parpadeos) ===
+  // ✅ Lógica de Auth mejorada para evitar parpadeos
   useEffect(() => {
+    // Si useAuth no ha terminado de hidratar, seguimos en 'checking'
+    if (!hydrated) return
+
     if (session && account?.id) {
       setAuthStatus('authenticated')
-    } else if (session === null || account === null) {
+    } else {
       setAuthStatus('anonymous')
     }
-  }, [session, account])
+  }, [session, account, hydrated])
 
-  // === Carga inicial de favoritas (solo si autenticado) ===
   useEffect(() => {
     let cancelled = false
-
     if (authStatus === 'checking') return
-
-    if (authStatus === 'anonymous') {
-      setItems([])
-      setLoading(false)
-      setError(null)
-      return
-    }
+    if (authStatus === 'anonymous') { setItems([]); setLoading(false); return }
 
     const load = async () => {
       if (!session || !account?.id) return
-
       setLoading(true)
-      setError(null)
-
       try {
         const data = await fetchFavoritesForUser(account.id, session)
-        if (cancelled) return
-        const baseItems = Array.isArray(data) ? data : []
-        setItems(baseItems)
-
-        // reset ratings lazy al recargar colección
-        setImdbRatings({})
-        imdbRatingsRef.current = {}
-        imdbInFlightRef.current = new Set()
-        imdbTimersRef.current = {}
-        imdbIdCacheRef.current = {}
+        if (!cancelled) setItems(Array.isArray(data) ? data : [])
       } catch (err) {
-        if (cancelled) return
-        console.error(err)
-        setItems([])
-        setError('No se han podido cargar tus favoritas. Inténtalo de nuevo más tarde.')
+        if (!cancelled) setError('Error cargando favoritos.')
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
-
     load()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [authStatus, session, account])
 
-  // ✅ Prefetch IMDb rating SOLO en hover/focus
   const prefetchImdb = useCallback(async (item) => {
-    if (!item?.id) return
-    if (typeof window === 'undefined') return
-
+    if (!item?.id || typeof window === 'undefined') return
     const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
     const key = `${mediaType}:${item.id}`
+    if (imdbRatingsRef.current?.[key] !== undefined || imdbInFlightRef.current.has(key)) return
 
-    // si ya tenemos valor (incluido null), no repetir
-    if (imdbRatingsRef.current?.[key] !== undefined) return
-    if (imdbInFlightRef.current.has(key)) return
-    if (imdbTimersRef.current[key]) return
-
-    // pequeño delay por si solo “roza” el cursor
     imdbTimersRef.current[key] = window.setTimeout(async () => {
       try {
         imdbInFlightRef.current.add(key)
-
-        // 1) resolver imdbId (cacheado)
-        let imdbId = imdbIdCacheRef.current?.[key] || null
+        let imdbId = imdbIdCacheRef.current?.[key]
         if (!imdbId) {
           const ext = await getExternalIds(mediaType, item.id)
-          imdbId = ext?.imdb_id || null
+          imdbId = ext?.imdb_id
           if (imdbId) imdbIdCacheRef.current[key] = imdbId
         }
-
         if (!imdbId) {
-          if (!unmountedRef.current) setImdbRatings((prev) => ({ ...prev, [key]: null }))
+          if (!unmountedRef.current) setImdbRatings(p => ({ ...p, [key]: null }))
           return
         }
-
-        // 2) sessionStorage cache
         const cached = readOmdbCache(imdbId)
         if (cached?.imdbRating != null) {
-          if (!unmountedRef.current) setImdbRatings((prev) => ({ ...prev, [key]: cached.imdbRating }))
+          if (!unmountedRef.current) setImdbRatings(p => ({ ...p, [key]: cached.imdbRating }))
           if (cached?.fresh) return
         }
-
-        // 3) OMDb
         const omdb = await fetchOmdbByImdb(imdbId)
-        const r =
-          omdb?.imdbRating && omdb.imdbRating !== 'N/A'
-            ? Number(omdb.imdbRating)
-            : null
-
-        const safe = Number.isFinite(r) ? r : null
-
-        if (!unmountedRef.current) setImdbRatings((prev) => ({ ...prev, [key]: safe }))
-        writeOmdbCache(imdbId, { imdbRating: safe })
+        const r = omdb?.imdbRating && omdb.imdbRating !== 'N/A' ? Number(omdb.imdbRating) : null
+        if (!unmountedRef.current) setImdbRatings(p => ({ ...p, [key]: r }))
+        writeOmdbCache(imdbId, { imdbRating: r })
       } catch {
-        if (!unmountedRef.current) setImdbRatings((prev) => ({ ...prev, [key]: null }))
+        if (!unmountedRef.current) setImdbRatings(p => ({ ...p, [key]: null }))
       } finally {
         imdbInFlightRef.current.delete(key)
-        if (imdbTimersRef.current[key]) {
-          window.clearTimeout(imdbTimersRef.current[key])
-          delete imdbTimersRef.current[key]
-        }
       }
-    }, 180)
+    }, 150)
   }, [])
 
-  // === Lista filtrada/ordenada ===
   const processedItems = useMemo(() => {
     let list = [...items]
-
-    if (typeFilter !== 'all') {
-      list = list.filter((item) => item.media_type === typeFilter)
-    }
-
+    if (typeFilter !== 'all') list = list.filter((i) => i.media_type === typeFilter)
     if (yearFilter.trim()) {
-      list = list.filter((item) => {
-        const isMovie = item.media_type === 'movie'
-        const date = isMovie ? item.release_date : item.first_air_date
-        if (!date) return false
-        return date.slice(0, 4) === yearFilter.trim()
+      list = list.filter((i) => {
+        const date = i.media_type === 'movie' ? i.release_date : i.first_air_date
+        return date && date.slice(0, 4) === yearFilter.trim()
       })
     }
-
     list.sort((a, b) => {
-      const isMovieA = a.media_type === 'movie'
-      const isMovieB = b.media_type === 'movie'
-      const dateA = isMovieA ? a.release_date : a.first_air_date
-      const dateB = isMovieB ? b.release_date : b.first_air_date
+      const dateA = a.media_type === 'movie' ? a.release_date : a.first_air_date
+      const dateB = b.media_type === 'movie' ? b.release_date : b.first_air_date
       const yearA = dateA ? parseInt(dateA.slice(0, 4)) : 0
       const yearB = dateB ? parseInt(dateB.slice(0, 4)) : 0
-      const ratingA = typeof a.vote_average === 'number' ? a.vote_average : 0
-      const ratingB = typeof b.vote_average === 'number' ? b.vote_average : 0
-      const titleA = (isMovieA ? a.title : a.name || '').toLowerCase()
-      const titleB = (isMovieB ? b.title : b.name || '').toLowerCase()
+      const titleA = (a.title || a.name || '').toLowerCase()
+      const titleB = (b.title || b.name || '').toLowerCase()
 
       switch (sortBy) {
-        case 'year_desc':
-          return yearB - yearA
-        case 'year_asc':
-          return yearA - yearB
-        case 'rating_desc':
-          return ratingB - ratingA
-        case 'rating_asc':
-          return ratingA - ratingB
-        case 'title_desc':
-          return titleB.localeCompare(titleA)
-        case 'title_asc':
-        default:
-          return titleA.localeCompare(titleB)
+        case 'year_desc': return yearB - yearA
+        case 'year_asc': return yearA - yearB
+        case 'rating_desc': return (b.vote_average || 0) - (a.vote_average || 0)
+        case 'rating_asc': return (a.vote_average || 0) - (b.vote_average || 0)
+        case 'title_desc': return titleB.localeCompare(titleA)
+        default: return titleA.localeCompare(titleB)
       }
     })
     return list
   }, [items, typeFilter, yearFilter, sortBy])
 
-  // === 1) Usuario anónimo ===
+  // ✅ MOSTRAR LOADER MIENTRAS VERIFICAMOS SESIÓN (Evita parpadeo de Login)
+  if (authStatus === 'checking') {
+    return (
+      <div className="min-h-screen bg-[#101010] flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-red-500" />
+      </div>
+    )
+  }
+
   if (authStatus === 'anonymous') {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-12 flex flex-col items-center justify-center min-h-[50vh] text-center">
+      <div className="max-w-7xl mx-auto px-4 py-20 flex flex-col items-center justify-center min-h-[60vh] text-center">
         <Heart className="w-16 h-16 text-neutral-700 mb-4" />
         <h1 className="text-3xl font-bold text-white mb-2">Favoritas</h1>
-        <p className="text-neutral-400 max-w-md">
-          Inicia sesión para acceder a tu colección personal de películas y series favoritas.
-        </p>
-        <Link
-          href="/login"
-          className="mt-6 px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-neutral-200 transition-colors"
-        >
+        <p className="text-neutral-400 mb-6">Inicia sesión para ver tu colección.</p>
+        <Link href="/login" className="px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-neutral-200">
           Iniciar Sesión
         </Link>
       </div>
     )
   }
 
-  const isInitialLoading = authStatus === 'checking' || loading
-
   return (
-    <div className="min-h-screen bg-[#101010] text-gray-100 font-sans">
-      <div className="max-w-[1600px] mx-auto px-4 py-12">
-        {/* Cabecera + Filtros */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-red-500/10 rounded-full">
-              <Heart className="w-6 h-6 text-red-500 fill-current" />
+    <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-red-500/30">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] left-1/4 w-[600px] h-[600px] bg-red-600/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-1/4 w-[500px] h-[500px] bg-indigo-600/5 rounded-full blur-[100px]" />
+      </div>
+
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-500/10 rounded-2xl border border-red-500/20">
+              <Heart className="w-8 h-8 text-red-500 fill-current" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-white">Favoritas</h1>
-              <p className="text-sm text-neutral-400">{items.length} títulos guardados</p>
+              <h1 className="text-4xl font-black text-white tracking-tight">Favoritas</h1>
+              <p className="text-neutral-400 mt-1 font-medium">{items.length} títulos guardados</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Filtro Tipo */}
-            <div className="bg-neutral-900 border border-neutral-800 p-1 rounded-lg flex gap-1">
-              {['all', 'movie', 'tv'].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setTypeFilter(type)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${typeFilter === type
-                    ? 'bg-neutral-800 text-white shadow-sm'
-                    : 'text-neutral-400 hover:text-neutral-200'
-                    }`}
-                >
-                  {type === 'all' ? 'Todo' : type === 'movie' ? 'Películas' : 'Series'}
-                </button>
-              ))}
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full xl:w-auto">
+            <Dropdown label="Tipo" valueLabel={typeFilter === 'all' ? 'Todo' : typeFilter === 'movie' ? 'Películas' : 'Series'} icon={Film}>
+              {({ close }) => (
+                <>
+                  <DropdownItem active={typeFilter === 'all'} onClick={() => { setTypeFilter('all'); close() }}>Todo</DropdownItem>
+                  <DropdownItem active={typeFilter === 'movie'} onClick={() => { setTypeFilter('movie'); close() }}>Películas</DropdownItem>
+                  <DropdownItem active={typeFilter === 'tv'} onClick={() => { setTypeFilter('tv'); close() }}>Series</DropdownItem>
+                </>
+              )}
+            </Dropdown>
 
-            {/* Filtro Año */}
-            <input
-              type="number"
-              placeholder="Año..."
-              value={yearFilter}
-              onChange={(e) => setYearFilter(e.target.value)}
-              className="h-10 w-24 px-3 bg-neutral-900 border border-neutral-800 rounded-lg text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600 transition-colors"
-            />
+            <Dropdown label="Ordenar" valueLabel={sortBy.includes('year') ? 'Año' : sortBy.includes('rating') ? 'Nota' : 'Título'} icon={ArrowUpDown}>
+              {({ close }) => (
+                <>
+                  <DropdownItem active={sortBy === 'rating_desc'} onClick={() => { setSortBy('rating_desc'); close() }}>Nota (+ a -)</DropdownItem>
+                  <DropdownItem active={sortBy === 'year_desc'} onClick={() => { setSortBy('year_desc'); close() }}>Año (Reciente)</DropdownItem>
+                  <DropdownItem active={sortBy === 'year_asc'} onClick={() => { setSortBy('year_asc'); close() }}>Año (Antiguo)</DropdownItem>
+                  <DropdownItem active={sortBy === 'title_asc'} onClick={() => { setSortBy('title_asc'); close() }}>A - Z</DropdownItem>
+                </>
+              )}
+            </Dropdown>
 
-            {/* Ordenar Por */}
-            <div className="relative">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="h-10 pl-3 pr-8 bg-neutral-900 border border-neutral-800 rounded-lg text-sm text-white focus:outline-none focus:border-neutral-600 appearance-none cursor-pointer min-w-[140px] transition-colors"
-              >
-                <option value="rating_desc">Más valoradas</option>
-                <option value="rating_asc">Menos valoradas</option>
-                <option value="year_desc">Más recientes</option>
-                <option value="year_asc">Más antiguas</option>
-                <option value="title_asc">A - Z</option>
-                <option value="title_desc">Z - A</option>
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
+            <div className="col-span-2 sm:col-span-2 relative group">
+              <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">Año</div>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-zinc-300 transition-colors" />
+                <input
+                  type="number"
+                  placeholder="Filtrar por año..."
+                  value={yearFilter}
+                  onChange={(e) => setYearFilter(e.target.value)}
+                  className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-all"
+                />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Contenido / Grid / Estados */}
-        {isInitialLoading ? (
-          <div className="flex items-center justify-center py-20 min-h-[50vh] gap-3">
-            <Loader2 className="w-6 h-6 animate-spin text-yellow-500" />
-            <span className="text-neutral-300 text-lg">Cargando tu colección...</span>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-32">
+            <Loader2 className="w-10 h-10 animate-spin text-red-500 mb-4" />
+            <span className="text-neutral-500 text-sm font-medium animate-pulse">Cargando tu colección...</span>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-red-700 rounded-xl bg-red-950/20">
-            <FilmIcon className="w-12 h-12 text-red-500 mb-3" />
-            <p className="text-red-400 text-lg mb-2">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-2 px-4 py-2 text-sm font-semibold rounded-full bg-red-500 text-white hover:bg-red-400 transition-colors"
-            >
-              Reintentar
-            </button>
-          </div>
+          <div className="text-center py-20 text-red-400">{error}</div>
         ) : processedItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-neutral-800 rounded-xl bg-neutral-900/20">
-            <FilmIcon className="w-12 h-12 text-neutral-600 mb-3" />
-            <p className="text-neutral-400 text-lg">No se encontraron resultados con estos filtros.</p>
-            <button
-              onClick={() => {
-                setTypeFilter('all')
-                setYearFilter('')
-                setSortBy('rating_desc')
-              }}
-              className="mt-4 text-sm text-yellow-500 hover:underline"
-            >
-              Limpiar filtros
-            </button>
+          <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
+            <FilterX className="w-16 h-16 text-neutral-700 mb-4" />
+            <h3 className="text-xl font-bold text-neutral-300">Sin resultados</h3>
+            <button onClick={() => { setTypeFilter('all'); setYearFilter(''); setSortBy('rating_desc') }} className="mt-4 text-sm text-red-500 font-bold hover:underline">Limpiar filtros</button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6">
             {processedItems.map((item) => {
               const isMovie = item.media_type === 'movie'
               const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
               const href = `/details/${mediaType}/${item.id}`
               const title = isMovie ? item.title : item.name
-
+              const date = isMovie ? item.release_date : item.first_air_date
+              const year = date ? date.slice(0, 4) : ''
               const imdbKey = `${mediaType}:${item.id}`
               const imdbScore = imdbRatings[imdbKey]
 
@@ -534,38 +446,48 @@ export default function FavoritesPage() {
                 <Link
                   key={`${mediaType}-${item.id}`}
                   href={href}
-                  className="group block relative"
+                  className="group block relative w-full h-full"
                   title={title}
                   onMouseEnter={() => prefetchImdb(item)}
                   onFocus={() => prefetchImdb(item)}
                 >
-                  <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-neutral-900 shadow-xl group-hover:shadow-emerald-900/30 group-hover:shadow-2xl transition-all duration-500 ease-out group-hover:-translate-y-2 z-0 border border-white/5 group-hover:border-white/20">
+                  <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] z-0">
                     <SmartPoster item={item} title={title} />
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
 
-                    <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider text-white/90 border border-white/10 shadow-lg z-10">
-                      {isMovie ? <FilmIcon className="w-3 h-3" /> : <TvIcon className="w-3 h-3" />}
-                    </div>
+                      <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
 
-                    <div className="absolute bottom-2 right-2 flex flex-row-reverse items-center gap-1 transform-gpu opacity-0 translate-y-2 translate-x-2 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300 ease-out z-10">
-                      {item.vote_average > 0 && (
-                        <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-emerald-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-75 group-hover:scale-110 group-hover:translate-y-0">
-                          <img src="/logo-TMDb.png" alt="TMDb" className="w-auto h-3" />
-                          <span className="text-emerald-400 text-[10px] font-bold font-mono">
-                            {item.vote_average.toFixed(1)}
-                          </span>
+                        <span className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'}`}>
+                          {isMovie ? 'PELÍCULA' : 'SERIE'}
+                        </span>
+
+                        <div className="flex flex-col items-end gap-1">
+                          {item.vote_average > 0 && (
+                            <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                              <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">{item.vote_average.toFixed(1)}</span>
+                              <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
+                            </div>
+                          )}
+                          {typeof imdbScore === 'number' && imdbScore > 0 && (
+                            <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                              <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">{imdbScore.toFixed(1)}</span>
+                              <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
 
-                      {typeof imdbScore === 'number' && imdbScore > 0 && (
-                        <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-yellow-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-150 group-hover:scale-110 group-hover:translate-y-0">
-                          <img src="/logo-IMDb.png" alt="IMDb" className="w-auto h-3" />
-                          <span className="text-yellow-400 text-[10px] font-bold font-mono">
-                            {Number(imdbScore).toFixed(1)}
-                          </span>
-                        </div>
-                      )}
+                      <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 text-left">
+                        <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-md">
+                          {title}
+                        </h3>
+                        {year && (
+                          <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
+                            {year}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </Link>
