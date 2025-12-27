@@ -1,5 +1,7 @@
+// /src/app/api/trakt/auth/callback/route.js
 import { NextResponse } from "next/server"
 import { cookies, headers } from "next/headers"
+import { setTraktCookies, clearTraktCookies } from "@/lib/trakt/server"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -30,9 +32,10 @@ export async function GET(req) {
     const origin = originFromHeaders()
     const redirectUri = `${origin}/api/trakt/auth/callback`
 
-    const tokenRes = await fetch("https://trakt.tv/oauth/token", {
+    const tokenRes = await fetch("https://api.trakt.tv/oauth/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({
             code,
             client_id: clientId,
@@ -42,26 +45,39 @@ export async function GET(req) {
         }),
     })
 
-    const tokenJson = await tokenRes.json()
-    if (!tokenRes.ok) {
+    const tokenJson = await tokenRes.json().catch(() => null)
+    if (!tokenRes.ok || !tokenJson?.access_token) {
         return NextResponse.json(
-            { error: "Token exchange failed", details: tokenJson },
+            { error: "Token exchange failed", details: tokenJson || {} },
             { status: 500 }
         )
     }
 
-    // Guardamos tokens en cookie (simple y funciona en Vercel).
-    // Si ya lo haces distinto, adapta pero NO uses filesystem.
-    cookies().set("trakt_tokens", Buffer.from(JSON.stringify(tokenJson)).toString("base64"), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: origin.startsWith("https://"),
-        path: "/",
-        maxAge: 60 * 60 * 24 * 365,
+    // ✅ calcular expires_at_ms como espera tu lib
+    const createdAtSec = Number(tokenJson.created_at || 0)
+    const expiresInSec = Number(tokenJson.expires_in || 0)
+    const expiresAtMs = (createdAtSec + expiresInSec) * 1000
+
+    const res = NextResponse.redirect(`${origin}/history`)
+
+    // ✅ guarda cookies correctas (las que usa status/history/item/watched)
+    setTraktCookies(res, {
+        access_token: tokenJson.access_token,
+        refresh_token: tokenJson.refresh_token,
+        expires_at_ms: expiresAtMs,
     })
 
-    cookies().delete("trakt_oauth_state")
+    // ✅ limpia state
+    res.cookies.set("trakt_oauth_state", "", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 0,
+    })
 
-    // Vuelve a Historial (o donde quieras)
-    return NextResponse.redirect(`${origin}/history`)
+    // (opcional) limpia cualquier cookie antigua que tengas
+    // res.cookies.set("trakt_tokens", "", { path: "/", maxAge: 0 })
+
+    return res
 }

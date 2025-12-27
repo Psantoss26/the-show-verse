@@ -1,3 +1,4 @@
+// /src/lib/api/traktClient.js
 async function safeJson(res) {
     try {
         return await res.json()
@@ -38,13 +39,13 @@ function normalizeWatchedAtForApi(input) {
 }
 
 export async function traktAuthStatus() {
-    const res = await fetch('/api/trakt/auth/status', { cache: 'no-store' })
+    const res = await fetch('/api/trakt/auth/status', { cache: 'no-store', credentials: 'include' })
     const json = await safeJson(res)
     return json || { connected: false }
 }
 
 export async function traktDisconnect() {
-    const res = await fetch('/api/trakt/auth/disconnect', { method: 'POST' })
+    const res = await fetch('/api/trakt/auth/disconnect', { method: 'POST', credentials: 'include' })
     const json = await safeJson(res)
     if (!res.ok) throw new Error(json?.error || 'Disconnect failed')
     return json
@@ -52,7 +53,7 @@ export async function traktDisconnect() {
 
 export async function traktGetItemStatus({ type, tmdbId }) {
     const url = `/api/trakt/item/status?type=${encodeURIComponent(type)}&tmdbId=${encodeURIComponent(tmdbId)}`
-    const res = await fetch(url, { cache: 'no-store' })
+    const res = await fetch(url, { cache: 'no-store', credentials: 'include' })
     const json = await safeJson(res)
     if (!res.ok) throw new Error(json?.error || `Trakt status HTTP ${res.status}`)
     return json
@@ -68,6 +69,7 @@ export async function traktSetWatched({ type, tmdbId, watched, watchedAt }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        credentials: 'include'
     })
 
     const json = await safeJson(res)
@@ -87,7 +89,8 @@ export async function traktHistoryOp({ op, type, tmdbId, watchedAt, historyId })
     const res = await fetch('/api/trakt/item/history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        credentials: 'include'
     })
 
     const json = await safeJson(res)
@@ -118,7 +121,7 @@ export async function traktGetHistory({ type = 'all', from, to, page = 1, limit 
     if (from) qs.set('from', from)
     if (to) qs.set('to', to)
 
-    const res = await fetch(`/api/trakt/history?${qs.toString()}`, { cache: 'no-store' })
+    const res = await fetch(`/api/trakt/history?${qs.toString()}`, { cache: 'no-store', credentials: 'include' })
     const json = await safeJson(res)
     if (!res.ok) throw new Error(json?.error || `Trakt history HTTP ${res.status}`)
     return json
@@ -127,7 +130,8 @@ export async function traktGetHistory({ type = 'all', from, to, page = 1, limit 
 /** ✅ NUEVO/CLAVE: carga episodios vistos por show (SIN especiales) */
 export async function traktGetShowWatched({ tmdbId }) {
     const res = await fetch(`/api/trakt/show/watched?tmdbId=${encodeURIComponent(tmdbId)}`, {
-        cache: 'no-store'
+        cache: 'no-store',
+        credentials: 'include'
     })
     const json = await safeJson(res)
     if (!res.ok) throw new Error(json?.error || `Trakt show watched HTTP ${res.status}`)
@@ -144,7 +148,8 @@ export async function traktSetEpisodeWatched({ tmdbId, season, episode, watched,
     const res = await fetch('/api/trakt/episode/watched', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        credentials: 'include'
     })
 
     const json = await safeJson(res)

@@ -42,10 +42,32 @@ export function tokenIsExpired(expiresAtMs) {
 }
 
 export function readTraktCookies(cookieStore) {
-    const accessToken = cookieStore.get('trakt_access_token')?.value || null
-    const refreshToken = cookieStore.get('trakt_refresh_token')?.value || null
-    const expiresAtMs = cookieStore.get('trakt_expires_at')?.value || null
-    return { accessToken, refreshToken, expiresAtMs: expiresAtMs ? Number(expiresAtMs) : null }
+    let accessToken = cookieStore.get('trakt_access_token')?.value || null
+    let refreshToken = cookieStore.get('trakt_refresh_token')?.value || null
+    let expiresAtMs = cookieStore.get('trakt_expires_at')?.value || null
+
+    // ✅ BACKCOMPAT: cookie antigua trakt_tokens (base64 JSON)
+    if (!accessToken && !refreshToken) {
+        const legacy = cookieStore.get('trakt_tokens')?.value || null
+        if (legacy) {
+            try {
+                const json = JSON.parse(Buffer.from(legacy, 'base64').toString('utf8'))
+                accessToken = json?.access_token || null
+                refreshToken = json?.refresh_token || null
+
+                const createdAtSec = Number(json?.created_at || 0)
+                const expiresInSec = Number(json?.expires_in || 0)
+                const exp = (createdAtSec + expiresInSec) * 1000
+                if (Number.isFinite(exp) && exp > 0) expiresAtMs = exp
+            } catch { }
+        }
+    }
+
+    return {
+        accessToken,
+        refreshToken,
+        expiresAtMs: expiresAtMs ? Number(expiresAtMs) : null
+    }
 }
 
 export function setTraktCookies(res, tokens) {
