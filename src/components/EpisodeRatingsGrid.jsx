@@ -192,7 +192,7 @@ export default function EpisodeRatingsGrid({
   const { ref: inViewRef, inView } = useInViewOnce('450px')
 
   // Controles estilo SeriesGraph
-  const [layoutMode, setLayoutMode] = useState('wrapped') // 'grid' | 'wrapped'
+  const [layoutMode, setLayoutMode] = useState('grid') // 'grid' | 'wrapped'
   const userPickedLayoutRef = useRef(false)
 
   const [inverted, setInverted] = useState(false)

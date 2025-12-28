@@ -1,13 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useConfirm, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import 'swiper/swiper-bundle.css'
+
 import useTmdbLists from '@/lib/hooks/useTmdbLists'
 import { getListDetails } from '@/lib/api/tmdbLists'
 import { getExternalIds } from '@/lib/api/tmdb'
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
 import { useAuth } from '@/context/AuthContext'
+
 import {
     Loader2,
     Plus,
@@ -35,7 +39,7 @@ const readOmdbCache = (imdbId) => {
         const raw = window.sessionStorage.getItem(`showverse:omdb:${imdbId}`)
         if (!raw) return null
         const parsed = JSON.parse(raw)
-        return { ...parsed, fresh: (Date.now() - (parsed?.t || 0)) < OMDB_CACHE_TTL_MS }
+        return { ...parsed, fresh: Date.now() - (parsed?.t || 0) < OMDB_CACHE_TTL_MS }
     } catch {
         return null
     }
@@ -46,12 +50,49 @@ const writeOmdbCache = (imdbId, patch) => {
         const prev = readOmdbCache(imdbId) || {}
         const next = { t: Date.now(), imdbRating: patch?.imdbRating ?? prev?.imdbRating ?? null }
         window.sessionStorage.setItem(`showverse:omdb:${imdbId}`, JSON.stringify(next))
-    } catch { }
+    } catch {
+        // ignore
+    }
+}
+
+/* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
+const useIsMobileLayout = (breakpointPx = 768) => {
+    const [isMobile, setIsMobile] = useState(() => {
+        if (typeof window === 'undefined') return false
+        return window.matchMedia(`(max-width:${breakpointPx - 1}px)`).matches
+    })
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+
+        const mq = window.matchMedia(`(max-width:${breakpointPx - 1}px)`)
+        const update = () => setIsMobile(mq.matches)
+        update()
+
+        if (mq.addEventListener) mq.addEventListener('change', update)
+        else mq.addListener(update)
+
+        window.addEventListener('orientationchange', update)
+        window.addEventListener('resize', update)
+
+        return () => {
+            if (mq.removeEventListener) mq.removeEventListener('change', update)
+            else mq.removeListener(update)
+
+            window.removeEventListener('orientationchange', update)
+            window.removeEventListener('resize', update)
+        }
+    }, [breakpointPx])
+
+    return isMobile
 }
 
 function TmdbImg({ filePath, size = 'w780', alt, className = '' }) {
     const [failed, setFailed] = useState(false)
-    useEffect(() => { setFailed(false) }, [filePath])
+    useEffect(() => {
+        setFailed(false)
+    }, [filePath])
+
     if (!filePath || failed) {
         return (
             <div className={`bg-zinc-900 flex items-center justify-center ${className}`}>
@@ -59,6 +100,7 @@ function TmdbImg({ filePath, size = 'w780', alt, className = '' }) {
             </div>
         )
     }
+
     return (
         <img
             src={`https://image.tmdb.org/t/p/${size}${filePath}`}
@@ -67,6 +109,7 @@ function TmdbImg({ filePath, size = 'w780', alt, className = '' }) {
             loading="lazy"
             decoding="async"
             draggable={false}
+            onDragStart={(e) => e.preventDefault()}
             onError={() => setFailed(true)}
         />
     )
@@ -106,10 +149,18 @@ function ListCoverBackdropCollage({ items = [], alt = '' }) {
         return (
             <div className="w-full h-full grid grid-cols-2 gap-0.5">
                 <div className="overflow-hidden h-full">
-                    <TmdbImg filePath={backdrops[0]} alt={alt} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <TmdbImg
+                        filePath={backdrops[0]}
+                        alt={alt}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
                 </div>
                 <div className="overflow-hidden h-full">
-                    <TmdbImg filePath={backdrops[1]} alt={alt} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <TmdbImg
+                        filePath={backdrops[1]}
+                        alt={alt}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
                 </div>
             </div>
         )
@@ -119,13 +170,25 @@ function ListCoverBackdropCollage({ items = [], alt = '' }) {
         return (
             <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
                 <div className="row-span-2 overflow-hidden h-full">
-                    <TmdbImg filePath={backdrops[0]} alt={alt} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <TmdbImg
+                        filePath={backdrops[0]}
+                        alt={alt}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
                 </div>
                 <div className="overflow-hidden w-full h-full">
-                    <TmdbImg filePath={backdrops[1]} alt={alt} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <TmdbImg
+                        filePath={backdrops[1]}
+                        alt={alt}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
                 </div>
                 <div className="overflow-hidden w-full h-full">
-                    <TmdbImg filePath={backdrops[2]} alt={alt} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <TmdbImg
+                        filePath={backdrops[2]}
+                        alt={alt}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
                 </div>
             </div>
         )
@@ -135,7 +198,11 @@ function ListCoverBackdropCollage({ items = [], alt = '' }) {
         <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
             {backdrops.slice(0, 4).map((p, i) => (
                 <div key={`${p}-${i}`} className="overflow-hidden w-full h-full relative">
-                    <TmdbImg filePath={p} alt={alt} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <TmdbImg
+                        filePath={p}
+                        alt={alt}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
                 </div>
             ))}
         </div>
@@ -148,7 +215,9 @@ function Dropdown({ valueLabel, icon: Icon, children, className = '' }) {
 
     useEffect(() => {
         if (!open) return
-        const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+        const onDown = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+        }
         document.addEventListener('pointerdown', onDown)
         return () => document.removeEventListener('pointerdown', onDown)
     }, [open])
@@ -190,7 +259,7 @@ function DropdownItem({ active, onClick, children }) {
             type="button"
             onClick={onClick}
             className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between
-      ${active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
+        ${active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
         >
             <span className="font-medium">{children}</span>
             {active && <CheckCircle2 className="w-3.5 h-3.5 text-purple-500" />}
@@ -250,7 +319,11 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
                             Cancelar
                         </button>
                         <button
-                            onClick={() => { onCreate(name, desc); setName(''); setDesc('') }}
+                            onClick={() => {
+                                onCreate(name, desc)
+                                setName('')
+                                setDesc('')
+                            }}
                             disabled={creating || !name.trim()}
                             className="flex-1 py-3 rounded-xl font-bold text-sm bg-purple-600 text-white hover:bg-purple-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
@@ -263,122 +336,21 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
     )
 }
 
-// --- DRAGGABLE HORIZONTAL SCROLLER (desktop) ---
-function DraggableRow({ children }) {
-    const ref = useRef(null)
-    const pointer = useRef({
-        down: false,
-        startX: 0,
-        startLeft: 0,
-        moved: false,
-        pointerId: null
-    })
-    const recentDragTs = useRef(0)
-
-    const onPointerDown = (e) => {
-        // solo habilitar “drag to scroll” con ratón (en móvil ya arrastras nativo)
-        if (e.pointerType !== 'mouse') return
-        const el = ref.current
-        if (!el) return
-
-        pointer.current.down = true
-        pointer.current.pointerId = e.pointerId
-        pointer.current.startX = e.clientX
-        pointer.current.startLeft = el.scrollLeft
-        pointer.current.moved = false
-
-        try { el.setPointerCapture(e.pointerId) } catch { }
-    }
-
-    const onPointerMove = (e) => {
-        if (e.pointerType !== 'mouse') return
-        const el = ref.current
-        if (!el) return
-        if (!pointer.current.down) return
-
-        const dx = e.clientX - pointer.current.startX
-        if (Math.abs(dx) > 4) pointer.current.moved = true
-        el.scrollLeft = pointer.current.startLeft - dx
-
-        if (pointer.current.moved) {
-            // evita selección de texto / drag fantasma
-            e.preventDefault()
-        }
-    }
-
-    const endDrag = (e) => {
-        if (e.pointerType !== 'mouse') return
-        const el = ref.current
-        if (!el) return
-        if (!pointer.current.down) return
-
-        pointer.current.down = false
-        if (pointer.current.moved) recentDragTs.current = Date.now()
-
-        try {
-            if (pointer.current.pointerId != null) el.releasePointerCapture(pointer.current.pointerId)
-        } catch { }
-        pointer.current.pointerId = null
-    }
-
-    const onClickCapture = (e) => {
-        // si acabamos de arrastrar, bloquea el click para que no abra la ficha
-        if (Date.now() - recentDragTs.current < 250) {
-            e.preventDefault()
-            e.stopPropagation()
-        }
-    }
-
-    const onWheel = (e) => {
-        // convierte scroll vertical en horizontal cuando el cursor está encima (mejor UX en desktop)
-        const el = ref.current
-        if (!el) return
-        const mostlyVertical = Math.abs(e.deltaY) > Math.abs(e.deltaX)
-        if (mostlyVertical && !e.shiftKey) {
-            el.scrollLeft += e.deltaY
-            e.preventDefault()
-        }
-    }
-
-    return (
-        <div
-            ref={ref}
-            className="
-        no-scrollbar
-        -mx-4 sm:-mx-6 lg:-mx-8
-        px-4 sm:px-6 lg:px-8
-        flex gap-3 sm:gap-4
-        overflow-x-auto overflow-y-hidden
-        pb-4
-        snap-x snap-mandatory md:snap-none
-        select-none
-        touch-pan-x
-        cursor-grab active:cursor-grabbing
-      "
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-            onPointerLeave={endDrag}
-            onClickCapture={onClickCapture}
-            onWheel={onWheel}
-        >
-            {children}
-        </div>
-    )
-}
-
-function ListItemCard({ item, className }) {
+function ListItemCard({ item }) {
     const [imdbScore, setImdbScore] = useState(null)
-    const title = item.title || item.name
-    const date = item.release_date || item.first_air_date
+
+    const title = item?.title || item?.name || '—'
+    const date = item?.release_date || item?.first_air_date
     const year = date ? date.slice(0, 4) : ''
-    const mediaType = item.media_type || 'movie'
+    const mediaType = item?.media_type || (item?.title ? 'movie' : 'tv')
     const href = `/details/${mediaType}/${item.id}`
 
+    const posterPath = item?.poster_path || item?.backdrop_path || null
+
     const prefetchImdb = useCallback(async () => {
-        if (!item.id) return
+        if (!item?.id) return
         const key = `${mediaType}:${item.id}`
+
         if (imdbRatingsCache.has(key)) {
             setImdbScore(imdbRatingsCache.get(key))
             return
@@ -386,8 +358,7 @@ function ListItemCard({ item, className }) {
 
         try {
             const ext = await getExternalIds(mediaType, item.id)
-            const imdbId = ext?.imdb_id
-
+            const imdbId = ext?.imdb_id || null
             if (!imdbId) return
 
             const cached = readOmdbCache(imdbId)
@@ -399,52 +370,70 @@ function ListItemCard({ item, className }) {
 
             const omdb = await fetchOmdbByImdb(imdbId)
             const r = omdb?.imdbRating && omdb.imdbRating !== 'N/A' ? Number(omdb.imdbRating) : null
-            if (Number.isFinite(r) && r > 0) {
-                setImdbScore(r)
-                imdbRatingsCache.set(key, r)
-                writeOmdbCache(imdbId, { imdbRating: r })
+            const safe = Number.isFinite(r) ? r : null
+
+            if (safe) {
+                setImdbScore(safe)
+                imdbRatingsCache.set(key, safe)
+                writeOmdbCache(imdbId, { imdbRating: safe })
             }
-        } catch { }
+        } catch {
+            // ignore
+        }
     }, [item, mediaType])
 
-    // ✅ IMPORTANT: usar group con nombre para que NO se active el hover de toda la fila
     return (
         <Link
             href={href}
-            className={`block group/card relative shrink-0 snap-start ${className}`}
+            className="block group/card relative w-full select-none"
             onMouseEnter={prefetchImdb}
             onFocus={prefetchImdb}
-            title={title}
+            draggable={false}
         >
-            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover/card:shadow-[0_0_25px_rgba(255,255,255,0.08)] group-hover/card:scale-[1.03]">
+            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-lg ring-1 ring-white/5 transition-transform duration-300 group-hover/card:scale-[1.02]">
                 <TmdbImg
-                    filePath={item.poster_path}
+                    filePath={posterPath}
                     size="w500"
                     alt={title}
-                    className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover/card:scale-110"
+                    className="w-full h-full object-cover"
                 />
 
-                <div className="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex flex-col justify-between pointer-events-none">
-                    <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-end items-start transform -translate-y-2 group-hover/card:translate-y-0 transition-transform duration-300">
-                        <div className="flex flex-col items-end gap-1">
-                            {item.vote_average > 0 && (
-                                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                    <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">{item.vote_average.toFixed(1)}</span>
-                                    <img src="/logo-TMDb.png" alt="TMDb" className="w-auto h-2.5 opacity-100" draggable={false} />
-                                </div>
-                            )}
-                            {typeof imdbScore === 'number' && imdbScore > 0 && (
-                                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                    <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">{imdbScore.toFixed(1)}</span>
-                                    <img src="/logo-IMDb.png" alt="IMDb" className="w-auto h-2.5 opacity-100" draggable={false} />
-                                </div>
-                            )}
-                        </div>
+                {/* overlay SOLO para esta card (group/card) + pointer-events-none para no “bloquear” el drag */}
+                <div className="pointer-events-none absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+
+                    {/* ratings arriba derecha */}
+                    <div className="absolute top-2 right-2 flex flex-col items-end gap-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
+                        {typeof item?.vote_average === 'number' && item.vote_average > 0 && (
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-emerald-300 text-[11px] font-black font-mono tracking-tight">
+                                    {item.vote_average.toFixed(1)}
+                                </span>
+                                <img src="/logo-TMDb.png" alt="TMDb" className="w-auto h-2.5" draggable={false} />
+                            </div>
+                        )}
+                        {typeof imdbScore === 'number' && imdbScore > 0 && (
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-yellow-300 text-[11px] font-black font-mono tracking-tight">
+                                    {imdbScore.toFixed(1)}
+                                </span>
+                                <img src="/logo-IMDb.png" alt="IMDb" className="w-auto h-2.5" draggable={false} />
+                            </div>
+                        )}
                     </div>
 
-                    <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover/card:translate-y-0 transition-transform duration-300 text-left">
-                        <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-md">{title}</h3>
-                        {year && <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">{year}</p>}
+                    {/* título + año */}
+                    <div className="absolute inset-x-0 bottom-0 p-3">
+                        <div className="flex items-end justify-between gap-3">
+                            <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2">
+                                {title}
+                            </h3>
+                            {year && (
+                                <span className="shrink-0 text-[10px] sm:text-xs font-black text-yellow-300">
+                                    {year}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -455,15 +444,62 @@ function ListItemCard({ item, className }) {
 function sortLists(lists, mode) {
     const arr = [...lists]
     switch (mode) {
-        case 'name_asc': return arr.sort((a, b) => (a?.name || '').localeCompare(b?.name || ''))
-        case 'name_desc': return arr.sort((a, b) => (b?.name || '').localeCompare(a?.name || ''))
-        case 'items_desc': return arr.sort((a, b) => (b?.item_count || 0) - (a?.item_count || 0))
-        case 'items_asc': return arr.sort((a, b) => (a?.item_count || 0) - (b?.item_count || 0))
-        default: return arr
+        case 'name_asc':
+            return arr.sort((a, b) => (a?.name || '').localeCompare(b?.name || ''))
+        case 'name_desc':
+            return arr.sort((a, b) => (b?.name || '').localeCompare(a?.name || ''))
+        case 'items_desc':
+            return arr.sort((a, b) => (b?.item_count || 0) - (a?.item_count || 0))
+        case 'items_asc':
+            return arr.sort((a, b) => (a?.item_count || 0) - (b?.item_count || 0))
+        default:
+            return arr
     }
 }
 
+/* ========= fila tipo Dashboard: drag con ratón + 3 completas en móvil ========= */
+function ListItemsRow({ items, isMobile }) {
+    if (!Array.isArray(items) || items.length === 0) return null
+
+    const breakpoints = {
+        0: { slidesPerView: 3, spaceBetween: 12 },
+        420: { slidesPerView: 3, spaceBetween: 12 },
+        640: { slidesPerView: 4, spaceBetween: 14 },
+        768: { slidesPerView: 6, spaceBetween: 14 },
+        1024: { slidesPerView: 8, spaceBetween: 16 },
+        1280: { slidesPerView: 8, spaceBetween: 18 }
+    }
+
+    return (
+        <div className="-mx-4 sm:mx-0">
+            <Swiper
+                slidesPerView={3}
+                spaceBetween={12}
+                breakpoints={breakpoints}
+                loop={false}
+                watchOverflow={true}
+                allowTouchMove={true}
+                simulateTouch={true}
+                grabCursor={!isMobile}
+                threshold={6}
+                preventClicks={true}
+                preventClicksPropagation={true}
+                className="px-4 sm:px-0 cursor-grab active:cursor-grabbing"
+            >
+                {items.map((item) => (
+                    <SwiperSlide key={`${item?.id}`} className="select-none">
+                        <ListItemCard item={item} />
+                    </SwiperSlide>
+                ))}
+            </Swiper>
+        </div>
+    )
+}
+
+// ================== MAIN PAGE ==================
 export default function ListsPage() {
+    const isMobile = useIsMobileLayout(768)
+
     const { canUse, lists, loading, error, refresh, loadMore, hasMore, create, del } = useTmdbLists()
     const { session, account } = useAuth()
 
@@ -472,24 +508,26 @@ export default function ListsPage() {
     const [creating, setCreating] = useState(false)
     const [query, setQuery] = useState('')
     const [sortMode, setSortMode] = useState('items_desc')
+    const [viewMode, setViewMode] = useState('rows') // ✅ por defecto como “Dashboard”
 
-    // ✅ por defecto en “filas”, como dashboards
-    const [viewMode, setViewMode] = useState('rows')
-
-    // Map: listId -> Array of items
+    // Map: listId -> Array of items (first page)
     const [itemsMap, setItemsMap] = useState({})
     const itemsMapRef = useRef(itemsMap)
     const inFlight = useRef(new Set())
     const runIdRef = useRef(0)
 
-    useEffect(() => { itemsMapRef.current = itemsMap }, [itemsMap])
+    useEffect(() => {
+        itemsMapRef.current = itemsMap
+    }, [itemsMap])
 
+    // ✅ Auth
     useEffect(() => {
         if (session === undefined) return
         if (session && account?.id) setAuthStatus('authenticated')
         else setAuthStatus('anonymous')
     }, [session, account])
 
+    // ✅ precargar items por lista (page 1)
     useEffect(() => {
         let cancelled = false
         const runId = ++runIdRef.current
@@ -533,7 +571,10 @@ export default function ListsPage() {
         }
 
         run()
-        return () => { cancelled = true; inFlight.current.clear() }
+        return () => {
+            cancelled = true
+            inFlight.current.clear()
+        }
     }, [lists])
 
     const filtered = useMemo(() => {
@@ -561,6 +602,7 @@ export default function ListsPage() {
         await del(listId)
     }
 
+    // loader auth
     if (authStatus === 'checking') {
         return (
             <div className="min-h-screen bg-[#101010] flex items-center justify-center">
@@ -577,8 +619,13 @@ export default function ListsPage() {
                         <ListVideo className="w-8 h-8 text-zinc-500" />
                     </div>
                     <h1 className="text-2xl font-bold text-white mb-3">Mis Listas</h1>
-                    <p className="text-zinc-400 mb-8">Inicia sesión con tu cuenta TMDb para gestionar tus listas personalizadas.</p>
-                    <Link href="/login" className="px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition">
+                    <p className="text-zinc-400 mb-8">
+                        Inicia sesión con tu cuenta TMDb para gestionar tus listas personalizadas.
+                    </p>
+                    <Link
+                        href="/login"
+                        className="px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition"
+                    >
                         Iniciar Sesión
                     </Link>
                 </div>
@@ -586,24 +633,15 @@ export default function ListsPage() {
         )
     }
 
-    // tamaños exactos para “3 completas” en móvil y “8 completas” en desktop
-    const cardSizeClass = `
-    w-[calc((100%-1.5rem)/3)] min-w-[calc((100%-1.5rem)/3)]
-    sm:w-[calc((100%-3rem)/4)] sm:min-w-[calc((100%-3rem)/4)]
-    md:w-[calc((100%-5rem)/6)] md:min-w-[calc((100%-5rem)/6)]
-    lg:w-[calc((100%-7rem)/8)] lg:min-w-[calc((100%-7rem)/8)]
-  `
-
     return (
-        <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30">
+        <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30 overflow-x-hidden">
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-[-10%] left-1/4 w-[600px] h-[600px] bg-purple-600/5 rounded-full blur-[120px]" />
                 <div className="absolute bottom-[-10%] right-1/4 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[100px]" />
             </div>
 
             <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-
-                {/* Header + Controls */}
+                {/* HEADER + CONTROLES */}
                 <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-purple-500/10 rounded-2xl border border-purple-500/20">
@@ -615,8 +653,8 @@ export default function ListsPage() {
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-between gap-3 bg-neutral-900/60 border border-white/5 p-2 rounded-2xl backdrop-blur-md w-full xl:w-auto">
-                        <div className="relative flex-1 min-w-[220px] max-w-md">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-neutral-900/60 border border-white/5 p-2 rounded-2xl backdrop-blur-md w-full xl:w-auto">
+                        <div className="relative flex-1 min-w-0 sm:min-w-[260px]">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                             <input
                                 value={query}
@@ -626,25 +664,34 @@ export default function ListsPage() {
                             />
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3 shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3">
                             <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 shrink-0">
                                 <button
                                     onClick={() => setViewMode('grid')}
-                                    className={`p-1.5 rounded-lg transition ${viewMode === 'grid' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    className={`p-1.5 rounded-lg transition ${viewMode === 'grid'
+                                        ? 'bg-zinc-700 text-white shadow'
+                                        : 'text-zinc-500 hover:text-zinc-300'
+                                        }`}
                                     title="Vista Cuadrícula"
                                 >
                                     <LayoutGrid className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => setViewMode('rows')}
-                                    className={`p-1.5 rounded-lg transition ${viewMode === 'rows' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    className={`p-1.5 rounded-lg transition ${viewMode === 'rows'
+                                        ? 'bg-zinc-700 text-white shadow'
+                                        : 'text-zinc-500 hover:text-zinc-300'
+                                        }`}
                                     title="Vista Filas"
                                 >
                                     <Rows className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => setViewMode('list')}
-                                    className={`p-1.5 rounded-lg transition ${viewMode === 'list' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    className={`p-1.5 rounded-lg transition ${viewMode === 'list'
+                                        ? 'bg-zinc-700 text-white shadow'
+                                        : 'text-zinc-500 hover:text-zinc-300'
+                                        }`}
                                     title="Vista Lista"
                                 >
                                     <StretchHorizontal className="w-4 h-4" />
@@ -658,10 +705,42 @@ export default function ListsPage() {
                             >
                                 {({ close }) => (
                                     <>
-                                        <DropdownItem active={sortMode === 'items_desc'} onClick={() => { setSortMode('items_desc'); close() }}>Más items</DropdownItem>
-                                        <DropdownItem active={sortMode === 'items_asc'} onClick={() => { setSortMode('items_asc'); close() }}>Menos items</DropdownItem>
-                                        <DropdownItem active={sortMode === 'name_asc'} onClick={() => { setSortMode('name_asc'); close() }}>Nombre (A-Z)</DropdownItem>
-                                        <DropdownItem active={sortMode === 'name_desc'} onClick={() => { setSortMode('name_desc'); close() }}>Nombre (Z-A)</DropdownItem>
+                                        <DropdownItem
+                                            active={sortMode === 'items_desc'}
+                                            onClick={() => {
+                                                setSortMode('items_desc')
+                                                close()
+                                            }}
+                                        >
+                                            Más items
+                                        </DropdownItem>
+                                        <DropdownItem
+                                            active={sortMode === 'items_asc'}
+                                            onClick={() => {
+                                                setSortMode('items_asc')
+                                                close()
+                                            }}
+                                        >
+                                            Menos items
+                                        </DropdownItem>
+                                        <DropdownItem
+                                            active={sortMode === 'name_asc'}
+                                            onClick={() => {
+                                                setSortMode('name_asc')
+                                                close()
+                                            }}
+                                        >
+                                            Nombre (A-Z)
+                                        </DropdownItem>
+                                        <DropdownItem
+                                            active={sortMode === 'name_desc'}
+                                            onClick={() => {
+                                                setSortMode('name_desc')
+                                                close()
+                                            }}
+                                        >
+                                            Nombre (Z-A)
+                                        </DropdownItem>
                                     </>
                                 )}
                             </Dropdown>
@@ -697,6 +776,7 @@ export default function ListsPage() {
                     )}
                 </AnimatePresence>
 
+                {/* CONTENT */}
                 {loading && lists.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-32">
                         <Loader2 className="w-10 h-10 animate-spin text-purple-500 mb-4" />
@@ -720,14 +800,18 @@ export default function ListsPage() {
                                                 <div className="aspect-video w-full bg-zinc-950 relative overflow-hidden group-hover:opacity-90 transition-opacity">
                                                     <ListCoverBackdropCollage items={items} alt={l.name} />
                                                     <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-60" />
-                                                    <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-bold text-white border border-white/10 flex items-center gap-1.5">
-                                                        <ListVideo className="w-3 h-3 text-purple-400" />
-                                                        {l.item_count}
+
+                                                    <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/10 flex items-center gap-2">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                                        {l.item_count} items
                                                     </div>
                                                 </div>
+
                                                 <div className="p-4 flex flex-col flex-1">
                                                     <div className="flex justify-between items-start gap-2">
-                                                        <h3 className="text-lg font-bold text-white leading-tight line-clamp-1 group-hover:text-purple-400 transition-colors">{l.name}</h3>
+                                                        <h3 className="text-lg font-bold text-white leading-tight line-clamp-1 group-hover:text-purple-400 transition-colors">
+                                                            {l.name}
+                                                        </h3>
                                                     </div>
                                                     <p className="text-sm text-zinc-400 mt-1 line-clamp-2 leading-relaxed flex-1">
                                                         {l.description || <span className="italic opacity-50">Sin descripción</span>}
@@ -752,61 +836,51 @@ export default function ListsPage() {
                             <div className="space-y-12">
                                 {filtered.map((l) => {
                                     const items = itemsMap[String(l.id)] || []
+
                                     return (
                                         <section key={l.id} className="space-y-4">
-                                            {/* ✅ Header mejorado */}
-                                            <div className="px-1 sm:px-2">
-                                                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-3 border-b border-white/5">
-                                                    <div className="min-w-0">
-                                                        <div className="flex items-center gap-3 min-w-0">
-                                                            <Link href={`/lists/${l.id}`} className="min-w-0">
-                                                                <h3 className="text-2xl sm:text-3xl font-black text-white hover:text-purple-400 transition-colors truncate">
-                                                                    {l.name}
-                                                                </h3>
-                                                            </Link>
+                                            {/* Header fila (mejorado) */}
+                                            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-white/5 pb-3">
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <h3 className="text-2xl sm:text-3xl font-black text-white truncate">
+                                                            {l.name}
+                                                        </h3>
 
-                                                            <span className="shrink-0 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-[11px] font-black text-zinc-300">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-                                                                {l.item_count} items
-                                                            </span>
-                                                        </div>
-
-                                                        {l.description ? (
-                                                            <p className="text-sm text-zinc-500 mt-1 line-clamp-1 max-w-4xl">{l.description}</p>
-                                                        ) : (
-                                                            <p className="text-sm text-zinc-600 mt-1 italic opacity-70">Sin descripción</p>
-                                                        )}
+                                                        <span className="shrink-0 inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold text-zinc-200">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                                            {l.item_count} items
+                                                        </span>
                                                     </div>
 
-                                                    <div className="flex items-center gap-2 shrink-0">
-                                                        <button
-                                                            onClick={(e) => handleDelete(e, l.id)}
-                                                            className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-zinc-900/70 border border-white/10 text-zinc-400 hover:text-white hover:border-red-500/30 hover:bg-red-500/10 transition"
-                                                            title="Borrar lista"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
+                                                    {l.description && (
+                                                        <p className="text-sm text-zinc-500 mt-1 line-clamp-1 max-w-3xl">
+                                                            {l.description}
+                                                        </p>
+                                                    )}
+                                                </div>
 
-                                                        <Link
-                                                            href={`/lists/${l.id}`}
-                                                            className="h-9 inline-flex items-center gap-2 px-3.5 rounded-xl bg-purple-600/15 border border-purple-500/25 text-purple-200 hover:text-white hover:bg-purple-600/25 hover:border-purple-500/40 transition text-xs font-black uppercase tracking-wider"
-                                                        >
-                                                            Ver todo <ChevronRight className="w-4 h-4" />
-                                                        </Link>
-                                                    </div>
+                                                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                                                    <button
+                                                        onClick={(e) => handleDelete(e, l.id)}
+                                                        className="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition"
+                                                        title="Borrar lista"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+
+                                                    <Link
+                                                        href={`/lists/${l.id}`}
+                                                        className="h-10 inline-flex items-center gap-2 rounded-xl bg-purple-600/15 border border-purple-500/30 px-4 text-xs font-black uppercase tracking-wider text-purple-200 hover:bg-purple-600/22 hover:border-purple-500/45 transition"
+                                                    >
+                                                        Ver todo <ChevronRight className="w-4 h-4" />
+                                                    </Link>
                                                 </div>
                                             </div>
 
+                                            {/* Fila items */}
                                             {items.length > 0 ? (
-                                                <DraggableRow>
-                                                    {items.map((item) => (
-                                                        <ListItemCard
-                                                            key={item.id}
-                                                            item={item}
-                                                            className={`${cardSizeClass}`}
-                                                        />
-                                                    ))}
-                                                </DraggableRow>
+                                                <ListItemsRow items={items} isMobile={isMobile} />
                                             ) : (
                                                 <div className="h-40 flex items-center justify-center bg-zinc-900/20 rounded-2xl border border-dashed border-white/5 text-zinc-600 text-sm">
                                                     Lista vacía
@@ -828,22 +902,34 @@ export default function ListsPage() {
                                             <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all">
                                                 <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-950 border border-white/5 relative">
                                                     {firstItem ? (
-                                                        <TmdbImg filePath={firstItem.poster_path} size="w92" alt={l.name} className="w-full h-full object-cover" />
+                                                        <TmdbImg
+                                                            filePath={firstItem.poster_path || firstItem.backdrop_path}
+                                                            size="w92"
+                                                            alt={l.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
                                                     ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-zinc-700"><ListVideo className="w-6 h-6" /></div>
+                                                        <div className="w-full h-full flex items-center justify-center text-zinc-700">
+                                                            <ListVideo className="w-6 h-6" />
+                                                        </div>
                                                     )}
                                                 </div>
 
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="text-base font-bold text-white truncate group-hover:text-purple-400 transition-colors">{l.name}</h3>
+                                                    <h3 className="text-base font-bold text-white truncate group-hover:text-purple-400 transition-colors">
+                                                        {l.name}
+                                                    </h3>
                                                     <p className="text-sm text-zinc-400 truncate">{l.description || '—'}</p>
                                                 </div>
 
                                                 <div className="flex items-center gap-6 pr-2">
                                                     <div className="text-right hidden sm:block">
-                                                        <span className="text-xs text-zinc-500 uppercase font-bold tracking-wider block">Items</span>
+                                                        <span className="text-xs text-zinc-500 uppercase font-bold tracking-wider block">
+                                                            Items
+                                                        </span>
                                                         <span className="text-sm font-bold text-white">{l.item_count}</span>
                                                     </div>
+
                                                     <button
                                                         onClick={(e) => handleDelete(e, l.id)}
                                                         className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
@@ -872,11 +958,6 @@ export default function ListsPage() {
                     </div>
                 )}
             </div>
-
-            <style jsx global>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
         </div>
     )
 }
