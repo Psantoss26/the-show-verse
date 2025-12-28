@@ -39,7 +39,11 @@ import {
   Search,
   RotateCcw,
   Play,
-  ExternalLink
+  ExternalLink,
+  ThumbsUp,
+  ThumbsDown,
+  Sparkles,
+  Star
 } from 'lucide-react'
 
 /* === cuenta / api === */
@@ -62,7 +66,10 @@ import {
   traktUpdateWatchPlay,
   traktRemoveWatchPlay,
   traktGetShowWatched,
-  traktSetEpisodeWatched
+  traktSetEpisodeWatched,
+  traktGetComments,
+  traktGetLists,
+  traktGetShowSeasons
 } from '@/lib/api/traktClient'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
@@ -343,6 +350,78 @@ const formatVoteCount = (v) => {
     notation: 'compact',
     maximumFractionDigits: 1
   }).format(n)
+}
+
+const stripHtml = (s) => String(s || '').replace(/<[^>]*>?/gm, '').trim()
+
+const formatDateTimeEs = (iso) => {
+  if (!iso) return ''
+  try {
+    return new Date(iso).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })
+  } catch {
+    return iso
+  }
+}
+
+// Sentimiento derivado de comentarios (heurístico, estable y rápido)
+const buildSentimentFromComments = (comments = []) => {
+  const POS = [
+    'amazing', 'beautiful', 'great', 'stunning', 'incredible', 'masterpiece', 'immersive', 'spectacle',
+    'love', 'fantastic', 'brilliant', 'excellent', 'iconic',
+    'impresionante', 'increible', 'hermoso', 'espectacular', 'genial', 'magnífico', 'maravilloso'
+  ]
+  const NEG = [
+    'boring', 'generic', 'predictable', 'weak', 'bad', 'terrible', 'awful', 'dull', 'cliche', 'overrated',
+    'lazy', 'flat', 'slow', 'shallow', 'mediocre',
+    'aburrido', 'genérico', 'predecible', 'flojo', 'malo', 'lento', 'sobrevalorado', 'insípido'
+  ]
+
+  const norm = (t) => stripHtml(t).toLowerCase()
+  const splitSentences = (t) =>
+    norm(t)
+      .split(/(?<=[\.\!\?])\s+|\n+/g)
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .filter((x) => x.length >= 28 && x.length <= 140)
+
+  const score = (s, lex) => lex.reduce((acc, w) => (s.includes(w) ? acc + 1 : acc), 0)
+
+  const pool = []
+  for (const c of comments) {
+    const text = c?.comment?.comment ?? c?.comment ?? ''
+    const likes = Number(c?.likes || 0)
+    for (const sent of splitSentences(text)) {
+      const p = score(sent, POS)
+      const n = score(sent, NEG)
+      if (p === 0 && n === 0) continue
+      pool.push({ sent, likes, p, n })
+    }
+  }
+
+  // ordena por “fuerza” y likes
+  const pos = [...pool]
+    .filter((x) => x.p > x.n)
+    .sort((a, b) => (b.p - a.p) || (b.likes - a.likes))
+  const neg = [...pool]
+    .filter((x) => x.n > x.p)
+    .sort((a, b) => (b.n - a.n) || (b.likes - a.likes))
+
+  const uniq = (arr, max) => {
+    const out = []
+    const seen = new Set()
+    for (const it of arr) {
+      if (seen.has(it.sent)) continue
+      seen.add(it.sent)
+      out.push(it.sent)
+      if (out.length >= max) break
+    }
+    return out
+  }
+
+  return {
+    pros: uniq(pos, 4),
+    cons: uniq(neg, 4)
+  }
 }
 
 const SectionTitle = ({ title, icon: Icon }) => (
@@ -669,6 +748,84 @@ function AddToListModal({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function PosterStack({ posters = [] }) {
+  const [hovered, setHovered] = useState(null)
+
+  const imgs = posters.slice(0, 5)
+
+  // CONFIGURACIÓN
+  const POSTER_W = 96   // Ancho base (w-24)
+  const STEP = 35       // Solape entre cartas
+  const HOVER_GAP = 60  // Hueco extra al hacer hover
+
+  // Ancho dinámico del contenedor para centrarlo
+  const totalWidth = imgs.length > 0
+    ? POSTER_W + (imgs.length - 1) * STEP + (hovered !== null ? HOVER_GAP : 0)
+    : POSTER_W
+
+  return (
+    <div
+      // Mantenemos items-end y un pequeño padding inferior para anclarlas al suelo
+      className="relative flex h-full w-full items-end justify-center transition-all duration-300 pb-3"
+      style={{ width: totalWidth }}
+      onMouseLeave={() => setHovered(null)}
+    >
+      {imgs.map((src, idx) => {
+        // Lógica de posición horizontal
+        const isAfterHover = hovered !== null && idx > hovered
+        const leftPosition = idx * STEP + (isAfterHover ? HOVER_GAP : 0)
+
+        const isHover = hovered === idx
+        const isAnyoneHovered = hovered !== null
+
+        // Rotación suavizada tipo abanico
+        const rotation = isHover ? 0 : (idx - (imgs.length - 1) / 2) * 5
+
+        return (
+          <div
+            key={`${src}-${idx}`}
+            className="absolute transition-all duration-500 cubic-bezier(0.25, 0.2, 0.25, 0.2)"
+            style={{
+              left: 0,
+              transform: `translateX(${leftPosition}px) rotate(${rotation}deg)`,
+              zIndex: isHover ? 50 : idx,
+              transformOrigin: 'bottom center',
+              // 🔥 CAMBIO AQUÍ: Reducimos la elevación de 20 a 8px
+              bottom: isHover ? 4 : 0,
+            }}
+            onMouseEnter={() => setHovered(idx)}
+            onClick={(e) => {
+              e.preventDefault()
+              setHovered(h => (h === idx ? null : idx))
+            }}
+          >
+            <div
+              className={`
+                relative h-40 w-28 overflow-hidden rounded-xl border bg-zinc-900 shadow-2xl transition-all duration-300
+                ${isHover
+                  // Mantenemos el scale-110, pero ahora tiene espacio de sobra
+                  ? 'scale-110 border-white/40 ring-1 ring-white/50 shadow-[0_0_30px_rgba(99,102,241,0.5)]'
+                  : 'scale-100 border-white/10 shadow-black/60'
+                }
+                ${isAnyoneHovered && !isHover ? 'brightness-[0.4] blur-[0.5px]' : 'brightness-100'}
+              `}
+            >
+              <img
+                src={src}
+                alt="Poster"
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+              {/* Brillo especular */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-white/10 opacity-60" />
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -1599,6 +1756,177 @@ export default function DetailsClient({
   // ✅ EPISODIOS VISTOS (solo TV)
   const [watchedBySeason, setWatchedBySeason] = useState({}) // { [seasonNumber]: [episodeNumber...] }
   const [episodeBusyKey, setEpisodeBusyKey] = useState('')   // "S1E3" etc
+
+  // =====================================================================
+  // ✅ TRAKT COMMUNITY: Sentimientos / Comentarios / Temporadas / Listas
+  // =====================================================================
+
+  const [tSentiment, setTSentiment] = useState({ loading: false, error: '', pros: [], cons: [], sourceCount: 0 })
+
+  const [tCommentsTab, setTCommentsTab] = useState('likes30') // likes30 | likesAll | recent
+  const [tComments, setTComments] = useState({ loading: false, error: '', items: [], page: 1, hasMore: false, total: 0 })
+
+  const [tSeasons, setTSeasons] = useState({ loading: false, error: '', items: [] })
+
+  const [tListsTab, setTListsTab] = useState('popular') // popular | trending (lo mostramos como "Following")
+  const [tLists, setTLists] = useState({ loading: false, error: '', items: [], page: 1, hasMore: false, total: 0 })
+
+  // Reset al cambiar de título
+  useEffect(() => {
+    setTSentiment({ loading: false, error: '', pros: [], cons: [], sourceCount: 0 })
+    setTComments({ loading: false, error: '', items: [], page: 1, hasMore: false, total: 0 })
+    setTCommentsTab('likes30')
+    setTSeasons({ loading: false, error: '', items: [] })
+    setTLists({ loading: false, error: '', items: [], page: 1, hasMore: false, total: 0 })
+    setTListsTab('popular')
+  }, [id, traktType])
+
+  // 1) Sentimientos (derivados de comentarios top)
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      setTSentiment((p) => ({ ...p, loading: true, error: '' }))
+      try {
+        const r = await traktGetComments({
+          type: traktType,         // 'movie' | 'show'
+          tmdbId: id,
+          sort: 'likes',
+          page: 1,
+          limit: 50
+        })
+        if (ignore) return
+        const items = Array.isArray(r?.items) ? r.items : []
+        const { pros, cons } = buildSentimentFromComments(items)
+        setTSentiment({ loading: false, error: '', pros, cons, sourceCount: items.length })
+      } catch (e) {
+        if (!ignore) setTSentiment({ loading: false, error: e?.message || 'Error', pros: [], cons: [], sourceCount: 0 })
+      }
+    }
+
+    load()
+    return () => { ignore = true }
+  }, [id, traktType]) // público: no depende de conexión
+
+  // 2) Comentarios (tabs)
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      setTComments((p) => ({ ...p, loading: true, error: '' }))
+
+      try {
+        const isLikes30 = tCommentsTab === 'likes30'
+        const sort = tCommentsTab === 'recent' ? 'newest' : 'likes'
+
+        // Para likes30: pedimos más y filtramos por fecha
+        const reqLimit = isLikes30 ? 50 : 20
+        const page = isLikes30 ? 1 : tComments.page
+
+        const r = await traktGetComments({
+          type: traktType,
+          tmdbId: id,
+          sort,
+          page,
+          limit: reqLimit
+        })
+
+        if (ignore) return
+
+        let items = Array.isArray(r?.items) ? r.items : []
+        const total = Number(r?.pagination?.itemCount || 0)
+        const hasMore = !!(r?.pagination?.pageCount && r?.pagination?.page < r?.pagination?.pageCount)
+
+        if (isLikes30) {
+          const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+          items = items.filter((c) => {
+            const t = new Date(c?.created_at || 0).getTime()
+            return Number.isFinite(t) && t >= cutoff
+          })
+          // Mantén máximo 20 para UI (puedes subirlo si quieres)
+          items = items.slice(0, 20)
+        }
+
+        setTComments((p) => ({
+          ...p,
+          loading: false,
+          error: '',
+          items: p.page > 1 && !isLikes30 ? [...(p.items || []), ...items] : items,
+          hasMore: !isLikes30 ? hasMore : false,
+          total
+        }))
+      } catch (e) {
+        if (!ignore) setTComments((p) => ({ ...p, loading: false, error: e?.message || 'Error' }))
+      }
+    }
+
+    load()
+    return () => { ignore = true }
+  }, [id, traktType, tCommentsTab, tComments.page])
+
+  // si cambia tab => resetea paginación
+  useEffect(() => {
+    setTComments((p) => ({ ...p, items: [], page: 1, hasMore: false, total: 0 }))
+  }, [tCommentsTab])
+
+  // 3) Temporadas (solo show)
+  useEffect(() => {
+    let ignore = false
+    const load = async () => {
+      if (type !== 'tv') return
+      setTSeasons((p) => ({ ...p, loading: true, error: '' }))
+      try {
+        const r = await traktGetShowSeasons({ tmdbId: id, extended: 'full' })
+        if (ignore) return
+        setTSeasons({ loading: false, error: '', items: Array.isArray(r?.items) ? r.items : [] })
+      } catch (e) {
+        if (!ignore) setTSeasons({ loading: false, error: e?.message || 'Error', items: [] })
+      }
+    }
+    load()
+    return () => { ignore = true }
+  }, [id, type])
+
+  // 4) Listas (popular / trending)
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      setTLists((p) => ({ ...p, loading: true, error: '' }))
+      try {
+        const r = await traktGetLists({
+          type: traktType,
+          tmdbId: id,
+          tab: tListsTab,
+          page: tLists.page,
+          limit: 10
+        })
+        if (ignore) return
+
+        const items = Array.isArray(r?.items) ? r.items : []
+        const total = Number(r?.pagination?.itemCount || 0)
+        const hasMore = !!(r?.pagination?.pageCount && r?.pagination?.page < r?.pagination?.pageCount)
+
+        setTLists((p) => ({
+          ...p,
+          loading: false,
+          error: '',
+          items: p.page > 1 ? [...(p.items || []), ...items] : items,
+          hasMore,
+          total
+        }))
+      } catch (e) {
+        if (!ignore) setTLists((p) => ({ ...p, loading: false, error: e?.message || 'Error' }))
+      }
+    }
+
+    load()
+    return () => { ignore = true }
+  }, [id, traktType, tListsTab, tLists.page])
+
+  useEffect(() => {
+    setTLists((p) => ({ ...p, items: [], page: 1, hasMore: false, total: 0 }))
+  }, [tListsTab])
 
   const [syncTrakt, setSyncTrakt] = useState(false)
   useEffect(() => {
@@ -3546,6 +3874,419 @@ export default function DetailsClient({
             </div>
           </section>
         )}
+
+        {/* ===================================================== */}
+        {/* ✅ TRAKT: SENTIMIENTOS (AI SUMMARY) */}
+        <section className="mb-12">
+          <SectionTitle title="Análisis de Sentimientos" icon={Sparkles} />
+
+          <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
+            {/* Header del bloque */}
+            <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
+              <div className="flex items-center gap-4">
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
+                  <img src="/logo-Trakt.png" alt="Trakt" className="h-full w-full object-cover" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold leading-tight text-white">Trakt Community Pulse</h3>
+                  <p className="text-xs font-medium text-zinc-400">
+                    Resumen por IA basado en comentarios sobre <span className="text-zinc-200">{title}</span>
+                  </p>
+                </div>
+              </div>
+              {tSentiment.loading && <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />}
+            </div>
+
+            <div className="p-6">
+              {tSentiment.error ? (
+                <div className="rounded-xl bg-red-500/10 p-4 text-center text-sm font-medium text-red-400 border border-red-500/20">
+                  {tSentiment.error}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  {/* Columna Positiva */}
+                  <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+                        <ThumbsUp className="h-4 w-4" />
+                      </div>
+                      <span className="font-bold tracking-wide text-emerald-100">Lo Bueno</span>
+                    </div>
+
+                    {tSentiment.pros?.length ? (
+                      <ul className="space-y-3">
+                        {tSentiment.pros.map((s, i) => (
+                          <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm italic text-zinc-500">No hay suficientes datos positivos.</div>
+                    )}
+                  </div>
+
+                  {/* Columna Negativa */}
+                  <div className="relative overflow-hidden rounded-2xl border border-rose-500/20 bg-gradient-to-b from-rose-500/10 to-transparent p-5">
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
+                        <ThumbsDown className="h-4 w-4" />
+                      </div>
+                      <span className="font-bold tracking-wide text-rose-100">Lo Malo</span>
+                    </div>
+
+                    {tSentiment.cons?.length ? (
+                      <ul className="space-y-3">
+                        {tSentiment.cons.map((s, i) => (
+                          <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]" />
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm italic text-zinc-500">No hay suficientes datos negativos.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ===================================================== */}
+        {/* ✅ TRAKT: COMENTARIOS */}
+        <section className="mb-12">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+            <SectionTitle title="Comentarios" icon={MessageSquareIcon} />
+
+            <div className="flex items-center gap-2">
+              <a
+                href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : `https://trakt.tv/search?query=${encodeURIComponent(title)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 transition hover:border-yellow-500/50 hover:bg-yellow-500/10 hover:text-yellow-400"
+              >
+                <span className="hidden sm:inline">Ver en Trakt</span>
+                {tComments.total > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white">{tComments.total}</span>}
+                <ExternalLink className="h-3 w-3 opacity-50 transition group-hover:opacity-100" />
+              </a>
+
+              <a
+                href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : `https://trakt.tv/search?query=${encodeURIComponent(title)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 rounded-full bg-white text-black px-4 py-2 text-xs font-bold uppercase tracking-wider transition hover:bg-zinc-200"
+              >
+                <Plus className="h-3 w-3" />
+                <span className="hidden sm:inline">Escribir</span>
+              </a>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/20 backdrop-blur-sm">
+            {/* Filtros estilo Tabs Modernos */}
+            <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-4 py-3">
+              <div className="flex gap-1 rounded-xl bg-black/40 p-1">
+                {[
+                  { id: 'likes30', label: 'Top 30 Días' },
+                  { id: 'likesAll', label: 'Top Histórico' },
+                  { id: 'recent', label: 'Recientes' }
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTCommentsTab(t.id)}
+                    className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${tCommentsTab === t.id
+                      ? 'bg-zinc-700 text-white shadow-md'
+                      : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+                      }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              {tComments.loading && <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />}
+            </div>
+
+            <div className="space-y-4 p-4 sm:p-6">
+              {tComments.error && <div className="text-center text-sm text-red-400">{tComments.error}</div>}
+
+              {!tComments.loading && !tComments.error && (tComments.items || []).length === 0 && (
+                <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
+                  <MessageSquareIcon className="mb-2 h-8 w-8 opacity-20" />
+                  <p className="text-sm">Sé el primero en comentar.</p>
+                </div>
+              )}
+
+              {(tComments.items || []).slice(0, 10).map((c) => {
+                const user = c?.user || {}
+                const avatar = user?.images?.avatar?.full || user?.images?.avatar?.medium || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.username || 'User')}`
+                const text = stripHtml(c?.comment?.comment ?? c?.comment ?? '')
+                const created = c?.created_at ? formatDateTimeEs(c.created_at) : ''
+                const likes = Number(c?.likes || 0)
+
+                return (
+                  <div key={String(c?.id || `${user?.username}-${created}`)} className="group relative flex gap-4 rounded-2xl bg-white/5 p-5 transition hover:bg-white/10">
+                    {/* Avatar */}
+                    <div className="shrink-0">
+                      <img src={avatar} alt={user?.username} className="h-12 w-12 rounded-full object-cover shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20" />
+                    </div>
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-baseline justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white group-hover:text-yellow-400 transition-colors cursor-pointer">
+                            {user?.name || user?.username || 'Usuario'}
+                          </span>
+                          {user?.vip && <span className="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-500">VIP</span>}
+                        </div>
+                        <span className="text-xs text-zinc-500">{created}</span>
+                      </div>
+
+                      <div className="relative text-sm leading-relaxed text-zinc-300">
+                        {/* Icono de comillas decorativo */}
+                        <span className="absolute -left-3 -top-1 font-serif text-4xl text-white/5">“</span>
+                        <p className="whitespace-pre-line">{text}</p>
+                      </div>
+
+                      {/* Actions Footer */}
+                      <div className="mt-3 flex items-center gap-4 border-t border-white/5 pt-3">
+                        <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2 py-1 text-xs font-medium text-emerald-400">
+                          <ThumbsUp className="h-3 w-3" /> {likes}
+                        </div>
+                        <a
+                          href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : undefined}
+                          target="_blank" rel="noreferrer"
+                          className="ml-auto text-xs font-semibold text-zinc-500 hover:text-white transition-colors"
+                        >
+                          Responder en Trakt →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {tComments.hasMore && (
+                <button
+                  type="button"
+                  onClick={() => setTComments((p) => ({ ...p, page: (p.page || 1) + 1 }))}
+                  className="w-full rounded-xl border border-dashed border-white/10 py-4 text-xs font-bold uppercase tracking-widest text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
+                >
+                  Cargar más comentarios
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ===================================================== */}
+        {/* ✅ TRAKT: TEMPORADAS (Con Progreso Visual) */}
+        {type === 'tv' && (
+          <section className="mb-12">
+            <SectionTitle title="Temporadas" icon={Layers} />
+
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {tSeasons.loading && <div className="col-span-full py-10 flex justify-center"><Loader2 className="animate-spin text-white/50" /></div>}
+
+              {!tSeasons.loading && (tSeasons.items || []).map((s) => {
+                const sn = Number(s?.number)
+                const titleSeason = sn === 0 ? 'Especiales' : `Temporada ${sn}`
+                const rating = typeof s?.rating === 'number' ? s.rating : null
+
+                // Lógica de progreso
+                const tmdbSeason = (data?.seasons || []).find((x) => Number(x?.season_number) === sn)
+                const totalEp = Number(tmdbSeason?.episode_count || 0) || null
+                const watchedEp = Array.isArray(watchedBySeason?.[sn]) ? watchedBySeason[sn].length : 0
+                const percentage = totalEp ? Math.round((watchedEp / totalEp) * 100) : 0
+
+                // Color basado en progreso
+                const isComplete = percentage === 100
+                const barColor = isComplete ? 'bg-emerald-500' : 'bg-yellow-500'
+
+                return (
+                  <div key={sn} className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 transition-all hover:-translate-y-1 hover:border-white/20 hover:bg-white/10 hover:shadow-xl">
+                    {/* Fondo decorativo del número de temporada */}
+                    <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10">
+                      {sn}
+                    </div>
+
+                    <div className="relative p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="text-lg font-extrabold text-white">{titleSeason}</h4>
+                          <div className="mt-1 flex items-center gap-2 text-xs font-medium text-zinc-400">
+                            {rating && (
+                              <span className="flex items-center gap-1 text-yellow-400">
+                                <Star className="h-3 w-3 fill-yellow-400" /> {rating.toFixed(1)}
+                              </span>
+                            )}
+                            {totalEp && <span>• {totalEp} episodios</span>}
+                          </div>
+                        </div>
+
+                        {trakt?.traktUrl && (
+                          <a
+                            href={`${trakt.traktUrl}/seasons/${sn}`}
+                            target="_blank" rel="noreferrer"
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
+                            title="Ver en Trakt"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Barra de Progreso */}
+                      {totalEp !== null && (
+                        <div className="mt-6">
+                          <div className="mb-1.5 flex items-end justify-between text-xs font-bold">
+                            <span className={percentage > 0 ? 'text-white' : 'text-zinc-500'}>
+                              {watchedEp} <span className="text-zinc-500 font-normal">vistos</span>
+                            </span>
+                            <span className="text-zinc-500">{percentage}%</span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ===================================================== */}
+        {/* ✅ TRAKT: LISTAS (DISEÑO MEJORADO) */}
+        <section className="mb-12">
+          <div className="mb-6 flex items-center justify-between">
+            <SectionTitle title="Listas Populares" icon={ListVideo} />
+
+            {/* Selector de Listas */}
+            <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
+              {['popular', 'trending'].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setTListsTab(tab)}
+                  className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${tListsTab === tab
+                    ? 'bg-white text-black shadow-lg scale-105'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                    }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            {tLists.loading && (
+              <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                <span className="text-sm font-medium animate-pulse">Buscando listas y portadas...</span>
+              </div>
+            )}
+
+            {!tLists.loading &&
+              (tLists.items || []).map((row) => {
+                const list = row?.list || row || {}
+                const user = row?.user || list?.user || {}
+                const previews = row?.previewPosters || [] // Las imágenes que trae la API nueva
+
+                const name = list?.name || 'Lista'
+                const itemCount = Number(list?.item_count || list?.items || 0)
+                const likes = Number(list?.likes || 0)
+                const username = user?.username || user?.name
+                const slug = list?.ids?.slug || list?.ids?.trakt
+                const url = username && slug ? `https://trakt.tv/users/${username}/lists/${slug}` : null
+                const avatar = user?.images?.avatar?.full || `https://ui-avatars.com/api/?name=${username}&background=random`
+
+                return (
+                  <a
+                    key={String(list?.ids?.trakt || name)}
+                    href={url || '#'}
+                    target={url ? '_blank' : undefined}
+                    rel="noreferrer"
+                    className={`group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500 hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)] ${!url && 'pointer-events-none'
+                      }`}
+                  >
+                    {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS CON HUECO EN HOVER) */}
+                    <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
+                      {previews.length > 0 ? (
+                        <div className="h-full w-full flex items-center justify-center overflow-visible">
+                          <PosterStack posters={previews} />
+                        </div>
+                      ) : (
+                        <div className="flex h-full items-center justify-center opacity-10">
+                          <ListVideo className="h-20 w-20" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. CONTENIDO DE TEXTO */}
+                    <div className="relative flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
+                      <div>
+                        <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
+                          {name}
+                        </h4>
+
+                        {list?.description && (
+                          <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                            {stripHtml(list.description)}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Footer de la tarjeta */}
+                      <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+                        <div className="flex items-center gap-2">
+                          <img src={avatar} alt={username} className="h-6 w-6 rounded-full ring-1 ring-white/20" />
+                          <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[100px]">
+                            {username}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
+                          <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
+                            {itemCount} items
+                          </span>
+                          <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
+                            <ThumbsUp className="h-3 w-3" /> {likes}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </a>
+                )
+              })}
+          </div>
+
+          {tLists.hasMore && (
+            <div className="mt-8 flex justify-center">
+              <button
+                onClick={() => setTLists((p) => ({ ...p, page: (p.page || 1) + 1 }))}
+                className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold focus:outline-none"
+              >
+                <span className="absolute h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+                <span className="relative flex items-center gap-2 rounded-full bg-black px-6 py-2.5 transition-all duration-300 group-hover:bg-opacity-0">
+                  <span className="bg-gradient-to-r from-indigo-200 to-white bg-clip-text text-transparent group-hover:text-white">
+                    Cargar más listas
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-indigo-300 group-hover:text-white" />
+                </span>
+              </button>
+            </div>
+          )}
+        </section>
 
         {/* CRÍTICAS */}
         {reviews && reviews.length > 0 && (

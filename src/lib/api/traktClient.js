@@ -151,3 +151,40 @@ export async function traktSetEpisodeWatched({ tmdbId, season, episode, watched,
     if (!res.ok) throw new Error(json?.error || `Trakt episode watched HTTP ${res.status}`)
     return json // { watchedBySeason }
 }
+
+// ✅ COMMUNITY: comentarios, listas, temporadas
+export async function traktGetComments({ type, tmdbId, sort = 'likes', page = 1, limit = 20 }) {
+    const qs = new URLSearchParams({
+        type: String(type),
+        tmdbId: String(tmdbId),
+        sort: String(sort),
+        page: String(page),
+        limit: String(limit)
+    })
+    const res = await fetch(`/api/trakt/community/comments?${qs.toString()}`, { cache: 'no-store' })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json?.error || 'Error cargando comentarios')
+    return json
+}
+
+export async function traktGetLists({ type, tmdbId, tab = 'popular', page = 1, limit = 10 }) {
+    const qs = new URLSearchParams({
+        type: String(type),
+        tmdbId: String(tmdbId),
+        tab: String(tab),
+        page: String(page),
+        limit: String(limit)
+    })
+    const res = await fetch(`/api/trakt/community/lists?${qs.toString()}`, { cache: 'no-store' })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json?.error || 'Error cargando listas')
+    return json
+}
+
+export async function traktGetShowSeasons({ tmdbId, extended = 'full' }) {
+    const qs = new URLSearchParams({ tmdbId: String(tmdbId), extended: String(extended) })
+    const res = await fetch(`/api/trakt/community/seasons?${qs.toString()}`, { cache: 'no-store' })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json?.error || 'Error cargando temporadas')
+    return json
+}
