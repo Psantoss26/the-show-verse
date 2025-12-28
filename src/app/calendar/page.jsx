@@ -1,21 +1,144 @@
-// src/app/calendar/page.jsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
-import { format, isToday } from 'date-fns'
+import { format, isToday, addMonths, subMonths, addDays, subDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
-import { ImageOff, Loader2, FilmIcon, TvIcon } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  ImageOff,
+  Loader2,
+  CalendarDays, // Icono diferente para calendario
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Calendar as CalendarIcon
+} from 'lucide-react'
 
 import { getMoviesByDate } from '@/lib/api/calendar'
 
+// --- COMPONENTES UI AUXILIARES ---
+
+function TmdbPoster({ path, alt, className = '' }) {
+  const [failed, setFailed] = useState(false)
+
+  if (!path || failed) {
+    return (
+      <div className={`bg-zinc-900 flex items-center justify-center text-zinc-700 ${className}`}>
+        <ImageOff className="w-8 h-8 opacity-50" />
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={`https://image.tmdb.org/t/p/w500${path}`}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+function DateSelector({ selected, onSelect, currentMonth, onMonthChange }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [])
+
+  const handleSelect = (date) => {
+    if (date) {
+      onSelect(date)
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div ref={ref} className="relative z-50">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-3 px-5 py-3 bg-blue-600 hover:bg-blue-500 rounded-2xl text-white shadow-lg shadow-blue-900/20 transition-all group"
+      >
+        <CalendarIcon className="w-5 h-5 text-white/80" />
+        <span className="text-sm font-bold capitalize">
+          {format(selected, "d 'de' MMMM, yyyy", { locale: es })}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-white/70 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-1/2 -translate-x-1/2 mt-4 p-4 bg-[#161616] border border-white/10 rounded-3xl shadow-2xl z-50"
+          >
+            <DayPicker
+              mode="single"
+              selected={selected}
+              onSelect={handleSelect}
+              month={currentMonth}
+              onMonthChange={onMonthChange}
+              locale={es}
+              showOutsideDays
+              className="!m-0"
+              classNames={{
+                caption: "flex justify-center py-2 relative items-center mb-2",
+                caption_label: "text-sm font-bold text-white capitalize",
+                nav: "flex items-center",
+                nav_button: "h-7 w-7 bg-transparent p-0 hover:bg-white/10 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-colors",
+                nav_button_previous: "absolute left-1",
+                nav_button_next: "absolute right-1",
+                table: "w-full border-collapse space-y-1",
+                head_row: "flex mb-2",
+                head_cell: "text-zinc-500 rounded-md w-9 font-normal text-[0.8rem] uppercase",
+                row: "flex w-full mt-1",
+                cell: "text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+                day: "h-9 w-9 p-0 font-normal hover:bg-white/10 rounded-full transition-colors text-zinc-300 hover:text-white",
+                day_selected: "!bg-blue-600 !text-white hover:!bg-blue-500 font-bold shadow-md shadow-blue-500/20",
+                day_today: "text-blue-400 font-bold border border-blue-500/30",
+                day_outside: "text-zinc-700 opacity-50",
+                day_disabled: "text-zinc-700 opacity-50",
+                day_hidden: "invisible",
+              }}
+              components={{
+                IconLeft: () => <ChevronLeft className="w-4 h-4" />,
+                IconRight: () => <ChevronRight className="w-4 h-4" />,
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// --- PÁGINA PRINCIPAL ---
+
 export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date())
+  // Estado extra para controlar el mes visible del calendario independientemente de la selección
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+
   const [selectedMovies, setSelectedMovies] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  // Sincronizar el mes visual cuando se selecciona una fecha lejana
+  useEffect(() => {
+    setCurrentMonth(selectedDate)
+  }, [selectedDate])
 
   useEffect(() => {
     if (!selectedDate) return
@@ -27,9 +150,9 @@ export default function CalendarPage() {
         const movies = await getMoviesByDate(selectedDate)
         setSelectedMovies(Array.isArray(movies) ? movies : [])
       } catch (err) {
-        console.error('Error al cargar estrenos para esta fecha:', err)
+        console.error('Error al cargar estrenos:', err)
         setSelectedMovies([])
-        setError('No se han podido cargar los estrenos para esta fecha.')
+        setError('No se han podido cargar los estrenos.')
       } finally {
         setLoading(false)
       }
@@ -38,204 +161,201 @@ export default function CalendarPage() {
     fetchMovies()
   }, [selectedDate])
 
-  const titleDate = format(selectedDate, "d 'de' MMMM yyyy", { locale: es })
   const isTodaySelected = isToday(selectedDate)
 
+  // Handlers para navegación
+  const goPrevDay = () => setSelectedDate(prev => subDays(prev, 1))
+  const goNextDay = () => setSelectedDate(prev => addDays(prev, 1))
+
+  const goPrevMonth = () => {
+    const newDate = subMonths(selectedDate, 1)
+    setSelectedDate(newDate)
+  }
+  const goNextMonth = () => {
+    const newDate = addMonths(selectedDate, 1)
+    setSelectedDate(newDate)
+  }
+
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden text-white bg-black">
-      {/* COLUMNA IZQUIERDA: CALENDARIO */}
-      <div className="w-[350px] h-full flex flex-col justify-start px-6 pt-8 bg-[#111] border-r border-gray-800 flex-shrink-0">
-        <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
-          📅 Calendario de Estrenos
-        </h2>
-        <p className="text-xs text-neutral-400 mb-4 max-w-[260px]">
-          Consulta qué películas y series se estrenan cada día.
-        </p>
+    // Cambio de color de selección a blue-500
+    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-sans selection:bg-blue-500/30 pb-20">
 
-        <DayPicker
-          mode="single"
-          selected={selectedDate}
-          onSelect={setSelectedDate}
-          locale={es}
-          showOutsideDays
-          // 👇 MISMO DISEÑO QUE TENÍAS, SOLO CLASES
-          className="
-            rdp
-            !text-white
-            [&_.rdp-day]:rounded-full
-            [&_.rdp-day]:w-10
-            [&_.rdp-day]:h-10
-            [&_.rdp-day_selected]:bg-blue-600
-            [&_.rdp-day_selected]:text-white
-            [&_.rdp-day_today]:border
-            [&_.rdp-day_today]:border-yellow-400
-            [&_.rdp-day:not(.rdp-day_selected)]:hover:bg-gray-700
-            [&_.rdp-caption_label]:text-white
-            space-y-4
-          "
-          // 👇 AQUÍ FORZAMOS QUE LAS SEMANAS SEAN 7 COLUMNAS
-          styles={{
-            table: {
-              width: '100%',
-            },
-            head_row: {
-              display: 'grid',
-              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-            },
-            row: {
-              display: 'grid',
-              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-            },
-            cell: {
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: '4px 0',
-            },
-          }}
-        />
-
-        <p className="mt-6 text-sm text-gray-400 leading-tight">
-          Selecciona una fecha del calendario para ver los estrenos
-          programados ese día.
-        </p>
+      {/* Fondo ambiental AZUL */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-20%] left-[10%] w-[700px] h-[700px] bg-blue-600/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-cyan-600/5 rounded-full blur-[100px]" />
       </div>
 
-      {/* COLUMNA DERECHA: ESTRENOS DEL DÍA */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mb-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-              Estrenos
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold text-white mt-1">
-              {isTodaySelected ? 'Hoy' : 'Día seleccionado'} ·{' '}
-              <span className="text-neutral-300">{titleDate}</span>
-            </h2>
-            <p className="text-xs text-neutral-400 mt-2">
-              {selectedMovies.length > 0
-                ? `${selectedMovies.length} título${selectedMovies.length === 1 ? '' : 's'
-                } programado${selectedMovies.length === 1 ? '' : 's'
-                } para este día.`
-                : 'No hay estrenos registrados para esta fecha.'}
-            </p>
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+
+        {/* Header Section */}
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-5">
+            <div className="p-4 bg-blue-500/10 rounded-3xl border border-blue-500/20">
+              <CalendarDays className="w-10 h-10 text-blue-500" />
+            </div>
+            <div>
+              <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                Calendario
+              </h1>
+              <p className="text-zinc-400 mt-2 font-medium text-base">
+                Estrenos de Cine y Televisión
+              </p>
+            </div>
+          </div>
+
+          {/* --- CONTROLES DE NAVEGACIÓN (SIN FONDO NI BORDE EXTRA) --- */}
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+
+            {/* Navegación Meses */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={goPrevMonth}
+                className="p-3 rounded-2xl text-zinc-500 hover:text-white hover:bg-white/5 transition"
+                title="Mes anterior"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest px-2">Mes</span>
+              <button
+                onClick={goNextMonth}
+                className="p-3 rounded-2xl text-zinc-500 hover:text-white hover:bg-white/5 transition"
+                title="Mes siguiente"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Separador sutil */}
+            <div className="h-8 w-[1px] bg-white/10 hidden sm:block" />
+
+            {/* Navegación Días + Selector */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={goPrevDay}
+                className="p-3 rounded-2xl bg-zinc-900/50 border border-white/5 text-zinc-300 hover:text-white hover:border-white/20 transition shadow-lg"
+                title="Día anterior"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <DateSelector
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                currentMonth={currentMonth}
+                onMonthChange={setCurrentMonth}
+              />
+
+              <button
+                onClick={goNextDay}
+                className="p-3 rounded-2xl bg-zinc-900/50 border border-white/5 text-zinc-300 hover:text-white hover:border-white/20 transition shadow-lg"
+                title="Día siguiente"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!isTodaySelected && (
+              <button
+                onClick={() => setSelectedDate(new Date())}
+                className="ml-auto sm:ml-0 px-5 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white font-bold text-sm transition border border-white/5"
+              >
+                Volver a Hoy
+              </button>
+            )}
           </div>
         </div>
 
+        {/* Content Area */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-neutral-300">
-            <Loader2 className="w-7 h-7 animate-spin text-yellow-500" />
-            <span className="text-sm">
-              Cargando estrenos para{' '}
-              <span className="font-semibold">{titleDate}</span>...
+          <div className="flex flex-col items-center justify-center py-32">
+            <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
+            <span className="text-zinc-500 text-sm font-medium animate-pulse">
+              Consultando fecha...
             </span>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-red-700 rounded-xl bg-red-950/20">
-            <ImageOff className="w-12 h-12 text-red-500 mb-3" />
-            <p className="text-red-400 text-lg mb-2">{error}</p>
-            <p className="text-sm text-red-200/70 max-w-md">
-              Puede ser un problema temporal con la API. Inténtalo de nuevo en unos minutos.
-            </p>
+          <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-red-900/30 rounded-3xl bg-red-900/5">
+            <ImageOff className="w-16 h-16 text-red-500/50 mb-4" />
+            <h3 className="text-xl font-bold text-red-200">{error}</h3>
+            <p className="text-red-400/60 mt-2 text-sm">Inténtalo de nuevo más tarde.</p>
           </div>
         ) : selectedMovies.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-neutral-800 rounded-xl bg-neutral-900/20">
-            <ImageOff className="w-12 h-12 text-neutral-600 mb-3" />
-            <p className="text-neutral-300 text-lg mb-2">
-              No hay estrenos para esta fecha.
-            </p>
-            <p className="text-sm text-neutral-500 max-w-md">
-              Prueba a moverte por el calendario para descubrir otros días con
-              lanzamientos de cine y series.
+          <div className="flex flex-col items-center justify-center py-40 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
+            <div className="w-24 h-24 bg-zinc-900/50 rounded-full flex items-center justify-center mb-6 border border-zinc-800/50">
+              <CalendarIcon className="w-10 h-10 text-zinc-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-zinc-300">Día tranquilo</h3>
+            <p className="text-zinc-500 mt-2 max-w-md">
+              No hay grandes estrenos registrados para el <span className="text-blue-400 font-bold">{format(selectedDate, "d 'de' MMMM", { locale: es })}</span>.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-5 pb-6">
-            {selectedMovies.map((item) => {
-              const isMovie = item.media_type === 'movie' || !!item.title
-              const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
-              const href = `/details/${mediaType}/${item.id}`
-              const title = isMovie ? item.title : item.name
-              const date = isMovie ? item.release_date : item.first_air_date
+          <>
+            <div className="mb-8 flex items-center gap-3">
+              <div className="h-px flex-1 bg-gradient-to-r from-blue-500/50 to-transparent" />
+              <span className="text-blue-400 font-bold text-sm tracking-widest uppercase">
+                {selectedMovies.length} Lanzamientos
+              </span>
+            </div>
 
-              const imagePath = item.poster_path
-                ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
-                : item.backdrop_path
-                  ? `https://image.tmdb.org/t/p/w500${item.backdrop_path}`
-                  : null
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+              {selectedMovies.map((item) => {
+                const isMovie = item.media_type === 'movie' || !!item.title
+                const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
+                const href = `/details/${mediaType}/${item.id}`
+                const title = isMovie ? item.title : item.name
+                const year = (isMovie ? item.release_date : item.first_air_date)?.slice(0, 4)
+                const posterPath = item.poster_path || item.backdrop_path
 
-              const rating =
-                typeof item.vote_average === 'number' &&
-                  item.vote_average > 0
-                  ? item.vote_average.toFixed(1)
-                  : null
-
-              return (
-                <Link
-                  key={`${mediaType}-${item.id}-${date || ''}`}
-                  href={href}
-                  className="group block"
-                  title={title}
-                >
-                  <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-neutral-900 shadow-xl group-hover:shadow-emerald-900/30 group-hover:shadow-2xl transition-all duration-500 ease-out group-hover:-translate-y-2 border border-white/5 group-hover:border-white/20">
-                    {imagePath ? (
-                      <img
-                        src={imagePath}
+                return (
+                  <Link
+                    key={`${mediaType}-${item.id}`}
+                    href={href}
+                    className="group relative block animate-in fade-in zoom-in-95 duration-500"
+                  >
+                    <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_30px_rgba(37,99,235,0.2)] group-hover:scale-[1.03] z-0 group-hover:z-10">
+                      <TmdbPoster
+                        path={posterPath}
                         alt={title}
-                        loading="lazy"
-                        className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                        className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
                       />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-neutral-600 p-4 text-center bg-neutral-800">
-                        <ImageOff className="w-10 h-10 mb-2 opacity-60" />
-                        <span className="text-xs font-medium">
-                          Sin imagen
-                        </span>
+
+                      {/* Overlay Gradiente Azulado en Hover */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                      {/* Badge Tipo */}
+                      <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold uppercase tracking-wider text-white/90 shadow-lg">
+                        {isMovie ? 'Película' : 'Serie'}
                       </div>
-                    )}
 
-                    {/* overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      {/* Info Bottom (Slide Up Effect) */}
+                      <div className="absolute bottom-0 left-0 right-0 p-5 transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                        <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 drop-shadow-md group-hover:text-blue-400 transition-colors">
+                          {title}
+                        </h3>
+                        {year && (
+                          <p className="text-zinc-400 text-xs font-medium mt-1">
+                            {year}
+                          </p>
+                        )}
+                      </div>
 
-                    {/* tipo */}
-                    <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-md px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider text-white/90 border border-white/10 shadow-lg z-10 flex items-center gap-1.5">
-                      {isMovie ? (
-                        <FilmIcon className="w-3 h-3" />
-                      ) : (
-                        <TvIcon className="w-3 h-3" />
+                      {/* Rating Flotante */}
+                      {item.vote_average > 0 && (
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 shadow-lg">
+                          <span className="text-blue-400 text-xs font-black">
+                            {item.vote_average.toFixed(1)}
+                          </span>
+                          <img src="/logo-TMDb.png" alt="TMDb" className="h-2.5 w-auto opacity-80" />
+                        </div>
                       )}
-                      <span>{isMovie ? 'Película' : 'Serie'}</span>
                     </div>
-
-                    {/* rating TMDb */}
-                    {rating && (
-                      <div className="absolute bottom-2 right-2 bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-emerald-500/60 flex items-center gap-1.5 shadow-xl transform-gpu opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
-                        <img
-                          src="/logo-TMDb.png"
-                          alt="TMDb"
-                          className="w-auto h-3"
-                        />
-                        <span className="text-emerald-400 text-[10px] font-bold font-mono">
-                          {rating}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-2">
-                    <h3 className="text-sm font-semibold text-white line-clamp-2">
-                      {title}
-                    </h3>
-                    {date && (
-                      <p className="text-xs text-neutral-400 mt-0.5">
-                        {date.slice(0, 4)}
-                      </p>
-                    )}
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>
