@@ -43,7 +43,11 @@ import {
   ThumbsUp,
   ThumbsDown,
   Sparkles,
-  Star
+  Star,
+  Eye,
+  List,
+  LibraryBig,
+  MessageSquare
 } from 'lucide-react'
 
 /* === cuenta / api === */
@@ -69,7 +73,10 @@ import {
   traktSetEpisodeWatched,
   traktGetComments,
   traktGetLists,
-  traktGetShowSeasons
+  traktGetShowSeasons,
+  traktGetStats,
+  traktGetScoreboard,
+  traktSetRating
 } from '@/lib/api/traktClient'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
@@ -459,6 +466,144 @@ const MetaItem = ({
         >
           {value}
         </span>
+      </div>
+    </div>
+  )
+}
+
+const toneStyles = {
+  tmdb: 'border-emerald-500/25 bg-emerald-500/10',
+  trakt: 'border-red-500/25 bg-red-500/10',
+  imdb: 'border-yellow-500/25 bg-yellow-500/10',
+  rt: 'border-rose-500/25 bg-rose-500/10',
+  mc: 'border-lime-500/25 bg-lime-500/10',
+  jw: 'border-emerald-500/25 bg-emerald-500/10',
+  neutral: 'border-white/10 bg-white/5'
+}
+
+function ScoreBadge({
+  tone = 'neutral',
+  logo,
+  alt,
+  label,
+  value,
+  suffix,
+  sublabel,
+  subvalue,
+  href,
+  title
+}) {
+  if (value == null || value === '') return null
+
+  const Box = ({ children }) =>
+    href ? (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        title={title || label}
+        className="group"
+      >
+        {children}
+      </a>
+    ) : (
+      children
+    )
+
+  return (
+    <Box>
+      <div
+        className={`shrink-0 rounded-2xl border ${toneStyles[tone] || toneStyles.neutral}
+        px-3 py-2 flex items-center gap-2 transition hover:bg-white/10`}
+      >
+        {logo ? (
+          <img src={logo} alt={alt || label} className="h-4 w-auto opacity-90" />
+        ) : null}
+
+        <div className="leading-none">
+          <div className="flex items-baseline gap-1">
+            <span className="text-sm font-extrabold text-white">
+              {value}
+              {suffix ? <span className="text-[11px] text-zinc-300 ml-0.5">{suffix}</span> : null}
+            </span>
+            {subvalue != null && (
+              <span className="text-[11px] text-zinc-400 ml-1">
+                {subvalue}
+              </span>
+            )}
+          </div>
+
+          <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+            {sublabel || label}
+          </div>
+        </div>
+      </div>
+    </Box>
+  )
+}
+
+function StatChip({ icon: Icon, label, value }) {
+  if (value == null) return null
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 flex items-center gap-2">
+      <div className="w-9 h-9 rounded-xl bg-black/30 border border-white/10 flex items-center justify-center">
+        <Icon className="w-4 h-4 text-zinc-200" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-sm font-extrabold text-white leading-none">
+          {value}
+        </div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+          {label}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProviderRatingBox({
+  title,
+  logo,
+  connected = true,
+  rating,
+  loading,
+  disabled,
+  onRate,
+  onClear,
+  onConnect
+}) {
+  return (
+    <div className="flex-1 rounded-2xl border border-white/10 bg-black/25 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {logo ? <img src={logo} alt={title} className="h-4 w-auto opacity-90" /> : null}
+          <div className="text-xs font-extrabold text-white truncate">{title}</div>
+        </div>
+
+        {!connected && (
+          <button
+            type="button"
+            onClick={onConnect}
+            className="text-[11px] font-bold px-3 py-1 rounded-full bg-yellow-500 text-black hover:brightness-110"
+          >
+            Conectar
+          </button>
+        )}
+      </div>
+
+      <div className="mt-2">
+        {connected ? (
+          <StarRating
+            rating={rating}
+            onRating={onRate}
+            onClearRating={onClear}
+            disabled={disabled || loading}
+          />
+        ) : (
+          <div className="text-[11px] text-zinc-400 mt-2">
+            Conecta para puntuar.
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1686,51 +1831,73 @@ export default function DetailsClient({
     }
   }
 
-  const sendRating = async (value) => {
+  const sendTmdbRating = async (value, { skipSync = false } = {}) => {
     if (requireLogin() || ratingLoading || !TMDB_API_KEY) return
     try {
       setRatingLoading(true)
       setRatingError('')
       setUserRating(value)
+
       const url = `https://api.themoviedb.org/3/${endpointType}/${id}/rating?api_key=${TMDB_API_KEY}&session_id=${session}`
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json;charset=utf-8' },
         body: JSON.stringify({ value })
       })
-      if (!res.ok) throw new Error('Error al guardar puntuación')
-      if (syncTrakt && trakt.connected) {
-        // Trakt: 1..10 entero
-        await setTraktRatingSafe(value)
+      if (!res.ok) throw new Error('Error al guardar puntuación en TMDb')
+
+      // ✅ sync opcional hacia Trakt (sin bucle)
+      if (!skipSync && syncTrakt && trakt.connected) {
+        await setTraktRatingSafe(Math.round(value))
       }
     } catch (err) {
-      setRatingError(err.message)
+      setRatingError(err?.message || 'Error')
     } finally {
       setRatingLoading(false)
     }
   }
 
-  const clearRating = async () => {
+  const clearTmdbRating = async ({ skipSync = false } = {}) => {
     if (requireLogin() || ratingLoading || userRating == null || !TMDB_API_KEY) return
     try {
       setRatingLoading(true)
       setRatingError('')
       setUserRating(null)
+
       const url = `https://api.themoviedb.org/3/${endpointType}/${id}/rating?api_key=${TMDB_API_KEY}&session_id=${session}`
       const res = await fetch(url, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json;charset=utf-8' }
       })
-      if (!res.ok) throw new Error('Error al borrar puntuación')
-      if (syncTrakt && trakt.connected) {
-        // Trakt: 1..10 entero
+      if (!res.ok) throw new Error('Error al borrar puntuación en TMDb')
+
+      if (!skipSync && syncTrakt && trakt.connected) {
         await setTraktRatingSafe(null)
       }
     } catch (err) {
-      setRatingError(err.message)
+      setRatingError(err?.message || 'Error')
     } finally {
       setRatingLoading(false)
     }
+  }
+
+  const sendTraktRating = async (value) => {
+    if (!trakt.connected) {
+      window.location.href = "/api/trakt/auth/start"
+      return
+    }
+    // value Trakt: 1..10 entero
+    await setTraktRatingSafe(value == null ? null : Math.round(value))
+
+    // ✅ sync opcional hacia TMDb (sin bucle)
+    if (syncTrakt && session && TMDB_API_KEY) {
+      if (value == null) await clearTmdbRating({ skipSync: true })
+      else await sendTmdbRating(value, { skipSync: true })
+    }
+  }
+
+  const clearTraktRating = async () => {
+    await sendTraktRating(null)
   }
 
   const traktType = endpointType === 'tv' ? 'show' : 'movie'
@@ -1756,6 +1923,32 @@ export default function DetailsClient({
   // ✅ EPISODIOS VISTOS (solo TV)
   const [watchedBySeason, setWatchedBySeason] = useState({}) // { [seasonNumber]: [episodeNumber...] }
   const [episodeBusyKey, setEpisodeBusyKey] = useState('')   // "S1E3" etc
+
+  const [traktStats, setTraktStats] = useState(null)
+  const [traktStatsLoading, setTraktStatsLoading] = useState(false)
+  const [traktStatsError, setTraktStatsError] = useState('')
+
+  const [tScoreboard, setTScoreboard] = useState({
+    loading: false,
+    error: '',
+    found: false,
+    rating: null,  // community rating (0..10)
+    votes: null,   // community votes
+    stats: {
+      watchers: null,
+      plays: null,
+      collectors: null, // lo usamos como "libraries"
+      comments: null,
+      lists: null,
+      favorited: null
+    },
+    external: {
+      rtAudience: null,      // 🔌 preparado (si lo devuelves)
+      justwatchRank: null,   // 🔌 preparado (si lo devuelves)
+      justwatchDelta: null,  // 🔌 preparado (si lo devuelves)
+      justwatchCountry: 'ES'
+    }
+  })
 
   // =====================================================================
   // ✅ TRAKT COMMUNITY: Sentimientos / Comentarios / Temporadas / Listas
@@ -1964,6 +2157,87 @@ export default function DetailsClient({
   }
 
   useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      setTScoreboard((p) => ({ ...p, loading: true, error: '' }))
+      try {
+        const r = await traktGetScoreboard({ type: traktType, tmdbId: id })
+        if (ignore) return
+
+        const rating = typeof r?.community?.rating === 'number' ? r.community.rating : null
+        const votes = typeof r?.community?.votes === 'number' ? r.community.votes : null
+
+        // stats (si vienen)
+        const st = r?.stats || {}
+        setTScoreboard({
+          loading: false,
+          error: '',
+          found: !!r?.found,
+          rating,
+          votes,
+          stats: {
+            watchers: typeof st?.watchers === 'number' ? st.watchers : null,
+            plays: typeof st?.plays === 'number' ? st.plays : null,
+            collectors: typeof st?.collectors === 'number' ? st.collectors : null,
+            comments: typeof st?.comments === 'number' ? st.comments : null,
+            lists: typeof st?.lists === 'number' ? st.lists : null,
+            favorited: typeof st?.favorited === 'number' ? st.favorited : null
+          },
+          external: {
+            rtAudience: r?.external?.rtAudience ?? null,
+            justwatchRank: r?.external?.justwatchRank ?? null,
+            justwatchDelta: r?.external?.justwatchDelta ?? null,
+            justwatchCountry: r?.external?.justwatchCountry ?? 'ES'
+          }
+        })
+      } catch (e) {
+        if (!ignore) {
+          setTScoreboard((p) => ({
+            ...p,
+            loading: false,
+            found: false,
+            error: e?.message || 'Error cargando scoreboard'
+          }))
+        }
+      }
+    }
+
+    load()
+    return () => {
+      ignore = true
+    }
+  }, [id, traktType])
+
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+
+      ; (async () => {
+        try {
+          setTraktStatsLoading(true)
+          setTraktStatsError('')
+
+          const res = await traktGetStats({ type: traktType, tmdbId: id })
+          if (cancelled) return
+
+          // res puede venir como { stats } o directamente stats según lo implementes:
+          setTraktStats(res?.stats ?? res ?? null)
+        } catch (e) {
+          if (cancelled) return
+          setTraktStatsError(e?.message || 'No se pudieron cargar estadísticas de Trakt')
+          setTraktStats(null)
+        } finally {
+          if (!cancelled) setTraktStatsLoading(false)
+        }
+      })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [id, traktType])
+
+  useEffect(() => {
     setTraktWatchedOpen(false)
     setTraktEpisodesOpen(false)
     setEpisodeBusyKey('')
@@ -2110,7 +2384,11 @@ export default function DetailsClient({
     if (!trakt.connected || traktBusy) return
     setTraktBusy('rating')
     try {
-      await traktSetRating({ type: traktType, tmdbId: id, rating: valueOrNull })
+      await traktSetRating({
+        type: traktType,                 // 'movie' | 'show'
+        ids: { tmdb: Number(id) },        // ✅ lo que tu API route espera
+        rating: valueOrNull              // puede ser number o null (borrar)
+      })
       setTrakt((p) => ({ ...p, rating: valueOrNull == null ? null : Math.round(valueOrNull) }))
     } finally {
       setTraktBusy('')
@@ -2285,6 +2563,174 @@ export default function DetailsClient({
       abort = true
     }
   }, [type, id, data?.imdb_id, data?.external_ids?.imdb_id, endpointType])
+
+  /* =========================================
+   COMPONENTES AUXILIARES (MODIFICADOS)
+========================================= */
+
+  /* Separador vertical */
+  function Separator() {
+    return <div className="w-px h-8 bg-white/5 shrink-0 mx-2" />;
+  }
+
+  /* Badge de Puntuación: Logos SIEMPRE a color */
+  function CompactBadge({ logo, label, value, sub, suffix, href }) {
+    const Comp = href ? 'a' : 'div';
+
+    return (
+      <Comp
+        href={href}
+        target={href ? "_blank" : undefined}
+        rel={href ? "noopener noreferrer" : undefined}
+        className={`
+        flex items-center gap-3 group shrink-0 select-none
+        ${href ? "cursor-pointer" : ""}
+      `}
+      >
+        {/* CAMBIO REALIZADO: 
+          Se eliminó 'grayscale', 'group-hover:grayscale-0', 'opacity-80'.
+          Ahora siempre está a color y con opacidad total.
+      */}
+        <img
+          src={logo}
+          alt={label || "Provider"}
+          className="h-6 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110"
+        />
+
+        <div className="flex flex-col justify-center leading-none">
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-xl sm:text-2xl font-black text-white tracking-tighter shadow-black drop-shadow-sm">
+              {value != null ? value : '-'}
+            </span>
+            {suffix && (
+              <span className="text-[10px] font-bold text-zinc-500 mb-1">
+                {suffix}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {label && (
+              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest bg-white/5 px-1 rounded-sm">
+                {label}
+              </span>
+            )}
+            {sub && (
+              <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors tracking-wide whitespace-nowrap">
+                {sub}
+              </span>
+            )}
+          </div>
+        </div>
+      </Comp>
+    );
+  }
+
+  /* Estadística Minimalista */
+  function MiniStat({ icon: Icon, value, tooltip }) {
+    return (
+      <div className="flex items-center gap-2 group shrink-0" title={tooltip}>
+        <div className="p-1.5 bg-white/5 rounded-full group-hover:bg-white/10 transition-colors">
+          <Icon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" />
+        </div>
+        <span className="text-xs font-semibold text-zinc-400 font-mono tracking-tight group-hover:text-zinc-300">
+          {value}
+        </span>
+      </div>
+    );
+  }
+
+  /* NUEVO COMPONENTE: Botón de Puntuación Unificado 
+     Muestra una estrella y permite puntuar o borrar nota.
+  */
+  function UnifiedRateButton({ rating, loading, onRate, connected, onConnect }) {
+    // Si no hay conexión a ningún servicio, mostramos botón de conectar (por defecto a Login)
+    if (!connected) {
+      return (
+        <button
+          onClick={onConnect}
+          className="flex items-center gap-2 px-3 h-9 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+          title="Conectar para puntuar"
+        >
+          <Star className="w-4 h-4 text-zinc-500" />
+          <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Rate</span>
+        </button>
+      );
+    }
+
+    const hasRating = rating && rating > 0;
+
+    return (
+      <div className={`
+      relative group flex items-center justify-center gap-2 px-3 h-9 rounded-full transition-all border cursor-pointer
+      ${hasRating
+          ? "bg-yellow-500/10 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.15)]"
+          : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/10"}
+    `}>
+        {loading ? (
+          <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+        ) : (
+          <>
+            {/* Estrella: Llena y amarilla si hay nota, contorno gris si no */}
+            <Star
+              className={`w-4 h-4 transition-colors ${hasRating ? "fill-yellow-500 text-yellow-500" : "text-zinc-400 group-hover:text-white"}`}
+            />
+
+            {/* Texto: La nota o la palabra "RATE" */}
+            <span className={`text-sm font-black tracking-tight ${hasRating ? "text-yellow-500" : "text-zinc-400 group-hover:text-white"}`}>
+              {hasRating ? rating : "RATE"}
+            </span>
+          </>
+        )}
+
+        {/* Selector invisible superpuesto */}
+        {!loading && (
+          <select
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
+            value={rating || ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : Number(e.target.value);
+              onRate(val);
+            }}
+            title="Tu Puntuación (TMDb + Trakt)"
+          >
+            <option value="">Borrar nota</option>
+            <option disabled>──────────</option>
+            {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(val => (
+              <option key={val} value={val}>{val}</option>
+            ))}
+          </select>
+        )}
+      </div>
+    );
+  }
+
+  // Lógica unificada para puntuar en ambos sitios
+  const handleUnifiedRate = async (value) => {
+    // Si no está conectado a nada, redirigir a login (TMDb es la base)
+    if (!session) {
+      window.location.href = '/login';
+      return;
+    }
+
+    // 1. Gestionar TMDb
+    if (value === null) {
+      await clearTmdbRating({ skipSync: true });
+    } else {
+      await sendTmdbRating(value, { skipSync: true });
+    }
+
+    // 2. Gestionar Trakt (si está conectado)
+    if (trakt.connected) {
+      // Trakt usa null para borrar, o número entero
+      await sendTraktRating(value); // sendTraktRating ya maneja null internamente
+    }
+  };
+
+  // Calculamos una nota "visual" única (prioridad Trakt si existe, sino TMDb)
+  const unifiedUserRating = trakt.connected && trakt.rating
+    ? trakt.rating
+    : userRating;
 
   // ====== Ratings Episodios (TV) ======
   const [ratings, setRatings] = useState(null)
@@ -2847,178 +3293,124 @@ export default function DetailsClient({
               ))}
             </div>
 
-            {/* RATINGS BADGES */}
-            <div className="py-2 border-y border-white/10">
-              {/* ✅ MÓVIL: una sola fila, compacto, sin scroll (oculta Metacritic) */}
-              <div className="sm:hidden grid grid-flow-col auto-cols-fr items-center -ml-2 mr-2">
-                {/* TMDb */}
-                <div className="flex items-center justify-center gap-1 min-w-0">
-                  <img src="/logo-TMDb.png" alt="TMDb" className="h-3 w-auto opacity-90" />
-                  <span className="text-[13px] font-extrabold text-emerald-400 leading-none">
-                    {data.vote_average?.toFixed(1)}
-                  </span>
-                </div>
+            {/* =========================================
+                SCOREBOARD TOOLBAR (2 filas: ratings + stats)
+                ========================================= */}
+            <div className="w-full border-y border-white/10 bg-black/25 backdrop-blur-md">
+              {/* FILA 1: Ratings + Acciones */}
+              <div className="px-3 sm:px-4 py-2.5">
+                <div className="flex items-start gap-3">
+                  {/* Ratings externos (WRAP para que se vean todos) */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 min-w-0">
+                      {tScoreboard.loading && (
+                        <div className="w-4 h-4 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin shrink-0" />
+                      )}
 
-                {/* IMDb */}
-                {extras.imdbRating && (
-                  <div className="flex items-center justify-center gap-1 min-w-0">
-                    <img src="/logo-IMDb.png" alt="IMDb" className="h-3.5 w-auto opacity-90" />
-                    <span className="text-[13px] font-extrabold text-yellow-400 leading-none">
-                      {Number(extras.imdbRating).toFixed(1)}
-                    </span>
-                  </div>
-                )}
+                      <CompactBadge
+                        logo="/logo-TMDb.png"
+                        value={data.vote_average?.toFixed(1)}
+                        sub={`${formatVoteCount(data.vote_count)} votes`}
+                        href={tmdbDetailUrl}
+                      />
 
-                {/* Rotten Tomatoes (✅ se mantiene en móvil) */}
-                {extras.rtScore != null && (
-                  <div className="flex items-center justify-center gap-1 min-w-0">
-                    <img
-                      src="/logo-RottenTomatoes.png"
-                      alt="Rotten Tomatoes"
-                      className="h-3.5 w-auto opacity-90"
-                    />
-                    <span className="text-[13px] font-extrabold text-rose-300 leading-none">
-                      {Math.round(extras.rtScore)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Metacritic (✅ móvil: solo número, sin /100 para que quepa) */}
-                {extras.mcScore != null && (
-                  <div className="flex items-center justify-center gap-1 min-w-0">
-                    <img
-                      src="/logo-Metacritic.png"
-                      alt="Metacritic"
-                      className="h-3.5 w-auto opacity-90"
-                    />
-                    <span className="text-[13px] font-extrabold text-lime-200 leading-none">
-                      {Math.round(extras.mcScore)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Usuario */}
-                <div className="flex items-center justify-center min-w-0">
-                  {session ? (
-                    accountStatesLoading ? (
-                      <div className="inline-flex items-center justify-center px-2 py-1 rounded-xl border border-white/10 bg-white/5">
-                        <Loader2 className="w-4 h-4 animate-spin text-zinc-300" />
-                      </div>
-                    ) : (
-                      <div className="scale-[0.85] origin-center">
-                        <StarRating
-                          rating={userRating}
-                          onRating={sendRating}
-                          onClearRating={clearRating}
-                          disabled={ratingLoading}
+                      {tScoreboard.rating != null && (
+                        <CompactBadge
+                          logo="/logo-Trakt.png"
+                          value={Math.round(tScoreboard.rating * 10)}
+                          suffix="%"
+                          sub={`${formatVoteCount(tScoreboard.votes)} votes`}
+                          href={trakt?.traktUrl}
                         />
-                      </div>
-                    )
-                  ) : (
-                    <span className="text-[11px] font-semibold text-gray-400">Login</span>
-                  )}
-                </div>
-              </div>
+                      )}
 
-              {/* ✅ DESKTOP/TABLET: tu diseño original intacto */}
-              <div
-                className="hidden sm:flex items-center flex-nowrap overflow-x-auto pr-2
-      [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
-      divide-x divide-white/10"
-              >
-                {/* TMDb */}
-                <div className="flex items-center gap-2 pr-3 shrink-0 whitespace-nowrap">
-                  <img src="/logo-TMDb.png" alt="TMDb" className="h-3.5 sm:h-3.5 w-auto" />
-                  <div className="flex items-baseline gap-1.5 sm:gap-2">
-                    <span className="text-lg sm:text-xl font-bold text-emerald-400">
-                      {data.vote_average?.toFixed(1)}
-                    </span>
-                    {formatVoteCount(data.vote_count) && (
-                      <span className="text-[10px] sm:text-[11px] text-zinc-400">
-                        {formatVoteCount(data.vote_count)}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                      {extras.imdbRating && (
+                        <CompactBadge
+                          logo="/logo-IMDb.png"
+                          value={Number(extras.imdbRating).toFixed(1)}
+                          sub={`${formatVoteCount(extras.imdbVotes)} votes`}
+                          href={data.imdb_id ? `https://www.imdb.com/title/${data.imdb_id}` : undefined}
+                        />
+                      )}
 
-                {/* IMDb */}
-                {extras.imdbRating && (
-                  <div className="flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
-                    <img src="/logo-IMDb.png" alt="IMDb" className="h-4.5 sm:h-5 w-auto" />
-                    <div className="flex items-baseline gap-1.5 sm:gap-2">
-                      <span className="text-lg sm:text-xl font-bold text-yellow-400">
-                        {extras.imdbRating}
-                      </span>
-                      {formatVoteCount(extras.imdbVotes) && (
-                        <span className="text-[10px] sm:text-[11px] text-zinc-400">
-                          {formatVoteCount(extras.imdbVotes)}
-                        </span>
+                      {(tScoreboard?.external?.rtAudience != null || extras.rtScore != null) && (
+                        <CompactBadge
+                          logo="/logo-RottenTomatoes.png"
+                          value={
+                            tScoreboard?.external?.rtAudience != null
+                              ? Math.round(tScoreboard.external.rtAudience)
+                              : (extras.rtScore != null ? Math.round(extras.rtScore) : null)
+                          }
+                          suffix="%"
+                        />
+                      )}
+
+                      {extras.mcScore != null && (
+                        <CompactBadge
+                          logo="/logo-Metacritic.png"
+                          value={Math.round(extras.mcScore)}
+                          suffix="/100"
+                        />
+                      )}
+
+                      {tScoreboard?.external?.justwatchRank && (
+                        <CompactBadge
+                          logo="/logo-Justwatch.png"
+                          label="Rank"
+                          value={`#${tScoreboard.external.justwatchRank}`}
+                        />
                       )}
                     </div>
                   </div>
-                )}
 
-                {/* Rotten Tomatoes */}
-                {extras.rtScore != null && (
-                  <div className="flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
-                    <img
-                      src="/logo-RottenTomatoes.png"
-                      alt="Rotten Tomatoes"
-                      className="h-4.5 sm:h-5 w-auto"
+                  {/* Acciones usuario (siempre visibles) */}
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 pl-2 border-l border-white/5">
+
+                    {/* Botón Sync (Toggle pequeño) */}
+                    <button
+                      onClick={() => setSyncTrakt(!syncTrakt)}
+                      className={`
+                        flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded transition-colors 
+                        ${syncTrakt
+                          ? 'opacity-100'
+                          : 'opacity-40 hover:opacity-80'}
+                      `}
+                      title="Sincronizar puntuación entre TMDb y Trakt automáticamente"
+                    >
+                      <div className={`w-8 h-1 rounded-full ${syncTrakt ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]' : 'bg-zinc-600'}`} />
+                      <span className="text-[9px] font-bold uppercase text-zinc-400 tracking-widest">Sync</span>
+                    </button>
+
+                    {/* Botón Unificado de Puntuación */}
+                    <UnifiedRateButton
+                      rating={unifiedUserRating}
+                      loading={accountStatesLoading || ratingLoading || !!traktBusy}
+                      onRate={handleUnifiedRate}
+                      connected={!!session} // Asumimos TMDb como base mínima
+                      onConnect={() => (window.location.href = '/login')}
                     />
-                    <div className="flex items-baseline gap-1.5 sm:gap-2">
-                      <span className="text-lg sm:text-xl font-bold text-rose-300">
-                        {Math.round(extras.rtScore)}
-                        <span className="text-[10px] sm:text-[11px] text-zinc-400 ml-1">%</span>
-                      </span>
-                    </div>
                   </div>
-                )}
-
-                {/* Metacritic (✅ solo desktop) */}
-                {extras.mcScore != null && (
-                  <div className="flex items-center gap-2 px-3 shrink-0 whitespace-nowrap">
-                    <img
-                      src="/logo-Metacritic.png"
-                      alt="Metacritic"
-                      className="h-4.5 sm:h-5 w-auto"
-                    />
-                    <div className="flex items-baseline gap-1.5 sm:gap-2">
-                      <span className="text-lg sm:text-xl font-bold text-lime-200">
-                        {Math.round(extras.mcScore)}
-                      </span>
-                      <span className="text-[10px] sm:text-[11px] text-zinc-400">/100</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Usuario */}
-                {session && (
-                  <div className="flex items-center px-3 shrink-0 whitespace-nowrap">
-                    {accountStatesLoading ? (
-                      <div className="inline-flex items-center justify-center px-2.5 py-2 rounded-xl border border-white/10 bg-white/5">
-                        <Loader2 className="w-4 h-4 animate-spin text-zinc-300" />
-                      </div>
-                    ) : (
-                      <StarRating
-                        rating={userRating}
-                        onRating={sendRating}
-                        onClearRating={clearRating}
-                        disabled={ratingLoading}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {!session && (
-                  <p className="px-3 shrink-0 whitespace-nowrap text-[11px] sm:text-xs text-gray-400 sm:ml-auto">
-                    Inicia sesión para puntuar.
-                  </p>
-                )}
+                </div>
               </div>
-            </div>
 
-            {ratingError && <p className="text-xs text-red-400 mt-1">{ratingError}</p>}
+              {/* FILA 2: Trakt stats debajo */}
+              {!tScoreboard.loading && (
+                <div className="px-3 sm:px-4 py-2 border-t border-white/10 bg-black/20">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <MiniStat icon={Eye} value={formatVoteCount(tScoreboard?.stats?.watchers ?? 0)} tooltip="Watchers" />
+                    <MiniStat icon={Play} value={formatVoteCount(tScoreboard?.stats?.plays ?? 0)} tooltip="Plays" />
+                    <MiniStat icon={List} value={formatVoteCount(tScoreboard?.stats?.lists ?? 0)} tooltip="Lists" />
+                    <MiniStat icon={Heart} value={formatVoteCount(tScoreboard?.stats?.favorited ?? 0)} tooltip="Favorited" />
+                  </div>
+                </div>
+              )}
+
+              {(!!tScoreboard.error || ratingError) && (
+                <div className="px-4 pb-2 text-xs text-red-400 text-center bg-black/25 backdrop-blur-md">
+                  {tScoreboard.error || ratingError}
+                </div>
+              )}
+            </div>
 
             {/* Links Externos */}
             <div className="flex gap-2 flex-wrap mt-1">
