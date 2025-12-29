@@ -260,20 +260,34 @@ function pickBestNeutralPosterByResVotes(list, opts = {}) {
   return sorted[0] || pool1[0] || null
 }
 
-/* Tarjeta de Metadato Visual */
-function VisualMetaCard({ icon: Icon, label, value, subvalue, colorClass = "text-zinc-100", bgClass = "bg-zinc-800" }) {
+// 1. Formateador de números (1.5M, 20k)
+const formatShortNumber = (num) => {
+  if (!num) return null
+  const n = Number(num)
+  if (isNaN(n)) return null
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k'
+  return n.toString()
+}
+
+/* VisualMetaCard: Preparada para Flexbox dinámico */
+function VisualMetaCard({ icon: Icon, label, value, className = '' }) {
   if (!value) return null;
+
   return (
-    <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group">
-      <div className={`p-2.5 rounded-lg shrink-0 ${bgClass} bg-opacity-20 group-hover:bg-opacity-30 transition-all`}>
-        <Icon className={`w-5 h-5 ${colorClass}`} />
+    // 'w-auto' deja que el flex del padre decida el ancho.
+    <div className={`flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/5 h-full ${className}`}>
+      <div className="p-2 rounded-lg shrink-0 bg-white/5 text-zinc-400 mt-0.5">
+        <Icon className="w-4 h-4" />
       </div>
-      <div className="flex flex-col min-w-0 overflow-hidden">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-0.5">{label}</span>
-        <span className="text-sm font-bold text-zinc-100 truncate leading-tight" title={typeof value === 'string' ? value : ''}>
+
+      <div className="flex flex-col min-w-0 flex-1">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-0.5">
+          {label}
+        </span>
+        <span className="text-sm font-bold text-zinc-100 leading-tight whitespace-normal break-words">
           {value}
         </span>
-        {subvalue && <span className="text-[11px] text-zinc-400 truncate">{subvalue}</span>}
       </div>
     </div>
   );
@@ -1198,7 +1212,7 @@ export default function DetailsClient({
   const [accountStatesLoading, setAccountStatesLoading] = useState(false)
 
   // ✅ Resumen plegable (por defecto oculto)
-  const [overviewOpen, setOverviewOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('details')
 
   // ====== PREFERENCIAS DE IMÁGENES ======
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
@@ -1629,7 +1643,7 @@ export default function DetailsClient({
     setSelectedPreviewBackdropPath(null)
     setSelectedBackgroundPath(null)
 
-    setOverviewOpen(false)
+    setActiveTab('details')
 
     if (typeof window !== 'undefined') {
       try {
@@ -2588,74 +2602,74 @@ export default function DetailsClient({
 ========================================= */
 
   /* Badge de Puntuación: Ajustado para ser más sutil (texto más pequeño) */
-  function CompactBadge({ logo, label, value, sub, suffix, href }) {
-    const Comp = href ? 'a' : 'div';
+  function CompactBadge({
+    logo,
+    label,
+    value,
+    sub,
+    suffix,
+    href,
+    className = '',
+    hideSubOnMobile = true
+  }) {
+    const Comp = href ? 'a' : 'div'
 
     return (
       <Comp
         href={href}
-        target={href ? "_blank" : undefined}
-        rel={href ? "noopener noreferrer" : undefined}
+        target={href ? '_blank' : undefined}
+        rel={href ? 'noopener noreferrer' : undefined}
         className={`
-        flex items-center gap-2.5 group shrink-0 select-none
-        ${href ? "cursor-pointer" : ""}
+        flex items-center gap-2.5 group select-none min-w-0
+        ${href ? 'cursor-pointer' : ''}
+        ${className}
       `}
+        title={sub ? `${label || ''} ${value ?? ''} · ${sub}`.trim() : undefined}
       >
         <img
           src={logo}
-          alt={label || "Provider"}
+          alt={label || 'Provider'}
           className="h-5 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110"
         />
 
-        <div className="flex flex-col justify-center leading-none">
-          <div className="flex items-baseline gap-0.5">
-            {/* CAMBIO: Tamaño reducido de text-2xl a text-lg/xl para más elegancia */}
-            <span className="text-lg sm:text-xl font-black text-white tracking-tight shadow-black drop-shadow-sm">
+        <div className="flex flex-col justify-center leading-none min-w-0">
+          <div className="flex items-baseline gap-1 min-w-0">
+            <span className="text-lg sm:text-xl font-black text-white tracking-tight drop-shadow-sm">
               {value != null ? value : '-'}
             </span>
+
             {suffix && (
-              <span className="text-[10px] font-bold text-zinc-500 mb-0.5">
+              <span className="text-[10px] font-bold text-zinc-500 mb-0.5 shrink-0">
                 {suffix}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-1 mt-0.5">
+          <div className="flex items-center gap-1 mt-0.5 min-w-0">
             {label && (
-              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest bg-white/5 px-1 rounded-sm">
+              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest bg-white/5 px-1 rounded-sm shrink-0">
                 {label}
               </span>
             )}
+
             {sub && (
-              <span className="text-[9px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors tracking-wide whitespace-nowrap">
+              <span
+                className={`
+                text-[9px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors tracking-wide
+                truncate
+                ${hideSubOnMobile ? 'hidden sm:inline' : ''}
+              `}
+              >
                 {sub}
               </span>
             )}
           </div>
         </div>
       </Comp>
-    );
+    )
   }
 
-  /* Tarjeta de Metadato: Diseño Genérico, Compacto y "Clean" */
-  function VisualMetaCard({ icon: Icon, label, value }) {
-    if (!value) return null;
-    return (
-      <div className="flex items-center gap-3 p-2.5 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.06] transition-colors group">
-        <div className="p-2 rounded-md bg-white/5 text-zinc-400 group-hover:text-zinc-200 group-hover:bg-white/10 transition-colors">
-          <Icon className="w-4 h-4" />
-        </div>
-        <div className="flex flex-col min-w-0">
-          <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 mb-0.5">{label}</span>
-          <span className="text-xs sm:text-sm font-semibold text-zinc-200 truncate leading-tight" title={typeof value === 'string' ? value : ''}>
-            {value}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  /* Botón de Enlace Externo (Estilo Icono Scoreboard) */
+  /* Botón de Enlace Externo (Estilo unificado con las tarjetas) */
   function ExternalLinkButton({ icon, href, title }) {
     if (!href) return null;
     return (
@@ -2663,12 +2677,11 @@ export default function DetailsClient({
         href={href}
         target="_blank"
         rel="noreferrer"
-        className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all group"
+        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all group"
         title={title}
       >
-        {/* Si es string asumimos url de imagen, si es componente lo renderizamos */}
         {typeof icon === 'string' ? (
-          <img src={icon} alt={title} className="w-4 h-4 object-contain opacity-60 group-hover:opacity-100 transition-opacity" />
+          <img src={icon} alt={title} className="w-5 h-5 object-contain opacity-70 group-hover:opacity-100 transition-opacity" />
         ) : (
           icon
         )}
@@ -3331,11 +3344,11 @@ export default function DetailsClient({
               )}
             </div>
 
-            {/* 3. SCOREBOARD INTEGRADO (Nuevo diseño: números pequeños, enlaces filtrados) */}
-            <div className="w-full border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl overflow-hidden mb-6">
+            {/* ✅ 3. SCOREBOARD INTEGRADO */}
+            <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
               <div className="px-4 py-3 flex items-center gap-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
-                {/* A. Ratings (Texto ajustado) */}
+                {/* A. Ratings */}
                 <div className="flex items-center gap-5 shrink-0">
                   {tScoreboard.loading && <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />}
 
@@ -3360,7 +3373,7 @@ export default function DetailsClient({
 
                 <div className="w-px h-6 bg-white/10 shrink-0" />
 
-                {/* B. Enlaces Externos (Solo Web, Filmaffinity, SeriesGraph) */}
+                {/* B. Enlaces Externos (FilmAffinity actualizado) */}
                 <div className="flex items-center gap-2 shrink-0">
                   <ExternalLinkButton icon="/logo-Web.png" href={data.homepage} title="Web Oficial" />
                   <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} title="FilmAffinity" />
@@ -3369,13 +3382,8 @@ export default function DetailsClient({
 
                 <div className="w-px h-6 bg-white/10 shrink-0 ml-auto" />
 
-                {/* C. Controles Usuario (Sync + Rate) */}
+                {/* C. Controles Usuario: Rate (SIN Sync) */}
                 <div className="flex items-center gap-3 shrink-0">
-                  <button onClick={() => setSyncTrakt(!syncTrakt)} className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded transition-colors ${syncTrakt ? 'opacity-100' : 'opacity-40 hover:opacity-80'}`} title="Sync">
-                    <div className={`w-8 h-1 rounded-full ${syncTrakt ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]' : 'bg-zinc-600'}`} />
-                    <span className="text-[8px] font-bold uppercase text-zinc-400 tracking-widest">Sync</span>
-                  </button>
-
                   <UnifiedRateButton
                     rating={unifiedUserRating}
                     loading={accountStatesLoading || ratingLoading || !!traktBusy}
@@ -3386,7 +3394,7 @@ export default function DetailsClient({
                 </div>
               </div>
 
-              {/* Trakt Stats Footer */}
+              {/* Footer de Estadísticas */}
               {!tScoreboard.loading && (
                 <div className="px-4 py-2 border-t border-white/5 bg-black/10 flex items-center gap-6 overflow-x-auto [scrollbar-width:none]">
                   <MiniStat icon={Eye} value={formatVoteCount(tScoreboard?.stats?.watchers ?? 0)} tooltip="Watchers" />
@@ -3403,28 +3411,37 @@ export default function DetailsClient({
               )}
             </div>
 
-            {/* 4. CONTENEDOR TABS (Alternar Detalles / Sinopsis) */}
-            <div className="mb-2">
-              <div className="flex items-center gap-6 mb-4 border-b border-white/10 pb-1">
-                <button
-                  onClick={() => setOverviewOpen(false)}
-                  className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${!overviewOpen ? 'text-white border-yellow-500' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
-                >
-                  Detalles
-                </button>
-                <button
-                  onClick={() => setOverviewOpen(true)}
-                  className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${overviewOpen ? 'text-white border-yellow-500' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
-                >
-                  Sinopsis
-                </button>
+            {/* 4. CONTENEDOR TABS Y CONTENIDO */}
+            <div className="mb-6">
+
+              {/* --- MENÚ DE NAVEGACIÓN --- */}
+              <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
+                {[
+                  { id: 'details', label: 'Detalles' },
+                  { id: 'production', label: 'Producción' }, // ✅ Nueva Pestaña
+                  { id: 'synopsis', label: 'Sinopsis' },
+                  ...(extras.awards ? [{ id: 'awards', label: 'Premios' }] : [])
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
+          ${activeTab === tab.id
+                        ? 'text-white border-yellow-500'
+                        : 'text-zinc-500 border-transparent hover:text-zinc-300'
+                      }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
-              {/* Área de contenido cambiante */}
-              <div className="relative min-h-[120px]">
+              {/* --- ÁREA DE CONTENIDO --- */}
+              <div className="relative min-h-[100px]">
                 <AnimatePresence mode="wait">
-                  {overviewOpen ? (
-                    // VISTA SINOPSIS
+
+                  {/* 1. SINOPSIS */}
+                  {activeTab === 'synopsis' && (
                     <motion.div
                       key="synopsis"
                       initial={{ opacity: 0, y: 10 }}
@@ -3438,13 +3455,15 @@ export default function DetailsClient({
                             “{data.tagline}”
                           </div>
                         )}
-                        <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify">
+                        <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
                           {data.overview || 'No hay descripción disponible.'}
                         </p>
                       </div>
                     </motion.div>
-                  ) : (
-                    // VISTA DETALLES (GRID NUEVO Y BONITO)
+                  )}
+
+                  {/* 2. DETALLES (Auto-ajuste por contenido) */}
+                  {activeTab === 'details' && (
                     <motion.div
                       key="details"
                       initial={{ opacity: 0, y: 10 }}
@@ -3452,46 +3471,138 @@ export default function DetailsClient({
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {(type === 'movie' ? data.original_title : data.original_name) && (
-                          <VisualMetaCard icon={type === 'movie' ? FilmIcon : MonitorPlay} label="Título Original" value={type === 'movie' ? data.original_title : data.original_name} />
-                        )}
-                        {(movieDirector || createdByNames) && (
-                          <VisualMetaCard icon={Users} label={type === 'movie' ? 'Director' : 'Creadores'} value={movieDirector || createdByNames} />
-                        )}
-                        {countries && (
-                          <VisualMetaCard icon={MapPin} label="País" value={countries} />
-                        )}
-                        {languages && (
-                          <VisualMetaCard icon={Languages} label="Idiomas" value={languages} />
-                        )}
-                        {releaseDateValue && (
-                          <VisualMetaCard icon={CalendarIcon} label={type === 'movie' ? 'Estreno' : 'Inicio'} value={releaseDateValue} />
-                        )}
-                        {type === 'movie' && budgetValue && (
-                          <VisualMetaCard icon={BadgeDollarSignIcon} label="Presupuesto" value={budgetValue} />
-                        )}
-                        {type === 'movie' && revenueValue && (
-                          <VisualMetaCard icon={TrendingUp} label="Recaudación" value={revenueValue} />
-                        )}
-                        {type === 'tv' && data.number_of_seasons && (
-                          <VisualMetaCard icon={Layers} label="Formato" value={`${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`} />
-                        )}
-                        {(production || network) && (
-                          <VisualMetaCard icon={Building2} label={network ? 'Canal' : 'Producción'} value={network || production} />
-                        )}
-                        {extras.awards && (
-                          <div className="col-span-2 md:col-span-2">
-                            <VisualMetaCard icon={Trophy} label="Premios" value={extras.awards} />
-                          </div>
-                        )}
+                      {/* Flex wrap permite que bajen de línea si no caben, flex-auto ajusta el ancho según texto */}
+                      <div className="flex flex-wrap gap-3 items-stretch">
+
+                        <VisualMetaCard
+                          icon={type === 'movie' ? FilmIcon : MonitorPlay}
+                          label="Título Original"
+                          value={type === 'movie' ? data.original_title : data.original_name}
+                          // flex-auto: Crece según el texto. md:w-auto: Resetea anchos fijos.
+                          className="w-full sm:w-auto flex-auto min-w-[180px]"
+                        />
+
+                        <VisualMetaCard
+                          icon={MapPin}
+                          label="País"
+                          value={countries || '—'}
+                          className="w-full sm:w-auto flex-auto min-w-[120px]"
+                        />
+
+                        <VisualMetaCard
+                          icon={Languages}
+                          label="Idiomas"
+                          value={languages || '—'}
+                          className="w-full sm:w-auto flex-auto min-w-[120px]"
+                        />
+
+                        <VisualMetaCard
+                          icon={CalendarIcon}
+                          label={type === 'movie' ? 'Estreno' : 'Inicio'}
+                          value={releaseDateValue || '—'}
+                          className="w-full sm:w-auto flex-auto min-w-[130px]"
+                        />
+
                       </div>
                     </motion.div>
                   )}
+
+                  {/* 3. PRODUCCIÓN Y EQUIPO (Orden corregido, Fila única) */}
+                  {activeTab === 'production' && (
+                    <motion.div
+                      key="production"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <div className="flex flex-nowrap gap-3 items-stretch overflow-x-auto pb-2 [scrollbar-width:none]">
+
+                        {/* 1. Director / Creadores */}
+                        <VisualMetaCard
+                          icon={Users}
+                          label={type === 'movie' ? 'Director' : 'Creadores'}
+                          value={movieDirector || createdByNames || 'Desconocido'}
+                          className="w-auto flex-auto shrink-0"
+                        />
+
+                        {/* 2. Presupuesto (Cine) o Fecha Fin (TV) - MOVIDO AQUÍ */}
+                        {type === 'movie' ? (
+                          <VisualMetaCard
+                            icon={BadgeDollarSignIcon}
+                            label="Presupuesto"
+                            value={budgetValue || '—'}
+                            className="w-auto flex-auto shrink-0"
+                          />
+                        ) : (
+                          <VisualMetaCard
+                            icon={CalendarIcon}
+                            label={data.status === 'Ended' ? 'Finalización' : 'Última emisión'}
+                            value={lastAirDateValue || 'En emisión'}
+                            className="w-auto flex-auto shrink-0"
+                          />
+                        )}
+
+                        {/* 3. Recaudación (Cine) o Formato (TV) - MOVIDO AQUÍ */}
+                        {type === 'movie' ? (
+                          <VisualMetaCard
+                            icon={TrendingUp}
+                            label="Recaudación"
+                            value={revenueValue || '—'}
+                            className="w-auto flex-auto shrink-0"
+                          />
+                        ) : (
+                          <VisualMetaCard
+                            icon={Layers}
+                            label="Formato"
+                            value={data.number_of_seasons ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.` : '—'}
+                            className="w-auto flex-auto shrink-0"
+                          />
+                        )}
+
+                        {/* 4. Producción / Canal - MOVIDO AL FINAL (Suele ser largo) */}
+                        <VisualMetaCard
+                          icon={Building2}
+                          label={network ? 'Canal' : 'Producción'}
+                          value={network || production || '—'}
+                          // flex-auto hará que este crezca más si el texto es largo
+                          className="w-auto flex-auto shrink-0"
+                        />
+
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* 4. PREMIOS */}
+                  {activeTab === 'awards' && extras.awards && (
+                    <motion.div
+                      key="awards"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-6">
+                        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
+
+                        <div className="flex items-start gap-4 relative z-10">
+                          <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
+                            <Trophy className="w-8 h-8" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-white mb-2">Reconocimientos</h3>
+                            <p className="text-base font-medium text-yellow-100/90 leading-relaxed whitespace-pre-line">
+                              {extras.awards}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
                 </AnimatePresence>
               </div>
             </div>
-
           </div>
         </div>
 
