@@ -260,6 +260,25 @@ function pickBestNeutralPosterByResVotes(list, opts = {}) {
   return sorted[0] || pool1[0] || null
 }
 
+/* Tarjeta de Metadato Visual */
+function VisualMetaCard({ icon: Icon, label, value, subvalue, colorClass = "text-zinc-100", bgClass = "bg-zinc-800" }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group">
+      <div className={`p-2.5 rounded-lg shrink-0 ${bgClass} bg-opacity-20 group-hover:bg-opacity-30 transition-all`}>
+        <Icon className={`w-5 h-5 ${colorClass}`} />
+      </div>
+      <div className="flex flex-col min-w-0 overflow-hidden">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-0.5">{label}</span>
+        <span className="text-sm font-bold text-zinc-100 truncate leading-tight" title={typeof value === 'string' ? value : ''}>
+          {value}
+        </span>
+        {subvalue && <span className="text-[11px] text-zinc-400 truncate">{subvalue}</span>}
+      </div>
+    </div>
+  );
+}
+
 /* ====================================================================
  * MISMO CRITERIO QUE MainDashboard:
  *  - Backdrops: EN -> resolución -> votos
@@ -2568,12 +2587,7 @@ export default function DetailsClient({
    COMPONENTES AUXILIARES (MODIFICADOS)
 ========================================= */
 
-  /* Separador vertical */
-  function Separator() {
-    return <div className="w-px h-8 bg-white/5 shrink-0 mx-2" />;
-  }
-
-  /* Badge de Puntuación: Logos SIEMPRE a color */
+  /* Badge de Puntuación: Ajustado para ser más sutil (texto más pequeño) */
   function CompactBadge({ logo, label, value, sub, suffix, href }) {
     const Comp = href ? 'a' : 'div';
 
@@ -2583,46 +2597,82 @@ export default function DetailsClient({
         target={href ? "_blank" : undefined}
         rel={href ? "noopener noreferrer" : undefined}
         className={`
-        flex items-center gap-3 group shrink-0 select-none
+        flex items-center gap-2.5 group shrink-0 select-none
         ${href ? "cursor-pointer" : ""}
       `}
       >
-        {/* CAMBIO REALIZADO: 
-          Se eliminó 'grayscale', 'group-hover:grayscale-0', 'opacity-80'.
-          Ahora siempre está a color y con opacidad total.
-      */}
         <img
           src={logo}
           alt={label || "Provider"}
-          className="h-6 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110"
+          className="h-5 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110"
         />
 
         <div className="flex flex-col justify-center leading-none">
           <div className="flex items-baseline gap-0.5">
-            <span className="text-xl sm:text-2xl font-black text-white tracking-tighter shadow-black drop-shadow-sm">
+            {/* CAMBIO: Tamaño reducido de text-2xl a text-lg/xl para más elegancia */}
+            <span className="text-lg sm:text-xl font-black text-white tracking-tight shadow-black drop-shadow-sm">
               {value != null ? value : '-'}
             </span>
             {suffix && (
-              <span className="text-[10px] font-bold text-zinc-500 mb-1">
+              <span className="text-[10px] font-bold text-zinc-500 mb-0.5">
                 {suffix}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 mt-0.5">
+          <div className="flex items-center gap-1 mt-0.5">
             {label && (
               <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest bg-white/5 px-1 rounded-sm">
                 {label}
               </span>
             )}
             {sub && (
-              <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors tracking-wide whitespace-nowrap">
+              <span className="text-[9px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors tracking-wide whitespace-nowrap">
                 {sub}
               </span>
             )}
           </div>
         </div>
       </Comp>
+    );
+  }
+
+  /* Tarjeta de Metadato: Diseño Genérico, Compacto y "Clean" */
+  function VisualMetaCard({ icon: Icon, label, value }) {
+    if (!value) return null;
+    return (
+      <div className="flex items-center gap-3 p-2.5 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.06] transition-colors group">
+        <div className="p-2 rounded-md bg-white/5 text-zinc-400 group-hover:text-zinc-200 group-hover:bg-white/10 transition-colors">
+          <Icon className="w-4 h-4" />
+        </div>
+        <div className="flex flex-col min-w-0">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 mb-0.5">{label}</span>
+          <span className="text-xs sm:text-sm font-semibold text-zinc-200 truncate leading-tight" title={typeof value === 'string' ? value : ''}>
+            {value}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  /* Botón de Enlace Externo (Estilo Icono Scoreboard) */
+  function ExternalLinkButton({ icon, href, title }) {
+    if (!href) return null;
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all group"
+        title={title}
+      >
+        {/* Si es string asumimos url de imagen, si es componente lo renderizamos */}
+        {typeof icon === 'string' ? (
+          <img src={icon} alt={title} className="w-4 h-4 object-contain opacity-60 group-hover:opacity-100 transition-opacity" />
+        ) : (
+          icon
+        )}
+      </a>
     );
   }
 
@@ -3096,19 +3146,23 @@ export default function DetailsClient({
 
       {/* --- CONTENIDO PRINCIPAL --- */}
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
-        {/* HEADER HERO SECTION */}
-        <div className="flex flex-col lg:flex-row gap-10 mb-16 animate-in fade-in duration-700 slide-in-from-bottom-4">
-          {/* POSTER */}
-          <div className="w-full lg:w-[350px] flex-shrink-0 flex flex-col gap-5">
-            <div className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/60 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.95)] hover:border-yellow-500/60">
+        {/* =================================================================
+            HEADER HERO SECTION (Diseño Final Solicitado)
+           ================================================================= */}
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 animate-in fade-in duration-700 slide-in-from-bottom-4 items-start">
+
+          {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS --- */}
+          <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-4 relative z-10">
+            {/* Poster Card */}
+            <div className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.08)]">
               <button
                 type="button"
                 onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setUseBackdrop((v) => !v)
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setUseBackdrop((v) => !v);
                 }}
-                className={`absolute top-3 right-3 z-20 p-2.5 rounded-full backdrop-blur-md border transition-all shadow-lg
+                className={`absolute top-2 right-2 z-20 p-2 rounded-full backdrop-blur-md border transition-all shadow-lg
                   opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto
                   ${useBackdrop
                     ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/30'
@@ -3116,45 +3170,35 @@ export default function DetailsClient({
                   }`}
                 title={useBackdrop ? 'Desactivar fondo' : 'Activar fondo'}
               >
-                <ImageIcon className="w-5 h-5" />
+                <ImageIcon className="w-4 h-4" />
               </button>
 
               <div className="relative aspect-[2/3] bg-neutral-900">
-                {/* ✅ Skeleton mientras inicializa o mientras carga la imagen */}
                 {showPosterSkeleton && (
                   <div className="absolute inset-0 animate-pulse bg-neutral-800/60" />
                 )}
-
-                {/* ✅ Imagen (fade-in cuando termina de cargar) */}
                 {displayPosterPath && !posterImgError && (
-                  <>
-                    <img
-                      src={`https://image.tmdb.org/t/p/w780${displayPosterPath}`}
-                      alt={title}
-                      onLoad={() => setPosterImgLoaded(true)}
-                      onError={() => {
-                        setPosterImgError(true)
-                        setPosterImgLoaded(true)
-                      }}
-                      className={`w-full h-full object-cover transform-gpu transition-all duration-700
-          ${posterImgLoaded ? 'opacity-100' : 'opacity-0'}
-          group-hover:scale-[1.12] group-hover:-translate-y-1 group-hover:rotate-[0.6deg] group-hover:saturate-150`}
-                    />
-                    <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-t from-black/75 via-transparent to-transparent" />
-                  </>
+                  <img
+                    src={`https://image.tmdb.org/t/p/w780${displayPosterPath}`}
+                    alt={title}
+                    onLoad={() => setPosterImgLoaded(true)}
+                    onError={() => { setPosterImgError(true); setPosterImgLoaded(true); }}
+                    className={`w-full h-full object-cover transform-gpu transition-all duration-700
+                      ${posterImgLoaded ? 'opacity-100' : 'opacity-0'}
+                      group-hover:scale-[1.03] group-hover:saturate-110`}
+                  />
                 )}
-
-                {/* ✅ Solo muestra "no hay portada" cuando YA sabemos que no existe */}
                 {(showNoPoster || posterImgError) && (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <ImageOff className="w-12 h-12 text-neutral-700" />
+                    <ImageOff className="w-10 h-10 text-neutral-700" />
                   </div>
                 )}
               </div>
             </div>
 
+            {/* Providers Grid (Mantenido abajo del poster) */}
             {limitedProviders && limitedProviders.length > 0 && (
-              <div className="grid grid-cols-7 gap-2 place-items-center overflow-visible py-1">
+              <div className="flex flex-wrap justify-center gap-2 py-3 px-3 rounded-xl bg-black/30 border border-white/5 backdrop-blur-sm">
                 {limitedProviders.map((p) => (
                   <a
                     key={p.provider_id}
@@ -3162,14 +3206,12 @@ export default function DetailsClient({
                     target={tmdbWatchUrl ? '_blank' : undefined}
                     rel={tmdbWatchUrl ? 'noreferrer' : undefined}
                     title={p.provider_name}
-                    className="relative overflow-visible hover:z-10"
+                    className="relative transition-transform hover:scale-110 hover:z-10"
                   >
                     <img
                       src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
                       alt={p.provider_name}
-                      className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg object-contain cursor-pointer
-                     transform-gpu will-change-transform
-                     hover:scale-110 hover:-translate-y-0.5 transition-transform"
+                      className="w-10 h-10 rounded-lg object-contain shadow-md bg-white/5"
                     />
                   </a>
                 ))}
@@ -3177,231 +3219,180 @@ export default function DetailsClient({
             )}
           </div>
 
-          {/* INFO COLUMN */}
-          <div className="flex-1 flex flex-col gap-5">
-            {/* Título y Acciones */}
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white leading-tight drop-shadow-lg tracking-tight">
+          {/* --- COLUMNA DERECHA: INFO + TABS --- */}
+          <div className="flex-1 flex flex-col min-w-0 w-full">
+
+            {/* 1. TÍTULO Y CABECERA */}
+            <div className="mb-5">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
                 {title}
-                {yearIso && (
-                  <span className="text-2xl md:text-2xl font-light text-gray-400 ml-3">
-                    ({yearIso})
-                  </span>
-                )}
               </h1>
 
-              <div className="flex items-center mt-3 gap-3 shrink-0">
-                <button
-                  onClick={() => openVideo(preferredVideo)}
-                  disabled={!preferredVideo}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu
-                    ${preferredVideo
-                      ? 'bg-yellow-500/15 border-yellow-500/50 text-yellow-300 hover:bg-yellow-500/25 hover:shadow-[0_0_25px_rgba(234,179,8,0.25)]'
-                      : 'bg-white/5 border-white/10 text-white/30 cursor-not-allowed'
-                    }`}
-                  title={preferredVideo ? 'Ver tráiler / vídeo' : 'No hay vídeos disponibles'}
-                >
-                  <Play className="w-6 h-6" />
-                </button>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-base md:text-lg font-medium text-zinc-300">
+                {yearIso && <span className="text-white font-bold tracking-wide">{yearIso}</span>}
 
-                <TraktWatchedControl
-                  connected={trakt.connected}
-                  watched={trakt.watched}
-                  plays={trakt.plays}
-                  busy={!!traktBusy}
-                  onOpen={() => {
-                    if (!trakt.connected) {
-                      window.location.href = "/api/trakt/auth/start"
-                      return
-                    }
-                    // ✅ Para series: abrir tabla episodios
-                    if (endpointType === 'tv') setTraktEpisodesOpen(true)
-                    // ✅ Para pelis: mantener tu modal actual de plays/historial
-                    else setTraktWatchedOpen(true)
-                  }}
-                />
-
-                <button
-                  onClick={toggleFavorite}
-                  disabled={favLoading}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu ${favorite
-                    ? 'bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/30 hover:shadow-[0_0_25px_rgba(248,113,113,0.4)]'
-                    : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:shadow-lg'
-                    }`}
-                  title="Favorito"
-                >
-                  {favLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : favorite ? (
-                    <Heart className="fill-current w-6 h-6" />
-                  ) : (
-                    <Heart className="w-6 h-6" />
-                  )}
-                </button>
-
-                <button
-                  onClick={toggleWatchlist}
-                  disabled={wlLoading}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu ${watchlist
-                    ? 'bg-blue-500/20 border-blue-500 text-blue-400 hover:bg-blue-500/30 hover:shadow-[0_0_25px_rgba(59,130,246,0.4)]'
-                    : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:shadow-lg'
-                    }`}
-                  title="Pendiente"
-                >
-                  {wlLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : watchlist ? (
-                    <BookmarkMinus className="fill-current w-6 h-6" />
-                  ) : (
-                    <BookmarkPlus className="w-6 h-6" />
-                  )}
-                </button>
-
-                {canUseLists && (
-                  <button
-                    type="button"
-                    onClick={openListsModal}
-                    disabled={listsPresenceLoading}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border transform-gpu
-      ${listActive
-                        ? 'bg-purple-500/22 border-purple-500/70 text-purple-200 hover:bg-purple-500/30 hover:shadow-[0_0_22px_rgba(168,85,247,0.25)]'
-                        : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:shadow-lg'
-                      }
-      ${listsPresenceLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                    title="Añadir a listas"
-                  >
-                    {listsPresenceLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      // ✅ aquí pon el MISMO icono que en el navbar (si es otro, sustitúyelo)
-                      <ListVideo className="w-6 h-6" />
-                    )}
-                  </button>
+                {runtimeValue && (
+                  <>
+                    <span className="text-zinc-600 text-[10px]">●</span>
+                    <span>{runtimeValue}</span>
+                  </>
                 )}
+
+                {data.status && (
+                  <>
+                    <span className="text-zinc-600 text-[10px]">●</span>
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${data.status === 'Ended' || data.status === 'Canceled'
+                      ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                      : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                      }`}>
+                      {data.status}
+                    </span>
+                  </>
+                )}
+
+                {/* Géneros */}
+                <div className="flex flex-wrap items-center gap-1.5 ml-1">
+                  {data.genres?.slice(0, 3).map(g => (
+                    <span key={g.id} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/10 text-zinc-400 bg-white/5">
+                      {g.name}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Tags / Géneros */}
-            <div className="flex flex-wrap gap-2 text-sm font-medium">
-              {data.genres?.map((g) => (
-                <span
-                  key={g.id}
-                  className="px-3 py-1 rounded-full bg-white/10 text-gray-200 border border-white/5 hover:bg-white/20 transition-colors cursor-default"
+            {/* 2. BARRA DE ACCIONES PRINCIPALES */}
+            <div className="flex flex-wrap items-center gap-3 mb-8">
+              {/* Botón Tráiler (Solo icono) */}
+              <button
+                onClick={() => openVideo(preferredVideo)}
+                disabled={!preferredVideo}
+                className={`
+                  w-12 h-12 rounded-full flex items-center justify-center transition-all transform-gpu hover:scale-110 shadow-lg group
+                  ${preferredVideo
+                    ? 'bg-white text-black hover:bg-yellow-400'
+                    : 'bg-white/10 text-white/30 cursor-not-allowed'}
+                `}
+                title={preferredVideo ? 'Ver Tráiler' : 'Sin Tráiler'}
+              >
+                <Play className={`w-5 h-5 fill-current ${preferredVideo ? 'ml-0.5' : ''}`} />
+              </button>
+
+              <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
+
+              <TraktWatchedControl
+                connected={trakt.connected}
+                watched={trakt.watched}
+                plays={trakt.plays}
+                busy={!!traktBusy}
+                onOpen={() => {
+                  if (!trakt.connected) window.location.href = "/api/trakt/auth/start"
+                  else if (endpointType === 'tv') setTraktEpisodesOpen(true)
+                  else setTraktWatchedOpen(true)
+                }}
+              />
+
+              <button
+                onClick={toggleFavorite}
+                disabled={favLoading}
+                className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors border ${favorite
+                  ? 'border-red-500/50 bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                  : 'border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+                  }`}
+                title="Favorito"
+              >
+                {favLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Heart className={`w-5 h-5 ${favorite ? 'fill-current' : ''}`} />}
+              </button>
+
+              <button
+                onClick={toggleWatchlist}
+                disabled={wlLoading}
+                className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors border ${watchlist
+                  ? 'border-blue-500/50 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
+                  : 'border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+                  }`}
+                title="Watchlist"
+              >
+                {wlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <BookmarkPlus className={`w-5 h-5 ${watchlist ? 'fill-current' : ''}`} />}
+              </button>
+
+              {canUseLists && (
+                <button
+                  onClick={openListsModal}
+                  disabled={listsPresenceLoading}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors border ${listActive
+                    ? 'border-purple-500/50 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20'
+                    : 'border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+                    }`}
+                  title="Añadir a lista"
                 >
-                  {g.name}
-                </span>
-              ))}
+                  {listsPresenceLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ListVideo className="w-5 h-5" />}
+                </button>
+              )}
             </div>
 
-            {/* =========================================
-                SCOREBOARD TOOLBAR (2 filas: ratings + stats)
-                ========================================= */}
-            <div className="w-full border-y border-white/10 bg-black/25 backdrop-blur-md">
-              {/* FILA 1: Ratings + Acciones */}
-              <div className="px-3 sm:px-4 py-2.5">
-                <div className="flex items-start gap-3">
-                  {/* Ratings externos (WRAP para que se vean todos) */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 min-w-0">
-                      {tScoreboard.loading && (
-                        <div className="w-4 h-4 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin shrink-0" />
-                      )}
+            {/* 3. SCOREBOARD INTEGRADO (Nuevo diseño: números pequeños, enlaces filtrados) */}
+            <div className="w-full border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl overflow-hidden mb-6">
+              <div className="px-4 py-3 flex items-center gap-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
-                      <CompactBadge
-                        logo="/logo-TMDb.png"
-                        value={data.vote_average?.toFixed(1)}
-                        sub={`${formatVoteCount(data.vote_count)} votes`}
-                        href={tmdbDetailUrl}
-                      />
+                {/* A. Ratings (Texto ajustado) */}
+                <div className="flex items-center gap-5 shrink-0">
+                  {tScoreboard.loading && <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />}
 
-                      {tScoreboard.rating != null && (
-                        <CompactBadge
-                          logo="/logo-Trakt.png"
-                          value={Math.round(tScoreboard.rating * 10)}
-                          suffix="%"
-                          sub={`${formatVoteCount(tScoreboard.votes)} votes`}
-                          href={trakt?.traktUrl}
-                        />
-                      )}
+                  <CompactBadge logo="/logo-TMDb.png" value={data.vote_average?.toFixed(1)} sub={`${formatVoteCount(data.vote_count)} votes`} href={tmdbDetailUrl} />
 
-                      {extras.imdbRating && (
-                        <CompactBadge
-                          logo="/logo-IMDb.png"
-                          value={Number(extras.imdbRating).toFixed(1)}
-                          sub={`${formatVoteCount(extras.imdbVotes)} votes`}
-                          href={data.imdb_id ? `https://www.imdb.com/title/${data.imdb_id}` : undefined}
-                        />
-                      )}
+                  {tScoreboard.rating != null && (
+                    <CompactBadge logo="/logo-Trakt.png" value={Math.round(tScoreboard.rating * 10)} suffix="%" sub={`${formatVoteCount(tScoreboard.votes)} votes`} href={trakt?.traktUrl} />
+                  )}
 
-                      {(tScoreboard?.external?.rtAudience != null || extras.rtScore != null) && (
-                        <CompactBadge
-                          logo="/logo-RottenTomatoes.png"
-                          value={
-                            tScoreboard?.external?.rtAudience != null
-                              ? Math.round(tScoreboard.external.rtAudience)
-                              : (extras.rtScore != null ? Math.round(extras.rtScore) : null)
-                          }
-                          suffix="%"
-                        />
-                      )}
+                  {extras.imdbRating && (
+                    <CompactBadge logo="/logo-IMDb.png" value={Number(extras.imdbRating).toFixed(1)} sub={`${formatVoteCount(extras.imdbVotes)} votes`} href={data.imdb_id ? `https://www.imdb.com/title/${data.imdb_id}` : undefined} />
+                  )}
 
-                      {extras.mcScore != null && (
-                        <CompactBadge
-                          logo="/logo-Metacritic.png"
-                          value={Math.round(extras.mcScore)}
-                          suffix="/100"
-                        />
-                      )}
+                  {(tScoreboard?.external?.rtAudience != null || extras.rtScore != null) && (
+                    <CompactBadge logo="/logo-RottenTomatoes.png" value={tScoreboard?.external?.rtAudience != null ? Math.round(tScoreboard.external.rtAudience) : (extras.rtScore != null ? Math.round(extras.rtScore) : null)} suffix="%" />
+                  )}
 
-                      {tScoreboard?.external?.justwatchRank && (
-                        <CompactBadge
-                          logo="/logo-Justwatch.png"
-                          label="Rank"
-                          value={`#${tScoreboard.external.justwatchRank}`}
-                        />
-                      )}
-                    </div>
-                  </div>
+                  {extras.mcScore != null && (
+                    <CompactBadge logo="/logo-Metacritic.png" value={Math.round(extras.mcScore)} suffix="/100" />
+                  )}
+                </div>
 
-                  {/* Acciones usuario (siempre visibles) */}
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 pl-2 border-l border-white/5">
+                <div className="w-px h-6 bg-white/10 shrink-0" />
 
-                    {/* Botón Sync (Toggle pequeño) */}
-                    <button
-                      onClick={() => setSyncTrakt(!syncTrakt)}
-                      className={`
-                        flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded transition-colors 
-                        ${syncTrakt
-                          ? 'opacity-100'
-                          : 'opacity-40 hover:opacity-80'}
-                      `}
-                      title="Sincronizar puntuación entre TMDb y Trakt automáticamente"
-                    >
-                      <div className={`w-8 h-1 rounded-full ${syncTrakt ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]' : 'bg-zinc-600'}`} />
-                      <span className="text-[9px] font-bold uppercase text-zinc-400 tracking-widest">Sync</span>
-                    </button>
+                {/* B. Enlaces Externos (Solo Web, Filmaffinity, SeriesGraph) */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <ExternalLinkButton icon="/logo-Web.png" href={data.homepage} title="Web Oficial" />
+                  <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} title="FilmAffinity" />
+                  {type === 'tv' && <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} title="SeriesGraph" />}
+                </div>
 
-                    {/* Botón Unificado de Puntuación */}
-                    <UnifiedRateButton
-                      rating={unifiedUserRating}
-                      loading={accountStatesLoading || ratingLoading || !!traktBusy}
-                      onRate={handleUnifiedRate}
-                      connected={!!session} // Asumimos TMDb como base mínima
-                      onConnect={() => (window.location.href = '/login')}
-                    />
-                  </div>
+                <div className="w-px h-6 bg-white/10 shrink-0 ml-auto" />
+
+                {/* C. Controles Usuario (Sync + Rate) */}
+                <div className="flex items-center gap-3 shrink-0">
+                  <button onClick={() => setSyncTrakt(!syncTrakt)} className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded transition-colors ${syncTrakt ? 'opacity-100' : 'opacity-40 hover:opacity-80'}`} title="Sync">
+                    <div className={`w-8 h-1 rounded-full ${syncTrakt ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]' : 'bg-zinc-600'}`} />
+                    <span className="text-[8px] font-bold uppercase text-zinc-400 tracking-widest">Sync</span>
+                  </button>
+
+                  <UnifiedRateButton
+                    rating={unifiedUserRating}
+                    loading={accountStatesLoading || ratingLoading || !!traktBusy}
+                    onRate={handleUnifiedRate}
+                    connected={!!session}
+                    onConnect={() => (window.location.href = '/login')}
+                  />
                 </div>
               </div>
 
-              {/* FILA 2: Trakt stats debajo */}
+              {/* Trakt Stats Footer */}
               {!tScoreboard.loading && (
-                <div className="px-3 sm:px-4 py-2 border-t border-white/10 bg-black/20">
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                    <MiniStat icon={Eye} value={formatVoteCount(tScoreboard?.stats?.watchers ?? 0)} tooltip="Watchers" />
-                    <MiniStat icon={Play} value={formatVoteCount(tScoreboard?.stats?.plays ?? 0)} tooltip="Plays" />
-                    <MiniStat icon={List} value={formatVoteCount(tScoreboard?.stats?.lists ?? 0)} tooltip="Lists" />
-                    <MiniStat icon={Heart} value={formatVoteCount(tScoreboard?.stats?.favorited ?? 0)} tooltip="Favorited" />
-                  </div>
+                <div className="px-4 py-2 border-t border-white/5 bg-black/10 flex items-center gap-6 overflow-x-auto [scrollbar-width:none]">
+                  <MiniStat icon={Eye} value={formatVoteCount(tScoreboard?.stats?.watchers ?? 0)} tooltip="Watchers" />
+                  <MiniStat icon={Play} value={formatVoteCount(tScoreboard?.stats?.plays ?? 0)} tooltip="Plays" />
+                  <MiniStat icon={List} value={formatVoteCount(tScoreboard?.stats?.lists ?? 0)} tooltip="Lists" />
+                  <MiniStat icon={Heart} value={formatVoteCount(tScoreboard?.stats?.favorited ?? 0)} tooltip="Favorited" />
                 </div>
               )}
 
@@ -3412,379 +3403,95 @@ export default function DetailsClient({
               )}
             </div>
 
-            {/* Links Externos */}
-            <div className="flex gap-2 flex-wrap mt-1">
-              {data.homepage && (
-                <a
-                  href={data.homepage}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Web oficial"
-                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
+            {/* 4. CONTENEDOR TABS (Alternar Detalles / Sinopsis) */}
+            <div className="mb-2">
+              <div className="flex items-center gap-6 mb-4 border-b border-white/10 pb-1">
+                <button
+                  onClick={() => setOverviewOpen(false)}
+                  className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${!overviewOpen ? 'text-white border-yellow-500' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
                 >
-                  <img
-                    src="/logo-Web.png"
-                    alt="Web oficial"
-                    className="w-9 h-9 object-contain rounded-lg"
-                  />
-                </a>
-              )}
-
-              {tmdbDetailUrl && (
-                <a
-                  href={tmdbDetailUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="The Movie Database"
-                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
+                  Detalles
+                </button>
+                <button
+                  onClick={() => setOverviewOpen(true)}
+                  className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${overviewOpen ? 'text-white border-yellow-500' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
                 >
-                  <img
-                    src="/logo-TMDb.png"
-                    alt="TMDb"
-                    className="w-9 h-9 object-contain rounded-lg"
-                  />
-                </a>
-              )}
+                  Sinopsis
+                </button>
+              </div>
 
-              {data.imdb_id && (
-                <a
-                  href={`https://www.imdb.com/title/${data.imdb_id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="IMDb"
-                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
-                >
-                  <img
-                    src="/logo-IMDb.png"
-                    alt="IMDb"
-                    className="w-9 h-9 object-contain rounded-lg"
-                  />
-                </a>
-              )}
-
-              <a
-                href={filmAffinitySearchUrl}
-                target="_blank"
-                rel="noreferrer"
-                title="FilmAffinity"
-                className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
-              >
-                <img
-                  src="/logoFilmaffinity.png"
-                  alt="FilmAffinity"
-                  className="w-9 h-9 object-contain rounded-lg"
-                />
-              </a>
-
-              {/* Trakt */}
-              <a
-                href={
-                  trakt?.traktUrl
-                    ? trakt.traktUrl
-                    : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
-                }
-                target="_blank"
-                rel="noreferrer"
-                title="Trakt"
-                className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
-              >
-                <img
-                  src="/logo-Trakt.png"
-                  alt="Trakt"
-                  className="w-9 h-9 object-contain rounded-lg"
-                />
-              </a>
-
-              {type === 'tv' && seriesGraphUrl && (
-                <a
-                  href={seriesGraphUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="SeriesGraph"
-                  className="group flex items-center justify-center w-10 h-10 rounded-2xl transition-transform duration-200 transform-gpu hover:scale-110 active:scale-95"
-                >
-                  <img
-                    src="/logoseriesgraph.png"
-                    alt="SeriesGraph"
-                    className="w-9 h-9 object-contain rounded-lg"
-                  />
-                </a>
-              )}
-            </div>
-
-            {/* ✅ Resumen plegable (oculto por defecto) */}
-            <div>
-              <button
-                type="button"
-                onClick={() => setOverviewOpen((v) => !v)}
-                className="w-full flex items-center justify-between gap-4 px-4 py-3 rounded-2xl
-                  bg-white/5 border border-white/10 hover:bg-white/10 transition"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-black/25 border border-white/10 flex items-center justify-center shrink-0">
-                    <MessageSquareIcon className="w-5 h-5 text-zinc-200" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-extrabold text-white truncate">Resumen</div>
-                    <div className="text-[11px] text-zinc-400 truncate">
-                      {overviewOpen ? 'Ocultar sinopsis' : 'Mostrar sinopsis'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="shrink-0 text-zinc-300">
-                  {overviewOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                </div>
-              </button>
-
-              <AnimatePresence initial={false}>
-                {overviewOpen && (
-                  <motion.div
-                    key="overview"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.25, ease: 'easeOut' }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-4 pt-4 pb-4">
-                      {data?.tagline && (
-                        <p className="text-gray-300/70 text-[20px] sm:text-[20px] italic mb-4">
-                          “{data.tagline}”
+              {/* Área de contenido cambiante */}
+              <div className="relative min-h-[120px]">
+                <AnimatePresence mode="wait">
+                  {overviewOpen ? (
+                    // VISTA SINOPSIS
+                    <motion.div
+                      key="synopsis"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <div className="p-5 rounded-2xl bg-white/5 border border-white/5">
+                        {data.tagline && (
+                          <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
+                            “{data.tagline}”
+                          </div>
+                        )}
+                        <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify">
+                          {data.overview || 'No hay descripción disponible.'}
                         </p>
-                      )}
-
-                      {data?.overview ? (
-                        <p className="text-gray-300 text-sm sm:text-base md:text-lg leading-relaxed text-justify md:text-left">
-                          {data.overview}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-zinc-400">No hay resumen disponible.</p>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    // VISTA DETALLES (GRID NUEVO Y BONITO)
+                    <motion.div
+                      key="details"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {(type === 'movie' ? data.original_title : data.original_name) && (
+                          <VisualMetaCard icon={type === 'movie' ? FilmIcon : MonitorPlay} label="Título Original" value={type === 'movie' ? data.original_title : data.original_name} />
+                        )}
+                        {(movieDirector || createdByNames) && (
+                          <VisualMetaCard icon={Users} label={type === 'movie' ? 'Director' : 'Creadores'} value={movieDirector || createdByNames} />
+                        )}
+                        {countries && (
+                          <VisualMetaCard icon={MapPin} label="País" value={countries} />
+                        )}
+                        {languages && (
+                          <VisualMetaCard icon={Languages} label="Idiomas" value={languages} />
+                        )}
+                        {releaseDateValue && (
+                          <VisualMetaCard icon={CalendarIcon} label={type === 'movie' ? 'Estreno' : 'Inicio'} value={releaseDateValue} />
+                        )}
+                        {type === 'movie' && budgetValue && (
+                          <VisualMetaCard icon={BadgeDollarSignIcon} label="Presupuesto" value={budgetValue} />
+                        )}
+                        {type === 'movie' && revenueValue && (
+                          <VisualMetaCard icon={TrendingUp} label="Recaudación" value={revenueValue} />
+                        )}
+                        {type === 'tv' && data.number_of_seasons && (
+                          <VisualMetaCard icon={Layers} label="Formato" value={`${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`} />
+                        )}
+                        {(production || network) && (
+                          <VisualMetaCard icon={Building2} label={network ? 'Canal' : 'Producción'} value={network || production} />
+                        )}
+                        {extras.awards && (
+                          <div className="col-span-2 md:col-span-2">
+                            <VisualMetaCard icon={Trophy} label="Premios" value={extras.awards} />
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
-            {/* METADATOS / CARACTERÍSTICAS */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {type === 'movie' ? (
-                <>
-                  {data.original_title && (
-                    <MetaItem
-                      icon={FilmIcon}
-                      label="Título original"
-                      value={data.original_title}
-                      colorClass="text-blue-400"
-                      className="col-span-2 md:col-span-2"
-                    />
-                  )}
-
-                  {movieDirector && (
-                    <MetaItem
-                      icon={Users}
-                      label="Director"
-                      value={movieDirector}
-                      colorClass="text-rose-400"
-                      className="col-span-2 md:col-span-2"
-                    />
-                  )}
-
-                  {releaseDateValue && (
-                    <MetaItem
-                      icon={CalendarIcon}
-                      label={releaseDateLabel}
-                      value={releaseDateValue}
-                      colorClass="text-blue-300"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {runtimeValue && (
-                    <MetaItem
-                      icon={ClockIcon}
-                      label="Duración"
-                      value={runtimeValue}
-                      colorClass="text-purple-400"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {directorNames && (
-                    <MetaItem
-                      icon={Users}
-                      label="Director"
-                      value={directorNames}
-                      colorClass="text-rose-400"
-                      className="col-span-2 md:col-span-2"
-                    />
-                  )}
-
-                  {budgetValue && (
-                    <MetaItem
-                      icon={BadgeDollarSignIcon}
-                      label="Presupuesto"
-                      value={budgetValue}
-                      colorClass="text-yellow-500"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {revenueValue && (
-                    <MetaItem
-                      icon={TrendingUp}
-                      label="Recaudación"
-                      value={revenueValue}
-                      colorClass="text-emerald-500"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {production && (
-                    <MetaItem
-                      icon={Building2}
-                      label="Producción"
-                      value={production}
-                      colorClass="text-zinc-400"
-                      className={hasAwards ? 'col-span-2 md:col-span-2' : 'col-span-2 md:col-span-4'}
-                    />
-                  )}
-
-                  {extras.awards && (
-                    <MetaItem
-                      icon={Trophy}
-                      label="Premios"
-                      value={extras.awards}
-                      colorClass="text-yellow-500"
-                      className={hasProduction ? 'col-span-2 md:col-span-2' : 'col-span-2 md:col-span-4'}
-                    />
-                  )}
-                </>
-              ) : (
-                <>
-                  {data.original_name && (
-                    <MetaItem
-                      icon={FilmIcon}
-                      label="Título original"
-                      value={data.original_name}
-                      colorClass="text-blue-400"
-                      className="col-span-2 md:col-span-2"
-                    />
-                  )}
-
-                  {createdByNames && (
-                    <MetaItem
-                      icon={Users}
-                      label="Creado por"
-                      value={createdByNames}
-                      colorClass="text-rose-400"
-                      className="col-span-2 md:col-span-2"
-                    />
-                  )}
-
-                  {releaseDateValue && (
-                    <MetaItem
-                      icon={CalendarIcon}
-                      label="Primera emisión"
-                      value={releaseDateValue}
-                      colorClass="text-blue-300"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {lastAirDateValue && (
-                    <MetaItem
-                      icon={CalendarIcon}
-                      label="Última emisión"
-                      value={lastAirDateValue}
-                      colorClass="text-blue-300"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {data.status && (
-                    <MetaItem
-                      icon={StarIcon}
-                      label="Estado"
-                      value={data.status}
-                      colorClass="text-yellow-400"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {network && (
-                    <MetaItem
-                      icon={Building2}
-                      label="Canal"
-                      value={network}
-                      colorClass="text-zinc-300"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {typeof data.number_of_seasons === 'number' && (
-                    <MetaItem
-                      icon={Layers}
-                      label="Temporadas"
-                      value={`${data.number_of_seasons}`}
-                      colorClass="text-orange-400"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {typeof data.number_of_episodes === 'number' && (
-                    <MetaItem
-                      icon={MonitorPlay}
-                      label="Episodios"
-                      value={`${data.number_of_episodes}`}
-                      colorClass="text-pink-400"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {languages && (
-                    <MetaItem
-                      icon={Languages}
-                      label="Idiomas"
-                      value={languages}
-                      colorClass="text-indigo-400"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {countries && (
-                    <MetaItem
-                      icon={MapPin}
-                      label="País"
-                      value={countries}
-                      colorClass="text-red-400"
-                      className="col-span-1"
-                    />
-                  )}
-
-                  {production && (
-                    <MetaItem
-                      icon={Building2}
-                      label="Producción"
-                      value={production}
-                      colorClass="text-zinc-400"
-                      className={hasAwards ? 'col-span-2 md:col-span-2' : 'col-span-2 md:col-span-4'}
-                    />
-                  )}
-
-                  {extras.awards && (
-                    <MetaItem
-                      icon={Trophy}
-                      label="Premios"
-                      value={extras.awards}
-                      colorClass="text-yellow-500"
-                      className={hasProduction ? 'col-span-2 md:col-span-2' : 'col-span-2 md:col-span-4'}
-                    />
-                  )}
-                </>
-              )}
-            </div>
           </div>
         </div>
 
