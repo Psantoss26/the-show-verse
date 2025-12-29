@@ -188,3 +188,63 @@ export async function traktGetShowSeasons({ tmdbId, extended = 'full' }) {
     if (!res.ok) throw new Error(json?.error || 'Error cargando temporadas')
     return json
 }
+
+export async function traktGetScoreboard({ type, tmdbId }) {
+    const qs = new URLSearchParams({ type, tmdbId: String(tmdbId) })
+    const res = await fetch(`/api/trakt/scoreboard?${qs.toString()}`, {
+        method: 'GET',
+        credentials: 'include'
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.error || 'Error cargando scoreboard')
+    return json
+}
+
+export async function traktGetStats({ type, tmdbId }) {
+    const qs = new URLSearchParams({
+        type: String(type),
+        tmdbId: String(tmdbId),
+    })
+
+    const res = await fetch(`/api/trakt/stats?${qs.toString()}`, {
+        cache: 'no-store',
+    })
+
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.error || 'Error cargando stats de Trakt')
+    return json
+}
+
+export async function traktSetRating({ type, ids, tmdbId, rating }) {
+    const resolvedIds = ids || (tmdbId ? { tmdb: Number(tmdbId) } : null)
+
+    const res = await fetch('/api/trakt/ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            type,
+            ids: resolvedIds,
+            rating // puede ser number o null
+        })
+    })
+
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+        throw new Error(json?.error || json?.message || 'Error al puntuar en Trakt')
+    }
+    return json
+}
+
+export async function traktRemoveRating({ type, ids }) {
+    const res = await fetch('/api/trakt/ratings', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, ids }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+        throw new Error(data?.error || `Trakt remove rating failed (${res.status})`)
+    }
+    return data
+}
