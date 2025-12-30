@@ -3102,7 +3102,7 @@ export default function DetailsClient({
     }, 180)
   }, [type])
 
-  const limitedProviders = Array.isArray(providers) ? providers.slice(0, 7) : []
+  const limitedProviders = Array.isArray(providers) ? providers.slice(0, 6) : []
 
   const [posterImgLoaded, setPosterImgLoaded] = useState(false)
   const [posterImgError, setPosterImgError] = useState(false)
@@ -3165,7 +3165,8 @@ export default function DetailsClient({
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 animate-in fade-in duration-700 slide-in-from-bottom-4 items-start">
 
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS --- */}
-          <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-4 relative z-10">
+          <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10">
+
             {/* Poster Card */}
             <div className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.08)]">
               <button
@@ -3176,8 +3177,8 @@ export default function DetailsClient({
                   setUseBackdrop((v) => !v);
                 }}
                 className={`absolute top-2 right-2 z-20 p-2 rounded-full backdrop-blur-md border transition-all shadow-lg
-                  opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto
-                  ${useBackdrop
+        opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto
+        ${useBackdrop
                     ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/30'
                     : 'bg-black/40 border-white/20 text-white/80 hover:bg-black/80 hover:text-white'
                   }`}
@@ -3197,8 +3198,8 @@ export default function DetailsClient({
                     onLoad={() => setPosterImgLoaded(true)}
                     onError={() => { setPosterImgError(true); setPosterImgLoaded(true); }}
                     className={`w-full h-full object-cover transform-gpu transition-all duration-700
-                      ${posterImgLoaded ? 'opacity-100' : 'opacity-0'}
-                      group-hover:scale-[1.03] group-hover:saturate-110`}
+            ${posterImgLoaded ? 'opacity-100' : 'opacity-0'}
+            group-hover:scale-[1.03] group-hover:saturate-110`}
                   />
                 )}
                 {(showNoPoster || posterImgError) && (
@@ -3209,9 +3210,10 @@ export default function DetailsClient({
               </div>
             </div>
 
-            {/* Providers Grid (Mantenido abajo del poster) */}
+            {/* Providers Grid */}
             {limitedProviders && limitedProviders.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-2 py-3 px-3 rounded-xl bg-black/30 border border-white/5 backdrop-blur-sm">
+              // CAMBIO APLICADO: Añadido 'py-2' (padding vertical) para dar espacio al hover:scale
+              <div className="flex flex-row flex-nowrap justify-center items-center gap-2 w-full px-1 py-2 overflow-x-auto [scrollbar-width:none]">
                 {limitedProviders.map((p) => (
                   <a
                     key={p.provider_id}
@@ -3219,12 +3221,14 @@ export default function DetailsClient({
                     target={tmdbWatchUrl ? '_blank' : undefined}
                     rel={tmdbWatchUrl ? 'noreferrer' : undefined}
                     title={p.provider_name}
-                    className="relative transition-transform hover:scale-110 hover:z-10"
+                    // z-10 en hover asegura que se superponga si están muy juntos
+                    className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
                   >
                     <img
                       src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
                       alt={p.provider_name}
-                      className="w-10 h-10 rounded-lg object-contain shadow-md bg-white/5"
+                      // Iconos ligeramente más pequeños en móvil (w-9) para que quepan 7 mejor
+                      className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5"
                     />
                   </a>
                 ))}
@@ -3418,7 +3422,7 @@ export default function DetailsClient({
               <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
                 {[
                   { id: 'details', label: 'Detalles' },
-                  { id: 'production', label: 'Producción' }, // ✅ Nueva Pestaña
+                  { id: 'production', label: 'Producción' },
                   { id: 'synopsis', label: 'Sinopsis' },
                   ...(extras.awards ? [{ id: 'awards', label: 'Premios' }] : [])
                 ].map((tab) => (
@@ -3462,7 +3466,7 @@ export default function DetailsClient({
                     </motion.div>
                   )}
 
-                  {/* 2. DETALLES (Auto-ajuste por contenido) */}
+                  {/* 2. DETALLES */}
                   {activeTab === 'details' && (
                     <motion.div
                       key="details"
@@ -3471,43 +3475,45 @@ export default function DetailsClient({
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
                     >
-                      {/* Flex wrap permite que bajen de línea si no caben, flex-auto ajusta el ancho según texto */}
-                      <div className="flex flex-wrap gap-3 items-stretch">
+                      {/* MÓVIL: flex-col (vertical) -> Ocupan todo el ancho, no se cortan.
+             DESKTOP (lg): flex-row + flex-nowrap (horizontal) -> Una sola línea optimizada.
+          */}
+                      <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
 
                         <VisualMetaCard
                           icon={type === 'movie' ? FilmIcon : MonitorPlay}
                           label="Título Original"
                           value={type === 'movie' ? data.original_title : data.original_name}
-                          // flex-auto: Crece según el texto. md:w-auto: Resetea anchos fijos.
-                          className="w-full sm:w-auto flex-auto min-w-[180px]"
+                          expanded={true} // Permite 2 líneas y ancho extra en desktop
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
 
                         <VisualMetaCard
                           icon={MapPin}
                           label="País"
                           value={countries || '—'}
-                          className="w-full sm:w-auto flex-auto min-w-[120px]"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
 
                         <VisualMetaCard
                           icon={Languages}
                           label="Idiomas"
                           value={languages || '—'}
-                          className="w-full sm:w-auto flex-auto min-w-[120px]"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
 
                         <VisualMetaCard
                           icon={CalendarIcon}
                           label={type === 'movie' ? 'Estreno' : 'Inicio'}
                           value={releaseDateValue || '—'}
-                          className="w-full sm:w-auto flex-auto min-w-[130px]"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
 
                       </div>
                     </motion.div>
                   )}
 
-                  {/* 3. PRODUCCIÓN Y EQUIPO (Orden corregido, Fila única) */}
+                  {/* 3. PRODUCCIÓN Y EQUIPO */}
                   {activeTab === 'production' && (
                     <motion.div
                       key="production"
@@ -3516,57 +3522,59 @@ export default function DetailsClient({
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <div className="flex flex-nowrap gap-3 items-stretch overflow-x-auto pb-2 [scrollbar-width:none]">
+                      {/* Mismo formato: Vertical en móvil, Horizontal en Desktop */}
+                      <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
 
                         {/* 1. Director / Creadores */}
                         <VisualMetaCard
                           icon={Users}
                           label={type === 'movie' ? 'Director' : 'Creadores'}
                           value={movieDirector || createdByNames || 'Desconocido'}
-                          className="w-auto flex-auto shrink-0"
+                          expanded={true}
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
 
-                        {/* 2. Presupuesto (Cine) o Fecha Fin (TV) - MOVIDO AQUÍ */}
+                        {/* 2. Presupuesto (Cine) o Fecha Fin (TV) */}
                         {type === 'movie' ? (
                           <VisualMetaCard
                             icon={BadgeDollarSignIcon}
                             label="Presupuesto"
                             value={budgetValue || '—'}
-                            className="w-auto flex-auto shrink-0"
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
                         ) : (
                           <VisualMetaCard
                             icon={CalendarIcon}
                             label={data.status === 'Ended' ? 'Finalización' : 'Última emisión'}
                             value={lastAirDateValue || 'En emisión'}
-                            className="w-auto flex-auto shrink-0"
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
                         )}
 
-                        {/* 3. Recaudación (Cine) o Formato (TV) - MOVIDO AQUÍ */}
+                        {/* 3. Recaudación (Cine) o Formato (TV) */}
                         {type === 'movie' ? (
                           <VisualMetaCard
                             icon={TrendingUp}
                             label="Recaudación"
                             value={revenueValue || '—'}
-                            className="w-auto flex-auto shrink-0"
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
                         ) : (
                           <VisualMetaCard
                             icon={Layers}
                             label="Formato"
                             value={data.number_of_seasons ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.` : '—'}
-                            className="w-auto flex-auto shrink-0"
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
                         )}
 
-                        {/* 4. Producción / Canal - MOVIDO AL FINAL (Suele ser largo) */}
+                        {/* 4. Producción / Canal */}
                         <VisualMetaCard
                           icon={Building2}
                           label={network ? 'Canal' : 'Producción'}
                           value={network || production || '—'}
-                          // flex-auto hará que este crezca más si el texto es largo
-                          className="w-auto flex-auto shrink-0"
+                          expanded={true} // Vital para que no se recorte lateralmente
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
 
                       </div>
@@ -3599,7 +3607,6 @@ export default function DetailsClient({
                       </div>
                     </motion.div>
                   )}
-
                 </AnimatePresence>
               </div>
             </div>
