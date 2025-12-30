@@ -1,3 +1,4 @@
+
 // src/components/DetailsClient.jsx
 'use client'
 
@@ -78,7 +79,7 @@ import {
   traktGetScoreboard,
   traktSetRating
 } from '@/lib/api/traktClient'
-import DetailsSectionMenu from '@/components/DetailsSectionMenu'
+import DetailsSectionMenu from './DetailsSectionMenu'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
@@ -1214,7 +1215,6 @@ export default function DetailsClient({
 
   // ✅ Resumen plegable (por defecto oculto)
   const [activeTab, setActiveTab] = useState('details')
-  const [activeSection, setActiveSection] = useState('artwork')
 
   // ====== PREFERENCIAS DE IMÁGENES ======
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
@@ -1646,6 +1646,7 @@ export default function DetailsClient({
     setSelectedBackgroundPath(null)
 
     setActiveTab('details')
+    setActiveSection('info')
 
     if (typeof window !== 'undefined') {
       try {
@@ -3021,6 +3022,138 @@ export default function DetailsClient({
     }
   }, [type, id, data?.credits])
 
+  // ✅ MENÚ GLOBAL (nuevo)
+  const [activeSection, setActiveSection] = useState('media')
+
+  // ✅ cuando cambie type, fija una sección inicial válida
+  useEffect(() => {
+    setActiveSection(type === 'tv' ? 'episodes' : 'media')
+  }, [type])
+
+
+  // Helpers (ponlos cerca de tus helpers)
+  const mixedCount = (a, b) => {
+    const A = Number(a || 0)
+    const B = Number(b || 0)
+    if (A > 0 && B > 0) return `${A}+${B}`
+    if (A > 0) return A
+    if (B > 0) return B
+    return null
+  }
+
+  const sumCount = (...vals) => vals.reduce((acc, v) => acc + (Number(v || 0) || 0), 0)
+
+  // Dentro del componente:
+  const postersCount = imagesState?.posters?.length || 0
+  const backdropsCount = imagesState?.backdrops?.length || 0
+  const videosCount = videos?.length || 0
+  const mediaCount = sumCount(postersCount, backdropsCount, videosCount)
+
+  // Trakt comments + TMDb reviews (para el badge tipo "448+4")
+  const traktCommentsCount = Number(tComments?.total || 0)
+  const reviewsCount = Array.isArray(reviews) ? reviews.length : 0
+  const commentsCount = mixedCount(traktCommentsCount, reviewsCount)
+
+  // Otros counts
+  const listsCount = Array.isArray(tLists?.items) ? tLists.items.length : 0
+  const castCount = Array.isArray(castData) ? castData.length : 0
+  const recsCount = Array.isArray(recommendations) ? recommendations.length : 0
+
+  const sectionItems = useMemo(() => {
+    const items = []
+
+    // ✅ TV: Episodios
+    if (type === 'tv') {
+      items.push({
+        id: 'episodes',
+        label: 'Episodios',
+        icon: TrendingUp,
+        // si no tienes "ratings.length", puedes dejar count undefined
+        count: Array.isArray(ratings) ? ratings.length : undefined
+      })
+    }
+
+    // ✅ Media = Imágenes + Vídeos (unificado)
+    const postersCount = imagesState?.posters?.length || 0
+    const backdropsCount = imagesState?.backdrops?.length || 0
+    const videosCount = Array.isArray(videos) ? videos.length : 0
+    const mediaCount = postersCount + backdropsCount + videosCount
+
+    items.push({
+      id: 'media',
+      label: 'Media',
+      icon: ImageIcon,
+      count: mediaCount || undefined
+    })
+
+    // ✅ Sentimientos
+    items.push({
+      id: 'sentiment',
+      label: 'Sentimientos',
+      icon: Sparkles
+    })
+
+    // ✅ Comentarios = Trakt + Críticas (unificado)
+    const traktCommentsCount = Number(tComments?.total || 0) || 0
+    const reviewsCount = Array.isArray(reviews) ? reviews.length : 0
+    const commentsCount = traktCommentsCount + reviewsCount
+
+    items.push({
+      id: 'comments',
+      label: 'Comentarios',
+      icon: MessageSquareIcon,
+      count: commentsCount || undefined
+    })
+
+    // ✅ TV: Temporadas
+    if (type === 'tv') {
+      items.push({
+        id: 'seasons',
+        label: 'Temporadas',
+        icon: Layers,
+        count: Array.isArray(tSeasons?.items) ? tSeasons.items.length : undefined
+      })
+    }
+
+    // ✅ Listas
+    items.push({
+      id: 'lists',
+      label: 'Listas',
+      icon: ListVideo,
+      count: Array.isArray(tLists?.items) ? tLists.items.length : undefined
+    })
+
+    // ✅ Reparto
+    items.push({
+      id: 'cast',
+      label: 'Reparto',
+      icon: Users,
+      count: Array.isArray(castData) ? castData.length : undefined
+    })
+
+    // ✅ Recomendaciones (texto completo)
+    items.push({
+      id: 'recs',
+      label: 'Recomendaciones',
+      icon: MonitorPlay,
+      count: Array.isArray(recommendations) ? recommendations.length : undefined
+    })
+
+    return items
+  }, [
+    type,
+    ratings,
+    imagesState?.posters,
+    imagesState?.backdrops,
+    videos,
+    tComments?.total,
+    reviews,
+    tSeasons?.items,
+    tLists?.items,
+    castData,
+    recommendations
+  ])
+
   // =====================================================
   // ✅ IMDb para RECOMENDACIONES: SOLO HOVER (no auto)
   // =====================================================
@@ -3029,17 +3162,6 @@ export default function DetailsClient({
   const recImdbInFlightRef = useRef(new Set())
   const recImdbTimersRef = useRef({})
   const recImdbIdCacheRef = useRef({})
-
-  const sectionRefs = useRef({
-    artwork: null,
-    videos: null,
-    sentiment: null,
-    comments: null,
-    reviews: null,
-    lists: null,
-    cast: null,
-    recs: null,
-  })
 
   useEffect(() => {
     recImdbRatingsRef.current = recImdbRatings
@@ -3626,31 +3748,166 @@ export default function DetailsClient({
           </div>
         </div>
 
-        {/* EPISODIOS (TV) */}
-        {type === 'tv' && ratings && (
-          <section className="mb-10">
-            <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
-            <div className="p-2">
-              {ratingsLoading && (
-                <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
+        {/* ===================================================== */}
+        {/* ✅ MENÚ GLOBAL + CONTENIDO (tipo ActorDetails) */}
+        <div className="mt-10">
+          <DetailsSectionMenu items={sectionItems} activeId={activeSection} onChange={setActiveSection} />
+
+          <div className="mt-6 min-w-0">
+            <AnimatePresence mode="wait" initial={false}>
+
+              {/* ===== INFO (aquí pegas tu bloque de tabs: detalles/producción/sinopsis/premios) ===== */}
+              {activeSection === 'info' && (
+                <motion.div
+                  key="info"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                </motion.div>
               )}
-              {ratingsError && (
-                <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
+
+              {/* ===== EPISODIOS ===== */}
+              {activeSection === 'episodes' && (
+                <motion.div
+                  key="episodes"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {type === 'tv' ? (
+                    <section className="mb-10">
+                      <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
+                      <div className="p-2">
+                        {ratingsLoading && (
+                          <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
+                        )}
+                        {ratingsError && (
+                          <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
+                        )}
+                        {!ratingsLoading && !ratingsError && !ratings && (
+                          <p className="text-sm text-zinc-400 mb-2">No hay datos de episodios disponibles.</p>
+                        )}
+                        {!!ratings && !ratingsError && (
+                          <EpisodeRatingsGrid
+                            ratings={ratings}
+                            initialSource="avg"
+                            density="compact"
+                            traktConnected={trakt.connected}
+                            watchedBySeason={watchedBySeason}
+                            episodeBusyKey={episodeBusyKey}
+                            onToggleEpisodeWatched={toggleEpisodeWatched}
+                          />
+                        )}
+                      </div>
+                    </section>
+                  ) : (
+                    <div className="text-sm text-zinc-400">Esta sección solo aplica a series.</div>
+                  )}
+                </motion.div>
               )}
-              {!ratingsError && (
-                <EpisodeRatingsGrid
-                  ratings={ratings}
-                  initialSource="avg"
-                  density="compact"
-                  traktConnected={trakt.connected}
-                  watchedBySeason={watchedBySeason}
-                  episodeBusyKey={episodeBusyKey}
-                  onToggleEpisodeWatched={toggleEpisodeWatched}
-                />
+
+              {/* ===== IMÁGENES ===== */}
+              {activeSection === 'media' && (
+                <motion.div
+                  key="media"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {/* ✅ PEGA AQUÍ tu bloque ORIGINAL: “✅ PORTADAS Y FONDOS” */}
+                  {/* ... */}
+
+                  {/* ✅ PEGA AQUÍ tu bloque ORIGINAL: “=== TRÁILER Y VÍDEOS ===” */}
+                  {/* ... */}
+                </motion.div>
               )}
-            </div>
-          </section>
-        )}
+
+              {/* ===== SENTIMIENTOS ===== */}
+              {activeSection === 'sentiment' && (
+                <motion.div
+                  key="sentiment"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {/* ✅ PEGA AQUÍ tu bloque ORIGINAL: “✅ TRAKT: SENTIMIENTOS (AI SUMMARY)” */}
+                </motion.div>
+              )}
+
+              {/* ===== COMENTARIOS ===== */}
+              {activeSection === 'comments' && (
+                <motion.div
+                  key="comments"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {/* ✅ PEGA AQUÍ tu bloque ORIGINAL: “✅ TRAKT: COMENTARIOS” */}
+                </motion.div>
+              )}
+
+              {/* ===== TEMPORADAS ===== */}
+              {activeSection === 'seasons' && (
+                <motion.div
+                  key="seasons"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {/* ✅ PEGA AQUÍ tu bloque ORIGINAL: “✅ TRAKT: TEMPORADAS (Con Progreso Visual)” */}
+                </motion.div>
+              )}
+
+              {/* ===== LISTAS ===== */}
+              {activeSection === 'lists' && (
+                <motion.div
+                  key="lists"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {/* ✅ PEGA AQUÍ tu bloque ORIGINAL: “✅ TRAKT: LISTAS (DISEÑO MEJORADO)” */}
+                </motion.div>
+              )}
+
+              {/* ===== REPARTO ===== */}
+              {activeSection === 'cast' && (
+                <motion.div
+                  key="cast"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {/* ✅ PEGA AQUÍ tu bloque ORIGINAL: “=== REPARTO PRINCIPAL (Cast) ===” */}
+                </motion.div>
+              )}
+
+              {/* ===== RECOMENDACIONES ===== */}
+              {activeSection === 'recs' && (
+                <motion.div
+                  key="recs"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {/* ✅ PEGA AQUÍ tu bloque ORIGINAL: “=== RECOMENDACIONES ===” */}
+                </motion.div>
+              )}
+
+            </AnimatePresence>
+          </div>
+        </div>
+        {/* ===================================================== */}
 
         {/* ✅ PORTADAS Y FONDOS */}
         {(type === 'movie' || type === 'tv') && (
