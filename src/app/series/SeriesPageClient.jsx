@@ -23,7 +23,7 @@ import {
     getMediaAccountStates,
     markAsFavorite,
     markInWatchlist,
-    getDetails, // getDetails('tv', id, opts)
+    getDetails,
     getExternalIds
 } from '@/lib/api/tmdb'
 
@@ -42,7 +42,6 @@ const useIsMobileLayout = (breakpointPx = 768) => {
         if (typeof window === 'undefined') return
 
         const mq = window.matchMedia(`(max-width:${breakpointPx - 1}px)`)
-
         const update = () => setIsMobile(mq.matches)
         update()
 
@@ -72,9 +71,6 @@ const ratingOf = (m) =>
     typeof m?.vote_average === 'number' && m.vote_average > 0
         ? m.vote_average.toFixed(1)
         : '–'
-
-const short = (t = '', n = 420) =>
-    t.length > n ? t.slice(0, n - 1) + '…' : t
 
 const formatRuntime = (mins) => {
     if (!mins || typeof mins !== 'number') return null
@@ -244,9 +240,7 @@ async function getShowImages(showId) {
 }
 
 /* ====================================================================
- * MISMO CRITERIO QUE MainDashboard:
- *  - Backdrops: EN -> resolución -> votos
- *  - Posters: EN -> máxima resolución (estable)
+ * LOGICA IMAGENES (Backdrops / Posters)
  * ==================================================================== */
 function pickBestBackdropByLangResVotes(list, opts = {}) {
     const {
@@ -336,8 +330,8 @@ async function fetchBestTVBackdrop(showId) {
 
 /* ====================================================================
  * Poster TV (igual que MainDashboard/Movies):
- *  - <md: contain + blur
- *  - >=md: cover
+ * - <md: contain + blur
+ * - >=md: cover
  * ==================================================================== */
 function PosterImage({ show, cache }) {
     const [posterPath, setPosterPath] = useState(null)
@@ -396,7 +390,8 @@ function PosterImage({ show, cache }) {
     }, [show, cache])
 
     if (!ready || !posterPath) {
-        return <div className="w-full h-full rounded-3xl bg-neutral-800 animate-pulse" />
+        // CAMBIO: rounded-3xl -> rounded-lg
+        return <div className="w-full h-full rounded-lg bg-neutral-800 animate-pulse" />
     }
 
     return (
@@ -405,13 +400,15 @@ function PosterImage({ show, cache }) {
             <img
                 src={buildImg(posterPath, 'w342')}
                 alt={show.name || show.title}
-                className="hidden md:block w-full h-full object-cover rounded-3xl"
+                // CAMBIO: rounded-3xl -> rounded-lg
+                className="hidden md:block w-full h-full object-cover rounded-lg"
                 loading="lazy"
                 decoding="async"
             />
 
             {/* Mobile: contain + blur */}
-            <div className="relative w-full h-full rounded-3xl overflow-hidden bg-neutral-900 md:hidden">
+            {/* CAMBIO: rounded-3xl -> rounded-lg */}
+            <div className="relative w-full h-full rounded-lg overflow-hidden bg-neutral-900 md:hidden">
                 <img
                     src={buildImg(posterPath, 'w342')}
                     alt=""
@@ -434,6 +431,7 @@ function PosterImage({ show, cache }) {
 
 /* ====================================================================
  * TOP 10 (MÓVIL): Backdrop completo + número + 1 por vista
+ * ✅ MANTENIDO DISEÑO ORIGINAL (rounded-3xl)
  * ==================================================================== */
 function Top10MobileBackdropCardTV({ show, rank }) {
     const [backdropPath, setBackdropPath] = useState(null)
@@ -496,6 +494,7 @@ function Top10MobileBackdropCardTV({ show, rank }) {
 
     return (
         <Link href={href} className="block w-full">
+            {/* CAMBIO: Mantener rounded-3xl para Top 10 */}
             <div className="relative w-full rounded-3xl overflow-hidden bg-neutral-900 aspect-[16/9]">
                 {!ready && <div className="absolute inset-0 bg-neutral-900 animate-pulse" />}
 
@@ -807,7 +806,8 @@ function InlinePreviewCard({ show, heightClass }) {
 
     return (
         <div
-            className={`rounded-3xl overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
+            // CAMBIO: rounded-3xl -> rounded-lg
+            className={`rounded-lg overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
             onClick={() => { window.location.href = href }}
         >
             <div className="relative w-full h-full bg-black">
@@ -986,14 +986,9 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     if (isTop10 && isMobile) {
         return (
             <div className="relative group">
-                <h3 className="text-2xl sm:text-3xl md:text-4xl font-[730] text-primary-text mb-4 sm:text-left">
-                    <span
-                        className={`bg-gradient-to-b from-blue-600 via-blue-400 to-white bg-clip-text text-transparent tracking-widest uppercase ${anton.className}`}
-                    >
-                        {title}
-                    </span>
-                </h3>
-
+                {/* ✅ CAMBIO: NO RENDERIZAR TÍTULO EN TOP 10 MÓVIL
+                   Se elimina el <h3> que había aquí.
+                */}
                 <Swiper
                     slidesPerView={1}
                     spaceBetween={14}
@@ -1061,13 +1056,15 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 
     return (
         <div className="relative group">
-            <h3 className="text-2xl sm:text-3xl md:text-4xl font-[730] text-primary-text mb-4 sm:text-left">
-                <span
-                    className={`bg-gradient-to-b from-blue-600 via-blue-400 to-white bg-clip-text text-transparent tracking-widest uppercase ${anton.className}`}
-                >
+            {/* ✅ LOGICA TITULOS: 
+               - Si es Top 10 -> NO MOSTRAR TÍTULO (null)
+               - Si NO es Top 10 -> Mostrar título neutro
+            */}
+            {!isTop10 && (
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-100 mb-4 px-1 sm:px-0 tracking-tight">
                     {title}
-                </span>
-            </h3>
+                </h3>
+            )}
 
             <div
                 className="relative"
@@ -1100,7 +1097,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                         const isActive = !isMobile && hoveredId === s.id
                         const isLast = i === items.length - 1
 
-                        const base = 'relative flex-shrink-0 transition-all duration-300 ease-out'
+                        const base = 'relative flex-shrink-0 transition-all duration-300 ease-in-out'
 
                         const sizeClasses = isActive
                             ? 'w-full md:w-[320px] lg:w-[380px] xl:w-[430px] 2xl:w-[480px] z-20'
@@ -1127,8 +1124,10 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                                             key="preview"
                                             initial={{ opacity: 0, scale: 0.98 }}
                                             animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.98 }}
-                                            transition={{ duration: 0.18 }}
+                                            // CAMBIO: exit rápido
+                                            exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
+                                            // CAMBIO: entrada rápida lineal
+                                            transition={{ duration: 0.2, ease: "easeInOut" }}
                                             className="w-full h-full hidden md:block"
                                         >
                                             <InlinePreviewCard show={s} heightClass={heightClassDesktop} />
@@ -1138,8 +1137,8 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                                             key="poster"
                                             initial={{ opacity: 0, scale: 0.98 }}
                                             animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.98 }}
-                                            transition={{ duration: 0.15 }}
+                                            exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
+                                            transition={{ duration: 0.2, ease: "easeInOut" }}
                                             className="w-full h-full"
                                         >
                                             <Link href={`/details/tv/${s.id}`} className="block w-full h-full">
@@ -1178,7 +1177,6 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                     })}
                 </Swiper>
 
-                {/* Flechas: solo tablet/desktop */}
                 {showPrev && !isMobile && (
                     <button
                         type="button"
@@ -1238,7 +1236,6 @@ function GenreRows({ groups, isMobile, posterCacheRef }) {
  * Componente Principal (CLIENTE): recibe datos ya cargados en servidor
  * ==================================================================== */
 export default function SeriesPageClient({ initialData }) {
-    // ✅ Igual que MainDashboard/Movies: móvil SOLO por anchura. Tablet = desktop layout.
     const isMobile = useIsMobileLayout(768)
 
     const posterCacheRef = useRef(new Map())
