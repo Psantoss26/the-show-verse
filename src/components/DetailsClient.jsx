@@ -78,6 +78,7 @@ import {
   traktGetScoreboard,
   traktSetRating
 } from '@/lib/api/traktClient'
+import DetailsSectionMenu from '@/components/DetailsSectionMenu'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
@@ -1213,6 +1214,7 @@ export default function DetailsClient({
 
   // ✅ Resumen plegable (por defecto oculto)
   const [activeTab, setActiveTab] = useState('details')
+  const [activeSection, setActiveSection] = useState('artwork')
 
   // ====== PREFERENCIAS DE IMÁGENES ======
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
@@ -1932,6 +1934,52 @@ export default function DetailsClient({
   const clearTraktRating = async () => {
     await sendTraktRating(null)
   }
+
+  const scrollToSection = useCallback((id) => {
+    const el = sectionRefs.current[id]
+    if (!el) return
+
+    const offset = 110 // altura header / menú fijo
+    const y = el.getBoundingClientRect().top + window.scrollY - offset
+
+    window.scrollTo({ top: y, behavior: 'smooth' })
+    setActiveSection(id)
+  }, [])
+
+  const sectionMenuItems = useMemo(() => ([
+    { id: 'artwork', label: 'Portadas', icon: ImageIcon },
+    { id: 'videos', label: 'Vídeos', icon: MonitorPlay },
+    { id: 'sentiment', label: 'Sentimientos', icon: Sparkles },
+    { id: 'comments', label: 'Comentarios', icon: MessageSquareIcon },
+    { id: 'reviews', label: 'Críticas', icon: StarIcon },
+    { id: 'lists', label: 'Listas', icon: ListVideo },
+    { id: 'cast', label: 'Reparto', icon: Users },
+    { id: 'recs', label: 'Recomendaciones', icon: TrendingUp },
+  ]), [])
+
+  // ✅ 5) actualizar activo al hacer scroll
+  useEffect(() => {
+    const ids = Object.keys(sectionRefs.current)
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => (b.intersectionRatio || 0) - (a.intersectionRatio || 0))[0]
+
+        const id = visible?.target?.dataset?.sectionId
+        if (id) setActiveSection(id)
+      },
+      { rootMargin: '-120px 0px -55% 0px', threshold: [0.2, 0.4, 0.6] }
+    )
+
+    ids.forEach((id) => {
+      const el = sectionRefs.current[id]
+      if (el) observer.observe(el)
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   const traktType = endpointType === 'tv' ? 'show' : 'movie'
 
@@ -3027,6 +3075,17 @@ export default function DetailsClient({
   const recImdbInFlightRef = useRef(new Set())
   const recImdbTimersRef = useRef({})
   const recImdbIdCacheRef = useRef({})
+
+  const sectionRefs = useRef({
+    artwork: null,
+    videos: null,
+    sentiment: null,
+    comments: null,
+    reviews: null,
+    lists: null,
+    cast: null,
+    recs: null,
+  })
 
   useEffect(() => {
     recImdbRatingsRef.current = recImdbRatings
