@@ -32,28 +32,21 @@ import { fetchArtworkOverrides } from '@/lib/artworkApi'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
 
-/* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch)
-   ✅ FIX hydration: SSR y 1er render cliente deben coincidir => inicial false, y medir en useEffect
---- */
+/* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
 const useIsMobileLayout = (breakpointPx = 768) => {
     const [isMobile, setIsMobile] = useState(false)
 
     useEffect(() => {
         const mq = window.matchMedia(`(max-width:${breakpointPx - 1}px)`)
-
         const update = () => setIsMobile(mq.matches)
         update()
-
         if (mq.addEventListener) mq.addEventListener('change', update)
         else mq.addListener(update)
-
         window.addEventListener('orientationchange', update)
         window.addEventListener('resize', update)
-
         return () => {
             if (mq.removeEventListener) mq.removeEventListener('change', update)
             else mq.removeListener(update)
-
             window.removeEventListener('orientationchange', update)
             window.removeEventListener('resize', update)
         }
@@ -409,16 +402,18 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
 
     if (!ready || !posterPath) {
         return (
-            <div className={`w-full ${boxClass} rounded-3xl bg-neutral-800 animate-pulse`} />
+            // CAMBIO: rounded-3xl -> rounded-lg
+            <div className={`w-full ${boxClass} rounded-lg bg-neutral-800 animate-pulse`} />
         )
     }
 
     if (!isMobile) {
         return (
+            // CAMBIO: rounded-3xl -> rounded-lg
             <img
                 src={buildImg(posterPath, 'w342')}
                 alt={movie.title || movie.name}
-                className={`w-full ${boxClass} object-cover rounded-3xl`}
+                className={`w-full ${boxClass} object-cover rounded-lg`}
                 loading="lazy"
                 decoding="async"
             />
@@ -426,7 +421,8 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
     }
 
     return (
-        <div className={`relative w-full ${boxClass} rounded-3xl overflow-hidden bg-neutral-900`}>
+        // CAMBIO: rounded-3xl -> rounded-lg
+        <div className={`relative w-full ${boxClass} rounded-lg overflow-hidden bg-neutral-900`}>
             <img
                 src={buildImg(posterPath, 'w342')}
                 alt=""
@@ -730,7 +726,8 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
 
     return (
         <div
-            className={`rounded-3xl overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
+            // CAMBIO: rounded-3xl -> rounded-lg
+            className={`rounded-lg overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
             onClick={() => {
                 window.location.href = href
             }}
@@ -762,9 +759,9 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                                     key={trailer.key}
                                     ref={trailerIframeRef}
                                     className="absolute left-1/2 top-1/2
-                                        w-[140%] h-[180%]
-                                        -translate-x-1/2 -translate-y-1/2
-                                        pointer-events-none"
+                                    w-[140%] h-[180%]
+                                    -translate-x-1/2 -translate-y-1/2
+                                    pointer-events-none"
                                     src={trailerSrc}
                                     title={`Trailer - ${movie.title || movie.name}`}
                                     allow="autoplay; encrypted-media; picture-in-picture"
@@ -792,7 +789,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
 
                 <div
                     className="pointer-events-none absolute inset-x-0 bottom-0 h-2
-                        bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95"
+                      bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95"
                 />
             </div>
 
@@ -948,17 +945,12 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
         1280: { slidesPerView: 'auto', spaceBetween: 20 }
     }
 
-    // ✅ Remount cuando cambia hydrated/isMobile para evitar estados enganchados (especialmente allowTouchMove)
     const swiperKey = `${title}-${hydrated ? 'h' : 's'}-${isMobile ? 'm' : 'd'}`
 
     return (
         <div className="relative group">
-            <h3 className="text-2xl sm:text-3xl md:text-4xl font-[730] text-primary-text mb-4 sm:text-left">
-                <span
-                    className={`bg-gradient-to-b from-blue-600 via-blue-400 to-white bg-clip-text text-transparent tracking-widest uppercase ${anton.className}`}
-                >
-                    {title}
-                </span>
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-100 mb-4 px-1 sm:px-0 tracking-tight">
+                {title}
             </h3>
 
             <div
@@ -969,7 +961,6 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                     setHoveredId(null)
                 }}
             >
-                {/* ✅ Bloquea interacción hasta que React haya hidratado */}
                 <div className={!hydrated ? 'pointer-events-none touch-none' : ''}>
                     <Swiper
                         key={swiperKey}
@@ -983,7 +974,6 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                         loop={false}
                         watchOverflow={true}
                         grabCursor={!isMobile}
-                        // ✅ SIEMPRE true (Swiper puede quedarse “enganchado” si se inicializa con false)
                         allowTouchMove={true}
                         preventClicks={true}
                         preventClicksPropagation={true}
@@ -996,7 +986,7 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                             const isActive = hydrated && !isMobile && hoveredId === m.id
                             const isLast = i === items.length - 1
 
-                            const base = 'relative flex-shrink-0 transition-all duration-300 ease-out'
+                            const base = 'relative flex-shrink-0 transition-all duration-300 ease-in-out'
 
                             const sizeClasses = isMobile
                                 ? 'w-full'
@@ -1027,8 +1017,10 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                                                     key="preview"
                                                     initial={{ opacity: 0, scale: 0.98 }}
                                                     animate={{ opacity: 1, scale: 1 }}
-                                                    exit={{ opacity: 0, scale: 0.98 }}
-                                                    transition={{ duration: 0.18 }}
+                                                    // CAMBIO: exit mucho más rápido para evitar lag (0.1s)
+                                                    exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
+                                                    // CAMBIO: Transición de entrada rápida y lineal (0.2s) en vez de muelle
+                                                    transition={{ duration: 0.2, ease: "easeInOut" }}
                                                     className="w-full h-full hidden sm:block"
                                                 >
                                                     <InlinePreviewCard
@@ -1042,8 +1034,10 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                                                     key="poster"
                                                     initial={{ opacity: 0, scale: 0.98 }}
                                                     animate={{ opacity: 1, scale: 1 }}
-                                                    exit={{ opacity: 0, scale: 0.98 }}
-                                                    transition={{ duration: 0.15 }}
+                                                    // CAMBIO: exit muy rápido
+                                                    exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
+                                                    // CAMBIO: entrada rápida (0.2s)
+                                                    transition={{ duration: 0.2, ease: "easeInOut" }}
                                                     className="w-full h-full"
                                                 >
                                                     <Link href={`/details/movie/${m.id}`}>
@@ -1070,10 +1064,10 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                         type="button"
                         onClick={handlePrevClick}
                         className="absolute inset-y-0 left-0 w-28 z-30
-                       hidden sm:flex items-center justify-start
-                       bg-gradient-to-r from-black/80 via-black/55 to-transparent
-                       hover:from-black/95 hover:via-black/75
-                       transition-colors pointer-events-auto"
+                        hidden sm:flex items-center justify-start
+                        bg-gradient-to-r from-black/80 via-black/55 to-transparent
+                        hover:from-black/95 hover:via-black/75
+                        transition-colors pointer-events-auto"
                     >
                         <span className="ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ‹
@@ -1086,10 +1080,10 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                         type="button"
                         onClick={handleNextClick}
                         className="absolute inset-y-0 right-0 w-28 z-30
-                       hidden sm:flex items-center justify-end
-                       bg-gradient-to-l from-black/80 via-black/55 to-transparent
-                       hover:from-black/95 hover:via-black/75
-                       transition-colors pointer-events-auto"
+                        hidden sm:flex items-center justify-end
+                        bg-gradient-to-l from-black/80 via-black/55 to-transparent
+                        hover:from-black/95 hover:via-black/75
+                        transition-colors pointer-events-auto"
                     >
                         <span className="mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ›
@@ -1228,13 +1222,13 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                         {items.slice(0, 1).map((movie) => (
                             <div
                                 key={movie.id}
-                                className="w-full rounded-3xl bg-neutral-900 aspect-[16/9] animate-pulse"
+                                // CAMBIO: rounded-3xl -> rounded-xl
+                                className="w-full rounded-xl bg-neutral-900 aspect-[16/9] animate-pulse"
                             />
                         ))}
                     </div>
                 ) : (
                     <>
-                        {/* ✅ Bloquea interacción hasta que React haya hidratado */}
                         <div className={!hydrated ? 'pointer-events-none touch-none' : ''}>
                             <Swiper
                                 key={heroKey}
@@ -1249,7 +1243,6 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                 loop={false}
                                 watchOverflow={true}
                                 grabCursor={!isMobile}
-                                // ✅ SIEMPRE true (mismo motivo que en Row)
                                 allowTouchMove={true}
                                 preventClicks={true}
                                 preventClicksPropagation={true}
@@ -1269,7 +1262,9 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                         return (
                                             <SwiperSlide key={movie.id} className={slideClass}>
                                                 <Link href={`/details/movie/${movie.id}`}>
-                                                    <div className="relative rounded-3xl bg-neutral-900 aspect-[16/9]" />
+                                                    {// CAMBIO: rounded-3xl -> rounded-xl
+                                                    }
+                                                    <div className="relative rounded-xl bg-neutral-900 aspect-[16/9]" />
                                                 </Link>
                                             </SwiperSlide>
                                         )
@@ -1278,7 +1273,8 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                     return (
                                         <SwiperSlide key={movie.id} className={slideClass}>
                                             <Link href={`/details/movie/${movie.id}`}>
-                                                <div className="relative cursor-pointer overflow-hidden rounded-3xl aspect-[16/9] bg-neutral-900">
+                                                {/* CAMBIO: rounded-3xl -> rounded-xl */}
+                                                <div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900">
                                                     <img
                                                         src={buildImg(heroBackdrop, 'w780')}
                                                         alt=""
@@ -1295,8 +1291,9 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                                         )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
                                                         sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
                                                         alt={movie.title || movie.name}
-                                                        className={`absolute inset-0 w-full h-full rounded-3xl ${isMobile ? 'object-contain' : 'object-cover hover:scale-105'
-                                                            } transition-transform duration-300`}
+                                                        // CAMBIO: rounded-3xl -> rounded-xl
+                                                        className={`absolute inset-0 w-full h-full rounded-xl ${isMobile ? 'object-contain' : 'object-cover hover:scale-105'
+                                                            } transition-transform duration-500 ease-out`}
                                                         loading="lazy"
                                                         decoding="async"
                                                     />
@@ -1313,10 +1310,10 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                 type="button"
                                 onClick={handlePrevClick}
                                 className="absolute inset-y-0 left-0 w-32 z-20
-                           hidden sm:flex items-center justify-start
-                           bg-gradient-to-r from-black/75 via-black/45 to-transparent
-                           hover:from-black/90 hover:via-black/65
-                           transition-colors pointer-events-auto"
+                            hidden sm:flex items-center justify-start
+                            bg-gradient-to-r from-black/75 via-black/45 to-transparent
+                            hover:from-black/90 hover:via-black/65
+                            transition-colors pointer-events-auto"
                             >
                                 <span className="ml-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                                     ‹
@@ -1329,10 +1326,10 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                 type="button"
                                 onClick={handleNextClick}
                                 className="absolute inset-y-0 right-0 w-32 z-20
-                           hidden sm:flex items-center justify-end
-                           bg-gradient-to-l from-black/75 via-black/45 to-transparent
-                           hover:from-black/90 hover:via-black/65
-                           transition-colors pointer-events-auto"
+                            hidden sm:flex items-center justify-end
+                            bg-gradient-to-l from-black/75 via-black/45 to-transparent
+                            hover:from-black/90 hover:via-black/65
+                            transition-colors pointer-events-auto"
                             >
                                 <span className="mr-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                                     ›
@@ -1349,8 +1346,6 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
 /* =================== MainDashboard (CLIENTE) =================== */
 export default function MainDashboardClient({ initialData }) {
     const isMobile = useIsMobileLayout(768)
-
-    // ✅ hidración lista: bloquea interacción antes de tiempo
     const [hydrated, setHydrated] = useState(false)
     useEffect(() => setHydrated(true), [])
 
