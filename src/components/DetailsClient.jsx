@@ -2295,13 +2295,13 @@ export default function DetailsClient({
             <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
               <div
                 className="
-    py-3
-    pl-[calc(1rem+env(safe-area-inset-left))]
-    pr-[calc(1.25rem+env(safe-area-inset-right))]
-    sm:px-4
-    flex items-center gap-3 sm:gap-4
-    overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
-  "
+      py-3
+      pl-[calc(1rem+env(safe-area-inset-left))]
+      pr-[calc(1.25rem+env(safe-area-inset-right))]
+      sm:px-4
+      flex items-center gap-3 sm:gap-4
+      overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+    "
               >
                 {/* A. Ratings */}
                 <div className="flex items-center gap-4 sm:gap-5 shrink-0">
@@ -2351,33 +2351,27 @@ export default function DetailsClient({
                     />
                   )}
 
-                  {/* ... Rotten / Metacritic como lo tengas ... */}
+                  {/* (Rotten/Metacritic si los mantienes en desktop, déjalos aquí dentro del bloque A) */}
                 </div>
 
-                {/* ✅ Desktop: separador + links (con Web) */}
-                <div className="hidden sm:block w-px h-6 bg-white/10 shrink-0" />
-                <div className="hidden sm:flex items-center gap-3 shrink-0">
-                  <ExternalLinkButton icon="/logo-Web.png" href={data.homepage} title="Web Oficial" />
+                {/* ✅ SEPARADOR 1 (después de IMDb en móvil, porque es el último visible ahí) */}
+                <div className="w-px h-6 bg-white/10 shrink-0" />
+
+                {/* ✅ B. Links externos (entre separadores, alineados a la derecha) */}
+                <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
+                  {/* Web: NO en móvil */}
+                  <div className="hidden sm:block">
+                    <ExternalLinkButton icon="/logo-Web.png" href={data.homepage} title="Web Oficial" />
+                  </div>
+
                   <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} title="FilmAffinity" />
                   {type === 'tv' && (
                     <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} title="SeriesGraph" />
                   )}
                 </div>
 
-                {/* ✅ Desktop: empuja rating usuario */}
-                <div className="hidden sm:block w-px h-6 bg-white/10 shrink-0 ml-auto" />
-
-                {/* ✅ Mobile: empuje “SUAVE” (no hasta el borde) */}
-                <div className="sm:hidden flex-1 max-w-6" />
-                <div className="sm:hidden w-px h-6 bg-white/10 shrink-0" />
-
-                {/* ✅ Mobile: links SIN Web */}
-                <div className="sm:hidden flex items-center gap-2 shrink-0">
-                  <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} title="FilmAffinity" />
-                  {type === 'tv' && (
-                    <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} title="SeriesGraph" />
-                  )}
-                </div>
+                {/* ✅ SEPARADOR 2 (antes del rating del usuario) */}
+                <div className="w-px h-6 bg-white/10 shrink-0" />
 
                 {/* C. Puntuación Usuario */}
                 <div className="flex items-center gap-3 shrink-0">
@@ -2391,7 +2385,6 @@ export default function DetailsClient({
                   />
                 </div>
               </div>
-
               {/* Footer de Estadísticas (VISIBLE EN MÓVIL, SIN RECORTES) */}
               {!tScoreboard.loading && (
                 <div className="border-t border-white/5 bg-black/10">
