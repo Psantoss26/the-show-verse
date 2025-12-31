@@ -1646,7 +1646,6 @@ export default function DetailsClient({
     setSelectedBackgroundPath(null)
 
     setActiveTab('details')
-    setActiveSection('info')
 
     if (typeof window !== 'undefined') {
       try {
@@ -3023,17 +3022,15 @@ export default function DetailsClient({
   }, [type, id, data?.credits])
 
   // ✅ MENÚ GLOBAL (nuevo)
-  const [activeSection, setActiveSection] = useState('media')
+  // ✅ MENÚ GLOBAL (nuevo) — SIEMPRE válido
+  const defaultSectionId = useMemo(() => (type === 'tv' ? 'episodes' : 'info'), [type])
 
-  // ✅ Más fluido al cambiar secciones (evita bloqueo del render pesado)
-  const [isSwitchingSection, startSectionTransition] = useTransition()
+  const [activeSection, setActiveSection] = useState(() => defaultSectionId)
 
-  const handleSectionChange = useCallback((id) => {
-    // 1) actualiza el menú de forma fluida (no bloquea la UI si la sección es pesada)
-    startSectionTransition(() => {
-      setActiveSection(id)
-    })
-  }, [])
+  // reset al cambiar de título (id/type)
+  useEffect(() => {
+    setActiveSection(defaultSectionId)
+  }, [id, defaultSectionId])
 
   // ✅ cuando cambie type, fija una sección inicial válida
   useEffect(() => {
@@ -3068,6 +3065,12 @@ export default function DetailsClient({
   const listsCount = Array.isArray(tLists?.items) ? tLists.items.length : 0
   const castCount = Array.isArray(castData) ? castData.length : 0
   const recsCount = Array.isArray(recommendations) ? recommendations.length : 0
+
+  const [isSwitchingSection, startSectionTransition] = useTransition()
+
+  const handleSectionChange = useCallback((id) => {
+    startSectionTransition(() => setActiveSection(id))
+  }, [])
 
   const sectionItems = useMemo(() => {
     const items = []
@@ -3765,7 +3768,6 @@ export default function DetailsClient({
             items={sectionItems}
             activeId={activeSection}
             onChange={handleSectionChange}
-            columns={type === 'tv' ? 5 : 4}
           />
 
           <div className="mt-6 min-w-0">
@@ -3778,7 +3780,7 @@ export default function DetailsClient({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.12 }}
+                  transition={{ duration: 0.2 }}
                 >
                 </motion.div>
               )}
@@ -4872,7 +4874,6 @@ export default function DetailsClient({
                   )}
                 </motion.div>
               )}
-
               {/* ===== RECOMENDACIONES ===== */}
               {activeSection === 'recs' && (
                 <motion.div
@@ -4951,14 +4952,15 @@ export default function DetailsClient({
                       </Swiper>
                     </section>
                   )}
-
                 </motion.div>
               )}
+
             </AnimatePresence>
           </div>
         </div>
         {/* ===================================================== */}
       </div>
+
       {/* ✅ MODAL: Vídeos / Trailer */}
       <VideoModal open={videoModalOpen} onClose={closeVideo} video={activeVideo} />
 
