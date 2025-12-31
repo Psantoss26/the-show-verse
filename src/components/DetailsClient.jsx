@@ -1,7 +1,8 @@
+
 // src/components/DetailsClient.jsx
 'use client'
 
-import { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
+import { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback, useTransition } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import 'swiper/swiper-bundle.css'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -78,7 +79,7 @@ import {
   traktGetScoreboard,
   traktSetRating
 } from '@/lib/api/traktClient'
-import DetailsSectionMenu from '@/components/DetailsSectionMenu'
+import DetailsSectionMenu from './DetailsSectionMenu'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
@@ -1214,6 +1215,7 @@ export default function DetailsClient({
 
   // ✅ Resumen plegable (por defecto oculto)
   const [activeTab, setActiveTab] = useState('details')
+  const getDefaultSectionId = (t) => ('media')
 
   // ====== PREFERENCIAS DE IMÁGENES ======
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
@@ -1645,6 +1647,7 @@ export default function DetailsClient({
     setSelectedBackgroundPath(null)
 
     setActiveTab('details')
+    setActiveSection(getDefaultSectionId(type))
 
     if (typeof window !== 'undefined') {
       try {
@@ -2170,38 +2173,25 @@ export default function DetailsClient({
     } catch { }
   }, [syncTrakt])
 
-  const reloadTraktStatus = useCallback(async () => {
+  const reloadTraktStatus = async () => {
     setTrakt((p) => ({ ...p, loading: true, error: '' }))
+    const json = await traktGetItemStatus({ type: traktType, tmdbId: id })
 
-    try {
-      const json = await traktGetItemStatus({ type: traktType, tmdbId: id })
-
-      setTrakt({
-        loading: false,
-        connected: !!json.connected,
-        found: !!json.found,
-        traktUrl: json.traktUrl || null,
-        watched: !!json.watched,
-        plays: Number(json.plays || 0),
-        lastWatchedAt: json.lastWatchedAt || null,
-        rating: typeof json.rating === 'number' ? json.rating : null,
-        inWatchlist: !!json.inWatchlist,
-        progress: json.progress || null,
-        history: Array.isArray(json.history) ? json.history : [],
-        error: ''
-      })
-    } catch (e) {
-      // 👇 IMPORTANTE: sin throw, para que no aparezca overlay de Next
-      setTrakt((p) => ({
-        ...p,
-        loading: false,
-        connected: false,
-        found: false,
-        error: e?.message || 'Trakt token error'
-      }))
-    }
-  }, [traktType, id])
-
+    setTrakt({
+      loading: false,
+      connected: !!json.connected,
+      found: !!json.found,
+      traktUrl: json.traktUrl || null,
+      watched: !!json.watched,
+      plays: Number(json.plays || 0),
+      lastWatchedAt: json.lastWatchedAt || null,
+      rating: typeof json.rating === 'number' ? json.rating : null, // si no usas rating, pon null
+      inWatchlist: !!json.inWatchlist,
+      progress: json.progress || null,
+      history: Array.isArray(json.history) ? json.history : [],
+      error: ''
+    })
+  }
 
   useEffect(() => {
     let ignore = false
@@ -2293,8 +2283,9 @@ export default function DetailsClient({
 
   useEffect(() => {
     if (!traktWatchedOpen) return
-    reloadTraktStatus().catch(() => { })
-  }, [traktWatchedOpen, reloadTraktStatus])
+    reloadTraktStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traktWatchedOpen])
 
   useEffect(() => {
     let ignore = false
@@ -2398,7 +2389,7 @@ export default function DetailsClient({
     setTraktBusy('history')
     try {
       await traktAddWatchPlay({ type: traktType, tmdbId: id, watchedAt: yyyyMmDd })
-      await reloadTraktStatus().catch(() => { })
+      await reloadTraktStatus()
     } finally {
       setTraktBusy('')
     }
@@ -2409,8 +2400,7 @@ export default function DetailsClient({
     setTraktBusy('history')
     try {
       await traktUpdateWatchPlay({ type: traktType, tmdbId: id, historyId, watchedAt: yyyyMmDd })
-      await reloadTraktStatus().catch(() => { })
-
+      await reloadTraktStatus()
     } finally {
       setTraktBusy('')
     }
@@ -2421,7 +2411,7 @@ export default function DetailsClient({
     setTraktBusy('history')
     try {
       await traktRemoveWatchPlay({ historyId })
-      await reloadTraktStatus().catch(() => { })
+      await reloadTraktStatus()
     } finally {
       setTraktBusy('')
     }
@@ -2432,16 +2422,11 @@ export default function DetailsClient({
     setTraktBusy('rating')
     try {
       await traktSetRating({
-        type: traktType,
-        ids: { tmdb: Number(id) },
-        rating: valueOrNull == null ? null : Math.round(valueOrNull),
-        remove: valueOrNull == null // ✅ clave
+        type: traktType,                 // 'movie' | 'show'
+        ids: { tmdb: Number(id) },        // ✅ lo que tu API route espera
+        rating: valueOrNull              // puede ser number o null (borrar)
       })
-
-      setTrakt((p) => ({
-        ...p,
-        rating: valueOrNull == null ? null : Math.round(valueOrNull)
-      }))
+      setTrakt((p) => ({ ...p, rating: valueOrNull == null ? null : Math.round(valueOrNull) }))
     } finally {
       setTraktBusy('')
     }
@@ -3039,13 +3024,13 @@ export default function DetailsClient({
   }, [type, id, data?.credits])
 
   // ✅ MENÚ GLOBAL (nuevo)
-  const [activeSection, setActiveSection] = useState('media')
+
+  const [activeSection, setActiveSection] = useState(() => getDefaultSectionId(type))
 
   // ✅ cuando cambie type, fija una sección inicial válida
   useEffect(() => {
-    setActiveSection(type === 'tv' ? 'episodes' : 'media')
-  }, [type])
-
+    setActiveSection(getDefaultSectionId(type))
+  }, [type, id])
 
   // Helpers (ponlos cerca de tus helpers)
   const mixedCount = (a, b) => {
@@ -3059,53 +3044,42 @@ export default function DetailsClient({
 
   const sumCount = (...vals) => vals.reduce((acc, v) => acc + (Number(v || 0) || 0), 0)
 
+  // Dentro del componente:
   const postersCount = imagesState?.posters?.length || 0
   const backdropsCount = imagesState?.backdrops?.length || 0
+  const videosCount = videos?.length || 0
+  const mediaCount = sumCount(postersCount, backdropsCount, videosCount)
 
-  // vídeos: para NO crear una sección extra (y mantener 10/8),
-  // mételos dentro de "Fondos"
-  const videosCount = Array.isArray(videos) ? videos.length : 0
-
+  // Trakt comments + TMDb reviews (para el badge tipo "448+4")
   const traktCommentsCount = Number(tComments?.total || 0)
   const reviewsCount = Array.isArray(reviews) ? reviews.length : 0
+  const commentsCount = mixedCount(traktCommentsCount, reviewsCount)
 
+  // Otros counts
   const listsCount = Array.isArray(tLists?.items) ? tLists.items.length : 0
   const castCount = Array.isArray(castData) ? castData.length : 0
   const recsCount = Array.isArray(recommendations) ? recommendations.length : 0
 
-  // TV extras
-  const seasonsCount = Array.isArray(tSeasons?.items) ? tSeasons.items.length : 0
-  const episodesCount = Array.isArray(ratings) ? ratings.length : undefined
+  const [isSwitchingSection, startSectionTransition] = useTransition()
+
+  const handleSectionChange = useCallback((id) => {
+    startSectionTransition(() => setActiveSection(id))
+  }, [])
 
   const sectionItems = useMemo(() => {
     const items = []
 
-    const isTv = type === 'tv'
+    // ✅ Media = Imágenes + Vídeos (unificado)
+    const postersCount = imagesState?.posters?.length || 0
+    const backdropsCount = imagesState?.backdrops?.length || 0
+    const videosCount = Array.isArray(videos) ? videos.length : 0
+    const mediaCount = postersCount + backdropsCount + videosCount
 
-    // ✅ TV: Episodios
-    if (isTv) {
-      items.push({
-        id: 'episodes',
-        label: 'Episodios',
-        icon: TrendingUp,
-        count: episodesCount
-      })
-    }
-
-    // ✅ Portadas
     items.push({
-      id: 'posters',
-      label: 'Portadas',
+      id: 'media',
+      label: 'Media',
       icon: ImageIcon,
-      count: postersCount || undefined
-    })
-
-    // ✅ Vídeos (antes "Fondos")
-    items.push({
-      id: 'videos',
-      label: 'Vídeos',
-      icon: MonitorPlay, // o Play si prefieres
-      count: videosCount || undefined
+      count: mediaCount || undefined
     })
 
     // ✅ Sentimientos
@@ -3115,38 +3089,42 @@ export default function DetailsClient({
       icon: Sparkles
     })
 
-    // ✅ Comentarios (Trakt)
-    items.push({
-      id: 'comments',
-      label: 'Comentarios',
-      icon: MessageSquareIcon,
-      count: traktCommentsCount || undefined
-    })
-
-    // ✅ Críticas (TMDb reviews)
-    items.push({
-      id: 'reviews',
-      label: 'Críticas',
-      icon: StarIcon,
-      count: reviewsCount || undefined
-    })
-
     // ✅ TV: Temporadas
-    if (isTv) {
+    if (type === 'tv') {
       items.push({
         id: 'seasons',
         label: 'Temporadas',
         icon: Layers,
-        count: seasonsCount || undefined
+        count: Array.isArray(tSeasons?.items) ? tSeasons.items.length : undefined
+      })
+      // ✅ TV: Episodios
+      items.push({
+        id: 'episodes',
+        label: 'Episodios',
+        icon: TrendingUp,
+        // si no tienes "ratings.length", puedes dejar count undefined
+        count: Array.isArray(ratings) ? ratings.length : undefined
       })
     }
+
+    // ✅ Comentarios = Trakt + Críticas (unificado)
+    const traktCommentsCount = Number(tComments?.total || 0) || 0
+    const reviewsCount = Array.isArray(reviews) ? reviews.length : 0
+    const commentsCount = traktCommentsCount + reviewsCount
+
+    items.push({
+      id: 'comments',
+      label: 'Comentarios',
+      icon: MessageSquareIcon,
+      count: commentsCount || undefined
+    })
 
     // ✅ Listas
     items.push({
       id: 'lists',
       label: 'Listas',
       icon: ListVideo,
-      count: listsCount || undefined
+      count: Array.isArray(tLists?.items) ? tLists.items.length : undefined
     })
 
     // ✅ Reparto
@@ -3154,31 +3132,38 @@ export default function DetailsClient({
       id: 'cast',
       label: 'Reparto',
       icon: Users,
-      count: castCount || undefined
+      count: Array.isArray(castData) ? castData.length : undefined
     })
 
-    // ✅ Recomendaciones
+    // ✅ Recomendaciones (texto completo)
     items.push({
       id: 'recs',
       label: 'Recomendaciones',
       icon: MonitorPlay,
-      count: recsCount || undefined
+      count: Array.isArray(recommendations) ? recommendations.length : undefined
     })
 
     return items
   }, [
     type,
-    episodesCount,
-    postersCount,
-    backdropsCount,
-    videosCount,
-    traktCommentsCount,
-    reviewsCount,
-    seasonsCount,
-    listsCount,
-    castCount,
-    recsCount
+    ratings,
+    imagesState?.posters,
+    imagesState?.backdrops,
+    videos,
+    tComments?.total,
+    reviews,
+    tSeasons?.items,
+    tLists?.items,
+    castData,
+    recommendations
   ])
+
+  useEffect(() => {
+    if (!Array.isArray(sectionItems) || sectionItems.length === 0) return
+    if (!sectionItems.some((it) => it.id === activeSection)) {
+      setActiveSection(sectionItems[0].id)
+    }
+  }, [sectionItems, activeSection])
 
   // =====================================================
   // ✅ IMDb para RECOMENDACIONES: SOLO HOVER (no auto)
@@ -3780,58 +3765,16 @@ export default function DetailsClient({
           <DetailsSectionMenu
             items={sectionItems}
             activeId={activeSection}
-            onChange={setActiveSection}
-            columns={type === 'tv' ? 5 : 4}
+            onChange={handleSectionChange}
           />
 
           <div className="mt-6 min-w-0">
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence mode="sync" initial={false}>
 
-              {/* ===== EPISODIOS ===== */}
-              {activeSection === 'episodes' && (
+              {/* ===== IMÁGENES ===== */}
+              {activeSection === 'media' && (
                 <motion.div
-                  key="episodes"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {type === 'tv' ? (
-                    <section className="mb-10">
-                      <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
-                      <div className="p-2">
-                        {ratingsLoading && (
-                          <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
-                        )}
-                        {ratingsError && (
-                          <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
-                        )}
-                        {!ratingsLoading && !ratingsError && !ratings && (
-                          <p className="text-sm text-zinc-400 mb-2">No hay datos de episodios disponibles.</p>
-                        )}
-                        {!!ratings && !ratingsError && (
-                          <EpisodeRatingsGrid
-                            ratings={ratings}
-                            initialSource="avg"
-                            density="compact"
-                            traktConnected={trakt.connected}
-                            watchedBySeason={watchedBySeason}
-                            episodeBusyKey={episodeBusyKey}
-                            onToggleEpisodeWatched={toggleEpisodeWatched}
-                          />
-                        )}
-                      </div>
-                    </section>
-                  ) : (
-                    <div className="text-sm text-zinc-400">Esta sección solo aplica a series.</div>
-                  )}
-                </motion.div>
-              )}
-
-              {/* ===== PORTADAS ===== */}
-              {activeSection === 'posters' && (
-                <motion.div
-                  key="posters"
+                  key="media"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
@@ -4177,18 +4120,7 @@ export default function DetailsClient({
                       })()}
                     </section>
                   )}
-                </motion.div>
-              )}
 
-              {/* ===== FONDOS (+ VÍDEOS/TRÁILER) ===== */}
-              {activeSection === 'videos' && (
-                <motion.div
-                  key="videos"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
                   {/* === TRÁILER Y VÍDEOS === */}
                   {TMDB_API_KEY && (
                     <section className="mt-6">
@@ -4403,6 +4335,71 @@ export default function DetailsClient({
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
                 >
+                  {/* CRÍTICAS */}
+                  {reviews && reviews.length > 0 && (
+                    <section className="mb-10">
+                      <div className="flex items-center justify-between mb-2">
+                        <SectionTitle title="Críticas de Usuarios" icon={MessageSquareIcon} />
+                        {reviewLimit < reviews.length && (
+                          <button
+                            onClick={() => setReviewLimit((prev) => prev + 2)}
+                            className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
+                          >
+                            Ver más
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {reviews.slice(0, reviewLimit).map((r) => {
+                          const avatar = r.author_details?.avatar_path
+                            ? r.author_details.avatar_path.startsWith('/https')
+                              ? r.author_details.avatar_path.slice(1)
+                              : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
+                            : `https://ui-avatars.com/api/?name=${r.author}&background=random`
+
+                          return (
+                            <div
+                              key={r.id}
+                              className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
+                            >
+                              <div className="flex items-center gap-4">
+                                <img
+                                  src={avatar}
+                                  alt={r.author}
+                                  className="w-12 h-12 rounded-full object-cover shadow-lg"
+                                />
+                                <div>
+                                  <h4 className="font-bold text-white">{r.author}</h4>
+                                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                                    <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                                    {r.author_details?.rating && (
+                                      <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
+                                        ★ {r.author_details.rating}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
+                                "{r.content.replace(/<[^>]*>?/gm, '')}"
+                              </div>
+
+                              <a
+                                href={r.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
+                              >
+                                Leer review completa en TMDb &rarr;
+                              </a>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </section>
+                  )}
                   {/* ===================================================== */}
                   {/* ✅ TRAKT: COMENTARIOS */}
                   <section className="mb-12">
@@ -4533,83 +4530,6 @@ export default function DetailsClient({
                 </motion.div>
               )}
 
-              {/* ===== CRÍTICAS ===== */}
-              {activeSection === 'reviews' && (
-                <motion.div
-                  key="reviews"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {/* CRÍTICAS */}
-                  {reviews && reviews.length > 0 && (
-                    <section className="mb-10">
-                      <div className="flex items-center justify-between mb-2">
-                        <SectionTitle title="Críticas de Usuarios" icon={MessageSquareIcon} />
-                        {reviewLimit < reviews.length && (
-                          <button
-                            onClick={() => setReviewLimit((prev) => prev + 2)}
-                            className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
-                          >
-                            Ver más
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {reviews.slice(0, reviewLimit).map((r) => {
-                          const avatar = r.author_details?.avatar_path
-                            ? r.author_details.avatar_path.startsWith('/https')
-                              ? r.author_details.avatar_path.slice(1)
-                              : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
-                            : `https://ui-avatars.com/api/?name=${r.author}&background=random`
-
-                          return (
-                            <div
-                              key={r.id}
-                              className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
-                            >
-                              <div className="flex items-center gap-4">
-                                <img
-                                  src={avatar}
-                                  alt={r.author}
-                                  className="w-12 h-12 rounded-full object-cover shadow-lg"
-                                />
-                                <div>
-                                  <h4 className="font-bold text-white">{r.author}</h4>
-                                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                                    <span>{new Date(r.created_at).toLocaleDateString()}</span>
-                                    {r.author_details?.rating && (
-                                      <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
-                                        ★ {r.author_details.rating}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
-                                "{r.content.replace(/<[^>]*>?/gm, '')}"
-                              </div>
-
-                              <a
-                                href={r.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
-                              >
-                                Leer review completa en TMDb &rarr;
-                              </a>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </section>
-                  )}
-                </motion.div>
-              )}
-
               {/* ===== TEMPORADAS ===== */}
               {activeSection === 'seasons' && (
                 <motion.div
@@ -4699,6 +4619,47 @@ export default function DetailsClient({
                         })}
                       </div>
                     </section>
+                  )}
+                </motion.div>
+              )}
+
+              {/* ===== EPISODIOS ===== */}
+              {activeSection === 'episodes' && (
+                <motion.div
+                  key="episodes"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {type === 'tv' ? (
+                    <section className="mb-10">
+                      <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
+                      <div className="p-2">
+                        {ratingsLoading && (
+                          <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
+                        )}
+                        {ratingsError && (
+                          <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
+                        )}
+                        {!ratingsLoading && !ratingsError && !ratings && (
+                          <p className="text-sm text-zinc-400 mb-2">No hay datos de episodios disponibles.</p>
+                        )}
+                        {!!ratings && !ratingsError && (
+                          <EpisodeRatingsGrid
+                            ratings={ratings}
+                            initialSource="avg"
+                            density="compact"
+                            traktConnected={trakt.connected}
+                            watchedBySeason={watchedBySeason}
+                            episodeBusyKey={episodeBusyKey}
+                            onToggleEpisodeWatched={toggleEpisodeWatched}
+                          />
+                        )}
+                      </div>
+                    </section>
+                  ) : (
+                    <div className="text-sm text-zinc-400">Esta sección solo aplica a series.</div>
                   )}
                 </motion.div>
               )}
@@ -4899,7 +4860,6 @@ export default function DetailsClient({
                   )}
                 </motion.div>
               )}
-
               {/* ===== RECOMENDACIONES ===== */}
               {activeSection === 'recs' && (
                 <motion.div
@@ -5047,7 +5007,7 @@ export default function DetailsClient({
         setNewDesc={setNewListDesc}
         onCreateList={handleCreateListAndAdd}
       />
-    </div >
+    </div>
   )
 }
 
