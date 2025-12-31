@@ -1215,6 +1215,7 @@ export default function DetailsClient({
 
   // ✅ Resumen plegable (por defecto oculto)
   const [activeTab, setActiveTab] = useState('details')
+  const getDefaultSectionId = (t) => ('media')
 
   // ====== PREFERENCIAS DE IMÁGENES ======
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
@@ -1646,6 +1647,7 @@ export default function DetailsClient({
     setSelectedBackgroundPath(null)
 
     setActiveTab('details')
+    setActiveSection(getDefaultSectionId(type))
 
     if (typeof window !== 'undefined') {
       try {
@@ -3022,21 +3024,13 @@ export default function DetailsClient({
   }, [type, id, data?.credits])
 
   // ✅ MENÚ GLOBAL (nuevo)
-  // ✅ MENÚ GLOBAL (nuevo) — SIEMPRE válido
-  const defaultSectionId = useMemo(() => (type === 'tv' ? 'episodes' : 'info'), [type])
 
-  const [activeSection, setActiveSection] = useState(() => defaultSectionId)
-
-  // reset al cambiar de título (id/type)
-  useEffect(() => {
-    setActiveSection(defaultSectionId)
-  }, [id, defaultSectionId])
+  const [activeSection, setActiveSection] = useState(() => getDefaultSectionId(type))
 
   // ✅ cuando cambie type, fija una sección inicial válida
   useEffect(() => {
-    setActiveSection(type === 'tv' ? 'episodes' : 'media')
-  }, [type])
-
+    setActiveSection(getDefaultSectionId(type))
+  }, [type, id])
 
   // Helpers (ponlos cerca de tus helpers)
   const mixedCount = (a, b) => {
@@ -3075,17 +3069,6 @@ export default function DetailsClient({
   const sectionItems = useMemo(() => {
     const items = []
 
-    // ✅ TV: Episodios
-    if (type === 'tv') {
-      items.push({
-        id: 'episodes',
-        label: 'Episodios',
-        icon: TrendingUp,
-        // si no tienes "ratings.length", puedes dejar count undefined
-        count: Array.isArray(ratings) ? ratings.length : undefined
-      })
-    }
-
     // ✅ Media = Imágenes + Vídeos (unificado)
     const postersCount = imagesState?.posters?.length || 0
     const backdropsCount = imagesState?.backdrops?.length || 0
@@ -3106,6 +3089,24 @@ export default function DetailsClient({
       icon: Sparkles
     })
 
+    // ✅ TV: Temporadas
+    if (type === 'tv') {
+      items.push({
+        id: 'seasons',
+        label: 'Temporadas',
+        icon: Layers,
+        count: Array.isArray(tSeasons?.items) ? tSeasons.items.length : undefined
+      })
+      // ✅ TV: Episodios
+      items.push({
+        id: 'episodes',
+        label: 'Episodios',
+        icon: TrendingUp,
+        // si no tienes "ratings.length", puedes dejar count undefined
+        count: Array.isArray(ratings) ? ratings.length : undefined
+      })
+    }
+
     // ✅ Comentarios = Trakt + Críticas (unificado)
     const traktCommentsCount = Number(tComments?.total || 0) || 0
     const reviewsCount = Array.isArray(reviews) ? reviews.length : 0
@@ -3117,16 +3118,6 @@ export default function DetailsClient({
       icon: MessageSquareIcon,
       count: commentsCount || undefined
     })
-
-    // ✅ TV: Temporadas
-    if (type === 'tv') {
-      items.push({
-        id: 'seasons',
-        label: 'Temporadas',
-        icon: Layers,
-        count: Array.isArray(tSeasons?.items) ? tSeasons.items.length : undefined
-      })
-    }
 
     // ✅ Listas
     items.push({
@@ -3166,6 +3157,13 @@ export default function DetailsClient({
     castData,
     recommendations
   ])
+
+  useEffect(() => {
+    if (!Array.isArray(sectionItems) || sectionItems.length === 0) return
+    if (!sectionItems.some((it) => it.id === activeSection)) {
+      setActiveSection(sectionItems[0].id)
+    }
+  }, [sectionItems, activeSection])
 
   // =====================================================
   // ✅ IMDb para RECOMENDACIONES: SOLO HOVER (no auto)
@@ -3772,59 +3770,6 @@ export default function DetailsClient({
 
           <div className="mt-6 min-w-0">
             <AnimatePresence mode="sync" initial={false}>
-
-              {/* ===== INFO (aquí pegas tu bloque de tabs: detalles/producción/sinopsis/premios) ===== */}
-              {activeSection === 'info' && (
-                <motion.div
-                  key="info"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                </motion.div>
-              )}
-
-              {/* ===== EPISODIOS ===== */}
-              {activeSection === 'episodes' && (
-                <motion.div
-                  key="episodes"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {type === 'tv' ? (
-                    <section className="mb-10">
-                      <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
-                      <div className="p-2">
-                        {ratingsLoading && (
-                          <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
-                        )}
-                        {ratingsError && (
-                          <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
-                        )}
-                        {!ratingsLoading && !ratingsError && !ratings && (
-                          <p className="text-sm text-zinc-400 mb-2">No hay datos de episodios disponibles.</p>
-                        )}
-                        {!!ratings && !ratingsError && (
-                          <EpisodeRatingsGrid
-                            ratings={ratings}
-                            initialSource="avg"
-                            density="compact"
-                            traktConnected={trakt.connected}
-                            watchedBySeason={watchedBySeason}
-                            episodeBusyKey={episodeBusyKey}
-                            onToggleEpisodeWatched={toggleEpisodeWatched}
-                          />
-                        )}
-                      </div>
-                    </section>
-                  ) : (
-                    <div className="text-sm text-zinc-400">Esta sección solo aplica a series.</div>
-                  )}
-                </motion.div>
-              )}
 
               {/* ===== IMÁGENES ===== */}
               {activeSection === 'media' && (
@@ -4674,6 +4619,47 @@ export default function DetailsClient({
                         })}
                       </div>
                     </section>
+                  )}
+                </motion.div>
+              )}
+
+              {/* ===== EPISODIOS ===== */}
+              {activeSection === 'episodes' && (
+                <motion.div
+                  key="episodes"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {type === 'tv' ? (
+                    <section className="mb-10">
+                      <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
+                      <div className="p-2">
+                        {ratingsLoading && (
+                          <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
+                        )}
+                        {ratingsError && (
+                          <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
+                        )}
+                        {!ratingsLoading && !ratingsError && !ratings && (
+                          <p className="text-sm text-zinc-400 mb-2">No hay datos de episodios disponibles.</p>
+                        )}
+                        {!!ratings && !ratingsError && (
+                          <EpisodeRatingsGrid
+                            ratings={ratings}
+                            initialSource="avg"
+                            density="compact"
+                            traktConnected={trakt.connected}
+                            watchedBySeason={watchedBySeason}
+                            episodeBusyKey={episodeBusyKey}
+                            onToggleEpisodeWatched={toggleEpisodeWatched}
+                          />
+                        )}
+                      </div>
+                    </section>
+                  ) : (
+                    <div className="text-sm text-zinc-400">Esta sección solo aplica a series.</div>
                   )}
                 </motion.div>
               )}
