@@ -2410,7 +2410,7 @@ export default function DetailsClient({
       "
                   >
                     {/* Inner: min-w-max evita que “aplasten”/corten el último item */}
-                    <div className="flex items-center gap-5 min-w-max">
+                    <div className="flex items-center gap-3 min-w-max">
                       <div className="shrink-0">
                         <MiniStat icon={Eye} value={formatVoteCount(tScoreboard?.stats?.watchers ?? 0)} tooltip="Watchers" />
                       </div>
