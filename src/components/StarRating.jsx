@@ -137,7 +137,6 @@ export default function StarRating({
         disabled={disabled}
         onClick={() => {
           if (disabled) return
-          // si no hay rating, abre con valores por defecto
           if (!open && !hasRating) {
             setValue(7)
             setHalfMode(false)
@@ -145,12 +144,13 @@ export default function StarRating({
           setOpen((v) => !v)
         }}
         className={[
-          'inline-flex items-center gap-2 px-2.5 py-2 rounded-xl border transition',
+          'inline-flex items-center gap-1.5 sm:gap-2 px-2 py-2 sm:px-2.5 rounded-xl border transition',
           'bg-white/5 hover:bg-white/10',
           hasRating ? 'border-yellow-500/30 text-yellow-200' : 'border-white/10 text-zinc-200',
           disabled ? 'opacity-60 cursor-not-allowed hover:bg-white/5' : ''
         ].join(' ')}
-        title={hasRating ? `Tu puntuación: ${fmt(rating)}` : 'Puntuar'}
+        // ✅ En móvil no mostramos tooltip "Puntuar"
+        title={hasRating ? `Tu puntuación: ${fmt(rating)}` : undefined}
         aria-label={hasRating ? `Tu puntuación: ${fmt(rating)}` : 'Puntuar'}
       >
         <StarIcon
@@ -159,13 +159,17 @@ export default function StarRating({
             hasRating ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-300'
           ].join(' ')}
         />
+
+        {/* ✅ Solo en >= sm mostramos texto/valor */}
         {hasRating ? (
-          <span className="inline-flex items-baseline gap-1">
+          <span className="hidden sm:inline-flex items-baseline gap-1">
             <span className="text-sm font-extrabold leading-none">{fmt(rating)}</span>
             <span className="text-[10px] font-bold text-zinc-400 leading-none">/10</span>
           </span>
         ) : (
-          <span className="text-sm font-extrabold leading-none">Puntuar</span>
+          <span className="hidden sm:inline text-sm font-extrabold leading-none">
+            {pillLabel}
+          </span>
         )}
       </button>
 

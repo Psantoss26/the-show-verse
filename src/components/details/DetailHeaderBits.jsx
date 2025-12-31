@@ -1,7 +1,6 @@
 // src/components/details/DetailHeaderBits.jsx
 'use client'
 
-import React from 'react'
 import { Star } from 'lucide-react'
 
 export function CompactBadge({
@@ -12,7 +11,8 @@ export function CompactBadge({
     suffix,
     href,
     className = '',
-    hideSubOnMobile = true
+    hideSubOnMobile = true,
+    logoClassName = ''
 }) {
     const Comp = href ? 'a' : 'div'
 
@@ -31,7 +31,10 @@ export function CompactBadge({
             <img
                 src={logo}
                 alt={label || 'Provider'}
-                className="h-5 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110"
+                className={`
+          h-5 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110
+          ${logoClassName}
+        `}
             />
 
             <div className="flex flex-col justify-center leading-none min-w-0">
@@ -71,25 +74,37 @@ export function CompactBadge({
     )
 }
 
-export function ExternalLinkButton({ icon, href, title }) {
+export function ExternalLinkButton({
+    icon,
+    href,
+    title,
+    className = "",
+    size = 24, // px
+}) {
     if (!href) return null
+
     return (
         <a
             href={href}
             target="_blank"
-            rel="noreferrer"
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all group"
+            rel="noreferrer noopener"
             title={title}
+            aria-label={title}
+            className={[
+                "inline-flex items-center justify-center",
+                "opacity-90 hover:opacity-100 transition-opacity",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/40 rounded-lg",
+                className,
+            ].join(" ")}
         >
-            {typeof icon === 'string' ? (
-                <img
-                    src={icon}
-                    alt={title}
-                    className="w-5 h-5 object-contain opacity-70 group-hover:opacity-100 transition-opacity"
-                />
-            ) : (
-                icon
-            )}
+            <img
+                src={icon}
+                alt=""
+                width={size}
+                height={size}
+                className="block object-contain"
+                draggable="false"
+            />
         </a>
     )
 }
