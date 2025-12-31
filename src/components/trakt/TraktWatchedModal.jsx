@@ -11,9 +11,12 @@ import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
-    Eye
+    Check,
+    Clock,
+    History
 } from 'lucide-react'
 
+// --- Helpers de Fecha (Mismos que tenías) ---
 const todayYmd = () => new Date().toISOString().slice(0, 10)
 
 const isoToYmd = (iso) => {
@@ -45,24 +48,20 @@ const formatFullWatched = (iso) => {
     if (Number.isNaN(d.getTime())) return String(iso)
 
     const date = new Intl.DateTimeFormat('es-ES', {
-        weekday: 'short',
         day: '2-digit',
         month: 'short',
         year: 'numeric'
     }).format(d)
 
-    const hasTime = String(iso).includes('T')
-    if (!hasTime) return date
-
     const time = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' }).format(d)
-    return `${date} · ${time}`
+    return { date, time, full: `${date} · ${time}` }
 }
 
 const pickHistoryId = (h) => h?.id ?? h?.historyId ?? h?.history_id ?? null
 const pickWatchedAt = (h) => h?.watched_at ?? h?.watchedAt ?? h?.watchedAtIso ?? null
 
 // ----------------------------
-// Calendar (flat modal) picker
+// Componente: Calendario Estilizado
 // ----------------------------
 function buildMonthGrid(year, month, weekStartsOn = 1) {
     const first = new Date(year, month, 1)
@@ -91,7 +90,7 @@ function dateToYmdLocal(d) {
     return `${y}-${m}-${day}`
 }
 
-function CalendarPickerModal({ open, valueYmd, onSelect, onClose, title = 'Selecciona el día' }) {
+function CalendarPickerModal({ open, valueYmd, onSelect, onClose, title = 'Selecciona fecha' }) {
     const [monthDate, setMonthDate] = useState(() => {
         const d = new Date()
         d.setDate(1)
@@ -111,115 +110,86 @@ function CalendarPickerModal({ open, valueYmd, onSelect, onClose, title = 'Selec
     const year = monthDate.getFullYear()
     const month = monthDate.getMonth()
     const weeks = buildMonthGrid(year, month, 1)
-
     const monthLabel = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(monthDate)
-
     const selected = valueYmd || null
     const today = todayYmd()
     const dow = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
     return (
-        <div className="fixed inset-0 z-[10060]">
-            <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="fixed inset-0 z-[10060] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
 
-            <div className="absolute inset-0 flex items-center justify-center p-4">
-                <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#101010] shadow-2xl overflow-hidden">
-                    <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                            <div className="text-sm font-extrabold text-white truncate">{title}</div>
-                            <div className="text-[11px] text-zinc-400 mt-0.5 truncate">{selected ? formatYmdHuman(selected) : '—'}</div>
+            <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                {/* Header Calendario */}
+                <div className="px-5 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+                    <div>
+                        <div className="text-sm font-bold text-white uppercase tracking-wide">{title}</div>
+                        <div className="text-xs text-emerald-400 mt-0.5 font-mono">
+                            {selected ? formatYmdHuman(selected) : 'Sin fecha'}
                         </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
 
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="shrink-0 w-10 h-10 rounded-full border border-white/10 hover:bg-white/5 transition flex items-center justify-center"
-                            title="Cerrar"
-                        >
-                            <X className="w-5 h-5 text-zinc-200" />
-                        </button>
+                {/* Navegación Mes */}
+                <div className="p-4 pb-0 flex items-center justify-between mb-4">
+                    <button
+                        onClick={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+                        className="p-2 rounded-xl hover:bg-white/10 text-zinc-300 transition"
+                    >
+                        <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="text-sm font-bold text-white capitalize">{monthLabel}</span>
+                    <button
+                        onClick={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+                        className="p-2 rounded-xl hover:bg-white/10 text-zinc-300 transition"
+                    >
+                        <ChevronRight className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Grid */}
+                <div className="px-4 pb-6">
+                    <div className="grid grid-cols-7 mb-2">
+                        {dow.map((d) => (
+                            <div key={d} className="text-center text-[10px] font-bold text-zinc-500 uppercase">{d}</div>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1.5">
+                        {weeks.flat().map((d, i) => {
+                            const inMonth = d.getMonth() === month
+                            const key = dateToYmdLocal(d)
+                            const isSel = !!key && key === selected
+                            const isToday = !!key && key === today
+
+                            return (
+                                <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => key && onSelect?.(key)}
+                                    className={`
+                                        relative aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all duration-200
+                                        ${!inMonth ? 'text-zinc-700 opacity-50' : 'text-zinc-300 hover:bg-white/10'}
+                                        ${isSel ? '!bg-emerald-500 !text-black font-extrabold shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 z-10' : ''}
+                                        ${isToday && !isSel ? 'bg-white/5 border border-white/10 text-white' : ''}
+                                    `}
+                                >
+                                    {d.getDate()}
+                                    {isToday && !isSel && <div className="absolute bottom-1 w-1 h-1 bg-emerald-500 rounded-full" />}
+                                </button>
+                            )
+                        })}
                     </div>
 
-                    <div className="p-4">
-                        <div className="flex items-center justify-between gap-2 mb-3">
-                            <button
-                                type="button"
-                                onClick={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-                                className="w-10 h-10 rounded-xl border border-white/10 hover:bg-white/5 transition flex items-center justify-center"
-                                title="Mes anterior"
-                            >
-                                <ChevronLeft className="w-5 h-5 text-zinc-200" />
-                            </button>
-
-                            <div className="min-w-0 flex items-center gap-2">
-                                <div className="w-10 h-10 rounded-xl border border-white/10 flex items-center justify-center">
-                                    <CalendarDays className="w-5 h-5 text-yellow-300" />
-                                </div>
-                                <div className="text-sm font-extrabold text-white truncate capitalize">{monthLabel}</div>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-                                className="w-10 h-10 rounded-xl border border-white/10 hover:bg-white/5 transition flex items-center justify-center"
-                                title="Mes siguiente"
-                            >
-                                <ChevronRight className="w-5 h-5 text-zinc-200" />
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-2 text-[11px] font-bold text-zinc-500 mb-2">
-                            {dow.map((d) => (
-                                <div key={d} className="text-center">
-                                    {d}
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-2">
-                            {weeks.flat().map((d) => {
-                                const inMonth = d.getMonth() === month
-                                const key = dateToYmdLocal(d)
-                                const isSel = !!key && key === selected
-                                const isToday = !!key && key === today
-
-                                return (
-                                    <button
-                                        key={d.toISOString()}
-                                        type="button"
-                                        onClick={() => key && onSelect?.(key)}
-                                        className={`relative aspect-square rounded-xl border transition flex items-center justify-center
-                      ${inMonth ? '' : 'opacity-55'}
-                      ${isSel ? 'border-yellow-500/60 bg-yellow-500/10' : 'border-white/10 hover:bg-white/5'}
-                    `}
-                                        title={key || ''}
-                                    >
-                                        <div className="text-zinc-100 font-extrabold text-sm">{d.getDate()}</div>
-                                        {isToday && !isSel && (
-                                            <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 shadow ring-2 ring-black/60" />
-                                        )}
-                                    </button>
-                                )
-                            })}
-                        </div>
-
-                        <div className="mt-4 flex items-center justify-between gap-2">
-                            <button
-                                type="button"
-                                onClick={() => onSelect?.(todayYmd())}
-                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 hover:bg-white/5 transition text-sm font-bold text-zinc-200"
-                            >
-                                Hoy
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 hover:bg-white/5 transition text-sm font-bold text-zinc-200"
-                            >
-                                Cerrar
-                            </button>
-                        </div>
+                    <div className="mt-5 pt-4 border-t border-white/5 flex gap-2">
+                        <button
+                            onClick={() => onSelect?.(todayYmd())}
+                            className="flex-1 py-2.5 rounded-xl bg-white/5 text-xs font-bold text-white hover:bg-white/10 transition"
+                        >
+                            Seleccionar Hoy
+                        </button>
                     </div>
                 </div>
             </div>
@@ -227,6 +197,9 @@ function CalendarPickerModal({ open, valueYmd, onSelect, onClose, title = 'Selec
     )
 }
 
+// ----------------------------
+// Componente Principal
+// ----------------------------
 export default function TraktWatchedModal({
     open,
     onClose,
@@ -238,9 +211,10 @@ export default function TraktWatchedModal({
     onRemovePlay,
     busy
 }) {
+    // Hooks y lógica (igual que antes)
     const items = useMemo(() => {
         const arr = Array.isArray(history) ? history : []
-        const normalized = arr
+        return arr
             .map((h) => {
                 const id = pickHistoryId(h)
                 const watchedAt = pickWatchedAt(h)
@@ -249,13 +223,11 @@ export default function TraktWatchedModal({
             })
             .filter(Boolean)
             .sort((a, b) => new Date(b.watchedAt) - new Date(a.watchedAt))
-        return normalized
     }, [history])
 
     const [newDate, setNewDate] = useState(todayYmd())
     const [editingId, setEditingId] = useState(null)
     const [editDate, setEditDate] = useState(todayYmd())
-
     const [calOpen, setCalOpen] = useState(false)
     const [calTarget, setCalTarget] = useState('new') // 'new' | 'edit'
 
@@ -266,285 +238,245 @@ export default function TraktWatchedModal({
         setEditDate(todayYmd())
         setCalOpen(false)
         setCalTarget('new')
-    }, [open])
 
-    useEffect(() => {
-        if (!open) return
+        // Bloquear scroll
         const prev = document.body.style.overflow
         document.body.style.overflow = 'hidden'
-        return () => {
-            document.body.style.overflow = prev
-        }
+        return () => { document.body.style.overflow = prev }
     }, [open])
 
     useEffect(() => {
         if (!open) return
-        const onKey = (e) => {
-            if (e.key === 'Escape') onClose?.()
-        }
+        const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
     }, [open, onClose])
 
     if (!open) return null
 
+    // Handlers
     const startEdit = (id, watchedAtIso) => {
         setEditingId(id)
         setEditDate(isoToYmd(watchedAtIso) || todayYmd())
     }
-
     const stopEdit = () => {
         setEditingId(null)
         setEditDate(todayYmd())
     }
-
     const openCalendarForNew = () => {
         setCalTarget('new')
         setCalOpen(true)
     }
-
     const openCalendarForEdit = () => {
         setCalTarget('edit')
         setCalOpen(true)
     }
-
     const onPickCalendar = (ymd) => {
         if (!ymd) return
         if (calTarget === 'edit') setEditDate(ymd)
         else setNewDate(ymd)
         setCalOpen(false)
     }
-
     const doAdd = async () => {
         if (!newDate || busy) return
-        await onAddPlay?.(newDate) // YYYY-MM-DD
+        await onAddPlay?.(newDate)
         setNewDate(todayYmd())
     }
-
     const doSaveEdit = async () => {
         if (!editingId || !editDate || busy) return
-        await onUpdatePlay?.(editingId, editDate) // YYYY-MM-DD
+        await onUpdatePlay?.(editingId, editDate)
         stopEdit()
     }
-
     const doRemove = async (id) => {
         if (!id || busy) return
         await onRemovePlay?.(id)
         if (editingId === id) stopEdit()
     }
 
-    const playsLabel =
-        Number(plays || 0) > 0 ? `Visto · ${plays} vez${plays === 1 ? '' : 'es'}` : 'Aún no marcado como visto'
-
     return (
-        <div className="fixed inset-0 z-[10050]">
-            {/* overlay un poco más plano */}
-            <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="fixed inset-0 z-[10050] flex items-center justify-center p-4">
+            {/* Backdrop con Blur y Fade */}
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose} />
 
-            <div className="absolute inset-0 flex items-center justify-center p-4">
-                {/* ✅ modal plano: un solo fondo, sin “tarjetas” apiladas */}
-                <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#101010] shadow-2xl overflow-hidden">
-                    {/* Header */}
-                    <div className="px-5 py-4 border-b border-white/10 flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                            <h3 className="text-lg font-extrabold text-white truncate">Trakt · Visto</h3>
-                            <p className="text-xs text-zinc-400 mt-1 truncate">{playsLabel}</p>
-                        </div>
+            {/* Modal Container */}
+            <div className="relative w-full max-w-md flex flex-col max-h-[90vh] 
+                            rounded-3xl border border-white/10 bg-[#050505] 
+                            shadow-[0_0_50px_-12px_rgba(255,255,255,0.05)] 
+                            overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-300">
 
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="shrink-0 w-10 h-10 rounded-full border border-white/10 hover:bg-white/5 transition flex items-center justify-center"
-                            title="Cerrar"
-                        >
-                            <X className="w-5 h-5 text-zinc-200" />
-                        </button>
-                    </div>
-
-                    {/* Body */}
-                    <div className="px-5 py-4 space-y-4 max-h-[78vh] overflow-auto">
-                        {/* ✅ Añadir nuevo visionado (sin tarjeta) */}
-                        <div>
-                            <div className="text-xs font-bold text-zinc-300 mb-2">Añadir nueva vista</div>
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={openCalendarForNew}
-                                    disabled={busy}
-                                    className="flex-1 inline-flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2
-                             text-sm text-zinc-200 hover:bg-white/5 hover:border-white/15 transition disabled:opacity-70"
-                                    title="Seleccionar día"
-                                >
-                                    <span className="truncate">{formatYmdHuman(newDate)}</span>
-                                    <CalendarDays className="w-4 h-4 text-yellow-300 shrink-0" />
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setNewDate(todayYmd())}
-                                    disabled={busy}
-                                    className="px-3 py-2 rounded-xl border border-white/10 hover:bg-white/5 hover:border-white/15 transition text-sm text-zinc-200 disabled:opacity-70"
-                                >
-                                    Hoy
-                                </button>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={doAdd}
-                                disabled={busy || !newDate}
-                                className={`mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-extrabold transition
-                  ${busy || !newDate
-                                        ? 'bg-emerald-500/25 text-black/40 cursor-not-allowed'
-                                        : 'bg-emerald-500 text-black hover:brightness-110'
-                                    }`}
-                            >
-                                {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                                Añadir
-                            </button>
-
+                {/* Header Premium */}
+                <div className="px-6 py-5 border-b border-white/5 flex items-start justify-between bg-white/[0.02]">
+                    <div>
+                        <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
+                            Historial de Visionado
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400 uppercase tracking-wide">
+                                <Check className="w-3 h-3" />
+                                {plays ? `${plays} Vistas` : 'Sin ver'}
+                            </span>
                             {traktUrl && (
-                                <a
-                                    href={traktUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="mt-3 inline-flex items-center justify-center gap-2 w-full px-4 py-2 rounded-xl
-                             border border-white/10 hover:bg-white/5 hover:border-white/15 transition text-sm text-zinc-200"
-                                >
-                                    <ExternalLink className="w-4 h-4" />
-                                    Abrir en Trakt
+                                <a href={traktUrl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-zinc-500 hover:text-white transition flex items-center gap-1">
+                                    Trakt <ExternalLink className="w-2.5 h-2.5" />
                                 </a>
                             )}
                         </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 -mr-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white hover:rotate-90 transition-all duration-300">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
 
-                        {/* Divider */}
-                        <div className="h-px bg-white/10" />
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
 
-                        {/* ✅ Historial (sin tarjeta, lista plana) */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="text-xs font-bold text-zinc-300">Historial</div>
-                                <div className="text-[11px] text-zinc-500">{items.length ? `${items.length} registro(s)` : '—'}</div>
+                    {/* SECCIÓN 1: AÑADIR NUEVO (Hero Section) */}
+                    <div className="relative group">
+                        <div className="absolute -inset-2 bg-gradient-to-b from-emerald-500/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition duration-500 blur-lg" />
+                        <div className="relative flex flex-col gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Registrar nueva vista</span>
+                                {busy && <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />}
                             </div>
 
-                            {!items.length ? (
-                                <div className="text-sm text-zinc-400">Aún no hay entradas en el historial.</div>
-                            ) : (
-                                <div className="rounded-2xl border border-white/10 overflow-hidden">
-                                    <div className="max-h-[240px] overflow-auto">
-                                        {items.slice(0, 20).map((it, idx) => {
-                                            const isEditing = editingId === it.id
-                                            const dateLabel = formatFullWatched(it.watchedAt)
-
-                                            return (
-                                                <div
-                                                    key={it.id}
-                                                    className={`px-3 py-3 flex items-center justify-between gap-3 ${idx !== 0 ? 'border-t border-white/10' : ''
-                                                        }`}
-                                                >
-                                                    {/* Fecha completa + icono */}
-                                                    <div className="min-w-0 flex items-center gap-3">
-                                                        <div className="w-11 h-11 rounded-2xl border border-white/10 flex items-center justify-center shrink-0">
-                                                            <Eye className="w-5 h-5 text-emerald-200" />
-                                                        </div>
-
-                                                        <div className="min-w-0">
-                                                            <div className="text-sm font-extrabold text-white truncate">{dateLabel}</div>
-                                                            <div className="text-[11px] text-zinc-500 mt-0.5">
-                                                                {isEditing ? 'Editando fecha…' : 'Visionado registrado'}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Botones */}
-                                                    <div className="shrink-0 flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            disabled={busy}
-                                                            onClick={() => (isEditing ? stopEdit() : startEdit(it.id, it.watchedAt))}
-                                                            className="w-10 h-10 rounded-xl border border-white/10 hover:bg-white/5 hover:border-white/15 transition flex items-center justify-center disabled:opacity-70"
-                                                            title={isEditing ? 'Cancelar' : 'Editar fecha'}
-                                                        >
-                                                            <Pencil className="w-4 h-4 text-zinc-200" />
-                                                        </button>
-
-                                                        <button
-                                                            type="button"
-                                                            disabled={busy}
-                                                            onClick={() => doRemove(it.id)}
-                                                            className="w-10 h-10 rounded-xl border border-red-500/25 hover:bg-red-500/10 hover:border-red-500/40 transition flex items-center justify-center disabled:opacity-70"
-                                                            title="Quitar este visionado"
-                                                        >
-                                                            <Trash2 className="w-4 h-4 text-red-300" />
-                                                        </button>
-                                                    </div>
-
-                                                    {/* editor inline: debajo de la fila (plano) */}
-                                                    {isEditing && (
-                                                        <div className="w-full pt-3 mt-3 border-t border-white/10">
-                                                            <div className="flex items-center gap-2">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={openCalendarForEdit}
-                                                                    disabled={busy}
-                                                                    className="flex-1 inline-flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2
-                                             text-sm text-zinc-200 hover:bg-white/5 hover:border-white/15 transition disabled:opacity-70"
-                                                                    title="Seleccionar día"
-                                                                >
-                                                                    <span className="truncate">{formatYmdHuman(editDate)}</span>
-                                                                    <CalendarDays className="w-4 h-4 text-yellow-300 shrink-0" />
-                                                                </button>
-
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setEditDate(todayYmd())}
-                                                                    disabled={busy}
-                                                                    className="px-3 py-2 rounded-xl border border-white/10 hover:bg-white/5 hover:border-white/15 transition text-sm text-zinc-200 disabled:opacity-70"
-                                                                >
-                                                                    Hoy
-                                                                </button>
-                                                            </div>
-
-                                                            <button
-                                                                type="button"
-                                                                onClick={doSaveEdit}
-                                                                disabled={busy || !editDate}
-                                                                className={`mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-extrabold transition
-                                  ${busy || !editDate
-                                                                        ? 'bg-emerald-500/25 text-black/40 cursor-not-allowed'
-                                                                        : 'bg-emerald-500 text-black hover:brightness-110'
-                                                                    }`}
-                                                            >
-                                                                {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                                                                Actualizar fecha
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )
-                                        })}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={openCalendarForNew}
+                                    disabled={busy}
+                                    className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl bg-black/40 border border-white/10 hover:border-white/20 text-left transition disabled:opacity-50"
+                                >
+                                    <CalendarDays className="w-5 h-5 text-zinc-400" />
+                                    <div>
+                                        <div className="text-xs text-zinc-500 font-medium">Fecha</div>
+                                        <div className="text-sm font-bold text-white">{formatYmdHuman(newDate)}</div>
                                     </div>
-                                </div>
-                            )}
+                                </button>
+
+                                <button
+                                    onClick={doAdd}
+                                    disabled={busy}
+                                    className="px-5 py-3 rounded-xl bg-emerald-500 text-black font-extrabold hover:bg-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                >
+                                    <Plus className="w-6 h-6" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* SECCIÓN 2: HISTORIAL (Timeline) */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                            <History className="w-4 h-4 text-zinc-500" />
+                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Actividad Reciente</h4>
                         </div>
 
-                        {busy && (
-                            <div className="text-xs text-zinc-400 inline-flex items-center gap-2">
-                                <Loader2 className="w-4 h-4 animate-spin" /> Sincronizando con Trakt…
+                        {!items.length ? (
+                            <div className="py-8 flex flex-col items-center justify-center text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
+                                <Clock className="w-8 h-8 text-zinc-700 mb-2" />
+                                <p className="text-sm text-zinc-500">No hay registros en el historial.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {items.slice(0, 20).map((it) => {
+                                    const isEditing = editingId === it.id
+                                    const { date, time } = formatFullWatched(it.watchedAt)
+
+                                    return (
+                                        <div
+                                            key={it.id}
+                                            className={`
+                                                relative p-4 rounded-2xl border transition-all duration-300
+                                                ${isEditing
+                                                    ? 'bg-zinc-900 border-yellow-500/30 shadow-[0_0_30px_-10px_rgba(234,179,8,0.2)]'
+                                                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04] hover:border-white/10'
+                                                }
+                                            `}
+                                        >
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`
+                                                        w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border
+                                                        ${isEditing ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500' : 'bg-white/5 border-white/5 text-zinc-500'}
+                                                    `}>
+                                                        {isEditing ? <Pencil className="w-5 h-5" /> : <Check className="w-5 h-5" />}
+                                                    </div>
+                                                    <div>
+                                                        <div className={`text-sm font-bold ${isEditing ? 'text-yellow-100' : 'text-zinc-200'}`}>
+                                                            {isEditing ? 'Editando fecha...' : date}
+                                                        </div>
+                                                        <div className="text-xs text-zinc-500 font-mono mt-0.5 flex items-center gap-1">
+                                                            {!isEditing && <>{time} · ID: {it.id.toString().slice(-4)}</>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Acciones Rápidas (Solo visibles si NO se edita, o si es la fila activa) */}
+                                                {!isEditing && (
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => startEdit(it.id, it.watchedAt)}
+                                                            disabled={busy}
+                                                            className="p-2 rounded-lg hover:bg-white/10 text-zinc-500 hover:text-white transition"
+                                                            title="Editar"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => doRemove(it.id)}
+                                                            disabled={busy}
+                                                            className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition"
+                                                            title="Eliminar"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Editor Inline Expansible */}
+                                            {isEditing && (
+                                                <div className="mt-4 pt-4 border-t border-white/10 animate-in slide-in-from-top-2 fade-in">
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={openCalendarForEdit}
+                                                            disabled={busy}
+                                                            className="flex-1 flex items-center justify-between px-3 py-2.5 rounded-xl bg-black/50 border border-white/10 hover:border-white/20 text-sm text-zinc-200 transition"
+                                                        >
+                                                            <span className="font-mono">{formatYmdHuman(editDate)}</span>
+                                                            <CalendarDays className="w-4 h-4 text-yellow-500" />
+                                                        </button>
+                                                        <button
+                                                            onClick={doSaveEdit}
+                                                            disabled={busy}
+                                                            className="px-4 py-2 rounded-xl bg-yellow-500 text-black text-sm font-bold hover:bg-yellow-400 transition"
+                                                        >
+                                                            Guardar
+                                                        </button>
+                                                        <button
+                                                            onClick={stopEdit}
+                                                            disabled={busy}
+                                                            className="px-3 py-2 rounded-xl bg-white/5 text-zinc-400 text-sm font-bold hover:bg-white/10 transition"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Calendario */}
+            {/* Calendario Modal (Portaled o Overlay) */}
             <CalendarPickerModal
                 open={calOpen}
                 valueYmd={calTarget === 'edit' ? editDate : newDate}
                 onSelect={onPickCalendar}
                 onClose={() => setCalOpen(false)}
-                title={calTarget === 'edit' ? 'Cambiar día del visionado' : 'Elegir día del visionado'}
+                title={calTarget === 'edit' ? 'Cambiar fecha' : 'Fecha de visionado'}
             />
         </div>
     )
