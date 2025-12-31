@@ -139,6 +139,17 @@ import PosterStack from '@/components/details/PosterStack'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
+const PUBLIC_SCORE_CACHE = new Map() // key -> { ts, data }
+const TTL = 1000 * 60 * 5 // 5 min
+
+async function fetchPublicScoreboard({ type, id, imdbId, signal }) {
+  const url = `/api/scoreboard/public?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&imdb=${encodeURIComponent(imdbId || '')}`
+  const r = await fetch(url, { signal })
+  if (!r.ok) throw new Error(`scoreboard ${r.status}`)
+  return r.json()
+}
+
+
 // =====================================================================
 
 export default function DetailsClient({
