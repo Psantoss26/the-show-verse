@@ -2293,15 +2293,22 @@ export default function DetailsClient({
 
             {/* ✅ 3. SCOREBOARD INTEGRADO */}
             <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
-              <div className="px-4 py-3 flex items-center gap-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-
+              <div
+                className="
+    py-3
+    pl-[calc(1rem+env(safe-area-inset-left))]
+    pr-[calc(1.25rem+env(safe-area-inset-right))]
+    sm:px-4
+    flex items-center gap-3 sm:gap-4
+    overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+  "
+              >
                 {/* A. Ratings */}
-                <div className="flex items-center gap-5 shrink-0">
+                <div className="flex items-center gap-4 sm:gap-5 shrink-0">
                   {tScoreboard.loading && (
                     <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                   )}
 
-                  {/* ✅ TMDb (SIEMPRE) */}
                   <CompactBadge
                     logo="/logo-TMDb.png"
                     logoClassName="h-2 sm:h-4"
@@ -2310,20 +2317,30 @@ export default function DetailsClient({
                     href={tmdbDetailUrl}
                   />
 
-                  {/* ❌ Trakt (SOLO >= sm) */}
+                  {/* Trakt (móvil sin sufijo / desktop con %) */}
                   {tScoreboard.rating != null && (
-                    <div className="hidden sm:block">
-                      <CompactBadge
-                        logo="/logo-Trakt.png"
-                        value={Math.round(tScoreboard.rating * 10)}
-                        suffix="%"
-                        sub={`${formatVoteCount(tScoreboard.votes)} votes`}
-                        href={trakt?.traktUrl}
-                      />
-                    </div>
+                    <>
+                      <div className="sm:hidden">
+                        <CompactBadge
+                          logo="/logo-Trakt.png"
+                          value={Math.round(tScoreboard.rating * 10)}
+                          sub={`${formatVoteCount(tScoreboard.votes)} votes`}
+                          href={trakt?.traktUrl}
+                        />
+                      </div>
+
+                      <div className="hidden sm:block">
+                        <CompactBadge
+                          logo="/logo-Trakt.png"
+                          value={Math.round(tScoreboard.rating * 10)}
+                          suffix="%"
+                          sub={`${formatVoteCount(tScoreboard.votes)} votes`}
+                          href={trakt?.traktUrl}
+                        />
+                      </div>
+                    </>
                   )}
 
-                  {/* ✅ IMDb (SIEMPRE) */}
                   {extras.imdbRating && (
                     <CompactBadge
                       logo="/logo-IMDb.png"
@@ -2334,33 +2351,12 @@ export default function DetailsClient({
                     />
                   )}
 
-                  {/* ❌ Rotten (SOLO >= sm) */}
-                  {(tScoreboard?.external?.rtAudience != null || extras.rtScore != null) && (
-                    <div className="hidden sm:block">
-                      <CompactBadge
-                        logo="/logo-RottenTomatoes.png"
-                        value={
-                          tScoreboard?.external?.rtAudience != null
-                            ? Math.round(tScoreboard.external.rtAudience)
-                            : (extras.rtScore != null ? Math.round(extras.rtScore) : null)
-                        }
-                        suffix="%"
-                      />
-                    </div>
-                  )}
-
-                  {/* ❌ Metacritic (SOLO >= sm) */}
-                  {extras.mcScore != null && (
-                    <div className="hidden sm:block">
-                      <CompactBadge logo="/logo-Metacritic.png" value={Math.round(extras.mcScore)} suffix="/100" />
-                    </div>
-                  )}
+                  {/* ... Rotten / Metacritic como lo tengas ... */}
                 </div>
 
-                <div className="w-px h-6 bg-white/10 shrink-0" />
-
-                {/* B. Enlaces Externos */}
-                <div className="flex items-center gap-3 shrink-0">
+                {/* ✅ Desktop: separador + links (con Web) */}
+                <div className="hidden sm:block w-px h-6 bg-white/10 shrink-0" />
+                <div className="hidden sm:flex items-center gap-3 shrink-0">
                   <ExternalLinkButton icon="/logo-Web.png" href={data.homepage} title="Web Oficial" />
                   <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} title="FilmAffinity" />
                   {type === 'tv' && (
@@ -2368,7 +2364,20 @@ export default function DetailsClient({
                   )}
                 </div>
 
-                <div className="w-px h-6 bg-white/10 shrink-0 ml-auto" />
+                {/* ✅ Desktop: empuja rating usuario */}
+                <div className="hidden sm:block w-px h-6 bg-white/10 shrink-0 ml-auto" />
+
+                {/* ✅ Mobile: empuje “SUAVE” (no hasta el borde) */}
+                <div className="sm:hidden flex-1 max-w-6" />
+                <div className="sm:hidden w-px h-6 bg-white/10 shrink-0" />
+
+                {/* ✅ Mobile: links SIN Web */}
+                <div className="sm:hidden flex items-center gap-2 shrink-0">
+                  <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} title="FilmAffinity" />
+                  {type === 'tv' && (
+                    <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} title="SeriesGraph" />
+                  )}
+                </div>
 
                 {/* C. Puntuación Usuario */}
                 <div className="flex items-center gap-3 shrink-0">
@@ -2381,7 +2390,6 @@ export default function DetailsClient({
                     onConnect={() => (window.location.href = '/login')}
                   />
                 </div>
-
               </div>
 
               {/* Footer de Estadísticas (VISIBLE EN MÓVIL, SIN RECORTES) */}
