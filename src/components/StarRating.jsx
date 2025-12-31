@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { StarIcon, X, Minus, Plus, Check } from 'lucide-react'
+import { Star, X, Trash2, Minus, Plus } from 'lucide-react'
 
-const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
+// Utilidad para formatear números (7.0 -> 7)
 const fmt = (v) => {
   if (typeof v !== 'number' || !Number.isFinite(v)) return ''
   return v.toFixed(1).replace(/\.0$/, '')
@@ -18,107 +18,46 @@ export default function StarRating({
 }) {
   const hasRating = typeof rating === 'number' && Number.isFinite(rating)
 
-  const pillRef = useRef(null)
-  const popRef = useRef(null)
-
   const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
-
-  const [halfMode, setHalfMode] = useState(hasRating ? (rating % 1 !== 0) : false)
-  const [value, setValue] = useState(hasRating ? rating : 7)
-
-  // Posición del popover (FIXED, en body)
-  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const [value, setValue] = useState(hasRating ? rating : 8)
+  const rangeRef = useRef(null)
 
   useEffect(() => setMounted(true), [])
 
-  // Sync si cambia rating desde fuera
+  // Sincronizar rating externo
   useEffect(() => {
-    if (!hasRating) return
-    setValue(rating)
-    setHalfMode(rating % 1 !== 0)
+    if (hasRating) setValue(rating)
   }, [hasRating, rating])
 
-  const pillLabel = useMemo(() => (hasRating ? fmt(rating) : 'Puntuar'), [hasRating, rating])
-
-  // Posiciona el popover cuando se abre
-  useLayoutEffect(() => {
-    if (!open) return
-    if (!pillRef.current) return
-
-    const GAP = 8
-    const PAD = 10
-    const POP_W = 280
-
-    const place = () => {
-      const r = pillRef.current.getBoundingClientRect()
-      let left = r.left
-      let top = r.bottom + GAP
-
-      // clamp horizontal (viewport)
-      const maxLeft = window.innerWidth - POP_W - PAD
-      left = clamp(left, PAD, Math.max(PAD, maxLeft))
-
-      setPos({ top, left })
-    }
-
-    place()
-
-    // Recolocar en scroll/resize (captura para scroll en cualquier contenedor)
-    window.addEventListener('resize', place)
-    window.addEventListener('scroll', place, true)
-    return () => {
-      window.removeEventListener('resize', place)
-      window.removeEventListener('scroll', place, true)
-    }
-  }, [open])
-
-  // Cerrar al click fuera / Escape (teniendo en cuenta que el popover está en portal)
+  // Bloquear scroll al abrir
   useEffect(() => {
     if (!open) return
-
-    const onDown = (e) => {
-      const t = e.target
-      if (pillRef.current?.contains(t)) return
-      if (popRef.current?.contains(t)) return
-      setOpen(false)
-    }
-    const onKey = (e) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-
-    document.addEventListener('pointerdown', onDown)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('pointerdown', onDown)
-      window.removeEventListener('keydown', onKey)
-    }
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
   }, [open])
 
-  const pickBase = (n) => {
-    const next = clamp(n + (halfMode ? 0.5 : 0), 0.5, 10)
+  // Cerrar con ESC
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
+  // Handlers
+  const updateValue = (val) => {
+    // Clamp entre 0.5 y 10, redondeado a 0.5
+    const next = Math.min(10, Math.max(0.5, Math.round(val * 2) / 2))
     setValue(next)
   }
 
-  const adjust = (delta) => {
-    setValue((prev) => clamp(Number(prev || 0) + delta, 0.5, 10))
-  }
-
-  const toggleHalf = () => {
-    setHalfMode((prev) => {
-      const nextHalf = !prev
-      setValue((curr) => {
-        const base = Math.floor(Number(curr || 0))
-        return clamp(base + (nextHalf ? 0.5 : 0), 0.5, 10)
-      })
-      return nextHalf
-    })
-  }
+  const adjust = (delta) => updateValue(value + delta)
 
   const handleSave = async () => {
     if (disabled) return
-    const v = clamp(Math.round(value * 2) / 2, 0.5, 10)
-    await onRating?.(v)
+    await onRating?.(value)
     setOpen(false)
   }
 
@@ -128,206 +67,153 @@ export default function StarRating({
     setOpen(false)
   }
 
+  // Calcula el porcentaje para el gradiente del slider
+  const percentage = ((value - 0.5) / (10 - 0.5)) * 100
+
   return (
     <>
-      {/* PILL */}
+      {/* BOTÓN TRIGGER MODIFICADO */}
       <button
-        ref={pillRef}
         type="button"
         disabled={disabled}
         onClick={() => {
           if (disabled) return
-          if (!open && !hasRating) {
-            setValue(7)
-            setHalfMode(false)
-          }
-          setOpen((v) => !v)
+          if (!open && !hasRating) setValue(8)
+          setOpen(true)
         }}
-        className={[
-          'inline-flex items-center gap-1.5 sm:gap-2 px-2 py-2 sm:px-2.5 rounded-xl border transition',
-          'bg-white/5 hover:bg-white/10',
-          hasRating ? 'border-yellow-500/30 text-yellow-200' : 'border-white/10 text-zinc-200',
-          disabled ? 'opacity-60 cursor-not-allowed hover:bg-white/5' : ''
-        ].join(' ')}
-        // ✅ En móvil no mostramos tooltip "Puntuar"
-        title={hasRating ? `Tu puntuación: ${fmt(rating)}` : undefined}
-        aria-label={hasRating ? `Tu puntuación: ${fmt(rating)}` : 'Puntuar'}
+        className={`
+                    group inline-flex items-center justify-center gap-2 rounded-xl border transition-all duration-300
+                    ${/* Ajuste de padding: si no hay rating (solo icono en móvil), padding más cuadrado */ ''}
+                    ${!hasRating ? 'p-2 sm:px-3 sm:py-2' : 'px-3 py-2'}
+                    
+                    ${hasRating
+            ? 'bg-white/[0.08] border-white/20 text-white'
+            : 'bg-transparent border-white/10 text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+          }
+                    ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+        title={hasRating ? `Nota: ${fmt(rating)}` : 'Puntuar'}
       >
-        <StarIcon
-          className={[
-            'w-5 h-5',
-            hasRating ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-300'
-          ].join(' ')}
+        <Star
+          className={`w-5 h-5 transition-transform group-hover:scale-110 ${hasRating ? 'fill-yellow-500 text-yellow-500' : 'text-current'}`}
         />
 
-        {/* ✅ Solo en >= sm mostramos texto/valor */}
+        {/* LÓGICA DE VISIBILIDAD DEL TEXTO */}
         {hasRating ? (
-          <span className="hidden sm:inline-flex items-baseline gap-1">
-            <span className="text-sm font-extrabold leading-none">{fmt(rating)}</span>
-            <span className="text-[10px] font-bold text-zinc-400 leading-none">/10</span>
-          </span>
+          <span className="text-sm font-medium">{fmt(rating)}</span>
         ) : (
-          <span className="hidden sm:inline text-sm font-extrabold leading-none">
-            {pillLabel}
-          </span>
+          // Hidden en móvil, block en sm (tablet/pc)
+          <span className="hidden sm:block text-sm font-medium">Puntuar</span>
         )}
       </button>
 
-      {/* POPOVER (PORTAL) */}
-      {mounted && open &&
-        createPortal(
+      {/* MODAL (Portal) - Diseño Neutro Slider + Estrella Amarilla Fondo */}
+      {mounted && open && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
           <div
-            ref={popRef}
-            style={{ position: 'fixed', top: pos.top, left: pos.left, width: 280 }}
-            className="z-[100000] rounded-2xl border border-white/10 bg-[#101010]/95 shadow-2xl backdrop-blur overflow-hidden"
-          >
-            <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3">
-              <div className="text-[15px] font-extrabold text-white truncate">
-                Tu puntuación
-              </div>
+            className="absolute inset-0 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300"
+            onClick={() => setOpen(false)}
+          />
 
+          <div className="relative w-full max-w-sm bg-[#080808] border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5">
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+                Tu reseña
+              </span>
               <button
-                type="button"
                 onClick={() => setOpen(false)}
-                className="shrink-0 w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition flex items-center justify-center"
-                aria-label="Cerrar"
-                title="Cerrar"
+                className="p-2 -mr-2 rounded-full text-zinc-500 hover:bg-white/5 hover:text-white transition"
               >
-                <X className="w-4 h-4 text-zinc-200" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="px-4 py-3 space-y-3">
-              {/* Valor actual + ajuste fino */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-black/30 border border-white/10 flex items-center justify-center">
-                    <StarIcon className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+            <div className="px-6 pb-8 space-y-8">
+              {/* Display Principal */}
+              <div className="flex flex-col items-center justify-center gap-4">
+                <div className="relative flex items-center justify-center">
+                  <Star
+                    className="w-24 h-24 text-yellow-500/20 fill-yellow-500/20 absolute drop-shadow-[0_0_15px_rgba(234,179,8,0.2)]"
+                    strokeWidth={1}
+                  />
+                  <span className="relative text-6xl font-black text-white tracking-tighter z-10 font-sans">
+                    {fmt(value)}
+                  </span>
+                </div>
+              </div>
+
+              {/* ZONA DE SLIDER */}
+              <div className="space-y-6">
+                <div className="relative h-12 flex items-center justify-center group">
+                  <div className="absolute w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-zinc-200 rounded-full"
+                      style={{ width: `${percentage}%` }}
+                    />
                   </div>
-                  <div className="leading-tight">
-                    <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">
-                      Seleccionada
-                    </div>
-                    <div className="text-xl font-extrabold text-white inline-flex items-baseline gap-1">
-                      <span>{fmt(value)}</span>
-                      <span className="text-xs font-bold text-zinc-400">/10</span>
-                    </div>
+                  <input
+                    ref={rangeRef}
+                    type="range"
+                    min="0.5"
+                    max="10"
+                    step="0.5"
+                    value={value}
+                    onChange={(e) => updateValue(parseFloat(e.target.value))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                  />
+                  <div
+                    className="absolute h-7 w-7 bg-white rounded-full shadow-[0_0_20px_rgba(255,255,255,0.3)] pointer-events-none transition-all duration-75 z-10 flex items-center justify-center border-4 border-[#080808]"
+                    style={{ left: `calc(${percentage}% - 14px)` }}
+                  >
+                    <div className="w-1.5 h-1.5 bg-black rounded-full" />
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                {/* Botones de Ajuste */}
+                <div className="flex items-center justify-between text-zinc-500">
                   <button
-                    type="button"
                     onClick={() => adjust(-0.5)}
-                    disabled={disabled}
-                    className="w-10 h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition flex items-center justify-center disabled:opacity-50"
-                    title="-0.5"
-                    aria-label="-0.5"
+                    className="w-12 h-12 rounded-2xl border border-white/5 bg-white/[0.02] flex items-center justify-center hover:bg-white/10 hover:text-white transition active:scale-95"
                   >
-                    <Minus className="w-4 h-4" />
+                    <Minus className="w-5 h-5" />
                   </button>
-
+                  <span className="text-[10px] font-medium tracking-widest opacity-40">DESLIZA PARA PUNTUAR</span>
                   <button
-                    type="button"
-                    onClick={() => adjust(+0.5)}
-                    disabled={disabled}
-                    className="w-10 h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition flex items-center justify-center disabled:opacity-50"
-                    title="+0.5"
-                    aria-label="+0.5"
+                    onClick={() => adjust(0.5)}
+                    className="w-12 h-12 rounded-2xl border border-white/5 bg-white/[0.02] flex items-center justify-center hover:bg-white/10 hover:text-white transition active:scale-95"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                   </button>
                 </div>
               </div>
-
-              {/* Grid 1..10 */}
-              <div className="grid grid-cols-5 gap-2">
-                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
-                  const target = clamp(n + (halfMode ? 0.5 : 0), 0.5, 10)
-                  const active = Math.abs(value - target) < 0.001
-
-                  return (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => pickBase(n)}
-                      disabled={disabled}
-                      className={[
-                        'h-10 rounded-xl border text-sm font-extrabold transition',
-                        active
-                          ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200'
-                          : 'bg-white/5 border-white/10 text-zinc-200 hover:bg-white/10 hover:border-yellow-500/20',
-                        disabled ? 'opacity-60 cursor-not-allowed hover:bg-white/5' : ''
-                      ].join(' ')}
-                      title={`Poner ${fmt(target)}`}
-                      aria-label={`Poner ${fmt(target)}`}
-                    >
-                      {n}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Toggle +0.5 */}
-              <button
-                type="button"
-                onClick={toggleHalf}
-                disabled={disabled}
-                className={[
-                  'w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-xl border transition',
-                  halfMode
-                    ? 'bg-yellow-500/15 border-yellow-500/30 text-yellow-200'
-                    : 'bg-white/5 border-white/10 text-zinc-200 hover:bg-white/10',
-                  disabled ? 'opacity-60 cursor-not-allowed hover:bg-white/5' : ''
-                ].join(' ')}
-                title="Alternar +0.5"
-                aria-label="Alternar +0.5"
-              >
-                <span className="text-sm font-bold">+0.5</span>
-                {halfMode ? (
-                  <Check className="w-4 h-4 text-yellow-300" />
-                ) : (
-                  <span className="text-xs text-zinc-500"></span>
-                )}
-              </button>
 
               {/* Acciones */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={disabled}
-                  className={[
-                    'flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-extrabold transition',
-                    'bg-yellow-500 text-black hover:brightness-110',
-                    disabled ? 'opacity-60 cursor-not-allowed hover:brightness-100' : ''
-                  ].join(' ')}
-                >
-                  <Check className="w-4 h-4" />
-                  Guardar
-                </button>
-
+              <div className="flex items-center gap-3 pt-2">
                 {hasRating && (
                   <button
                     type="button"
                     onClick={handleClear}
-                    disabled={disabled}
-                    className={[
-                      'inline-flex items-center justify-center px-3 py-2 rounded-xl border transition font-bold',
-                      'bg-white/5 border-white/10 text-zinc-200 hover:bg-white/10 hover:border-red-500/30 hover:text-red-200',
-                      disabled ? 'opacity-60 cursor-not-allowed hover:bg-white/5 hover:text-zinc-200' : ''
-                    ].join(' ')}
-                    title="Borrar puntuación"
-                    aria-label="Borrar puntuación"
+                    className="h-12 w-12 flex items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-red-400 hover:border-red-900/50 hover:bg-red-900/10 transition"
+                    title="Eliminar nota"
                   >
-                    <X className="w-4 h-4" />
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={disabled}
+                  className="flex-1 h-12 rounded-xl bg-white text-black font-extrabold text-sm uppercase tracking-wide hover:bg-zinc-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  Confirmar
+                </button>
               </div>
             </div>
-          </div>,
-          document.body
-        )}
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   )
 }
