@@ -1569,177 +1569,6 @@ export default function DetailsClient({
     }
   }, [type, id, data?.imdb_id, data?.external_ids?.imdb_id, endpointType])
 
-  /* =========================================
-   COMPONENTES AUXILIARES (MODIFICADOS)
-========================================= */
-
-  /* Badge de Puntuación: Ajustado para ser más sutil (texto más pequeño) */
-  function CompactBadge({
-    logo,
-    label,
-    value,
-    sub,
-    suffix,
-    href,
-    className = '',
-    hideSubOnMobile = true
-  }) {
-    const Comp = href ? 'a' : 'div'
-
-    return (
-      <Comp
-        href={href}
-        target={href ? '_blank' : undefined}
-        rel={href ? 'noopener noreferrer' : undefined}
-        className={`
-        flex items-center gap-2.5 group select-none min-w-0
-        ${href ? 'cursor-pointer' : ''}
-        ${className}
-      `}
-        title={sub ? `${label || ''} ${value ?? ''} · ${sub}`.trim() : undefined}
-      >
-        <img
-          src={logo}
-          alt={label || 'Provider'}
-          className="h-5 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110"
-        />
-
-        <div className="flex flex-col justify-center leading-none min-w-0">
-          <div className="flex items-baseline gap-1 min-w-0">
-            <span className="text-lg sm:text-xl font-black text-white tracking-tight drop-shadow-sm">
-              {value != null ? value : '-'}
-            </span>
-
-            {suffix && (
-              <span className="text-[10px] font-bold text-zinc-500 mb-0.5 shrink-0">
-                {suffix}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1 mt-0.5 min-w-0">
-            {label && (
-              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest bg-white/5 px-1 rounded-sm shrink-0">
-                {label}
-              </span>
-            )}
-
-            {sub && (
-              <span
-                className={`
-                text-[9px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors tracking-wide
-                truncate
-                ${hideSubOnMobile ? 'hidden sm:inline' : ''}
-              `}
-              >
-                {sub}
-              </span>
-            )}
-          </div>
-        </div>
-      </Comp>
-    )
-  }
-
-  /* Botón de Enlace Externo (Estilo unificado con las tarjetas) */
-  function ExternalLinkButton({ icon, href, title }) {
-    if (!href) return null;
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all group"
-        title={title}
-      >
-        {typeof icon === 'string' ? (
-          <img src={icon} alt={title} className="w-5 h-5 object-contain opacity-70 group-hover:opacity-100 transition-opacity" />
-        ) : (
-          icon
-        )}
-      </a>
-    );
-  }
-
-  /* Estadística Minimalista */
-  function MiniStat({ icon: Icon, value, tooltip }) {
-    return (
-      <div className="flex items-center gap-2 group shrink-0" title={tooltip}>
-        <div className="p-1.5 bg-white/5 rounded-full group-hover:bg-white/10 transition-colors">
-          <Icon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" />
-        </div>
-        <span className="text-xs font-semibold text-zinc-400 font-mono tracking-tight group-hover:text-zinc-300">
-          {value}
-        </span>
-      </div>
-    );
-  }
-
-  /* NUEVO COMPONENTE: Botón de Puntuación Unificado 
-     Muestra una estrella y permite puntuar o borrar nota.
-  */
-  function UnifiedRateButton({ rating, loading, onRate, connected, onConnect }) {
-    // Si no hay conexión a ningún servicio, mostramos botón de conectar (por defecto a Login)
-    if (!connected) {
-      return (
-        <button
-          onClick={onConnect}
-          className="flex items-center gap-2 px-3 h-9 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
-          title="Conectar para puntuar"
-        >
-          <Star className="w-4 h-4 text-zinc-500" />
-          <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Rate</span>
-        </button>
-      );
-    }
-
-    const hasRating = rating && rating > 0;
-
-    return (
-      <div className={`
-      relative group flex items-center justify-center gap-2 px-3 h-9 rounded-full transition-all border cursor-pointer
-      ${hasRating
-          ? "bg-yellow-500/10 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.15)]"
-          : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/10"}
-    `}>
-        {loading ? (
-          <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-        ) : (
-          <>
-            {/* Estrella: Llena y amarilla si hay nota, contorno gris si no */}
-            <Star
-              className={`w-4 h-4 transition-colors ${hasRating ? "fill-yellow-500 text-yellow-500" : "text-zinc-400 group-hover:text-white"}`}
-            />
-
-            {/* Texto: La nota o la palabra "RATE" */}
-            <span className={`text-sm font-black tracking-tight ${hasRating ? "text-yellow-500" : "text-zinc-400 group-hover:text-white"}`}>
-              {hasRating ? rating : "RATE"}
-            </span>
-          </>
-        )}
-
-        {/* Selector invisible superpuesto */}
-        {!loading && (
-          <select
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
-            value={rating || ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : Number(e.target.value);
-              onRate(val);
-            }}
-            title="Tu Puntuación (TMDb + Trakt)"
-          >
-            <option value="">Borrar nota</option>
-            <option disabled>──────────</option>
-            {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(val => (
-              <option key={val} value={val}>{val}</option>
-            ))}
-          </select>
-        )}
-      </div>
-    );
-  }
-
   // Lógica unificada para puntuar en ambos sitios
   const handleUnifiedRate = async (value) => {
     // Si no está conectado a nada, redirigir a login (TMDb es la base)
@@ -2468,63 +2297,122 @@ export default function DetailsClient({
 
                 {/* A. Ratings */}
                 <div className="flex items-center gap-5 shrink-0">
-                  {tScoreboard.loading && <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />}
+                  {tScoreboard.loading && (
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  )}
 
-                  <CompactBadge logo="/logo-TMDb.png" value={data.vote_average?.toFixed(1)} sub={`${formatVoteCount(data.vote_count)} votes`} href={tmdbDetailUrl} />
+                  {/* ✅ TMDb (SIEMPRE) */}
+                  <CompactBadge
+                    logo="/logo-TMDb.png"
+                    logoClassName="h-2 sm:h-4"
+                    value={data.vote_average?.toFixed(1)}
+                    sub={`${formatVoteCount(data.vote_count)} votes`}
+                    href={tmdbDetailUrl}
+                  />
 
+                  {/* ❌ Trakt (SOLO >= sm) */}
                   {tScoreboard.rating != null && (
-                    <CompactBadge logo="/logo-Trakt.png" value={Math.round(tScoreboard.rating * 10)} suffix="%" sub={`${formatVoteCount(tScoreboard.votes)} votes`} href={trakt?.traktUrl} />
+                    <div className="hidden sm:block">
+                      <CompactBadge
+                        logo="/logo-Trakt.png"
+                        value={Math.round(tScoreboard.rating * 10)}
+                        suffix="%"
+                        sub={`${formatVoteCount(tScoreboard.votes)} votes`}
+                        href={trakt?.traktUrl}
+                      />
+                    </div>
                   )}
 
+                  {/* ✅ IMDb (SIEMPRE) */}
                   {extras.imdbRating && (
-                    <CompactBadge logo="/logo-IMDb.png" value={Number(extras.imdbRating).toFixed(1)} sub={`${formatVoteCount(extras.imdbVotes)} votes`} href={data.imdb_id ? `https://www.imdb.com/title/${data.imdb_id}` : undefined} />
+                    <CompactBadge
+                      logo="/logo-IMDb.png"
+                      logoClassName="h-5 sm:h-5"
+                      value={Number(extras.imdbRating).toFixed(1)}
+                      sub={`${formatVoteCount(extras.imdbVotes)} votes`}
+                      href={data.imdb_id ? `https://www.imdb.com/title/${data.imdb_id}` : undefined}
+                    />
                   )}
 
+                  {/* ❌ Rotten (SOLO >= sm) */}
                   {(tScoreboard?.external?.rtAudience != null || extras.rtScore != null) && (
-                    <CompactBadge logo="/logo-RottenTomatoes.png" value={tScoreboard?.external?.rtAudience != null ? Math.round(tScoreboard.external.rtAudience) : (extras.rtScore != null ? Math.round(extras.rtScore) : null)} suffix="%" />
+                    <div className="hidden sm:block">
+                      <CompactBadge
+                        logo="/logo-RottenTomatoes.png"
+                        value={
+                          tScoreboard?.external?.rtAudience != null
+                            ? Math.round(tScoreboard.external.rtAudience)
+                            : (extras.rtScore != null ? Math.round(extras.rtScore) : null)
+                        }
+                        suffix="%"
+                      />
+                    </div>
                   )}
 
+                  {/* ❌ Metacritic (SOLO >= sm) */}
                   {extras.mcScore != null && (
-                    <CompactBadge logo="/logo-Metacritic.png" value={Math.round(extras.mcScore)} suffix="/100" />
+                    <div className="hidden sm:block">
+                      <CompactBadge logo="/logo-Metacritic.png" value={Math.round(extras.mcScore)} suffix="/100" />
+                    </div>
                   )}
                 </div>
 
                 <div className="w-px h-6 bg-white/10 shrink-0" />
 
-                {/* B. Enlaces Externos (FilmAffinity actualizado) */}
-                <div className="flex items-center gap-2 shrink-0">
+                {/* B. Enlaces Externos */}
+                <div className="flex items-center gap-3 shrink-0">
                   <ExternalLinkButton icon="/logo-Web.png" href={data.homepage} title="Web Oficial" />
                   <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} title="FilmAffinity" />
-                  {type === 'tv' && <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} title="SeriesGraph" />}
+                  {type === 'tv' && (
+                    <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} title="SeriesGraph" />
+                  )}
                 </div>
 
                 <div className="w-px h-6 bg-white/10 shrink-0 ml-auto" />
 
-                {/* C. Controles Usuario: Rate (SIN Sync) */}
+                {/* C. Puntuación Usuario */}
                 <div className="flex items-center gap-3 shrink-0">
-                  <UnifiedRateButton
+                  <StarRating
                     rating={unifiedUserRating}
+                    max={10}
                     loading={accountStatesLoading || ratingLoading || !!traktBusy}
                     onRate={handleUnifiedRate}
                     connected={!!session}
                     onConnect={() => (window.location.href = '/login')}
                   />
                 </div>
+
               </div>
 
-              {/* Footer de Estadísticas */}
+              {/* Footer de Estadísticas (VISIBLE EN MÓVIL, SIN RECORTES) */}
               {!tScoreboard.loading && (
-                <div className="px-4 py-2 border-t border-white/5 bg-black/10 flex items-center gap-6 overflow-x-auto [scrollbar-width:none]">
-                  <MiniStat icon={Eye} value={formatVoteCount(tScoreboard?.stats?.watchers ?? 0)} tooltip="Watchers" />
-                  <MiniStat icon={Play} value={formatVoteCount(tScoreboard?.stats?.plays ?? 0)} tooltip="Plays" />
-                  <MiniStat icon={List} value={formatVoteCount(tScoreboard?.stats?.lists ?? 0)} tooltip="Lists" />
-                  <MiniStat icon={Heart} value={formatVoteCount(tScoreboard?.stats?.favorited ?? 0)} tooltip="Favorited" />
-                </div>
-              )}
-
-              {(!!tScoreboard.error || ratingError) && (
-                <div className="px-4 pb-2 text-xs text-red-400 text-center bg-black/25 backdrop-blur-md">
-                  {tScoreboard.error || ratingError}
+                <div className="border-t border-white/5 bg-black/10">
+                  {/* Scroller con padding + safe-area para que no se recorte en bordes */}
+                  <div
+                    className="
+        overflow-x-auto
+        [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
+        py-2
+        pl-[calc(1rem+env(safe-area-inset-left))]
+        pr-[calc(1rem+env(safe-area-inset-right))]
+      "
+                  >
+                    {/* Inner: min-w-max evita que “aplasten”/corten el último item */}
+                    <div className="flex items-center gap-5 min-w-max">
+                      <div className="shrink-0">
+                        <MiniStat icon={Eye} value={formatVoteCount(tScoreboard?.stats?.watchers ?? 0)} tooltip="Watchers" />
+                      </div>
+                      <div className="shrink-0">
+                        <MiniStat icon={Play} value={formatVoteCount(tScoreboard?.stats?.plays ?? 0)} tooltip="Plays" />
+                      </div>
+                      <div className="shrink-0">
+                        <MiniStat icon={List} value={formatVoteCount(tScoreboard?.stats?.lists ?? 0)} tooltip="Lists" />
+                      </div>
+                      <div className="shrink-0">
+                        <MiniStat icon={Heart} value={formatVoteCount(tScoreboard?.stats?.favorited ?? 0)} tooltip="Favorited" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
