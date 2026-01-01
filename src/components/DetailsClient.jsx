@@ -982,6 +982,8 @@ export default function DetailsClient({
     }
   })
 
+  const SHOW_BUSY_KEY = 'SHOW'
+
   // =====================================================================
   // ✅ TRAKT COMMUNITY: Sentimientos / Comentarios / Temporadas / Listas
   // =====================================================================
@@ -1471,6 +1473,65 @@ export default function DetailsClient({
         else cur.delete(episodeNumber)
         return { ...prev, [seasonNumber]: Array.from(cur).sort((a, b) => a - b) }
       })
+    } finally {
+      setEpisodeBusyKey('')
+    }
+  }
+
+  const onToggleShowWatched = async (watchedAtOrNull) => {
+    if (type !== 'tv') return
+    if (!trakt?.connected) return
+    if (episodeBusyKey) return
+
+    const tmdbIdNum = Number(id)
+    if (!Number.isFinite(tmdbIdNum)) return
+
+    const seasonsList = Array.isArray(data?.seasons) ? data.seasons : []
+    const seasonNumbers = seasonsList
+      .map((s) => s?.season_number)
+      .filter((n) => typeof n === 'number' && n > 0)
+
+    if (seasonNumbers.length === 0) {
+      console.warn('[DetailsClient] No hay temporadas válidas para marcar la serie completa.')
+      return
+    }
+
+    setEpisodeBusyKey(SHOW_BUSY_KEY)
+
+    try {
+      const res = await fetch('/api/trakt/history/show', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tmdbId: tmdbIdNum,
+          seasonNumbers,
+          watchedAt: watchedAtOrNull // ISO string (marcar) o null (desmarcar)
+        })
+      })
+
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || 'Error marcando serie en Trakt')
+
+      // ✅ Optimista: actualiza watchedBySeason según episode_count
+      setWatchedBySeason(() => {
+        if (!watchedAtOrNull) return {}
+        const next = {}
+        for (const s of seasonsList) {
+          const sn = s?.season_number
+          const total = Number(s?.episode_count || 0)
+          if (typeof sn === 'number' && sn > 0 && total > 0) {
+            next[sn] = Array.from({ length: total }, (_, i) => i + 1)
+          }
+        }
+        return next
+      })
+
+      // ✅ Refresca el estado real (por si Trakt devuelve algo distinto)
+      await reloadTraktStatus()
+      const fresh = await traktGetShowWatched({ tmdbId: tmdbIdNum })
+      setWatchedBySeason(fresh?.watchedBySeason || {})
+    } catch (e) {
+      console.error('[DetailsClient] onToggleShowWatched error:', e)
     } finally {
       setEpisodeBusyKey('')
     }
@@ -3893,6 +3954,7 @@ export default function DetailsClient({
         watchedBySeason={watchedBySeason}
         busyKey={episodeBusyKey}
         onToggleEpisodeWatched={toggleEpisodeWatched}
+        onToggleShowWatched={onToggleShowWatched}
       />
 
       {/* ✅ MODAL: Añadir a lista */}
