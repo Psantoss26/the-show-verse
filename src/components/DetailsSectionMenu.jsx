@@ -15,7 +15,7 @@ function CountBadge({ value }) {
         <div
             className="
         hidden sm:flex
-        absolute -top-1.5 -right-1.5 z-10
+        absolute -top-1.5 -right-3 z-10
         min-w-[22px] h-[18px] px-1.5
         rounded-full
         text-[10px] font-extrabold leading-[18px] text-center
