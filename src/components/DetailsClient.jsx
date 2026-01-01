@@ -2454,7 +2454,7 @@ export default function DetailsClient({
             </div>
 
             {/* 4. CONTENEDOR TABS Y CONTENIDO */}
-            <div className="mb-6">
+            <div>
 
               {/* --- MENÚ DE NAVEGACIÓN --- */}
               <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
@@ -2653,7 +2653,7 @@ export default function DetailsClient({
 
         {/* ===================================================== */}
         {/* ✅ MENÚ GLOBAL + CONTENIDO (tipo ActorDetails) */}
-        <div className="mt-10">
+        <div className="sm:mt-10">
           <DetailsSectionMenu
             items={sectionItems}
             activeId={activeSection}
