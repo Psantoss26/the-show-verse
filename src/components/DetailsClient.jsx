@@ -248,6 +248,15 @@ export default function DetailsClient({
 
   const [isMobileViewport, setIsMobileViewport] = useState(false)
 
+  const getListId = useCallback((lOrId) => {
+    if (lOrId == null) return null
+    if (typeof lOrId === 'string' || typeof lOrId === 'number') return String(lOrId)
+
+    const l = lOrId
+    const id = l?.id ?? l?._id ?? l?.ids?.tmdb ?? l?.slug ?? l?.name
+    return id != null ? String(id) : null
+  }, [])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -340,7 +349,7 @@ export default function DetailsClient({
       const base = Array.isArray(lists) && lists.length ? lists : await loadListsIfNeeded({ abortRef })
       if (abortRef?.current) return
 
-      const ids = base.map((l) => l?.id).filter(Boolean)
+      const ids = base.map(getListId).filter(Boolean)
       const concurrency = 5
       let idx = 0
       const nextMap = {}
@@ -349,8 +358,9 @@ export default function DetailsClient({
         while (!abortRef?.current && idx < ids.length) {
           const listId = ids[idx++]
           try {
-            const present = await tmdbListItemStatus({ listId, movieId, sessionId: session })
-            nextMap[listId] = present
+            const lid = String(listId)
+            const present = await tmdbListItemStatus({ apiKey: TMDB_API_KEY, listId: lid, movieId, sessionId: session })
+            nextMap[lid] = !!present
           } catch {
             nextMap[listId] = false
           }
@@ -387,26 +397,14 @@ export default function DetailsClient({
 
   const openListsModal = async () => {
     if (requireLogin()) return
-    if (!canUseLists) return
+    if (!canUseLists || !movieId) return
+
     setListModalOpen(true)
+    setListsError('')
+    setListQuery('')
 
     const abortRef = { current: false }
-    setListsLoading(true)
-    setListsError('')
-    try {
-      const lists = await tmdbFetchAllUserLists({
-        accountId: account.id,
-        sessionId: session,
-        language: 'es-ES'
-      })
-      if (abortRef.current) return
-      setUserLists(lists)
-      await loadPresenceForLists({ lists, silent: false, abortRef })
-    } catch (e) {
-      if (!abortRef.current) setListsError(e?.message || 'Error cargando listas')
-    } finally {
-      if (!abortRef.current) setListsLoading(false)
-    }
+    await loadPresenceForLists({ silent: false, abortRef })
   }
 
   const closeListsModal = () => {
@@ -421,21 +419,31 @@ export default function DetailsClient({
   const handleAddToSpecificList = async (listId) => {
     if (!session || !account?.id || !movieId) return
     if (!canUseLists) return
-    if (membershipMap?.[listId]) return
 
-    setBusyListId(listId)
+    const lid = getListId(listId)
+    if (!lid) return
+    if (membershipMap?.[lid]) return
+
+    setBusyListId(lid)
     setListsError('')
 
     try {
-      const res = await tmdbAddMovieToList({ listId, movieId, sessionId: session })
-      setMembershipMap((prev) => ({ ...prev, [listId]: true }))
+      const res = await tmdbAddMovieToList({
+        apiKey: TMDB_API_KEY,
+        listId: lid,
+        movieId,
+        sessionId: session
+      })
 
+      // ✅ optimista
+      setMembershipMap((prev) => ({ ...(prev || {}), [lid]: true }))
       setUserLists((prev) =>
-        (prev || []).map((l) =>
-          l.id === listId
+        (prev || []).map((l) => {
+          const id = getListId(l)
+          return id === lid
             ? { ...l, item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1) }
             : l
-        )
+        })
       )
     } catch (e) {
       setListsError(e?.message || 'Error añadiendo a la lista')
@@ -453,29 +461,37 @@ export default function DetailsClient({
 
     setCreatingList(true)
     setListsError('')
+
     try {
-      const listId = await tmdbCreateList({
+      const newIdRaw = await tmdbCreateList({
+        apiKey: TMDB_API_KEY,
         name: n,
         description: newListDesc.trim(),
         sessionId: session,
-        language: 'es'
+        language: 'es-ES'
       })
 
+      const newListId = getListId(newIdRaw)
+      if (!newListId) throw new Error('No se pudo crear la lista')
+
+      await tmdbAddMovieToList({
+        apiKey: TMDB_API_KEY,
+        listId: newListId,
+        movieId,
+        sessionId: session
+      })
+
+      // refresca listas (para que aparezca y con count correcto)
       const lists = await tmdbFetchAllUserLists({
+        apiKey: TMDB_API_KEY,
         accountId: account.id,
         sessionId: session,
         language: 'es-ES'
       })
       setUserLists(lists)
 
-      await tmdbAddMovieToList({ listId, movieId, sessionId: session })
-
-      setMembershipMap((prev) => ({ ...prev, [listId]: true }))
-      setUserLists((prev) =>
-        (prev || []).map((l) =>
-          l.id === listId ? { ...l, item_count: (l.item_count || 0) + 1 } : l
-        )
-      )
+      // marca presencia
+      setMembershipMap((prev) => ({ ...(prev || {}), [newListId]: true }))
 
       setCreateOpen(false)
       setNewListName('')

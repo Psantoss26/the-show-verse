@@ -1,7 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState, useConfirm, useCallback } from 'react'
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useCallback,
+    useDeferredValue,
+    useTransition,
+    memo,
+} from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import 'swiper/swiper-bundle.css'
@@ -26,12 +35,13 @@ import {
     CheckCircle2,
     ChevronDown,
     ChevronRight,
-    X
+    X,
 } from 'lucide-react'
 
 // ================== UTILS & CACHE ==================
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const imdbRatingsCache = new Map()
+const PRELOAD_FIRST_N_LISTS = 6
 
 const readOmdbCache = (imdbId) => {
     if (!imdbId || typeof window === 'undefined') return null
@@ -85,6 +95,33 @@ const useIsMobileLayout = (breakpointPx = 768) => {
     }, [breakpointPx])
 
     return isMobile
+}
+
+/* --- InView: lazy load por proximidad al viewport --- */
+const useInView = ({ rootMargin = '320px 0px', threshold = 0.01 } = {}) => {
+    const ref = useRef(null)
+    const [inView, setInView] = useState(false)
+
+    useEffect(() => {
+        const el = ref.current
+        if (!el) return
+        if (typeof IntersectionObserver === 'undefined') {
+            setInView(true)
+            return
+        }
+
+        const obs = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) setInView(true)
+            },
+            { rootMargin, threshold }
+        )
+
+        obs.observe(el)
+        return () => obs.disconnect()
+    }, [rootMargin, threshold])
+
+    return [ref, inView]
 }
 
 function TmdbImg({ filePath, size = 'w780', alt, className = '' }) {
@@ -336,7 +373,7 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
     )
 }
 
-function ListItemCard({ item }) {
+const ListItemCard = memo(function ListItemCard({ item, isMobile }) {
     const [imdbScore, setImdbScore] = useState(null)
 
     const title = item?.title || item?.name || '—'
@@ -344,7 +381,6 @@ function ListItemCard({ item }) {
     const year = date ? date.slice(0, 4) : ''
     const mediaType = item?.media_type || (item?.title ? 'movie' : 'tv')
     const href = `/details/${mediaType}/${item.id}`
-
     const posterPath = item?.poster_path || item?.backdrop_path || null
 
     const prefetchImdb = useCallback(async () => {
@@ -380,27 +416,30 @@ function ListItemCard({ item }) {
         } catch {
             // ignore
         }
-    }, [item, mediaType])
+    }, [item?.id, mediaType])
+
+    // En móvil evitamos disparar OMDb por “hover”.
+    const prefetchEnabled = !isMobile
 
     return (
         <Link
             href={href}
             className="block group/card relative w-full select-none"
-            onMouseEnter={prefetchImdb}
-            onFocus={prefetchImdb}
+            onMouseEnter={prefetchEnabled ? prefetchImdb : undefined}
+            onFocus={prefetchEnabled ? prefetchImdb : undefined}
             draggable={false}
         >
             <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-lg ring-1 ring-white/5 transition-transform duration-300 group-hover/card:scale-[1.02]">
-                <TmdbImg
-                    filePath={posterPath}
-                    size="w500"
-                    alt={title}
-                    className="w-full h-full object-cover"
-                />
+                <TmdbImg filePath={posterPath} size="w500" alt={title} className="w-full h-full object-cover" />
 
-                {/* overlay SOLO para esta card (group/card) + pointer-events-none para no “bloquear” el drag */}
-                <div className="pointer-events-none absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+                {/* overlay: en móvil SIEMPRE visible (no depende de hover) */}
+                <div
+                    className={[
+                        'pointer-events-none absolute inset-0 transition-opacity duration-200',
+                        isMobile ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100',
+                    ].join(' ')}
+                >
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
 
                     {/* ratings arriba derecha */}
                     <div className="absolute top-2 right-2 flex flex-col items-end gap-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
@@ -412,7 +451,7 @@ function ListItemCard({ item }) {
                                 <img src="/logo-TMDb.png" alt="TMDb" className="w-auto h-2.5" draggable={false} />
                             </div>
                         )}
-                        {typeof imdbScore === 'number' && imdbScore > 0 && (
+                        {!isMobile && typeof imdbScore === 'number' && imdbScore > 0 && (
                             <div className="flex items-center gap-1.5">
                                 <span className="text-yellow-300 text-[11px] font-black font-mono tracking-tight">
                                     {imdbScore.toFixed(1)}
@@ -425,21 +464,15 @@ function ListItemCard({ item }) {
                     {/* título + año */}
                     <div className="absolute inset-x-0 bottom-0 p-3">
                         <div className="flex items-end justify-between gap-3">
-                            <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2">
-                                {title}
-                            </h3>
-                            {year && (
-                                <span className="shrink-0 text-[10px] sm:text-xs font-black text-yellow-300">
-                                    {year}
-                                </span>
-                            )}
+                            <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2">{title}</h3>
+                            {year && <span className="shrink-0 text-[10px] sm:text-xs font-black text-yellow-300">{year}</span>}
                         </div>
                     </div>
                 </div>
             </div>
         </Link>
     )
-}
+})
 
 function sortLists(lists, mode) {
     const arr = [...lists]
@@ -461,37 +494,249 @@ function sortLists(lists, mode) {
 function ListItemsRow({ items, isMobile }) {
     if (!Array.isArray(items) || items.length === 0) return null
 
-    const breakpoints = {
+    const isTop10 = false // por si en el futuro reutilizas lógica
+
+    const breakpointsRow = {
         0: { slidesPerView: 3, spaceBetween: 12 },
-        420: { slidesPerView: 3, spaceBetween: 12 },
         640: { slidesPerView: 4, spaceBetween: 14 },
-        768: { slidesPerView: 6, spaceBetween: 14 },
-        1024: { slidesPerView: 8, spaceBetween: 16 },
-        1280: { slidesPerView: 8, spaceBetween: 18 }
+        768: { slidesPerView: 'auto', spaceBetween: 14 },
+        1024: { slidesPerView: 'auto', spaceBetween: 18 },
+        1280: { slidesPerView: 'auto', spaceBetween: 20 }
     }
 
     return (
+        // ✅ 1) full-bleed SOLO en móvil para cancelar el px-4 del layout
         <div className="-mx-4 sm:mx-0">
-            <Swiper
-                slidesPerView={3}
-                spaceBetween={12}
-                breakpoints={breakpoints}
-                loop={false}
-                watchOverflow={true}
-                allowTouchMove={true}
-                simulateTouch={true}
-                grabCursor={!isMobile}
-                threshold={6}
-                preventClicks={true}
-                preventClicksPropagation={true}
-                className="px-4 sm:px-0 cursor-grab active:cursor-grabbing"
-            >
-                {items.map((item) => (
-                    <SwiperSlide key={`${item?.id}`} className="select-none">
-                        <ListItemCard item={item} />
-                    </SwiperSlide>
+            {/* ✅ 2) gutter propio en móvil = 12px (px-3) => igual que spaceBetween */}
+            <div className="px-3 sm:px-0">
+                <Swiper
+                    slidesPerView={3}
+                    spaceBetween={12}
+                    breakpoints={breakpointsRow}
+                    loop={false}
+                    watchOverflow
+                    allowTouchMove
+                    simulateTouch
+                    grabCursor={!isMobile}
+                    threshold={6}
+                    preventClicks
+                    preventClicksPropagation
+                    touchStartPreventDefault={false}
+                    className="group relative"
+                >
+                    {items.map((item) => {
+                        const mt = item?.media_type || (item?.title ? 'movie' : 'tv')
+                        return (
+                            <SwiperSlide
+                                key={`${mt}-${item?.id}`}
+                                className="
+                  select-none
+                  md:!w-[140px] lg:!w-[140px] xl:!w-[168px] 2xl:!w-[201px]
+                "
+                            >
+                                <ListItemCard item={item} />
+                            </SwiperSlide>
+                        )
+                    })}
+                </Swiper>
+            </div>
+        </div>
+    )
+}
+
+function ListItemsRowSkeleton({ isMobile }) {
+    const n = isMobile ? 3 : 6
+    return (
+        <div className="-mx-4 sm:mx-0 px-[10px] sm:px-0">
+            <div className="flex gap-[10px] overflow-hidden">
+                {Array.from({ length: n }).map((_, i) => (
+                    <div
+                        key={i}
+                        className="w-[30%] sm:w-[140px] md:w-[150px] lg:w-[160px] aspect-[2/3] rounded-2xl bg-zinc-900/40 border border-white/5 animate-pulse"
+                    />
                 ))}
-            </Swiper>
+            </div>
+        </div>
+    )
+}
+
+function GridListCard({ list, itemsState, ensureListItems, canUse, onDelete }) {
+    const listId = String(list?.id || '')
+    const [ref, inView] = useInView()
+
+    useEffect(() => {
+        if (inView) ensureListItems(listId)
+    }, [inView, ensureListItems, listId])
+
+    const isLoading = itemsState === null || itemsState === undefined
+    const items = Array.isArray(itemsState) ? itemsState : []
+
+    return (
+        <div ref={ref}>
+            <Link href={`/lists/${list.id}`} className="group block h-full">
+                <div className="h-full bg-zinc-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-white/10 hover:bg-zinc-900/60 transition-all flex flex-col relative">
+                    <div className="aspect-video w-full bg-zinc-950 relative overflow-hidden group-hover:opacity-90 transition-opacity">
+                        {isLoading ? (
+                            <div className="w-full h-full animate-pulse bg-zinc-900/40" />
+                        ) : (
+                            <ListCoverBackdropCollage items={items} alt={list.name} />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-60" />
+
+                        <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/10 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                            {list.item_count} items
+                        </div>
+                    </div>
+
+                    <div className="p-4 flex flex-col flex-1">
+                        <div className="flex justify-between items-start gap-2">
+                            <h3 className="text-lg font-bold text-white leading-tight line-clamp-1 group-hover:text-purple-400 transition-colors">
+                                {list.name}
+                            </h3>
+                        </div>
+                        <p className="text-sm text-zinc-400 mt-1 line-clamp-2 leading-relaxed flex-1">
+                            {list.description || <span className="italic opacity-50">Sin descripción</span>}
+                        </p>
+                    </div>
+
+                    {canUse && (
+                        <button
+                            onClick={(e) => onDelete(e, list.id)}
+                            className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-red-600/80 text-white/70 hover:text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            title="Borrar lista"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            </Link>
+        </div>
+    )
+}
+
+function RowListSection({ list, itemsState, ensureListItems, isMobile, canUse, onDelete }) {
+    const listId = String(list?.id || '')
+    const [ref, inView] = useInView()
+
+    useEffect(() => {
+        if (inView) ensureListItems(listId)
+    }, [inView, ensureListItems, listId])
+
+    const isLoading = itemsState === null || itemsState === undefined
+    const items = Array.isArray(itemsState) ? itemsState : []
+
+    return (
+        <section ref={ref} className="space-y-4">
+            {/* Header fila (móvil mejorado: botones no rompen el layout) */}
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-white/5 pb-3">
+                <div className="min-w-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <h3 className="text-2xl sm:text-3xl font-black text-white truncate">{list.name}</h3>
+
+                        <span className="shrink-0 inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold text-zinc-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                            {list.item_count} items
+                        </span>
+                    </div>
+
+                    {list.description && (
+                        <p className="text-sm text-zinc-500 mt-1 line-clamp-1 max-w-3xl">{list.description}</p>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    {canUse && (
+                        <button
+                            onClick={(e) => onDelete(e, list.id)}
+                            className="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition"
+                            title="Borrar lista"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
+
+                    <Link
+                        href={`/lists/${list.id}`}
+                        className="h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600/15 border border-purple-500/30 px-4 text-xs font-black uppercase tracking-wider text-purple-200 hover:bg-purple-600/22 hover:border-purple-500/45 transition flex-1 sm:flex-none"
+                    >
+                        Ver todo <ChevronRight className="w-4 h-4" />
+                    </Link>
+                </div>
+            </div>
+
+            {/* Fila items */}
+            {isLoading ? (
+                <ListItemsRowSkeleton isMobile={isMobile} />
+            ) : items.length > 0 ? (
+                <ListItemsRow items={items} isMobile={isMobile} />
+            ) : (
+                <div className="h-40 flex items-center justify-center bg-zinc-900/20 rounded-2xl border border-dashed border-white/5 text-zinc-600 text-sm">
+                    Lista vacía
+                </div>
+            )}
+        </section>
+    )
+}
+
+function ListModeRow({ list, itemsState, ensureListItems, canUse, onDelete }) {
+    const listId = String(list?.id || '')
+    const [ref, inView] = useInView()
+
+    useEffect(() => {
+        if (inView) ensureListItems(listId)
+    }, [inView, ensureListItems, listId])
+
+    const isLoading = itemsState === null || itemsState === undefined
+    const items = Array.isArray(itemsState) ? itemsState : []
+    const firstItem = items[0]
+
+    return (
+        <div ref={ref}>
+            <Link href={`/lists/${list.id}`} className="group block">
+                <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all">
+                    <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-950 border border-white/5 relative">
+                        {isLoading ? (
+                            <div className="w-full h-full animate-pulse bg-zinc-900/40" />
+                        ) : firstItem ? (
+                            <TmdbImg
+                                filePath={firstItem.poster_path || firstItem.backdrop_path}
+                                size="w92"
+                                alt={list.name}
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-zinc-700">
+                                <ListVideo className="w-6 h-6" />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-bold text-white truncate group-hover:text-purple-400 transition-colors">
+                            {list.name}
+                        </h3>
+                        <p className="text-sm text-zinc-400 truncate">{list.description || '—'}</p>
+                    </div>
+
+                    <div className="flex items-center gap-4 pr-1">
+                        <div className="text-right hidden sm:block">
+                            <span className="text-xs text-zinc-500 uppercase font-bold tracking-wider block">Items</span>
+                            <span className="text-sm font-bold text-white">{list.item_count}</span>
+                        </div>
+
+                        {canUse && (
+                            <button
+                                onClick={(e) => onDelete(e, list.id)}
+                                className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
+                                title="Borrar"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </Link>
         </div>
     )
 }
@@ -499,6 +744,7 @@ function ListItemsRow({ items, isMobile }) {
 // ================== MAIN PAGE ==================
 export default function ListsPage() {
     const isMobile = useIsMobileLayout(768)
+    const [isPending, startTransition] = useTransition()
 
     const { canUse, lists, loading, error, refresh, loadMore, hasMore, create, del } = useTmdbLists()
     const { session, account } = useAuth()
@@ -507,14 +753,15 @@ export default function ListsPage() {
     const [createOpen, setCreateOpen] = useState(false)
     const [creating, setCreating] = useState(false)
     const [query, setQuery] = useState('')
+    const deferredQuery = useDeferredValue(query)
     const [sortMode, setSortMode] = useState('items_desc')
     const [viewMode, setViewMode] = useState('rows') // ✅ por defecto como “Dashboard”
 
-    // Map: listId -> Array of items (first page)
+    // Map: listId -> undefined (no pedido) | null (cargando) | Array(items)
     const [itemsMap, setItemsMap] = useState({})
     const itemsMapRef = useRef(itemsMap)
     const inFlight = useRef(new Set())
-    const runIdRef = useRef(0)
+    const controllersRef = useRef(new Map()) // listId -> AbortController
 
     useEffect(() => {
         itemsMapRef.current = itemsMap
@@ -527,61 +774,54 @@ export default function ListsPage() {
         else setAuthStatus('anonymous')
     }, [session, account])
 
-    // ✅ precargar items por lista (page 1)
-    useEffect(() => {
-        let cancelled = false
-        const runId = ++runIdRef.current
+    const safeLists = Array.isArray(lists) ? lists : []
+    const listsCount = safeLists.length
 
-        const run = async () => {
-            if (!Array.isArray(lists) || lists.length === 0) return
+    const ensureListItems = useCallback(async (listId) => {
+        if (!listId) return
 
-            const missing = lists
-                .map((l) => String(l?.id || ''))
-                .filter((id) => {
-                    if (!id) return false
-                    if (itemsMapRef.current[id] !== undefined) return false
-                    if (inFlight.current.has(id)) return false
-                    return true
+        // ya cargado o cargando
+        if (itemsMapRef.current[listId] !== undefined) return
+        if (inFlight.current.has(listId)) return
+
+        inFlight.current.add(listId)
+        setItemsMap((prev) => ({ ...prev, [listId]: null }))
+
+        const ctrl = new AbortController()
+        controllersRef.current.set(listId, ctrl)
+
+        try {
+            const json = await getListDetails({ listId, page: 1, language: 'es-ES', signal: ctrl.signal })
+            const items = Array.isArray(json?.items) ? json.items : []
+            setItemsMap((prev) => ({ ...prev, [listId]: items }))
+        } catch (e) {
+            if (e?.name === 'AbortError') {
+                // vuelve a “no pedido” para que pueda pedirse después
+                setItemsMap((prev) => {
+                    const next = { ...prev }
+                    delete next[listId]
+                    return next
                 })
-
-            if (!missing.length) return
-
-            const concurrency = 3
-            let idx = 0
-
-            const worker = async () => {
-                while (!cancelled && idx < missing.length) {
-                    const listId = missing[idx++]
-                    inFlight.current.add(listId)
-                    try {
-                        const json = await getListDetails({ listId, page: 1, language: 'es-ES' })
-                        const items = Array.isArray(json?.items) ? json.items : []
-                        if (cancelled || runIdRef.current !== runId) continue
-                        setItemsMap((prev) => ({ ...prev, [listId]: items }))
-                    } catch {
-                        if (cancelled || runIdRef.current !== runId) continue
-                        setItemsMap((prev) => ({ ...prev, [listId]: [] }))
-                    } finally {
-                        inFlight.current.delete(listId)
-                    }
-                }
+                return
             }
-
-            await Promise.all(Array.from({ length: Math.min(concurrency, missing.length) }, worker))
+            setItemsMap((prev) => ({ ...prev, [listId]: [] }))
+        } finally {
+            inFlight.current.delete(listId)
+            controllersRef.current.delete(listId)
         }
-
-        run()
-        return () => {
-            cancelled = true
-            inFlight.current.clear()
-        }
-    }, [lists])
+    }, [])
 
     const filtered = useMemo(() => {
-        const q = query.trim().toLowerCase()
-        const base = q ? lists.filter((l) => (l?.name || '').toLowerCase().includes(q)) : lists
+        const q = deferredQuery.trim().toLowerCase()
+        const base = q ? safeLists.filter((l) => (l?.name || '').toLowerCase().includes(q)) : safeLists
         return sortLists(base, sortMode)
-    }, [lists, query, sortMode])
+    }, [safeLists, deferredQuery, sortMode])
+
+    // ✅ precarga solo las primeras N listas visibles (el resto lo hace InView)
+    useEffect(() => {
+        const first = filtered.slice(0, PRELOAD_FIRST_N_LISTS)
+        for (const l of first) ensureListItems(String(l?.id || ''))
+    }, [filtered, ensureListItems])
 
     const handleCreate = async (name, desc) => {
         setCreating(true)
@@ -599,7 +839,29 @@ export default function ListsPage() {
         if (!canUse) return
         const ok = window.confirm('¿Seguro que quieres borrar esta lista?')
         if (!ok) return
+
+        // abort preview si estaba cargando
+        const ctrl = controllersRef.current.get(String(listId))
+        if (ctrl) ctrl.abort()
+
         await del(listId)
+
+        // limpia preview cache
+        setItemsMap((prev) => {
+            const next = { ...prev }
+            delete next[String(listId)]
+            return next
+        })
+    }
+
+    const handleRefresh = () => {
+        // aborta todo lo que estuviera volando + limpia previews (evita estados raros)
+        controllersRef.current.forEach((c) => c.abort())
+        controllersRef.current.clear()
+        inFlight.current.clear()
+        setItemsMap({})
+        imdbRatingsCache.clear()
+        refresh()
     }
 
     // loader auth
@@ -622,10 +884,7 @@ export default function ListsPage() {
                     <p className="text-zinc-400 mb-8">
                         Inicia sesión con tu cuenta TMDb para gestionar tus listas personalizadas.
                     </p>
-                    <Link
-                        href="/login"
-                        className="px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition"
-                    >
+                    <Link href="/login" className="px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition">
                         Iniciar Sesión
                     </Link>
                 </div>
@@ -648,119 +907,127 @@ export default function ListsPage() {
                             <ListVideo className="w-8 h-8 text-purple-500" />
                         </div>
                         <div>
-                            <h1 className="text-4xl font-black text-white tracking-tight">Mis Listas</h1>
-                            <p className="text-neutral-400 mt-1 font-medium">{lists.length} listas creadas</p>
+                            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Mis Listas</h1>
+                            <p className="text-neutral-400 mt-1 font-medium">{listsCount} listas creadas</p>
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-neutral-900/60 border border-white/5 p-2 rounded-2xl backdrop-blur-md w-full xl:w-auto">
-                        <div className="relative flex-1 min-w-0 sm:min-w-[260px]">
+                    {/* Controles: mejor wrap en móvil */}
+                    <div className="flex flex-col gap-3 bg-neutral-900/60 border border-white/5 p-2 rounded-2xl backdrop-blur-md w-full xl:w-auto">
+                        <div className="relative w-full sm:min-w-[320px]">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                             <input
                                 value={query}
-                                onChange={(e) => setQuery(e.target.value)}
+                                onChange={(e) => {
+                                    const v = e.target.value
+                                    startTransition(() => setQuery(v))
+                                }}
                                 placeholder="Buscar listas..."
                                 className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 text-sm text-white focus:outline-none focus:border-zinc-600 transition-all placeholder:text-zinc-600"
                             />
                         </div>
 
-                        <div className="flex items-center justify-between sm:justify-end gap-3">
-                            <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 shrink-0">
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-1.5 rounded-lg transition ${viewMode === 'grid'
-                                        ? 'bg-zinc-700 text-white shadow'
-                                        : 'text-zinc-500 hover:text-zinc-300'
-                                        }`}
-                                    title="Vista Cuadrícula"
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex items-center gap-2">
+                                <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 shrink-0">
+                                    <button
+                                        onClick={() => startTransition(() => setViewMode('grid'))}
+                                        className={`p-1.5 rounded-lg transition ${viewMode === 'grid' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'
+                                            }`}
+                                        title="Vista Cuadrícula"
+                                        aria-label="Vista cuadrícula"
+                                    >
+                                        <LayoutGrid className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => startTransition(() => setViewMode('rows'))}
+                                        className={`p-1.5 rounded-lg transition ${viewMode === 'rows' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'
+                                            }`}
+                                        title="Vista Filas"
+                                        aria-label="Vista filas"
+                                    >
+                                        <Rows className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => startTransition(() => setViewMode('list'))}
+                                        className={`p-1.5 rounded-lg transition ${viewMode === 'list' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'
+                                            }`}
+                                        title="Vista Lista"
+                                        aria-label="Vista lista"
+                                    >
+                                        <StretchHorizontal className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                <Dropdown
+                                    valueLabel={sortMode.includes('items') ? 'Items' : 'Nombre'}
+                                    icon={ArrowUpDown}
+                                    className="w-32"
                                 >
-                                    <LayoutGrid className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('rows')}
-                                    className={`p-1.5 rounded-lg transition ${viewMode === 'rows'
-                                        ? 'bg-zinc-700 text-white shadow'
-                                        : 'text-zinc-500 hover:text-zinc-300'
-                                        }`}
-                                    title="Vista Filas"
-                                >
-                                    <Rows className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('list')}
-                                    className={`p-1.5 rounded-lg transition ${viewMode === 'list'
-                                        ? 'bg-zinc-700 text-white shadow'
-                                        : 'text-zinc-500 hover:text-zinc-300'
-                                        }`}
-                                    title="Vista Lista"
-                                >
-                                    <StretchHorizontal className="w-4 h-4" />
-                                </button>
+                                    {({ close }) => (
+                                        <>
+                                            <DropdownItem
+                                                active={sortMode === 'items_desc'}
+                                                onClick={() => {
+                                                    startTransition(() => setSortMode('items_desc'))
+                                                    close()
+                                                }}
+                                            >
+                                                Más items
+                                            </DropdownItem>
+                                            <DropdownItem
+                                                active={sortMode === 'items_asc'}
+                                                onClick={() => {
+                                                    startTransition(() => setSortMode('items_asc'))
+                                                    close()
+                                                }}
+                                            >
+                                                Menos items
+                                            </DropdownItem>
+                                            <DropdownItem
+                                                active={sortMode === 'name_asc'}
+                                                onClick={() => {
+                                                    startTransition(() => setSortMode('name_asc'))
+                                                    close()
+                                                }}
+                                            >
+                                                Nombre (A-Z)
+                                            </DropdownItem>
+                                            <DropdownItem
+                                                active={sortMode === 'name_desc'}
+                                                onClick={() => {
+                                                    startTransition(() => setSortMode('name_desc'))
+                                                    close()
+                                                }}
+                                            >
+                                                Nombre (Z-A)
+                                            </DropdownItem>
+                                        </>
+                                    )}
+                                </Dropdown>
                             </div>
 
-                            <Dropdown
-                                valueLabel={sortMode.includes('items') ? 'Items' : 'Nombre'}
-                                icon={ArrowUpDown}
-                                className="w-32 shrink-0"
-                            >
-                                {({ close }) => (
-                                    <>
-                                        <DropdownItem
-                                            active={sortMode === 'items_desc'}
-                                            onClick={() => {
-                                                setSortMode('items_desc')
-                                                close()
-                                            }}
-                                        >
-                                            Más items
-                                        </DropdownItem>
-                                        <DropdownItem
-                                            active={sortMode === 'items_asc'}
-                                            onClick={() => {
-                                                setSortMode('items_asc')
-                                                close()
-                                            }}
-                                        >
-                                            Menos items
-                                        </DropdownItem>
-                                        <DropdownItem
-                                            active={sortMode === 'name_asc'}
-                                            onClick={() => {
-                                                setSortMode('name_asc')
-                                                close()
-                                            }}
-                                        >
-                                            Nombre (A-Z)
-                                        </DropdownItem>
-                                        <DropdownItem
-                                            active={sortMode === 'name_desc'}
-                                            onClick={() => {
-                                                setSortMode('name_desc')
-                                                close()
-                                            }}
-                                        >
-                                            Nombre (Z-A)
-                                        </DropdownItem>
-                                    </>
-                                )}
-                            </Dropdown>
+                            <div className="flex items-center gap-2 ml-auto">
+                                <button
+                                    onClick={handleRefresh}
+                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition"
+                                    title="Refrescar"
+                                    aria-label="Refrescar"
+                                >
+                                    <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin text-purple-500' : ''}`} />
+                                </button>
 
-                            <button
-                                onClick={refresh}
-                                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition"
-                                title="Refrescar"
-                            >
-                                <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin text-purple-500' : ''}`} />
-                            </button>
-
-                            <button
-                                onClick={() => setCreateOpen(true)}
-                                className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-all shadow-lg shadow-purple-900/20 flex items-center gap-2"
-                            >
-                                <Plus className="w-4 h-4" />
-                                <span className="hidden sm:inline">Crear</span>
-                            </button>
+                                <button
+                                    onClick={() => setCreateOpen(true)}
+                                    className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-all shadow-lg shadow-purple-900/20 flex items-center gap-2"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Crear</span>
+                                </button>
+                            </div>
                         </div>
+
+                        {isPending && <div className="h-0.5 bg-white/5 rounded-full overflow-hidden" />}
                     </div>
                 </div>
 
@@ -777,7 +1044,7 @@ export default function ListsPage() {
                 </AnimatePresence>
 
                 {/* CONTENT */}
-                {loading && lists.length === 0 ? (
+                {loading && listsCount === 0 ? (
                     <div className="flex flex-col items-center justify-center py-32">
                         <Loader2 className="w-10 h-10 animate-spin text-purple-500 mb-4" />
                         <span className="text-neutral-500 text-sm font-medium animate-pulse">Cargando tus listas...</span>
@@ -792,156 +1059,47 @@ export default function ListsPage() {
                     <>
                         {viewMode === 'grid' && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {filtered.map((l) => {
-                                    const items = itemsMap[String(l.id)] || []
-                                    return (
-                                        <Link key={l.id} href={`/lists/${l.id}`} className="group block h-full">
-                                            <div className="h-full bg-zinc-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-white/10 hover:bg-zinc-900/60 transition-all flex flex-col relative">
-                                                <div className="aspect-video w-full bg-zinc-950 relative overflow-hidden group-hover:opacity-90 transition-opacity">
-                                                    <ListCoverBackdropCollage items={items} alt={l.name} />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-60" />
-
-                                                    <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/10 flex items-center gap-2">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                                                        {l.item_count} items
-                                                    </div>
-                                                </div>
-
-                                                <div className="p-4 flex flex-col flex-1">
-                                                    <div className="flex justify-between items-start gap-2">
-                                                        <h3 className="text-lg font-bold text-white leading-tight line-clamp-1 group-hover:text-purple-400 transition-colors">
-                                                            {l.name}
-                                                        </h3>
-                                                    </div>
-                                                    <p className="text-sm text-zinc-400 mt-1 line-clamp-2 leading-relaxed flex-1">
-                                                        {l.description || <span className="italic opacity-50">Sin descripción</span>}
-                                                    </p>
-                                                </div>
-
-                                                <button
-                                                    onClick={(e) => handleDelete(e, l.id)}
-                                                    className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-red-600/80 text-white/70 hover:text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                                    title="Borrar lista"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </Link>
-                                    )
-                                })}
+                                {filtered.map((l) => (
+                                    <GridListCard
+                                        key={l.id}
+                                        list={l}
+                                        itemsState={itemsMap[String(l.id)]}
+                                        ensureListItems={ensureListItems}
+                                        canUse={!!canUse}
+                                        onDelete={handleDelete}
+                                    />
+                                ))}
                             </div>
                         )}
 
                         {viewMode === 'rows' && (
                             <div className="space-y-12">
-                                {filtered.map((l) => {
-                                    const items = itemsMap[String(l.id)] || []
-
-                                    return (
-                                        <section key={l.id} className="space-y-4">
-                                            {/* Header fila (mejorado) */}
-                                            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-white/5 pb-3">
-                                                <div className="min-w-0">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <h3 className="text-2xl sm:text-3xl font-black text-white truncate">
-                                                            {l.name}
-                                                        </h3>
-
-                                                        <span className="shrink-0 inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold text-zinc-200">
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                                                            {l.item_count} items
-                                                        </span>
-                                                    </div>
-
-                                                    {l.description && (
-                                                        <p className="text-sm text-zinc-500 mt-1 line-clamp-1 max-w-3xl">
-                                                            {l.description}
-                                                        </p>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                                                    <button
-                                                        onClick={(e) => handleDelete(e, l.id)}
-                                                        className="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition"
-                                                        title="Borrar lista"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-
-                                                    <Link
-                                                        href={`/lists/${l.id}`}
-                                                        className="h-10 inline-flex items-center gap-2 rounded-xl bg-purple-600/15 border border-purple-500/30 px-4 text-xs font-black uppercase tracking-wider text-purple-200 hover:bg-purple-600/22 hover:border-purple-500/45 transition"
-                                                    >
-                                                        Ver todo <ChevronRight className="w-4 h-4" />
-                                                    </Link>
-                                                </div>
-                                            </div>
-
-                                            {/* Fila items */}
-                                            {items.length > 0 ? (
-                                                <ListItemsRow items={items} isMobile={isMobile} />
-                                            ) : (
-                                                <div className="h-40 flex items-center justify-center bg-zinc-900/20 rounded-2xl border border-dashed border-white/5 text-zinc-600 text-sm">
-                                                    Lista vacía
-                                                </div>
-                                            )}
-                                        </section>
-                                    )
-                                })}
+                                {filtered.map((l) => (
+                                    <RowListSection
+                                        key={l.id}
+                                        list={l}
+                                        itemsState={itemsMap[String(l.id)]}
+                                        ensureListItems={ensureListItems}
+                                        isMobile={isMobile}
+                                        canUse={!!canUse}
+                                        onDelete={handleDelete}
+                                    />
+                                ))}
                             </div>
                         )}
 
                         {viewMode === 'list' && (
                             <div className="flex flex-col gap-3">
-                                {filtered.map((l) => {
-                                    const items = itemsMap[String(l.id)] || []
-                                    const firstItem = items[0]
-                                    return (
-                                        <Link key={l.id} href={`/lists/${l.id}`} className="group block">
-                                            <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all">
-                                                <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-950 border border-white/5 relative">
-                                                    {firstItem ? (
-                                                        <TmdbImg
-                                                            filePath={firstItem.poster_path || firstItem.backdrop_path}
-                                                            size="w92"
-                                                            alt={l.name}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-zinc-700">
-                                                            <ListVideo className="w-6 h-6" />
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="text-base font-bold text-white truncate group-hover:text-purple-400 transition-colors">
-                                                        {l.name}
-                                                    </h3>
-                                                    <p className="text-sm text-zinc-400 truncate">{l.description || '—'}</p>
-                                                </div>
-
-                                                <div className="flex items-center gap-6 pr-2">
-                                                    <div className="text-right hidden sm:block">
-                                                        <span className="text-xs text-zinc-500 uppercase font-bold tracking-wider block">
-                                                            Items
-                                                        </span>
-                                                        <span className="text-sm font-bold text-white">{l.item_count}</span>
-                                                    </div>
-
-                                                    <button
-                                                        onClick={(e) => handleDelete(e, l.id)}
-                                                        className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
-                                                        title="Borrar"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    )
-                                })}
+                                {filtered.map((l) => (
+                                    <ListModeRow
+                                        key={l.id}
+                                        list={l}
+                                        itemsState={itemsMap[String(l.id)]}
+                                        ensureListItems={ensureListItems}
+                                        canUse={!!canUse}
+                                        onDelete={handleDelete}
+                                    />
+                                ))}
                             </div>
                         )}
                     </>
