@@ -1,122 +1,130 @@
-// src/components/DetailsSectionMenu.jsx
 'use client'
 
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 
-export default function DetailsSectionMenu({
-    items = [],
-    activeId,
-    onChange,
-    columns = 4, // compat (ya no lo usamos)
-    className = '',
-}) {
-    const safeItems = useMemo(() => (Array.isArray(items) ? items : []), [items])
+const fmtCount = (n) => {
+    const v = Number(n || 0)
+    if (!Number.isFinite(v) || v <= 0) return null
+    return v > 999 ? '999+' : String(v)
+}
+
+function CountBadge({ value }) {
+    if (!value) return null
 
     return (
-        <div className={`w-full ${className}`}>
-            {/* Misma transparencia/estilo que ratings + líneas */}
-            <div className="py-2 border-y border-white/10 bg-white/5 backdrop-blur-md rounded-3xl">
-                {/* Una sola fila horizontal + ocupa todo el ancho */}
-                <div
-                    className="
-            flex items-stretch flex-nowrap
-            w-full
-            overflow-x-auto
-            px-2
-            gap-2
-            [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
-          "
-                >
-                    {safeItems.map((it) => {
-                        const isActive = it.id === activeId
-                        const disabled = !!it.disabled
-                        const Icon = it.icon
+        <div
+            className="
+        hidden sm:flex
+        absolute -top-1.5 -right-1.5 z-10
+        min-w-[22px] h-[18px] px-1.5
+        rounded-full
+        text-[10px] font-extrabold leading-[18px] text-center
+        bg-yellow-400 text-black
+        shadow-md shadow-black/40
+        ring-2 ring-black/35
+        pointer-events-none
+        items-center justify-center
+      "
+        >
+            {value}
+        </div>
+    )
+}
 
-                        // “Fondos” -> “Vídeos” (solo texto aquí)
-                        const isBackgrounds = it.id === 'backgrounds'
-                        const label = isBackgrounds ? 'Vídeos' : it.label
+
+export default function DetailsSectionMenu({ items = [], activeId, onChange }) {
+    const safeItems = useMemo(() => (Array.isArray(items) ? items.filter(Boolean) : []), [items])
+    const cols = Math.max(1, safeItems.length)
+
+    return (
+        <div className="w-full">
+            <div className="rounded-3xl border border-white/10 bg-black/30 backdrop-blur-md p-2 sm:p-2.5 overflow-visible">
+                {/* ===================== */}
+                {/* DESKTOP */}
+                {/* ===================== */}
+                <div className="hidden sm:flex items-stretch gap-2">
+                    {safeItems.map((it) => {
+                        const Icon = it.icon
+                        const isActive = it.id === activeId
+                        const badge = fmtCount(it.count ?? it.badge ?? it.total ?? it.itemsCount)
 
                         return (
                             <button
                                 key={it.id}
                                 type="button"
-                                onClick={() => !disabled && onChange?.(it.id)}
-                                disabled={disabled}
-                                title={label}
-                                className={`
-                  group relative
-                  flex flex-col items-center justify-center
-                  
-                  /* ✅ CLAVE: crece para ocupar todo el ancho */
-                  flex-1 basis-0
-                  /* ✅ mínimo para que si hay muchos, haga scroll */
-                  min-w-[56px] sm:min-w-[92px]
-
-                  rounded-2xl border transition-all duration-300 ease-out
-                  select-none outline-none
-                  h-12 sm:h-14
-                  px-1
-                  active:scale-95
-
-                  ${disabled
-                                        ? 'opacity-30 cursor-not-allowed border-transparent grayscale'
-                                        : isActive
-                                            ? 'bg-yellow-500/10 border-yellow-500/30 shadow-[0_0_20px_rgba(234,179,8,0.15)]'
-                                            : 'bg-transparent border-transparent hover:bg-white/10 hover:border-white/10'
-                                    }
-                `}
+                                onClick={() => onChange?.(it.id)}
+                                className={[
+                                    'group relative flex-1 min-w-0 rounded-2xl px-3 py-2.5 border transition',
+                                    isActive
+                                        ? 'bg-yellow-500/10 border-yellow-500/35'
+                                        : 'bg-white/5 border-white/10 hover:bg-white/7 hover:border-white/15',
+                                ].join(' ')}
+                                title={it.label}
                             >
-                                {/* ICONO */}
-                                {Icon && (
-                                    <span
-                                        className={`
-                      flex items-center justify-center rounded-xl transition-colors duration-300
-                      h-8 w-8
-                      ${isActive
-                                                ? 'text-yellow-400 bg-yellow-400/10'
-                                                : 'text-zinc-400 group-hover:text-zinc-100 bg-white/5 group-hover:bg-white/10'
-                                            }
-                    `}
-                                    >
-                                        <Icon className="h-4 w-4" />
-                                    </span>
-                                )}
+                                <div className="flex flex-col items-center justify-center gap-1.5">
+                                    {/* ICONO + BADGE */}
+                                    <div className="relative overflow-visible">
+                                        <div
+                                            className={[
+                                                'relative w-11 h-11 rounded-2xl flex items-center justify-center overflow-visible',
+                                                'border transition',
+                                                isActive
+                                                    ? 'bg-yellow-500/15 border-yellow-500/35'
+                                                    : 'bg-black/20 border-white/10 group-hover:bg-black/25',
+                                            ].join(' ')}
+                                        >
+                                            <CountBadge value={badge} />
 
-                                {/* TEXTO (solo en sm+) */}
-                                <span
-                                    className={`
-                    hidden sm:block mt-1
-                    text-[10px] font-bold uppercase tracking-widest
-                    text-center leading-tight w-full px-1
-                    transition-colors duration-300
-                    ${isActive ? 'text-yellow-100' : 'text-zinc-500 group-hover:text-zinc-300'}
-                  `}
-                                >
-                                    {label}
-                                </span>
+                                            {Icon ? (
+                                                <Icon
+                                                    className={[
+                                                        'w-5 h-5 transition',
+                                                        isActive ? 'text-yellow-300' : 'text-zinc-300 group-hover:text-white',
+                                                    ].join(' ')}
+                                                />
+                                            ) : null}
+                                        </div>
+                                    </div>
 
-                                {/* BADGE */}
-                                {typeof it.count === 'number' && (
-                                    <span
-                                        className={`
-                      absolute top-1 right-1
-                      flex min-w-[18px] h-[18px] items-center justify-center rounded-full
-                      px-1 text-[9px] font-black border backdrop-blur-sm
-                      transition-transform duration-300
-                      ${isActive
-                                                ? 'bg-yellow-500 text-black border-yellow-400 scale-110'
-                                                : 'bg-zinc-800/80 text-zinc-400 border-zinc-700/50 group-hover:border-zinc-600 group-hover:text-zinc-200'
-                                            }
-                    `}
-                                    >
-                                        {it.count}
-                                    </span>
-                                )}
+                                    <div className="text-[11px] font-bold uppercase tracking-widest text-zinc-300 group-hover:text-white transition truncate max-w-full">
+                                        {it.label}
+                                    </div>
+                                </div>
+                            </button>
+                        )
+                    })}
+                </div>
 
-                                {/* Indicador inferior (móvil) */}
-                                {isActive && (
-                                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.8)] sm:hidden" />
-                                )}
+                {/* ===================== */}
+                {/* MOBILE (1 fila, sin scroll) */}
+                {/* ===================== */}
+                <div className="sm:hidden grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+                    {safeItems.map((it) => {
+                        const Icon = it.icon
+                        const isActive = it.id === activeId
+                        const badge = fmtCount(it.count ?? it.badge ?? it.total ?? it.itemsCount)
+
+                        return (
+                            <button
+                                key={it.id}
+                                type="button"
+                                onClick={() => onChange?.(it.id)}
+                                className={[
+                                    'relative overflow-visible h-11 rounded-2xl border transition flex items-center justify-center',
+                                    isActive
+                                        ? 'bg-yellow-500/10 border-yellow-500/35'
+                                        : 'bg-white/5 border-white/10 hover:bg-white/7 hover:border-white/15',
+                                ].join(' ')}
+                                title={it.label}
+                                aria-label={it.label}
+                            >
+                                <div className="relative w-9 h-9 flex items-center justify-center overflow-visible">
+                                    <CountBadge value={badge} />
+
+                                    {Icon ? (
+                                        <Icon className={['w-5 h-5 transition', isActive ? 'text-yellow-300' : 'text-zinc-300'].join(' ')} />
+                                    ) : null}
+                                </div>
                             </button>
                         )
                     })}
