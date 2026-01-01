@@ -2194,7 +2194,7 @@ export default function DetailsClient({
           <div className="flex-1 flex flex-col min-w-0 w-full">
 
             {/* 1. TÍTULO Y CABECERA */}
-            <div className="mb-5">
+            <div className="mb-5 px-1">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
                 {title}
               </h1>
@@ -2222,7 +2222,7 @@ export default function DetailsClient({
                 )}
 
                 {/* Géneros */}
-                <div className="flex flex-wrap items-center gap-1.5 ml-1">
+                <div className="flex flex-wrap items-center gap-2">
                   {data.genres?.slice(0, 3).map(g => (
                     <span key={g.id} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/10 text-zinc-400 bg-white/5">
                       {g.name}
@@ -2233,7 +2233,7 @@ export default function DetailsClient({
             </div>
 
             {/* 2. BARRA DE ACCIONES PRINCIPALES */}
-            <div className="flex flex-wrap items-center gap-3 mb-8">
+            <div className="flex flex-wrap items-center gap-3 mb-8 px-1">
               {/* Botón Tráiler (Solo icono) */}
               <button
                 onClick={() => openVideo(preferredVideo)}
@@ -2362,7 +2362,31 @@ export default function DetailsClient({
                     />
                   )}
 
-                  {/* (Rotten/Metacritic si los mantienes en desktop, déjalos aquí dentro del bloque A) */}
+                  {/* ✅ Rotten Tomatoes: SOLO desktop (>= sm) */}
+                  {(tScoreboard?.external?.rtAudience != null || extras.rtScore != null) && (
+                    <div className="hidden sm:block">
+                      <CompactBadge
+                        logo="/logo-RottenTomatoes.png"
+                        value={
+                          tScoreboard?.external?.rtAudience != null
+                            ? Math.round(tScoreboard.external.rtAudience)
+                            : (extras.rtScore != null ? Math.round(extras.rtScore) : null)
+                        }
+                        suffix="%"
+                      />
+                    </div>
+                  )}
+
+                  {/* ✅ Metacritic: SOLO desktop (>= sm) */}
+                  {extras.mcScore != null && (
+                    <div className="hidden sm:block">
+                      <CompactBadge
+                        logo="/logo-Metacritic.png"
+                        value={Math.round(extras.mcScore)}
+                        suffix="/100"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* ✅ SEPARADOR 1 (después de IMDb en móvil, porque es el último visible ahí) */}
