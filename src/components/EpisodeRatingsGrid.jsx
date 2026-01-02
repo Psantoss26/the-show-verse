@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import { LayoutGrid, WrapText, ArrowUpDown, BarChart3 } from 'lucide-react'
 
 /* =======================
@@ -65,7 +66,7 @@ function useInViewOnce(rootMargin = '300px') {
   return { ref, inView }
 }
 
-// --- Tooltip flotante en portal (igual que antes, pero desactivable) ---
+// --- Tooltip flotante en portal ---
 function TooltipPortal({ activeData, anchorRect, enabled }) {
   const tooltipRef = useRef(null)
   const [coords, setCoords] = useState({ top: 0, left: 0, placement: 'top' })
@@ -83,7 +84,6 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
 
     let left = rLeft + rW / 2 - tW / 2
     let top = rTop - tH - GAP
-    let placement = 'top'
 
     if (left < VIEWPORT_PADDING) left = VIEWPORT_PADDING
     else if (left + tW > window.innerWidth - VIEWPORT_PADDING) {
@@ -92,10 +92,9 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
 
     if (top < VIEWPORT_PADDING) {
       top = rTop + rH + GAP
-      placement = 'bottom'
     }
 
-    setCoords({ top, left, placement })
+    setCoords({ top, left })
   }, [anchorRect, enabled])
 
   if (!enabled) return null
@@ -124,14 +123,8 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
           {activeData.tmdbVal != null && (
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
-                <img
-                  src="/logo-TMDb.png"
-                  alt="TMDb"
-                  className="h-3 w-auto rounded-[2px]"
-                />
-                <span className="text-[10px] uppercase tracking-wide text-emerald-300 font-bold">
-                  TMDb
-                </span>
+                <img src="/logo-TMDb.png" alt="TMDb" className="h-3 w-auto rounded-[2px]" />
+                <span className="text-[10px] uppercase tracking-wide text-emerald-300 font-bold">TMDb</span>
               </div>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-[14px] font-bold">
@@ -150,9 +143,7 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
                 <img src="/logo-IMDb.png" alt="IMDb" className="h-3 w-auto" />
-                <span className="text-[10px] uppercase tracking-wide text-yellow-300 font-bold">
-                  IMDb
-                </span>
+                <span className="text-[10px] uppercase tracking-wide text-yellow-300 font-bold">IMDb</span>
               </div>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-[14px] font-bold">
@@ -184,10 +175,12 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
 
 export default function EpisodeRatingsGrid({
   ratings,
+  showId, // ✅ nuevo: TMDb show id para poder navegar
   initialSource = 'imdb', // compat
   density = 'compact',
   fillMissingWithTmdb = true
 }) {
+  const router = useRouter()
   const isTouchLike = useIsTouchLike()
   const { ref: inViewRef, inView } = useInViewOnce('450px')
 
@@ -301,9 +294,7 @@ export default function EpisodeRatingsGrid({
               if (!Number.isNaN(d.getTime()) && d > new Date()) isUnaired = true
             }
 
-            let tmdbRating = toRatingNumber(
-              ep.tmdbRating ?? ep.tmdb ?? ep.vote_average
-            )
+            let tmdbRating = toRatingNumber(ep.tmdbRating ?? ep.tmdb ?? ep.vote_average)
             let imdbRating = toRatingNumber(ep.imdbRating ?? ep.imdb)
 
             let displayRating = imdbRating
@@ -315,9 +306,7 @@ export default function EpisodeRatingsGrid({
               displayRating = null
             }
 
-            const tmdbVotes = toNumberSafe(
-              ep.tmdbVotes ?? ep.tmdb_votes ?? ep.vote_count
-            )
+            const tmdbVotes = toNumberSafe(ep.tmdbVotes ?? ep.tmdb_votes ?? ep.vote_count)
             const imdbVotes = toNumberSafe(
               ep.imdbVotes ??
               ep.imdb_votes ??
@@ -356,7 +345,13 @@ export default function EpisodeRatingsGrid({
         .forEach((s) => {
           s.episodes.forEach((ep) => {
             if (ep.displayRating == null) return
-            allEpisodes.push({ ...ep, episodeNumber: counter++ })
+            // ✅ Guardamos el season/episode real para la navegación
+            allEpisodes.push({
+              ...ep,
+              episodeNumber: counter++, // número “aplanado” (solo visual)
+              _origSeasonNumber: s.season_number,
+              _origEpisodeNumber: ep.episodeNumber
+            })
           })
         })
 
@@ -370,9 +365,7 @@ export default function EpisodeRatingsGrid({
     } else {
       seasons = seasons
         .map((s) => {
-          const hasAnyRating = s.episodes.some(
-            (ep) => typeof ep.displayRating === 'number'
-          )
+          const hasAnyRating = s.episodes.some((ep) => typeof ep.displayRating === 'number')
           return { ...s, hasAnyRating }
         })
         .filter((s) => s.episodes.length > 0 && s.hasAnyRating)
@@ -392,9 +385,7 @@ export default function EpisodeRatingsGrid({
 
     const seasonAveragesMap = new Map()
     seasons.forEach((s) => {
-      const vals = s.episodes
-        .map((e) => e.displayRating)
-        .filter((v) => typeof v === 'number')
+      const vals = s.episodes.map((e) => e.displayRating).filter((v) => typeof v === 'number')
       if (!vals.length) {
         seasonAveragesMap.set(s.season_number, null)
         return
@@ -430,8 +421,7 @@ export default function EpisodeRatingsGrid({
   }
 
   const toneFor = (v) => {
-    if (v == null)
-      return { bg: 'bg-zinc-800', text: 'text-zinc-400', ring: 'ring-white/5' }
+    if (v == null) return { bg: 'bg-zinc-800', text: 'text-zinc-400', ring: 'ring-white/5' }
     if (v >= 9.5) return { bg: 'bg-teal-400', text: 'text-black', ring: 'ring-black/10' }
     if (v >= 9.0) return { bg: 'bg-emerald-700', text: 'text-white/90', ring: 'ring-black/10' }
     if (v >= 8.0) return { bg: 'bg-green-500', text: 'text-black', ring: 'ring-black/10' }
@@ -445,8 +435,7 @@ export default function EpisodeRatingsGrid({
     if (!tooltipEnabled) return null
     if (!ep || ep.isUnaired) return null
 
-    const hasData =
-      ep.tmdbRating != null || ep.imdbRating != null || ep.displayRating != null
+    const hasData = ep.tmdbRating != null || ep.imdbRating != null || ep.displayRating != null
     if (!hasData) return null
 
     const titleText = ep.name || `Episodio ${episodeNumber}`
@@ -464,22 +453,23 @@ export default function EpisodeRatingsGrid({
       ? `Episode ${episodeNumber}`
       : `Season ${seasonNumber}, Episode ${episodeNumber}`
 
-    return {
-      titleText,
-      seasonInfo,
-      tmdbVal,
-      imdbVal,
-      tmdbVotesStr,
-      imdbVotesStr,
-      avgVal,
-      format1
-    }
+    return { titleText, seasonInfo, tmdbVal, imdbVal, tmdbVotesStr, imdbVotesStr, avgVal, format1 }
   }
 
-  // ✅ Auto-optimización móvil:
-  // - si es touch y el grid es grande, cambiamos por defecto a Wrapped (sin impedir que el usuario elija Grid)
+  // ✅ navegación a detalles
+  const goToEpisode = useCallback((ep, seasonNumber, episodeNumber) => {
+    if (!showId) return
+    if (!ep || ep.isUnaired) return
+
+    const s = ep?._origSeasonNumber ?? seasonNumber
+    const e = ep?._origEpisodeNumber ?? episodeNumber
+    if (s == null || e == null) return
+
+    router.push(`/details/tv/${showId}/season/${s}/episode/${e}`)
+  }, [router, showId])
+
   const gridSize = seasonsSorted.length * maxEpisodes
-  const isHeavyGrid = gridSize >= 420 // umbral razonable para móviles (ajustable)
+  const isHeavyGrid = gridSize >= 420
 
   useEffect(() => {
     if (!isTouchLike) return
@@ -492,7 +482,6 @@ export default function EpisodeRatingsGrid({
     userPickedLayoutRef.current = true
     setLayoutMode(mode)
     if (mode === 'wrapped') {
-      // limpiamos tooltip si venimos de grid
       setHoveredEp(null)
       setAnchorRect(null)
     }
@@ -500,18 +489,32 @@ export default function EpisodeRatingsGrid({
 
   if (!seasonsSorted.length || maxEpisodes === 0) return null
 
+  const cellProps = (ep, seasonNumber, episodeNumber) => {
+    const clickable = !!(ep && !ep.isUnaired && showId)
+    return {
+      role: clickable ? 'link' : undefined,
+      tabIndex: clickable ? 0 : -1,
+      onClick: clickable ? () => goToEpisode(ep, seasonNumber, episodeNumber) : undefined,
+      onKeyDown: clickable
+        ? (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            goToEpisode(ep, seasonNumber, episodeNumber)
+          }
+        }
+        : undefined,
+      title: clickable ? 'Ver detalles del episodio' : undefined,
+      clickable
+    }
+  }
+
   // =======================
-  //  Render GRID normal
-  //  (optim: menos blur/shadows en móvil + content-visibility)
+  // Render GRID normal
   // =======================
   const renderGrid = () => (
     <div
       className="overflow-x-auto overflow-y-visible mt-2 [-webkit-overflow-scrolling:touch] overscroll-contain"
-      style={{
-        // ⚡ evita que el navegador “pinte todo” cuando está fuera de pantalla (gran mejora en scroll móvil)
-        contentVisibility: 'auto',
-        containIntrinsicSize: '900px 520px'
-      }}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '900px 520px' }}
     >
       <table className="border-separate border-spacing-0 [table-layout:fixed]">
         <thead>
@@ -571,6 +574,7 @@ export default function EpisodeRatingsGrid({
                 const textClass = isUpcoming ? 'text-black' : spec.text
 
                 const tooltipData = isUpcoming ? null : buildTooltipData(ep, s.season_number, epNum)
+                const { role, tabIndex, onClick, onKeyDown, title, clickable } = cellProps(ep, s.season_number, epNum)
 
                 return (
                   <td key={`s${s.season_number}-e${epNum}`} className="p-1">
@@ -581,6 +585,11 @@ export default function EpisodeRatingsGrid({
                       onMouseLeave={tooltipEnabled ? handleMouseLeave : undefined}
                     >
                       <div
+                        role={role}
+                        tabIndex={tabIndex}
+                        onClick={onClick}
+                        onKeyDown={onKeyDown}
+                        title={title}
                         className={`
                           ${bgClass} ${textClass}
                           ${SZ.cell}
@@ -590,8 +599,10 @@ export default function EpisodeRatingsGrid({
                           font-semibold
                           [font-variant-numeric:tabular-nums]
                           select-none
-                          cursor-default
+                          ${clickable ? 'cursor-pointer hover:brightness-[1.06]' : 'cursor-default'}
+                          ${clickable ? 'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30' : ''}
                           ${tooltipEnabled ? 'md:shadow-[0_0_0_2px_rgba(0,0,0,0.9)]' : 'shadow-none'}
+                          transition
                         `}
                       >
                         {val ?? '—'}
@@ -651,15 +662,12 @@ export default function EpisodeRatingsGrid({
   )
 
   // =======================
-  //  Render GRID invertido
+  // Render GRID invertido
   // =======================
   const renderGridInverted = () => (
     <div
       className="overflow-x-auto overflow-y-visible mt-2 [-webkit-overflow-scrolling:touch] overscroll-contain"
-      style={{
-        contentVisibility: 'auto',
-        containIntrinsicSize: '900px 520px'
-      }}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '900px 520px' }}
     >
       <table className="border-separate border-spacing-0 [table-layout:fixed]">
         <thead>
@@ -732,6 +740,7 @@ export default function EpisodeRatingsGrid({
                 const textClass = isUpcoming ? 'text-black' : spec.text
 
                 const tooltipData = isUpcoming ? null : buildTooltipData(ep, s.season_number, epNum)
+                const { role, tabIndex, onClick, onKeyDown, title, clickable } = cellProps(ep, s.season_number, epNum)
 
                 return (
                   <td key={`s${s.season_number}-e${epNum}`} className="p-1">
@@ -742,6 +751,11 @@ export default function EpisodeRatingsGrid({
                       onMouseLeave={tooltipEnabled ? handleMouseLeave : undefined}
                     >
                       <div
+                        role={role}
+                        tabIndex={tabIndex}
+                        onClick={onClick}
+                        onKeyDown={onKeyDown}
+                        title={title}
                         className={`
                           ${bgClass} ${textClass} ring-1 ${spec.ring}
                           rounded-[6px]
@@ -750,9 +764,10 @@ export default function EpisodeRatingsGrid({
                           font-semibold
                           [font-variant-numeric:tabular-nums]
                           text-[15px] md:text-[16px] lg:text-[22px]
-                          ${tooltipEnabled ? 'md:hover:brightness-[1.07]' : ''}
+                          ${clickable ? 'cursor-pointer hover:brightness-[1.07]' : 'cursor-default'}
+                          ${clickable ? 'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30' : ''}
                           transition duration-150
-                          cursor-default select-none
+                          select-none
                         `}
                       >
                         {val ?? '—'}
@@ -793,7 +808,7 @@ export default function EpisodeRatingsGrid({
   )
 
   // =======================
-  //  Render Wrapped
+  // Render Wrapped
   // =======================
   const renderWrapped = () => (
     <div className="space-y-6 mt-2" style={{ contentVisibility: 'auto', containIntrinsicSize: '800px 520px' }}>
@@ -825,6 +840,8 @@ export default function EpisodeRatingsGrid({
                   ? null
                   : buildTooltipData(ep, s.season_number, ep.episodeNumber)
 
+                const { role, tabIndex, onClick, onKeyDown, title, clickable } = cellProps(ep, s.season_number, ep.episodeNumber)
+
                 return (
                   <div
                     key={`wrap-s${s.season_number}-e${ep.episodeNumber}`}
@@ -835,6 +852,11 @@ export default function EpisodeRatingsGrid({
                     onMouseLeave={tooltipEnabled ? handleMouseLeave : undefined}
                   >
                     <div
+                      role={role}
+                      tabIndex={tabIndex}
+                      onClick={onClick}
+                      onKeyDown={onKeyDown}
+                      title={title}
                       className={`
                         ${bgClass} ${textClass} ring-1 ${spec.ring}
                         rounded-[6px]
@@ -843,9 +865,10 @@ export default function EpisodeRatingsGrid({
                         font-semibold
                         [font-variant-numeric:tabular-nums]
                         text-[15px] md:text-[16px] lg:text-[22px]
-                        ${tooltipEnabled ? 'md:hover:brightness-[1.07]' : ''}
+                        ${clickable ? 'cursor-pointer hover:brightness-[1.07]' : 'cursor-default'}
+                        ${clickable ? 'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30' : ''}
                         transition duration-150
-                        cursor-default select-none
+                        select-none
                       `}
                     >
                       {val ?? '—'}
@@ -862,7 +885,10 @@ export default function EpisodeRatingsGrid({
   )
 
   // ✅ En móvil, si el grid es pesado, no lo montamos hasta que el usuario lo elija (y esté cerca en viewport)
-  const shouldRenderHeavyGrid = layoutMode === 'grid' && (!isTouchLike || !isHeavyGrid) ? true : (layoutMode === 'grid' && inView)
+  const shouldRenderHeavyGrid =
+    layoutMode === 'grid' && (!isTouchLike || !isHeavyGrid)
+      ? true
+      : (layoutMode === 'grid' && inView)
 
   return (
     <>
@@ -906,7 +932,6 @@ export default function EpisodeRatingsGrid({
           shouldRenderHeavyGrid ? (
             inverted ? renderGridInverted() : renderGrid()
           ) : (
-            // placeholder ultra-ligero para evitar “parón” al llegar a la sección
             <div className="mt-2 rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-zinc-300">
               Cargando vista Grid…
             </div>
