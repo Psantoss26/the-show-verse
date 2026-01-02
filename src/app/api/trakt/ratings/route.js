@@ -1,230 +1,208 @@
-// src/app/api/trakt/ratings/route.js
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { traktFetch } from '@/lib/trakt/server'
-
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 const TRAKT_API = 'https://api.trakt.tv'
+const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID
+const TRAKT_CLIENT_SECRET = process.env.TRAKT_CLIENT_SECRET
+const TRAKT_REDIRECT_URI = process.env.TRAKT_REDIRECT_URI // ponlo en tu .env si quieres refresh automático
 
-function requireEnv(name) {
-    const v = process.env[name]
-    if (!v) throw new Error(`Missing env var: ${name}`)
-    return v
+function json(res, status = 200) {
+    return NextResponse.json(res, { status })
 }
 
-function traktHeaders(token) {
-    return {
-        'Content-Type': 'application/json',
-        'trakt-api-version': '2',
-        'trakt-api-key': requireEnv('TRAKT_CLIENT_ID'),
-        Authorization: `Bearer ${token}`,
-    }
+function mustEnv() {
+    if (!TRAKT_CLIENT_ID) throw new Error('Missing TRAKT_CLIENT_ID')
+    if (!TRAKT_CLIENT_SECRET) throw new Error('Missing TRAKT_CLIENT_SECRET')
 }
 
-// Acepta: movie | show | season | episode | tv
-function normalizeType(input) {
-    const t = String(input || '').toLowerCase().trim()
-    if (t === 'tv' || t === 'show') return 'show'
-    if (t === 'movie') return 'movie'
-    if (t === 'season' || t === 'seasons') return 'season'
-    if (t === 'episode' || t === 'episodes') return 'episode'
-    return null
+async function readTraktAuthCookies() {
+    // Next 15+: cookies() puede ser async en algunos entornos
+    const store = await cookies()
+    const accessToken = store.get('trakt_access_token')?.value || null
+    const refreshToken = store.get('trakt_refresh_token')?.value || null
+    const expiresAtMs = store.get('trakt_expires_at')?.value ? Number(store.get('trakt_expires_at').value) : null
+    return { accessToken, refreshToken, expiresAtMs, store }
 }
 
-function typeToArrayKey(type) {
-    if (type === 'movie') return 'movies'
-    if (type === 'show') return 'shows'
-    if (type === 'season') return 'seasons'
-    if (type === 'episode') return 'episodes'
-    return null
-}
+async function refreshIfNeeded(auth) {
+    mustEnv()
+    const { accessToken, refreshToken, expiresAtMs, store } = auth
+    if (!accessToken) return { ...auth, accessToken: null }
+    if (!refreshToken || !expiresAtMs) return auth
 
-async function readJsonSafe(req) {
-    try {
-        return await req.json()
-    } catch {
-        return null
-    }
-}
+    // margen de 60s
+    const now = Date.now()
+    if (now < expiresAtMs - 60_000) return auth
+    if (!TRAKT_REDIRECT_URI) return auth
 
-function normalizeIds(payload) {
-    // si viene ids
-    if (payload?.ids && typeof payload.ids === 'object') return payload.ids
-
-    // soporte directo
-    const tmdbId = payload?.tmdbId ?? payload?.tmdb
-    const traktId = payload?.traktId ?? payload?.trakt
-
-    const ids = {}
-    if (tmdbId != null) ids.tmdb = Number(tmdbId)
-    if (traktId != null) ids.trakt = Number(traktId)
-
-    return Object.keys(ids).length ? ids : null
-}
-
-function isValidRating(r) {
-    const n = Math.round(Number(r))
-    return Number.isFinite(n) && n >= 1 && n <= 10
-}
-
-/**
- * ✅ GET rating actual del usuario
- * - movie/show: /api/trakt/ratings?type=show&tmdbId=1399
- * - season/episode: /api/trakt/ratings?type=season&traktId=12345
- */
-export async function GET(req) {
-    try {
-        const { searchParams } = new URL(req.url)
-        const type = normalizeType(searchParams.get('type'))
-        const tmdbId = searchParams.get('tmdbId')
-        const traktIdParam = searchParams.get('traktId') || searchParams.get('id')
-
-        if (!type) {
-            return NextResponse.json({ error: 'Missing/invalid type' }, { status: 400 })
-        }
-
-        const key = typeToArrayKey(type)
-        if (!key) {
-            return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
-        }
-
-        let traktId = traktIdParam ? Number(traktIdParam) : null
-
-        // Para movie/show permitimos tmdbId y resolvemos a trakt id con search
-        if (!traktId && (type === 'movie' || type === 'show') && tmdbId) {
-            const safeType = type // movie|show
-            const search = await fetch(`${TRAKT_API}/search/tmdb/${tmdbId}?type=${safeType}`, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'trakt-api-version': '2',
-                    'trakt-api-key': requireEnv('TRAKT_CLIENT_ID'),
-                },
-                cache: 'no-store',
-            })
-            const json = await search.json().catch(() => null)
-            const hit = Array.isArray(json) ? json[0] : null
-            const item = hit?.[safeType]
-            traktId = item?.ids?.trakt ? Number(item.ids.trakt) : null
-        }
-
-        // season/episode requieren traktId
-        if (!Number.isFinite(traktId)) {
-            return NextResponse.json(
-                { error: 'Missing traktId (season/episode) or tmdbId (movie/show)' },
-                { status: 400 }
-            )
-        }
-
-        // Trakt devuelve array con el item
-        const data = await traktFetch(`/sync/ratings/${key}/${traktId}`, { cache: 'no-store' })
-        const item = Array.isArray(data) ? data[0] : null
-        const rating = item?.rating ?? null
-
-        return NextResponse.json({ rating })
-    } catch (e) {
-        return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
-    }
-}
-
-export async function POST(req) {
-    const body = await req.json().catch(() => ({}))
-
-    const type = normalizeType(body?.type)
-    const ids = normalizeIds(body)
-
-    const hasRatingKey = Object.prototype.hasOwnProperty.call(body, 'rating')
-    const rating = body?.rating
-
-    if (!type || !ids || !hasRatingKey) {
-        return NextResponse.json({ error: 'Missing type/ids/rating' }, { status: 400 })
-    }
-
-    const key = typeToArrayKey(type)
-    if (!key) {
-        return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
-    }
-
-    const isRemove = rating == null
-
-    if (!isRemove && !isValidRating(rating)) {
-        return NextResponse.json({ error: 'Invalid rating (1..10)' }, { status: 400 })
-    }
-
-    // ✅ Reglas de ids:
-    // - movie/show: puede usar tmdb (como hasta ahora) o trakt
-    // - season/episode: requiere trakt
-    if ((type === 'season' || type === 'episode') && !Number.isFinite(Number(ids?.trakt))) {
-        return NextResponse.json({ error: 'Missing ids.trakt for season/episode' }, { status: 400 })
-    }
-    if ((type === 'movie' || type === 'show') && !(Number.isFinite(Number(ids?.tmdb)) || Number.isFinite(Number(ids?.trakt)))) {
-        return NextResponse.json({ error: 'Missing ids.tmdb (or ids.trakt) for movie/show' }, { status: 400 })
-    }
-
-    const cleanIds = {}
-    if (Number.isFinite(Number(ids?.trakt))) cleanIds.trakt = Number(ids.trakt)
-    if (Number.isFinite(Number(ids?.tmdb))) cleanIds.tmdb = Number(ids.tmdb)
-
-    const intRating = isRemove ? null : Math.round(Number(rating))
-
-    const item = isRemove ? { ids: cleanIds } : { ids: cleanIds, rating: intRating }
-    const payload = { [key]: [item] }
-
-    const path = isRemove ? '/sync/ratings/remove' : '/sync/ratings'
-    const traktRes = await traktFetch(path, {
+    const res = await fetch(`${TRAKT_API}/oauth/token`, {
         method: 'POST',
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+            client_id: TRAKT_CLIENT_ID,
+            client_secret: TRAKT_CLIENT_SECRET,
+            redirect_uri: TRAKT_REDIRECT_URI,
+        }),
     })
 
-    return NextResponse.json(traktRes, { status: 200 })
+    if (!res.ok) return auth
+    const data = await res.json()
+
+    const newAccess = data?.access_token || null
+    const newRefresh = data?.refresh_token || refreshToken
+    const newExpiresIn = Number(data?.expires_in || 0)
+    const newExpiresAtMs = newExpiresIn ? Date.now() + newExpiresIn * 1000 : expiresAtMs
+
+    if (newAccess) {
+        store.set('trakt_access_token', newAccess, { path: '/', httpOnly: true, sameSite: 'lax', secure: true })
+        store.set('trakt_refresh_token', newRefresh, { path: '/', httpOnly: true, sameSite: 'lax', secure: true })
+        store.set('trakt_expires_at', String(newExpiresAtMs), { path: '/', httpOnly: true, sameSite: 'lax', secure: true })
+    }
+
+    return { ...auth, accessToken: newAccess, refreshToken: newRefresh, expiresAtMs: newExpiresAtMs }
 }
 
-export async function DELETE(req) {
+async function traktFetch(path, { accessToken }, { method = 'GET', body } = {}) {
+    mustEnv()
+    const res = await fetch(`${TRAKT_API}${path}`, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'trakt-api-version': '2',
+            'trakt-api-key': TRAKT_CLIENT_ID,
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        cache: 'no-store',
+    })
+    return res
+}
+
+function normalizeRating(val) {
+    if (val === null || val === undefined) return null
+    const n = Number(val)
+    if (!Number.isFinite(n)) return null
+    const int = Math.trunc(n)
+    if (int < 1 || int > 10) throw new Error('Rating must be 1..10 or null')
+    return int
+}
+
+// ----------------------
+// GET: leer rating user
+// /api/trakt/ratings?type=season&tmdbId=XXXX&season=Y
+// ----------------------
+export async function GET(req) {
     try {
-        const cookieStore = await cookies()
-        const token = cookieStore.get('trakt_access_token')?.value
-        if (!token) {
-            return NextResponse.json({ error: 'Not authenticated with Trakt' }, { status: 401 })
+        const url = new URL(req.url)
+        const type = url.searchParams.get('type')
+
+        const auth0 = await readTraktAuthCookies()
+        const auth = await refreshIfNeeded(auth0)
+        if (!auth.accessToken) return json({ error: 'Unauthorized' }, 401)
+
+        if (type === 'season') {
+            const tmdbId = Number(url.searchParams.get('tmdbId'))
+            const seasonNumber = Number(url.searchParams.get('season'))
+            if (!Number.isFinite(tmdbId) || !Number.isFinite(seasonNumber)) {
+                return json({ error: 'Missing tmdbId/season' }, 400)
+            }
+
+            // Trakt no tiene “get rating for 1 season” directo en tu caso,
+            // así que buscamos en /sync/ratings/seasons paginado y cortamos al encontrar.
+            let page = 1
+            const limit = 100
+
+            while (page <= 20) {
+                const res = await traktFetch(`/sync/ratings/seasons?extended=full&page=${page}&limit=${limit}`, auth)
+                if (res.status === 401) return json({ error: 'Unauthorized' }, 401)
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}))
+                    return json({ error: err?.error || 'Trakt GET ratings failed' }, res.status)
+                }
+
+                const items = await res.json()
+                if (!Array.isArray(items) || items.length === 0) break
+
+                const found = items.find((it) => {
+                    const showTmdb = Number(it?.show?.ids?.tmdb)
+                    const sn = Number(it?.season?.number)
+                    return showTmdb === tmdbId && sn === seasonNumber
+                })
+
+                if (found) {
+                    return json({
+                        found: true,
+                        rating: typeof found?.rating === 'number' ? found.rating : null,
+                        rated_at: found?.rated_at || null,
+                    })
+                }
+
+                page++
+            }
+
+            return json({ found: false, rating: null })
         }
 
-        const payload = await readJsonSafe(req)
-        const type = normalizeType(payload?.type)
-        const ids = normalizeIds(payload)
-
-        if (!type || !ids) {
-            return NextResponse.json({ error: 'Missing type/ids' }, { status: 400 })
-        }
-
-        const key = typeToArrayKey(type)
-        if (!key) {
-            return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
-        }
-
-        // season/episode requieren trakt
-        if ((type === 'season' || type === 'episode') && !Number.isFinite(Number(ids?.trakt))) {
-            return NextResponse.json({ error: 'Missing ids.trakt for season/episode' }, { status: 400 })
-        }
-
-        const body = { [key]: [{ ids }] }
-
-        const r = await fetch(`${TRAKT_API}/sync/ratings/remove`, {
-            method: 'POST',
-            headers: traktHeaders(token),
-            body: JSON.stringify(body),
-            cache: 'no-store',
-        })
-
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok) {
-            return NextResponse.json(
-                { error: data?.error || data?.message || 'Trakt remove rating failed', details: data },
-                { status: r.status }
-            )
-        }
-
-        return NextResponse.json(data)
+        return json({ error: 'Unsupported type' }, 400)
     } catch (e) {
-        return NextResponse.json({ error: 'Unexpected error', details: e?.stack || String(e) }, { status: 500 })
+        console.error(e)
+        return json({ error: e?.message || 'Server error' }, 500)
+    }
+}
+
+// ----------------------
+// POST: crear/eliminar rating
+// body: { type:'season', tmdbId, season, rating }
+// rating=null => remove
+// ----------------------
+export async function POST(req) {
+    try {
+        const body = await req.json().catch(() => ({}))
+        const type = body?.type
+
+        const auth0 = await readTraktAuthCookies()
+        const auth = await refreshIfNeeded(auth0)
+        if (!auth.accessToken) return json({ error: 'Unauthorized' }, 401)
+
+        if (type === 'season') {
+            const tmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb)
+            const seasonNumber = Number(body?.season ?? body?.seasonNumber)
+            if (!Number.isFinite(tmdbId) || !Number.isFinite(seasonNumber)) {
+                return json({ error: 'Missing tmdbId (show) or season number' }, 400)
+            }
+
+            const rating = normalizeRating(body?.rating)
+            const isRemove = rating === null
+
+            const endpoint = isRemove ? '/sync/ratings/remove' : '/sync/ratings'
+            const payload = {
+                shows: [
+                    {
+                        ids: { tmdb: tmdbId },
+                        seasons: [
+                            isRemove
+                                ? { number: seasonNumber }
+                                : { number: seasonNumber, rating, rated_at: new Date().toISOString() },
+                        ],
+                    },
+                ],
+            }
+
+            const res = await traktFetch(endpoint, auth, { method: 'POST', body: payload })
+            if (res.status === 401) return json({ error: 'Unauthorized' }, 401)
+
+            const out = await res.json().catch(() => ({}))
+            if (!res.ok) return json({ error: out?.error || 'Trakt rating failed', details: out }, res.status)
+
+            return json({ ok: true, removed: isRemove, rating: isRemove ? null : rating, summary: out })
+        }
+
+        // Mantén compatibilidad: si tu app usa este endpoint para otros tipos
+        return json({ error: 'Unsupported type' }, 400)
+    } catch (e) {
+        console.error(e)
+        return json({ error: e?.message || 'Server error' }, 500)
     }
 }
