@@ -46,6 +46,31 @@ export const formatVoteCount = (v) => {
     }).format(n)
 }
 
+export function formatCountShort(input) {
+    if (input == null) return null
+
+    let n = input
+    // Acepta "2,5M" no, pero acepta strings de OMDb tipo "2,498,190"
+    if (typeof n === 'string') {
+        const digits = n.replace(/[^\d]/g, '')
+        n = digits ? Number(digits) : NaN
+    }
+
+    if (!Number.isFinite(n) || n <= 0) return null
+
+    const fmt1 = (x) => x.toFixed(1).replace(/\.0$/, '').replace('.', ',')
+
+    if (n >= 1_000_000) {
+        const v = n / 1_000_000
+        return `${v >= 10 ? Math.round(v) : fmt1(v)}M`
+    }
+    if (n >= 1_000) {
+        const v = n / 1_000
+        return `${v >= 10 ? Math.round(v) : fmt1(v)}K`
+    }
+    return String(n)
+}
+
 export const stripHtml = (s) => String(s || '').replace(/<[^>]*>?/gm, '').trim()
 
 export const formatDateTimeEs = (iso) => {

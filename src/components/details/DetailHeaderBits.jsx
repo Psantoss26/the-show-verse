@@ -11,7 +11,7 @@ export function CompactBadge({
     suffix,
     href,
     className = '',
-    hideSubOnMobile = true,
+    hideSubOnMobile = false,
     logoClassName = ''
 }) {
     const Comp = href ? 'a' : 'div'
@@ -39,12 +39,12 @@ export function CompactBadge({
 
             <div className="flex flex-col justify-center leading-none min-w-0">
                 <div className="flex items-baseline gap-1 min-w-0">
-                    <span className="text-lg sm:text-xl font-black text-white tracking-tight drop-shadow-sm">
+                    <span className="text-lg sm:text-xl font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors">
                         {value != null ? value : '-'}
                     </span>
 
                     {suffix && (
-                        <span className="text-[10px] font-bold text-zinc-500 mb-0.5 shrink-0">
+                        <span className="text-[10px] font-bold text-white/55 mb-0.5 shrink-0 transition-colors group-hover:text-white/70">
                             {suffix}
                         </span>
                     )}
@@ -52,7 +52,7 @@ export function CompactBadge({
 
                 <div className="flex items-center gap-1 mt-0.5 min-w-0">
                     {label && (
-                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest bg-white/5 px-1 rounded-sm shrink-0">
+                        <span className="text-[9px] font-bold text-white/45 uppercase tracking-widest bg-white/5 px-1 rounded-sm shrink-0">
                             {label}
                         </span>
                     )}
@@ -60,7 +60,7 @@ export function CompactBadge({
                     {sub && (
                         <span
                             className={`
-                text-[9px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors tracking-wide
+                text-[11px] sm:text-xs font-bold text-white/65 group-hover:text-white/80 transition-colors tracking-wide
                 truncate
                 ${hideSubOnMobile ? 'hidden sm:inline' : ''}
               `}

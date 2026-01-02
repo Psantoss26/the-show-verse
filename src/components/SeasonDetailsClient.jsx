@@ -14,7 +14,6 @@ import {
     Eye,
     Play as PlayIcon,
     List as ListIcon,
-    Heart as HeartIcon,
     Clock as ClockIcon,
     LayoutGrid,
     AlignJustify
@@ -22,7 +21,7 @@ import {
 
 import { SectionTitle, VisualMetaCard } from '@/components/details/DetailAtoms'
 import { CompactBadge, MiniStat, UnifiedRateButton } from '@/components/details/DetailHeaderBits'
-import { formatDateEs, formatVoteCount } from '@/lib/details/formatters'
+import { formatDateEs, formatVoteCount, formatCountShort } from '@/lib/details/formatters'
 import StarRating from '@/components/StarRating'
 
 export default function SeasonDetailsClient({ showId, seasonNumber, show, season, imdb, imdbUrl }) {
@@ -64,16 +63,16 @@ export default function SeasonDetailsClient({ showId, seasonNumber, show, season
         return sum > 0 ? sum : null
     }, [season?.vote_count, episodes])
 
-    // ✅ helper: tu formatVoteCount(0) probablemente devuelve null => mostramos "0"
+    // helper: tu formatVoteCount(0) probablemente devuelve null => mostramos "0"
     const fmtStat = useCallback((n) => {
         const v = typeof n === 'number' ? n : 0
         return formatVoteCount(v) ?? '0'
     }, [])
 
-    // ✅ Tabs como DetailsClient
+    // Tabs como DetailsClient
     const [activeTab, setActiveTab] = useState('details')
 
-    // ✅ Trakt scoreboard
+    // Trakt scoreboard
     const [tScoreboard, setTScoreboard] = useState({
         loading: true,
         rating: null,
@@ -81,6 +80,13 @@ export default function SeasonDetailsClient({ showId, seasonNumber, show, season
         stats: null,
         traktUrl: null,
     })
+
+    const traktDecimal = useMemo(() => {
+        if (tScoreboard.rating == null) return null
+        const v = Number(tScoreboard.rating) // Trakt ya viene 0..10
+        if (!Number.isFinite(v) || v <= 0) return null
+        return v.toFixed(1) // punto
+    }, [tScoreboard.rating])
 
     useEffect(() => {
         let alive = true
@@ -326,30 +332,18 @@ export default function SeasonDetailsClient({ showId, seasonNumber, show, season
                                         logo="/logo-TMDb.png"
                                         logoClassName="h-2 sm:h-4"
                                         value={seasonVote?.toFixed(1)}
-                                        sub={tmdbVotesSeason ? `${formatVoteCount(tmdbVotesSeason)} votes` : undefined}
+                                        sub={tmdbVotesSeason ? formatCountShort(tmdbVotesSeason) : undefined}
                                         href={tmdbSeasonUrl}
                                     />
 
-                                    {tScoreboard.rating != null && (
-                                        <>
-                                            <div className="sm:hidden">
-                                                <CompactBadge
-                                                    logo="/logo-Trakt.png"
-                                                    value={Math.round(tScoreboard.rating * 10)}
-                                                    sub={tScoreboard.votes ? `${formatVoteCount(tScoreboard.votes)} votes` : undefined}
-                                                    href={tScoreboard.traktUrl}
-                                                />
-                                            </div>
-                                            <div className="hidden sm:block">
-                                                <CompactBadge
-                                                    logo="/logo-Trakt.png"
-                                                    value={Math.round(tScoreboard.rating * 10)}
-                                                    suffix="%"
-                                                    sub={tScoreboard.votes ? `${formatVoteCount(tScoreboard.votes)} votes` : undefined}
-                                                    href={tScoreboard.traktUrl}
-                                                />
-                                            </div>
-                                        </>
+                                    {/* Trakt (móvil sin sufijo / desktop con %) */}
+                                    {traktDecimal && (
+                                        <CompactBadge
+                                            logo="/logo-Trakt.png"
+                                            value={traktDecimal}
+                                            sub={tScoreboard.votes ? formatCountShort(tScoreboard.votes) : undefined}
+                                            href={tScoreboard.traktUrl}
+                                        />
                                     )}
 
                                     {imdb?.rating != null && (
@@ -357,7 +351,7 @@ export default function SeasonDetailsClient({ showId, seasonNumber, show, season
                                             logo="/logo-IMDb.png"
                                             logoClassName="h-5 sm:h-5"
                                             value={Number(imdb.rating).toFixed(1)}
-                                            sub={imdb?.votes ? `${formatVoteCount(imdb.votes)} votes` : undefined}
+                                            sub={imdb?.votes ? formatCountShort(imdb.votes) : undefined}
                                             href={imdbUrl || undefined}
                                         />
                                     )}
@@ -409,10 +403,6 @@ export default function SeasonDetailsClient({ showId, seasonNumber, show, season
                                             </div>
                                             <div className="shrink-0">
                                                 <MiniStat icon={ListIcon} value={fmtStat(tScoreboard?.stats?.lists)} tooltip="Lists" />
-                                            </div>
-                                            {/* ✅ FAVORITOS visible aunque sea 0 */}
-                                            <div className="shrink-0">
-                                                <MiniStat icon={HeartIcon} value={fmtStat(tScoreboard?.stats?.favorited)} tooltip="Favorited" />
                                             </div>
                                         </div>
                                     </div>
