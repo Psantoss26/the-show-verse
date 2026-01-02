@@ -3655,6 +3655,7 @@ export default function DetailsClient({
                           {!!ratings && !ratingsError && (
                             <EpisodeRatingsGrid
                               ratings={ratings}
+                              showId={Number(id)}
                               initialSource="avg"
                               density="compact"
                               traktConnected={trakt.connected}

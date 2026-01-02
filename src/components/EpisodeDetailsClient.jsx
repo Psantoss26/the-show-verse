@@ -492,34 +492,26 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
                     </div>
                 </div>
 
-                {/* Cast */}
+                {/* === Reparto del episodio === */}
                 {cast.length > 0 && (
                     <section className="mb-10">
                         <SectionTitle title="Reparto del episodio" icon={UsersIcon} />
-
                         <Swiper
                             spaceBetween={12}
                             slidesPerView={3}
-                            watchOverflow
-                            observer
-                            observeParents
-                            resizeObserver
-                            updateOnWindowResize
-                            roundLengths
                             breakpoints={{
                                 500: { slidesPerView: 3, spaceBetween: 14 },
                                 768: { slidesPerView: 4, spaceBetween: 16 },
                                 1024: { slidesPerView: 5, spaceBetween: 18 },
-                                1280: { slidesPerView: 6, spaceBetween: 20 },
+                                1280: { slidesPerView: 6, spaceBetween: 20 }
                             }}
-                            className="pb-8 w-full"
+                            className="pb-8"
                         >
                             {cast.slice(0, 20).map((actor) => (
                                 <SwiperSlide key={actor.id}>
                                     <a
                                         href={`/details/person/${actor.id}`}
-                                        className="block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                                        title={actor.name}
+                                        className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                                     >
                                         <div className="aspect-[2/3] overflow-hidden relative">
                                             {actor.profile_path ? (
@@ -527,12 +519,10 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
                                                     src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                                                     alt={actor.name}
                                                     className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
-                                                    loading="lazy"
-                                                    decoding="async"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                                                    <UsersIcon className="w-10 h-10 opacity-60" />
+                                                    <UsersIconComponent size={40} />
                                                 </div>
                                             )}
 
@@ -543,7 +533,7 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
                                                     {actor.name}
                                                 </p>
                                                 <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                                                    {stripHtml(actor?.character || '')}
+                                                    {actor.character}
                                                 </p>
                                             </div>
                                         </div>
@@ -554,34 +544,26 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
                     </section>
                 )}
 
-                {/* Guest Stars */}
-                {guestStars?.length > 0 && (
+                {/* === Invitados === */}
+                {guestStars.length > 0 && (
                     <section className="mb-10">
                         <SectionTitle title="Invitados" icon={UsersIcon} />
-
                         <Swiper
                             spaceBetween={12}
                             slidesPerView={3}
-                            watchOverflow
-                            observer
-                            observeParents
-                            resizeObserver
-                            updateOnWindowResize
-                            roundLengths
                             breakpoints={{
                                 500: { slidesPerView: 3, spaceBetween: 14 },
                                 768: { slidesPerView: 4, spaceBetween: 16 },
                                 1024: { slidesPerView: 5, spaceBetween: 18 },
-                                1280: { slidesPerView: 6, spaceBetween: 20 },
+                                1280: { slidesPerView: 6, spaceBetween: 20 }
                             }}
-                            className="pb-8 w-full"
+                            className="pb-8"
                         >
                             {guestStars.slice(0, 20).map((actor) => (
                                 <SwiperSlide key={actor.id}>
                                     <a
                                         href={`/details/person/${actor.id}`}
-                                        className="block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                                        title={actor.name}
+                                        className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                                     >
                                         <div className="aspect-[2/3] overflow-hidden relative">
                                             {actor.profile_path ? (
@@ -589,12 +571,10 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
                                                     src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                                                     alt={actor.name}
                                                     className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
-                                                    loading="lazy"
-                                                    decoding="async"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                                                    <UsersIcon className="w-10 h-10 opacity-60" />
+                                                    <UsersIconComponent size={40} />
                                                 </div>
                                             )}
 
@@ -605,7 +585,7 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
                                                     {actor.name}
                                                 </p>
                                                 <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                                                    {stripHtml(actor?.character || '')}
+                                                    {actor.character}
                                                 </p>
                                             </div>
                                         </div>
@@ -619,3 +599,24 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
         </div>
     )
 }
+
+// Icon helper para el reparto
+const UsersIconComponent = ({ size = 24, className }) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+    >
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+)
