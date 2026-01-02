@@ -8,7 +8,9 @@ export const dynamic = 'force-dynamic'
 const TRAKT_API = 'https://api.trakt.tv'
 const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID
 const TRAKT_CLIENT_SECRET = process.env.TRAKT_CLIENT_SECRET
-const TRAKT_REDIRECT_URI = process.env.TRAKT_REDIRECT_URI // opcional: solo si quieres refresh automático
+const TRAKT_REDIRECT_URI =
+    process.env.TRAKT_REDIRECT_URI ||
+    (process.env.TRAKT_APP_ORIGIN ? `${String(process.env.TRAKT_APP_ORIGIN).replace(/\/+$/, '')}/api/trakt/auth/callback` : null)
 
 function jsonWithCookies(payload, status = 200, cookiesToSet = []) {
     const res = NextResponse.json(payload, { status })
