@@ -1437,8 +1437,9 @@ export default function DetailsClient({
     try {
       await traktSetRating({
         type: traktType,                 // 'movie' | 'show'
-        ids: { tmdb: Number(id) },        // ✅ lo que tu API route espera
-        rating: valueOrNull              // puede ser number o null (borrar)
+        ids: { tmdb: Number(id) },       // lo que tu API route espera
+        tmdbId: Number(id),
+        rating: valueOrNull              // puede ser number o null
       })
       setTrakt((p) => ({ ...p, rating: valueOrNull == null ? null : Math.round(valueOrNull) }))
     } finally {
@@ -2511,7 +2512,7 @@ export default function DetailsClient({
                     max={10}
                     loading={accountStatesLoading || ratingLoading || !!traktBusy}
                     onRate={handleUnifiedRate}
-                    connected={!!session}
+                    connected={!!session || trakt.connected}
                     onConnect={() => (window.location.href = '/login')}
                   />
                 </div>

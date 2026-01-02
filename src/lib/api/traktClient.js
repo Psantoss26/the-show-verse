@@ -216,23 +216,31 @@ export async function traktGetStats({ type, tmdbId }) {
     return json
 }
 
-export async function traktSetRating({ type, ids, tmdbId, rating }) {
-    const resolvedIds = ids || (tmdbId ? { tmdb: Number(tmdbId) } : null)
+export async function traktSetRating({ type, tmdbId, ids, season, episode, rating }) {
+    const body = {
+        type,
+        rating: rating == null ? null : Number(rating),
+    }
+
+    // ✅ movie/show: tu route espera tmdbId
+    const tmdb = tmdbId ?? ids?.tmdb
+    if (tmdb != null) body.tmdbId = Number(tmdb)
+
+    // ✅ season/episode: por si lo reutilizas (tu backend ya puede resolver por tmdbId+season/episode)
+    if (season != null) body.season = Number(season)
+    if (episode != null) body.episode = Number(episode)
+
+    // ✅ opcional: si tu backend aceptara traktId directo
+    if (ids?.trakt != null) body.traktId = Number(ids.trakt)
 
     const res = await fetch('/api/trakt/ratings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            type,
-            ids: resolvedIds,
-            rating // puede ser number o null
-        })
+        body: JSON.stringify(body),
     })
 
     const json = await res.json().catch(() => ({}))
-    if (!res.ok) {
-        throw new Error(json?.error || json?.message || 'Error al puntuar en Trakt')
-    }
+    if (!res.ok) throw new Error(json?.error || 'Trakt rating failed')
     return json
 }
 
