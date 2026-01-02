@@ -2493,12 +2493,12 @@ export default function DetailsClient({
                 <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
                   {/* Web: NO en móvil */}
                   <div className="hidden sm:block">
-                    <ExternalLinkButton icon="/logo-Web.png" href={data.homepage} title="Web Oficial" />
+                    <ExternalLinkButton icon="/logo-Web.png" href={data.homepage} />
                   </div>
 
-                  <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} title="FilmAffinity" />
+                  <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} />
                   {type === 'tv' && (
-                    <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} title="SeriesGraph" />
+                    <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} />
                   )}
                 </div>
 
