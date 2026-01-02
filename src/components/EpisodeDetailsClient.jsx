@@ -23,7 +23,7 @@ import {
 
 import { SectionTitle, VisualMetaCard } from '@/components/details/DetailAtoms'
 import { CompactBadge, ExternalLinkButton, MiniStat, UnifiedRateButton } from '@/components/details/DetailHeaderBits'
-import { formatDateEs, stripHtml, formatVoteCount } from '@/lib/details/formatters'
+import { formatDateEs, stripHtml, formatVoteCount, formatCountShort } from '@/lib/details/formatters'
 import StarRating from '@/components/StarRating'
 
 export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumber, show, episode, imdb, imdbUrl }) {
@@ -67,6 +67,13 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
         stats: null,
         traktUrl: null,
     })
+
+    const traktDecimal = useMemo(() => {
+        if (tScoreboard.rating == null) return null
+        const v = Number(tScoreboard.rating) // Trakt ya viene 0..10
+        if (!Number.isFinite(v) || v <= 0) return null
+        return v.toFixed(1) // punto
+    }, [tScoreboard.rating])
 
     useEffect(() => {
         let alive = true
@@ -337,30 +344,18 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
                                         logo="/logo-TMDb.png"
                                         logoClassName="h-2 sm:h-4"
                                         value={vote?.toFixed(1)}
-                                        sub={voteCount ? `${formatVoteCount(voteCount)} votes` : undefined}
+                                        sub={voteCount ? formatCountShort(voteCount) : undefined}
                                         href={tmdbEpisodeUrl}
                                     />
 
-                                    {tScoreboard.rating != null && (
-                                        <>
-                                            <div className="sm:hidden">
-                                                <CompactBadge
-                                                    logo="/logo-Trakt.png"
-                                                    value={Math.round(tScoreboard.rating * 10)}
-                                                    sub={tScoreboard.votes ? `${formatVoteCount(tScoreboard.votes)} votes` : undefined}
-                                                    href={tScoreboard.traktUrl}
-                                                />
-                                            </div>
-                                            <div className="hidden sm:block">
-                                                <CompactBadge
-                                                    logo="/logo-Trakt.png"
-                                                    value={Math.round(tScoreboard.rating * 10)}
-                                                    suffix="%"
-                                                    sub={tScoreboard.votes ? `${formatVoteCount(tScoreboard.votes)} votes` : undefined}
-                                                    href={tScoreboard.traktUrl}
-                                                />
-                                            </div>
-                                        </>
+                                    {/* Trakt (móvil sin sufijo / desktop con %) */}
+                                    {traktDecimal && (
+                                        <CompactBadge
+                                            logo="/logo-Trakt.png"
+                                            value={traktDecimal}
+                                            sub={tScoreboard.votes ? formatCountShort(tScoreboard.votes) : undefined}
+                                            href={tScoreboard.traktUrl}
+                                        />
                                     )}
 
                                     {imdb?.rating != null && (
@@ -368,7 +363,7 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
                                             logo="/logo-IMDb.png"
                                             logoClassName="h-5 sm:h-5"
                                             value={Number(imdb.rating).toFixed(1)}
-                                            sub={imdb?.votes ? `${formatVoteCount(imdb.votes)} votes` : undefined}
+                                            sub={imdb?.votes ? formatCountShort(imdb.votes) : undefined}
                                             href={imdbUrl || undefined}
                                         />
                                     )}
@@ -409,10 +404,6 @@ export default function EpisodeDetailsClient({ showId, seasonNumber, episodeNumb
                                             </div>
                                             <div className="shrink-0">
                                                 <MiniStat icon={ListIcon} value={fmtStat(tScoreboard?.stats?.lists)} tooltip="Lists" />
-                                            </div>
-                                            {/* ✅ FAVORITOS visible aunque sea 0 */}
-                                            <div className="shrink-0">
-                                                <MiniStat icon={HeartIcon} value={fmtStat(tScoreboard?.stats?.favorited)} tooltip="Favorited" />
                                             </div>
                                         </div>
                                     </div>

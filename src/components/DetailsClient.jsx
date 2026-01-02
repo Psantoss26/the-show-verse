@@ -106,6 +106,7 @@ import {
   slugifyForSeriesGraph,
   formatDateEs,
   formatVoteCount,
+  formatCountShort,
   stripHtml,
   formatDateTimeEs,
   mixedCount,
@@ -1971,6 +1972,13 @@ export default function DetailsClient({
     })
   }, [])
 
+  const traktDecimal = useMemo(() => {
+    if (tScoreboard.rating == null) return null
+    const v = Number(tScoreboard.rating) // Trakt ya viene 0..10
+    if (!Number.isFinite(v) || v <= 0) return null
+    return v.toFixed(1) // punto
+  }, [tScoreboard.rating])
+
   const sectionItems = useMemo(() => {
     const items = []
 
@@ -2421,32 +2429,18 @@ export default function DetailsClient({
                     logo="/logo-TMDb.png"
                     logoClassName="h-2 sm:h-4"
                     value={data.vote_average?.toFixed(1)}
-                    sub={`${formatVoteCount(data.vote_count)} votes`}
+                    sub={formatCountShort(data.vote_count)}
                     href={tmdbDetailUrl}
                   />
 
                   {/* Trakt (móvil sin sufijo / desktop con %) */}
-                  {tScoreboard.rating != null && (
-                    <>
-                      <div className="sm:hidden">
-                        <CompactBadge
-                          logo="/logo-Trakt.png"
-                          value={Math.round(tScoreboard.rating * 10)}
-                          sub={`${formatVoteCount(tScoreboard.votes)} votes`}
-                          href={trakt?.traktUrl}
-                        />
-                      </div>
-
-                      <div className="hidden sm:block">
-                        <CompactBadge
-                          logo="/logo-Trakt.png"
-                          value={Math.round(tScoreboard.rating * 10)}
-                          suffix="%"
-                          sub={`${formatVoteCount(tScoreboard.votes)} votes`}
-                          href={trakt?.traktUrl}
-                        />
-                      </div>
-                    </>
+                  {traktDecimal && (
+                    <CompactBadge
+                      logo="/logo-Trakt.png"
+                      value={traktDecimal}
+                      sub={tScoreboard.votes ? formatCountShort(tScoreboard.votes) : undefined}
+                      href={tScoreboard.traktUrl}
+                    />
                   )}
 
                   {extras.imdbRating && (
@@ -2454,7 +2448,7 @@ export default function DetailsClient({
                       logo="/logo-IMDb.png"
                       logoClassName="h-5 sm:h-5"
                       value={Number(extras.imdbRating).toFixed(1)}
-                      sub={`${formatVoteCount(extras.imdbVotes)} votes`}
+                      sub={formatCountShort(extras.imdbVotes)}
                       href={data.imdb_id ? `https://www.imdb.com/title/${data.imdb_id}` : undefined}
                     />
                   )}
