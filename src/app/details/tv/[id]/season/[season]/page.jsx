@@ -1,7 +1,7 @@
 // src/app/details/tv/[id]/season/[season]/page.jsx
 import SeasonDetailsClient from '@/components/SeasonDetailsClient'
 
-export const revalidate = 60 * 60 // 1h
+export const revalidate = 3600 // 1h
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 const OMDB_API_KEY = process.env.OMDB_API_KEY || process.env.NEXT_PUBLIC_OMDB_API_KEY
