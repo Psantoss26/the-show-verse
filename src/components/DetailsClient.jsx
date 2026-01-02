@@ -2075,8 +2075,15 @@ export default function DetailsClient({
       count: Array.isArray(tLists?.items) ? tLists.items.length : undefined
     })
 
-    if (collectionId && collectionData?.items?.length) {
-      items.push({ id: 'collection', label: 'Colección', icon: Layers, count: collectionData.items.length })
+    // ✅ Colección
+    if (collectionId) {
+      items.push({
+        id: 'collection',
+        label: 'Colección',
+        icon: Layers,
+        count: collectionData?.items?.length || undefined,
+        loading: collectionLoading && !collectionData
+      })
     }
 
     // ✅ Reparto
