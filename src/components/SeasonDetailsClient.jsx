@@ -23,6 +23,7 @@ import {
 import { SectionTitle, VisualMetaCard } from '@/components/details/DetailAtoms'
 import { CompactBadge, MiniStat, UnifiedRateButton } from '@/components/details/DetailHeaderBits'
 import { formatDateEs, formatVoteCount } from '@/lib/details/formatters'
+import StarRating from '@/components/StarRating'
 
 export default function SeasonDetailsClient({ showId, seasonNumber, show, season, imdb, imdbUrl }) {
     const router = useRouter()
@@ -116,35 +117,81 @@ export default function SeasonDetailsClient({ showId, seasonNumber, show, season
     // ✅ Rate (Trakt)
     const [userRating, setUserRating] = useState(null)
     const [ratingLoading, setRatingLoading] = useState(false)
+    const [traktConnected, setTraktConnected] = useState(true)
+
+    // ✅ cargar rating actual del usuario al entrar
+    useEffect(() => {
+        let alive = true
+            ; (async () => {
+                try {
+                    setRatingLoading(true)
+                    const res = await fetch(
+                        `/api/trakt/ratings?type=season&tmdbId=${Number(showId)}&season=${Number(seasonNumber)}`,
+                        { cache: 'no-store' }
+                    )
+
+                    if (!alive) return
+
+                    if (res.status === 401) {
+                        setTraktConnected(false)
+                        setUserRating(null)
+                        return
+                    }
+
+                    setTraktConnected(true)
+                    const json = await res.json().catch(() => ({}))
+                    setUserRating(typeof json?.rating === 'number' ? json.rating : null)
+                } catch (e) {
+                    console.error(e)
+                    if (alive) {
+                        // si falla la carga, no rompemos UI
+                        setUserRating(null)
+                    }
+                } finally {
+                    if (alive) setRatingLoading(false)
+                }
+            })()
+
+        return () => {
+            alive = false
+        }
+    }, [showId, seasonNumber])
 
     const handleRate = useCallback(
         async (val) => {
             try {
                 setRatingLoading(true)
+
                 const res = await fetch('/api/trakt/ratings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         type: 'season',
-                        ids: { tmdb: Number(season?.id) }, // TMDb season id
-                        rating: val,
+                        tmdbId: Number(showId),
+                        season: Number(seasonNumber),
+                        rating: val ?? null,
                     }),
                 })
 
                 if (res.status === 401) {
                     window.location.href = '/api/trakt/auth/start'
-                    return
+                    return false
                 }
+
                 const json = await res.json().catch(() => ({}))
                 if (!res.ok) throw new Error(json?.error || 'Trakt rating failed')
+
                 setUserRating(val ?? null)
+                setTraktConnected(true)
+                return true
             } catch (e) {
                 console.error(e)
+                return false
             } finally {
                 setRatingLoading(false)
             }
         },
-        [season?.id]
+        [showId, seasonNumber]
     )
 
     return (
@@ -327,12 +374,16 @@ export default function SeasonDetailsClient({ showId, seasonNumber, show, season
 
                                 {/* C. Puntuación usuario */}
                                 <div className="flex items-center gap-3 shrink-0">
-                                    <UnifiedRateButton
+                                    <StarRating
                                         rating={userRating}
                                         loading={ratingLoading}
-                                        onRate={handleRate}
-                                        connected={true}
+                                        connected={traktConnected}
                                         onConnect={() => (window.location.href = '/api/trakt/auth/start')}
+                                        onRating={handleRate}
+                                        onClearRating={() => handleRate(null)}
+                                        min={1}
+                                        step={1}
+                                        max={10}
                                     />
                                 </div>
                             </div>
