@@ -1,3 +1,4 @@
+// /src/app/lists/page.jsx
 'use client'
 
 import Link from 'next/link'
@@ -37,6 +38,7 @@ import {
     ChevronRight,
     X,
 } from 'lucide-react'
+import useTraktLists from '@/lib/hooks/useTraktLists'
 
 // ================== UTILS & CACHE ==================
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000
@@ -757,6 +759,14 @@ export default function ListsPage() {
     const [sortMode, setSortMode] = useState('items_desc')
     const [viewMode, setViewMode] = useState('rows') // ✅ por defecto como “Dashboard”
 
+    // ✅ NUEVO: selector de fuente
+    const [source, setSource] = useState('trakt') // 'tmdb' | 'trakt' | 'collections'
+    const [traktMode, setTraktMode] = useState('official') // official | trending | popular | user
+
+    const trakt = useTraktLists({ mode: traktMode })
+    const [featuredCollections, setFeaturedCollections] = useState([])
+    const [collectionsLoading, setCollectionsLoading] = useState(false)
+
     // Map: listId -> undefined (no pedido) | null (cargando) | Array(items)
     const [itemsMap, setItemsMap] = useState({})
     const itemsMapRef = useRef(itemsMap)
@@ -774,48 +784,130 @@ export default function ListsPage() {
         else setAuthStatus('anonymous')
     }, [session, account])
 
-    const safeLists = Array.isArray(lists) ? lists : []
-    const listsCount = safeLists.length
+    const safeTmdbLists = Array.isArray(lists) ? lists : []
 
-    const ensureListItems = useCallback(async (listId) => {
-        if (!listId) return
-
-        // ya cargado o cargando
-        if (itemsMapRef.current[listId] !== undefined) return
-        if (inFlight.current.has(listId)) return
-
-        inFlight.current.add(listId)
-        setItemsMap((prev) => ({ ...prev, [listId]: null }))
-
-        const ctrl = new AbortController()
-        controllersRef.current.set(listId, ctrl)
-
-        try {
-            const json = await getListDetails({ listId, page: 1, language: 'es-ES', signal: ctrl.signal })
-            const items = Array.isArray(json?.items) ? json.items : []
-            setItemsMap((prev) => ({ ...prev, [listId]: items }))
-        } catch (e) {
-            if (e?.name === 'AbortError') {
-                // vuelve a “no pedido” para que pueda pedirse después
-                setItemsMap((prev) => {
-                    const next = { ...prev }
-                    delete next[listId]
-                    return next
-                })
-                return
-            }
-            setItemsMap((prev) => ({ ...prev, [listId]: [] }))
-        } finally {
-            inFlight.current.delete(listId)
-            controllersRef.current.delete(listId)
+    // ✅ carga colecciones destacadas cuando toca
+    useEffect(() => {
+        if (source !== 'collections') return
+        let alive = true
+            ; (async () => {
+                try {
+                    setCollectionsLoading(true)
+                    const res = await fetch('/api/tmdb/collections/featured', { cache: 'no-store' })
+                    const j = await res.json().catch(() => ({}))
+                    if (!alive) return
+                    setFeaturedCollections(Array.isArray(j?.collections) ? j.collections : [])
+                } catch {
+                    if (alive) setFeaturedCollections([])
+                } finally {
+                    if (alive) setCollectionsLoading(false)
+                }
+            })()
+        return () => {
+            alive = false
         }
-    }, [])
+    }, [source])
+
+    // ✅ lista activa según fuente
+    const activeLists = useMemo(() => {
+        if (source === 'tmdb') return safeTmdbLists.map((l) => ({ ...l, source: 'tmdb' }))
+        if (source === 'trakt') return (Array.isArray(trakt?.lists) ? trakt.lists : []).map((l) => ({ ...l, source: 'trakt' }))
+        return (Array.isArray(featuredCollections) ? featuredCollections : []).map((c) => ({ ...c, source: 'collections' }))
+    }, [source, safeTmdbLists, trakt?.lists, featuredCollections])
 
     const filtered = useMemo(() => {
         const q = deferredQuery.trim().toLowerCase()
-        const base = q ? safeLists.filter((l) => (l?.name || '').toLowerCase().includes(q)) : safeLists
+        const base = q ? activeLists.filter((l) => (l?.name || '').toLowerCase().includes(q)) : activeLists
         return sortLists(base, sortMode)
-    }, [safeLists, deferredQuery, sortMode])
+    }, [activeLists, deferredQuery, sortMode])
+
+    const visibleCount = filtered.length
+
+    // ✅ reset caches al cambiar de fuente/modo (evita previews cruzados)
+    useEffect(() => {
+        controllersRef.current.forEach((c) => c.abort())
+        controllersRef.current.clear()
+        inFlight.current.clear()
+        setItemsMap({})
+        imdbRatingsCache.clear()
+    }, [source, traktMode])
+
+    const listsTitle =
+        source === 'tmdb' ? 'Mis Listas' : source === 'trakt' ? 'Listas de Trakt' : 'Colecciones'
+
+    const subtitle =
+        source === 'tmdb'
+            ? `${safeTmdbLists.length} listas creadas`
+            : source === 'trakt'
+                ? `${visibleCount} listas`
+                : `${visibleCount} colecciones`
+
+    // ✅ ensureListItems multi-origen
+    const ensureListItems = useCallback(
+        async (listId) => {
+            if (!listId) return
+
+            // ya cargado o cargando
+            if (itemsMapRef.current[listId] !== undefined) return
+            if (inFlight.current.has(listId)) return
+
+            // busca el objeto de lista en el “filtered” actual
+            const listObj = filtered.find((x) => String(x?.id) === String(listId))
+            const src = listObj?.source || source
+
+            inFlight.current.add(listId)
+            setItemsMap((prev) => ({ ...prev, [listId]: null }))
+
+            const ctrl = new AbortController()
+            controllersRef.current.set(listId, ctrl)
+
+            try {
+                if (src === 'tmdb') {
+                    const json = await getListDetails({ listId, page: 1, language: 'es-ES', signal: ctrl.signal })
+                    const items = Array.isArray(json?.items) ? json.items : []
+                    setItemsMap((prev) => ({ ...prev, [listId]: items }))
+                    return
+                }
+
+                if (src === 'trakt') {
+                    // Trakt lists: necesitamos "user" para la ruta /users/{user}/lists/{id}/items
+                    const user = listObj?.user || 'trakt'
+                    const res = await fetch(
+                        `/api/trakt/list-items?user=${encodeURIComponent(user)}&listId=${encodeURIComponent(listId)}&limit=24`,
+                        { signal: ctrl.signal, cache: 'no-store' }
+                    )
+                    const j = await res.json().catch(() => ({}))
+                    const items = Array.isArray(j?.items) ? j.items : []
+                    setItemsMap((prev) => ({ ...prev, [listId]: items }))
+                    return
+                }
+
+                // collections
+                const res = await fetch(`/api/tmdb/collection?id=${encodeURIComponent(listId)}`, {
+                    signal: ctrl.signal,
+                    cache: 'no-store',
+                })
+                const j = await res.json().catch(() => ({}))
+                const items = Array.isArray(j?.items) ? j.items : []
+                setItemsMap((prev) => ({ ...prev, [listId]: items }))
+            } catch (e) {
+                if (e?.name === 'AbortError') {
+                    // vuelve a “no pedido” para que pueda pedirse después
+                    setItemsMap((prev) => {
+                        const next = { ...prev }
+                        delete next[listId]
+                        return next
+                    })
+                    return
+                }
+                setItemsMap((prev) => ({ ...prev, [listId]: [] }))
+            } finally {
+                inFlight.current.delete(listId)
+                controllersRef.current.delete(listId)
+            }
+        },
+        [filtered, source]
+    )
 
     // ✅ precarga solo las primeras N listas visibles (el resto lo hace InView)
     useEffect(() => {
@@ -836,7 +928,7 @@ export default function ListsPage() {
     const handleDelete = async (e, listId) => {
         e.preventDefault()
         e.stopPropagation()
-        if (!canUse) return
+        if (!canUse || source !== 'tmdb') return
         const ok = window.confirm('¿Seguro que quieres borrar esta lista?')
         if (!ok) return
 
@@ -861,7 +953,18 @@ export default function ListsPage() {
         inFlight.current.clear()
         setItemsMap({})
         imdbRatingsCache.clear()
-        refresh()
+
+        if (source === 'tmdb') refresh()
+        else if (source === 'trakt') trakt?.refresh?.()
+        else {
+            // collections: re-fetch
+            setFeaturedCollections([])
+            setCollectionsLoading(true)
+            fetch('/api/tmdb/collections/featured', { cache: 'no-store' })
+                .then((r) => r.json().catch(() => ({})))
+                .then((j) => setFeaturedCollections(Array.isArray(j?.collections) ? j.collections : []))
+                .finally(() => setCollectionsLoading(false))
+        }
     }
 
     // loader auth
@@ -892,6 +995,23 @@ export default function ListsPage() {
         )
     }
 
+    const loadingUnified =
+        source === 'tmdb'
+            ? loading
+            : source === 'trakt'
+                ? trakt?.loading
+                : collectionsLoading
+
+    const errorUnified =
+        source === 'tmdb'
+            ? error
+            : source === 'trakt'
+                ? trakt?.error
+                : ''
+
+    // ✅ readonly: Trakt y Colecciones no crean/borran ni loadMore
+    const canEdit = !!canUse && source === 'tmdb'
+
     return (
         <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30 overflow-x-hidden">
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -906,14 +1026,70 @@ export default function ListsPage() {
                         <div className="p-3 bg-purple-500/10 rounded-2xl border border-purple-500/20">
                             <ListVideo className="w-8 h-8 text-purple-500" />
                         </div>
-                        <div>
-                            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Mis Listas</h1>
-                            <p className="text-neutral-400 mt-1 font-medium">{listsCount} listas creadas</p>
+                        <div className="min-w-0">
+                            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight truncate">{listsTitle}</h1>
+                            <p className="text-neutral-400 mt-1 font-medium">{subtitle}</p>
                         </div>
                     </div>
 
                     {/* Controles: mejor wrap en móvil */}
                     <div className="flex flex-col gap-3 bg-neutral-900/60 border border-white/5 p-2 rounded-2xl backdrop-blur-md w-full xl:w-auto">
+                        {/* ✅ selector de fuente */}
+                        <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => setSource('trakt')}
+                                className={[
+                                    'h-9 px-4 rounded-full border text-xs font-black uppercase tracking-wider transition',
+                                    source === 'trakt'
+                                        ? 'bg-white text-black border-white/10'
+                                        : 'bg-white/5 text-zinc-200 border-white/10 hover:bg-white/10',
+                                ].join(' ')}
+                            >
+                                Trakt
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setSource('collections')}
+                                className={[
+                                    'h-9 px-4 rounded-full border text-xs font-black uppercase tracking-wider transition',
+                                    source === 'collections'
+                                        ? 'bg-white text-black border-white/10'
+                                        : 'bg-white/5 text-zinc-200 border-white/10 hover:bg-white/10',
+                                ].join(' ')}
+                            >
+                                Colecciones
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setSource('tmdb')}
+                                className={[
+                                    'h-9 px-4 rounded-full border text-xs font-black uppercase tracking-wider transition',
+                                    source === 'tmdb'
+                                        ? 'bg-white text-black border-white/10'
+                                        : 'bg-white/5 text-zinc-200 border-white/10 hover:bg-white/10',
+                                ].join(' ')}
+                            >
+                                TMDb
+                            </button>
+
+                            {source === 'trakt' && (
+                                <select
+                                    value={traktMode}
+                                    onChange={(e) => setTraktMode(e.target.value)}
+                                    className="h-9 px-3 rounded-full bg-black/30 border border-white/10 text-xs text-zinc-200"
+                                    title="Modo Trakt"
+                                >
+                                    <option value="official">Official</option>
+                                    <option value="trending">Trending</option>
+                                    <option value="popular">Popular</option>
+                                    <option value="user">Mis listas</option>
+                                </select>
+                            )}
+                        </div>
+
                         <div className="relative w-full sm:min-w-[320px]">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                             <input
@@ -922,7 +1098,7 @@ export default function ListsPage() {
                                     const v = e.target.value
                                     startTransition(() => setQuery(v))
                                 }}
-                                placeholder="Buscar listas..."
+                                placeholder={source === 'collections' ? 'Buscar colecciones...' : 'Buscar listas...'}
                                 className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 text-sm text-white focus:outline-none focus:border-zinc-600 transition-all placeholder:text-zinc-600"
                             />
                         </div>
@@ -1014,16 +1190,18 @@ export default function ListsPage() {
                                     title="Refrescar"
                                     aria-label="Refrescar"
                                 >
-                                    <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin text-purple-500' : ''}`} />
+                                    <RefreshCcw className={`w-4 h-4 ${loadingUnified ? 'animate-spin text-purple-500' : ''}`} />
                                 </button>
 
-                                <button
-                                    onClick={() => setCreateOpen(true)}
-                                    className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-all shadow-lg shadow-purple-900/20 flex items-center gap-2"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Crear</span>
-                                </button>
+                                {canEdit && (
+                                    <button
+                                        onClick={() => setCreateOpen(true)}
+                                        className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-all shadow-lg shadow-purple-900/20 flex items-center gap-2"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span className="hidden sm:inline">Crear</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -1032,28 +1210,42 @@ export default function ListsPage() {
                 </div>
 
                 <AnimatePresence>
-                    {createOpen && (
+                    {createOpen && canEdit && (
                         <CreateListModal
                             open={createOpen}
                             onClose={() => setCreateOpen(false)}
                             onCreate={handleCreate}
                             creating={creating}
-                            error={error}
+                            error={errorUnified}
                         />
                     )}
                 </AnimatePresence>
 
+                {errorUnified ? (
+                    <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-200 text-sm">
+                        {String(errorUnified)}
+                    </div>
+                ) : null}
+
                 {/* CONTENT */}
-                {loading && listsCount === 0 ? (
+                {loadingUnified && visibleCount === 0 ? (
                     <div className="flex flex-col items-center justify-center py-32">
                         <Loader2 className="w-10 h-10 animate-spin text-purple-500 mb-4" />
-                        <span className="text-neutral-500 text-sm font-medium animate-pulse">Cargando tus listas...</span>
+                        <span className="text-neutral-500 text-sm font-medium animate-pulse">
+                            {source === 'collections' ? 'Cargando colecciones...' : 'Cargando listas...'}
+                        </span>
                     </div>
                 ) : filtered.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
                         <ListVideo className="w-16 h-16 text-neutral-700 mb-4" />
-                        <h3 className="text-xl font-bold text-neutral-300">No tienes listas</h3>
-                        <p className="text-zinc-500 mt-2">Crea una nueva lista arriba para empezar.</p>
+                        <h3 className="text-xl font-bold text-neutral-300">
+                            {source === 'collections' ? 'No hay colecciones' : 'No hay listas'}
+                        </h3>
+                        <p className="text-zinc-500 mt-2">
+                            {source === 'tmdb'
+                                ? 'Crea una nueva lista arriba para empezar.'
+                                : 'Prueba cambiando el modo o el buscador.'}
+                        </p>
                     </div>
                 ) : (
                     <>
@@ -1061,11 +1253,11 @@ export default function ListsPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                 {filtered.map((l) => (
                                     <GridListCard
-                                        key={l.id}
+                                        key={`${l.source}-${l.id}`}
                                         list={l}
                                         itemsState={itemsMap[String(l.id)]}
                                         ensureListItems={ensureListItems}
-                                        canUse={!!canUse}
+                                        canUse={canEdit}
                                         onDelete={handleDelete}
                                     />
                                 ))}
@@ -1076,12 +1268,12 @@ export default function ListsPage() {
                             <div className="space-y-12">
                                 {filtered.map((l) => (
                                     <RowListSection
-                                        key={l.id}
+                                        key={`${l.source}-${l.id}`}
                                         list={l}
                                         itemsState={itemsMap[String(l.id)]}
                                         ensureListItems={ensureListItems}
                                         isMobile={isMobile}
-                                        canUse={!!canUse}
+                                        canUse={canEdit}
                                         onDelete={handleDelete}
                                     />
                                 ))}
@@ -1092,11 +1284,11 @@ export default function ListsPage() {
                             <div className="flex flex-col gap-3">
                                 {filtered.map((l) => (
                                     <ListModeRow
-                                        key={l.id}
+                                        key={`${l.source}-${l.id}`}
                                         list={l}
                                         itemsState={itemsMap[String(l.id)]}
                                         ensureListItems={ensureListItems}
-                                        canUse={!!canUse}
+                                        canUse={canEdit}
                                         onDelete={handleDelete}
                                     />
                                 ))}
@@ -1105,7 +1297,8 @@ export default function ListsPage() {
                     </>
                 )}
 
-                {hasMore && !loading && (
+                {/* ✅ LoadMore SOLO TMDb */}
+                {source === 'tmdb' && hasMore && !loadingUnified && (
                     <div className="flex justify-center pt-8">
                         <button
                             onClick={loadMore}

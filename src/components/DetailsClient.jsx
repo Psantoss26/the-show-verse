@@ -49,7 +49,7 @@ import {
   Eye,
   List,
   LibraryBig,
-  MessageSquare
+  MessageSquare,
 } from 'lucide-react'
 
 /* === cuenta / api === */
@@ -1556,6 +1556,41 @@ export default function DetailsClient({
     }
   }
 
+  const collectionId =
+    typeof data?.belongs_to_collection?.id === 'number'
+      ? data.belongs_to_collection.id
+      : null
+
+  const [collectionData, setCollectionData] = useState(null)
+  const [collectionLoading, setCollectionLoading] = useState(false)
+
+  useEffect(() => {
+    if (!collectionId) {
+      setCollectionData(null)
+      setCollectionLoading(false)
+      return
+    }
+
+    let alive = true
+      ; (async () => {
+        try {
+          setCollectionLoading(true)
+          const res = await fetch(`/api/tmdb/collection?id=${collectionId}`, { cache: 'no-store' })
+          const j = await res.json().catch(() => ({}))
+          if (!alive) return
+          setCollectionData(res.ok && j?.collection ? j : null)
+        } catch {
+          if (alive) setCollectionData(null)
+        } finally {
+          if (alive) setCollectionLoading(false)
+        }
+      })()
+
+    return () => {
+      alive = false
+    }
+  }, [collectionId])
+
   // =====================================================
   // ✅ Extras: IMDb rating rápido + votos/premios en idle
   // =====================================================
@@ -2040,6 +2075,10 @@ export default function DetailsClient({
       count: Array.isArray(tLists?.items) ? tLists.items.length : undefined
     })
 
+    if (collectionId && collectionData?.items?.length) {
+      items.push({ id: 'collection', label: 'Colección', icon: Layers, count: collectionData.items.length })
+    }
+
     // ✅ Reparto
     items.push({
       id: 'cast',
@@ -2068,7 +2107,9 @@ export default function DetailsClient({
     tSeasons?.items,
     tLists?.items,
     castData,
-    recommendations
+    recommendations,
+    collectionId,
+    collectionData
   ])
 
   useEffect(() => {
@@ -2439,7 +2480,7 @@ export default function DetailsClient({
                       logo="/logo-Trakt.png"
                       value={traktDecimal}
                       sub={tScoreboard.votes ? formatCountShort(tScoreboard.votes) : undefined}
-                      href={tScoreboard.traktUrl}
+                      href={trakt?.traktUrl}
                     />
                   )}
 
@@ -3801,6 +3842,77 @@ export default function DetailsClient({
                             </span>
                           </button>
                         </div>
+                      )}
+                    </section>
+                  </motion.div>
+                )}
+
+                {/* ===== COLECCIÓN ===== */}
+                {activeSection === 'collection' && (
+                  <motion.div
+                    key="episodes"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <section className="mb-10">
+                      <SectionTitle title="Colección" icon={Layers} />
+
+                      {collectionLoading ? (
+                        <div className="mt-4 text-sm text-zinc-400">Cargando colección…</div>
+                      ) : collectionData?.items?.length ? (
+                        <Swiper
+                          spaceBetween={12}
+                          slidesPerView={3}
+                          breakpoints={{
+                            500: { slidesPerView: 3, spaceBetween: 14 },
+                            768: { slidesPerView: 4, spaceBetween: 16 },
+                            1024: { slidesPerView: 5, spaceBetween: 18 },
+                            1280: { slidesPerView: 6, spaceBetween: 20 }
+                          }}
+                          className="pb-8"
+                        >
+                          {collectionData.items.map((m) => (
+                            <SwiperSlide key={m.id}>
+                              <a
+                                href={`/details/movie/${m.id}`}
+                                className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                                title={m.title}
+                              >
+                                <div className="aspect-[2/3] overflow-hidden relative">
+                                  {m.poster_path ? (
+                                    <img
+                                      src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
+                                      alt={m.title}
+                                      className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.06]"
+                                      loading="lazy"
+                                      decoding="async"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
+                                      <ImageOff className="w-10 h-10 opacity-60" />
+                                    </div>
+                                  )}
+
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
+                                  <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
+                                    <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
+                                      {m.title}
+                                    </p>
+                                    {m.release_date ? (
+                                      <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
+                                        {m.release_date?.slice(0, 4)}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </a>
+                            </SwiperSlide>
+                          ))}
+                        </Swiper>
+                      ) : (
+                        <div className="mt-4 text-sm text-zinc-400">No hay datos de colección.</div>
                       )}
                     </section>
                   </motion.div>
