@@ -110,13 +110,14 @@ export async function traktRemoveWatchPlay({ historyId }) {
 /**
  * Historial global
  */
-export async function traktGetHistory({ type = 'all', from, to, page = 1, limit = 200 } = {}) {
+export async function traktGetHistory({ type = 'all', from, to, page = 1, limit = 200, extended = 'full' } = {}) {
     const qs = new URLSearchParams()
     qs.set('type', type)
     qs.set('page', String(page))
     qs.set('limit', String(limit))
     if (from) qs.set('from', from)
     if (to) qs.set('to', to)
+    if (extended) qs.set('extended', extended)
 
     const res = await fetch(`/api/trakt/history?${qs.toString()}`, { cache: 'no-store' })
     const json = await safeJson(res)
