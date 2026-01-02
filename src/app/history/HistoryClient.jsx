@@ -18,9 +18,7 @@ import {
     Filter,
     CheckCircle2,
     Eye,
-    Calendar as CalendarIcon,
-    Layers,
-    ListFilter
+    Layers
 } from 'lucide-react'
 
 import { traktAuthStatus, traktGetHistory } from '@/lib/api/traktClient'
@@ -74,27 +72,86 @@ function isEpisodeEntry(entry) {
     const t = entry?.type
     if (t === 'episode' || t === 'episodes') return true
     if (entry?.episode) return true
-    return false
+
+    // por si tu API lo aplana:
+    const s = entry?.season ?? entry?.season_number ?? entry?.seasonNumber
+    const e = entry?.number ?? entry?.episode_number ?? entry?.episodeNumber
+    return s != null && e != null
+}
+
+function getEpisodeMeta(entry) {
+    const seasonRaw =
+        entry?.episode?.season ??
+        entry?.season ??
+        entry?.season_number ??
+        entry?.seasonNumber
+
+    const episodeRaw =
+        entry?.episode?.number ??
+        entry?.episode?.episode ?? // por si algún mapeo raro
+        entry?.number ??
+        entry?.episode_number ??
+        entry?.episodeNumber
+
+    if (seasonRaw == null || episodeRaw == null) return null
+
+    const season = Number(seasonRaw)
+    const episode = Number(episodeRaw)
+    if (!Number.isFinite(season) || !Number.isFinite(episode)) return null
+
+    const title =
+        entry?.episode?.title ??
+        entry?.episodeTitle ??
+        entry?.episode?.name ??
+        null
+
+    return { season, episode, title }
+}
+
+// IMPORTANTE: si es episodio, prioriza el TMDb de la SERIE (show)
+function getTmdbId(entry) {
+    if (isEpisodeEntry(entry)) {
+        return (
+            entry?.tmdbId ||
+            entry?.show?.ids?.tmdb ||
+            entry?.show?.tmdbId ||
+            entry?.show_tmdb_id ||
+            entry?.tmdb_show_id ||
+            // fallback (por si solo llega el del episodio)
+            entry?.ids?.tmdb ||
+            entry?.episode?.ids?.tmdb ||
+            null
+        )
+    }
+
+    return (
+        entry?.tmdbId ||
+        entry?.ids?.tmdb ||
+        entry?.movie?.ids?.tmdb ||
+        entry?.show?.ids?.tmdb ||
+        null
+    )
+}
+
+// Badge “bonito” (chip) con pad y punto
+function formatEpisodeBadge(meta) {
+    if (!meta) return null
+    return `T${pad2(meta.season)} · E${pad2(meta.episode)}`
+}
+
+// ✅ NUEVO: formato para el TÍTULO (sin pad, sin punto)
+// Querías: "Juego de tronos T1 E1"
+function formatEpisodeInline(meta) {
+    if (!meta) return null
+    return `T${meta.season} E${meta.episode}`
 }
 
 function getMainTitle(entry) {
     return entry?.title_es || entry?.show?.title || entry?.movie?.title || entry?.title || 'Sin título'
 }
 
-function getEpisodeMeta(entry) {
-    const season = entry?.episode?.season ?? entry?.season
-    const episode = entry?.episode?.number ?? entry?.number
-    const title = entry?.episode?.title ?? entry?.episodeTitle
-    if (season != null && episode != null) return { season, episode, title }
-    return null
-}
-
 function getYear(entry) {
     return entry?.year || entry?.movie?.year || entry?.show?.year || null
-}
-
-function getTmdbId(entry) {
-    return entry?.tmdbId || entry?.ids?.tmdb || entry?.movie?.ids?.tmdb || entry?.show?.ids?.tmdb || null
 }
 
 function getHistoryId(entry) {
@@ -185,7 +242,6 @@ async function apiPost(url, body) {
 // ----------------------------
 // UI COMPONENTS
 // ----------------------------
-
 function StatCard({ label, value, icon: Icon, colorClass = "text-white" }) {
     return (
         <div className="flex-1 min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 backdrop-blur-sm transition hover:bg-zinc-900/70">
@@ -255,7 +311,7 @@ function DropdownItem({ active, onClick, children }) {
 }
 
 // ----------------------------
-// Calendar Panel (Always Visible)
+// Calendar Panel
 // ----------------------------
 function buildMonthGrid(year, month, weekStartsOn = 1) {
     const first = new Date(year, month, 1)
@@ -275,7 +331,6 @@ function buildMonthGrid(year, month, weekStartsOn = 1) {
     return weeks
 }
 
-// ✅ MODIFICADO: Estilos para hacerlo más grande y visible
 function CalendarPanel({ monthDate, onPrev, onNext, countsByDay, selectedYmd, onSelectYmd }) {
     const year = monthDate.getFullYear()
     const month = monthDate.getMonth()
@@ -314,8 +369,8 @@ function CalendarPanel({ monthDate, onPrev, onNext, countsByDay, selectedYmd, on
                             onClick={() => key && onSelectYmd(selected ? null : key)}
                             disabled={!inMonth}
                             className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all duration-200 text-sm font-bold
-                                ${!inMonth ? 'opacity-0 pointer-events-none' : 'text-zinc-300'}
-                                ${selected ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 z-10 scale-110'
+                ${!inMonth ? 'opacity-0 pointer-events-none' : 'text-zinc-300'}
+                ${selected ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 z-10 scale-110'
                                     : isToday ? 'bg-zinc-800 text-white border border-emerald-500/50'
                                         : 'bg-zinc-900/50 hover:bg-zinc-800 hover:text-white hover:scale-105'}`}
                         >
@@ -378,8 +433,14 @@ function Poster({ entry, className = "" }) {
 // Tarjeta modo LISTA
 function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
     const type = getItemType(entry)
+
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
-    const title = getMainTitle(entry)
+    const baseTitle = getMainTitle(entry)
+    const inlineEp = (type === 'show' && epMeta) ? formatEpisodeInline(epMeta) : null
+
+    // ✅ AQUÍ está la clave: el título incluye T1 E1
+    const title = inlineEp ? `${baseTitle} ${inlineEp}` : baseTitle
+
     const year = getYear(entry)
     const { time: watchedTime } = formatWatchedLine(entry?.watched_at)
     const href = useMemo(() => getDetailsHref(entry), [entry])
@@ -390,37 +451,47 @@ function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
     const handleConfirm = async (e) => { e.preventDefault(); e.stopPropagation(); await onRemoveFromHistory?.(entry, { historyId }) }
     const handleCancel = (e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(false) }
 
-    const epBadge = type === 'show' && epMeta ? `T${epMeta.season} · E${epMeta.episode}` : null
-
     const Content = (
         <div className={`relative flex items-center gap-4 p-3 pr-12 transition-all ${busy ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
             <Poster entry={entry} className="w-[60px] aspect-[2/3] rounded-md" />
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
                 <div className="flex items-center gap-2">
                     <h4 className="text-white font-bold text-sm leading-tight truncate">{title}</h4>
-                    {epBadge && <span className="text-[10px] font-bold text-zinc-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/5 shrink-0">{epBadge}</span>}
                 </div>
+
                 <div className="flex items-center gap-2 text-xs text-zinc-500">
                     <span className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${type === 'movie' ? 'bg-sky-500/10 text-sky-500' : 'bg-purple-500/10 text-purple-500'}`}>
                         {type === 'movie' ? 'PELÍCULA' : 'SERIE'}
                     </span>
                     <span>•</span>
-                    <span className="truncate max-w-[200px]">{type === 'show' && epMeta?.title ? epMeta.title : year}</span>
+
+                    {/* Para series: si hay título de episodio, lo mostramos; si no, el año */}
+                    <span className="truncate max-w-[260px]">
+                        {type === 'show' && epMeta?.title ? epMeta.title : year}
+                    </span>
                 </div>
+
                 <div className="text-[11px] text-zinc-600 flex items-center gap-1.5 mt-0.5 font-mono">
                     <RotateCcw className="w-3 h-3" /> {watchedTime}
                 </div>
             </div>
 
             {!confirmDel && (
-                <button onClick={handleDeleteClick} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors z-10 opacity-0 group-hover:opacity-100">
+                <button
+                    onClick={handleDeleteClick}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors z-10 opacity-0 group-hover:opacity-100"
+                >
                     <Trash2 className="w-4 h-4" />
                 </button>
             )}
 
             <AnimatePresence>
                 {confirmDel && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/95 z-20 flex items-center justify-end px-4 gap-3 rounded-xl" onClick={(e) => e.stopPropagation()}>
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-black/95 z-20 flex items-center justify-end px-4 gap-3 rounded-xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <span className="text-red-200 text-xs font-medium mr-auto">¿Eliminar?</span>
                         <button onClick={handleCancel} className="text-zinc-400 hover:text-white text-xs font-bold">Cancelar</button>
                         <button onClick={handleConfirm} className="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2">
@@ -445,7 +516,14 @@ function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
 // Tarjeta modo GRID
 function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
     const type = getItemType(entry)
-    const title = getMainTitle(entry)
+
+    const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
+    const baseTitle = getMainTitle(entry)
+    const inlineEp = (type === 'show' && epMeta) ? formatEpisodeInline(epMeta) : null
+
+    // ✅ título incluye T1 E1
+    const title = inlineEp ? `${baseTitle} ${inlineEp}` : baseTitle
+
     const { time: watchedTime } = formatWatchedLine(entry?.watched_at)
     const href = useMemo(() => getDetailsHref(entry), [entry])
     const historyId = getHistoryId(entry)
@@ -454,6 +532,9 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
     const handleDeleteClick = (e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(true) }
     const handleConfirm = async (e) => { e.preventDefault(); e.stopPropagation(); await onRemoveFromHistory?.(entry, { historyId }) }
     const handleCancel = (e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(false) }
+
+    // (opcional) chip con formato bonito si lo quieres en grid también
+    const epBadge = (type === 'show' && epMeta) ? formatEpisodeBadge(epMeta) : null
 
     const CardInner = (
         <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md hover:shadow-emerald-900/20 transition-all">
@@ -467,8 +548,14 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
                         </span>
                         <span className="text-[10px] text-zinc-400">{watchedTime}</span>
                     </div>
+
+                    {/* ✅ aquí ya sale "Juego de tronos T1 E1" */}
                     <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">{title}</h5>
+
+                    {/* opcional: si quieres dejar el chip extra */}
+                    {epBadge && <span className="text-[10px] text-zinc-400">{epBadge}</span>}
                 </div>
+
                 <button onClick={handleDeleteClick} className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-red-600 text-white rounded-full transition-colors backdrop-blur-sm">
                     <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -476,7 +563,11 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
 
             <AnimatePresence>
                 {confirmDel && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/95 z-20 flex flex-col items-center justify-center p-4 text-center" onClick={(e) => e.stopPropagation()}>
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-black/95 z-20 flex flex-col items-center justify-center p-4 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <p className="text-red-200 text-xs font-bold mb-3">¿Borrar?</p>
                         <div className="flex gap-2 w-full">
                             <button onClick={handleCancel} className="flex-1 py-1.5 rounded bg-zinc-800 text-zinc-300 text-xs font-bold">No</button>
@@ -516,11 +607,18 @@ export default function HistoryClient() {
     useEffect(() => {
         const mq = window.matchMedia('(max-width: 1024px)')
         const apply = () => { setIsMobile(!!mq.matches); setFiltersOpen(!mq.matches) }
-        apply(); mq.addEventListener?.('change', apply); return () => mq.removeEventListener?.('change', apply)
+        apply()
+        mq.addEventListener?.('change', apply)
+        return () => mq.removeEventListener?.('change', apply)
     }, [])
 
     const loadAuth = useCallback(async () => {
-        try { const st = await traktAuthStatus(); setAuth({ loading: false, connected: !!st?.connected }) } catch { setAuth({ loading: false, connected: false }) }
+        try {
+            const st = await traktAuthStatus()
+            setAuth({ loading: false, connected: !!st?.connected })
+        } catch {
+            setAuth({ loading: false, connected: false })
+        }
     }, [])
 
     const loadHistory = useCallback(async () => {
@@ -529,15 +627,22 @@ export default function HistoryClient() {
             const json = await traktGetHistory({ type: 'all', page: 1, limit: 200 })
             const { items } = normalizeHistoryResponse(json)
             const sorted = [...items].sort((a, b) => new Date(b?.watched_at) - new Date(a?.watched_at))
+
             const enriched = await mapLimit(sorted, 10, async (e) => {
-                const t = getItemType(e); const id = getTmdbId(e)
+                const t = getItemType(e)
+                const id = getTmdbId(e)
                 if (!t || !id) return e
                 const r = await fetchTmdbPoster({ type: t, tmdbId: id })
                 if (!r) return e
                 return { ...e, title_es: r?.title_es || null, year: r?.year || getYear(e), poster_path: r?.poster_path || null }
             })
+
             setRaw(enriched)
-        } catch { setRaw([]) } finally { setLoading(false) }
+        } catch {
+            setRaw([])
+        } finally {
+            setLoading(false)
+        }
     }, [])
 
     useEffect(() => { loadAuth() }, [loadAuth])
@@ -549,7 +654,11 @@ export default function HistoryClient() {
         try {
             await apiPost('/api/trakt/history/remove', { ids: [historyId] })
             setRaw((prev) => (prev || []).filter((x) => String(getHistoryId(x)) !== String(historyId)))
-        } catch { } finally { setMutatingId('') }
+        } catch {
+            // noop
+        } finally {
+            setMutatingId('')
+        }
     }, [])
 
     const filtered = useMemo(() => {
@@ -561,16 +670,25 @@ export default function HistoryClient() {
             const d = new Date(e?.watched_at)
             if (Number.isNaN(d.getTime())) return false
             if (selectedDay && ymdLocal(d) !== selectedDay) return false
-            if (needle) { const title = (getMainTitle(e) || '').toLowerCase(); if (!title.includes(needle)) return false }
+            if (needle) {
+                const title = (getMainTitle(e) || '').toLowerCase()
+                if (!title.includes(needle)) return false
+            }
             return true
         })
     }, [raw, q, typeFilter, selectedDay])
 
     const stats = useMemo(() => {
-        const plays = filtered.length; const uniqSet = new Set(); let movies = 0; let shows = 0
+        const plays = filtered.length
+        const uniqSet = new Set()
+        let movies = 0
+        let shows = 0
         for (const e of filtered) {
-            const t = getItemType(e); if (t === 'movie') movies++; if (t === 'show') shows++
-            const id = getTmdbId(e) || `${t}:${getMainTitle(e)}`; uniqSet.add(String(id))
+            const t = getItemType(e)
+            if (t === 'movie') movies++
+            if (t === 'show') shows++
+            const id = getTmdbId(e) || `${t}:${getMainTitle(e)}`
+            uniqSet.add(String(id))
         }
         return { plays, unique: uniqSet.size, movies, shows }
     }, [filtered])
@@ -578,8 +696,10 @@ export default function HistoryClient() {
     const countsByDay = useMemo(() => {
         const m = {}
         for (const e of raw || []) {
-            const w = e?.watched_at; if (!w) continue
-            const k = ymdLocal(new Date(w)); if (!k) continue
+            const w = e?.watched_at
+            if (!w) continue
+            const k = ymdLocal(new Date(w))
+            if (!k) continue
             m[k] = (m[k] || 0) + 1
         }
         return m
@@ -588,16 +708,27 @@ export default function HistoryClient() {
     const grouped = useMemo(() => {
         const map = new Map()
         for (const e of filtered) {
-            const d = new Date(e?.watched_at); if (Number.isNaN(d.getTime())) continue
-            let key; if (groupBy === 'year') key = `${d.getFullYear()}-01-01`; else if (groupBy === 'month') key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01`; else key = ymdLocal(d)
-            if (!key) continue; if (!map.has(key)) map.set(key, [])
+            const d = new Date(e?.watched_at)
+            if (Number.isNaN(d.getTime())) continue
+            let key
+            if (groupBy === 'year') key = `${d.getFullYear()}-01-01`
+            else if (groupBy === 'month') key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01`
+            else key = ymdLocal(d)
+            if (!key) continue
+            if (!map.has(key)) map.set(key, [])
             map.get(key).push(e)
         }
         const keys = Array.from(map.keys()).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
         return keys.map((k) => ({ key: k, date: new Date(k), items: map.get(k) || [] }))
     }, [filtered, groupBy])
 
-    if (auth.loading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="w-8 h-8 text-emerald-500 animate-spin" /></div>
+    if (auth.loading) {
+        return (
+            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-emerald-500/30">
@@ -624,7 +755,11 @@ export default function HistoryClient() {
                         </div>
 
                         {auth.connected && (
-                            <button onClick={() => loadHistory()} disabled={loading} className="flex items-center gap-2 px-5 py-2.5 bg-white text-black hover:bg-zinc-200 rounded-full text-sm font-bold transition disabled:opacity-50 shadow-lg shadow-white/5">
+                            <button
+                                onClick={() => loadHistory()}
+                                disabled={loading}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-white text-black hover:bg-zinc-200 rounded-full text-sm font-bold transition disabled:opacity-50 shadow-lg shadow-white/5"
+                            >
                                 <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                                 {loading ? 'Sincronizando...' : 'Sincronizar'}
                             </button>
@@ -647,11 +782,15 @@ export default function HistoryClient() {
                     {/* Izquierda */}
                     <div className="space-y-6 min-w-0">
                         {auth.connected && (
-                            // ✅ BARRA UNIFICADA EN UNA SOLA LÍNEA
                             <div className="flex flex-col xl:flex-row gap-4">
                                 <div className="relative flex-1">
                                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                                    <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar..." className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-zinc-600" />
+                                    <input
+                                        value={q}
+                                        onChange={(e) => setQ(e.target.value)}
+                                        placeholder="Buscar..."
+                                        className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-zinc-600"
+                                    />
                                 </div>
 
                                 <div className="flex flex-wrap gap-4 items-center">
@@ -676,10 +815,16 @@ export default function HistoryClient() {
                                     </InlineDropdown>
 
                                     <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
-                                        <button onClick={() => setViewMode('list')} className={`px-4 h-full rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === 'list' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                        <button
+                                            onClick={() => setViewMode('list')}
+                                            className={`px-4 h-full rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === 'list' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        >
                                             <LayoutList className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => setViewMode('grid')} className={`px-4 h-full rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === 'grid' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                        <button
+                                            onClick={() => setViewMode('grid')}
+                                            className={`px-4 h-full rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === 'grid' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        >
                                             <LayoutGrid className="w-4 h-4" />
                                         </button>
                                     </div>
@@ -694,7 +839,10 @@ export default function HistoryClient() {
                                 </div>
                                 <h2 className="text-2xl font-bold text-white mb-2">Conecta tu cuenta de Trakt</h2>
                                 <p className="text-zinc-400 max-w-sm mb-8 text-sm">Para ver tu historial de visualizaciones sincronizado, necesitas iniciar sesión.</p>
-                                <button onClick={() => window.location.assign('/api/trakt/auth/start?next=/history')} className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10">
+                                <button
+                                    onClick={() => window.location.assign('/api/trakt/auth/start?next=/history')}
+                                    className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
+                                >
                                     Conectar ahora
                                 </button>
                             </div>
@@ -717,13 +865,23 @@ export default function HistoryClient() {
                                         {viewMode === 'grid' ? (
                                             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                                                 {g.items.map((entry) => (
-                                                    <HistoryGridCard key={getHistoryId(entry) || Math.random()} entry={entry} busy={mutatingId === `del:${getHistoryId(entry)}`} onRemoveFromHistory={removeFromHistory} />
+                                                    <HistoryGridCard
+                                                        key={getHistoryId(entry) || `${getTmdbId(entry)}:${entry?.watched_at}:${Math.random()}`}
+                                                        entry={entry}
+                                                        busy={mutatingId === `del:${getHistoryId(entry)}`}
+                                                        onRemoveFromHistory={removeFromHistory}
+                                                    />
                                                 ))}
                                             </div>
                                         ) : (
                                             <div className="space-y-2">
                                                 {g.items.map((entry) => (
-                                                    <HistoryItemCard key={getHistoryId(entry) || Math.random()} entry={entry} busy={mutatingId === `del:${getHistoryId(entry)}`} onRemoveFromHistory={removeFromHistory} />
+                                                    <HistoryItemCard
+                                                        key={getHistoryId(entry) || `${getTmdbId(entry)}:${entry?.watched_at}:${Math.random()}`}
+                                                        entry={entry}
+                                                        busy={mutatingId === `del:${getHistoryId(entry)}`}
+                                                        onRemoveFromHistory={removeFromHistory}
+                                                    />
                                                 ))}
                                             </div>
                                         )}

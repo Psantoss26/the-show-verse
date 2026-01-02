@@ -3,6 +3,7 @@
 'use client'
 
 import { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import 'swiper/swiper-bundle.css'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -162,6 +163,8 @@ export default function DetailsClient({
   watchLink,
   reviews
 }) {
+  const router = useRouter()
+
   const title = data.title || data.name
   const endpointType = type === 'tv' ? 'tv' : 'movie'
   const yearIso = (data.release_date || data.first_air_date || '')?.slice(0, 4)
@@ -192,7 +195,6 @@ export default function DetailsClient({
 
   // ✅ Resumen plegable (por defecto oculto)
   const [activeTab, setActiveTab] = useState('details')
-  const getDefaultSectionId = (t) => ('media')
 
   // ====== PREFERENCIAS DE IMÁGENES ======
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
@@ -219,6 +221,13 @@ export default function DetailsClient({
   const [isHoveredImages, setIsHoveredImages] = useState(false)
   const [canPrevImages, setCanPrevImages] = useState(false)
   const [canNextImages, setCanNextImages] = useState(false)
+
+  const asTmdbPath = (v) => {
+    if (!v) return null
+    if (typeof v === 'string') return v
+    if (typeof v === 'object' && typeof v.file_path === 'string') return v.file_path
+    return null
+  }
 
   // =====================================================================
   // ✅ LISTAS (estado + modal + detección)
@@ -642,7 +651,7 @@ export default function DetailsClient({
     setSelectedBackgroundPath(null)
 
     setActiveTab('details')
-    setActiveSection(getDefaultSectionId(type))
+    setActiveSection(null)
 
     if (typeof window !== 'undefined') {
       try {
@@ -687,11 +696,14 @@ export default function DetailsClient({
           const bestPoster = pickBestPosterTV(posters)
           const bestBackdropForBackground = pickBestBackdropTVNeutralFirst(backdrops)
 
-          if (bestPoster) await preloadTmdb(bestPoster, 'w780')
+          const bestPosterPath = asTmdbPath(bestPoster)
+          const bestBackdropPath = asTmdbPath(bestBackdropForBackground)
+
+          if (bestPosterPath) await preloadTmdb(bestPosterPath, 'w780')
 
           if (!cancelled) {
-            if (bestPoster) poster = bestPoster
-            if (bestBackdropForBackground) backdrop = bestBackdropForBackground
+            if (bestPosterPath) poster = bestPosterPath
+            if (bestBackdropPath) backdrop = bestBackdropPath
 
             setImagesState((prev) => ({
               posters: mergeUniqueImages(prev.posters, posters),
@@ -738,8 +750,8 @@ export default function DetailsClient({
       }
 
       if (!cancelled) {
-        setBasePosterPath(poster)
-        setBaseBackdropPath(backdrop)
+        setBasePosterPath(asTmdbPath(poster))
+        setBaseBackdropPath(asTmdbPath(backdrop))
         setArtworkInitialized(true)
       }
     }
@@ -750,13 +762,18 @@ export default function DetailsClient({
     }
   }, [id, endpointType, data?.images, data?.poster_path, data?.backdrop_path, data?.profile_path])
 
-  const displayPosterPath = artworkInitialized
-    ? selectedPosterPath || basePosterPath || data.profile_path || null
-    : null
+  const displayPosterPath =
+    asTmdbPath(selectedPosterPath) ||
+    asTmdbPath(basePosterPath) ||
+    asTmdbPath(data.poster_path) ||
+    asTmdbPath(data.profile_path) ||
+    null
 
-  const displayBackdropPath = artworkInitialized
-    ? selectedBackgroundPath || baseBackdropPath || null
-    : null
+  const displayBackdropPath =
+    asTmdbPath(selectedBackgroundPath) ||
+    asTmdbPath(baseBackdropPath) ||
+    asTmdbPath(data.backdrop_path) ||
+    null
 
   const mobileNeutralPosterPath = useMemo(() => {
     const best = pickBestNeutralPosterByResVotes(imagesState?.posters || [])?.file_path || null
@@ -1910,11 +1927,11 @@ export default function DetailsClient({
 
   // ✅ MENÚ GLOBAL (nuevo)
 
-  const [activeSection, setActiveSection] = useState(() => getDefaultSectionId(type))
+  const [activeSection, setActiveSection] = useState(() => null)
 
   // ✅ cuando cambie type, fija una sección inicial válida
   useEffect(() => {
-    setActiveSection(getDefaultSectionId(type))
+    setActiveSection(null)
   }, [type, id])
 
   // Helpers (ponlos cerca de tus helpers)
@@ -1947,8 +1964,10 @@ export default function DetailsClient({
 
   const [isSwitchingSection, startSectionTransition] = useTransition()
 
-  const handleSectionChange = useCallback((id) => {
-    startSectionTransition(() => setActiveSection(id))
+  const handleSectionChange = useCallback((nextId) => {
+    startSectionTransition(() => {
+      setActiveSection((cur) => (cur === nextId ? null : nextId))
+    })
   }, [])
 
   const sectionItems = useMemo(() => {
@@ -2045,8 +2064,9 @@ export default function DetailsClient({
 
   useEffect(() => {
     if (!Array.isArray(sectionItems) || sectionItems.length === 0) return
+    if (activeSection == null) return
     if (!sectionItems.some((it) => it.id === activeSection)) {
-      setActiveSection(sectionItems[0].id)
+      setActiveSection(null)
     }
   }, [sectionItems, activeSection])
 
@@ -2141,11 +2161,10 @@ export default function DetailsClient({
   useEffect(() => {
     setPosterImgLoaded(false)
     setPosterImgError(false)
-  }, [id, endpointType, displayPosterPath])
+  }, [id, endpointType])
 
-  const showNoPoster = artworkInitialized && !displayPosterPath
-  const showPosterSkeleton =
-    !artworkInitialized || (displayPosterPath && !posterImgLoaded && !posterImgError)
+  const showNoPoster = !displayPosterPath && !showPosterSkeleton
+  const showPosterSkeleton = !!displayPosterPath && !posterImgLoaded && !posterImgError
 
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
@@ -2281,14 +2300,14 @@ export default function DetailsClient({
 
                 {runtimeValue && (
                   <>
-                    <span className="text-zinc-600 text-[10px]">●</span>
+                    <span className="text-white text-[10px]">●</span>
                     <span>{runtimeValue}</span>
                   </>
                 )}
 
                 {data.status && (
                   <>
-                    <span className="text-zinc-600 text-[10px]">●</span>
+                    <span className="text-white text-[10px]">●</span>
                     <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${data.status === 'Ended' || data.status === 'Canceled'
                       ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                       : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -2737,1182 +2756,1205 @@ export default function DetailsClient({
             onChange={handleSectionChange}
           />
 
-          <div className="mt-6 min-w-0">
-            <AnimatePresence mode="wait" initial={false}>
+          {activeSection != null && (
+            <div className="mt-6 min-w-0">
+              <AnimatePresence mode="wait" initial={false}>
+                {/* ===== IMÁGENES ===== */}
+                {activeSection === 'media' && (
+                  <motion.div
+                    key="media"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                    className="min-w-0"
+                  >
+                    {/* ✅ PORTADAS Y FONDOS */}
+                    {(type === 'movie' || type === 'tv') && (
+                      <section className="mb-10">
+                        <SectionTitle title="Portadas y fondos" icon={ImageIcon} />
 
-              {/* ===== IMÁGENES ===== */}
-              {activeSection === 'media' && (
-                <motion.div
-                  key="media"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.22, ease: 'easeOut' }}
-                  className="min-w-0"
-                >
-                  {/* ✅ PORTADAS Y FONDOS */}
-                  {(type === 'movie' || type === 'tv') && (
-                    <section className="mb-10">
-                      <SectionTitle title="Portadas y fondos" icon={ImageIcon} />
-
-                      {/* Barra superior: tabs + filtros + reset (alineado correctamente) */}
-                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                        <div className="flex flex-wrap items-end gap-4">
-                          {/* Tabs */}
-                          <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
-                            {['posters', 'backdrops', 'background'].map((tab) => (
-                              <button
-                                key={tab}
-                                type="button"
-                                onClick={() => setActiveImagesTab(tab)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
+                        {/* Barra superior: tabs + filtros + reset (alineado correctamente) */}
+                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                          <div className="flex flex-wrap items-end gap-4">
+                            {/* Tabs */}
+                            <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
+                              {['posters', 'backdrops', 'background'].map((tab) => (
+                                <button
+                                  key={tab}
+                                  type="button"
+                                  onClick={() => setActiveImagesTab(tab)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
                 ${activeImagesTab === tab ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}
               `}
-                              >
-                                {tab === 'posters' ? 'Portada' : tab === 'backdrops' ? 'Vista previa' : 'Fondo'}
-                              </button>
-                            ))}
-                          </div>
+                                >
+                                  {tab === 'posters' ? 'Portada' : tab === 'backdrops' ? 'Vista previa' : 'Fondo'}
+                                </button>
+                              ))}
+                            </div>
 
-                          {/* Filtros */}
-                          <div className="flex flex-wrap items-end gap-3">
-                            {/* Resolución (siempre visible) */}
-                            <div ref={resMenuRef} className="relative">
-                              <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">
-                                Resolución
-                              </div>
+                            {/* Filtros */}
+                            <div className="flex flex-wrap items-end gap-3">
+                              {/* Resolución (siempre visible) */}
+                              <div ref={resMenuRef} className="relative">
+                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">
+                                  Resolución
+                                </div>
 
-                              <button
-                                type="button"
-                                onClick={() => setResMenuOpen((v) => !v)}
-                                className="inline-flex items-center justify-between gap-2 min-w-[140px]
+                                <button
+                                  type="button"
+                                  onClick={() => setResMenuOpen((v) => !v)}
+                                  className="inline-flex items-center justify-between gap-2 min-w-[140px]
                 px-3 py-2 rounded-xl bg-black/35 border border-white/10
                 hover:bg-black/45 hover:border-white/15 transition text-sm text-zinc-200"
-                              >
-                                <span className="font-semibold">
-                                  {imagesResFilter === 'all'
-                                    ? 'Todas'
-                                    : imagesResFilter === '720p'
-                                      ? '720p'
-                                      : imagesResFilter === '1080p'
-                                        ? '1080p'
-                                        : imagesResFilter === '2k'
-                                          ? '2K'
-                                          : '4K'}
-                                </span>
-                                <ChevronDown className={`w-4 h-4 transition-transform ${resMenuOpen ? 'rotate-180' : ''}`} />
-                              </button>
+                                >
+                                  <span className="font-semibold">
+                                    {imagesResFilter === 'all'
+                                      ? 'Todas'
+                                      : imagesResFilter === '720p'
+                                        ? '720p'
+                                        : imagesResFilter === '1080p'
+                                          ? '1080p'
+                                          : imagesResFilter === '2k'
+                                            ? '2K'
+                                            : '4K'}
+                                  </span>
+                                  <ChevronDown className={`w-4 h-4 transition-transform ${resMenuOpen ? 'rotate-180' : ''}`} />
+                                </button>
 
-                              <AnimatePresence>
-                                {resMenuOpen && (
-                                  <motion.div
-                                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                                    transition={{ duration: 0.14, ease: 'easeOut' }}
-                                    className="absolute left-0 top-full z-[9999] mt-2 w-44 rounded-2xl
+                                <AnimatePresence>
+                                  {resMenuOpen && (
+                                    <motion.div
+                                      initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                                      exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                                      transition={{ duration: 0.14, ease: 'easeOut' }}
+                                      className="absolute left-0 top-full z-[9999] mt-2 w-44 rounded-2xl
                     border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
-                                  >
-                                    <div className="py-1">
-                                      {[
-                                        { id: 'all', label: 'Todas' },
-                                        { id: '720p', label: '720p' },
-                                        { id: '1080p', label: '1080p' },
-                                        { id: '2k', label: '2K' },
-                                        { id: '4k', label: '4K' }
-                                      ].map((opt) => {
-                                        const active = imagesResFilter === opt.id
-                                        return (
-                                          <button
-                                            key={opt.id}
-                                            type="button"
-                                            onClick={() => {
-                                              setImagesResFilter(opt.id)
-                                              setResMenuOpen(false)
-                                            }}
-                                            className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
+                                    >
+                                      <div className="py-1">
+                                        {[
+                                          { id: 'all', label: 'Todas' },
+                                          { id: '720p', label: '720p' },
+                                          { id: '1080p', label: '1080p' },
+                                          { id: '2k', label: '2K' },
+                                          { id: '4k', label: '4K' }
+                                        ].map((opt) => {
+                                          const active = imagesResFilter === opt.id
+                                          return (
+                                            <button
+                                              key={opt.id}
+                                              type="button"
+                                              onClick={() => {
+                                                setImagesResFilter(opt.id)
+                                                setResMenuOpen(false)
+                                              }}
+                                              className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
                             transition ${active ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
-                                          >
-                                            <span className="font-semibold">{opt.label}</span>
-                                            {active && <Check className="w-4 h-4 text-emerald-300" />}
-                                          </button>
-                                        )
-                                      })}
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-
-                            {/* Idioma (solo en Portada y Vista previa) */}
-                            {activeImagesTab !== 'background' && (
-                              <div>
-                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">
-                                  Idioma
-                                </div>
-                                <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
-                                  <button
-                                    type="button"
-                                    onClick={() => setLangES((v) => !v)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-                    ${langES ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
-                                  >
-                                    ES
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setLangEN((v) => !v)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-                    ${langEN ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
-                                  >
-                                    EN
-                                  </button>
-                                </div>
+                                            >
+                                              <span className="font-semibold">{opt.label}</span>
+                                              {active && <Check className="w-4 h-4 text-emerald-300" />}
+                                            </button>
+                                          )
+                                        })}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
                               </div>
-                            )}
-                          </div>
-                        </div>
 
-                        {/* Reset */}
-                        <button
-                          type="button"
-                          onClick={handleResetArtwork}
-                          className="inline-flex items-center justify-center w-10 h-10 rounded-xl
+                              {/* Idioma (solo en Portada y Vista previa) */}
+                              {activeImagesTab !== 'background' && (
+                                <div>
+                                  <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">
+                                    Idioma
+                                  </div>
+                                  <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
+                                    <button
+                                      type="button"
+                                      onClick={() => setLangES((v) => !v)}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
+                    ${langES ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                    >
+                                      ES
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setLangEN((v) => !v)}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
+                    ${langEN ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                    >
+                                      EN
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Reset */}
+                          <button
+                            type="button"
+                            onClick={handleResetArtwork}
+                            className="inline-flex items-center justify-center w-10 h-10 rounded-xl
           border border-red-500/30 bg-red-500/10 text-red-400
           hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45 transition"
-                          title="Restaurar valores por defecto"
-                          aria-label="Restaurar valores por defecto"
-                        >
-                          <RotateCcw className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      {imagesLoading && (
-                        <div className="text-sm text-zinc-400 inline-flex items-center gap-2 mb-3">
-                          <Loader2 className="w-4 h-4 animate-spin" /> Cargando imágenes…
+                            title="Restaurar valores por defecto"
+                            aria-label="Restaurar valores por defecto"
+                          >
+                            <RotateCcw className="w-5 h-5" />
+                          </button>
                         </div>
-                      )}
-                      {!!imagesError && <div className="text-sm text-red-400 mb-3">{imagesError}</div>}
 
-                      {(() => {
-                        const rawList = activeImagesTab === 'posters' ? imagesState.posters : imagesState.backdrops
+                        {imagesLoading && (
+                          <div className="text-sm text-zinc-400 inline-flex items-center gap-2 mb-3">
+                            <Loader2 className="w-4 h-4 animate-spin" /> Cargando imágenes…
+                          </div>
+                        )}
+                        {!!imagesError && <div className="text-sm text-red-400 mb-3">{imagesError}</div>}
 
-                        const isPoster = activeImagesTab === 'posters'
-                        const aspect = isPoster ? 'aspect-[2/3]' : 'aspect-[16/9]'
-                        const size = isPoster ? 'w342' : 'w780'
+                        {(() => {
+                          const rawList = activeImagesTab === 'posters' ? imagesState.posters : imagesState.backdrops
 
-                        // ✅ Activas separadas (fix: Vista previa ya NO marca el fondo)
-                        const currentPosterActive =
-                          (selectedPosterPath || basePosterPath || data.poster_path || data.profile_path) ?? null
+                          const isPoster = activeImagesTab === 'posters'
+                          const aspect = isPoster ? 'aspect-[2/3]' : 'aspect-[16/9]'
+                          const size = isPoster ? 'w342' : 'w780'
 
-                        // ✅ si hay un selectedPreviewBackdropPath guardado pero NO es ES/EN, lo ignoramos
-                        const selectedPreviewObj = selectedPreviewBackdropPath
-                          ? (imagesState.backdrops || []).find((b) => b?.file_path === selectedPreviewBackdropPath)
-                          : null
+                          // ✅ Activas separadas (fix: Vista previa ya NO marca el fondo)
+                          const currentPosterActive =
+                            (selectedPosterPath || basePosterPath || data.poster_path || data.profile_path) ?? null
 
-                        const selectedPreviewLang = (selectedPreviewObj?.iso_639_1 || '').toLowerCase()
-                        const selectedPreviewValid =
-                          !selectedPreviewObj || selectedPreviewLang === 'es' || selectedPreviewLang === 'en'
+                          // ✅ si hay un selectedPreviewBackdropPath guardado pero NO es ES/EN, lo ignoramos
+                          const selectedPreviewObj = selectedPreviewBackdropPath
+                            ? (imagesState.backdrops || []).find((b) => b?.file_path === selectedPreviewBackdropPath)
+                            : null
 
-                        const previewFallback =
-                          pickBestBackdropByLangResVotes(imagesState.backdrops)?.file_path ||
-                          data.backdrop_path ||
-                          null
+                          const selectedPreviewLang = (selectedPreviewObj?.iso_639_1 || '').toLowerCase()
+                          const selectedPreviewValid =
+                            !selectedPreviewObj || selectedPreviewLang === 'es' || selectedPreviewLang === 'en'
 
-                        const currentPreviewActive =
-                          selectedPreviewBackdropPath || previewFallback
+                          const previewFallback =
+                            pickBestBackdropByLangResVotes(imagesState.backdrops)?.file_path ||
+                            data.backdrop_path ||
+                            null
 
-                        const currentBackgroundActive =
-                          (selectedBackgroundPath || baseBackdropPath || data.backdrop_path) ?? null
+                          const currentPreviewActive =
+                            selectedPreviewBackdropPath || previewFallback
 
-                        const activePath =
-                          activeImagesTab === 'posters'
-                            ? currentPosterActive
-                            : activeImagesTab === 'backdrops'
-                              ? currentPreviewActive
-                              : currentBackgroundActive
+                          const currentBackgroundActive =
+                            (selectedBackgroundPath || baseBackdropPath || data.backdrop_path) ?? null
 
-                        const filtered = (rawList || []).filter((img) => {
-                          const fp = img?.file_path
-                          if (!fp) return false
+                          const activePath =
+                            activeImagesTab === 'posters'
+                              ? currentPosterActive
+                              : activeImagesTab === 'backdrops'
+                                ? currentPreviewActive
+                                : currentBackgroundActive
 
-                          // ✅ Siempre mostramos la activa aunque los filtros no coincidan (para no “perder” el check)
-                          if (fp === activePath) return true
+                          const filtered = (rawList || []).filter((img) => {
+                            const fp = img?.file_path
+                            if (!fp) return false
 
-                          // Resolución
-                          if (imagesResFilter !== 'all') {
-                            const b = imgResBucket(img)
-                            const target = imagesResFilter === '2k' ? '2k' : imagesResFilter
-                            if (b !== target) return false
+                            // ✅ Siempre mostramos la activa aunque los filtros no coincidan (para no “perder” el check)
+                            if (fp === activePath) return true
+
+                            // Resolución
+                            if (imagesResFilter !== 'all') {
+                              const b = imgResBucket(img)
+                              const target = imagesResFilter === '2k' ? '2k' : imagesResFilter
+                              if (b !== target) return false
+                            }
+
+                            if (activeImagesTab === 'background') {
+                              // Fondo: solo sin idioma
+                              return !img?.iso_639_1
+                            }
+
+                            // Portada / Vista previa: solo ES/EN según toggles
+                            const lang = (img?.iso_639_1 || '').toLowerCase()
+                            if (!lang) return false
+                            const okES = lang === 'es' && langES
+                            const okEN = lang === 'en' && langEN
+                            return okES || okEN
+                          })
+
+                          const ordered = (() => {
+                            const idx = (filtered || []).findIndex((x) => x?.file_path === activePath)
+                            if (idx <= 0) return filtered
+                            return [filtered[idx], ...filtered.slice(0, idx), ...filtered.slice(idx + 1)]
+                          })()
+
+                          if (!Array.isArray(filtered) || filtered.length === 0) {
+                            return (
+                              <div className="text-sm text-zinc-400">
+                                No hay imágenes disponibles con los filtros actuales.
+                              </div>
+                            )
                           }
 
-                          if (activeImagesTab === 'background') {
-                            // Fondo: solo sin idioma
-                            return !img?.iso_639_1
-                          }
-
-                          // Portada / Vista previa: solo ES/EN según toggles
-                          const lang = (img?.iso_639_1 || '').toLowerCase()
-                          if (!lang) return false
-                          const okES = lang === 'es' && langES
-                          const okEN = lang === 'en' && langEN
-                          return okES || okEN
-                        })
-
-                        const ordered = (() => {
-                          const idx = (filtered || []).findIndex((x) => x?.file_path === activePath)
-                          if (idx <= 0) return filtered
-                          return [filtered[idx], ...filtered.slice(0, idx), ...filtered.slice(idx + 1)]
-                        })()
-
-                        if (!Array.isArray(filtered) || filtered.length === 0) {
                           return (
-                            <div className="text-sm text-zinc-400">
-                              No hay imágenes disponibles con los filtros actuales.
-                            </div>
-                          )
-                        }
+                            // ✅ Limita overflow lateral sin cortar la animación vertical
+                            <div className="relative overflow-x-hidden overflow-y-visible">
+                              {/* padding lateral: evita que 1ª/última “muerdan” el borde */}
+                              <div className="px-2 sm:px-3">
+                                <Swiper
+                                  key={activeImagesTab}
+                                  spaceBetween={12}
+                                  slidesPerView={isPoster ? 3 : 1}
+                                  breakpoints={
+                                    isPoster
+                                      ? {
+                                        640: { slidesPerView: 4, spaceBetween: 14 },
+                                        768: { slidesPerView: 5, spaceBetween: 16 },
+                                        1024: { slidesPerView: 6, spaceBetween: 18 },
+                                        1280: { slidesPerView: 7, spaceBetween: 18 }
+                                      }
+                                      : {
+                                        640: { slidesPerView: 2, spaceBetween: 14 },
+                                        768: { slidesPerView: 3, spaceBetween: 16 },
+                                        1024: { slidesPerView: 4, spaceBetween: 18 },
+                                        1280: { slidesPerView: 4, spaceBetween: 18 }
+                                      }
+                                  }
+                                  className="pb-8"
+                                >
+                                  {ordered.map((img, idx) => {
+                                    const filePath = img?.file_path
+                                    if (!filePath) return null
 
-                        return (
-                          // ✅ Limita overflow lateral sin cortar la animación vertical
-                          <div className="relative overflow-x-hidden overflow-y-visible">
-                            {/* padding lateral: evita que 1ª/última “muerdan” el borde */}
-                            <div className="px-2 sm:px-3">
-                              <Swiper
-                                key={activeImagesTab}
-                                spaceBetween={12}
-                                slidesPerView={isPoster ? 3 : 1}
-                                breakpoints={
-                                  isPoster
-                                    ? {
-                                      640: { slidesPerView: 4, spaceBetween: 14 },
-                                      768: { slidesPerView: 5, spaceBetween: 16 },
-                                      1024: { slidesPerView: 6, spaceBetween: 18 },
-                                      1280: { slidesPerView: 7, spaceBetween: 18 }
-                                    }
-                                    : {
-                                      640: { slidesPerView: 2, spaceBetween: 14 },
-                                      768: { slidesPerView: 3, spaceBetween: 16 },
-                                      1024: { slidesPerView: 4, spaceBetween: 18 },
-                                      1280: { slidesPerView: 4, spaceBetween: 18 }
-                                    }
-                                }
-                                className="pb-8"
-                              >
-                                {ordered.map((img, idx) => {
-                                  const filePath = img?.file_path
-                                  if (!filePath) return null
+                                    const isActive = activePath === filePath
+                                    const resText = imgResLabel(img)
 
-                                  const isActive = activePath === filePath
-                                  const resText = imgResLabel(img)
-
-                                  return (
-                                    <SwiperSlide key={filePath} className="h-full pt-3 pb-3">
-                                      <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={() => {
-                                          if (activeImagesTab === 'posters') handleSelectPoster(filePath)
-                                          else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(filePath)
-                                          else handleSelectBackground(filePath)
-                                        }}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault()
-                                            if (activeImagesTab === 'posters') handleSelectPoster(filePath)
-                                            else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(filePath)
-                                            else handleSelectBackground(filePath)
-                                          }
-                                        }}
-                                        className={`group relative w-full rounded-2xl overflow-hidden border cursor-pointer
-                        transition-all duration-300 transform-gpu hover:-translate-y-1
-                        ${isActive
-                                            ? 'border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]'
-                                            : 'border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30'
-                                          }`}
-                                        title="Seleccionar"
-                                      >
-                                        <div className={`w-full ${aspect} bg-black/40`}>
-                                          <img
-                                            src={`https://image.tmdb.org/t/p/${size}${filePath}`}
-                                            alt="option"
-                                            loading="lazy"
-                                            decoding="async"
-                                            // ✅ Solo escala la imagen (no el card) -> no recorta laterales en bordes
-                                            className="w-full h-full object-cover transition-transform duration-700 transform-gpu
-                            group-hover:scale-[1.08]"
-                                          />
-                                        </div>
-
-                                        {isActive && (
-                                          <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
-                                        )}
-
-                                        {/* ✅ SOLO RESOLUCIÓN al hover */}
-                                        {resText && (
-                                          <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <span className="text-[10px] font-bold tracking-wide px-2 py-1 rounded-full
-                            bg-black/70 border border-white/15 text-zinc-100">
-                                              {resText}
-                                            </span>
-                                          </div>
-                                        )}
-
-                                        {/* copiar URL (hover) */}
+                                    return (
+                                      <SwiperSlide key={filePath} className="h-full pt-3 pb-3">
                                         <div
                                           role="button"
                                           tabIndex={0}
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleCopyImageUrl(filePath)
+                                          onClick={() => {
+                                            if (activeImagesTab === 'posters') handleSelectPoster(filePath)
+                                            else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(filePath)
+                                            else handleSelectBackground(filePath)
                                           }}
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter' || e.key === ' ') {
                                               e.preventDefault()
-                                              e.stopPropagation()
-                                              handleCopyImageUrl(filePath)
+                                              if (activeImagesTab === 'posters') handleSelectPoster(filePath)
+                                              else if (activeImagesTab === 'backdrops') handleSelectPreviewBackdrop(filePath)
+                                              else handleSelectBackground(filePath)
                                             }
                                           }}
-                                          className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
-                          opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
-                                          title="Copiar URL"
+                                          className={`group relative w-full rounded-2xl overflow-hidden border cursor-pointer
+                        transition-all duration-300 transform-gpu hover:-translate-y-1
+                        ${isActive
+                                              ? 'border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]'
+                                              : 'border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30'
+                                            }`}
+                                          title="Seleccionar"
                                         >
-                                          <LinkIcon size={14} />
+                                          <div className={`w-full ${aspect} bg-black/40`}>
+                                            <img
+                                              src={`https://image.tmdb.org/t/p/${size}${filePath}`}
+                                              alt="option"
+                                              loading="lazy"
+                                              decoding="async"
+                                              // ✅ Solo escala la imagen (no el card) -> no recorta laterales en bordes
+                                              className="w-full h-full object-cover transition-transform duration-700 transform-gpu
+                            group-hover:scale-[1.08]"
+                                            />
+                                          </div>
+
+                                          {isActive && (
+                                            <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
+                                          )}
+
+                                          {/* ✅ SOLO RESOLUCIÓN al hover */}
+                                          {resText && (
+                                            <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <span className="text-[10px] font-bold tracking-wide px-2 py-1 rounded-full
+                            bg-black/70 border border-white/15 text-zinc-100">
+                                                {resText}
+                                              </span>
+                                            </div>
+                                          )}
+
+                                          {/* copiar URL (hover) */}
+                                          <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleCopyImageUrl(filePath)
+                                            }}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                handleCopyImageUrl(filePath)
+                                              }
+                                            }}
+                                            className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
+                          opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
+                                            title="Copiar URL"
+                                          >
+                                            <LinkIcon size={14} />
+                                          </div>
                                         </div>
-                                      </div>
-                                    </SwiperSlide>
-                                  )
-                                })}
-                              </Swiper>
-                            </div>
-                          </div>
-                        )
-                      })()}
-                    </section>
-                  )}
-
-                  {/* === TRÁILER Y VÍDEOS === */}
-                  {TMDB_API_KEY && (
-                    <section className="mt-6">
-                      <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} />
-
-                      <div className="rounded-2xl p-0 mb-10">
-                        {videosLoading && (
-                          <div className="text-sm text-zinc-400 inline-flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" /> Cargando vídeos…
-                          </div>
-                        )}
-
-                        {!!videosError && <div className="text-sm text-red-400">{videosError}</div>}
-
-                        {!videosLoading && !videosError && videos.length === 0 && (
-                          <div className="text-sm text-zinc-400">
-                            No hay tráileres o vídeos disponibles en TMDb para este título.
-                          </div>
-                        )}
-
-                        {videos.length > 0 && (
-                          <Swiper
-                            spaceBetween={12}
-                            slidesPerView={2}
-                            breakpoints={{
-                              640: { slidesPerView: 2, spaceBetween: 16 },
-                              768: { slidesPerView: 3, spaceBetween: 16 },
-                              1024: { slidesPerView: 4, spaceBetween: 16 },
-                              1280: { slidesPerView: 4, spaceBetween: 16 }
-                            }}
-                            className="pb-2"
-                          >
-                            {videos.slice(0, 20).map((v) => {
-                              const thumb = videoThumbUrl(v)
-                              const fallbackPath = displayBackdropPath || displayPosterPath
-                              const fallback = fallbackPath
-                                ? `https://image.tmdb.org/t/p/w780${fallbackPath}`
-                                : '/placeholder.png'
-
-                              return (
-                                <SwiperSlide key={`${v.site}:${v.key}`} className="h-full">
-                                  <button
-                                    type="button"
-                                    onClick={() => openVideo(v)}
-                                    title={v.name || 'Ver vídeo'}
-                                    className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
-                            border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
-                                  >
-                                    <div className="relative aspect-video overflow-hidden">
-                                      <img
-                                        src={thumb || fallback}
-                                        alt={v.name || 'Video'}
-                                        className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
-                                      />
-                                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                                      <div className="absolute inset-0 flex items-center justify-center">
-                                        <div className="w-14 h-14 rounded-full bg-black/55 border border-white/15 flex items-center justify-center transition-transform hover:scale-105">
-                                          <Play className="w-7 h-7 text-yellow-300 translate-x-[1px]" />
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    <div className="flex flex-col flex-1 p-4 items-start">
-                                      {/* ✅ Título arriba (1 línea siempre) */}
-                                      <div className="w-full min-h-[22px]">
-                                        <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
-                                          {v.name || 'Vídeo'}
-                                        </div>
-                                      </div>
-
-                                      {/* ✅ Propiedades debajo, alineadas a la izquierda */}
-                                      <div className="mt-3 flex flex-wrap items-center gap-1.5 ml-[-4px]">
-                                        {v.type && (
-                                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
-                                            {v.type}
-                                          </span>
-                                        )}
-                                        {v.iso_639_1 && (
-                                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
-                                            {v.iso_639_1.toUpperCase()}
-                                          </span>
-                                        )}
-                                        {v.official && (
-                                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200">
-                                            Official
-                                          </span>
-                                        )}
-                                      </div>
-
-                                      {/* ✅ Fuente y fecha abajo, mismo margen izquierdo */}
-                                      <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
-                                        <span className="font-semibold text-zinc-200">{v.site || '—'}</span>
-                                        {v.published_at && (
-                                          <>
-                                            <span className="text-zinc-600">·</span>
-                                            <span className="shrink-0">
-                                              {new Date(v.published_at).toLocaleDateString('es-ES')}
-                                            </span>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </button>
-                                </SwiperSlide>
-                              )
-                            })}
-                          </Swiper>
-                        )}
-                      </div>
-                    </section>
-                  )}
-                </motion.div>
-              )}
-
-              {/* ===== SENTIMIENTOS ===== */}
-              {activeSection === 'sentiment' && (
-                <motion.div
-                  key="sentiment"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {/* ===================================================== */}
-                  {/* ✅ TRAKT: SENTIMIENTOS (AI SUMMARY) */}
-                  <section className="mb-12">
-                    <SectionTitle title="Análisis de Sentimientos" icon={Sparkles} />
-
-                    <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
-                      {/* Header del bloque */}
-                      <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
-                        <div className="flex items-center gap-4">
-                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
-                            <img src="/logo-Trakt.png" alt="Trakt" className="h-full w-full object-cover" />
-                          </div>
-                          <div>
-                            <h3 className="text-base font-bold leading-tight text-white">Trakt Community Pulse</h3>
-                            <p className="text-xs font-medium text-zinc-400">
-                              Resumen por IA basado en comentarios sobre <span className="text-zinc-200">{title}</span>
-                            </p>
-                          </div>
-                        </div>
-                        {tSentiment.loading && <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />}
-                      </div>
-
-                      <div className="p-6">
-                        {tSentiment.error ? (
-                          <div className="rounded-xl bg-red-500/10 p-4 text-center text-sm font-medium text-red-400 border border-red-500/20">
-                            {tSentiment.error}
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                            {/* Columna Positiva */}
-                            <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
-                              <div className="mb-4 flex items-center gap-3">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
-                                  <ThumbsUp className="h-4 w-4" />
-                                </div>
-                                <span className="font-bold tracking-wide text-emerald-100">Lo Bueno</span>
+                                      </SwiperSlide>
+                                    )
+                                  })}
+                                </Swiper>
                               </div>
-
-                              {tSentiment.pros?.length ? (
-                                <ul className="space-y-3">
-                                  {tSentiment.pros.map((s, i) => (
-                                    <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
-                                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
-                                      <span>{s}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <div className="text-sm italic text-zinc-500">No hay suficientes datos positivos.</div>
-                              )}
                             </div>
+                          )
+                        })()}
+                      </section>
+                    )}
 
-                            {/* Columna Negativa */}
-                            <div className="relative overflow-hidden rounded-2xl border border-rose-500/20 bg-gradient-to-b from-rose-500/10 to-transparent p-5">
-                              <div className="mb-4 flex items-center gap-3">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
-                                  <ThumbsDown className="h-4 w-4" />
-                                </div>
-                                <span className="font-bold tracking-wide text-rose-100">Lo Malo</span>
-                              </div>
+                    {/* === TRÁILER Y VÍDEOS === */}
+                    {TMDB_API_KEY && (
+                      <section className="mt-6">
+                        <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} />
 
-                              {tSentiment.cons?.length ? (
-                                <ul className="space-y-3">
-                                  {tSentiment.cons.map((s, i) => (
-                                    <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
-                                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]" />
-                                      <span>{s}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <div className="text-sm italic text-zinc-500">No hay suficientes datos negativos.</div>
-                              )}
+                        <div className="rounded-2xl p-0 mb-10">
+                          {videosLoading && (
+                            <div className="text-sm text-zinc-400 inline-flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" /> Cargando vídeos…
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-                </motion.div>
-              )}
+                          )}
 
-              {/* ===== COMENTARIOS ===== */}
-              {activeSection === 'comments' && (
-                <motion.div
-                  key="comments"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {/* CRÍTICAS */}
-                  {reviews && reviews.length > 0 && (
-                    <section className="mb-10">
-                      <div className="flex items-center justify-between mb-2">
-                        <SectionTitle title="Críticas de Usuarios" icon={MessageSquareIcon} />
-                        {reviewLimit < reviews.length && (
-                          <button
-                            onClick={() => setReviewLimit((prev) => prev + 2)}
-                            className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
-                          >
-                            Ver más
-                          </button>
-                        )}
-                      </div>
+                          {!!videosError && <div className="text-sm text-red-400">{videosError}</div>}
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {reviews.slice(0, reviewLimit).map((r) => {
-                          const avatar = r.author_details?.avatar_path
-                            ? r.author_details.avatar_path.startsWith('/https')
-                              ? r.author_details.avatar_path.slice(1)
-                              : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
-                            : `https://ui-avatars.com/api/?name=${r.author}&background=random`
+                          {!videosLoading && !videosError && videos.length === 0 && (
+                            <div className="text-sm text-zinc-400">
+                              No hay tráileres o vídeos disponibles en TMDb para este título.
+                            </div>
+                          )}
 
-                          return (
-                            <div
-                              key={r.id}
-                              className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
+                          {videos.length > 0 && (
+                            <Swiper
+                              spaceBetween={12}
+                              slidesPerView={2}
+                              breakpoints={{
+                                640: { slidesPerView: 2, spaceBetween: 16 },
+                                768: { slidesPerView: 3, spaceBetween: 16 },
+                                1024: { slidesPerView: 4, spaceBetween: 16 },
+                                1280: { slidesPerView: 4, spaceBetween: 16 }
+                              }}
+                              className="pb-2"
                             >
-                              <div className="flex items-center gap-4">
-                                <img
-                                  src={avatar}
-                                  alt={r.author}
-                                  className="w-12 h-12 rounded-full object-cover shadow-lg"
-                                />
-                                <div>
-                                  <h4 className="font-bold text-white">{r.author}</h4>
-                                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                                    <span>{new Date(r.created_at).toLocaleDateString()}</span>
-                                    {r.author_details?.rating && (
-                                      <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
-                                        ★ {r.author_details.rating}
+                              {videos.slice(0, 20).map((v) => {
+                                const thumb = videoThumbUrl(v)
+                                const fallbackPath = displayBackdropPath || displayPosterPath
+                                const fallback = fallbackPath
+                                  ? `https://image.tmdb.org/t/p/w780${fallbackPath}`
+                                  : '/placeholder.png'
+
+                                return (
+                                  <SwiperSlide key={`${v.site}:${v.key}`} className="h-full">
+                                    <button
+                                      type="button"
+                                      onClick={() => openVideo(v)}
+                                      title={v.name || 'Ver vídeo'}
+                                      className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
+                            border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
+                                    >
+                                      <div className="relative aspect-video overflow-hidden">
+                                        <img
+                                          src={thumb || fallback}
+                                          alt={v.name || 'Video'}
+                                          className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                          <div className="w-14 h-14 rounded-full bg-black/55 border border-white/15 flex items-center justify-center transition-transform hover:scale-105">
+                                            <Play className="w-7 h-7 text-yellow-300 translate-x-[1px]" />
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex flex-col flex-1 p-4 items-start">
+                                        {/* ✅ Título arriba (1 línea siempre) */}
+                                        <div className="w-full min-h-[22px]">
+                                          <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
+                                            {v.name || 'Vídeo'}
+                                          </div>
+                                        </div>
+
+                                        {/* ✅ Propiedades debajo, alineadas a la izquierda */}
+                                        <div className="mt-3 flex flex-wrap items-center gap-1.5 ml-[-4px]">
+                                          {v.type && (
+                                            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
+                                              {v.type}
+                                            </span>
+                                          )}
+                                          {v.iso_639_1 && (
+                                            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
+                                              {v.iso_639_1.toUpperCase()}
+                                            </span>
+                                          )}
+                                          {v.official && (
+                                            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200">
+                                              Official
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {/* ✅ Fuente y fecha abajo, mismo margen izquierdo */}
+                                        <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
+                                          <span className="font-semibold text-zinc-200">{v.site || '—'}</span>
+                                          {v.published_at && (
+                                            <>
+                                              <span className="text-zinc-600">·</span>
+                                              <span className="shrink-0">
+                                                {new Date(v.published_at).toLocaleDateString('es-ES')}
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </button>
+                                  </SwiperSlide>
+                                )
+                              })}
+                            </Swiper>
+                          )}
+                        </div>
+                      </section>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* ===== SENTIMIENTOS ===== */}
+                {activeSection === 'sentiment' && (
+                  <motion.div
+                    key="sentiment"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {/* ===================================================== */}
+                    {/* ✅ TRAKT: SENTIMIENTOS (AI SUMMARY) */}
+                    <section className="mb-12">
+                      <SectionTitle title="Análisis de Sentimientos" icon={Sparkles} />
+
+                      <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
+                        {/* Header del bloque */}
+                        <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
+                              <img src="/logo-Trakt.png" alt="Trakt" className="h-full w-full object-cover" />
+                            </div>
+                            <div>
+                              <h3 className="text-base font-bold leading-tight text-white">Trakt Community Pulse</h3>
+                              <p className="text-xs font-medium text-zinc-400">
+                                Resumen por IA basado en comentarios sobre <span className="text-zinc-200">{title}</span>
+                              </p>
+                            </div>
+                          </div>
+                          {tSentiment.loading && <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />}
+                        </div>
+
+                        <div className="p-6">
+                          {tSentiment.error ? (
+                            <div className="rounded-xl bg-red-500/10 p-4 text-center text-sm font-medium text-red-400 border border-red-500/20">
+                              {tSentiment.error}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                              {/* Columna Positiva */}
+                              <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
+                                <div className="mb-4 flex items-center gap-3">
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+                                    <ThumbsUp className="h-4 w-4" />
+                                  </div>
+                                  <span className="font-bold tracking-wide text-emerald-100">Lo Bueno</span>
+                                </div>
+
+                                {tSentiment.pros?.length ? (
+                                  <ul className="space-y-3">
+                                    {tSentiment.pros.map((s, i) => (
+                                      <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
+                                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                                        <span>{s}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <div className="text-sm italic text-zinc-500">No hay suficientes datos positivos.</div>
+                                )}
+                              </div>
+
+                              {/* Columna Negativa */}
+                              <div className="relative overflow-hidden rounded-2xl border border-rose-500/20 bg-gradient-to-b from-rose-500/10 to-transparent p-5">
+                                <div className="mb-4 flex items-center gap-3">
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
+                                    <ThumbsDown className="h-4 w-4" />
+                                  </div>
+                                  <span className="font-bold tracking-wide text-rose-100">Lo Malo</span>
+                                </div>
+
+                                {tSentiment.cons?.length ? (
+                                  <ul className="space-y-3">
+                                    {tSentiment.cons.map((s, i) => (
+                                      <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
+                                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]" />
+                                        <span>{s}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <div className="text-sm italic text-zinc-500">No hay suficientes datos negativos.</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </section>
+                  </motion.div>
+                )}
+
+                {/* ===== COMENTARIOS ===== */}
+                {activeSection === 'comments' && (
+                  <motion.div
+                    key="comments"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {/* CRÍTICAS */}
+                    {reviews && reviews.length > 0 && (
+                      <section className="mb-10">
+                        <div className="flex items-center justify-between mb-2">
+                          <SectionTitle title="Críticas de Usuarios" icon={MessageSquareIcon} />
+                          {reviewLimit < reviews.length && (
+                            <button
+                              onClick={() => setReviewLimit((prev) => prev + 2)}
+                              className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
+                            >
+                              Ver más
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {reviews.slice(0, reviewLimit).map((r) => {
+                            const avatar = r.author_details?.avatar_path
+                              ? r.author_details.avatar_path.startsWith('/https')
+                                ? r.author_details.avatar_path.slice(1)
+                                : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
+                              : `https://ui-avatars.com/api/?name=${r.author}&background=random`
+
+                            return (
+                              <div
+                                key={r.id}
+                                className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <img
+                                    src={avatar}
+                                    alt={r.author}
+                                    className="w-12 h-12 rounded-full object-cover shadow-lg"
+                                  />
+                                  <div>
+                                    <h4 className="font-bold text-white">{r.author}</h4>
+                                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                                      <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                                      {r.author_details?.rating && (
+                                        <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
+                                          ★ {r.author_details.rating}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
+                                  "{r.content.replace(/<[^>]*>?/gm, '')}"
+                                </div>
+
+                                <a
+                                  href={r.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
+                                >
+                                  Leer review completa en TMDb &rarr;
+                                </a>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </section>
+                    )}
+                    {/* ===================================================== */}
+                    {/* ✅ TRAKT: COMENTARIOS */}
+                    <section className="mb-12">
+                      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+                        <SectionTitle title="Comentarios" icon={MessageSquareIcon} />
+
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : `https://trakt.tv/search?query=${encodeURIComponent(title)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 transition hover:border-yellow-500/50 hover:bg-yellow-500/10 hover:text-yellow-400"
+                          >
+                            <span className="hidden sm:inline">Ver en Trakt</span>
+                            {tComments.total > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white">{tComments.total}</span>}
+                            <ExternalLink className="h-3 w-3 opacity-50 transition group-hover:opacity-100" />
+                          </a>
+
+                          <a
+                            href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : `https://trakt.tv/search?query=${encodeURIComponent(title)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-2 rounded-full bg-white text-black px-4 py-2 text-xs font-bold uppercase tracking-wider transition hover:bg-zinc-200"
+                          >
+                            <Plus className="h-3 w-3" />
+                            <span className="hidden sm:inline">Escribir</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/20 backdrop-blur-sm">
+                        {/* Filtros estilo Tabs Modernos */}
+                        <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-4 py-3">
+                          <div className="flex gap-1 rounded-xl bg-black/40 p-1">
+                            {[
+                              { id: 'likes30', label: 'Top 30 Días' },
+                              { id: 'likesAll', label: 'Top Histórico' },
+                              { id: 'recent', label: 'Recientes' }
+                            ].map((t) => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => setTCommentsTab(t.id)}
+                                className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${tCommentsTab === t.id
+                                  ? 'bg-zinc-700 text-white shadow-md'
+                                  : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+                                  }`}
+                              >
+                                {t.label}
+                              </button>
+                            ))}
+                          </div>
+                          {tComments.loading && <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />}
+                        </div>
+
+                        <div className="space-y-4 p-4 sm:p-6">
+                          {tComments.error && <div className="text-center text-sm text-red-400">{tComments.error}</div>}
+
+                          {!tComments.loading && !tComments.error && (tComments.items || []).length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
+                              <MessageSquareIcon className="mb-2 h-8 w-8 opacity-20" />
+                              <p className="text-sm">Sé el primero en comentar.</p>
+                            </div>
+                          )}
+
+                          {(tComments.items || []).slice(0, 10).map((c) => {
+                            const user = c?.user || {}
+                            const avatar = user?.images?.avatar?.full || user?.images?.avatar?.medium || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.username || 'User')}`
+                            const text = stripHtml(c?.comment?.comment ?? c?.comment ?? '')
+                            const created = c?.created_at ? formatDateTimeEs(c.created_at) : ''
+                            const likes = Number(c?.likes || 0)
+
+                            return (
+                              <div key={String(c?.id || `${user?.username}-${created}`)} className="group relative flex gap-4 rounded-2xl bg-white/5 p-5 transition hover:bg-white/10">
+                                {/* Avatar */}
+                                <div className="shrink-0">
+                                  <img src={avatar} alt={user?.username} className="h-12 w-12 rounded-full object-cover shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20" />
+                                </div>
+
+                                {/* Content */}
+                                <div className="min-w-0 flex-1">
+                                  <div className="mb-1 flex items-baseline justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-white group-hover:text-yellow-400 transition-colors cursor-pointer">
+                                        {user?.name || user?.username || 'Usuario'}
                                       </span>
-                                    )}
+                                      {user?.vip && <span className="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-500">VIP</span>}
+                                    </div>
+                                    <span className="text-xs text-zinc-500">{created}</span>
+                                  </div>
+
+                                  <div className="relative text-sm leading-relaxed text-zinc-300">
+                                    {/* Icono de comillas decorativo */}
+                                    <span className="absolute -left-3 -top-1 font-serif text-4xl text-white/5">“</span>
+                                    <p className="whitespace-pre-line">{text}</p>
+                                  </div>
+
+                                  {/* Actions Footer */}
+                                  <div className="mt-3 flex items-center gap-4 border-t border-white/5 pt-3">
+                                    <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2 py-1 text-xs font-medium text-emerald-400">
+                                      <ThumbsUp className="h-3 w-3" /> {likes}
+                                    </div>
+                                    <a
+                                      href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : undefined}
+                                      target="_blank" rel="noreferrer"
+                                      className="ml-auto text-xs font-semibold text-zinc-500 hover:text-white transition-colors"
+                                    >
+                                      Responder en Trakt →
+                                    </a>
                                   </div>
                                 </div>
                               </div>
+                            )
+                          })}
 
-                              <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
-                                "{r.content.replace(/<[^>]*>?/gm, '')}"
-                              </div>
-
-                              <a
-                                href={r.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
-                              >
-                                Leer review completa en TMDb &rarr;
-                              </a>
-                            </div>
-                          )
-                        })}
+                          {tComments.hasMore && (
+                            <button
+                              type="button"
+                              onClick={() => setTComments((p) => ({ ...p, page: (p.page || 1) + 1 }))}
+                              className="w-full rounded-xl border border-dashed border-white/10 py-4 text-xs font-bold uppercase tracking-widest text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
+                            >
+                              Cargar más comentarios
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </section>
-                  )}
-                  {/* ===================================================== */}
-                  {/* ✅ TRAKT: COMENTARIOS */}
-                  <section className="mb-12">
-                    <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-                      <SectionTitle title="Comentarios" icon={MessageSquareIcon} />
+                  </motion.div>
+                )}
 
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : `https://trakt.tv/search?query=${encodeURIComponent(title)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 transition hover:border-yellow-500/50 hover:bg-yellow-500/10 hover:text-yellow-400"
-                        >
-                          <span className="hidden sm:inline">Ver en Trakt</span>
-                          {tComments.total > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white">{tComments.total}</span>}
-                          <ExternalLink className="h-3 w-3 opacity-50 transition group-hover:opacity-100" />
-                        </a>
+                {/* ===== TEMPORADAS ===== */}
+                {activeSection === 'seasons' && (
+                  <motion.div
+                    key="seasons"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {type === 'tv' && (
+                      <section className="mb-12">
+                        <SectionTitle title="Temporadas" icon={Layers} />
 
-                        <a
-                          href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : `https://trakt.tv/search?query=${encodeURIComponent(title)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-2 rounded-full bg-white text-black px-4 py-2 text-xs font-bold uppercase tracking-wider transition hover:bg-zinc-200"
-                        >
-                          <Plus className="h-3 w-3" />
-                          <span className="hidden sm:inline">Escribir</span>
-                        </a>
-                      </div>
-                    </div>
+                        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {tSeasons.loading && (
+                            <div className="col-span-full py-10 flex justify-center">
+                              <Loader2 className="animate-spin text-white/50" />
+                            </div>
+                          )}
 
-                    <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/20 backdrop-blur-sm">
-                      {/* Filtros estilo Tabs Modernos */}
-                      <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-4 py-3">
-                        <div className="flex gap-1 rounded-xl bg-black/40 p-1">
-                          {[
-                            { id: 'likes30', label: 'Top 30 Días' },
-                            { id: 'likesAll', label: 'Top Histórico' },
-                            { id: 'recent', label: 'Recientes' }
-                          ].map((t) => (
+                          {!tSeasons.loading &&
+                            (tSeasons.items || []).map((s) => {
+                              const sn = Number(s?.number)
+                              const titleSeason = sn === 0 ? 'Especiales' : `Temporada ${sn}`
+                              const rating = typeof s?.rating === 'number' ? s.rating : null
+
+                              // Lógica de progreso (usa TMDb para saber total)
+                              const tmdbSeason = (data?.seasons || []).find(
+                                (x) => Number(x?.season_number) === sn
+                              )
+                              const totalEp = Number(tmdbSeason?.episode_count || 0) || null
+                              const watchedEp = Array.isArray(watchedBySeason?.[sn])
+                                ? watchedBySeason[sn].length
+                                : 0
+                              const percentage = totalEp ? Math.round((watchedEp / totalEp) * 100) : 0
+
+                              const isComplete = percentage === 100
+                              const barColor = isComplete ? 'bg-emerald-500' : 'bg-yellow-500'
+
+                              return (
+                                <button
+                                  key={sn}
+                                  type="button"
+                                  onClick={() => router.push(`/details/tv/${id}/season/${sn}`)}
+                                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5
+                             transition-all hover:-translate-y-1 hover:border-white/20 hover:bg-white/10 hover:shadow-xl
+                             text-left w-full"
+                                  title={`Ver ${titleSeason}`}
+                                >
+                                  {/* Fondo decorativo del número de temporada */}
+                                  <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10">
+                                    {sn}
+                                  </div>
+
+                                  <div className="relative p-5">
+                                    <div className="flex items-start justify-between">
+                                      <div>
+                                        <h4 className="text-lg font-extrabold text-white">{titleSeason}</h4>
+
+                                        <div className="mt-1 flex items-center gap-2 text-xs font-medium text-zinc-400">
+                                          {rating != null && (
+                                            <span className="flex items-center gap-1 text-yellow-400">
+                                              <Star className="h-3 w-3 fill-yellow-400" /> {rating.toFixed(1)}
+                                            </span>
+                                          )}
+                                          {totalEp != null && <span>• {totalEp} episodios</span>}
+                                        </div>
+                                      </div>
+
+                                      {/* Botón externo a Trakt (NO navega a la season page) */}
+                                      {trakt?.traktUrl && (
+                                        <a
+                                          href={`${trakt.traktUrl}/seasons/${sn}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          onClick={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            window.open(`${trakt.traktUrl}/seasons/${sn}`, '_blank', 'noopener,noreferrer')
+                                          }}
+                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
+                                          title="Ver en Trakt"
+                                        >
+                                          <ExternalLink className="h-4 w-4" />
+                                        </a>
+                                      )}
+                                    </div>
+
+                                    {/* Barra de Progreso */}
+                                    {totalEp != null && (
+                                      <div className="mt-6">
+                                        <div className="mb-1.5 flex items-end justify-between text-xs font-bold">
+                                          <span className={percentage > 0 ? 'text-white' : 'text-zinc-500'}>
+                                            {watchedEp} <span className="text-zinc-500 font-normal">vistos</span>
+                                          </span>
+                                          <span className="text-zinc-500">{percentage}%</span>
+                                        </div>
+
+                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                                          <div
+                                            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                                            style={{ width: `${percentage}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </button>
+                              )
+                            })}
+                        </div>
+                      </section>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* ===== EPISODIOS ===== */}
+                {activeSection === 'episodes' && (
+                  <motion.div
+                    key="episodes"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {type === 'tv' ? (
+                      <section className="mb-10">
+                        <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
+                        <div className="p-2">
+                          {ratingsLoading && (
+                            <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
+                          )}
+                          {ratingsError && (
+                            <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
+                          )}
+                          {!ratingsLoading && !ratingsError && !ratings && (
+                            <p className="text-sm text-zinc-400 mb-2">No hay datos de episodios disponibles.</p>
+                          )}
+                          {!!ratings && !ratingsError && (
+                            <EpisodeRatingsGrid
+                              ratings={ratings}
+                              initialSource="avg"
+                              density="compact"
+                              traktConnected={trakt.connected}
+                              watchedBySeason={watchedBySeason}
+                              episodeBusyKey={episodeBusyKey}
+                              onToggleEpisodeWatched={toggleEpisodeWatched}
+                            />
+                          )}
+                        </div>
+                      </section>
+                    ) : (
+                      <div className="text-sm text-zinc-400">Esta sección solo aplica a series.</div>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* ===== LISTAS ===== */}
+                {activeSection === 'lists' && (
+                  <motion.div
+                    key="lists"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {/* ===================================================== */}
+                    {/* ✅ TRAKT: LISTAS (DISEÑO MEJORADO) */}
+                    <section className="mb-12">
+                      <div className="mb-6 flex items-center justify-between">
+                        <SectionTitle title="Listas Populares" icon={ListVideo} />
+
+                        {/* Selector de Listas */}
+                        <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
+                          {['popular', 'trending'].map((tab) => (
                             <button
-                              key={t.id}
-                              type="button"
-                              onClick={() => setTCommentsTab(t.id)}
-                              className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${tCommentsTab === t.id
-                                ? 'bg-zinc-700 text-white shadow-md'
-                                : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+                              key={tab}
+                              onClick={() => setTListsTab(tab)}
+                              className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${tListsTab === tab
+                                ? 'bg-white text-black shadow-lg scale-105'
+                                : 'text-zinc-400 hover:text-white hover:bg-white/5'
                                 }`}
                             >
-                              {t.label}
+                              {tab}
                             </button>
                           ))}
                         </div>
-                        {tComments.loading && <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />}
                       </div>
 
-                      <div className="space-y-4 p-4 sm:p-6">
-                        {tComments.error && <div className="text-center text-sm text-red-400">{tComments.error}</div>}
-
-                        {!tComments.loading && !tComments.error && (tComments.items || []).length === 0 && (
-                          <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
-                            <MessageSquareIcon className="mb-2 h-8 w-8 opacity-20" />
-                            <p className="text-sm">Sé el primero en comentar.</p>
+                      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                        {tLists.loading && (
+                          <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
+                            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                            <span className="text-sm font-medium animate-pulse">Buscando listas y portadas...</span>
                           </div>
                         )}
 
-                        {(tComments.items || []).slice(0, 10).map((c) => {
-                          const user = c?.user || {}
-                          const avatar = user?.images?.avatar?.full || user?.images?.avatar?.medium || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.username || 'User')}`
-                          const text = stripHtml(c?.comment?.comment ?? c?.comment ?? '')
-                          const created = c?.created_at ? formatDateTimeEs(c.created_at) : ''
-                          const likes = Number(c?.likes || 0)
+                        {!tLists.loading &&
+                          (tLists.items || []).map((row) => {
+                            const list = row?.list || row || {}
+                            const user = row?.user || list?.user || {}
+                            const previews = row?.previewPosters || [] // Las imágenes que trae la API nueva
 
-                          return (
-                            <div key={String(c?.id || `${user?.username}-${created}`)} className="group relative flex gap-4 rounded-2xl bg-white/5 p-5 transition hover:bg-white/10">
-                              {/* Avatar */}
-                              <div className="shrink-0">
-                                <img src={avatar} alt={user?.username} className="h-12 w-12 rounded-full object-cover shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20" />
-                              </div>
+                            const name = list?.name || 'Lista'
+                            const itemCount = Number(list?.item_count || list?.items || 0)
+                            const likes = Number(list?.likes || 0)
+                            const username = user?.username || user?.name
+                            const slug = list?.ids?.slug || list?.ids?.trakt
+                            const url = username && slug ? `https://trakt.tv/users/${username}/lists/${slug}` : null
+                            const avatar = user?.images?.avatar?.full || `https://ui-avatars.com/api/?name=${username}&background=random`
 
-                              {/* Content */}
-                              <div className="min-w-0 flex-1">
-                                <div className="mb-1 flex items-baseline justify-between gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-white group-hover:text-yellow-400 transition-colors cursor-pointer">
-                                      {user?.name || user?.username || 'Usuario'}
-                                    </span>
-                                    {user?.vip && <span className="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-500">VIP</span>}
-                                  </div>
-                                  <span className="text-xs text-zinc-500">{created}</span>
-                                </div>
-
-                                <div className="relative text-sm leading-relaxed text-zinc-300">
-                                  {/* Icono de comillas decorativo */}
-                                  <span className="absolute -left-3 -top-1 font-serif text-4xl text-white/5">“</span>
-                                  <p className="whitespace-pre-line">{text}</p>
-                                </div>
-
-                                {/* Actions Footer */}
-                                <div className="mt-3 flex items-center gap-4 border-t border-white/5 pt-3">
-                                  <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2 py-1 text-xs font-medium text-emerald-400">
-                                    <ThumbsUp className="h-3 w-3" /> {likes}
-                                  </div>
-                                  <a
-                                    href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : undefined}
-                                    target="_blank" rel="noreferrer"
-                                    className="ml-auto text-xs font-semibold text-zinc-500 hover:text-white transition-colors"
-                                  >
-                                    Responder en Trakt →
-                                  </a>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-
-                        {tComments.hasMore && (
-                          <button
-                            type="button"
-                            onClick={() => setTComments((p) => ({ ...p, page: (p.page || 1) + 1 }))}
-                            className="w-full rounded-xl border border-dashed border-white/10 py-4 text-xs font-bold uppercase tracking-widest text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
-                          >
-                            Cargar más comentarios
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-                </motion.div>
-              )}
-
-              {/* ===== TEMPORADAS ===== */}
-              {activeSection === 'seasons' && (
-                <motion.div
-                  key="seasons"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {/* ===================================================== */}
-                  {/* ✅ TRAKT: TEMPORADAS (Con Progreso Visual) */}
-                  {type === 'tv' && (
-                    <section className="mb-12">
-                      <SectionTitle title="Temporadas" icon={Layers} />
-
-                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {tSeasons.loading && <div className="col-span-full py-10 flex justify-center"><Loader2 className="animate-spin text-white/50" /></div>}
-
-                        {!tSeasons.loading && (tSeasons.items || []).map((s) => {
-                          const sn = Number(s?.number)
-                          const titleSeason = sn === 0 ? 'Especiales' : `Temporada ${sn}`
-                          const rating = typeof s?.rating === 'number' ? s.rating : null
-
-                          // Lógica de progreso
-                          const tmdbSeason = (data?.seasons || []).find((x) => Number(x?.season_number) === sn)
-                          const totalEp = Number(tmdbSeason?.episode_count || 0) || null
-                          const watchedEp = Array.isArray(watchedBySeason?.[sn]) ? watchedBySeason[sn].length : 0
-                          const percentage = totalEp ? Math.round((watchedEp / totalEp) * 100) : 0
-
-                          // Color basado en progreso
-                          const isComplete = percentage === 100
-                          const barColor = isComplete ? 'bg-emerald-500' : 'bg-yellow-500'
-
-                          return (
-                            <div key={sn} className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 transition-all hover:-translate-y-1 hover:border-white/20 hover:bg-white/10 hover:shadow-xl">
-                              {/* Fondo decorativo del número de temporada */}
-                              <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10">
-                                {sn}
-                              </div>
-
-                              <div className="relative p-5">
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <h4 className="text-lg font-extrabold text-white">{titleSeason}</h4>
-                                    <div className="mt-1 flex items-center gap-2 text-xs font-medium text-zinc-400">
-                                      {rating && (
-                                        <span className="flex items-center gap-1 text-yellow-400">
-                                          <Star className="h-3 w-3 fill-yellow-400" /> {rating.toFixed(1)}
-                                        </span>
-                                      )}
-                                      {totalEp && <span>• {totalEp} episodios</span>}
+                            return (
+                              <a
+                                key={String(list?.ids?.trakt || name)}
+                                href={url || '#'}
+                                target={url ? '_blank' : undefined}
+                                rel="noreferrer"
+                                className={`group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500 hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)] ${!url && 'pointer-events-none'
+                                  }`}
+                              >
+                                {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS CON HUECO EN HOVER) */}
+                                <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
+                                  {previews.length > 0 ? (
+                                    <div className="h-full w-full flex items-center justify-center overflow-visible">
+                                      <PosterStack posters={previews} />
                                     </div>
-                                  </div>
-
-                                  {trakt?.traktUrl && (
-                                    <a
-                                      href={`${trakt.traktUrl}/seasons/${sn}`}
-                                      target="_blank" rel="noreferrer"
-                                      className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
-                                      title="Ver en Trakt"
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                    </a>
+                                  ) : (
+                                    <div className="flex h-full items-center justify-center opacity-10">
+                                      <ListVideo className="h-20 w-20" />
+                                    </div>
                                   )}
                                 </div>
 
-                                {/* Barra de Progreso */}
-                                {totalEp !== null && (
-                                  <div className="mt-6">
-                                    <div className="mb-1.5 flex items-end justify-between text-xs font-bold">
-                                      <span className={percentage > 0 ? 'text-white' : 'text-zinc-500'}>
-                                        {watchedEp} <span className="text-zinc-500 font-normal">vistos</span>
+                                {/* 2. CONTENIDO DE TEXTO */}
+                                <div className="relative flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
+                                  <div>
+                                    <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
+                                      {name}
+                                    </h4>
+
+                                    {list?.description && (
+                                      <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                                        {stripHtml(list.description)}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {/* Footer de la tarjeta */}
+                                  <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+                                    <div className="flex items-center gap-2">
+                                      <img src={avatar} alt={username} className="h-6 w-6 rounded-full ring-1 ring-white/20" />
+                                      <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[100px]">
+                                        {username}
                                       </span>
-                                      <span className="text-zinc-500">{percentage}%</span>
                                     </div>
-                                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                                      <div
-                                        className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                                        style={{ width: `${percentage}%` }}
-                                      />
+
+                                    <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
+                                      <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
+                                        {itemCount} items
+                                      </span>
+                                      <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
+                                        <ThumbsUp className="h-3 w-3" /> {likes}
+                                      </span>
                                     </div>
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
+                                </div>
+                              </a>
+                            )
+                          })}
                       </div>
-                    </section>
-                  )}
-                </motion.div>
-              )}
 
-              {/* ===== EPISODIOS ===== */}
-              {activeSection === 'episodes' && (
-                <motion.div
-                  key="episodes"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {type === 'tv' ? (
-                    <section className="mb-10">
-                      <SectionTitle title="Valoración de Episodios" icon={TrendingUp} />
-                      <div className="p-2">
-                        {ratingsLoading && (
-                          <p className="text-sm text-gray-300 mb-2">Cargando ratings…</p>
-                        )}
-                        {ratingsError && (
-                          <p className="text-sm text-red-400 mb-2">{ratingsError}</p>
-                        )}
-                        {!ratingsLoading && !ratingsError && !ratings && (
-                          <p className="text-sm text-zinc-400 mb-2">No hay datos de episodios disponibles.</p>
-                        )}
-                        {!!ratings && !ratingsError && (
-                          <EpisodeRatingsGrid
-                            ratings={ratings}
-                            initialSource="avg"
-                            density="compact"
-                            traktConnected={trakt.connected}
-                            watchedBySeason={watchedBySeason}
-                            episodeBusyKey={episodeBusyKey}
-                            onToggleEpisodeWatched={toggleEpisodeWatched}
-                          />
-                        )}
-                      </div>
-                    </section>
-                  ) : (
-                    <div className="text-sm text-zinc-400">Esta sección solo aplica a series.</div>
-                  )}
-                </motion.div>
-              )}
-
-              {/* ===== LISTAS ===== */}
-              {activeSection === 'lists' && (
-                <motion.div
-                  key="lists"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {/* ===================================================== */}
-                  {/* ✅ TRAKT: LISTAS (DISEÑO MEJORADO) */}
-                  <section className="mb-12">
-                    <div className="mb-6 flex items-center justify-between">
-                      <SectionTitle title="Listas Populares" icon={ListVideo} />
-
-                      {/* Selector de Listas */}
-                      <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
-                        {['popular', 'trending'].map((tab) => (
+                      {tLists.hasMore && (
+                        <div className="mt-8 flex justify-center">
                           <button
-                            key={tab}
-                            onClick={() => setTListsTab(tab)}
-                            className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${tListsTab === tab
-                              ? 'bg-white text-black shadow-lg scale-105'
-                              : 'text-zinc-400 hover:text-white hover:bg-white/5'
-                              }`}
+                            onClick={() => setTLists((p) => ({ ...p, page: (p.page || 1) + 1 }))}
+                            className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold focus:outline-none"
                           >
-                            {tab}
+                            <span className="absolute h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+                            <span className="relative flex items-center gap-2 rounded-full bg-black px-6 py-2.5 transition-all duration-300 group-hover:bg-opacity-0">
+                              <span className="bg-gradient-to-r from-indigo-200 to-white bg-clip-text text-transparent group-hover:text-white">
+                                Cargar más listas
+                              </span>
+                              <ChevronDown className="h-4 w-4 text-indigo-300 group-hover:text-white" />
+                            </span>
                           </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                      {tLists.loading && (
-                        <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
-                          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-                          <span className="text-sm font-medium animate-pulse">Buscando listas y portadas...</span>
                         </div>
                       )}
-
-                      {!tLists.loading &&
-                        (tLists.items || []).map((row) => {
-                          const list = row?.list || row || {}
-                          const user = row?.user || list?.user || {}
-                          const previews = row?.previewPosters || [] // Las imágenes que trae la API nueva
-
-                          const name = list?.name || 'Lista'
-                          const itemCount = Number(list?.item_count || list?.items || 0)
-                          const likes = Number(list?.likes || 0)
-                          const username = user?.username || user?.name
-                          const slug = list?.ids?.slug || list?.ids?.trakt
-                          const url = username && slug ? `https://trakt.tv/users/${username}/lists/${slug}` : null
-                          const avatar = user?.images?.avatar?.full || `https://ui-avatars.com/api/?name=${username}&background=random`
-
-                          return (
-                            <a
-                              key={String(list?.ids?.trakt || name)}
-                              href={url || '#'}
-                              target={url ? '_blank' : undefined}
-                              rel="noreferrer"
-                              className={`group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500 hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)] ${!url && 'pointer-events-none'
-                                }`}
-                            >
-                              {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS CON HUECO EN HOVER) */}
-                              <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
-                                {previews.length > 0 ? (
-                                  <div className="h-full w-full flex items-center justify-center overflow-visible">
-                                    <PosterStack posters={previews} />
-                                  </div>
-                                ) : (
-                                  <div className="flex h-full items-center justify-center opacity-10">
-                                    <ListVideo className="h-20 w-20" />
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* 2. CONTENIDO DE TEXTO */}
-                              <div className="relative flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
-                                <div>
-                                  <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
-                                    {name}
-                                  </h4>
-
-                                  {list?.description && (
-                                    <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
-                                      {stripHtml(list.description)}
-                                    </p>
-                                  )}
-                                </div>
-
-                                {/* Footer de la tarjeta */}
-                                <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
-                                  <div className="flex items-center gap-2">
-                                    <img src={avatar} alt={username} className="h-6 w-6 rounded-full ring-1 ring-white/20" />
-                                    <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[100px]">
-                                      {username}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
-                                    <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
-                                      {itemCount} items
-                                    </span>
-                                    <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
-                                      <ThumbsUp className="h-3 w-3" /> {likes}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </a>
-                          )
-                        })}
-                    </div>
-
-                    {tLists.hasMore && (
-                      <div className="mt-8 flex justify-center">
-                        <button
-                          onClick={() => setTLists((p) => ({ ...p, page: (p.page || 1) + 1 }))}
-                          className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold focus:outline-none"
-                        >
-                          <span className="absolute h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
-                          <span className="relative flex items-center gap-2 rounded-full bg-black px-6 py-2.5 transition-all duration-300 group-hover:bg-opacity-0">
-                            <span className="bg-gradient-to-r from-indigo-200 to-white bg-clip-text text-transparent group-hover:text-white">
-                              Cargar más listas
-                            </span>
-                            <ChevronDown className="h-4 w-4 text-indigo-300 group-hover:text-white" />
-                          </span>
-                        </button>
-                      </div>
-                    )}
-                  </section>
-                </motion.div>
-              )}
-
-              {/* ===== REPARTO ===== */}
-              {activeSection === 'cast' && (
-                <motion.div
-                  key="cast"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {/* === REPARTO PRINCIPAL (Cast) === */}
-                  {castData && castData.length > 0 && (
-                    <section className="mb-16">
-                      <SectionTitle title="Reparto Principal" icon={Users} />
-                      <Swiper
-                        spaceBetween={12}
-                        slidesPerView={3}
-                        breakpoints={{
-                          500: { slidesPerView: 3, spaceBetween: 14 },
-                          768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 5, spaceBetween: 18 },
-                          1280: { slidesPerView: 6, spaceBetween: 20 }
-                        }}
-                        className="pb-8"
-                      >
-                        {castData.slice(0, 20).map((actor) => (
-                          <SwiperSlide key={actor.id}>
-                            <a
-                              href={`/details/person/${actor.id}`}
-                              className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                            >
-                              <div className="aspect-[2/3] overflow-hidden relative">
-                                {actor.profile_path ? (
-                                  <img
-                                    src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
-                                    alt={actor.name}
-                                    className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                                    <UsersIconComponent size={40} />
-                                  </div>
-                                )}
-
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
-
-                                <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
-                                  <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
-                                    {actor.name}
-                                  </p>
-                                  <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                                    {actor.character}
-                                  </p>
-                                </div>
-                              </div>
-                            </a>
-                          </SwiperSlide>
-                        ))}
-                      </Swiper>
                     </section>
-                  )}
-                </motion.div>
-              )}
-              {/* ===== RECOMENDACIONES ===== */}
-              {activeSection === 'recs' && (
-                <motion.div
-                  key="recs"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {/* === RECOMENDACIONES === */}
-                  {recommendations && recommendations.length > 0 && (
-                    <section className="mb-16">
-                      <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
+                  </motion.div>
+                )}
 
-                      <Swiper
-                        spaceBetween={12}
-                        slidesPerView={3}
-                        breakpoints={{
-                          500: { slidesPerView: 3, spaceBetween: 14 },
-                          768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 5, spaceBetween: 18 },
-                          1280: { slidesPerView: 6, spaceBetween: 20 }
-                        }}
-                      >
-                        {recommendations.slice(0, 15).map((rec) => {
-                          const tmdbScore =
-                            typeof rec.vote_average === 'number' && rec.vote_average > 0
-                              ? rec.vote_average
-                              : null
+                {/* ===== REPARTO ===== */}
+                {activeSection === 'cast' && (
+                  <motion.div
+                    key="cast"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {/* === REPARTO PRINCIPAL (Cast) === */}
+                    {castData && castData.length > 0 && (
+                      <section className="mb-16">
+                        <SectionTitle title="Reparto Principal" icon={Users} />
+                        <Swiper
+                          spaceBetween={12}
+                          slidesPerView={3}
+                          breakpoints={{
+                            500: { slidesPerView: 3, spaceBetween: 14 },
+                            768: { slidesPerView: 4, spaceBetween: 16 },
+                            1024: { slidesPerView: 5, spaceBetween: 18 },
+                            1280: { slidesPerView: 6, spaceBetween: 20 }
+                          }}
+                          className="pb-8"
+                        >
+                          {castData.slice(0, 20).map((actor) => (
+                            <SwiperSlide key={actor.id}>
+                              <a
+                                href={`/details/person/${actor.id}`}
+                                className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                              >
+                                <div className="aspect-[2/3] overflow-hidden relative">
+                                  {actor.profile_path ? (
+                                    <img
+                                      src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
+                                      alt={actor.name}
+                                      className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
+                                      <UsersIconComponent size={40} />
+                                    </div>
+                                  )}
 
-                          const imdbScore =
-                            recImdbRatings[rec.id] != null ? recImdbRatings[rec.id] : undefined
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
 
-                          return (
-                            <SwiperSlide key={rec.id}>
-                              <a href={`/details/${rec.media_type || type}/${rec.id}`} className="block group">
-                                <div
-                                  className="mt-3 relative rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:scale-105 hover:-translate-y-1 bg-black/40 aspect-[2/3]"
-                                  onMouseEnter={() => prefetchRecImdb(rec)}  // ✅ SOLO HOVER
-                                  onFocus={() => prefetchRecImdb(rec)}       // ✅ accesibilidad
-                                >
-                                  <img
-                                    src={
-                                      rec.poster_path
-                                        ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
-                                        : '/placeholder.png'
-                                    }
-                                    alt={rec.title || rec.name}
-                                    className="w-full h-full object-cover"
-                                  />
-
-                                  <div className="absolute bottom-2 right-2 flex flex-row-reverse items-center gap-1 transform-gpu opacity-0 translate-y-2 translate-x-2 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300 ease-out">
-                                    {tmdbScore && (
-                                      <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-emerald-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-75 group-hover:scale-110 group-hover:translate-y-0">
-                                        <img src="/logo-TMDb.png" alt="TMDb" className="w-auto h-3" />
-                                        <span className="text-emerald-400 text-[10px] font-bold font-mono">
-                                          {tmdbScore.toFixed(1)}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {imdbScore != null && (
-                                      <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-yellow-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-150 group-hover:scale-110 group-hover:translate-y-0">
-                                        <img src="/logo-IMDb.png" alt="IMDb" className="w-auto h-3" />
-                                        <span className="text-yellow-400 text-[10px] font-bold font-mono">
-                                          {Number(imdbScore).toFixed(1)}
-                                        </span>
-                                      </div>
-                                    )}
+                                  <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
+                                    <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
+                                      {actor.name}
+                                    </p>
+                                    <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
+                                      {actor.character}
+                                    </p>
                                   </div>
                                 </div>
                               </a>
                             </SwiperSlide>
-                          )
-                        })}
-                      </Swiper>
-                    </section>
-                  )}
-                </motion.div>
-              )}
+                          ))}
+                        </Swiper>
+                      </section>
+                    )}
+                  </motion.div>
+                )}
+                {/* ===== RECOMENDACIONES ===== */}
+                {activeSection === 'recs' && (
+                  <motion.div
+                    key="recs"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {/* === RECOMENDACIONES === */}
+                    {recommendations && recommendations.length > 0 && (
+                      <section className="mb-16">
+                        <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
 
-            </AnimatePresence>
-          </div>
+                        <Swiper
+                          spaceBetween={12}
+                          slidesPerView={3}
+                          breakpoints={{
+                            500: { slidesPerView: 3, spaceBetween: 14 },
+                            768: { slidesPerView: 4, spaceBetween: 16 },
+                            1024: { slidesPerView: 5, spaceBetween: 18 },
+                            1280: { slidesPerView: 6, spaceBetween: 20 }
+                          }}
+                        >
+                          {recommendations.slice(0, 15).map((rec) => {
+                            const tmdbScore =
+                              typeof rec.vote_average === 'number' && rec.vote_average > 0
+                                ? rec.vote_average
+                                : null
+
+                            const imdbScore =
+                              recImdbRatings[rec.id] != null ? recImdbRatings[rec.id] : undefined
+
+                            return (
+                              <SwiperSlide key={rec.id}>
+                                <a href={`/details/${rec.media_type || type}/${rec.id}`} className="block group">
+                                  <div
+                                    className="mt-3 relative rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:scale-105 hover:-translate-y-1 bg-black/40 aspect-[2/3]"
+                                    onMouseEnter={() => prefetchRecImdb(rec)}  // ✅ SOLO HOVER
+                                    onFocus={() => prefetchRecImdb(rec)}       // ✅ accesibilidad
+                                  >
+                                    <img
+                                      src={
+                                        rec.poster_path
+                                          ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
+                                          : '/placeholder.png'
+                                      }
+                                      alt={rec.title || rec.name}
+                                      className="w-full h-full object-cover"
+                                    />
+
+                                    <div className="absolute bottom-2 right-2 flex flex-row-reverse items-center gap-1 transform-gpu opacity-0 translate-y-2 translate-x-2 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300 ease-out">
+                                      {tmdbScore && (
+                                        <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-emerald-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-75 group-hover:scale-110 group-hover:translate-y-0">
+                                          <img src="/logo-TMDb.png" alt="TMDb" className="w-auto h-3" />
+                                          <span className="text-emerald-400 text-[10px] font-bold font-mono">
+                                            {tmdbScore.toFixed(1)}
+                                          </span>
+                                        </div>
+                                      )}
+
+                                      {imdbScore != null && (
+                                        <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-yellow-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-150 group-hover:scale-110 group-hover:translate-y-0">
+                                          <img src="/logo-IMDb.png" alt="IMDb" className="w-auto h-3" />
+                                          <span className="text-yellow-400 text-[10px] font-bold font-mono">
+                                            {Number(imdbScore).toFixed(1)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </a>
+                              </SwiperSlide>
+                            )
+                          })}
+                        </Swiper>
+                      </section>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
         {/* ===================================================== */}
       </div>

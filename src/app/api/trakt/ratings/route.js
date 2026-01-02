@@ -23,18 +23,20 @@ function traktHeaders(token) {
     }
 }
 
-// Acepta: movie | show | episode | tv
+// Acepta: movie | show | season | episode | tv
 function normalizeType(input) {
     const t = String(input || '').toLowerCase().trim()
     if (t === 'tv' || t === 'show') return 'show'
     if (t === 'movie') return 'movie'
-    if (t === 'episode') return 'episode'
+    if (t === 'season' || t === 'seasons') return 'season'
+    if (t === 'episode' || t === 'episodes') return 'episode'
     return null
 }
 
 function typeToArrayKey(type) {
     if (type === 'movie') return 'movies'
     if (type === 'show') return 'shows'
+    if (type === 'season') return 'seasons'
     if (type === 'episode') return 'episodes'
     return null
 }
@@ -48,58 +50,128 @@ async function readJsonSafe(req) {
 }
 
 function normalizeIds(payload) {
-    // Si ya viene ids (ej: { tmdb: 123 }), úsalo
+    // si viene ids
     if (payload?.ids && typeof payload.ids === 'object') return payload.ids
 
-    // Soporta tmdbId directo (por si tu front envía tmdbId)
+    // soporte directo
     const tmdbId = payload?.tmdbId ?? payload?.tmdb
-    if (tmdbId != null) return { tmdb: Number(tmdbId) }
+    const traktId = payload?.traktId ?? payload?.trakt
 
-    return null
+    const ids = {}
+    if (tmdbId != null) ids.tmdb = Number(tmdbId)
+    if (traktId != null) ids.trakt = Number(traktId)
+
+    return Object.keys(ids).length ? ids : null
+}
+
+function isValidRating(r) {
+    const n = Math.round(Number(r))
+    return Number.isFinite(n) && n >= 1 && n <= 10
+}
+
+/**
+ * ✅ GET rating actual del usuario
+ * - movie/show: /api/trakt/ratings?type=show&tmdbId=1399
+ * - season/episode: /api/trakt/ratings?type=season&traktId=12345
+ */
+export async function GET(req) {
+    try {
+        const { searchParams } = new URL(req.url)
+        const type = normalizeType(searchParams.get('type'))
+        const tmdbId = searchParams.get('tmdbId')
+        const traktIdParam = searchParams.get('traktId') || searchParams.get('id')
+
+        if (!type) {
+            return NextResponse.json({ error: 'Missing/invalid type' }, { status: 400 })
+        }
+
+        const key = typeToArrayKey(type)
+        if (!key) {
+            return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+        }
+
+        let traktId = traktIdParam ? Number(traktIdParam) : null
+
+        // Para movie/show permitimos tmdbId y resolvemos a trakt id con search
+        if (!traktId && (type === 'movie' || type === 'show') && tmdbId) {
+            const safeType = type // movie|show
+            const search = await fetch(`${TRAKT_API}/search/tmdb/${tmdbId}?type=${safeType}`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'trakt-api-version': '2',
+                    'trakt-api-key': requireEnv('TRAKT_CLIENT_ID'),
+                },
+                cache: 'no-store',
+            })
+            const json = await search.json().catch(() => null)
+            const hit = Array.isArray(json) ? json[0] : null
+            const item = hit?.[safeType]
+            traktId = item?.ids?.trakt ? Number(item.ids.trakt) : null
+        }
+
+        // season/episode requieren traktId
+        if (!Number.isFinite(traktId)) {
+            return NextResponse.json(
+                { error: 'Missing traktId (season/episode) or tmdbId (movie/show)' },
+                { status: 400 }
+            )
+        }
+
+        // Trakt devuelve array con el item
+        const data = await traktFetch(`/sync/ratings/${key}/${traktId}`, { cache: 'no-store' })
+        const item = Array.isArray(data) ? data[0] : null
+        const rating = item?.rating ?? null
+
+        return NextResponse.json({ rating })
+    } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+    }
 }
 
 export async function POST(req) {
     const body = await req.json().catch(() => ({}))
 
-    const type = body?.type
-    const ids = body?.ids ?? (body?.tmdbId ? { tmdb: Number(body.tmdbId) } : null)
+    const type = normalizeType(body?.type)
+    const ids = normalizeIds(body)
 
-    // ✅ rating puede ser null para borrar, pero tiene que existir la key
     const hasRatingKey = Object.prototype.hasOwnProperty.call(body, 'rating')
     const rating = body?.rating
 
-    if (!type || !ids?.tmdb || !hasRatingKey) {
-        return NextResponse.json(
-            { error: 'Missing type/ids/rating' },
-            { status: 400 }
-        )
+    if (!type || !ids || !hasRatingKey) {
+        return NextResponse.json({ error: 'Missing type/ids/rating' }, { status: 400 })
     }
 
-    // normaliza
-    const tmdb = Number(ids.tmdb)
-    if (!Number.isFinite(tmdb)) {
-        return NextResponse.json({ error: 'Invalid ids.tmdb' }, { status: 400 })
+    const key = typeToArrayKey(type)
+    if (!key) {
+        return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
     }
 
     const isRemove = rating == null
-    const intRating = isRemove ? null : Math.round(Number(rating))
 
-    if (!isRemove && !(intRating >= 1 && intRating <= 10)) {
+    if (!isRemove && !isValidRating(rating)) {
         return NextResponse.json({ error: 'Invalid rating (1..10)' }, { status: 400 })
     }
 
-    // Trakt: payload por tipo
-    const key = type === 'show' ? 'shows' : type === 'movie' ? 'movies' : null
-    if (!key) {
-        return NextResponse.json({ error: 'Invalid type (use "movie" or "show")' }, { status: 400 })
+    // ✅ Reglas de ids:
+    // - movie/show: puede usar tmdb (como hasta ahora) o trakt
+    // - season/episode: requiere trakt
+    if ((type === 'season' || type === 'episode') && !Number.isFinite(Number(ids?.trakt))) {
+        return NextResponse.json({ error: 'Missing ids.trakt for season/episode' }, { status: 400 })
+    }
+    if ((type === 'movie' || type === 'show') && !(Number.isFinite(Number(ids?.tmdb)) || Number.isFinite(Number(ids?.trakt)))) {
+        return NextResponse.json({ error: 'Missing ids.tmdb (or ids.trakt) for movie/show' }, { status: 400 })
     }
 
-    const item = isRemove ? { ids: { tmdb } } : { ids: { tmdb }, rating: intRating }
+    const cleanIds = {}
+    if (Number.isFinite(Number(ids?.trakt))) cleanIds.trakt = Number(ids.trakt)
+    if (Number.isFinite(Number(ids?.tmdb))) cleanIds.tmdb = Number(ids.tmdb)
+
+    const intRating = isRemove ? null : Math.round(Number(rating))
+
+    const item = isRemove ? { ids: cleanIds } : { ids: cleanIds, rating: intRating }
     const payload = { [key]: [item] }
 
-    // ✅ endpoint Trakt correcto según sea add o remove
     const path = isRemove ? '/sync/ratings/remove' : '/sync/ratings'
-
     const traktRes = await traktFetch(path, {
         method: 'POST',
         body: JSON.stringify(payload)
@@ -125,6 +197,15 @@ export async function DELETE(req) {
         }
 
         const key = typeToArrayKey(type)
+        if (!key) {
+            return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+        }
+
+        // season/episode requieren trakt
+        if ((type === 'season' || type === 'episode') && !Number.isFinite(Number(ids?.trakt))) {
+            return NextResponse.json({ error: 'Missing ids.trakt for season/episode' }, { status: 400 })
+        }
+
         const body = { [key]: [{ ids }] }
 
         const r = await fetch(`${TRAKT_API}/sync/ratings/remove`, {

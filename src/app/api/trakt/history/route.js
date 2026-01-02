@@ -11,17 +11,13 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const TMDB_KEY =
-    process.env.TMDB_API_KEY ||
-    process.env.NEXT_PUBLIC_TMDB_API_KEY // fallback si no tienes server key separada
-
+const TMDB_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY
 const TMDB_BASE = 'https://api.themoviedb.org/3'
-const TMDB_IMG = 'https://image.tmdb.org/t/p/w185'
 
-// ⚠️ Ajusta estas rutas a las que uses en tu app:
 function detailsHrefFor(type, tmdbId) {
     if (!tmdbId) return null
-    return type === 'movie' ? `/movie/${tmdbId}` : `/tv/${tmdbId}`
+    const mediaType = type === 'movie' ? 'movie' : 'tv'
+    return `/details/${mediaType}/${tmdbId}`
 }
 
 function ymdToIsoStart(ymd) {
@@ -44,25 +40,23 @@ async function safeJson(res) {
 async function fetchTmdbLocalized({ type, tmdbId }) {
     if (!TMDB_KEY || !tmdbId) return null
     const endpoint = type === 'movie' ? 'movie' : 'tv'
-    const url = `${TMDB_BASE}/${endpoint}/${encodeURIComponent(
-        tmdbId
-    )}?api_key=${encodeURIComponent(TMDB_KEY)}&language=es-ES`
+    const url = `${TMDB_BASE}/${endpoint}/${encodeURIComponent(tmdbId)}?api_key=${encodeURIComponent(
+        TMDB_KEY
+    )}&language=es-ES`
 
-    // cachea para no freír TMDB en cada refresh
     const res = await fetch(url, { next: { revalidate: 60 * 60 * 24 } })
     if (!res.ok) return null
     const j = await safeJson(res)
     if (!j) return null
 
     const title = type === 'movie' ? j?.title : j?.name
-    const posterPath = j?.poster_path || null
+    const poster_path = j?.poster_path || null
     const date = type === 'movie' ? j?.release_date : j?.first_air_date
     const year = date ? String(date).slice(0, 4) : null
 
-    return { title, posterPath, year }
+    return { title, poster_path, year }
 }
 
-// mini mapLimit para no disparar 200 fetches en paralelo
 async function mapLimit(arr, limit, fn) {
     const out = new Array(arr.length)
     let i = 0
@@ -77,14 +71,16 @@ async function mapLimit(arr, limit, fn) {
 }
 
 export async function GET(request) {
+    // ✅ FIX: cookies() es Promise en tu Next
     const cookieStore = await cookies()
     const { accessToken, refreshToken, expiresAtMs } = readTraktCookies(cookieStore)
 
     const type = request.nextUrl.searchParams.get('type') || 'all' // all|movies|shows
-    const from = request.nextUrl.searchParams.get('from') || null // YYYY-MM-DD
-    const to = request.nextUrl.searchParams.get('to') || null // YYYY-MM-DD
+    const from = request.nextUrl.searchParams.get('from') || null
+    const to = request.nextUrl.searchParams.get('to') || null
     const page = Number(request.nextUrl.searchParams.get('page') || 1)
     const limit = Number(request.nextUrl.searchParams.get('limit') || 200)
+    const extended = request.nextUrl.searchParams.get('extended') || 'full'
 
     if (!accessToken && !refreshToken) {
         return NextResponse.json({ connected: false, items: [], stats: null })
@@ -100,10 +96,10 @@ export async function GET(request) {
             token = refreshedTokens.access_token
         }
 
-        // Trakt: /sync/history (all) o /sync/history/movies|shows
         const qs = new URLSearchParams()
         qs.set('page', String(page))
         qs.set('limit', String(limit))
+        qs.set('extended', extended)
         if (from) qs.set('start_at', ymdToIsoStart(from))
         if (to) qs.set('end_at', ymdToIsoEnd(to))
 
@@ -117,57 +113,73 @@ export async function GET(request) {
 
         const raw = Array.isArray(r.json) ? r.json : []
 
-        // Normaliza a {type:'movie'|'show', tmdbId, watched_at, ...}
+        // ✅ Normaliza e INCLUYE info de episodio (season/number)
         const normalized = raw
             .map((h) => {
-                const isMovie = !!h?.movie
-                const obj = isMovie ? h.movie : h.show
-                const mediaType = isMovie ? 'movie' : 'show'
-                const tmdbId = obj?.ids?.tmdb ?? null
+                const id = h?.id ?? null
+                const watched_at = h?.watched_at ?? null
 
-                return {
-                    id: h?.id ?? null,
-                    watched_at: h?.watched_at ?? null,
-                    type: mediaType,
-                    tmdbId,
-                    // fallback inglés por si TMDB falla
-                    title: obj?.title ?? null,
-                    year: obj?.year ?? null,
+                // MOVIE
+                if (h?.movie) {
+                    const obj = h.movie
+                    const tmdbId = obj?.ids?.tmdb ?? null
+                    return { id, watched_at, type: 'movie', tmdbId, title: obj?.title ?? null, year: obj?.year ?? null }
                 }
+
+                // EPISODE => lo devolvemos como type:'show' + episode meta
+                if (h?.show && h?.episode) {
+                    const show = h.show
+                    const ep = h.episode
+                    const tmdbId = show?.ids?.tmdb ?? null
+
+                    const season = ep?.season ?? null
+                    const number = ep?.number ?? null
+                    const episodeTitle = ep?.title ?? null
+
+                    return {
+                        id,
+                        watched_at,
+                        type: 'show',
+                        tmdbId,
+                        title: show?.title ?? null,
+                        year: show?.year ?? null,
+
+                        // ✅ lo que tu HistoryClient lee con getEpisodeMeta()
+                        episode: { season, number, title: episodeTitle },
+                        season,
+                        number,
+                        episodeTitle,
+                    }
+                }
+
+                // SHOW (por si llega así)
+                if (h?.show) {
+                    const obj = h.show
+                    const tmdbId = obj?.ids?.tmdb ?? null
+                    return { id, watched_at, type: 'show', tmdbId, title: obj?.title ?? null, year: obj?.year ?? null }
+                }
+
+                return null
             })
+            .filter(Boolean)
             .filter((x) => x.id && x.watched_at && x.type && x.tmdbId)
 
-        // Enriquecemos con TMDB en español (y póster)
+        // ✅ Enriquecemos con TMDb ES + poster_path (para que tu Poster() no refetchee)
         const enriched = await mapLimit(normalized, 10, async (item) => {
             const tmdbType = item.type === 'movie' ? 'movie' : 'show'
-            const tmdb = await fetchTmdbLocalized({
-                type: tmdbType === 'movie' ? 'movie' : 'show', // usamos show->tv internamente
-                tmdbId: item.tmdbId,
-            }).catch(() => null)
-
-            // show en TMDB es "tv"
-            let tmdbFixed = tmdb
-            if (!tmdbFixed && item.type === 'show') {
-                tmdbFixed = await fetchTmdbLocalized({ type: 'show', tmdbId: item.tmdbId }).catch(() => null)
-            }
-
-            const title_es = tmdbFixed?.title || null
-            const posterUrl = tmdbFixed?.posterPath ? `${TMDB_IMG}${tmdbFixed.posterPath}` : null
-            const year = tmdbFixed?.year || item.year || null
+            const tmdb = await fetchTmdbLocalized({ type: tmdbType, tmdbId: item.tmdbId }).catch(() => null)
 
             return {
                 ...item,
-                title_es,
-                posterUrl,
-                year,
+                title_es: tmdb?.title || null,
+                poster_path: tmdb?.poster_path || null,
+                year: tmdb?.year || item.year || null,
                 detailsHref: detailsHrefFor(item.type, item.tmdbId),
             }
         })
 
-        // Stats
         const plays = enriched.length
-        const uniqueKey = (x) => `${x.type}:${x.tmdbId}`
-        const uniques = new Set(enriched.map(uniqueKey)).size
+        const uniques = new Set(enriched.map((x) => `${x.type}:${x.tmdbId}`)).size
         const movies = enriched.filter((x) => x.type === 'movie').length
         const shows = enriched.filter((x) => x.type === 'show').length
 
