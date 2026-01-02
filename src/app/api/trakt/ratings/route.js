@@ -103,7 +103,8 @@ function normalizeRating(val) {
 // GET: leer rating user
 // - /api/trakt/ratings?type=season&tmdbId=XXXX&season=Y
 // - /api/trakt/ratings?type=movie&tmdbId=XXXX
-// - /api/trakt/ratings?type=show&tmdbId=XXXX  (o type=tv)
+// - /api/trakt/ratings?type=show&tmdbId=XXXX
+// - /api/trakt/ratings?type=episode&tmdbId=SHOW_TMDB&season=Y&episode=Z
 // ======================
 export async function GET(req) {
     try {
@@ -153,7 +154,7 @@ export async function GET(req) {
             return json({ found: false, rating: null })
         }
 
-        // ---- SEASON (lo que ya tenías) ----
+        // ---- SEASON ----
         if (type === 'season') {
             const tmdbId = Number(url.searchParams.get('tmdbId'))
             const seasonNumber = Number(url.searchParams.get('season'))
@@ -195,6 +196,50 @@ export async function GET(req) {
             return json({ found: false, rating: null })
         }
 
+        // ---- EPISODE (NUEVO) ----
+        if (type === 'episode') {
+            const showTmdbId = Number(url.searchParams.get('tmdbId'))
+            const seasonNumber = Number(url.searchParams.get('season'))
+            const episodeNumber = Number(url.searchParams.get('episode'))
+            if (!Number.isFinite(showTmdbId) || !Number.isFinite(seasonNumber) || !Number.isFinite(episodeNumber)) {
+                return json({ error: 'Missing tmdbId/season/episode' }, 400)
+            }
+
+            let page = 1
+            const limit = 100
+
+            while (page <= 20) {
+                const res = await traktFetch(`/sync/ratings/episodes?extended=full&page=${page}&limit=${limit}`, auth)
+                if (res.status === 401) return json({ error: 'Unauthorized' }, 401)
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}))
+                    return json({ error: err?.error || 'Trakt GET ratings failed' }, res.status)
+                }
+
+                const items = await res.json()
+                if (!Array.isArray(items) || items.length === 0) break
+
+                const found = items.find((it) => {
+                    const showTmdb = Number(it?.show?.ids?.tmdb)
+                    const sn = Number(it?.episode?.season) // en /ratings/episodes suele venir aquí
+                    const en = Number(it?.episode?.number)
+                    return showTmdb === showTmdbId && sn === seasonNumber && en === episodeNumber
+                })
+
+                if (found) {
+                    return json({
+                        found: true,
+                        rating: typeof found?.rating === 'number' ? found.rating : null,
+                        rated_at: found?.rated_at || null
+                    })
+                }
+
+                page++
+            }
+
+            return json({ found: false, rating: null })
+        }
+
         return json({ error: 'Unsupported type' }, 400)
     } catch (e) {
         console.error(e)
@@ -206,6 +251,7 @@ export async function GET(req) {
 // POST: crear/eliminar rating
 // - movie/show: body { type:'movie'|'show'|'tv', tmdbId OR ids:{tmdb}, rating }
 // - season:     body { type:'season', tmdbId, season, rating }
+// - episode:    body { type:'episode', tmdbId(SHOW), season, episode, rating }
 // rating=null => remove
 // ======================
 export async function POST(req) {
@@ -245,7 +291,7 @@ export async function POST(req) {
             return json({ ok: true, type, removed: isRemove, rating: isRemove ? null : rating, summary: out })
         }
 
-        // ---- SEASON (lo que ya tenías) ----
+        // ---- SEASON ----
         if (type === 'season') {
             const tmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb)
             const seasonNumber = Number(body?.season ?? body?.seasonNumber)
@@ -277,6 +323,50 @@ export async function POST(req) {
             if (!res.ok) return json({ error: out?.error || 'Trakt rating failed', details: out }, res.status)
 
             return json({ ok: true, removed: isRemove, rating: isRemove ? null : rating, summary: out })
+        }
+
+        // ---- EPISODE (NUEVO) ----
+        if (type === 'episode') {
+            const showTmdbId = Number(
+                body?.tmdbId ?? body?.showId ?? body?.tvId ?? body?.showTmdbId ?? body?.ids?.tmdb
+            )
+            const seasonNumber = Number(body?.season ?? body?.seasonNumber)
+            const episodeNumber = Number(body?.episode ?? body?.episodeNumber)
+
+            if (!Number.isFinite(showTmdbId) || !Number.isFinite(seasonNumber) || !Number.isFinite(episodeNumber)) {
+                return json({ error: 'Missing tmdbId (show) / season / episode' }, 400)
+            }
+
+            const rating = normalizeRating(body?.rating)
+            const isRemove = rating === null
+
+            const endpoint = isRemove ? '/sync/ratings/remove' : '/sync/ratings'
+
+            const payload = {
+                shows: [
+                    {
+                        ids: { tmdb: showTmdbId },
+                        seasons: [
+                            {
+                                number: seasonNumber,
+                                episodes: [
+                                    isRemove
+                                        ? { number: episodeNumber }
+                                        : { number: episodeNumber, rating, rated_at: new Date().toISOString() }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+
+            const res = await traktFetch(endpoint, auth, { method: 'POST', body: payload })
+            if (res.status === 401) return json({ error: 'Unauthorized' }, 401)
+
+            const out = await res.json().catch(() => ({}))
+            if (!res.ok) return json({ error: out?.error || 'Trakt rating failed', details: out }, res.status)
+
+            return json({ ok: true, type, removed: isRemove, rating: isRemove ? null : rating, summary: out })
         }
 
         return json({ error: 'Unsupported type' }, 400)
