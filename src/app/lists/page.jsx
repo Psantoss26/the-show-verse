@@ -557,20 +557,16 @@ function normalizeTraktItemsToCards(items) {
 function ListItemsRow({ items, isMobile }) {
     if (!Array.isArray(items) || items.length === 0) return null
 
-    const isTop10 = false // por si en el futuro reutilizas lógica
-
     const breakpointsRow = {
         0: { slidesPerView: 3, spaceBetween: 12 },
         640: { slidesPerView: 4, spaceBetween: 14 },
         768: { slidesPerView: 'auto', spaceBetween: 14 },
         1024: { slidesPerView: 'auto', spaceBetween: 18 },
-        1280: { slidesPerView: 'auto', spaceBetween: 20 }
+        1280: { slidesPerView: 'auto', spaceBetween: 20 },
     }
 
     return (
-        // ✅ 1) full-bleed SOLO en móvil para cancelar el px-4 del layout
         <div className="-mx-4 sm:mx-0">
-            {/* ✅ 2) gutter propio en móvil = 12px (px-3) => igual que spaceBetween */}
             <div className="px-3 sm:px-0">
                 <Swiper
                     slidesPerView={3}
@@ -592,12 +588,10 @@ function ListItemsRow({ items, isMobile }) {
                         return (
                             <SwiperSlide
                                 key={`${mt}-${item?.id}`}
-                                className="
-                  select-none
-                  md:!w-[140px] lg:!w-[140px] xl:!w-[168px] 2xl:!w-[201px]
-                "
+                                className="select-none md:!w-[140px] lg:!w-[140px] xl:!w-[168px] 2xl:!w-[201px]"
                             >
-                                <ListItemCard item={item} />
+                                {/* ✅ IMPORTANTE: pasamos isMobile */}
+                                <ListItemCard item={item} isMobile={isMobile} />
                             </SwiperSlide>
                         )
                     })}
@@ -623,6 +617,30 @@ function ListItemsRowSkeleton({ isMobile }) {
     )
 }
 
+/** ✅ Wrapper: Link interno si existe, si no anchor externo, si no div */
+function ListNavWrapper({ list, className = '', children }) {
+    const href = list?.internalUrl || null
+    const ext = list?.externalUrl || null
+
+    if (href) {
+        return (
+            <Link href={href} className={className}>
+                {children}
+            </Link>
+        )
+    }
+
+    if (ext) {
+        return (
+            <a href={ext} target="_blank" rel="noreferrer" className={className}>
+                {children}
+            </a>
+        )
+    }
+
+    return <div className={className}>{children}</div>
+}
+
 function GridListCard({ list, itemsState, ensureListItems, canUse, onDelete }) {
     const listId = String(list?.id || '')
     const [ref, inView] = useInView()
@@ -636,7 +654,8 @@ function GridListCard({ list, itemsState, ensureListItems, canUse, onDelete }) {
 
     return (
         <div ref={ref}>
-            <Link href={`/lists/${list.id}`} className="group block h-full">
+            {/* ✅ antes: Link fijo a /lists/:id (rompía Trakt/Colecciones) */}
+            <ListNavWrapper list={list} className="group block h-full">
                 <div className="h-full bg-zinc-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-white/10 hover:bg-zinc-900/60 transition-all flex flex-col relative">
                     <div className="aspect-video w-full bg-zinc-950 relative overflow-hidden group-hover:opacity-90 transition-opacity">
                         {isLoading ? (
@@ -673,7 +692,7 @@ function GridListCard({ list, itemsState, ensureListItems, canUse, onDelete }) {
                         </button>
                     )}
                 </div>
-            </Link>
+            </ListNavWrapper>
         </div>
     )
 }
@@ -691,7 +710,6 @@ function RowListSection({ list, itemsState, ensureListItems, isMobile, canUse, o
 
     return (
         <section ref={ref} className="space-y-4">
-            {/* Header fila (móvil mejorado: botones no rompen el layout) */}
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-white/5 pb-3">
                 <div className="min-w-0">
                     <div className="flex items-center gap-3 min-w-0">
@@ -719,16 +737,27 @@ function RowListSection({ list, itemsState, ensureListItems, isMobile, canUse, o
                         </button>
                     )}
 
-                    <Link
-                        href={`/lists/${list.id}`}
-                        className="h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600/15 border border-purple-500/30 px-4 text-xs font-black uppercase tracking-wider text-purple-200 hover:bg-purple-600/22 hover:border-purple-500/45 transition flex-1 sm:flex-none"
-                    >
-                        Ver todo <ChevronRight className="w-4 h-4" />
-                    </Link>
+                    {/* ✅ antes: Link fijo a /lists/:id */}
+                    {list?.internalUrl ? (
+                        <Link
+                            href={list.internalUrl}
+                            className="h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600/15 border border-purple-500/30 px-4 text-xs font-black uppercase tracking-wider text-purple-200 hover:bg-purple-600/22 hover:border-purple-500/45 transition flex-1 sm:flex-none"
+                        >
+                            Ver todo <ChevronRight className="w-4 h-4" />
+                        </Link>
+                    ) : list?.externalUrl ? (
+                        <a
+                            href={list.externalUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600/15 border border-purple-500/30 px-4 text-xs font-black uppercase tracking-wider text-purple-200 hover:bg-purple-600/22 hover:border-purple-500/45 transition flex-1 sm:flex-none"
+                        >
+                            Ver todo <ChevronRight className="w-4 h-4" />
+                        </a>
+                    ) : null}
                 </div>
             </div>
 
-            {/* Fila items */}
             {isLoading ? (
                 <ListItemsRowSkeleton isMobile={isMobile} />
             ) : items.length > 0 ? (
@@ -756,7 +785,8 @@ function ListModeRow({ list, itemsState, ensureListItems, canUse, onDelete }) {
 
     return (
         <div ref={ref}>
-            <Link href={`/lists/${list.id}`} className="group block">
+            {/* ✅ antes: Link fijo a /lists/:id */}
+            <ListNavWrapper list={list} className="group block">
                 <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all">
                     <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-950 border border-white/5 relative">
                         {isLoading ? (
@@ -799,7 +829,7 @@ function ListModeRow({ list, itemsState, ensureListItems, canUse, onDelete }) {
                         )}
                     </div>
                 </div>
-            </Link>
+            </ListNavWrapper>
         </div>
     )
 }
