@@ -492,6 +492,67 @@ function sortLists(lists, mode) {
     }
 }
 
+function getTraktUsername(list) {
+    return list?.user?.username || list?.user?.ids?.slug || list?.user || 'trakt'
+}
+
+function getTraktListKey(list) {
+    // Preferimos slug (más estable), si no id
+    return list?.ids?.slug || list?.ids?.trakt || list?.id
+}
+
+function buildInternalUrl(list) {
+    const src = list?.source
+    if (src === 'tmdb') return `/lists/${list?.id}`
+
+    if (src === 'trakt') {
+        const u = getTraktUsername(list)
+        const key = getTraktListKey(list)
+        if (!u || !key) return null
+        return `/lists/trakt/${encodeURIComponent(u)}/${encodeURIComponent(String(key))}`
+    }
+
+    // Colecciones: no sabemos tu ruta interna real → mejor no romper
+    return null
+}
+
+function buildExternalUrl(list) {
+    const src = list?.source
+    if (src === 'tmdb') return `https://www.themoviedb.org/list/${list?.id}`
+    if (src === 'trakt') return list?.traktUrl || null
+    if (src === 'collections') return `https://www.themoviedb.org/collection/${list?.id}`
+    return null
+}
+
+function normalizeTraktItemsToCards(items) {
+    // Convierte items de Trakt (con _tmdb) al shape que usan tus previews (ListItemCard)
+    if (!Array.isArray(items)) return []
+
+    return items
+        .map((it) => {
+            const t = it?._tmdb
+            if (!t?.id || !t?.media_type) return null
+
+            const title =
+                it?.movie?.title ||
+                it?.show?.title ||
+                it?.person?.name ||
+                it?.episode?.title ||
+                it?.season?.title ||
+                'Elemento'
+
+            return {
+                id: t.id,
+                media_type: t.media_type,
+                title: t.media_type === 'movie' ? title : undefined,
+                name: t.media_type !== 'movie' ? title : undefined,
+                poster_path: t.poster_path || null,
+                backdrop_path: t.backdrop_path || null,
+            }
+        })
+        .filter(Boolean)
+}
+
 /* ========= fila tipo Dashboard: drag con ratón + 3 completas en móvil ========= */
 function ListItemsRow({ items, isMobile }) {
     if (!Array.isArray(items) || items.length === 0) return null
@@ -810,9 +871,32 @@ export default function ListsPage() {
 
     // ✅ lista activa según fuente
     const activeLists = useMemo(() => {
-        if (source === 'tmdb') return safeTmdbLists.map((l) => ({ ...l, source: 'tmdb' }))
-        if (source === 'trakt') return (Array.isArray(trakt?.lists) ? trakt.lists : []).map((l) => ({ ...l, source: 'trakt' }))
-        return (Array.isArray(featuredCollections) ? featuredCollections : []).map((c) => ({ ...c, source: 'collections' }))
+        if (source === 'tmdb') {
+            return safeTmdbLists.map((l) => ({
+                ...l,
+                source: 'tmdb',
+                internalUrl: buildInternalUrl({ ...l, source: 'tmdb' }),
+                externalUrl: buildExternalUrl({ ...l, source: 'tmdb' }),
+            }))
+        }
+
+        if (source === 'trakt') {
+            const arr = Array.isArray(trakt?.lists) ? trakt.lists : []
+            return arr.map((l) => ({
+                ...l,
+                source: 'trakt',
+                internalUrl: buildInternalUrl({ ...l, source: 'trakt' }),
+                externalUrl: buildExternalUrl({ ...l, source: 'trakt' }),
+            }))
+        }
+
+        const cols = Array.isArray(featuredCollections) ? featuredCollections : []
+        return cols.map((c) => ({
+            ...c,
+            source: 'collections',
+            internalUrl: buildInternalUrl({ ...c, source: 'collections' }), // null
+            externalUrl: buildExternalUrl({ ...c, source: 'collections' }),
+        }))
     }, [source, safeTmdbLists, trakt?.lists, featuredCollections])
 
     const filtered = useMemo(() => {
@@ -870,15 +954,17 @@ export default function ListsPage() {
                 }
 
                 if (src === 'trakt') {
-                    // Trakt lists: necesitamos "user" para la ruta /users/{user}/lists/{id}/items
-                    const user = listObj?.user || 'trakt'
+                    const username = getTraktUsername(listObj)
+                    const listKey = getTraktListKey(listObj)
+
                     const res = await fetch(
-                        `/api/trakt/list-items?user=${encodeURIComponent(user)}&listId=${encodeURIComponent(listId)}&limit=24`,
+                        `/api/trakt/lists/${encodeURIComponent(username)}/${encodeURIComponent(String(listKey))}?page=1&limit=24`,
                         { signal: ctrl.signal, cache: 'no-store' }
                     )
                     const j = await res.json().catch(() => ({}))
-                    const items = Array.isArray(j?.items) ? j.items : []
-                    setItemsMap((prev) => ({ ...prev, [listId]: items }))
+
+                    const normalized = normalizeTraktItemsToCards(j?.items)
+                    setItemsMap((prev) => ({ ...prev, [listId]: normalized }))
                     return
                 }
 
