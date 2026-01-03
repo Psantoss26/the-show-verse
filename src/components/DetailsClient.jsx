@@ -9,6 +9,7 @@ import 'swiper/swiper-bundle.css'
 import { AnimatePresence, motion } from 'framer-motion'
 import EpisodeRatingsGrid from '@/components/EpisodeRatingsGrid'
 import { saveArtworkOverride } from '@/lib/artworkApi'
+import Link from 'next/link'
 
 import {
   CalendarIcon,
@@ -3753,37 +3754,54 @@ export default function DetailsClient({
                       </div>
 
                       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                        {tLists.loading && (
+                        {tLists.loading ? (
                           <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
                             <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
                             <span className="text-sm font-medium animate-pulse">Buscando listas y portadas...</span>
                           </div>
-                        )}
-
-                        {!tLists.loading &&
+                        ) : (
                           (tLists.items || []).map((row) => {
                             const list = row?.list || row || {}
                             const user = row?.user || list?.user || {}
-                            const previews = row?.previewPosters || [] // Las imágenes que trae la API nueva
+                            const previews = row?.previewPosters || []
 
                             const name = list?.name || 'Lista'
                             const itemCount = Number(list?.item_count || list?.items || 0)
                             const likes = Number(list?.likes || 0)
-                            const username = user?.username || user?.name
-                            const slug = list?.ids?.slug || list?.ids?.trakt
-                            const url = username && slug ? `https://trakt.tv/users/${username}/lists/${slug}` : null
-                            const avatar = user?.images?.avatar?.full || `https://ui-avatars.com/api/?name=${username}&background=random`
+                            const username = user?.username || user?.name || null
+                            const slug = list?.ids?.slug || null
+                            const traktId = list?.ids?.trakt || null
+
+                            // ✅ Ruta interna (slug si existe; si no, traktId)
+                            const internalUrl =
+                              username && (slug || traktId)
+                                ? `/lists/trakt/${encodeURIComponent(username)}/${encodeURIComponent(String(slug || traktId))}`
+                                : null
+
+                            // (opcional) enlace externo a Trakt, pero ya NO es el click principal
+                            const traktUrl =
+                              username && (slug || traktId)
+                                ? `https://trakt.tv/users/${username}/lists/${slug || traktId}`
+                                : null
+
+                            const avatar =
+                              user?.images?.avatar?.full ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(username || 'user')}&background=random`
+
+                            const disabled = !internalUrl
 
                             return (
-                              <a
-                                key={String(list?.ids?.trakt || name)}
-                                href={url || '#'}
-                                target={url ? '_blank' : undefined}
-                                rel="noreferrer"
-                                className={`group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500 hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)] ${!url && 'pointer-events-none'
-                                  }`}
+                              <Link
+                                key={String(traktId || `${username}-${slug}` || name)}
+                                href={internalUrl || '#'}
+                                aria-disabled={disabled}
+                                className={[
+                                  'group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500',
+                                  'hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)]',
+                                  disabled ? 'pointer-events-none opacity-60' : '',
+                                ].join(' ')}
                               >
-                                {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS CON HUECO EN HOVER) */}
+                                {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS) */}
                                 <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
                                   {previews.length > 0 ? (
                                     <div className="h-full w-full flex items-center justify-center overflow-visible">
@@ -3793,6 +3811,22 @@ export default function DetailsClient({
                                     <div className="flex h-full items-center justify-center opacity-10">
                                       <ListVideo className="h-20 w-20" />
                                     </div>
+                                  )}
+
+                                  {/* Botón externo (opcional) sin romper el Link */}
+                                  {traktUrl && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        window.open(traktUrl, '_blank', 'noopener,noreferrer')
+                                      }}
+                                      className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-zinc-200 border border-white/10 hover:border-indigo-400/30 hover:text-white"
+                                      title="Ver en Trakt"
+                                    >
+                                      Trakt
+                                    </button>
                                   )}
                                 </div>
 
@@ -3810,12 +3844,16 @@ export default function DetailsClient({
                                     )}
                                   </div>
 
-                                  {/* Footer de la tarjeta */}
+                                  {/* Footer */}
                                   <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
-                                    <div className="flex items-center gap-2">
-                                      <img src={avatar} alt={username} className="h-6 w-6 rounded-full ring-1 ring-white/20" />
-                                      <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[100px]">
-                                        {username}
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <img
+                                        src={avatar}
+                                        alt={username || 'user'}
+                                        className="h-6 w-6 rounded-full ring-1 ring-white/20"
+                                      />
+                                      <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px]">
+                                        {username || '—'}
                                       </span>
                                     </div>
 
@@ -3829,9 +3867,10 @@ export default function DetailsClient({
                                     </div>
                                   </div>
                                 </div>
-                              </a>
+                              </Link>
                             )
-                          })}
+                          })
+                        )}
                       </div>
 
                       {tLists.hasMore && (
