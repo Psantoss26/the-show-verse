@@ -2713,7 +2713,7 @@ export default function DetailsClient({
                 </div>
 
                 {/* ✅ SEPARADOR 2 (antes del rating del usuario) */}
-                <div className="w-px h-6 bg-white/10 shrink-0" />
+                <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
 
                 {/* C. Puntuación Usuario */}
                 <div className="flex items-center gap-3 shrink-0">
