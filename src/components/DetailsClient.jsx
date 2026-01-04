@@ -51,6 +51,7 @@ import {
   List,
   LibraryBig,
   MessageSquare,
+  MoreHorizontal
 } from 'lucide-react'
 
 /* === cuenta / api === */
@@ -139,6 +140,7 @@ import { CompactBadge, ExternalLinkButton, MiniStat, UnifiedRateButton } from '@
 import AddToListModal from '@/components/details/AddToListModal'
 import VideoModal from '@/components/details/VideoModal'
 import PosterStack from '@/components/details/PosterStack'
+import ExternalLinksModal from '@/components/details/ExternalLinksModal'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
@@ -1874,9 +1876,13 @@ export default function DetailsClient({
   const showPrevImages = isHoveredImages && canPrevImages
   const showNextImages = isHoveredImages && canNextImages
 
+  const [externalLinksOpen, setExternalLinksOpen] = useState(false)
+
   const filmAffinitySearchUrl = `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent(
     data.title || data.name
   )}`
+
+  const isMovie = endpointType === 'movie'
 
   const seriesGraphUrl =
     type === 'tv' && data?.id && (data.name || data.original_name)
@@ -1884,8 +1890,6 @@ export default function DetailsClient({
         data.original_name || data.name
       )}`
       : null
-
-  const isMovie = endpointType === 'movie' // o: type === 'movie'
 
   const officialSiteUrl = normalizeUrl(data?.homepage)
 
@@ -1985,6 +1989,24 @@ export default function DetailsClient({
     run()
     return () => ac.abort()
   }, [title, resolvedImdbId])
+
+  const externalLinks = useMemo(() => {
+    const items = []
+
+    if (officialSiteUrl) items.push({ id: 'web', label: 'Web oficial', icon: '/logo-Web.png', href: officialSiteUrl })
+    if (filmAffinitySearchUrl) items.push({ id: 'fa', label: 'FilmAffinity', icon: '/logoFilmaffinity.png', href: filmAffinitySearchUrl })
+    if (justWatchUrl) items.push({ id: 'jw', label: 'JustWatch', icon: '/logo-JustWatch.png', href: justWatchUrl })
+
+    // ✅ Letterboxd SOLO movies
+    if (isMovie && letterboxdUrl) items.push({ id: 'lb', label: 'Letterboxd', icon: '/logo-Letterboxd.png', href: letterboxdUrl })
+
+    if (type === 'tv' && seriesGraphUrl) items.push({ id: 'sg', label: 'SeriesGraph', icon: '/logoseriesgraph.png', href: seriesGraphUrl })
+
+    // (opcional) TMDb detail/watch si quieres:
+    // if (tmdbDetailUrl) items.push({ id: 'tmdb', label: 'TMDb', icon: '/logo-TMDb.png', href: tmdbDetailUrl })
+
+    return items
+  }, [officialSiteUrl, filmAffinitySearchUrl, justWatchUrl, isMovie, letterboxdUrl, type, seriesGraphUrl])
 
   // ====== Datos meta / características (reorganizadas) ======
   const directorsOrCreators =
@@ -2659,25 +2681,35 @@ export default function DetailsClient({
 
                 {/* ✅ B. Links externos */}
                 <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
-                  {/* Official site (antes “Web”) */}
-                  <div className="hidden sm:block">
-                    <ExternalLinkButton icon="/logo-Web.png" href={officialSiteUrl} />
+                  {/* ✅ DESKTOP: iconos normales */}
+                  <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
+                    <div className="hidden sm:block">
+                      <ExternalLinkButton icon="/logo-Web.png" href={officialSiteUrl} />
+                    </div>
+
+                    <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} />
+                    <ExternalLinkButton icon="/logo-JustWatch.png" href={justWatchUrl} />
+
+                    {isMovie && (
+                      <ExternalLinkButton icon="/logo-Letterboxd.png" href={letterboxdUrl} />
+                    )}
+
+                    {type === 'tv' && (
+                      <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} />
+                    )}
                   </div>
 
-                  <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} />
-
-                  <ExternalLinkButton
-                    icon="/logo-JustWatch.png"
-                    href={extLinks.justwatch || justWatchUrl}
-                  />
-
-                  {isMovie && (
-                    <ExternalLinkButton icon="/logo-Letterboxd.png" href={letterboxdUrl} />
-                  )}
-
-                  {type === 'tv' && (
-                    <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} />
-                  )}
+                  {/* ✅ MÓVIL: botón "..." */}
+                  <button
+                    type="button"
+                    onClick={() => setExternalLinksOpen(true)}
+                    className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center
+               border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
+                    title="Enlaces"
+                    aria-label="Abrir enlaces externos"
+                  >
+                    <MoreHorizontal className="w-5 h-5" />
+                  </button>
                 </div>
 
                 {/* ✅ SEPARADOR 2 (antes del rating del usuario) */}
@@ -4250,6 +4282,13 @@ export default function DetailsClient({
 
       {/* ✅ MODAL: Vídeos / Trailer */}
       <VideoModal open={videoModalOpen} onClose={closeVideo} video={activeVideo} />
+
+      {/* ✅ MODAL: Enlaces externos */}
+      <ExternalLinksModal
+        open={externalLinksOpen}
+        onClose={() => setExternalLinksOpen(false)}
+        links={externalLinks}
+      />
 
       <TraktWatchedModal
         open={traktWatchedOpen}
