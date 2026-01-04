@@ -1951,26 +1951,61 @@ export default function DetailsClient({
     return j?.url || null
   }
 
+  const jwCacheKey = useMemo(
+    () => `showverse:jw:${endpointType}:${id}:${(yearIso || '').trim()}`,
+    [endpointType, id, yearIso]
+  )
+
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const cached = window.localStorage.getItem(jwCacheKey)
+      if (cached) {
+        setExtLinks((p) => ({ ...p, justwatch: cached || null }))
+      }
+    } catch { }
+  }, [jwCacheKey])
+
+  // ✅ 1) hidratar desde cache para que el icono salga instantáneo en visitas posteriores
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const cached = window.localStorage.getItem(jwCacheKey)
+      if (cached) {
+        setExtLinks((p) => ({ ...p, justwatch: cached || null }))
+      }
+    } catch { }
+  }, [jwCacheKey])
+
+  useEffect(() => {
+    // Si no hay title, reseteamos estado y cache
     if (!title) {
       setExtLinks((p) => ({ ...p, justwatch: null, loadingJW: false, errorJW: '' }))
+      try {
+        if (typeof window !== 'undefined') window.localStorage.removeItem(jwCacheKey)
+      } catch { }
       return
     }
 
     const ac = new AbortController()
 
     const run = async () => {
+      // ✅ Importante: marcamos loading pero NO ponemos justwatch:null (así no “parpadea”)
       setExtLinks((p) => ({ ...p, loadingJW: true, errorJW: '' }))
 
       try {
         const country = 'es'
+
         const watchnow =
-          watchLink && typeof watchLink === 'string' && !watchLink.includes('themoviedb.org')
+          watchLink &&
+            typeof watchLink === 'string' &&
+            !watchLink.includes('themoviedb.org')
             ? watchLink
             : null
 
         const qs = new URLSearchParams()
         qs.set('country', country)
+        if (yearIso) qs.set('year', yearIso)
 
         if (watchnow) qs.set('watchnow', watchnow)
         else qs.set('title', title)
@@ -1979,16 +2014,30 @@ export default function DetailsClient({
           signal: ac.signal
         })
 
-        setExtLinks((p) => ({ ...p, justwatch: resolved || null, loadingJW: false }))
+        if (ac.signal.aborted) return
+
+        setExtLinks((p) => ({ ...p, justwatch: resolved || null, loadingJW: false, errorJW: '' }))
+
+        // ✅ cache: para que en siguientes visitas salga instantáneo
+        try {
+          if (typeof window !== 'undefined') {
+            if (resolved) window.localStorage.setItem(jwCacheKey, resolved)
+            else window.localStorage.removeItem(jwCacheKey)
+          }
+        } catch { }
       } catch (e) {
         if (ac.signal.aborted) return
         setExtLinks((p) => ({ ...p, loadingJW: false, errorJW: e?.message || 'Error' }))
+
+        // (opcional) si falla, no machacamos cache automáticamente
+        // si quieres limpiar cache al fallar:
+        // try { if (typeof window !== 'undefined') window.localStorage.removeItem(jwCacheKey) } catch {}
       }
     }
 
     run()
     return () => ac.abort()
-  }, [title, watchLink])
+  }, [title, watchLink, yearIso, jwCacheKey])
 
   useEffect(() => {
     if (!title && !resolvedImdbId) {
@@ -2021,13 +2070,13 @@ export default function DetailsClient({
     return () => ac.abort()
   }, [title, resolvedImdbId])
 
+  const jwHref = extLinks.justwatch || null
+
   const externalLinks = useMemo(() => {
     const items = []
 
     if (officialSiteUrl) items.push({ id: 'web', label: 'Web oficial', icon: '/logo-Web.png', href: officialSiteUrl })
     if (filmAffinitySearchUrl) items.push({ id: 'fa', label: 'FilmAffinity', icon: '/logoFilmaffinity.png', href: filmAffinitySearchUrl })
-
-    const jwHref = extLinks.justwatch || justWatchUrl // fallback si fallase
     if (jwHref) items.push({ id: 'jw', label: 'JustWatch', icon: '/logo-JustWatch.png', href: jwHref })
 
     // ✅ Letterboxd SOLO movies
@@ -2721,7 +2770,12 @@ export default function DetailsClient({
                     </div>
 
                     <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} />
-                    <ExternalLinkButton icon="/logo-JustWatch.png" href={justWatchUrl} />
+                    <ExternalLinkButton
+                      icon="/logo-JustWatch.png"
+                      title="JustWatch"
+                      href={jwHref}
+                      fallbackHref={justWatchUrl}
+                    />
 
                     {isMovie && (
                       <ExternalLinkButton icon="/logo-Letterboxd.png" href={letterboxdUrl} />
