@@ -1,155 +1,166 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useRef, useLayoutEffect, useState } from 'react'
 
-const fmtCount = (n) => {
-    const v = Number(n || 0)
-    if (!Number.isFinite(v) || v <= 0) return null
-    return v > 999 ? '999+' : String(v)
-}
-
-function CountBadge({ value }) {
-    if (!value) return null
-    return (
-        <div
-            className="
-        hidden sm:flex
-        absolute -top-1.5 -right-3 z-10
-        min-w-[22px] h-[18px] px-1.5
-        rounded-full
-        text-[10px] font-extrabold leading-[18px] text-center
-        bg-yellow-400 text-black
-        shadow-md shadow-black/40
-        ring-2 ring-black/35
-        pointer-events-none
-        items-center justify-center
-      "
-        >
-            {value}
-        </div>
-    )
-}
-
-export default function DetailsSectionMenu({ items = [], activeId, onChange, compact = false }) {
+export default function DetailsSectionMenu({
+    items = [],
+    activeId,
+    onChange,
+    className = '',
+    maxWidthClass = 'max-w-[1400px]',
+}) {
     const safeItems = useMemo(() => (Array.isArray(items) ? items.filter(Boolean) : []), [items])
-    const cols = Math.max(1, safeItems.length)
 
-    const wrapClass = compact
-        ? 'rounded-2xl border border-white/10 bg-black/55 backdrop-blur-md p-1.5 sm:p-1.5'
-        : 'rounded-3xl border border-white/10 bg-black/30 backdrop-blur-md p-2 sm:p-2.5'
+    const containerRef = useRef(null)
+    const innerRef = useRef(null)
 
-    const btnClassDesktop = (isActive) =>
-        [
-            'group relative flex-1 min-w-0 border transition',
-            compact ? 'rounded-xl px-2 py-2' : 'rounded-2xl px-3 py-2.5',
-            isActive
-                ? 'bg-yellow-500/10 border-yellow-500/35'
-                : 'bg-white/5 border-white/10 hover:bg-white/7 hover:border-white/15',
-        ].join(' ')
+    const [scale, setScale] = useState(1)
+    const [fits, setFits] = useState(true)
 
-    const iconBoxClass = (isActive) =>
-        [
-            'relative flex items-center justify-center overflow-visible border transition',
-            compact ? 'w-10 h-10 rounded-xl' : 'w-11 h-11 rounded-2xl',
-            isActive
-                ? 'bg-yellow-500/15 border-yellow-500/35'
-                : 'bg-black/20 border-white/10 group-hover:bg-black/25',
-        ].join(' ')
+    useLayoutEffect(() => {
+        const el = containerRef.current
+        const inner = innerRef.current
+        if (!el || !inner) return
+
+        let raf = 0
+
+        const measure = () => {
+            cancelAnimationFrame(raf)
+            raf = requestAnimationFrame(() => {
+                const available = el.clientWidth || 0
+
+                inner.style.transform = 'scale(1)'
+                inner.style.transformOrigin = 'center'
+
+                const needed = inner.scrollWidth || 0
+
+                if (!available || !needed) {
+                    setFits(true)
+                    setScale(1)
+                    inner.style.transform = 'scale(1)'
+                    return
+                }
+
+                if (needed <= available) {
+                    setFits(true)
+                    setScale(1)
+                    inner.style.transform = 'scale(1)'
+                } else {
+                    const nextScale = Math.min(1, available / needed)
+                    setFits(false)
+                    setScale(nextScale)
+                    inner.style.transform = `scale(${nextScale})`
+                    inner.style.transformOrigin = 'center'
+                }
+            })
+        }
+
+        measure()
+
+        const ro = new ResizeObserver(measure)
+        ro.observe(el)
+        ro.observe(inner)
+
+        return () => {
+            cancelAnimationFrame(raf)
+            ro.disconnect()
+        }
+    }, [safeItems.length])
+
+    if (safeItems.length === 0) return null
 
     return (
-        <div className="w-full">
-            <div className={wrapClass}>
-                {/* ===================== */}
-                {/* DESKTOP */}
-                {/* ===================== */}
-                <div className="hidden sm:flex items-stretch gap-2">
-                    {safeItems.map((it) => {
-                        const Icon = it.icon
-                        const isActive = it.id === activeId
-                        const badge = fmtCount(it.count ?? it.badge ?? it.total ?? it.itemsCount)
-
-                        return (
-                            <button
-                                key={it.id}
-                                type="button"
-                                onClick={() => onChange?.(it.id)}
-                                className={btnClassDesktop(isActive)}
-                                title={it.label}
-                                aria-current={isActive ? 'true' : undefined}
-                            >
-                                <div className="flex flex-col items-center justify-center gap-1.5">
-                                    <div className="relative overflow-visible">
-                                        <div className={iconBoxClass(isActive)}>
-                                            <CountBadge value={badge} />
-                                            {Icon ? (
-                                                <Icon
-                                                    className={[
-                                                        'w-5 h-5 transition',
-                                                        isActive ? 'text-yellow-300' : 'text-zinc-300 group-hover:text-white',
-                                                    ].join(' ')}
-                                                />
-                                            ) : null}
-                                        </div>
-
-                                        {/* indicador sutil */}
-                                        {isActive && (
-                                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-1 rounded-full bg-yellow-400/80 shadow" />
-                                        )}
-                                    </div>
-
-                                    {/* ✅ ocultar títulos en compacto */}
-                                    {!compact && (
-                                        <div className="text-[11px] font-bold uppercase tracking-widest text-zinc-300 group-hover:text-white transition truncate max-w-full">
-                                            {it.label}
-                                        </div>
-                                    )}
-                                </div>
-                            </button>
-                        )
-                    })}
-                </div>
-
-                {/* ===================== */}
-                {/* MOBILE */}
-                {/* ===================== */}
+        // ✅ sticky SIN fondo: el fondo va dentro para poder redondear
+        <div className={['sticky top-0 z-40 w-full', className].join(' ')}>
+            <nav className={['mx-auto w-full', maxWidthClass].join(' ')}>
+                {/* ✅ “banda” negra redondeada */}
                 <div
-                    className="sm:hidden grid gap-1.5"
-                    style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+                    className="
+            border border-white/10 bg-black/80 backdrop-blur-xl
+            rounded-2xl sm:rounded-3xl
+            shadow-[0_10px_35px_rgba(0,0,0,0.35)]
+            overflow-hidden
+          "
                 >
-                    {safeItems.map((it) => {
-                        const Icon = it.icon
-                        const isActive = it.id === activeId
-                        const badge = fmtCount(it.count ?? it.badge ?? it.total ?? it.itemsCount)
+                    {/* ✅ separador inferior dentro del bloque */}
+                    <div className="border-b border-white/5">
+                        <div className="py-2">
+                            <div ref={containerRef} className="w-full overflow-hidden">
+                                <div className="flex w-full justify-center">
+                                    <div
+                                        ref={innerRef}
+                                        className={[
+                                            'flex flex-nowrap items-center whitespace-nowrap',
+                                            fits ? 'w-full justify-between' : 'w-max justify-center',
+                                            'gap-1 sm:gap-2',
+                                            'px-2', // padding interno para que no pegue a los bordes
+                                        ].join(' ')}
+                                        style={{
+                                            transform: `scale(${scale})`,
+                                            transformOrigin: 'center',
+                                            willChange: 'transform',
+                                        }}
+                                    >
+                                        {safeItems.map((item) => {
+                                            const Icon = item.icon
+                                            const isActive = item.id === activeId
 
-                        return (
-                            <button
-                                key={it.id}
-                                type="button"
-                                onClick={() => onChange?.(it.id)}
-                                className={[
-                                    'relative overflow-visible border transition flex items-center justify-center',
-                                    compact ? 'h-10 rounded-xl' : 'h-11 rounded-2xl',
-                                    isActive
-                                        ? 'bg-yellow-500/10 border-yellow-500/35'
-                                        : 'bg-white/5 border-white/10 hover:bg-white/7 hover:border-white/15',
-                                ].join(' ')}
-                                title={it.label}
-                                aria-label={it.label}
-                                aria-current={isActive ? 'true' : undefined}
-                            >
-                                <div className="relative w-9 h-9 flex items-center justify-center overflow-visible">
-                                    <CountBadge value={badge} />
-                                    {Icon ? (
-                                        <Icon
-                                            className={['w-5 h-5 transition', isActive ? 'text-yellow-300' : 'text-zinc-300'].join(' ')}
-                                        />
-                                    ) : null}
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    onClick={() => onChange?.(item.id)}
+                                                    type="button"
+                                                    aria-current={isActive ? 'page' : undefined}
+                                                    className={[
+                                                        'group relative flex items-center justify-center rounded-lg',
+                                                        'px-2.5 py-2 sm:px-3 sm:py-2.5',
+                                                        'transition-all duration-200',
+                                                        'outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/50',
+                                                        'hover:bg-white/5',
+                                                        'whitespace-nowrap',
+                                                    ].join(' ')}
+                                                    title={item.label}
+                                                    aria-label={item.label}
+                                                >
+                                                    {isActive && <div className="absolute inset-0 rounded-lg bg-white/10 shadow-inner" />}
+
+                                                    <div className="relative z-10 flex items-center gap-2">
+                                                        {Icon && (
+                                                            <Icon
+                                                                className={[
+                                                                    'h-5 w-5 transition-colors duration-300',
+                                                                    isActive
+                                                                        ? 'text-yellow-400'
+                                                                        : 'text-zinc-400 group-hover:text-zinc-200',
+                                                                ].join(' ')}
+                                                            />
+                                                        )}
+
+                                                        {/* ✅ móvil: solo icono | >=sm: icono + texto */}
+                                                        <span
+                                                            className={[
+                                                                'hidden sm:inline',
+                                                                'text-sm font-semibold tracking-wide uppercase transition-colors duration-300',
+                                                                isActive ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-200',
+                                                            ].join(' ')}
+                                                        >
+                                                            {item.label}
+                                                        </span>
+                                                    </div>
+
+                                                    {isActive && (
+                                                        <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent opacity-80" />
+                                                    )}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
                                 </div>
-                            </button>
-                        )
-                    })}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </nav>
         </div>
     )
 }
