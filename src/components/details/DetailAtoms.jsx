@@ -22,8 +22,8 @@ export function VisualMetaCard({ icon: Icon, label, value, className = '' }) {
     )
 }
 
-export const SectionTitle = ({ title, icon: Icon }) => (
-    <div className="flex items-center gap-3 mb-6 border-l-4 border-yellow-500 pl-4 py-1">
+export const SectionTitle = ({ title, icon: Icon, className = '' }) => (
+    <div className={`flex items-center gap-3 mb-6 border-l-4 border-yellow-500 pl-4 py-1 ${className}`}>
         {Icon && <Icon className="text-yellow-500 w-6 h-6" />}
         <h2 className="text-2xl md:text-3xl font-bold text-white tracking-wide">
             {title}

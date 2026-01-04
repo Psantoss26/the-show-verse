@@ -51,7 +51,8 @@ import {
   List,
   LibraryBig,
   MessageSquare,
-  MoreHorizontal
+  MoreHorizontal,
+  SlidersHorizontal
 } from 'lucide-react'
 
 /* === cuenta / api === */
@@ -606,6 +607,41 @@ export default function DetailsClient({
   const [imagesResFilter, setImagesResFilter] = useState('all') // all | 720p | 1080p | 2k | 4k
   const [langES, setLangES] = useState(true)
   const [langEN, setLangEN] = useState(true)
+
+  // Panel móvil de filtros (Portadas y fondos)
+  const [artworkControlsOpen, setArtworkControlsOpen] = useState(false)
+
+  // Wrapper para detectar click fuera / cerrar panel
+  const artworkControlsWrapRef = useRef(null)
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setArtworkControlsOpen(false)
+        // si tienes el dropdown de resolución abierto, también lo cerramos
+        setResMenuOpen?.(false)
+      }
+    }
+
+    const onDown = (e) => {
+      const wrap = artworkControlsWrapRef.current
+      if (!wrap) return
+      if (!wrap.contains(e.target)) {
+        setArtworkControlsOpen(false)
+        setResMenuOpen?.(false)
+      }
+    }
+
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('touchstart', onDown, { passive: true })
+
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('touchstart', onDown)
+    }
+  }, [])
 
   const [resMenuOpen, setResMenuOpen] = useState(false)
   const resMenuRef = useRef(null)
@@ -3181,53 +3217,61 @@ export default function DetailsClient({
             <section id="section-media" ref={registerSection('media')}>
               {/* ✅ PORTADAS Y FONDOS */}
               {(type === 'movie' || type === 'tv') && (
-                <section className="mb-10">
-                  <SectionTitle title="Portadas y fondos" icon={ImageIcon} />
+                <section className="mb-16" ref={artworkControlsWrapRef}>
+                  {/* ✅ Header: TODO alineado en UNA SOLA FILA con el título */}
+                  <div className="mb-6 flex items-center justify-between gap-3">
+                    {/* ✅ Mantiene tamaño del título como antes, y quitamos el mb interno para no desalinear */}
+                    <SectionTitle title="Portadas y fondos" icon={ImageIcon} className="mb-0 mt-4" />
 
-                  {/* Barra superior: tabs + filtros + reset (alineado correctamente) */}
-                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="flex flex-wrap items-end gap-4">
-                      {/* Tabs */}
-                      <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
-                        {['posters', 'backdrops', 'background'].map((tab) => (
-                          <button
-                            key={tab}
-                            type="button"
-                            onClick={() => setActiveImagesTab(tab)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-                ${activeImagesTab === tab ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}
-              `}
-                          >
-                            {tab === 'posters' ? 'Portada' : tab === 'backdrops' ? 'Vista previa' : 'Fondo'}
-                          </button>
-                        ))}
-                      </div>
+                    {/* ✅ Misma altura que el título en desktop (md:text-3xl + py-1 ≈ 44px) */}
+                    <div className="flex items-center gap-2 sm:gap-3 h-10 md:h-11">
+                      {/* ===================== DESKTOP: tabs + filtros en línea ===================== */}
+                      <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
+                        {/* Tabs */}
+                        <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 w-fit h-10 md:h-11">
+                          {['posters', 'backdrops', 'background'].map((tab) => (
+                            <button
+                              key={tab}
+                              type="button"
+                              onClick={() => setActiveImagesTab(tab)}
+                              className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
+              ${activeImagesTab === tab
+                                  ? 'bg-white/10 text-white shadow'
+                                  : 'text-zinc-400 hover:text-zinc-200'
+                                }`}
+                              style={{ WebkitTapHighlightColor: 'transparent' }}
+                            >
+                              {tab === 'posters' ? 'Portada' : tab === 'backdrops' ? 'Vista previa' : 'Fondo'}
+                            </button>
+                          ))}
+                        </div>
 
-                      {/* Filtros */}
-                      <div className="flex flex-wrap items-end gap-3">
-                        {/* Resolución (siempre visible) */}
+                        {/* Resolución (sin label superior) */}
                         <div ref={resMenuRef} className="relative">
-                          <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">
-                            Resolución
-                          </div>
-
                           <button
                             type="button"
                             onClick={() => setResMenuOpen((v) => !v)}
-                            className="inline-flex items-center justify-between gap-2 min-w-[140px]
-                px-3 py-2 rounded-xl bg-black/35 border border-white/10
-                hover:bg-black/45 hover:border-white/15 transition text-sm text-zinc-200"
+                            className="h-10 md:h-11 inline-flex items-center justify-between gap-2 min-w-[150px]
+            px-3 rounded-xl bg-neutral-800/80 border border-white/10
+            hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/15 transition-all duration-300
+            text-sm text-zinc-200"
+                            title="Resolución"
+                            aria-label="Resolución"
+                            style={{ WebkitTapHighlightColor: 'transparent' }}
                           >
-                            <span className="font-semibold">
-                              {imagesResFilter === 'all'
-                                ? 'Todas'
-                                : imagesResFilter === '720p'
-                                  ? '720p'
-                                  : imagesResFilter === '1080p'
-                                    ? '1080p'
-                                    : imagesResFilter === '2k'
-                                      ? '2K'
-                                      : '4K'}
+                            <span className="inline-flex items-center gap-2">
+                              <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">RES</span>
+                              <span className="font-semibold">
+                                {imagesResFilter === 'all'
+                                  ? 'Todas'
+                                  : imagesResFilter === '720p'
+                                    ? '720p'
+                                    : imagesResFilter === '1080p'
+                                      ? '1080p'
+                                      : imagesResFilter === '2k'
+                                        ? '2K'
+                                        : '4K'}
+                              </span>
                             </span>
                             <ChevronDown className={`w-4 h-4 transition-transform ${resMenuOpen ? 'rotate-180' : ''}`} />
                           </button>
@@ -3240,7 +3284,7 @@ export default function DetailsClient({
                                 exit={{ opacity: 0, y: 6, scale: 0.98 }}
                                 transition={{ duration: 0.14, ease: 'easeOut' }}
                                 className="absolute left-0 top-full z-[9999] mt-2 w-44 rounded-2xl
-                    border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
+                border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
                               >
                                 <div className="py-1">
                                   {[
@@ -3260,7 +3304,7 @@ export default function DetailsClient({
                                           setResMenuOpen(false)
                                         }}
                                         className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
-                            transition ${active ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
+                        transition ${active ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
                                       >
                                         <span className="font-semibold">{opt.label}</span>
                                         {active && <Check className="w-4 h-4 text-emerald-300" />}
@@ -3273,26 +3317,31 @@ export default function DetailsClient({
                           </AnimatePresence>
                         </div>
 
-                        {/* Idioma (solo en Portada y Vista previa) */}
+                        {/* Idioma (sin label superior) */}
                         {activeImagesTab !== 'background' && (
-                          <div>
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">
-                              Idioma
-                            </div>
-                            <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
+                          <div
+                            className="h-10 md:h-11 flex items-center gap-2 px-2 rounded-xl bg-neutral-800/80 border border-white/10"
+                            title="Idioma"
+                            aria-label="Idioma"
+                          >
+                            <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90 px-1">IDI</span>
+
+                            <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
                               <button
                                 type="button"
                                 onClick={() => setLangES((v) => !v)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-                    ${langES ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
+                ${langES ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                style={{ WebkitTapHighlightColor: 'transparent' }}
                               >
                                 ES
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setLangEN((v) => !v)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-                    ${langEN ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
+                ${langEN ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                style={{ WebkitTapHighlightColor: 'transparent' }}
                               >
                                 EN
                               </button>
@@ -3300,21 +3349,176 @@ export default function DetailsClient({
                           </div>
                         )}
                       </div>
-                    </div>
 
-                    {/* Reset */}
-                    <button
-                      type="button"
-                      onClick={handleResetArtwork}
-                      className="inline-flex items-center justify-center w-10 h-10 rounded-xl
-          border border-red-500/30 bg-red-500/10 text-red-400
-          hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45 transition"
-                      title="Restaurar valores por defecto"
-                      aria-label="Restaurar valores por defecto"
-                    >
-                      <RotateCcw className="w-5 h-5" />
-                    </button>
+                      {/* ===================== MÓVIL: botón filtros + reset ===================== */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setArtworkControlsOpen((v) => !v)
+                          setResMenuOpen(false)
+                        }}
+                        className="sm:hidden inline-flex items-center justify-center w-10 h-10 rounded-xl
+        border border-white/10 bg-neutral-800/80 text-zinc-200
+        hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/20 transition-all duration-300
+        transform-gpu hover:-translate-y-0.5"
+                        title="Filtros"
+                        aria-label="Filtros"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <SlidersHorizontal className="w-5 h-5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleResetArtwork}
+                        className="inline-flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
+        border border-red-500/30 bg-red-500/10 text-red-400
+        hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45 transition"
+                        title="Restaurar valores por defecto"
+                        aria-label="Restaurar valores por defecto"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <RotateCcw className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* ✅ Panel móvil desplegable (sin labels superiores) */}
+                  <AnimatePresence>
+                    {artworkControlsOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.16, ease: 'easeOut' }}
+                        className="sm:hidden mb-4 rounded-xl overflow-hidden bg-neutral-800/80 shadow-lg border border-white/10"
+                      >
+                        <div className="p-3 space-y-3">
+                          {/* Tabs móvil */}
+                          <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
+                            {['posters', 'backdrops', 'background'].map((tab) => (
+                              <button
+                                key={tab}
+                                type="button"
+                                onClick={() => setActiveImagesTab(tab)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
+                    ${activeImagesTab === tab ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                style={{ WebkitTapHighlightColor: 'transparent' }}
+                              >
+                                {tab === 'posters' ? 'Portada' : tab === 'backdrops' ? 'Vista previa' : 'Fondo'}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Resolución móvil */}
+                          <div ref={resMenuRef} className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setResMenuOpen((v) => !v)}
+                              className="h-10 w-full inline-flex items-center justify-between gap-2
+                  px-3 rounded-xl bg-black/35 border border-white/10
+                  hover:bg-black/45 hover:border-white/15 transition text-sm text-zinc-200"
+                              title="Resolución"
+                              aria-label="Resolución"
+                              style={{ WebkitTapHighlightColor: 'transparent' }}
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
+                                  RES
+                                </span>
+                                <span className="font-semibold">
+                                  {imagesResFilter === 'all'
+                                    ? 'Todas'
+                                    : imagesResFilter === '720p'
+                                      ? '720p'
+                                      : imagesResFilter === '1080p'
+                                        ? '1080p'
+                                        : imagesResFilter === '2k'
+                                          ? '2K'
+                                          : '4K'}
+                                </span>
+                              </span>
+                              <ChevronDown className={`w-4 h-4 transition-transform ${resMenuOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            <AnimatePresence>
+                              {resMenuOpen && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                                  transition={{ duration: 0.14, ease: 'easeOut' }}
+                                  className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
+                      border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
+                                >
+                                  <div className="py-1">
+                                    {[
+                                      { id: 'all', label: 'Todas' },
+                                      { id: '720p', label: '720p' },
+                                      { id: '1080p', label: '1080p' },
+                                      { id: '2k', label: '2K' },
+                                      { id: '4k', label: '4K' }
+                                    ].map((opt) => {
+                                      const active = imagesResFilter === opt.id
+                                      return (
+                                        <button
+                                          key={opt.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setImagesResFilter(opt.id)
+                                            setResMenuOpen(false)
+                                          }}
+                                          className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
+                              transition ${active ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
+                                        >
+                                          <span className="font-semibold">{opt.label}</span>
+                                          {active && <Check className="w-4 h-4 text-emerald-300" />}
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+
+                          {/* Idioma móvil */}
+                          {activeImagesTab !== 'background' && (
+                            <div
+                              className="h-10 flex items-center gap-2 px-2 rounded-xl bg-black/35 border border-white/10"
+                              title="Idioma"
+                              aria-label="Idioma"
+                            >
+                              <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90 px-1">
+                                IDI
+                              </span>
+
+                              <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                                <button
+                                  type="button"
+                                  onClick={() => setLangES((v) => !v)}
+                                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all
+                      ${langES ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                  style={{ WebkitTapHighlightColor: 'transparent' }}
+                                >
+                                  ES
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setLangEN((v) => !v)}
+                                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all
+                      ${langEN ? 'bg-white/10 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                  style={{ WebkitTapHighlightColor: 'transparent' }}
+                                >
+                                  EN
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {imagesLoading && (
                     <div className="text-sm text-zinc-400 inline-flex items-center gap-2 mb-3">
@@ -3324,35 +3528,22 @@ export default function DetailsClient({
                   {!!imagesError && <div className="text-sm text-red-400 mb-3">{imagesError}</div>}
 
                   {(() => {
-                    const rawList = activeImagesTab === 'posters' ? imagesState.posters : imagesState.backdrops
+                    const rawList = activeImagesTab === 'posters' ? imagesState?.posters : imagesState?.backdrops
 
                     const isPoster = activeImagesTab === 'posters'
                     const aspect = isPoster ? 'aspect-[2/3]' : 'aspect-[16/9]'
                     const size = isPoster ? 'w342' : 'w780'
 
-                    // ✅ Activas separadas (fix: Vista previa ya NO marca el fondo)
                     const currentPosterActive =
-                      (selectedPosterPath || basePosterPath || data.poster_path || data.profile_path) ?? null
-
-                    // ✅ si hay un selectedPreviewBackdropPath guardado pero NO es ES/EN, lo ignoramos
-                    const selectedPreviewObj = selectedPreviewBackdropPath
-                      ? (imagesState.backdrops || []).find((b) => b?.file_path === selectedPreviewBackdropPath)
-                      : null
-
-                    const selectedPreviewLang = (selectedPreviewObj?.iso_639_1 || '').toLowerCase()
-                    const selectedPreviewValid =
-                      !selectedPreviewObj || selectedPreviewLang === 'es' || selectedPreviewLang === 'en'
+                      (selectedPosterPath || basePosterPath || data?.poster_path || data?.profile_path) ?? null
 
                     const previewFallback =
-                      pickBestBackdropByLangResVotes(imagesState.backdrops)?.file_path ||
-                      data.backdrop_path ||
-                      null
+                      pickBestBackdropByLangResVotes(imagesState?.backdrops)?.file_path || data?.backdrop_path || null
 
-                    const currentPreviewActive =
-                      selectedPreviewBackdropPath || previewFallback
+                    const currentPreviewActive = selectedPreviewBackdropPath || previewFallback
 
                     const currentBackgroundActive =
-                      (selectedBackgroundPath || baseBackdropPath || data.backdrop_path) ?? null
+                      (selectedBackgroundPath || baseBackdropPath || data?.backdrop_path) ?? null
 
                     const activePath =
                       activeImagesTab === 'posters'
@@ -3364,11 +3555,8 @@ export default function DetailsClient({
                     const filtered = (rawList || []).filter((img) => {
                       const fp = img?.file_path
                       if (!fp) return false
-
-                      // ✅ Siempre mostramos la activa aunque los filtros no coincidan (para no “perder” el check)
                       if (fp === activePath) return true
 
-                      // Resolución
                       if (imagesResFilter !== 'all') {
                         const b = imgResBucket(img)
                         const target = imagesResFilter === '2k' ? '2k' : imagesResFilter
@@ -3376,11 +3564,9 @@ export default function DetailsClient({
                       }
 
                       if (activeImagesTab === 'background') {
-                        // Fondo: solo sin idioma
                         return !img?.iso_639_1
                       }
 
-                      // Portada / Vista previa: solo ES/EN según toggles
                       const lang = (img?.iso_639_1 || '').toLowerCase()
                       if (!lang) return false
                       const okES = lang === 'es' && langES
@@ -3394,7 +3580,7 @@ export default function DetailsClient({
                       return [filtered[idx], ...filtered.slice(0, idx), ...filtered.slice(idx + 1)]
                     })()
 
-                    if (!Array.isArray(filtered) || filtered.length === 0) {
+                    if (!ordered || ordered.length === 0) {
                       return (
                         <div className="text-sm text-zinc-400">
                           No hay imágenes disponibles con los filtros actuales.
@@ -3402,33 +3588,36 @@ export default function DetailsClient({
                       )
                     }
 
+                    // ✅ 4 completos para backdrops (vista previa / fondo)
+                    const isBackdropLike = activeImagesTab !== 'posters'
+
+                    const breakpoints = isPoster
+                      ? {
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        640: { slidesPerView: 4, spaceBetween: 14 },
+                        768: { slidesPerView: 5, spaceBetween: 16 },
+                        1024: { slidesPerView: 6, spaceBetween: 18 },
+                        1280: { slidesPerView: 7, spaceBetween: 18 }
+                      }
+                      : {
+                        0: { slidesPerView: 4, spaceBetween: 12 },
+                        640: { slidesPerView: 4, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 5, spaceBetween: 18 },
+                        1280: { slidesPerView: 6, spaceBetween: 20 }
+                      }
+
                     return (
-                      // ✅ Limita overflow lateral sin cortar la animación vertical
                       <div className="relative overflow-x-hidden overflow-y-visible">
-                        {/* padding lateral: evita que 1ª/última “muerdan” el borde */}
-                        <div className="px-2 sm:px-3">
+                        <div>
                           <Swiper
                             key={activeImagesTab}
                             spaceBetween={12}
-                            slidesPerView={isPoster ? 3 : 1}
-                            breakpoints={
-                              isPoster
-                                ? {
-                                  640: { slidesPerView: 4, spaceBetween: 14 },
-                                  768: { slidesPerView: 5, spaceBetween: 16 },
-                                  1024: { slidesPerView: 6, spaceBetween: 18 },
-                                  1280: { slidesPerView: 7, spaceBetween: 18 }
-                                }
-                                : {
-                                  640: { slidesPerView: 2, spaceBetween: 14 },
-                                  768: { slidesPerView: 3, spaceBetween: 16 },
-                                  1024: { slidesPerView: 4, spaceBetween: 18 },
-                                  1280: { slidesPerView: 4, spaceBetween: 18 }
-                                }
-                            }
+                            slidesPerView={isBackdropLike ? 4 : 3}
+                            breakpoints={breakpoints}
                             className="pb-8"
                           >
-                            {ordered.map((img, idx) => {
+                            {ordered.map((img) => {
                               const filePath = img?.file_path
                               if (!filePath) return null
 
@@ -3460,6 +3649,7 @@ export default function DetailsClient({
                                         : 'border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30'
                                       }`}
                                     title="Seleccionar"
+                                    style={{ WebkitTapHighlightColor: 'transparent' }}
                                   >
                                     <div className={`w-full ${aspect} bg-black/40`}>
                                       <img
@@ -3467,7 +3657,6 @@ export default function DetailsClient({
                                         alt="option"
                                         loading="lazy"
                                         decoding="async"
-                                        // ✅ Solo escala la imagen (no el card) -> no recorta laterales en bordes
                                         className="w-full h-full object-cover transition-transform duration-700 transform-gpu
                             group-hover:scale-[1.08]"
                                       />
@@ -3477,7 +3666,6 @@ export default function DetailsClient({
                                       <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
                                     )}
 
-                                    {/* ✅ SOLO RESOLUCIÓN al hover */}
                                     {resText && (
                                       <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <span className="text-[10px] font-bold tracking-wide px-2 py-1 rounded-full
@@ -3487,7 +3675,6 @@ export default function DetailsClient({
                                       </div>
                                     )}
 
-                                    {/* copiar URL (hover) */}
                                     <div
                                       role="button"
                                       tabIndex={0}
@@ -3926,19 +4113,28 @@ export default function DetailsClient({
               )}
               {/* ===================================================== */}
               {/* ✅ TRAKT: COMENTARIOS */}
-              <section className="mb-12">
-                <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-                  <SectionTitle title="Comentarios" icon={MessageSquareIcon} />
+              <section className="mb-10">
+                <div className="mb-2 flex items-center justify-between gap-4">
+                  {/* ✅ Mantiene SectionTitle (mismo tamaño), pero sin mb interno aquí */}
+                  <SectionTitle title="Comentarios" icon={MessageSquareIcon} className="mb-0" />
 
-                  <div className="flex items-center gap-2">
+                  {/* ✅ Bloque derecho centrado al título */}
+                  <div className="flex items-center gap-2 h-10 md:h-11 transform-gpu -translate-y-[3px] md:-translate-y-[10px]">
                     <a
                       href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : `https://trakt.tv/search?query=${encodeURIComponent(title)}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 transition hover:border-yellow-500/50 hover:bg-yellow-500/10 hover:text-yellow-400"
+                      className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5
+        px-4 h-10 md:h-11 text-xs font-bold uppercase tracking-wider text-zinc-300 transition
+        hover:border-yellow-500/50 hover:bg-yellow-500/10 hover:text-yellow-400"
+                      style={{ WebkitTapHighlightColor: 'transparent' }}
                     >
                       <span className="hidden sm:inline">Ver en Trakt</span>
-                      {tComments.total > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white">{tComments.total}</span>}
+                      {tComments.total > 0 && (
+                        <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white">
+                          {tComments.total}
+                        </span>
+                      )}
                       <ExternalLink className="h-3 w-3 opacity-50 transition group-hover:opacity-100" />
                     </a>
 
@@ -3946,7 +4142,9 @@ export default function DetailsClient({
                       href={trakt?.traktUrl ? `${trakt.traktUrl}/comments` : `https://trakt.tv/search?query=${encodeURIComponent(title)}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-2 rounded-full bg-white text-black px-4 py-2 text-xs font-bold uppercase tracking-wider transition hover:bg-zinc-200"
+                      className="flex items-center gap-2 rounded-full bg-white text-black
+        px-4 h-10 md:h-11 text-xs font-bold uppercase tracking-wider transition hover:bg-zinc-200"
+                      style={{ WebkitTapHighlightColor: 'transparent' }}
                     >
                       <Plus className="h-3 w-3" />
                       <span className="hidden sm:inline">Escribir</span>
