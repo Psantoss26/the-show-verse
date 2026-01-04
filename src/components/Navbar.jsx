@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import '@/app/globals.css'
@@ -161,28 +161,6 @@ export default function Navbar() {
   const isActive = (href) =>
     pathname === href || (href !== '/' && pathname?.startsWith(href))
 
-  const topNavRef = useRef(null)
-
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const root = document.documentElement
-    const navEl = topNavRef.current
-
-    // altura real (por si cambia en el futuro)
-    const h = navEl ? Math.round(navEl.getBoundingClientRect().height) : 0
-
-    // En desktop siempre visible; en móvil depende de barsVisible
-    const offset = !isMobile ? h : (barsVisible ? h : 0)
-
-    root.style.setProperty('--app-navbar-offset', `${offset}px`)
-
-    return () => {
-      // opcional: si alguna vez desmontas Navbar
-      root.style.removeProperty('--app-navbar-offset')
-    }
-  }, [isMobile, barsVisible])
-
   const navLinkClass = (href) =>
     `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(href)
       ? 'bg-white/10 text-white'
@@ -311,7 +289,6 @@ export default function Navbar() {
     <>
       {/* ===================== TOP BAR ===================== */}
       <motion.nav
-        ref={topNavRef}
         animate={topAnimate}
         transition={{ type: 'tween', duration: 0.18 }}
         className="sticky top-0 z-40 w-full bg-black/80 backdrop-blur-md border-b border-neutral-800 will-change-transform"
