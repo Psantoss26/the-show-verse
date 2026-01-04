@@ -17,9 +17,6 @@ export default function DetailsSectionMenu({
     const [scale, setScale] = useState(1)
     const [fits, setFits] = useState(true)
 
-    // =========================
-    // Auto-fit en 1 línea (scale)
-    // =========================
     useLayoutEffect(() => {
         const el = containerRef.current
         const inner = innerRef.current
@@ -72,15 +69,8 @@ export default function DetailsSectionMenu({
 
     if (safeItems.length === 0) return null
 
-    // ✅ Ahora el sticky top depende del navbar (lo setea Navbar en :root)
-    //    Si el navbar está oculto => --app-navbar-offset = 0px => menú pegado arriba.
-    const stickyTopStyle = `calc(var(--app-navbar-offset, 0px) + env(safe-area-inset-top, 0px))`
-
     return (
-        <div
-            className={['sticky z-30 w-full', 'transition-[top] duration-200 ease-out', className].join(' ')}
-            style={{ top: stickyTopStyle, willChange: 'top' }}
-        >
+        <div className={['sticky top-0 z-30 w-full', className].join(' ')}>
             <nav className={['mx-auto w-full', maxWidthClass].join(' ')}>
                 <div
                     className="
@@ -100,7 +90,6 @@ export default function DetailsSectionMenu({
                                             'flex flex-nowrap items-center whitespace-nowrap',
                                             fits ? 'w-full justify-between' : 'w-max justify-center',
                                             'gap-1 sm:gap-2',
-                                            // ✅ un pelín más de aire lateral interno
                                             'px-5 sm:px-7',
                                         ].join(' ')}
                                         style={{
@@ -130,19 +119,22 @@ export default function DetailsSectionMenu({
                                                     title={item.label}
                                                     aria-label={item.label}
                                                 >
-                                                    {isActive && <div className="absolute inset-0 rounded-lg bg-white/10 shadow-inner" />}
+                                                    {isActive && (
+                                                        <div className="absolute inset-0 rounded-lg bg-white/10 shadow-inner" />
+                                                    )}
 
                                                     <div className="relative z-10 flex items-center gap-2">
                                                         {Icon && (
                                                             <Icon
                                                                 className={[
                                                                     'h-5 w-5 transition-colors duration-300',
-                                                                    isActive ? 'text-yellow-400' : 'text-zinc-400 group-hover:text-zinc-200',
+                                                                    isActive
+                                                                        ? 'text-yellow-400'
+                                                                        : 'text-zinc-400 group-hover:text-zinc-200',
                                                                 ].join(' ')}
                                                             />
                                                         )}
 
-                                                        {/* ✅ móvil: solo icono | >=sm: icono + texto */}
                                                         <span
                                                             className={[
                                                                 'hidden sm:inline',
