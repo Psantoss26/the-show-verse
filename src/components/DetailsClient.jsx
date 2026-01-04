@@ -231,6 +231,13 @@ export default function DetailsClient({
     return null
   }
 
+  const normalizeUrl = (u) => {
+    if (!u) return null
+    const s = String(u).trim()
+    if (!s) return null
+    return s.startsWith('http://') || s.startsWith('https://') ? s : `https://${s}`
+  }
+
   // =====================================================================
   // ✅ LISTAS (estado + modal + detección)
   // =====================================================================
@@ -1605,6 +1612,8 @@ export default function DetailsClient({
   })
   const [imdbVotesLoading, setImdbVotesLoading] = useState(false)
 
+  const [resolvedImdbId, setResolvedImdbId] = useState(null)
+
   useEffect(() => {
     let abort = false
 
@@ -1626,8 +1635,19 @@ export default function DetailsClient({
         setExtras({ imdbRating: null, imdbVotes: null, awards: null, rtScore: null, mcScore: null })
         setImdbVotesLoading(false)
 
+        // ✅ NUEVO: resetea el imdbId resuelto para este título
+        setResolvedImdbId(null)
+
         const imdbId = await resolveImdbId()
-        if (abort || !imdbId) return
+
+        // ✅ NUEVO: si el effect ya se canceló, salimos
+        if (abort) return
+
+        // ✅ NUEVO: guarda el imdbId resuelto (o null) para usarlo en links/badges
+        setResolvedImdbId(imdbId || null)
+
+        // ✅ NUEVO: si no hay imdbId, no seguimos (no se puede pedir OMDb)
+        if (!imdbId) return
 
         // ✅ cache instantáneo
         const cached = readOmdbCache(imdbId)
@@ -1646,6 +1666,7 @@ export default function DetailsClient({
         if (cached?.mcScore != null) {
           setExtras((prev) => ({ ...prev, mcScore: cached.mcScore }))
         }
+
         // si el cache está fresco y ya hay rating/votos, no hace falta pedir nada
         if (cached?.fresh && cached?.imdbRating != null && cached?.imdbVotes != null) return
 
@@ -1672,7 +1693,7 @@ export default function DetailsClient({
           mcScore
         })
 
-        // votos/premios en idle (como ya lo tenías)
+        // votos/premios en idle
         setImdbVotesLoading(true)
         runIdle(() => {
           if (abort) return
@@ -1700,8 +1721,11 @@ export default function DetailsClient({
         })
       } catch {
         if (!abort) {
-          setExtras({ imdbRating: null, imdbVotes: null, awards: null })
+          setExtras({ imdbRating: null, imdbVotes: null, awards: null, rtScore: null, mcScore: null })
           setImdbVotesLoading(false)
+
+          // ✅ NUEVO: también resetea el resolvedImdbId si hay error
+          setResolvedImdbId(null)
         }
       }
     }
@@ -1860,6 +1884,105 @@ export default function DetailsClient({
         data.original_name || data.name
       )}`
       : null
+
+  const officialSiteUrl = normalizeUrl(data?.homepage)
+
+  const justWatchUrl = title
+    ? `https://www.justwatch.com/es/buscar?q=${encodeURIComponent(title)}`
+    : null
+
+  const letterboxdUrl = title
+    ? (resolvedImdbId
+      ? `https://letterboxd.com/imdb/${encodeURIComponent(resolvedImdbId)}/`
+      : `https://letterboxd.com/search/${encodeURIComponent(title)}/`)
+    : null
+
+  // ====== External links (resolved) ======
+  const [extLinks, setExtLinks] = useState({
+    justwatch: null,
+    letterboxd: null,
+    loadingJW: false,
+    loadingLB: false,
+    errorJW: '',
+    errorLB: ''
+  })
+
+  async function fetchResolvedLink(url, { signal } = {}) {
+    const r = await fetch(url, { signal, cache: 'no-store' })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j?.error || `Request failed: ${r.status}`)
+    return j?.url || null
+  }
+
+  useEffect(() => {
+    if (!title) {
+      setExtLinks((p) => ({ ...p, justwatch: null, loadingJW: false, errorJW: '' }))
+      return
+    }
+
+    const ac = new AbortController()
+
+    const run = async () => {
+      setExtLinks((p) => ({ ...p, loadingJW: true, errorJW: '' }))
+
+      try {
+        const country = 'es'
+        const watchnow =
+          watchLink && typeof watchLink === 'string' && !watchLink.includes('themoviedb.org')
+            ? watchLink
+            : null
+
+        const qs = new URLSearchParams()
+        qs.set('country', country)
+
+        if (watchnow) qs.set('watchnow', watchnow)
+        else qs.set('title', title)
+
+        const resolved = await fetchResolvedLink(`/api/links/justwatch?${qs.toString()}`, {
+          signal: ac.signal
+        })
+
+        setExtLinks((p) => ({ ...p, justwatch: resolved || null, loadingJW: false }))
+      } catch (e) {
+        if (ac.signal.aborted) return
+        setExtLinks((p) => ({ ...p, loadingJW: false, errorJW: e?.message || 'Error' }))
+      }
+    }
+
+    run()
+    return () => ac.abort()
+  }, [title, watchLink])
+
+  useEffect(() => {
+    if (!title && !resolvedImdbId) {
+      setExtLinks((p) => ({ ...p, letterboxd: null, loadingLB: false, errorLB: '' }))
+      return
+    }
+
+    const ac = new AbortController()
+
+    const run = async () => {
+      setExtLinks((p) => ({ ...p, loadingLB: true, errorLB: '' }))
+
+      try {
+        const qs = new URLSearchParams()
+        if (resolvedImdbId) qs.set('imdb', resolvedImdbId)
+        else if (title) qs.set('title', title)
+
+        const resolved = await fetchResolvedLink(`/api/links/letterboxd?${qs.toString()}`, {
+          signal: ac.signal
+        })
+
+        setExtLinks((p) => ({ ...p, letterboxd: resolved || null, loadingLB: false }))
+      } catch (e) {
+        if (ac.signal.aborted) return
+        setExtLinks((p) => ({ ...p, loadingLB: false, errorLB: e?.message || 'Error' }))
+      }
+    }
+
+    run()
+    return () => ac.abort()
+  }, [title, resolvedImdbId])
 
   // ====== Datos meta / características (reorganizadas) ======
   const directorsOrCreators =
@@ -2498,7 +2621,7 @@ export default function DetailsClient({
                       logoClassName="h-5 sm:h-5"
                       value={Number(extras.imdbRating).toFixed(1)}
                       sub={formatCountShort(extras.imdbVotes)}
-                      href={data.imdb_id ? `https://www.imdb.com/title/${data.imdb_id}` : undefined}
+                      href={resolvedImdbId ? `https://www.imdb.com/title/${resolvedImdbId}` : undefined}
                     />
                   )}
 
@@ -2532,14 +2655,25 @@ export default function DetailsClient({
                 {/* ✅ SEPARADOR 1 (después de IMDb en móvil, porque es el último visible ahí) */}
                 <div className="w-px h-6 bg-white/10 shrink-0" />
 
-                {/* ✅ B. Links externos (entre separadores, alineados a la derecha) */}
+                {/* ✅ B. Links externos */}
                 <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
-                  {/* Web: NO en móvil */}
+                  {/* Official site (antes “Web”) */}
                   <div className="hidden sm:block">
-                    <ExternalLinkButton icon="/logo-Web.png" href={data.homepage} />
+                    <ExternalLinkButton icon="/logo-Web.png" href={officialSiteUrl} />
                   </div>
 
                   <ExternalLinkButton icon="/logoFilmaffinity.png" href={filmAffinitySearchUrl} />
+
+                  <ExternalLinkButton
+                    icon="/logo-JustWatch.png"
+                    href={extLinks.justwatch || justWatchUrl}
+                  />
+
+                  <ExternalLinkButton
+                    icon="/logo-Letterboxd.png"
+                    href={extLinks.letterboxd || letterboxdUrl}
+                  />
+
                   {type === 'tv' && (
                     <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} />
                   )}
