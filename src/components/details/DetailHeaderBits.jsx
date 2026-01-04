@@ -77,44 +77,59 @@ export function CompactBadge({
 export function ExternalLinkButton({
     icon,
     href,
-    title,
+    title = 'Enlace externo',
     onClick,
-    size = 40,      // desktop por defecto
-    iconSize = 25,  // tamaño visual del logo dentro
-    className = ''
+    size = 40,
+    iconSize = 22,
+    className = '',
+    loading = false,
+    fallbackHref = null // ✅ si aún no está resuelto, puedes abrir búsqueda (opcional)
 }) {
-    // ✅ Si no hay enlace, no se muestra el icono
-    if (!href) return null
+    const finalHref = href || fallbackHref || null
+    const disabled = !finalHref && !loading // si loading=true mostramos el botón (placeholder)
 
     return (
         <button
             type="button"
+            disabled={disabled}
             onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
+
+                // si está loading y NO hay href final (ni fallback), no hacemos nada
+                if (!finalHref) return
+
+                // si te pasan onClick, respétalo
                 if (onClick) return onClick(e)
-                window.open(href, '_blank', 'noopener,noreferrer')
+
+                window.open(finalHref, '_blank', 'noopener,noreferrer')
             }}
             title={title}
             aria-label={title}
             className={[
-                // ✅ Caja fija, alineación perfecta
-                'shrink-0 grid place-items-center',
-                // ✅ Estilo
+                'relative shrink-0 grid place-items-center',
                 'rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm',
                 'transition hover:bg-white/10 hover:border-white/20',
+                disabled ? 'opacity-0 pointer-events-none' : '', // ✅ si no hay link real, NO se muestra
                 className
             ].join(' ')}
             style={{ width: size, height: size }}
         >
+            {/* Logo */}
             <img
                 src={icon}
                 alt=""
-                // ✅ MISMO “espacio” visual para todos los logos
                 style={{ width: iconSize, height: iconSize }}
                 className="object-contain"
                 draggable="false"
             />
+
+            {/* Overlay loading (no “apaga” el icono) */}
+            {loading && (
+                <span className="absolute inset-0 grid place-items-center">
+                    <span className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white/70 animate-spin" />
+                </span>
+            )}
         </button>
     )
 }
