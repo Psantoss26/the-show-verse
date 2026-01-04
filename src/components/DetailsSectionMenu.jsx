@@ -17,6 +17,9 @@ export default function DetailsSectionMenu({
     const [scale, setScale] = useState(1)
     const [fits, setFits] = useState(true)
 
+    // =========================
+    // Auto-fit en 1 línea (scale)
+    // =========================
     useLayoutEffect(() => {
         const el = containerRef.current
         const inner = innerRef.current
@@ -69,8 +72,15 @@ export default function DetailsSectionMenu({
 
     if (safeItems.length === 0) return null
 
+    // ✅ Navbar publica aquí su offset:
+    // --app-navbar-offset: "64px" (visible) | "0px" (oculto)
+    const stickyTopStyle = 'calc(env(safe-area-inset-top, 0px) + var(--app-navbar-offset, 0px))'
+
     return (
-        <div className={['sticky top-0 z-40 w-full', className].join(' ')}>
+        <div
+            className={['sticky z-40 w-full transition-[top] duration-200 ease-out', className].join(' ')}
+            style={{ top: stickyTopStyle }}
+        >
             <nav className={['mx-auto w-full', maxWidthClass].join(' ')}>
                 <div
                     className="
@@ -90,10 +100,8 @@ export default function DetailsSectionMenu({
                                             'flex flex-nowrap items-center whitespace-nowrap',
                                             fits ? 'w-full justify-between' : 'w-max justify-center',
                                             'gap-1 sm:gap-2',
-                                            // ✅ MÁS aire lateral (antes px-2)
+                                            // ✅ aire lateral interno
                                             'px-4 sm:px-6',
-                                            // (opcional) un pelín más de padding vertical si lo quieres
-                                            // 'py-0.5',
                                         ].join(' ')}
                                         style={{
                                             transform: `scale(${scale})`,
@@ -134,6 +142,7 @@ export default function DetailsSectionMenu({
                                                             />
                                                         )}
 
+                                                        {/* ✅ móvil: solo icono | >=sm: icono + texto */}
                                                         <span
                                                             className={[
                                                                 'hidden sm:inline',
