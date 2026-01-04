@@ -1885,13 +1885,15 @@ export default function DetailsClient({
       )}`
       : null
 
+  const isMovie = endpointType === 'movie' // o: type === 'movie'
+
   const officialSiteUrl = normalizeUrl(data?.homepage)
 
   const justWatchUrl = title
     ? `https://www.justwatch.com/es/buscar?q=${encodeURIComponent(title)}`
     : null
 
-  const letterboxdUrl = title
+  const letterboxdUrl = isMovie && title
     ? (resolvedImdbId
       ? `https://letterboxd.com/imdb/${encodeURIComponent(resolvedImdbId)}/`
       : `https://letterboxd.com/search/${encodeURIComponent(title)}/`)
@@ -2669,10 +2671,9 @@ export default function DetailsClient({
                     href={extLinks.justwatch || justWatchUrl}
                   />
 
-                  <ExternalLinkButton
-                    icon="/logo-Letterboxd.png"
-                    href={extLinks.letterboxd || letterboxdUrl}
-                  />
+                  {isMovie && (
+                    <ExternalLinkButton icon="/logo-Letterboxd.png" href={letterboxdUrl} />
+                  )}
 
                   {type === 'tv' && (
                     <ExternalLinkButton icon="/logoseriesgraph.png" href={seriesGraphUrl} />
