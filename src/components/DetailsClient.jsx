@@ -1891,7 +1891,38 @@ export default function DetailsClient({
       )}`
       : null
 
-  const officialSiteUrl = normalizeUrl(data?.homepage)
+  const [traktHomepage, setTraktHomepage] = useState(null)
+
+  const tmdbOfficialSiteUrl = useMemo(() => normalizeUrl(data?.homepage), [data?.homepage])
+  const [officialSiteUrl, setOfficialSiteUrl] = useState(tmdbOfficialSiteUrl)
+
+  // reset al cambiar de item (deja el de TMDb como fallback)
+  useEffect(() => {
+    setOfficialSiteUrl(tmdbOfficialSiteUrl)
+  }, [tmdbOfficialSiteUrl, id])
+
+  // pedir official site a Trakt (si existe, pisa el de TMDb)
+  useEffect(() => {
+    if (!id) return
+    const ac = new AbortController()
+
+      ; (async () => {
+        try {
+          const r = await fetch(`/api/trakt/official-site?type=${endpointType}&tmdbId=${encodeURIComponent(id)}`, {
+            signal: ac.signal,
+            cache: 'no-store'
+          })
+          const j = await r.json().catch(() => ({}))
+          if (!r.ok) return
+          const u = normalizeUrl(j?.url)
+          if (u) setOfficialSiteUrl(u)
+        } catch {
+          // ignore
+        }
+      })()
+
+    return () => ac.abort()
+  }, [id, endpointType])
 
   const justWatchUrl = title
     ? `https://www.justwatch.com/es/buscar?q=${encodeURIComponent(title)}`
@@ -1995,7 +2026,9 @@ export default function DetailsClient({
 
     if (officialSiteUrl) items.push({ id: 'web', label: 'Web oficial', icon: '/logo-Web.png', href: officialSiteUrl })
     if (filmAffinitySearchUrl) items.push({ id: 'fa', label: 'FilmAffinity', icon: '/logoFilmaffinity.png', href: filmAffinitySearchUrl })
-    if (justWatchUrl) items.push({ id: 'jw', label: 'JustWatch', icon: '/logo-JustWatch.png', href: justWatchUrl })
+
+    const jwHref = extLinks.justwatch || justWatchUrl // fallback si fallase
+    if (jwHref) items.push({ id: 'jw', label: 'JustWatch', icon: '/logo-JustWatch.png', href: jwHref })
 
     // ✅ Letterboxd SOLO movies
     if (isMovie && letterboxdUrl) items.push({ id: 'lb', label: 'Letterboxd', icon: '/logo-Letterboxd.png', href: letterboxdUrl })
@@ -2006,7 +2039,7 @@ export default function DetailsClient({
     // if (tmdbDetailUrl) items.push({ id: 'tmdb', label: 'TMDb', icon: '/logo-TMDb.png', href: tmdbDetailUrl })
 
     return items
-  }, [officialSiteUrl, filmAffinitySearchUrl, justWatchUrl, isMovie, letterboxdUrl, type, seriesGraphUrl])
+  }, [officialSiteUrl, filmAffinitySearchUrl, justWatchUrl, extLinks.justwatch, isMovie, letterboxdUrl, type, seriesGraphUrl])
 
   // ====== Datos meta / características (reorganizadas) ======
   const directorsOrCreators =
