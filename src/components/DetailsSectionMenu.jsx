@@ -70,10 +70,8 @@ export default function DetailsSectionMenu({
     if (safeItems.length === 0) return null
 
     return (
-        // ✅ sticky SIN fondo: el fondo va dentro para poder redondear
         <div className={['sticky top-0 z-40 w-full', className].join(' ')}>
             <nav className={['mx-auto w-full', maxWidthClass].join(' ')}>
-                {/* ✅ “banda” negra redondeada */}
                 <div
                     className="
             border border-white/10 bg-black/80 backdrop-blur-xl
@@ -82,7 +80,6 @@ export default function DetailsSectionMenu({
             overflow-hidden
           "
                 >
-                    {/* ✅ separador inferior dentro del bloque */}
                     <div className="border-b border-white/5">
                         <div className="py-2">
                             <div ref={containerRef} className="w-full overflow-hidden">
@@ -93,7 +90,10 @@ export default function DetailsSectionMenu({
                                             'flex flex-nowrap items-center whitespace-nowrap',
                                             fits ? 'w-full justify-between' : 'w-max justify-center',
                                             'gap-1 sm:gap-2',
-                                            'px-2', // padding interno para que no pegue a los bordes
+                                            // ✅ MÁS aire lateral (antes px-2)
+                                            'px-4 sm:px-6',
+                                            // (opcional) un pelín más de padding vertical si lo quieres
+                                            // 'py-0.5',
                                         ].join(' ')}
                                         style={{
                                             transform: `scale(${scale})`,
@@ -129,14 +129,11 @@ export default function DetailsSectionMenu({
                                                             <Icon
                                                                 className={[
                                                                     'h-5 w-5 transition-colors duration-300',
-                                                                    isActive
-                                                                        ? 'text-yellow-400'
-                                                                        : 'text-zinc-400 group-hover:text-zinc-200',
+                                                                    isActive ? 'text-yellow-400' : 'text-zinc-400 group-hover:text-zinc-200',
                                                                 ].join(' ')}
                                                             />
                                                         )}
 
-                                                        {/* ✅ móvil: solo icono | >=sm: icono + texto */}
                                                         <span
                                                             className={[
                                                                 'hidden sm:inline',
