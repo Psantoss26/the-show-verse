@@ -72,14 +72,14 @@ export default function DetailsSectionMenu({
 
     if (safeItems.length === 0) return null
 
-    // ✅ Navbar publica aquí su offset:
-    // --app-navbar-offset: "64px" (visible) | "0px" (oculto)
-    const stickyTopStyle = 'calc(env(safe-area-inset-top, 0px) + var(--app-navbar-offset, 0px))'
+    // ✅ Ahora el sticky top depende del navbar (lo setea Navbar en :root)
+    //    Si el navbar está oculto => --app-navbar-offset = 0px => menú pegado arriba.
+    const stickyTopStyle = `calc(var(--app-navbar-offset, 0px) + env(safe-area-inset-top, 0px))`
 
     return (
         <div
-            className={['sticky z-40 w-full transition-[top] duration-200 ease-out', className].join(' ')}
-            style={{ top: stickyTopStyle }}
+            className={['sticky z-30 w-full', 'transition-[top] duration-200 ease-out', className].join(' ')}
+            style={{ top: stickyTopStyle, willChange: 'top' }}
         >
             <nav className={['mx-auto w-full', maxWidthClass].join(' ')}>
                 <div
@@ -100,8 +100,8 @@ export default function DetailsSectionMenu({
                                             'flex flex-nowrap items-center whitespace-nowrap',
                                             fits ? 'w-full justify-between' : 'w-max justify-center',
                                             'gap-1 sm:gap-2',
-                                            // ✅ aire lateral interno
-                                            'px-4 sm:px-6',
+                                            // ✅ un pelín más de aire lateral interno
+                                            'px-5 sm:px-7',
                                         ].join(' ')}
                                         style={{
                                             transform: `scale(${scale})`,
