@@ -78,34 +78,46 @@ export function ExternalLinkButton({
     icon,
     href,
     title,
-    className = "",
-    size = 24, // px
+    onClick,
+    size = 40,        // desktop por defecto
+    iconSize = 22,    // tamaño visual del logo dentro
+    className = ''
 }) {
-    if (!href) return null
+    const disabled = !href
 
     return (
-        <a
-            href={href}
-            target="_blank"
-            rel="noreferrer noopener"
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={(e) => {
+                if (disabled) return
+                e.preventDefault()
+                e.stopPropagation()
+                if (onClick) return onClick(e)
+                window.open(href, '_blank', 'noopener,noreferrer')
+            }}
             title={title}
             aria-label={title}
             className={[
-                "inline-flex items-center justify-center",
-                "opacity-90 hover:opacity-100 transition-opacity",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/40 rounded-lg",
-                className,
-            ].join(" ")}
+                // ✅ Caja fija, alineación perfecta
+                'shrink-0 grid place-items-center',
+                // ✅ Estilo
+                'rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm',
+                'transition hover:bg-white/10 hover:border-white/20',
+                disabled ? 'opacity-40 cursor-not-allowed' : '',
+                className
+            ].join(' ')}
+            style={{ width: size, height: size }}
         >
             <img
                 src={icon}
                 alt=""
-                width={size}
-                height={size}
-                className="block object-contain"
+                // ✅ MISMO “espacio” visual para todos los logos
+                style={{ width: iconSize, height: iconSize }}
+                className="object-contain"
                 draggable="false"
             />
-        </a>
+        </button>
     )
 }
 
