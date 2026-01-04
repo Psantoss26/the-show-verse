@@ -3171,7 +3171,7 @@ export default function DetailsClient({
                 items={sectionItems}
                 activeId={activeSectionId}
                 onChange={scrollToSection}
-                compact={menuCompact} // ✅ aquí ocurre el “modo compacto”
+                compact={menuCompact} // “modo compacto”
               />
             </div>
           </div>

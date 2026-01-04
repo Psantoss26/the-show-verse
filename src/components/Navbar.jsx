@@ -19,8 +19,7 @@ import {
   Menu as MenuIcon,
   HomeIcon,
   Compass,
-  Activity,
-  History
+  Activity
 } from 'lucide-react'
 import TraktHistoryNavButton from '@/components/trakt/TraktHistoryNavButton'
 
@@ -59,9 +58,7 @@ function SearchBar({ onResultClick }) {
         )
         const data = await res.json()
         const filteredResults = (data.results || []).filter(
-          (item) =>
-            item.media_type !== 'person' ||
-            item.known_for_department === 'Acting'
+          (item) => item.media_type !== 'person' || item.known_for_department === 'Acting'
         )
         setResults(filteredResults)
         setShowDropdown(true)
@@ -151,13 +148,6 @@ export default function Navbar() {
   const [showMobileSearch, setShowMobileSearch] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // Mostrar/ocultar barras (móvil) según scroll
-  const [isMobile, setIsMobile] = useState(false)
-  const [barsVisible, setBarsVisible] = useState(true)
-
-  const lastYRef = useRef(0)
-  const tickingRef = useRef(false)
-
   const isActive = (href) =>
     pathname === href || (href !== '/' && pathname?.startsWith(href))
 
@@ -213,86 +203,28 @@ export default function Navbar() {
   }
 
   const navLinkClassMobileBottom = (href) =>
-    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${isActive(href) ? 'text-blue-400' : 'text-neutral-400 hover:text-white'
+    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${isActive(href)
+      ? 'text-blue-400'
+      : 'text-neutral-400 hover:text-white'
     }`
 
   // Menú inferior fijo: 4 secciones. Si no hay sesión, fav/watchlist llevan a login.
   const favHref = hydrated && account ? '/favorites' : '/login'
   const watchHref = hydrated && account ? '/watchlist' : '/login'
 
-  // Detectar móvil (lg breakpoint)
-  useEffect(() => {
-    const calc = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 1024)
-    calc()
-    window.addEventListener('resize', calc)
-    return () => window.removeEventListener('resize', calc)
-  }, [])
-
   // Bloquear scroll cuando overlays están abiertos
   useEffect(() => {
     const locked = showMobileSearch || mobileMenuOpen
-    document.body.style.overflow = locked ? 'hidden' : 'auto'
-    // Si hay overlay, forzamos barras visibles
-    if (locked) setBarsVisible(true)
+    document.body.style.overflow = locked ? 'hidden' : ''
+    return () => {
+      document.body.style.overflow = ''
+    }
   }, [showMobileSearch, mobileMenuOpen])
-
-  // Scroll -> ocultar/mostrar (solo móvil)
-  useEffect(() => {
-    if (!isMobile) {
-      setBarsVisible(true)
-      return
-    }
-
-    const THRESHOLD = 12
-    const TOP_LOCK = 40
-
-    lastYRef.current = window.scrollY || 0
-
-    const onScroll = () => {
-      if (showMobileSearch || mobileMenuOpen) return
-
-      const currentY = window.scrollY || 0
-      const delta = currentY - lastYRef.current
-
-      if (tickingRef.current) return
-      tickingRef.current = true
-
-      requestAnimationFrame(() => {
-        if (currentY <= TOP_LOCK) {
-          setBarsVisible(true)
-        } else if (Math.abs(delta) >= THRESHOLD) {
-          if (delta > 0) setBarsVisible(false)
-          else setBarsVisible(true)
-        }
-
-        lastYRef.current = currentY
-        tickingRef.current = false
-      })
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [isMobile, showMobileSearch, mobileMenuOpen])
-
-  // Animaciones top/bottom (solo móvil)
-  const topAnimate = useMemo(() => {
-    if (!isMobile) return { y: 0 }
-    return { y: barsVisible ? 0 : -80 }
-  }, [isMobile, barsVisible])
-
-  const bottomAnimate = useMemo(() => {
-    if (!isMobile) return { y: 0 }
-    return { y: barsVisible ? 0 : 90 }
-  }, [isMobile, barsVisible])
 
   return (
     <>
       {/* ===================== TOP BAR ===================== */}
-      <motion.nav
-        animate={topAnimate}
-        transition={{ type: 'tween', duration: 0.18 }}
-        className="sticky top-0 z-40 w-full bg-black/80 backdrop-blur-md border-b border-neutral-800 will-change-transform"
-      >
+      <nav className="sticky top-0 z-40 w-full bg-black/80 backdrop-blur-md border-b border-neutral-800">
         {/* ---------------- Desktop ---------------- */}
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
           {/* Izquierda */}
@@ -327,7 +259,6 @@ export default function Navbar() {
                 <CalendarDaysIcon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
               </Link>
 
-              {/* History (verde) ya estandarizado dentro del componente */}
               <TraktHistoryNavButton />
 
               {hydrated && account && (
@@ -415,14 +346,10 @@ export default function Navbar() {
             )}
           </div>
         </div>
-      </motion.nav>
+      </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
-      <motion.div
-        animate={bottomAnimate}
-        transition={{ type: 'tween', duration: 0.18 }}
-        className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black/95 backdrop-blur-md border-t border-neutral-800 flex items-center justify-around will-change-transform"
-      >
+      <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black/95 backdrop-blur-md border-t border-neutral-800 flex items-center justify-around">
         <Link href="/movies" className={navLinkClassMobileBottom('/movies')}>
           <FilmIcon className="w-6 h-6" />
           <span className="text-xs">Películas</span>
@@ -442,7 +369,7 @@ export default function Navbar() {
           <Bookmark className="w-6 h-6" />
           <span className="text-xs">Pendientes</span>
         </Link>
-      </motion.div>
+      </div>
 
       {/* ===================== DRAWER MENÚ (MÓVIL) ===================== */}
       <AnimatePresence>
@@ -530,9 +457,7 @@ export default function Navbar() {
                 <Link
                   href="/trakt"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/trakt')
-                    ? 'bg-white/10 text-white'
-                    : 'text-neutral-300 hover:bg-white/5'
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/trakt') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
                     }`}
                 >
                   <Activity className="w-5 h-5" />
