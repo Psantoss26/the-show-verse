@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -242,13 +242,19 @@ async function apiPost(url, body) {
 // ----------------------------
 // UI COMPONENTS
 // ----------------------------
-function StatCard({ label, value, icon: Icon, colorClass = "text-white" }) {
+function StatCard({ label, value, icon: Icon, colorClass = "text-white", loading = false }) {
     return (
         <div className="flex-1 min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 backdrop-blur-sm transition hover:bg-zinc-900/70">
             <div className={`p-2 rounded-full bg-white/5 mb-1 ${colorClass}`}>
                 <Icon className="w-4 h-4" />
             </div>
-            <div className="text-2xl font-black text-white tracking-tight">{value}</div>
+            <div className="text-2xl font-black text-white tracking-tight">
+                {loading ? (
+                    <span className="inline-block h-7 w-12 rounded-lg bg-white/10 animate-pulse" />
+                ) : (
+                    value
+                )}
+            </div>
             <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">{label}</div>
         </div>
     )
@@ -591,6 +597,7 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
 export default function HistoryClient() {
     const [auth, setAuth] = useState({ loading: true, connected: false })
     const [loading, setLoading] = useState(false)
+    const [historyLoaded, setHistoryLoaded] = useState(false)
     const [raw, setRaw] = useState([])
     const [mutatingId, setMutatingId] = useState('')
 
@@ -642,11 +649,14 @@ export default function HistoryClient() {
             setRaw([])
         } finally {
             setLoading(false)
+            setHistoryLoaded(true)
         }
     }, [])
 
     useEffect(() => { loadAuth() }, [loadAuth])
-    useEffect(() => { if (!auth.loading && auth.connected) loadHistory() }, [auth.loading, auth.connected, loadHistory])
+    useLayoutEffect(() => {
+        if (!auth.loading && auth.connected) loadHistory()
+    }, [auth.loading, auth.connected, loadHistory])
 
     const removeFromHistory = useCallback(async (_entry, { historyId }) => {
         if (!historyId) return
@@ -768,10 +778,10 @@ export default function HistoryClient() {
 
                     {auth.connected && (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <StatCard label="Total Vistos" value={stats.plays} icon={CheckCircle2} colorClass="text-emerald-400 bg-emerald-500/10" />
-                            <StatCard label="Títulos Únicos" value={stats.unique} icon={LayoutList} colorClass="text-purple-400 bg-purple-500/10" />
-                            <StatCard label="Películas" value={stats.movies} icon={Film} colorClass="text-sky-400 bg-sky-500/10" />
-                            <StatCard label="Episodios" value={stats.shows} icon={Tv} colorClass="text-pink-400 bg-pink-500/10" />
+                            <StatCard label="Total Vistos" value={stats.plays} loading={!historyLoaded} icon={CheckCircle2} colorClass="text-emerald-400 bg-emerald-500/10" />
+                            <StatCard label="Títulos Únicos" value={stats.unique} loading={!historyLoaded} icon={LayoutList} colorClass="text-purple-400 bg-purple-500/10" />
+                            <StatCard label="Películas" value={stats.movies} loading={!historyLoaded} icon={Film} colorClass="text-sky-400 bg-sky-500/10" />
+                            <StatCard label="Episodios" value={stats.shows} loading={!historyLoaded} icon={Tv} colorClass="text-pink-400 bg-pink-500/10" />
                         </div>
                     )}
                 </header>
@@ -846,7 +856,7 @@ export default function HistoryClient() {
                                     Conectar ahora
                                 </button>
                             </div>
-                        ) : filtered.length === 0 && !loading ? (
+                        ) : (historyLoaded && filtered.length === 0 && !loading) ? (
                             <div className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
                                 <LayoutList className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
                                 <p className="text-zinc-500 font-medium">No se encontraron resultados.</p>
