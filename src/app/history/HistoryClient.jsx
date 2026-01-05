@@ -162,7 +162,26 @@ function getDetailsHref(entry) {
     const type = getItemType(entry)
     const tmdbId = getTmdbId(entry)
     if (!type || !tmdbId) return null
-    const mediaType = type === 'movie' ? 'movie' : 'tv'
+
+    // Película -> details/movie/:id
+    if (type === 'movie') {
+        return `/details/movie/${tmdbId}`
+    }
+
+    // Serie / Episodio -> details/tv/:id ...
+    const mediaType = 'tv'
+
+    // ✅ Si es episodio, manda a la página del episodio
+    if (isEpisodeEntry(entry)) {
+        const meta = getEpisodeMeta(entry)
+        if (meta?.season != null && meta?.episode != null) {
+            return `/details/${mediaType}/${tmdbId}/season/${meta.season}/episode/${meta.episode}`
+        }
+        // fallback si no tenemos season/episode por algún motivo
+        return `/details/${mediaType}/${tmdbId}`
+    }
+
+    // Serie normal -> details/tv/:id
     return `/details/${mediaType}/${tmdbId}`
 }
 
@@ -525,44 +544,97 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
 
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
     const baseTitle = getMainTitle(entry)
-    const inlineEp = (type === 'show' && epMeta) ? formatEpisodeInline(epMeta) : null
 
-    // ✅ título incluye T1 E1
-    const title = inlineEp ? `${baseTitle} ${inlineEp}` : baseTitle
+    // ✅ En GRID no metemos T/E dentro del título para no duplicar
+    const title = baseTitle
+
+    const episodeTitle = type === 'show' && epMeta?.title ? epMeta.title : null
+    const epBadge = type === 'show' && epMeta ? formatEpisodeBadge(epMeta) : null
 
     const { time: watchedTime } = formatWatchedLine(entry?.watched_at)
     const href = useMemo(() => getDetailsHref(entry), [entry])
     const historyId = getHistoryId(entry)
     const [confirmDel, setConfirmDel] = useState(false)
 
-    const handleDeleteClick = (e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(true) }
-    const handleConfirm = async (e) => { e.preventDefault(); e.stopPropagation(); await onRemoveFromHistory?.(entry, { historyId }) }
-    const handleCancel = (e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(false) }
-
-    // (opcional) chip con formato bonito si lo quieres en grid también
-    const epBadge = (type === 'show' && epMeta) ? formatEpisodeBadge(epMeta) : null
+    const handleDeleteClick = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setConfirmDel(true)
+    }
+    const handleConfirm = async (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        await onRemoveFromHistory?.(entry, { historyId })
+    }
+    const handleCancel = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setConfirmDel(false)
+    }
 
     const CardInner = (
         <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md hover:shadow-emerald-900/20 transition-all">
             <Poster entry={entry} className="w-full h-full" />
 
-            <div className={`absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 ${confirmDel ? 'opacity-0 pointer-events-none' : ''}`}>
-                <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+            {/* ✅ Overlay: en móvil visible por defecto; en escritorio solo con hover */}
+            <div
+                className={[
+                    'absolute inset-0 bg-black/80',
+                    'opacity-100 lg:opacity-0 lg:group-hover:opacity-100',
+                    'transition-opacity flex flex-col justify-end p-3',
+                    confirmDel ? 'opacity-0 pointer-events-none' : '',
+                    busy ? 'opacity-60 pointer-events-none grayscale' : '',
+                ].join(' ')}
+            >
+                <div className="transform translate-y-0 lg:translate-y-2 lg:group-hover:translate-y-0 transition-transform duration-300">
                     <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${type === 'movie' ? 'bg-sky-500/20 text-sky-300' : 'bg-purple-500/20 text-purple-300'}`}>
+                        <span
+                            className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${type === 'movie'
+                                ? 'bg-sky-500/20 text-sky-300'
+                                : 'bg-purple-500/20 text-purple-300'
+                                }`}
+                        >
                             {type === 'movie' ? 'Cine' : 'TV'}
                         </span>
                         <span className="text-[10px] text-zinc-400">{watchedTime}</span>
                     </div>
 
-                    {/* ✅ aquí ya sale "Juego de tronos T1 E1" */}
-                    <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">{title}</h5>
+                    {/* ✅ Título (sin T/E dentro) */}
+                    <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
+                        {title}
+                    </h5>
 
-                    {/* opcional: si quieres dejar el chip extra */}
-                    {epBadge && <span className="text-[10px] text-zinc-400">{epBadge}</span>}
+                    {/* ✅ MÓVIL: mantener lo que ya había (badge debajo del título) */}
+                    {type === 'show' && epBadge && (
+                        <div className="mt-0.5 lg:hidden text-[10px] text-zinc-400">
+                            {epBadge}
+                        </div>
+                    )}
+
+                    {/* ✅ ESCRITORIO: T03 · E03 + Título episodio en la misma línea (un pelín más grande) */}
+                    {type === 'show' && (epBadge || episodeTitle) && (
+                        <div className="mt-0.5 hidden lg:flex items-center gap-2 text-[11px] text-zinc-300/90">
+                            {epBadge && (
+                                <span className="shrink-0 font-medium text-zinc-200/90">
+                                    {epBadge}
+                                </span>
+                            )}
+                            {epBadge && episodeTitle && <span className="text-zinc-500">•</span>}
+                            {episodeTitle && (
+                                <span className="min-w-0 truncate text-zinc-300/85">
+                                    {episodeTitle}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
-                <button onClick={handleDeleteClick} className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-red-600 text-white rounded-full transition-colors backdrop-blur-sm">
+                <button
+                    onClick={handleDeleteClick}
+                    className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-red-600 text-white rounded-full transition-colors backdrop-blur-sm"
+                    title="Borrar"
+                    aria-label="Borrar"
+                >
                     <Trash2 className="w-3.5 h-3.5" />
                 </button>
             </div>
@@ -570,14 +642,24 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
             <AnimatePresence>
                 {confirmDel && (
                     <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
                         className="absolute inset-0 bg-black/95 z-20 flex flex-col items-center justify-center p-4 text-center"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <p className="text-red-200 text-xs font-bold mb-3">¿Borrar?</p>
                         <div className="flex gap-2 w-full">
-                            <button onClick={handleCancel} className="flex-1 py-1.5 rounded bg-zinc-800 text-zinc-300 text-xs font-bold">No</button>
-                            <button onClick={handleConfirm} className="flex-1 py-1.5 rounded bg-red-600 text-white text-xs font-bold flex items-center justify-center">
+                            <button
+                                onClick={handleCancel}
+                                className="flex-1 py-1.5 rounded bg-zinc-800 text-zinc-300 text-xs font-bold"
+                            >
+                                No
+                            </button>
+                            <button
+                                onClick={handleConfirm}
+                                className="flex-1 py-1.5 rounded bg-red-600 text-white text-xs font-bold flex items-center justify-center"
+                            >
                                 {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Sí'}
                             </button>
                         </div>
@@ -588,7 +670,11 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
     )
 
     if (!href) return <div>{CardInner}</div>
-    return <Link href={href} className="block">{CardInner}</Link>
+    return (
+        <Link href={href} className="block">
+            {CardInner}
+        </Link>
+    )
 }
 
 // ----------------------------
