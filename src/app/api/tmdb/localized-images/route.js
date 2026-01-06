@@ -4,12 +4,38 @@ import { NextResponse } from 'next/server'
 const TMDB = 'https://api.themoviedb.org/3'
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
-// Prioriza ES y luego EN por mayor vote_count
+function pickBestByLangThenResolution(list, opts = {}) {
+  const { preferLangs = ['en', 'en-US'], minWidth = 0 } = opts
+  if (!Array.isArray(list) || list.length === 0) return null
+
+  const area = (img) => (img?.width || 0) * (img?.height || 0)
+  const lang = (img) => img?.iso_639_1 || null
+
+  const sizeFiltered = minWidth > 0 ? list.filter((p) => (p?.width || 0) >= minWidth) : list
+  const pool0 = sizeFiltered.length ? sizeFiltered : list
+
+  const hasPreferred = pool0.some((p) => preferLangs.includes(lang(p)))
+  const pool1 = hasPreferred ? pool0.filter((p) => preferLangs.includes(lang(p))) : pool0
+
+  let best = null
+  let bestArea = -1
+  for (const p of pool1) {
+    const a = area(p)
+    if (a > bestArea) {
+      bestArea = a
+      best = p
+    }
+  }
+  return best
+}
+
+// Aplica ES -> EN -> (si no hay, cualquiera) y elige la de mayor área con minWidth
 function pickLocalized(backdrops = []) {
-  const byVotes = (a, b) => (b.vote_count || 0) - (a.vote_count || 0)
-  const es = backdrops.filter(b => b.iso_639_1 === 'es' || b.iso_639_1 === 'es-ES').sort(byVotes)
-  const en = backdrops.filter(b => b.iso_639_1 === 'en' || b.iso_639_1 === 'en-US').sort(byVotes)
-  return (es[0]?.file_path) || (en[0]?.file_path) || null
+  const best = pickBestByLangThenResolution(backdrops, {
+    preferLangs: ['es', 'es-ES', 'en', 'en-US'],
+    minWidth: 1280, // backdrops: pedimos calidad mínima razonable (ajusta si quieres)
+  })
+  return best?.file_path || null
 }
 
 async function poolMap(concurrency, items, fn) {
@@ -20,10 +46,11 @@ async function poolMap(concurrency, items, fn) {
     const tick = () => {
       while (active < concurrency && i < items.length) {
         const idx = i++
+        const item = items[idx]
         active++
-        fn(items[idx], idx)
-          .then(v => (results[idx] = v))
-          .catch(() => (results[idx] = null))
+        fn(item, idx)
+          .then((v) => (results[idx] = v))
+          .catch(() => (results[idx] = [item, null])) // evita null suelto en Object.fromEntries
           .finally(() => {
             active--
             if (i >= items.length && active === 0) resolve(results)
@@ -47,7 +74,8 @@ export async function POST(req) {
     const unique = [...new Set(ids)].slice(0, 400)
 
     const pairs = await poolMap(8, unique, async (id) => {
-      const url = `${TMDB}/${type}/${id}/images?api_key=${API_KEY}&include_image_language=es-ES,es,en-US,en`
+      // IMPORTANTE: incluye "null" para permitir backdrops sin idioma (muy comunes en TMDb)
+      const url = `${TMDB}/${type}/${id}/images?api_key=${API_KEY}&include_image_language=es,en,null`
       const r = await fetch(url, { cache: 'force-cache', next: { revalidate } })
       if (!r.ok) return [id, null]
       const j = await r.json()
