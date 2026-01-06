@@ -210,8 +210,9 @@ export default function DetailsClient({
   const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] = useState(null)
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null)
 
-  const [basePosterPath, setBasePosterPath] = useState(data.poster_path || data.profile_path || null)
-  const [baseBackdropPath, setBaseBackdropPath] = useState(data.backdrop_path || null)
+  // ✅ Evita SSR/primer render con un poster “provisional”
+  const [basePosterPath, setBasePosterPath] = useState(null)
+  const [baseBackdropPath, setBaseBackdropPath] = useState(null)
   const [artworkInitialized, setArtworkInitialized] = useState(false)
 
   const [imagesState, setImagesState] = useState(() => ({
@@ -680,10 +681,23 @@ export default function DetailsClient({
   }
 
   useLayoutEffect(() => {
+    setPosterResolved(false)
     setArtworkInitialized(false)
 
-    setBasePosterPath(data.poster_path || data.profile_path || null)
-    setBaseBackdropPath(data.backdrop_path || null)
+    const initialPoster =
+      (typeof window !== 'undefined' ? window.localStorage.getItem(posterStorageKey) : null) ||
+      data?.poster_path ||
+      data?.profile_path ||
+      null
+
+    const initialBackdrop =
+      (typeof window !== 'undefined' ? window.localStorage.getItem(backgroundStorageKey) : null) ||
+      data?.backdrop_path ||
+      null
+
+    setBaseBackdropPath(initialBackdrop)
+    setBasePosterPath(initialPoster)
+    setPosterResolved(!!initialPoster)
 
     setImagesState({
       posters: data.poster_path ? [{ file_path: data.poster_path, from: 'main' }] : [],
@@ -713,6 +727,7 @@ export default function DetailsClient({
         // ignore
       }
     }
+    setArtworkInitialized(true)
   }, [id, endpointType, data?.poster_path, data?.backdrop_path, data?.profile_path])
 
   useEffect(() => {
@@ -797,8 +812,15 @@ export default function DetailsClient({
       }
 
       if (!cancelled) {
-        setBasePosterPath(asTmdbPath(poster))
-        setBaseBackdropPath(asTmdbPath(backdrop))
+        // NO sobrescribas si ya había un póster base (evita el “swap” al terminar de cargar)
+        if (poster) {
+          setBasePosterPath((prev) => prev || asTmdbPath(poster))
+        }
+        if (backdrop) {
+          setBaseBackdropPath((prev) => prev || asTmdbPath(backdrop))
+        }
+
+        setPosterResolved(true)
         setArtworkInitialized(true)
       }
     }
@@ -812,14 +834,13 @@ export default function DetailsClient({
   const displayPosterPath =
     asTmdbPath(selectedPosterPath) ||
     asTmdbPath(basePosterPath) ||
-    asTmdbPath(data.poster_path) ||
-    asTmdbPath(data.profile_path) ||
+    asTmdbPath(data?.poster_path || data?.profile_path) ||
     null
 
   const displayBackdropPath =
     asTmdbPath(selectedBackgroundPath) ||
     asTmdbPath(baseBackdropPath) ||
-    asTmdbPath(data.backdrop_path) ||
+    asTmdbPath(data?.backdrop_path) ||
     null
 
   const mobileNeutralPosterPath = useMemo(() => {
@@ -2577,16 +2598,30 @@ export default function DetailsClient({
 
   const limitedProviders = Array.isArray(providers) ? providers.slice(0, 6) : []
 
-  const [posterImgLoaded, setPosterImgLoaded] = useState(false)
+  const [posterResolved, setPosterResolved] = useState(false) // ya sabemos si hay poster o no
+  const [posterLowLoaded, setPosterLowLoaded] = useState(false)
+  const [posterHighLoaded, setPosterHighLoaded] = useState(false)
   const [posterImgError, setPosterImgError] = useState(false)
 
   useEffect(() => {
-    setPosterImgLoaded(false)
+    setPosterLowLoaded(false)
+    setPosterHighLoaded(false)
     setPosterImgError(false)
-  }, [id, endpointType])
+  }, [displayPosterPath])
 
-  const showNoPoster = !displayPosterPath && !showPosterSkeleton
-  const showPosterSkeleton = !!displayPosterPath && !posterImgLoaded && !posterImgError
+  const posterLowUrl = displayPosterPath ? `https://image.tmdb.org/t/p/w342${displayPosterPath}` : null
+  const posterHighUrl = displayPosterPath ? `https://image.tmdb.org/t/p/w780${displayPosterPath}` : null
+
+  // Skeleton mientras:
+  // - no hemos “resuelto” si hay poster
+  // - o existe poster pero aún no ha cargado el low
+  const showPosterSkeleton =
+    !posterResolved || (displayPosterPath && !posterLowLoaded && !posterImgError)
+
+  // Icono NO IMAGE solo si ya hemos resuelto y NO hay poster (o falló)
+  const showNoPoster =
+    posterResolved && (!displayPosterPath || posterImgError)
+
 
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
@@ -2663,18 +2698,47 @@ export default function DetailsClient({
                 {showPosterSkeleton && (
                   <div className="absolute inset-0 animate-pulse bg-neutral-800/60" />
                 )}
-                {displayPosterPath && !posterImgError && (
-                  <img
-                    src={`https://image.tmdb.org/t/p/w780${displayPosterPath}`}
-                    alt={title}
-                    onLoad={() => setPosterImgLoaded(true)}
-                    onError={() => { setPosterImgError(true); setPosterImgLoaded(true); }}
-                    className={`w-full h-full object-cover transform-gpu transition-all duration-700
-            ${posterImgLoaded ? 'opacity-100' : 'opacity-0'}
+
+                {posterLowUrl && !posterImgError && (
+                  <>
+                    {/* LOW: aparece rápido */}
+                    <img
+                      src={posterLowUrl}
+                      alt={title}
+                      loading="eager"
+                      fetchPriority="high"
+                      decoding="async"
+                      onLoad={() => {
+                        setPosterLowLoaded(true)
+                        setPosterResolved(true)
+                      }}
+                      onError={() => {
+                        setPosterImgError(true)
+                        setPosterResolved(true)
+                      }}
+                      className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-all duration-700
+          ${posterLowLoaded ? 'opacity-100' : 'opacity-0'}
+          group-hover:scale-[1.03] group-hover:saturate-110`}
+                    />
+
+                    {/* HIGH: mejora de calidad encima */}
+                    {posterLowLoaded && posterHighUrl && (
+                      <img
+                        src={posterHighUrl}
+                        alt={title}
+                        loading="eager"
+                        decoding="async"
+                        onLoad={() => setPosterHighLoaded(true)}
+                        onError={() => { }}
+                        className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500
+            ${posterHighLoaded ? 'opacity-100' : 'opacity-0'}
             group-hover:scale-[1.03] group-hover:saturate-110`}
-                  />
+                      />
+                    )}
+                  </>
                 )}
-                {(showNoPoster || posterImgError) && (
+
+                {showNoPoster && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <ImageOff className="w-10 h-10 text-neutral-700" />
                   </div>
