@@ -1,34 +1,3 @@
 {
-  "movie:157336": {},
-  "movie:24428": {
-    "backdrop": "/qGT0p13Ejh6lRZTtFNURs3uT8WF.jpg"
-  },
-  "movie:299536": {
-    "backdrop": "/icUSGFn22cP2BQ0tXCIsykWVCQ.jpg"
-  },
-  "movie:1726": {
-    "poster": "/78lPtwv72eTNqFW9COBYI0dWDJa.jpg",
-    "backdrop": "/A1m5BJznmmsDyj25AnhDyFbBSJJ.jpg"
-  },
-  "movie:680": {},
-  "tv:1399": {
-    "backdrop": "/al47fx8U9uWesKoe17ovu2sd1Cy.jpg",
-    "poster": "/fw9hNiJO0U5MUg2XGyCOlTS3jdS.jpg"
-  },
-  "movie:120": {
-    "background": "/x2RS3uTcsJJ9IfjNPcgDmukoEcQ.jpg"
-  },
-  "movie:11036": {
-    "background": "/kMXamIoNIY7wfBpKavorz7ZHjn0.jpg"
-  },
-  "movie:122": {},
-  "tv:66732": {},
-  "movie:278": {
-    "background": "/pNjh59JSxChQktamG3LMp9ZoQzp.jpg"
-  },
-  "movie:453": {},
-  "movie:508": {},
-  "movie:83533": {
-    "poster": "/g96wHxU7EnoIFwemb2RgohIXrgW.jpg"
-  }
+  "movie:120": {}
 }
