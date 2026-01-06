@@ -333,6 +333,7 @@ async function getBestTrailerCached(movieId) {
 function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
     const [posterPath, setPosterPath] = useState(null)
     const [ready, setReady] = useState(false)
+    const { poster: userPoster } = getArtworkPreference(movie.id)
 
     useEffect(() => {
         let abort = false
@@ -352,13 +353,12 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
                 return
             }
 
-            if (posterOverride) {
-                const url = buildImg(posterOverride, 'w342')
-                await preloadImage(url)
+            // Si todavía NO sabemos si hay override (porque aún no cargó el fetch batch),
+            // NO elijas un póster alternativo, porque luego harás swap.
+            if (posterOverride === undefined) {
                 if (!abort) {
-                    cache.current.set(movie.id, posterOverride)
-                    setPosterPath(posterOverride)
-                    setReady(true)
+                    setPosterPath(null)
+                    setReady(false)
                 }
                 return
             }
@@ -999,8 +999,11 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                                     ? 'sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]'
                                     : ''
 
-                            const posterOverride = posterOverrides?.[m.id] || null
-                            const backdropOverride = backdropOverrides?.[m.id] || null
+                            const hasPosterOverride = Object.prototype.hasOwnProperty.call(posterOverrides || {}, m.id)
+                            const posterOverride = hasPosterOverride ? posterOverrides[m.id] : undefined
+
+                            const hasBackdropOverride = Object.prototype.hasOwnProperty.call(backdropOverrides || {}, m.id)
+                            const backdropOverride = hasBackdropOverride ? backdropOverrides[m.id] : undefined
 
                             return (
                                 <SwiperSlide key={m.id} className={isMobile ? 'select-none' : '!w-auto select-none'}>
