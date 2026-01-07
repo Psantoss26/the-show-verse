@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { getExternalIds } from '@/lib/api/tmdb'
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
+import { traktGetItemStatus, traktGetScoreboard } from '@/lib/api/traktClient'
 import {
   Loader2,
   Bookmark,
@@ -14,17 +15,59 @@ import {
   FilterX,
   ChevronDown,
   CheckCircle2,
-  Calendar,
   ArrowUpDown,
+  Layers,
+  Search,
+  Star,
 } from 'lucide-react'
 
 // ================== UTILS & CACHE ==================
 const posterChoiceCache = new Map()
 const posterInFlight = new Map()
+
+// user ratings cache (IMPORTANT: do NOT cache "null" for long, or ratings won't refresh after voting)
+const userRatingCache = new Map() // key -> { v: number|null, t: number }
+const userRatingInFlight = new Map()
+
+// trakt community rating cache
+const traktScoreCache = new Map() // key -> { v: number|null, votes: number|null, t: number }
+const traktScoreInFlight = new Map()
+
+let traktConnectedKnown = null // null | boolean
+
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const USER_RATING_TTL_MS = 10 * 60 * 1000
+const USER_RATING_TTL_NULL_MS = 45 * 1000
+const TRAKT_SCORE_TTL_MS = 24 * 60 * 60 * 1000
+
+const TMDB_BASE = 'https://api.themoviedb.org/3'
 
 function buildImg(path, size = 'w500') {
   return `https://image.tmdb.org/t/p/${size}${path}`
+}
+
+function clampNumber(v) {
+  return typeof v === 'number' && !Number.isNaN(v) ? v : null
+}
+
+function formatHalfSteps(v) {
+  if (typeof v !== 'number' || Number.isNaN(v)) return null
+  const r = Math.round(v * 2) / 2
+  return Number.isInteger(r) ? String(r) : r.toFixed(1)
+}
+
+function formatAvg(v) {
+  if (typeof v !== 'number' || Number.isNaN(v)) return '—'
+  const r = Math.round(v * 10) / 10
+  return Number.isInteger(r) ? String(r) : r.toFixed(1)
+}
+
+function normText(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
 }
 
 function preloadImage(src) {
@@ -46,10 +89,7 @@ function getPosterPreference(type, id) {
 function pickBestPosterEN(posters) {
   if (!Array.isArray(posters) || posters.length === 0) return null
 
-  const maxVotes = posters.reduce(
-    (max, p) => ((p.vote_count || 0) > max ? (p.vote_count || 0) : max),
-    0
-  )
+  const maxVotes = posters.reduce((max, p) => ((p.vote_count || 0) > max ? p.vote_count || 0 : max), 0)
   const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes)
   if (!withMaxVotes.length) return null
 
@@ -96,10 +136,9 @@ async function getBestPosterCached(type, id) {
 }
 
 /**
- * SmartPoster sin “saltos”:
- * - contenedor con aspect ratio (lo pone el wrapper padre)
- * - skeleton + img en absoluto (no mueve el layout)
- * - page wrapper con overflow-y-scroll (evita shift por scrollbar)
+ * SmartPoster:
+ * - contenedor fijo (aspect-[2/3] en wrapper)
+ * - skeleton + img superpuestos
  */
 function SmartPoster({ item, title }) {
   const type = item.media_type || (item.title ? 'movie' : 'tv')
@@ -185,7 +224,35 @@ const writeOmdbCache = (imdbId, patch) => {
   } catch { }
 }
 
-// --- UI COMPONENTS ---
+// ================== small helpers ==================
+function runPool(items, limit, worker) {
+  return new Promise((resolve) => {
+    const queue = [...items]
+    let active = 0
+    let done = 0
+    const total = queue.length
+
+    const next = () => {
+      while (active < limit && queue.length) {
+        const it = queue.shift()
+        active++
+        Promise.resolve(worker(it))
+          .catch(() => { })
+          .finally(() => {
+            active--
+            done++
+            if (done >= total) resolve()
+            else next()
+          })
+      }
+      if (total === 0) resolve()
+    }
+
+    next()
+  })
+}
+
+// ================== UI COMPONENTS ==================
 function Dropdown({ label, valueLabel, icon: Icon, children, className = '' }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -204,6 +271,7 @@ function Dropdown({ label, valueLabel, icon: Icon, children, className = '' }) {
       <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
         {label}
       </div>
+
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -247,16 +315,84 @@ function DropdownItem({ active, onClick, children }) {
   )
 }
 
-// ================== TMDb account pagination (watchlist) ==================
-const TMDB_BASE = 'https://api.themoviedb.org/3'
+// Móvil mejorado (sin overflow) + logos
+function StatBox({ label, value, icon: Icon, imgSrc, colorClass }) {
+  return (
+    <div className="flex flex-col items-start min-w-0">
+      <div className="flex items-center gap-1.5 mb-1 opacity-75 min-w-0">
+        {imgSrc ? (
+          <img src={imgSrc} alt={label} className="w-auto h-3 sm:h-3.5 object-contain opacity-85 shrink-0" />
+        ) : Icon ? (
+          <Icon className={`w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 ${colorClass}`} />
+        ) : null}
 
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">
+          {label}
+        </span>
+      </div>
+
+      <div className="flex items-baseline gap-1.5 min-w-0">
+        <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight leading-none truncate">
+          {value}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function GroupDivider({ title, stats, count, total }) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0
+
+  return (
+    <div className="my-8 sm:my-10">
+      <div className="relative overflow-hidden rounded-2xl bg-[#0a0a0a] border border-white/[0.08]">
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/[0.03] via-transparent to-transparent opacity-50" />
+
+        <div className="relative px-4 sm:px-6 py-4 sm:py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
+          <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
+            <div className="w-1.5 h-10 sm:h-12 bg-gradient-to-b from-blue-500 to-blue-600 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.35)] shrink-0" />
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight line-clamp-2 sm:line-clamp-1">
+                {title}
+              </h2>
+              <div className="mt-1 text-xs sm:text-sm text-zinc-500 font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-zinc-300 font-bold">{count}</span>
+                <span>items</span>
+                <span className="hidden sm:inline w-1 h-1 rounded-full bg-zinc-700" />
+                <span className="opacity-90">{pct}% del total</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-3 sm:pt-4 lg:pt-0 border-t border-white/5 lg:border-t-0 w-full lg:w-auto">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-4">
+              <StatBox label="IMDb" value={formatAvg(stats?.imdb?.avg)} imgSrc="/logo-IMDb.png" />
+              <StatBox label="Trakt" value={formatAvg(stats?.trakt?.avg)} imgSrc="/logo-Trakt.png" />
+              <StatBox label="TMDb" value={formatAvg(stats?.tmdb?.avg)} imgSrc="/logo-TMDb.png" />
+              <div className="sm:pl-4 sm:border-l border-white/10">
+                <StatBox
+                  label="Tu media"
+                  value={formatAvg(stats?.my?.avg)}
+                  icon={Star}
+                  colorClass="text-amber-400 fill-amber-400"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ================== TMDb account pagination (watchlist) ==================
 function getSessionId(session) {
   if (!session) return null
   if (typeof session === 'string') return session
   return session.session_id || session.id || session.sessionId || null
 }
 
-async function fetchAccountListPage({ accountId, sessionId, listKind, mediaType, page }) {
+async function fetchAccountListPage({ accountId, sessionId, listKind, mediaType, page, language }) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
   if (!apiKey || !accountId || !sessionId) throw new Error('Missing TMDb auth')
 
@@ -268,6 +404,7 @@ async function fetchAccountListPage({ accountId, sessionId, listKind, mediaType,
   url.searchParams.set('session_id', sessionId)
   url.searchParams.set('sort_by', 'created_at.desc')
   url.searchParams.set('page', String(page || 1))
+  if (language) url.searchParams.set('language', language)
 
   const r = await fetch(url.toString(), { cache: 'no-store' })
   const j = await r.json().catch(() => ({}))
@@ -281,10 +418,196 @@ async function fetchAccountListPage({ accountId, sessionId, listKind, mediaType,
     total_pages: j?.total_pages || 1,
     total_results: j?.total_results || withType.length,
     results: withType,
+    _lang: language || null,
   }
 }
 
-// --- MAIN PAGE ---
+function applyLangFields(item, lang) {
+  const isES = typeof lang === 'string' && lang.toLowerCase().startsWith('es')
+  const isEN = typeof lang === 'string' && lang.toLowerCase().startsWith('en')
+
+  const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
+  if (mediaType === 'movie') {
+    const t = item.title || item.original_title || ''
+    if (isES) item._title_es = t
+    if (isEN) item._title_en = t
+  } else {
+    const n = item.name || item.original_name || ''
+    if (isES) item._name_es = n
+    if (isEN) item._name_en = n
+  }
+  return item
+}
+
+function mergeLangInto(base, alt, altLang) {
+  if (!alt) return base
+  const out = { ...base }
+
+  applyLangFields(out, base?._lang || null)
+  const tmp = applyLangFields({ ...alt }, altLang)
+
+  if (tmp._title_es) out._title_es = tmp._title_es
+  if (tmp._title_en) out._title_en = tmp._title_en
+  if (tmp._name_es) out._name_es = tmp._name_es
+  if (tmp._name_en) out._name_en = tmp._name_en
+
+  return out
+}
+
+async function fetchAccountListPageBilingual({ accountId, sessionId, listKind, mediaType, page }) {
+  const [esRes, enRes] = await Promise.allSettled([
+    fetchAccountListPage({ accountId, sessionId, listKind, mediaType, page, language: 'es-ES' }),
+    fetchAccountListPage({ accountId, sessionId, listKind, mediaType, page, language: 'en-US' }),
+  ])
+
+  const esOk = esRes.status === 'fulfilled' ? esRes.value : null
+  const enOk = enRes.status === 'fulfilled' ? enRes.value : null
+  const base = esOk || enOk
+  if (!base) throw new Error('TMDb request failed')
+
+  const baseLang = base === esOk ? 'es-ES' : 'en-US'
+  const alt = base === esOk ? enOk : esOk
+  const altLang = base === esOk ? 'en-US' : 'es-ES'
+
+  const altMap = new Map()
+  if (alt?.results?.length) {
+    for (const it of alt.results) altMap.set(it.id, it)
+  }
+
+  const merged = []
+  for (const it of base.results || []) {
+    const a = altMap.get(it.id)
+    const b2 = mergeLangInto({ ...it, _lang: baseLang }, a, altLang)
+    merged.push(b2)
+    altMap.delete(it.id)
+  }
+
+  for (const [, it] of altMap.entries()) {
+    const extra = mergeLangInto({ ...it, _lang: altLang }, null, null)
+    merged.push(extra)
+  }
+
+  return {
+    page: base.page,
+    total_pages: base.total_pages,
+    total_results: base.total_results,
+    results: merged.map((x) => {
+      applyLangFields(x, baseLang)
+      if (altLang) applyLangFields(x, altLang)
+      return x
+    }),
+  }
+}
+
+// ================== USER / TRAKT SCORE FETCHERS ==================
+function makeKey(mediaType, id) {
+  return `${mediaType}:${id}`
+}
+
+function toTraktType(mediaType) {
+  return mediaType === 'movie' ? 'movie' : 'show'
+}
+
+async function fetchTmdbUserRating({ mediaType, id, sessionId }) {
+  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
+  if (!apiKey || !sessionId) return null
+  try {
+    const url = new URL(`${TMDB_BASE}/${mediaType}/${id}/account_states`)
+    url.searchParams.set('api_key', apiKey)
+    url.searchParams.set('session_id', sessionId)
+
+    const r = await fetch(url.toString(), { cache: 'no-store' })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) return null
+
+    const rated = j?.rated
+    if (rated && typeof rated === 'object' && typeof rated.value === 'number') return rated.value
+    return null
+  } catch {
+    return null
+  }
+}
+
+async function getUnifiedUserRatingCached({ mediaType, id, sessionId, getImdbId }) {
+  const key = makeKey(mediaType, id)
+  const now = Date.now()
+
+  const cached = userRatingCache.get(key)
+  if (cached) {
+    const ttl = cached.v == null ? USER_RATING_TTL_NULL_MS : USER_RATING_TTL_MS
+    if (now - cached.t < ttl) return cached.v
+  }
+
+  if (userRatingInFlight.has(key)) return userRatingInFlight.get(key)
+
+  const p = (async () => {
+    const tmdb = await fetchTmdbUserRating({ mediaType, id, sessionId })
+    if (typeof tmdb === 'number') {
+      userRatingCache.set(key, { v: tmdb, t: Date.now() })
+      userRatingInFlight.delete(key)
+      return tmdb
+    }
+
+    if (traktConnectedKnown === false) {
+      userRatingCache.set(key, { v: null, t: Date.now() })
+      userRatingInFlight.delete(key)
+      return null
+    }
+
+    try {
+      const imdbId = await getImdbId?.(mediaType, id)
+      const res = await traktGetItemStatus({
+        type: toTraktType(mediaType),
+        tmdbId: id,
+        imdbId: imdbId || undefined,
+      })
+
+      if (typeof res?.connected === 'boolean') traktConnectedKnown = res.connected
+      const tr = clampNumber(res?.rating)
+      userRatingCache.set(key, { v: tr, t: Date.now() })
+      userRatingInFlight.delete(key)
+      return tr
+    } catch {
+      userRatingCache.set(key, { v: null, t: Date.now() })
+      userRatingInFlight.delete(key)
+      return null
+    }
+  })()
+
+  userRatingInFlight.set(key, p)
+  return p
+}
+
+async function getTraktCommunityScoreCached({ mediaType, id }) {
+  const key = makeKey(mediaType, id)
+  const now = Date.now()
+  const cached = traktScoreCache.get(key)
+  if (cached && now - cached.t < TRAKT_SCORE_TTL_MS) return cached
+
+  if (traktScoreInFlight.has(key)) return traktScoreInFlight.get(key)
+
+  const p = (async () => {
+    try {
+      const r = await traktGetScoreboard({ type: toTraktType(mediaType), tmdbId: id })
+      const rating = typeof r?.community?.rating === 'number' ? r.community.rating : null
+      const votes = typeof r?.community?.votes === 'number' ? r.community.votes : null
+      const payload = { v: rating, votes, t: Date.now() }
+      traktScoreCache.set(key, payload)
+      traktScoreInFlight.delete(key)
+      return payload
+    } catch {
+      const payload = { v: null, votes: null, t: Date.now() }
+      traktScoreCache.set(key, payload)
+      traktScoreInFlight.delete(key)
+      return payload
+    }
+  })()
+
+  traktScoreInFlight.set(key, p)
+  return p
+}
+
+// ================== MAIN PAGE ==================
 export default function WatchlistPage() {
   const { session, account, hydrated } = useAuth()
   const [authStatus, setAuthStatus] = useState('checking')
@@ -294,12 +617,13 @@ export default function WatchlistPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(null)
 
-  // Filters
+  // Filters / Group / Sort
   const [typeFilter, setTypeFilter] = useState('all')
-  const [yearFilter, setYearFilter] = useState('')
-  const [sortBy, setSortBy] = useState('rating_desc')
+  const [query, setQuery] = useState('')
+  const [groupBy, setGroupBy] = useState('none')
+  const [sortBy, setSortBy] = useState('added_desc')
 
-  // Totales reales (TMDb)
+  // Totals (TMDb)
   const [totalMovie, setTotalMovie] = useState(0)
   const [totalTv, setTotalTv] = useState(0)
 
@@ -328,7 +652,7 @@ export default function WatchlistPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Lazy Ratings
+  // IMDb ratings
   const [imdbRatings, setImdbRatings] = useState({})
   const imdbRatingsRef = useRef({})
   const imdbInFlightRef = useRef(new Set())
@@ -336,9 +660,25 @@ export default function WatchlistPage() {
   const imdbIdCacheRef = useRef({})
   const unmountedRef = useRef(false)
 
+  // User ratings (unified)
+  const [myRatings, setMyRatings] = useState({})
+  const myRatingsRef = useRef({})
+  const myInFlightRef = useRef(new Set())
+
+  // Trakt community ratings
+  const [traktScores, setTraktScores] = useState({})
+  const traktScoresRef = useRef({})
+  const traktInFlightRef = useRef(new Set())
+
   useEffect(() => {
     imdbRatingsRef.current = imdbRatings
   }, [imdbRatings])
+  useEffect(() => {
+    myRatingsRef.current = myRatings
+  }, [myRatings])
+  useEffect(() => {
+    traktScoresRef.current = traktScores
+  }, [traktScores])
 
   useEffect(() => {
     unmountedRef.current = false
@@ -355,10 +695,38 @@ export default function WatchlistPage() {
     else setAuthStatus('anonymous')
   }, [session, account, hydrated])
 
-  // Reset visible when filters/sort change
+  // Reset visible when filters/group/sort change
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE)
-  }, [typeFilter, yearFilter, sortBy])
+  }, [typeFilter, query, groupBy, sortBy])
+
+  // Clear rating caches + state when coming back
+  useEffect(() => {
+    const refresh = () => {
+      userRatingCache.clear()
+      userRatingInFlight.clear()
+      traktConnectedKnown = null
+
+      setMyRatings({})
+      setTraktScores({})
+      myInFlightRef.current = new Set()
+      traktInFlightRef.current = new Set()
+    }
+
+    refresh()
+
+    const onFocus = () => refresh()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [])
 
   // Initial load (precarga para llegar a 42)
   useEffect(() => {
@@ -383,7 +751,6 @@ export default function WatchlistPage() {
       setError(null)
       setLoadingMore(false)
 
-      // reset paging
       setNextMoviePage(1)
       setNextTvPage(1)
       setHasMoreMovie(true)
@@ -391,10 +758,9 @@ export default function WatchlistPage() {
       seenRef.current = new Set()
 
       try {
-        // page 1 movie + tv
         const [m1, t1] = await Promise.all([
-          fetchAccountListPage({ accountId: account.id, sessionId, listKind: 'watchlist', mediaType: 'movie', page: 1 }),
-          fetchAccountListPage({ accountId: account.id, sessionId, listKind: 'watchlist', mediaType: 'tv', page: 1 }),
+          fetchAccountListPageBilingual({ accountId: account.id, sessionId, listKind: 'watchlist', mediaType: 'movie', page: 1 }),
+          fetchAccountListPageBilingual({ accountId: account.id, sessionId, listKind: 'watchlist', mediaType: 'tv', page: 1 }),
         ])
 
         if (cancelled) return
@@ -412,13 +778,12 @@ export default function WatchlistPage() {
           }
         }
 
-        // precarga extra para llegar a 42 (máx 2 requests extra)
         let unique2 = [...unique]
         let moviePageLoaded = 1
         let tvPageLoaded = 1
 
         if (unique2.length < INITIAL_VISIBLE && m1.page < m1.total_pages) {
-          const m2 = await fetchAccountListPage({
+          const m2 = await fetchAccountListPageBilingual({
             accountId: account.id,
             sessionId,
             listKind: 'watchlist',
@@ -436,7 +801,7 @@ export default function WatchlistPage() {
         }
 
         if (unique2.length < INITIAL_VISIBLE && t1.page < t1.total_pages) {
-          const t2 = await fetchAccountListPage({
+          const t2 = await fetchAccountListPageBilingual({
             accountId: account.id,
             sessionId,
             listKind: 'watchlist',
@@ -476,81 +841,199 @@ export default function WatchlistPage() {
     }
   }, [authStatus, session, account])
 
-  // Prefetch IMDb
-  const prefetchImdb = useCallback(async (item) => {
-    if (!item?.id || typeof window === 'undefined') return
-    const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
-    const key = `${mediaType}:${item.id}`
-    if (imdbRatingsRef.current?.[key] !== undefined || imdbInFlightRef.current.has(key)) return
-
-    imdbTimersRef.current[key] = window.setTimeout(async () => {
-      try {
-        imdbInFlightRef.current.add(key)
-        let imdbId = imdbIdCacheRef.current?.[key]
-        if (!imdbId) {
-          const ext = await getExternalIds(mediaType, item.id)
-          imdbId = ext?.imdb_id
-          if (imdbId) imdbIdCacheRef.current[key] = imdbId
-        }
-        if (!imdbId) {
-          if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: null }))
-          return
-        }
-        const cached = readOmdbCache(imdbId)
-        if (cached?.imdbRating != null) {
-          if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: cached.imdbRating }))
-          if (cached?.fresh) return
-        }
-        const omdb = await fetchOmdbByImdb(imdbId)
-        const r = omdb?.imdbRating && omdb.imdbRating !== 'N/A' ? Number(omdb.imdbRating) : null
-        if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: r }))
-        writeOmdbCache(imdbId, { imdbRating: r })
-      } catch {
-        if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: null }))
-      } finally {
-        imdbInFlightRef.current.delete(key)
-      }
-    }, 150)
+  // External IDs helper
+  const getImdbId = useCallback(async (mediaType, id) => {
+    const k = makeKey(mediaType, id)
+    let imdbId = imdbIdCacheRef.current?.[k]
+    if (imdbId) return imdbId
+    const ext = await getExternalIds(mediaType, id)
+    imdbId = ext?.imdb_id || null
+    if (imdbId) imdbIdCacheRef.current[k] = imdbId
+    return imdbId
   }, [])
 
-  // Process & Sort
+  const prefetchImdb = useCallback(
+    async (item) => {
+      if (!item?.id || typeof window === 'undefined') return
+      const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
+      const key = makeKey(mediaType, item.id)
+      if (imdbRatingsRef.current?.[key] !== undefined || imdbInFlightRef.current.has(key)) return
+
+      imdbTimersRef.current[key] = window.setTimeout(async () => {
+        try {
+          imdbInFlightRef.current.add(key)
+
+          const imdbId = await getImdbId(mediaType, item.id)
+          if (!imdbId) {
+            if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: null }))
+            return
+          }
+
+          const cached = readOmdbCache(imdbId)
+          if (cached?.imdbRating != null) {
+            if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: cached.imdbRating }))
+            if (cached?.fresh) return
+          }
+
+          const omdb = await fetchOmdbByImdb(imdbId)
+          const r = omdb?.imdbRating && omdb.imdbRating !== 'N/A' ? Number(omdb.imdbRating) : null
+          if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: r }))
+          writeOmdbCache(imdbId, { imdbRating: r })
+        } catch {
+          if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: null }))
+        } finally {
+          imdbInFlightRef.current.delete(key)
+        }
+      }, 150)
+    },
+    [getImdbId]
+  )
+
+  const prefetchMyRating = useCallback(
+    async (item) => {
+      const sessionId = getSessionId(session)
+      if (!item?.id || !sessionId) return
+      const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
+      const key = makeKey(mediaType, item.id)
+
+      if (myRatingsRef.current?.[key] !== undefined || myInFlightRef.current.has(key)) return
+
+      myInFlightRef.current.add(key)
+      try {
+        const v = await getUnifiedUserRatingCached({
+          mediaType,
+          id: item.id,
+          sessionId,
+          getImdbId,
+        })
+        if (!unmountedRef.current) setMyRatings((p) => ({ ...p, [key]: v }))
+      } finally {
+        myInFlightRef.current.delete(key)
+      }
+    },
+    [session, getImdbId]
+  )
+
+  const prefetchTraktScore = useCallback(async (item) => {
+    if (!item?.id) return
+    const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
+    const key = makeKey(mediaType, item.id)
+    if (traktScoresRef.current?.[key] !== undefined || traktInFlightRef.current.has(key)) return
+
+    traktInFlightRef.current.add(key)
+    try {
+      const payload = await getTraktCommunityScoreCached({ mediaType, id: item.id })
+      if (!unmountedRef.current) setTraktScores((p) => ({ ...p, [key]: payload?.v ?? null }))
+    } finally {
+      traktInFlightRef.current.delete(key)
+    }
+  }, [])
+
   const processedItems = useMemo(() => {
     let list = [...items]
+
     if (typeFilter !== 'all') list = list.filter((i) => i.media_type === typeFilter)
 
-    if (yearFilter.trim()) {
+    const q = normText(query)
+    if (q) {
       list = list.filter((i) => {
-        const date = i.media_type === 'movie' ? i.release_date : i.first_air_date
-        return date && date.slice(0, 4) === yearFilter.trim()
+        const mediaType = i.media_type || (i.title ? 'movie' : 'tv')
+        const candidates =
+          mediaType === 'movie'
+            ? [i.title, i._title_es, i._title_en, i.original_title]
+            : [i.name, i._name_es, i._name_en, i.original_name]
+
+        return candidates
+          .filter(Boolean)
+          .map(normText)
+          .some((t) => t.includes(q))
       })
     }
 
+    const getYear = (i) => {
+      const date = i.media_type === 'movie' ? i.release_date : i.first_air_date
+      const y = date ? parseInt(date.slice(0, 4), 10) : 0
+      return Number.isFinite(y) ? y : 0
+    }
+
+    const getAddedTs = (i) => {
+      const v = i?.created_at
+      const ts = v ? Date.parse(v) : 0
+      return Number.isFinite(ts) ? ts : 0
+    }
+
+    const getTitle = (i) =>
+      normText(i.title || i.name || i._title_es || i._name_es || i._title_en || i._name_en || '')
+
+    const getImdb = (i) => imdbRatingsRef.current?.[makeKey(i.media_type, i.id)]
+    const getMy = (i) => myRatingsRef.current?.[makeKey(i.media_type, i.id)]
+    const getTrakt = (i) => traktScoresRef.current?.[makeKey(i.media_type, i.id)]
+
     list.sort((a, b) => {
-      const dateA = a.media_type === 'movie' ? a.release_date : a.first_air_date
-      const dateB = b.media_type === 'movie' ? b.release_date : b.first_air_date
-      const yearA = dateA ? parseInt(dateA.slice(0, 4)) : 0
-      const yearB = dateB ? parseInt(dateB.slice(0, 4)) : 0
-      const titleA = (a.title || a.name || '').toLowerCase()
-      const titleB = (b.title || b.name || '').toLowerCase()
+      const ya = getYear(a)
+      const yb = getYear(b)
+      const ta = getTitle(a)
+      const tb = getTitle(b)
 
       switch (sortBy) {
+        case 'added_desc':
+          return getAddedTs(b) - getAddedTs(a)
+        case 'added_asc':
+          return getAddedTs(a) - getAddedTs(b)
+
         case 'year_desc':
-          return yearB - yearA
+          return yb - ya
         case 'year_asc':
-          return yearA - yearB
-        case 'rating_desc':
+          return ya - yb
+
+        case 'tmdb_desc':
           return (b.vote_average || 0) - (a.vote_average || 0)
-        case 'rating_asc':
+        case 'tmdb_asc':
           return (a.vote_average || 0) - (b.vote_average || 0)
+
+        case 'imdb_desc': {
+          const ib = getImdb(b)
+          const ia = getImdb(a)
+          return (typeof ib === 'number' ? ib : -1) - (typeof ia === 'number' ? ia : -1)
+        }
+        case 'imdb_asc': {
+          const ib = getImdb(b)
+          const ia = getImdb(a)
+          return (typeof ia === 'number' ? ia : 999) - (typeof ib === 'number' ? ib : 999)
+        }
+
+        case 'trakt_desc': {
+          const rb = getTrakt(b)
+          const ra = getTrakt(a)
+          return (typeof rb === 'number' ? rb : -1) - (typeof ra === 'number' ? ra : -1)
+        }
+        case 'trakt_asc': {
+          const rb = getTrakt(b)
+          const ra = getTrakt(a)
+          return (typeof ra === 'number' ? ra : 999) - (typeof rb === 'number' ? rb : 999)
+        }
+
+        case 'my_desc': {
+          const mb = getMy(b)
+          const ma = getMy(a)
+          return (typeof mb === 'number' ? mb : -1) - (typeof ma === 'number' ? ma : -1)
+        }
+        case 'my_asc': {
+          const mb = getMy(b)
+          const ma = getMy(a)
+          return (typeof ma === 'number' ? ma : 999) - (typeof mb === 'number' ? mb : 999)
+        }
+
         case 'title_desc':
-          return titleB.localeCompare(titleA)
+          return tb.localeCompare(ta)
+        case 'title_asc':
         default:
-          return titleA.localeCompare(titleB)
+          return ta.localeCompare(tb)
       }
     })
 
     return list
-  }, [items, typeFilter, yearFilter, sortBy])
+  }, [items, typeFilter, query, sortBy])
 
   const visibleItems = useMemo(() => processedItems.slice(0, visibleCount), [processedItems, visibleCount])
 
@@ -566,13 +1049,11 @@ export default function WatchlistPage() {
     if (loading || loadingMore) return
     if (!canLoadMore) return
 
-    // 1) Si ya hay más local, mostramos +21
     if (visibleCount < processedItems.length) {
       setVisibleCount((v) => v + UI_BATCH)
       return
     }
 
-    // 2) Si no hay más local, pedimos a TMDb
     const sessionId = getSessionId(session)
     if (!sessionId || !account?.id) return
 
@@ -585,7 +1066,7 @@ export default function WatchlistPage() {
       const tasks = []
       if (wantMovie) {
         tasks.push(
-          fetchAccountListPage({
+          fetchAccountListPageBilingual({
             accountId: account.id,
             sessionId,
             listKind: 'watchlist',
@@ -596,7 +1077,7 @@ export default function WatchlistPage() {
       }
       if (wantTv) {
         tasks.push(
-          fetchAccountListPage({
+          fetchAccountListPageBilingual({
             accountId: account.id,
             sessionId,
             listKind: 'watchlist',
@@ -611,7 +1092,8 @@ export default function WatchlistPage() {
       setItems((prev) => {
         const next = [...prev]
         for (const r of results) {
-          for (const it of r.res.results) {
+          const res = r.res
+          for (const it of res.results) {
             const k = `${it.media_type}:${it.id}`
             if (!seenRef.current.has(k)) {
               seenRef.current.add(k)
@@ -654,7 +1136,6 @@ export default function WatchlistPage() {
     nextTvPage,
   ])
 
-  // IntersectionObserver (solo cuando el usuario ya hizo scroll)
   useEffect(() => {
     if (!canLoadMore) return
     const el = sentinelRef.current
@@ -674,11 +1155,217 @@ export default function WatchlistPage() {
     return () => obs.disconnect()
   }, [loadMore, canLoadMore])
 
+  // Prefetch “Mi nota”
+  useEffect(() => {
+    if (authStatus !== 'authenticated') return
+    const sessionId = getSessionId(session)
+    if (!sessionId) return
+    const subset = visibleItems.slice(0, Math.min(visibleItems.length, INITIAL_VISIBLE))
+
+    runPool(
+      subset.filter((it) => myRatingsRef.current?.[makeKey(it.media_type, it.id)] === undefined),
+      6,
+      async (it) => {
+        await prefetchMyRating(it)
+      }
+    )
+  }, [authStatus, session, visibleItems, prefetchMyRating])
+
+  // Prefetch IMDb + Trakt para medias / ordenaciones
+  useEffect(() => {
+    const subset = visibleItems.slice(0, Math.min(visibleItems.length, INITIAL_VISIBLE))
+
+    const needsImdb = groupBy !== 'none' || sortBy.startsWith('imdb_') || groupBy === 'imdb_rating'
+    const needsTrakt = groupBy !== 'none' || sortBy.startsWith('trakt_') || groupBy === 'trakt_rating'
+
+    if (needsImdb) {
+      runPool(
+        subset.slice(0, 28).filter((it) => imdbRatingsRef.current?.[makeKey(it.media_type, it.id)] === undefined),
+        2,
+        async (it) => {
+          await prefetchImdb(it)
+        }
+      )
+    }
+
+    if (needsTrakt) {
+      runPool(
+        subset.filter((it) => traktScoresRef.current?.[makeKey(it.media_type, it.id)] === undefined),
+        4,
+        async (it) => {
+          await prefetchTraktScore(it)
+        }
+      )
+    }
+  }, [visibleItems, groupBy, sortBy, prefetchImdb, prefetchTraktScore])
+
   const totalForHeader = useMemo(() => {
     if (typeFilter === 'movie') return totalMovie || 0
     if (typeFilter === 'tv') return totalTv || 0
     return (totalMovie || 0) + (totalTv || 0)
   }, [typeFilter, totalMovie, totalTv])
+
+  const groupedSections = useMemo(() => {
+    if (groupBy === 'none') return null
+
+    const getYear = (i) => {
+      const date = i.media_type === 'movie' ? i.release_date : i.first_air_date
+      const y = date ? parseInt(date.slice(0, 4), 10) : 0
+      return Number.isFinite(y) ? y : 0
+    }
+
+    const keyToScoreBucket = (prefix, score, mode = 'int') => {
+      if (typeof score !== 'number') return { key: 'no', label: `${prefix} · Sin nota` }
+      if (mode === 'half') {
+        const s = Math.round(score * 2) / 2
+        const lbl = formatHalfSteps(s) || String(s)
+        return { key: String(s), label: `${prefix} · ${lbl}` }
+      }
+      const b = Math.floor(score)
+      const hi = b === 10 ? '10' : `${b}.x`
+      return { key: String(b), label: `${prefix} · ${hi}` }
+    }
+
+    const avgOf = (vals) => {
+      const nums = vals.filter((v) => typeof v === 'number' && !Number.isNaN(v))
+      if (!nums.length) return { avg: null, n: 0 }
+      const sum = nums.reduce((a, b) => a + b, 0)
+      return { avg: sum / nums.length, n: nums.length }
+    }
+
+    const groups = new Map()
+
+    for (const it of visibleItems) {
+      const mediaType = it.media_type || (it.title ? 'movie' : 'tv')
+      const k = makeKey(mediaType, it.id)
+
+      let gKey = 'no'
+      let gLabel = 'Sin agrupar'
+
+      if (groupBy === 'year') {
+        const y = getYear(it)
+        gKey = y ? String(y) : 'no'
+        gLabel = y ? `Año · ${y}` : 'Año · Desconocido'
+      } else if (groupBy === 'decade') {
+        const y = getYear(it)
+        const d = y ? Math.floor(y / 10) * 10 : 0
+        gKey = d ? String(d) : 'no'
+        gLabel = d ? `Década · ${d}s` : 'Década · Desconocida'
+      } else if (groupBy === 'tmdb_rating') {
+        const r = clampNumber(it.vote_average)
+        const out = keyToScoreBucket('TMDb', r, 'int')
+        gKey = out.key
+        gLabel = out.label
+      } else if (groupBy === 'imdb_rating') {
+        const r = clampNumber(imdbRatings?.[k])
+        const out = keyToScoreBucket('IMDb', r, 'int')
+        gKey = out.key
+        gLabel = out.label
+      } else if (groupBy === 'trakt_rating') {
+        const r = clampNumber(traktScores?.[k])
+        const out = keyToScoreBucket('Trakt', r, 'int')
+        gKey = out.key
+        gLabel = out.label
+      } else if (groupBy === 'user_rating') {
+        const r = clampNumber(myRatings?.[k])
+        const out = keyToScoreBucket('Mi nota', r, 'half')
+        gKey = out.key
+        gLabel = out.label
+      }
+
+      if (!groups.has(gKey)) groups.set(gKey, { title: gLabel, items: [] })
+      groups.get(gKey).items.push(it)
+    }
+
+    const entries = [...groups.entries()].map(([k, v]) => {
+      const tmdbVals = v.items.map((it) => (typeof it.vote_average === 'number' ? it.vote_average : null))
+      const imdbVals = v.items.map((it) => imdbRatings?.[makeKey(it.media_type, it.id)] ?? null)
+      const traktVals = v.items.map((it) => traktScores?.[makeKey(it.media_type, it.id)] ?? null)
+      const myVals = v.items.map((it) => myRatings?.[makeKey(it.media_type, it.id)] ?? null)
+
+      return {
+        k,
+        ...v,
+        stats: {
+          tmdb: avgOf(tmdbVals),
+          imdb: avgOf(imdbVals),
+          trakt: avgOf(traktVals),
+          my: avgOf(myVals),
+        },
+      }
+    })
+
+    const sortNumDesc = (a, b) => {
+      const na = a.k === 'no' ? -999 : Number(a.k)
+      const nb = b.k === 'no' ? -999 : Number(b.k)
+      return nb - na
+    }
+
+    if (groupBy === 'year' || groupBy === 'decade' || groupBy.endsWith('rating') || groupBy === 'user_rating') {
+      entries.sort(sortNumDesc)
+    }
+
+    entries.sort((a, b) => {
+      if (a.k === 'no') return 1
+      if (b.k === 'no') return -1
+      return 0
+    })
+
+    return entries
+  }, [groupBy, visibleItems, imdbRatings, traktScores, myRatings])
+
+  const sortLabel = useMemo(() => {
+    switch (sortBy) {
+      case 'added_desc':
+        return 'Añadido (reciente)'
+      case 'added_asc':
+        return 'Añadido (antiguo)'
+      case 'year_desc':
+        return 'Año (reciente)'
+      case 'year_asc':
+        return 'Año (antiguo)'
+      case 'tmdb_desc':
+        return 'TMDb (alta)'
+      case 'tmdb_asc':
+        return 'TMDb (baja)'
+      case 'imdb_desc':
+        return 'IMDb (alta)'
+      case 'imdb_asc':
+        return 'IMDb (baja)'
+      case 'trakt_desc':
+        return 'Trakt (alta)'
+      case 'trakt_asc':
+        return 'Trakt (baja)'
+      case 'my_desc':
+        return 'Mi nota (alta)'
+      case 'my_asc':
+        return 'Mi nota (baja)'
+      case 'title_desc':
+        return 'Z - A'
+      case 'title_asc':
+      default:
+        return 'A - Z'
+    }
+  }, [sortBy])
+
+  const groupLabel = useMemo(() => {
+    switch (groupBy) {
+      case 'year':
+        return 'Año'
+      case 'decade':
+        return 'Década'
+      case 'tmdb_rating':
+        return 'Nota TMDb'
+      case 'imdb_rating':
+        return 'Nota IMDb'
+      case 'trakt_rating':
+        return 'Nota Trakt'
+      case 'user_rating':
+        return 'Mi nota'
+      default:
+        return 'Sin agrupar'
+    }
+  }, [groupBy])
 
   // --- UI states ---
   if (authStatus === 'checking') {
@@ -694,7 +1381,7 @@ export default function WatchlistPage() {
       <div className="min-h-screen bg-[#101010] overflow-y-scroll max-w-7xl mx-auto px-4 py-20 flex flex-col items-center justify-center text-center">
         <Bookmark className="w-16 h-16 text-neutral-700 mb-4" />
         <h1 className="text-3xl font-bold text-white mb-2">Pendientes</h1>
-        <p className="text-neutral-400 mb-6">Inicia sesión para ver tu lista de seguimiento.</p>
+        <p className="text-neutral-400 mb-6">Inicia sesión para ver tu lista.</p>
         <Link href="/login" className="px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-neutral-200">
           Iniciar Sesión
         </Link>
@@ -704,7 +1391,6 @@ export default function WatchlistPage() {
 
   return (
     <div className="min-h-screen bg-[#101010] overflow-y-scroll text-gray-100 font-sans selection:bg-blue-500/30">
-      {/* Background Ambient */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-1/4 w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-10%] right-1/4 w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[100px]" />
@@ -712,7 +1398,7 @@ export default function WatchlistPage() {
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Header */}
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20">
               <Bookmark className="w-8 h-8 text-blue-500 fill-current" />
@@ -723,7 +1409,7 @@ export default function WatchlistPage() {
             </div>
           </div>
 
-          {/* Filtros */}
+          {/* Filters */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full xl:w-auto">
             <Dropdown
               label="Tipo"
@@ -732,55 +1418,275 @@ export default function WatchlistPage() {
             >
               {({ close }) => (
                 <>
-                  <DropdownItem active={typeFilter === 'all'} onClick={() => { setTypeFilter('all'); close() }}>
+                  <DropdownItem
+                    active={typeFilter === 'all'}
+                    onClick={() => {
+                      setTypeFilter('all')
+                      close()
+                    }}
+                  >
                     Todo
                   </DropdownItem>
-                  <DropdownItem active={typeFilter === 'movie'} onClick={() => { setTypeFilter('movie'); close() }}>
+                  <DropdownItem
+                    active={typeFilter === 'movie'}
+                    onClick={() => {
+                      setTypeFilter('movie')
+                      close()
+                    }}
+                  >
                     Películas
                   </DropdownItem>
-                  <DropdownItem active={typeFilter === 'tv'} onClick={() => { setTypeFilter('tv'); close() }}>
+                  <DropdownItem
+                    active={typeFilter === 'tv'}
+                    onClick={() => {
+                      setTypeFilter('tv')
+                      close()
+                    }}
+                  >
                     Series
                   </DropdownItem>
                 </>
               )}
             </Dropdown>
 
-            <Dropdown
-              label="Ordenar"
-              valueLabel={sortBy.includes('year') ? 'Año' : sortBy.includes('rating') ? 'Nota' : 'Título'}
-              icon={ArrowUpDown}
-            >
+            <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Layers}>
               {({ close }) => (
                 <>
-                  <DropdownItem active={sortBy === 'rating_desc'} onClick={() => { setSortBy('rating_desc'); close() }}>
-                    Nota (+ a -)
+                  <DropdownItem
+                    active={groupBy === 'none'}
+                    onClick={() => {
+                      setGroupBy('none')
+                      close()
+                    }}
+                  >
+                    Sin agrupar
                   </DropdownItem>
-                  <DropdownItem active={sortBy === 'year_desc'} onClick={() => { setSortBy('year_desc'); close() }}>
-                    Año (Reciente)
+
+                  <DropdownItem
+                    active={groupBy === 'year'}
+                    onClick={() => {
+                      setGroupBy('year')
+                      close()
+                    }}
+                  >
+                    Año
                   </DropdownItem>
-                  <DropdownItem active={sortBy === 'year_asc'} onClick={() => { setSortBy('year_asc'); close() }}>
-                    Año (Antiguo)
+
+                  <DropdownItem
+                    active={groupBy === 'decade'}
+                    onClick={() => {
+                      setGroupBy('decade')
+                      close()
+                    }}
+                  >
+                    Década
                   </DropdownItem>
-                  <DropdownItem active={sortBy === 'title_asc'} onClick={() => { setSortBy('title_asc'); close() }}>
-                    A - Z
+
+                  <DropdownItem
+                    active={groupBy === 'tmdb_rating'}
+                    onClick={() => {
+                      setGroupBy('tmdb_rating')
+                      close()
+                    }}
+                  >
+                    Nota TMDb
+                  </DropdownItem>
+
+                  <DropdownItem
+                    active={groupBy === 'trakt_rating'}
+                    onClick={() => {
+                      setGroupBy('trakt_rating')
+                      close()
+                    }}
+                  >
+                    Nota Trakt
+                  </DropdownItem>
+
+                  <DropdownItem
+                    active={groupBy === 'imdb_rating'}
+                    onClick={() => {
+                      setGroupBy('imdb_rating')
+                      close()
+                    }}
+                  >
+                    Nota IMDb
+                  </DropdownItem>
+
+                  <DropdownItem
+                    active={groupBy === 'user_rating'}
+                    onClick={() => {
+                      setGroupBy('user_rating')
+                      close()
+                    }}
+                  >
+                    Mi nota
                   </DropdownItem>
                 </>
               )}
             </Dropdown>
 
-            <div className="col-span-2 sm:col-span-2 relative group">
+            <Dropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown}>
+              {({ close }) => (
+                <>
+                  <DropdownItem
+                    active={sortBy === 'added_desc'}
+                    onClick={() => {
+                      setSortBy('added_desc')
+                      close()
+                    }}
+                  >
+                    Añadido (reciente)
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === 'added_asc'}
+                    onClick={() => {
+                      setSortBy('added_asc')
+                      close()
+                    }}
+                  >
+                    Añadido (antiguo)
+                  </DropdownItem>
+
+                  <DropdownItem
+                    active={sortBy === 'tmdb_desc'}
+                    onClick={() => {
+                      setSortBy('tmdb_desc')
+                      close()
+                    }}
+                  >
+                    TMDb (alta)
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === 'tmdb_asc'}
+                    onClick={() => {
+                      setSortBy('tmdb_asc')
+                      close()
+                    }}
+                  >
+                    TMDb (baja)
+                  </DropdownItem>
+
+                  <DropdownItem
+                    active={sortBy === 'trakt_desc'}
+                    onClick={() => {
+                      setSortBy('trakt_desc')
+                      close()
+                    }}
+                  >
+                    Trakt (alta)
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === 'trakt_asc'}
+                    onClick={() => {
+                      setSortBy('trakt_asc')
+                      close()
+                    }}
+                  >
+                    Trakt (baja)
+                  </DropdownItem>
+
+                  <DropdownItem
+                    active={sortBy === 'imdb_desc'}
+                    onClick={() => {
+                      setSortBy('imdb_desc')
+                      close()
+                    }}
+                  >
+                    IMDb (alta)
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === 'imdb_asc'}
+                    onClick={() => {
+                      setSortBy('imdb_asc')
+                      close()
+                    }}
+                  >
+                    IMDb (baja)
+                  </DropdownItem>
+
+                  <DropdownItem
+                    active={sortBy === 'my_desc'}
+                    onClick={() => {
+                      setSortBy('my_desc')
+                      close()
+                    }}
+                  >
+                    Mi nota (alta)
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === 'my_asc'}
+                    onClick={() => {
+                      setSortBy('my_asc')
+                      close()
+                    }}
+                  >
+                    Mi nota (baja)
+                  </DropdownItem>
+
+                  <DropdownItem
+                    active={sortBy === 'year_desc'}
+                    onClick={() => {
+                      setSortBy('year_desc')
+                      close()
+                    }}
+                  >
+                    Año (reciente)
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === 'year_asc'}
+                    onClick={() => {
+                      setSortBy('year_asc')
+                      close()
+                    }}
+                  >
+                    Año (antiguo)
+                  </DropdownItem>
+
+                  <DropdownItem
+                    active={sortBy === 'title_asc'}
+                    onClick={() => {
+                      setSortBy('title_asc')
+                      close()
+                    }}
+                  >
+                    A - Z
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === 'title_desc'}
+                    onClick={() => {
+                      setSortBy('title_desc')
+                      close()
+                    }}
+                  >
+                    Z - A
+                  </DropdownItem>
+                </>
+              )}
+            </Dropdown>
+
+            {/* Search */}
+            <div className="relative group z-10">
               <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
-                Año
+                Buscar
               </div>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-zinc-300 transition-colors" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-zinc-300 transition-colors" />
                 <input
-                  type="number"
-                  placeholder="Filtrar por año..."
-                  value={yearFilter}
-                  onChange={(e) => setYearFilter(e.target.value)}
-                  className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-all"
+                  type="text"
+                  placeholder="Buscar"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-all"
                 />
+                {query?.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] rounded-lg bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 transition"
+                  >
+                    Limpiar
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -801,8 +1707,9 @@ export default function WatchlistPage() {
             <button
               onClick={() => {
                 setTypeFilter('all')
-                setYearFilter('')
-                setSortBy('rating_desc')
+                setGroupBy('none')
+                setSortBy('added_desc')
+                setQuery('')
               }}
               className="mt-4 text-sm text-blue-500 font-bold hover:underline"
             >
@@ -811,78 +1718,201 @@ export default function WatchlistPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6">
-              {visibleItems.map((item) => {
-                const isMovie = item.media_type === 'movie'
-                const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
-                const href = `/details/${mediaType}/${item.id}`
-                const title = isMovie ? item.title : item.name
-                const date = isMovie ? item.release_date : item.first_air_date
-                const year = date ? date.slice(0, 4) : ''
-                const imdbKey = `${mediaType}:${item.id}`
-                const imdbScore = imdbRatings[imdbKey]
+            {groupedSections ? (
+              <div>
+                {groupedSections.map((section) => (
+                  <div key={`grp-${section.k}`}>
+                    <GroupDivider title={section.title} stats={section.stats} count={section.items.length} total={visibleItems.length} />
 
-                return (
-                  <Link
-                    key={`${mediaType}-${item.id}`}
-                    href={href}
-                    className="group block relative w-full h-full"
-                    title={title}
-                    onMouseEnter={() => prefetchImdb(item)}
-                    onFocus={() => prefetchImdb(item)}
-                  >
-                    <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] z-0">
-                      <SmartPoster item={item} title={title} />
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6">
+                      {section.items.map((item) => {
+                        const isMovie = item.media_type === 'movie'
+                        const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
+                        const href = `/details/${mediaType}/${item.id}`
+                        const title = isMovie ? item.title : item.name
+                        const date = isMovie ? item.release_date : item.first_air_date
+                        const year = date ? date.slice(0, 4) : ''
+                        const key = makeKey(mediaType, item.id)
+                        const imdbScore = imdbRatings[key]
+                        const myScore = myRatings[key]
+                        const myLabel = formatHalfSteps(myScore)
 
-                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
-                        {/* Top: Type & Ratings */}
-                        <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                          <span
-                            className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
-                              ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                              : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                              }`}
+                        return (
+                          <Link
+                            key={`${mediaType}-${item.id}`}
+                            href={href}
+                            className="group block relative w-full h-full"
+                            title={title}
+                            onMouseEnter={() => {
+                              prefetchImdb(item)
+                              prefetchMyRating(item)
+                              prefetchTraktScore(item)
+                            }}
+                            onFocus={() => {
+                              prefetchImdb(item)
+                              prefetchMyRating(item)
+                              prefetchTraktScore(item)
+                            }}
                           >
-                            {isMovie ? 'PELÍCULA' : 'SERIE'}
-                          </span>
+                            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] z-0">
+                              <SmartPoster item={item} title={title} />
 
-                          <div className="flex flex-col items-end gap-1">
-                            {item.vote_average > 0 && (
-                              <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                                  {item.vote_average.toFixed(1)}
-                                </span>
-                                <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
+                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
+                                <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
+                                  <span
+                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
+                                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                                      : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                                      }`}
+                                  >
+                                    {isMovie ? 'PELÍCULA' : 'SERIE'}
+                                  </span>
+
+                                  <div className="flex flex-col items-end gap-1">
+                                    {item.vote_average > 0 && (
+                                      <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                        <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
+                                          {item.vote_average.toFixed(1)}
+                                        </span>
+                                        <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
+                                      </div>
+                                    )}
+                                    {typeof imdbScore === 'number' && imdbScore > 0 && (
+                                      <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                        <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
+                                          {imdbScore.toFixed(1)}
+                                        </span>
+                                        <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
+                                  <div className="flex items-end justify-between gap-3">
+                                    <div className="min-w-0 text-left">
+                                      <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-md">
+                                        {title}
+                                      </h3>
+                                      {year && (
+                                        <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
+                                          {year}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {myLabel ? (
+                                      <div className="shrink-0 self-end opacity-0 translate-y-1 scale-[0.98] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 transition-all duration-300">
+                                        <span className="text-2xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">
+                                          {myLabel}
+                                        </span>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                            {typeof imdbScore === 'number' && imdbScore > 0 && (
-                              <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                                  {imdbScore.toFixed(1)}
-                                </span>
-                                <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
+                            </div>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6">
+                {visibleItems.map((item) => {
+                  const isMovie = item.media_type === 'movie'
+                  const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
+                  const href = `/details/${mediaType}/${item.id}`
+                  const title = isMovie ? item.title : item.name
+                  const date = isMovie ? item.release_date : item.first_air_date
+                  const year = date ? date.slice(0, 4) : ''
+                  const key = makeKey(mediaType, item.id)
+                  const imdbScore = imdbRatings[key]
+                  const myScore = myRatings[key]
+                  const myLabel = formatHalfSteps(myScore)
+
+                  return (
+                    <Link
+                      key={`${mediaType}-${item.id}`}
+                      href={href}
+                      className="group block relative w-full h-full"
+                      title={title}
+                      onMouseEnter={() => {
+                        prefetchImdb(item)
+                        prefetchMyRating(item)
+                        prefetchTraktScore(item)
+                      }}
+                      onFocus={() => {
+                        prefetchImdb(item)
+                        prefetchMyRating(item)
+                        prefetchTraktScore(item)
+                      }}
+                    >
+                      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] z-0">
+                        <SmartPoster item={item} title={title} />
+
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
+                          <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
+                            <span
+                              className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
+                                ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                                : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                                }`}
+                            >
+                              {isMovie ? 'PELÍCULA' : 'SERIE'}
+                            </span>
+
+                            <div className="flex flex-col items-end gap-1">
+                              {item.vote_average > 0 && (
+                                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                  <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
+                                    {item.vote_average.toFixed(1)}
+                                  </span>
+                                  <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
+                                </div>
+                              )}
+                              {typeof imdbScore === 'number' && imdbScore > 0 && (
+                                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                  <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
+                                    {imdbScore.toFixed(1)}
+                                  </span>
+                                  <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
+                            <div className="flex items-end justify-between gap-3">
+                              <div className="min-w-0 text-left">
+                                <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-md">
+                                  {title}
+                                </h3>
+                                {year && (
+                                  <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
+                                    {year}
+                                  </p>
+                                )}
                               </div>
-                            )}
+
+                              {myLabel ? (
+                                <div className="shrink-0 self-end opacity-0 translate-y-1 scale-[0.98] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 transition-all duration-300">
+                                  <span className="text-2xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">
+                                    {myLabel}
+                                  </span>
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
-
-                        {/* Bottom: Info */}
-                        <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 text-left">
-                          <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-md">
-                            {title}
-                          </h3>
-                          {year && (
-                            <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
-                              {year}
-                            </p>
-                          )}
-                        </div>
                       </div>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Sentinel + Loader */}
             <div ref={sentinelRef} className="h-10" />
