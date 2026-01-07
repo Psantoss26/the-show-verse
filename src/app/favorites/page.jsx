@@ -332,65 +332,84 @@ function DropdownItem({ active, onClick, children }) {
   )
 }
 
-// Versión actualizada: sin recuento a la derecha y con soporte para imágenes
+// Versión móvil mejorada: tamaños adaptativos + sin min-width rígido
 function StatBox({ label, value, icon: Icon, imgSrc, colorClass }) {
   return (
-    <div className="flex flex-col items-start min-w-[70px]">
-      <div className="flex items-center gap-1.5 mb-1 opacity-70">
+    <div className="flex flex-col items-start min-w-0">
+      <div className="flex items-center gap-1.5 mb-1 opacity-75 min-w-0">
         {imgSrc ? (
-          <img src={imgSrc} alt={label} className="w-auto h-3 object-contain opacity-80" />
-        ) : (
-          Icon && <Icon className={`w-3 h-3 ${colorClass}`} />
-        )}
-        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{label}</span>
+          <img
+            src={imgSrc}
+            alt={label}
+            className="w-auto h-3 sm:h-3.5 object-contain opacity-85 shrink-0"
+          />
+        ) : Icon ? (
+          <Icon className={`w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 ${colorClass}`} />
+        ) : null}
+
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">
+          {label}
+        </span>
       </div>
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-xl font-black text-white tabular-nums tracking-tight leading-none">{value}</span>
+
+      <div className="flex items-baseline gap-1.5 min-w-0">
+        <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight leading-none truncate">
+          {value}
+        </span>
       </div>
     </div>
   )
 }
 
 /**
- * Cabecera de grupo mejorada:
- * - Título limpio
- * - Estadísticas con Logos oficiales
- * - Sin recuentos adicionales en las medias
+ * Cabecera de grupo: layout responsive
+ * - Móvil: título en 2 líneas + stats en grid 2x2
+ * - Desktop: mantiene look “premium” y alineación horizontal
  */
 function GroupDivider({ title, stats, count, total }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
 
   return (
-    <div className="my-10">
+    <div className="my-8 sm:my-10">
       <div className="relative overflow-hidden rounded-2xl bg-[#0a0a0a] border border-white/[0.08]">
+        {/* Fondo sutil */}
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/[0.03] via-transparent to-transparent opacity-50" />
 
-        <div className="relative px-6 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="w-1.5 h-12 bg-gradient-to-b from-red-500 to-red-600 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.4)]" />
-            <div>
-              <h2 className="text-2xl font-black tracking-tight text-white truncate">{title}</h2>
-              <div className="flex items-center gap-2 mt-1 text-sm text-zinc-500 font-medium">
+        <div className="relative px-4 sm:px-6 py-4 sm:py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
+          {/* Título del grupo */}
+          <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
+            <div className="w-1.5 h-10 sm:h-12 bg-gradient-to-b from-red-500 to-red-600 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0" />
+
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight line-clamp-2 sm:line-clamp-1">
+                {title}
+              </h2>
+
+              <div className="mt-1 text-xs sm:text-sm text-zinc-500 font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="text-zinc-300 font-bold">{count}</span>
                 <span>items</span>
-                <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                <span>{pct}% del total</span>
+                <span className="hidden sm:inline w-1 h-1 rounded-full bg-zinc-700" />
+                <span className="opacity-90">{pct}% del total</span>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-4 pt-4 lg:pt-0 border-t border-white/5 lg:border-t-0">
-            <StatBox label="IMDb" value={formatAvg(stats?.imdb?.avg)} imgSrc="/logo-IMDb.png" />
-            <StatBox label="Trakt" value={formatAvg(stats?.trakt?.avg)} imgSrc="/logo-Trakt.png" />
-            <StatBox label="TMDb" value={formatAvg(stats?.tmdb?.avg)} imgSrc="/logo-TMDb.png" />
+          {/* Stats */}
+          <div className="pt-3 sm:pt-4 lg:pt-0 border-t border-white/5 lg:border-t-0 w-full lg:w-auto">
+            {/* Móvil: grid 2x2 | Desktop: fila */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-4">
+              <StatBox label="IMDb" value={formatAvg(stats?.imdb?.avg)} imgSrc="/logo-IMDb.png" />
+              <StatBox label="Trakt" value={formatAvg(stats?.trakt?.avg)} imgSrc="/logo-Trakt.png" />
+              <StatBox label="TMDb" value={formatAvg(stats?.tmdb?.avg)} imgSrc="/logo-TMDb.png" />
 
-            <div className="pl-4 lg:border-l border-white/10">
-              <StatBox
-                label="Tu media"
-                value={formatAvg(stats?.my?.avg)}
-                icon={Star}
-                colorClass="text-amber-400 fill-amber-400"
-              />
+              <div className="sm:pl-4 sm:border-l border-white/10">
+                <StatBox
+                  label="Tu media"
+                  value={formatAvg(stats?.my?.avg)}
+                  icon={Star}
+                  colorClass="text-amber-400 fill-amber-400"
+                />
+              </div>
             </div>
           </div>
         </div>
