@@ -1,3 +1,4 @@
+// /src/app/auth/tmdb/callback/CallbackClient.jsx
 'use client'
 
 import { useEffect } from 'react'
