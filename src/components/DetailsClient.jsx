@@ -2297,30 +2297,6 @@ export default function DetailsClient({
 
   const [activeSection, setActiveSection] = useState(() => null)
 
-  const movieDirectorNames = useMemo(() => {
-    const crew =
-      (Array.isArray(data?.credits?.crew) && data.credits.crew.length)
-        ? data.credits.crew
-        : (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
-
-    const names = crew
-      .filter((c) => c?.job === 'Director' || c?.job === 'Co-Director')
-      .map((c) => c?.name)
-      .filter(Boolean)
-
-    return names.length ? names.join(', ') : null
-  }, [data?.credits?.crew, movieDirectorsCrew])
-
-  const tvCreatorNames = useMemo(() => {
-    const creators =
-      (Array.isArray(data?.created_by) && data.created_by.length)
-        ? data.created_by
-        : (Array.isArray(tvCreators) ? tvCreators : [])
-
-    const names = creators.map((c) => c?.name).filter(Boolean)
-    return names.length ? names.join(', ') : null
-  }, [data?.created_by, tvCreators])
-
   // ✅ cuando cambie type, fija una sección inicial válida
   useEffect(() => {
     setActiveSection(null)
@@ -2369,198 +2345,29 @@ export default function DetailsClient({
     return v.toFixed(1) // punto
   }, [tScoreboard.rating])
 
-  // =====================================================
-  // ✅ CAST: mantener orden TMDb + evitar cast incompleto
-  // =====================================================
-  const [tmdbCast, setTmdbCast] = useState([])
-  const [tmdbCastLoading, setTmdbCastLoading] = useState(false)
-  const [tmdbCastError, setTmdbCastError] = useState('')
-
-  const pickBestRoleName = (roles) => {
-    const arr = Array.isArray(roles) ? roles : []
-    if (!arr.length) return ''
-    // coge el rol con más episodios (suele ser el “principal”)
-    const best = [...arr].sort(
-      (a, b) => Number(b?.episode_count || 0) - Number(a?.episode_count || 0)
-    )[0]
-    return best?.character || ''
-  }
-
-  const normalizeCastFromTmdb = (raw = [], { isAggregate = false } = {}) => {
-    const list = Array.isArray(raw) ? raw : []
-
-    // normaliza a tu shape: { id, name, profile_path, character, order }
-    const normalized = list
-      .filter((p) => p?.id && p?.name)
-      .map((p, idx) => {
-        const order =
-          Number.isFinite(Number(p?.order)) ? Number(p.order)
-            : Number.isFinite(Number(p?.cast_id)) ? Number(p.cast_id)
-              : idx
-
-        const character =
-          p?.character ||
-          (isAggregate ? pickBestRoleName(p?.roles) : '') ||
-          ''
-
-        return {
-          ...p,
-          character,
-          order,
-        }
-      })
-
-    // dedup por id respetando el PRIMER aparecido (que ya viene en orden TMDb)
-    const seen = new Set()
-    const unique = []
-    for (const item of normalized) {
-      if (seen.has(item.id)) continue
-      seen.add(item.id)
-      unique.push(item)
-    }
-
-    // orden TMDb: por `order` asc
-    unique.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9))
-    return unique
-  }
-
-  useEffect(() => {
-    let ignore = false
-    const ac = new AbortController()
-
-    const fetchJson = async (url) => {
-      const r = await fetch(url, { signal: ac.signal, cache: 'no-store' })
-      const j = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(j?.status_message || `TMDb ${r.status}`)
-      return j
-    }
-
-    const run = async () => {
-      // fallback: si no hay apiKey, nos quedamos con castData
-      if (!TMDB_API_KEY || !id || (endpointType !== 'tv' && endpointType !== 'movie')) {
-        setTmdbCast([])
-        setTmdbCastError('')
-        setTmdbCastLoading(false)
-        return
-      }
-
-      setTmdbCastLoading(true)
-      setTmdbCastError('')
-
-      try {
-        if (endpointType === 'tv') {
-          // 1) aggregate_credits (lo más parecido a lo que ves en TMDb web)
-          const aggUrl = `https://api.themoviedb.org/3/tv/${id}/aggregate_credits?api_key=${TMDB_API_KEY}`
-          const agg = await fetchJson(aggUrl)
-          const aggCast = normalizeCastFromTmdb(agg?.cast, { isAggregate: true })
-
-          // 2) fallback a credits si aggregate viene raro/vacío
-          if (!aggCast.length) {
-            const url = `https://api.themoviedb.org/3/tv/${id}/credits?api_key=${TMDB_API_KEY}`
-            const j = await fetchJson(url)
-            const c = normalizeCastFromTmdb(j?.cast, { isAggregate: false })
-            if (!ignore) setTmdbCast(c)
-          } else {
-            if (!ignore) setTmdbCast(aggCast)
-          }
-        } else {
-          // movie credits
-          const url = `https://api.themoviedb.org/3/movie/${id}/credits?api_key=${TMDB_API_KEY}`
-          const j = await fetchJson(url)
-          const c = normalizeCastFromTmdb(j?.cast, { isAggregate: false })
-          if (!ignore) setTmdbCast(c)
-        }
-      } catch (e) {
-        if (!ignore) {
-          setTmdbCast([])
-          setTmdbCastError(e?.message || 'Error cargando reparto en TMDb')
-        }
-      } finally {
-        if (!ignore) setTmdbCastLoading(false)
-      }
-    }
-
-    run()
-    return () => {
-      ignore = true
-      ac.abort()
-    }
-  }, [id, endpointType])
-
   const castDataForUI = useMemo(() => {
-    // Preferimos el cast real traído de TMDb (más completo).
-    // Si por lo que sea no existe, usamos el prop castData tal cual (sin reordenar).
-    const base =
-      Array.isArray(tmdbCast) && tmdbCast.length
-        ? tmdbCast
-        : (Array.isArray(castData) ? castData : [])
+    const baseCast = Array.isArray(castData) ? castData : []
 
-    // Si viene del prop sin `order`, lo dejamos en el orden original.
-    const hasOrder = base.some((p) => Number.isFinite(Number(p?.order)))
+    const extras =
+      type === 'movie'
+        ? (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
+          .filter((d) => d?.id && d?.name)
+          .map((d) => ({ ...d, character: 'Director' }))
+        : type === 'tv'
+          ? (Array.isArray(tvCreators) ? tvCreators : [])
+            .filter((c) => c?.id && c?.name)
+            .map((c) => ({ ...c, character: 'Creador' }))
+          : []
 
-    const normalized = base
-      .filter((p) => p?.id && p?.name)
-      .map((p, idx) => ({
-        ...p,
-        order: Number.isFinite(Number(p?.order)) ? Number(p.order) : idx
-      }))
-
+    // dedup por id
     const seen = new Set()
-    const unique = []
-    for (const item of normalized) {
-      if (seen.has(item.id)) continue
-      seen.add(item.id)
-      unique.push(item)
-    }
-
-    if (hasOrder) {
-      unique.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9))
-    }
-    return unique
-  }, [tmdbCast, castData])
-
-  const castPrincipal = useMemo(() => {
-    const cast = Array.isArray(castData) ? castData : []
-
-    // --- MOVIE: director(es) desde credits o fallback state ---
-    const crew =
-      (Array.isArray(data?.credits?.crew) && data.credits.crew.length)
-        ? data.credits.crew
-        : (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
-
-    const directors = type === 'movie'
-      ? crew
-        .filter((c) => c?.job === 'Director' || c?.job === 'Co-Director')
-        .map((d) => ({
-          ...d,
-          __badge: 'Director',
-          __subtitle: d?.job || 'Director', // por si quieres mostrar "Co-Director"
-        }))
-      : []
-
-    // --- TV: creadores desde created_by o fallback state ---
-    const creatorsSrc =
-      (Array.isArray(data?.created_by) && data.created_by.length)
-        ? data.created_by
-        : (Array.isArray(tvCreators) ? tvCreators : [])
-
-    const creators = type !== 'movie'
-      ? creatorsSrc.map((c) => ({
-        ...c,
-        __badge: 'Creador',
-        __subtitle: 'Creador',
-      }))
-      : []
-
-    // Dedupe por id para no repetir si coincide con cast
-    const pinned = (type === 'movie' ? directors : creators).filter(Boolean)
-    const pinnedIds = new Set(pinned.map((p) => p?.id).filter(Boolean))
-
-    // Mantén tu límite actual de actores (20) y añade los “pinned” delante
-    const actors = cast.filter((a) => a?.id && !pinnedIds.has(a.id)).slice(0, 20)
-
-    return [...pinned, ...actors]
-  }, [type, castData, data?.credits?.crew, data?.created_by, movieDirectorsCrew, tvCreators])
+    return [...extras, ...baseCast].filter((p) => {
+      if (!p?.id) return false
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+  }, [castData, type, movieDirectorsCrew, tvCreators])
 
   const sectionItems = useMemo(() => {
     const items = []
@@ -4818,17 +4625,17 @@ export default function DetailsClient({
                     }}
                     className="pb-8"
                   >
-                    {castPrincipal.map((person) => (
-                      <SwiperSlide key={person.id}>
+                    {castDataForUI.slice(0, 20).map((actor) => (
+                      <SwiperSlide key={actor.id}>
                         <a
-                          href={`/details/person/${person.id}`}
+                          href={`/details/person/${actor.id}`}
                           className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                         >
                           <div className="aspect-[2/3] overflow-hidden relative">
-                            {person.profile_path ? (
+                            {actor.profile_path ? (
                               <img
-                                src={`https://image.tmdb.org/t/p/w342${person.profile_path}`}
-                                alt={person.name}
+                                src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
+                                alt={actor.name}
                                 className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
                               />
                             ) : (
@@ -4841,10 +4648,10 @@ export default function DetailsClient({
 
                             <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
                               <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
-                                {person.name}
+                                {actor.name}
                               </p>
                               <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                                {person.character || person.__subtitle}
+                                {actor.character}
                               </p>
                             </div>
                           </div>
