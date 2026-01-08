@@ -1,15 +1,16 @@
-'use client'
+import { Suspense } from 'react'
+import LoginClient from './LoginClient'
 
-import LoginForm from '@/components/auth/LoginForm'
-import NoPageScroll from '@/components/NoPageScroll'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
-export default function LoginPage() {
+export default function LoginPage({ searchParams }) {
+  const rawNext = typeof searchParams?.next === 'string' ? searchParams.next : '/'
+  const next = rawNext.startsWith('/') ? rawNext : '/'
+
   return (
-    <main className="h-[100dvh] overflow-hidden bg-black text-white">
-      <NoPageScroll />
-      <div className="h-full w-full flex items-center justify-center px-4 py-4">
-        <LoginForm />
-      </div>
-    </main>
+    <Suspense fallback={null}>
+      <LoginClient next={next} />
+    </Suspense>
   )
 }
