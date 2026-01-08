@@ -2208,46 +2208,90 @@ export default function DetailsClient({
 
   // ✅ Director (movie) — fallback si data no trae credits
   const [movieDirector, setMovieDirector] = useState(null)
+  const [movieDirectorsCrew, setMovieDirectorsCrew] = useState([])
 
   useEffect(() => {
-    let ignore = false
-
-    const loadDirector = async () => {
-      if (type !== 'movie' || !id) {
-        setMovieDirector(null)
-        return
-      }
-
-      const crew = data?.credits?.crew
-      if (Array.isArray(crew) && crew.length) {
-        const dirs = crew.filter((c) => c?.job === 'Director').map((d) => d?.name).filter(Boolean)
-        if (!ignore) setMovieDirector(dirs.length ? dirs.join(', ') : null)
-        return
-      }
-
-      try {
-        if (!TMDB_API_KEY) return
-        const url = `https://api.themoviedb.org/3/movie/${id}/credits?api_key=${TMDB_API_KEY}`
-        const res = await fetch(url)
-        const json = await res.json()
-        if (!res.ok) return
-
-        const dirs = (json?.crew || [])
-          .filter((c) => c?.job === 'Director')
-          .map((d) => d?.name)
-          .filter(Boolean)
-
-        if (!ignore) setMovieDirector(dirs.length ? dirs.join(', ') : null)
-      } catch {
-        if (!ignore) setMovieDirector(null)
-      }
+    const isMovie = type === 'movie'
+    if (!isMovie || !id) {
+      setMovieDirectorsCrew([])
+      return
     }
 
-    loadDirector()
-    return () => {
-      ignore = true
+    // 1) Si ya vienen credits en "data", úsalo
+    const crew = data?.credits?.crew
+    if (Array.isArray(crew) && crew.length) {
+      const dirsCrew = crew.filter((c) => c?.job === 'Director' || c?.job === 'Co-Director')
+      setMovieDirectorsCrew(dirsCrew)
+      return
     }
-  }, [type, id, data?.credits])
+
+    // 2) Si no vienen, pide credits a tu API route
+    const ac = new AbortController()
+
+      ; (async () => {
+        try {
+          const res = await fetch(`/api/tmdb/movies/${id}/credits`, {
+            signal: ac.signal,
+            cache: 'no-store',
+          })
+          const json = await res.json().catch(() => ({}))
+          if (!res.ok) {
+            setMovieDirectorsCrew([])
+            return
+          }
+
+          const dirsCrew = (json?.crew || []).filter(
+            (c) => c?.job === 'Director' || c?.job === 'Co-Director'
+          )
+
+          setMovieDirectorsCrew(dirsCrew)
+        } catch (e) {
+          if (e?.name !== 'AbortError') setMovieDirectorsCrew([])
+        }
+      })()
+
+    return () => ac.abort()
+  }, [type, id, data?.credits?.crew])
+
+  const [tvCreators, setTvCreators] = useState([])
+
+  useEffect(() => {
+    const isTv = type === 'tv'
+    if (!isTv || !id) {
+      setTvCreators([])
+      return
+    }
+
+    // 1) Si ya viene created_by en "data", úsalo
+    const creators = data?.created_by
+    if (Array.isArray(creators) && creators.length) {
+      setTvCreators(creators)
+      return
+    }
+
+    // 2) Si no viene, pide details a tu API route (ajusta la ruta si difiere)
+    const ac = new AbortController()
+
+      ; (async () => {
+        try {
+          const res = await fetch(`/api/tmdb/tv/${id}`, {
+            signal: ac.signal,
+            cache: 'no-store',
+          })
+          const json = await res.json().catch(() => ({}))
+          if (!res.ok) {
+            setTvCreators([])
+            return
+          }
+
+          setTvCreators(Array.isArray(json?.created_by) ? json.created_by : [])
+        } catch (e) {
+          if (e?.name !== 'AbortError') setTvCreators([])
+        }
+      })()
+
+    return () => ac.abort()
+  }, [type, id, data?.created_by])
 
   // ✅ MENÚ GLOBAL (nuevo)
 
@@ -2300,6 +2344,30 @@ export default function DetailsClient({
     if (!Number.isFinite(v) || v <= 0) return null
     return v.toFixed(1) // punto
   }, [tScoreboard.rating])
+
+  const castDataForUI = useMemo(() => {
+    const baseCast = Array.isArray(castData) ? castData : []
+
+    const extras =
+      type === 'movie'
+        ? (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
+          .filter((d) => d?.id && d?.name)
+          .map((d) => ({ ...d, character: 'Director' }))
+        : type === 'tv'
+          ? (Array.isArray(tvCreators) ? tvCreators : [])
+            .filter((c) => c?.id && c?.name)
+            .map((c) => ({ ...c, character: 'Creador' }))
+          : []
+
+    // dedup por id
+    const seen = new Set()
+    return [...extras, ...baseCast].filter((p) => {
+      if (!p?.id) return false
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+  }, [castData, type, movieDirectorsCrew, tvCreators])
 
   const sectionItems = useMemo(() => {
     const items = []
@@ -2378,7 +2446,7 @@ export default function DetailsClient({
       id: 'cast',
       label: 'Reparto',
       icon: Users,
-      count: Array.isArray(castData) ? castData.length : undefined
+      count: castDataForUI?.length ? castDataForUI.length : undefined
     })
 
     // ✅ Recomendaciones (texto completo)
@@ -2401,6 +2469,7 @@ export default function DetailsClient({
     tSeasons?.items,
     tLists?.items,
     castData,
+    castDataForUI,
     recommendations,
     collectionId,
     collectionData
@@ -4556,7 +4625,7 @@ export default function DetailsClient({
                     }}
                     className="pb-8"
                   >
-                    {castData.slice(0, 20).map((actor) => (
+                    {castDataForUI.slice(0, 20).map((actor) => (
                       <SwiperSlide key={actor.id}>
                         <a
                           href={`/details/person/${actor.id}`}
