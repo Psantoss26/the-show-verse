@@ -267,7 +267,10 @@ function Dropdown({ label, valueLabel, icon: Icon, children, className = '' }) {
   }, [open])
 
   return (
-    <div ref={ref} className={`relative z-30 ${className}`}>
+    <div
+      ref={ref}
+      className={`relative ${open ? 'z-[9999]' : 'z-20'} ${className}`}
+    >
       <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
         {label}
       </div>
