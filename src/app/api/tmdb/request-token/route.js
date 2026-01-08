@@ -1,3 +1,4 @@
+// /src/app/api/tmdb/request-token/route.js
 // Genera un request token de TMDb
 import { tmdbGet, json } from '../utils';
 

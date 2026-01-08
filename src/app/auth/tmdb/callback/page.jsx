@@ -1,20 +1,19 @@
-import { Suspense } from 'react'
-import CallbackClient from './CallbackClient'
+'use client'
 
-// Opcional pero recomendable para callbacks de OAuth:
-// evita SSG y fuerza que siempre sea dinámico
+import { useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+
 export const dynamic = 'force-dynamic'
 
-export default function TmdbCallbackPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen flex items-center justify-center">
-          <p className="text-lg">Cargando callback de TMDb...</p>
-        </main>
-      }
-    >
-      <CallbackClient />
-    </Suspense>
-  )
+export default function LegacyTmdbCallback() {
+  const router = useRouter()
+  const sp = useSearchParams()
+
+  useEffect(() => {
+    // reenvía todo tal cual
+    const qs = sp?.toString() || ''
+    router.replace(`/auth/callback${qs ? `?${qs}` : ''}`)
+  }, [router, sp])
+
+  return null
 }
