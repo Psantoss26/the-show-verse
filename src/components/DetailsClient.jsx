@@ -3106,32 +3106,28 @@ export default function DetailsClient({
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
                     >
-                      {/* MÓVIL: flex-col (vertical) -> Ocupan todo el ancho, no se cortan.
-             DESKTOP (lg): flex-row + flex-nowrap (horizontal) -> Una sola línea optimizada.
-          */}
                       <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-
                         <VisualMetaCard
                           icon={type === 'movie' ? FilmIcon : MonitorPlay}
                           label="Título Original"
                           value={type === 'movie' ? data.original_title : data.original_name}
-                          expanded={true} // Permite 2 líneas y ancho extra en desktop
+                          expanded={true}
                           className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
 
-                        <VisualMetaCard
-                          icon={MapPin}
-                          label="País"
-                          value={countries || '—'}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-
-                        <VisualMetaCard
-                          icon={Languages}
-                          label="Idiomas"
-                          value={languages || '—'}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
+                        {/* Formato (solo TV) */}
+                        {type !== 'movie' ? (
+                          <VisualMetaCard
+                            icon={Layers}
+                            label="Formato"
+                            value={
+                              data.number_of_seasons
+                                ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
+                                : '—'
+                            }
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          />
+                        ) : null}
 
                         <VisualMetaCard
                           icon={CalendarIcon}
@@ -3140,6 +3136,33 @@ export default function DetailsClient({
                           className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
 
+                        {/* Finalización / Última emisión (solo TV) */}
+                        {type !== 'movie' ? (
+                          <VisualMetaCard
+                            icon={CalendarIcon}
+                            label={data.status === 'Ended' ? 'Finalización' : 'Última emisión'}
+                            value={lastAirDateValue || 'En emisión'}
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          />
+                        ) : null}
+
+                        {/* Presupuesto + Recaudación (solo Cine) */}
+                        {type === 'movie' ? (
+                          <>
+                            <VisualMetaCard
+                              icon={BadgeDollarSignIcon}
+                              label="Presupuesto"
+                              value={budgetValue || '—'}
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            />
+                            <VisualMetaCard
+                              icon={TrendingUp}
+                              label="Recaudación"
+                              value={revenueValue || '—'}
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            />
+                          </>
+                        ) : null}
                       </div>
                     </motion.div>
                   )}
@@ -3153,61 +3176,35 @@ export default function DetailsClient({
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
                     >
-                      {/* Mismo formato: Vertical en móvil, Horizontal en Desktop */}
                       <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
 
-                        {/* 1. Director / Creadores */}
+                        {/* Director (Cine) / Creadores (TV) */}
                         <VisualMetaCard
                           icon={Users}
                           label={type === 'movie' ? 'Director' : 'Creadores'}
-                          value={movieDirector || createdByNames || 'Desconocido'}
+                          value={type === 'movie' ? (movieDirector || 'Desconocido') : (createdByNames || 'Desconocido')}
                           expanded={true}
                           className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
 
-                        {/* 2. Presupuesto (Cine) o Fecha Fin (TV) */}
-                        {type === 'movie' ? (
+                        {/* Canal (solo TV) */}
+                        {type !== 'movie' ? (
                           <VisualMetaCard
-                            icon={BadgeDollarSignIcon}
-                            label="Presupuesto"
-                            value={budgetValue || '—'}
+                            icon={MonitorPlay}
+                            label="Canal"
+                            value={network || '—'}
                             className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
-                        ) : (
-                          <VisualMetaCard
-                            icon={CalendarIcon}
-                            label={data.status === 'Ended' ? 'Finalización' : 'Última emisión'}
-                            value={lastAirDateValue || 'En emisión'}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                          />
-                        )}
+                        ) : null}
 
-                        {/* 3. Recaudación (Cine) o Formato (TV) */}
-                        {type === 'movie' ? (
-                          <VisualMetaCard
-                            icon={TrendingUp}
-                            label="Recaudación"
-                            value={revenueValue || '—'}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                          />
-                        ) : (
-                          <VisualMetaCard
-                            icon={Layers}
-                            label="Formato"
-                            value={data.number_of_seasons ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.` : '—'}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                          />
-                        )}
-
-                        {/* 4. Producción / Canal */}
+                        {/* Producción (ambos) */}
                         <VisualMetaCard
                           icon={Building2}
-                          label={network ? 'Canal' : 'Producción'}
-                          value={network || production || '—'}
-                          expanded={true} // Vital para que no se recorte lateralmente
+                          label="Producción"
+                          value={production || '—'}
+                          expanded={true}
                           className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
-
                       </div>
                     </motion.div>
                   )}
