@@ -1,11 +1,10 @@
+// /src/app/auth/callback/CallbackClient.jsx
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-
-export const dynamic = 'force-dynamic'
 
 export default function CallbackPage() {
     const router = useRouter()
