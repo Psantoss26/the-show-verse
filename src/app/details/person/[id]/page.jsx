@@ -31,12 +31,10 @@ export default function ActorDetailsPage() {
     }
   }, [id]);
 
-  if (!actorDetails) return <div>Loading...</div>; // Cargar datos antes de mostrar la vista
-
   return (
     <ActorDetails
-      actorDetails={actorDetails} 
-      actorMovies={actorMovies} 
+      actorDetails={actorDetails}
+      actorMovies={actorMovies}
     />
   );
 }
