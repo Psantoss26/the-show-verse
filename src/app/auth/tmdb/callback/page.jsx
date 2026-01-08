@@ -1,19 +1,16 @@
-'use client'
-
-import { useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
-export default function LegacyTmdbCallback() {
-  const router = useRouter()
-  const sp = useSearchParams()
+export default function TmdbCallbackRedirect({ searchParams }) {
+  const usp = new URLSearchParams()
 
-  useEffect(() => {
-    // reenvía todo tal cual
-    const qs = sp?.toString() || ''
-    router.replace(`/auth/callback${qs ? `?${qs}` : ''}`)
-  }, [router, sp])
+  for (const [k, v] of Object.entries(searchParams || {})) {
+    if (Array.isArray(v)) v.forEach((val) => usp.append(k, val))
+    else if (v != null) usp.set(k, v)
+  }
 
-  return null
+  const qs = usp.toString()
+  redirect(`/auth/callback${qs ? `?${qs}` : ''}`)
 }
