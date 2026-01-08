@@ -2345,29 +2345,183 @@ export default function DetailsClient({
     return v.toFixed(1) // punto
   }, [tScoreboard.rating])
 
-  const castDataForUI = useMemo(() => {
-    const baseCast = Array.isArray(castData) ? castData : []
+  // =====================================================
+  // ✅ CAST: mantener orden TMDb + evitar cast incompleto
+  // =====================================================
+  const [tmdbCast, setTmdbCast] = useState([])
+  const [tmdbCastLoading, setTmdbCastLoading] = useState(false)
+  const [tmdbCastError, setTmdbCastError] = useState('')
 
+  const pickBestRoleName = (roles) => {
+    const arr = Array.isArray(roles) ? roles : []
+    if (!arr.length) return ''
+    // coge el rol con más episodios (suele ser el “principal”)
+    const best = [...arr].sort(
+      (a, b) => Number(b?.episode_count || 0) - Number(a?.episode_count || 0)
+    )[0]
+    return best?.character || ''
+  }
+
+  const normalizeCastFromTmdb = (raw = [], { isAggregate = false } = {}) => {
+    const list = Array.isArray(raw) ? raw : []
+
+    // normaliza a tu shape: { id, name, profile_path, character, order }
+    const normalized = list
+      .filter((p) => p?.id && p?.name)
+      .map((p, idx) => {
+        const order =
+          Number.isFinite(Number(p?.order)) ? Number(p.order)
+            : Number.isFinite(Number(p?.cast_id)) ? Number(p.cast_id)
+              : idx
+
+        const character =
+          p?.character ||
+          (isAggregate ? pickBestRoleName(p?.roles) : '') ||
+          ''
+
+        return {
+          ...p,
+          character,
+          order,
+        }
+      })
+
+    // dedup por id respetando el PRIMER aparecido (que ya viene en orden TMDb)
+    const seen = new Set()
+    const unique = []
+    for (const item of normalized) {
+      if (seen.has(item.id)) continue
+      seen.add(item.id)
+      unique.push(item)
+    }
+
+    // orden TMDb: por `order` asc
+    unique.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9))
+    return unique
+  }
+
+  useEffect(() => {
+    let ignore = false
+    const ac = new AbortController()
+
+    const fetchJson = async (url) => {
+      const r = await fetch(url, { signal: ac.signal, cache: 'no-store' })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j?.status_message || `TMDb ${r.status}`)
+      return j
+    }
+
+    const run = async () => {
+      // fallback: si no hay apiKey, nos quedamos con castData
+      if (!TMDB_API_KEY || !id || (endpointType !== 'tv' && endpointType !== 'movie')) {
+        setTmdbCast([])
+        setTmdbCastError('')
+        setTmdbCastLoading(false)
+        return
+      }
+
+      setTmdbCastLoading(true)
+      setTmdbCastError('')
+
+      try {
+        if (endpointType === 'tv') {
+          // 1) aggregate_credits (lo más parecido a lo que ves en TMDb web)
+          const aggUrl = `https://api.themoviedb.org/3/tv/${id}/aggregate_credits?api_key=${TMDB_API_KEY}`
+          const agg = await fetchJson(aggUrl)
+          const aggCast = normalizeCastFromTmdb(agg?.cast, { isAggregate: true })
+
+          // 2) fallback a credits si aggregate viene raro/vacío
+          if (!aggCast.length) {
+            const url = `https://api.themoviedb.org/3/tv/${id}/credits?api_key=${TMDB_API_KEY}`
+            const j = await fetchJson(url)
+            const c = normalizeCastFromTmdb(j?.cast, { isAggregate: false })
+            if (!ignore) setTmdbCast(c)
+          } else {
+            if (!ignore) setTmdbCast(aggCast)
+          }
+        } else {
+          // movie credits
+          const url = `https://api.themoviedb.org/3/movie/${id}/credits?api_key=${TMDB_API_KEY}`
+          const j = await fetchJson(url)
+          const c = normalizeCastFromTmdb(j?.cast, { isAggregate: false })
+          if (!ignore) setTmdbCast(c)
+        }
+      } catch (e) {
+        if (!ignore) {
+          setTmdbCast([])
+          setTmdbCastError(e?.message || 'Error cargando reparto en TMDb')
+        }
+      } finally {
+        if (!ignore) setTmdbCastLoading(false)
+      }
+    }
+
+    run()
+    return () => {
+      ignore = true
+      ac.abort()
+    }
+  }, [id, endpointType])
+
+  const castDataForUI = useMemo(() => {
+    // 1) Base cast: preferimos TMDb (más completo); si no, usamos castData tal cual
+    const base =
+      Array.isArray(tmdbCast) && tmdbCast.length
+        ? tmdbCast
+        : (Array.isArray(castData) ? castData : [])
+
+    // 2) Extras (Director / Creador)
     const extras =
       type === 'movie'
         ? (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
           .filter((d) => d?.id && d?.name)
-          .map((d) => ({ ...d, character: 'Director' }))
+          .map((d, idx) => ({
+            ...d,
+            character: 'Director',
+            // orden negativo para que vaya arriba si luego hay sort por order
+            order: -1000 + idx
+          }))
         : type === 'tv'
           ? (Array.isArray(tvCreators) ? tvCreators : [])
             .filter((c) => c?.id && c?.name)
-            .map((c) => ({ ...c, character: 'Creador' }))
+            .map((c, idx) => ({
+              ...c,
+              character: 'Creador',
+              order: -1000 + idx
+            }))
           : []
 
-    // dedup por id
+    // 3) ¿Hay order real en el base? (si viene de TMDb normalmente sí)
+    const baseHasOrder = base.some((p) => Number.isFinite(Number(p?.order)))
+
+    // 4) Normalizamos base: filtramos y garantizamos un order numérico
+    const normalizedBase = base
+      .filter((p) => p?.id && p?.name)
+      .map((p, idx) => ({
+        ...p,
+        order: Number.isFinite(Number(p?.order))
+          ? Number(p.order)
+          : (baseHasOrder ? 1000 + idx : idx) // si hay order, los sin order al final
+      }))
+
+    // 5) Unimos (extras primero para que “ganen” en dedupe) y deduplicamos por id
     const seen = new Set()
-    return [...extras, ...baseCast].filter((p) => {
-      if (!p?.id) return false
-      if (seen.has(p.id)) return false
-      seen.add(p.id)
-      return true
-    })
-  }, [castData, type, movieDirectorsCrew, tvCreators])
+    const mergedUnique = []
+
+    for (const item of [...extras, ...normalizedBase]) {
+      if (!item?.id) continue
+      if (seen.has(item.id)) continue
+      seen.add(item.id)
+      mergedUnique.push(item)
+    }
+
+    // 6) Si el cast base tiene order, ordenamos por order (extras quedan arriba por order negativo)
+    if (baseHasOrder) {
+      mergedUnique.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9))
+    }
+
+    return mergedUnique
+  }, [tmdbCast, castData, type, movieDirectorsCrew, tvCreators])
 
   const sectionItems = useMemo(() => {
     const items = []
