@@ -17,9 +17,12 @@ export const metadata = {
   title: 'The Show Verse',
   description: 'Tu plataforma de películas y series',
   icons: {
-    icon: '/TheShowVerse2.png',
-    shortcut: '/TheShowVerse2.png',
-    apple: '/TheShowVerse2.png',
+    icon: [
+      { url: '/favicon.ico' }, // pestañas + bookmarks (clásico)
+      { url: '/icon.png', type: 'image/png', sizes: '32x32' }, // fallback moderno
+    ],
+    shortcut: ['/favicon.ico'],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }], // iOS (app)
   },
   manifest: '/site.webmanifest',
 }
