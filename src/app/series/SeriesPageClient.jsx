@@ -219,7 +219,7 @@ async function getShowImages(showId) {
         const url =
             `https://api.themoviedb.org/3/tv/${showId}/images` +
             `?api_key=${apiKey}` +
-            `&include_image_language=en,en-US,es,es-ES,null`
+            `&include_image_language=en,en-US`
 
         const r = await fetch(url, { cache: 'force-cache' })
         if (!r.ok) throw new Error('TMDb TV images error')
@@ -477,9 +477,9 @@ function Top10MobileBackdropCardTV({ show, rank }) {
             let chosen = null
             try {
                 const preferred = await fetchBestTVBackdrop(show.id)
-                chosen = preferred || show.backdrop_path || show.poster_path || null
+                chosen = preferred || null
             } catch {
-                chosen = show.backdrop_path || show.poster_path || null
+                chosen = null
             }
 
             tvBackdropCache.set(show.id, chosen)
@@ -632,7 +632,7 @@ function InlinePreviewCard({ show, heightClass }) {
                 } else {
                     try {
                         const preferred = await fetchBestTVBackdrop(show.id)
-                        const chosen = preferred || show.backdrop_path || show.poster_path || null
+                        const chosen = preferred || null
 
                         tvBackdropCache.set(show.id, chosen)
 

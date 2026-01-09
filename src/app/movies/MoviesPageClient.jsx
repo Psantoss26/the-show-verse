@@ -140,45 +140,42 @@ function getArtworkPreference(movieId) {
  * LOGICA IMAGENES (Backdrops / Posters)
  * ==================================================================== */
 function pickBestBackdropByLangResVotes(list, opts = {}) {
-    const {
-        preferLangs = ['en', 'en-US'],
-        minWidth = 1200
-    } = opts
-
+    const { preferLangs = ['en', 'en-US'], minWidth = 1200 } = opts
     if (!Array.isArray(list) || list.length === 0) return null
 
-    // Normaliza 'en-US' -> 'en'
+    // normaliza a 'en'
     const norm = (v) => (v ? String(v).toLowerCase().split('-')[0] : null)
     const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean))
-    const lang = (img) => norm(img?.iso_639_1)
+    const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1))
 
-    // Mantén filtro mínimo (si no hay, cae al original)
-    const sizeFiltered =
-        minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
-    const pool0 = sizeFiltered.length ? sizeFiltered : list
+    // Mantener orden + minWidth (si no hay, cae al original)
+    const pool0 = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
+    const pool = pool0.length ? pool0 : list
 
-    // “En inglés disponibles”: si hay alguno en preferLangs, nos quedamos solo con esos
-    const hasPreferred = pool0.some((b) => preferSet.has(lang(b)))
-    const poolLang = hasPreferred ? pool0.filter((b) => preferSet.has(lang(b))) : pool0
+    // ✅ SOLO 3 primeras EN (en orden). Si no hay EN, devolvemos null (siempre EN)
+    const top3en = []
+    for (const b of pool) {
+        if (isPreferredLang(b)) top3en.push(b)
+        if (top3en.length === 3) break
+    }
+    if (!top3en.length) return null
 
-    // ✅ SOLO las 3 primeras (ya filtradas por idioma si aplica)
-    const top3 = poolLang.slice(0, 3)
-    if (!top3.length) return null
+    const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h
 
-    // 1) 1920x1080
-    const first1080 = top3.find((b) => (b?.width || 0) === 1920 && (b?.height || 0) === 1080)
-    if (first1080) return first1080
+    // Prioridades: 1920x1080, 2560x1440, 3840x2160, 1280x720, y si no la primera EN
+    const b1080 = top3en.find((b) => isRes(b, 1920, 1080))
+    if (b1080) return b1080
 
-    // 2) 1712x964 “ya vale”
-    const first1712 = top3.find((b) => (b?.width || 0) === 1712 && (b?.height || 0) === 964)
-    if (first1712) return first1712
+    const b1440 = top3en.find((b) => isRes(b, 2560, 1440))
+    if (b1440) return b1440
 
-    // 3) 4K 3840x2160
-    const first4k = top3.find((b) => (b?.width || 0) === 3840 && (b?.height || 0) === 2160)
-    if (first4k) return first4k
+    const b4k = top3en.find((b) => isRes(b, 3840, 2160))
+    if (b4k) return b4k
 
-    // 4) primera de esas 3
-    return top3[0]
+    const b720 = top3en.find((b) => isRes(b, 1280, 720))
+    if (b720) return b720
+
+    return top3en[0]
 }
 
 function pickBestPosterByLangThenResolution(list, opts = {}) {
@@ -217,7 +214,7 @@ async function getMovieImages(movieId) {
         const url =
             `https://api.themoviedb.org/3/movie/${movieId}/images` +
             `?api_key=${apiKey}` +
-            `&include_image_language=en,en-US,es,es-ES,null`
+            `&include_image_language=en,en-US`
 
         const r = await fetch(url, { cache: 'force-cache' })
         const j = await r.json()
@@ -464,9 +461,9 @@ function Top10MobileBackdropCard({ movie, rank }) {
             let chosen = null
             try {
                 const preferred = await fetchBestBackdrop(movie.id)
-                chosen = preferred || movie.backdrop_path || movie.poster_path || null
+                chosen = preferred || null
             } catch {
-                chosen = movie.backdrop_path || movie.poster_path || null
+                chosen = null
             }
 
             movieBackdropCache.set(movie.id, chosen)
@@ -618,12 +615,7 @@ function InlinePreviewCard({ movie, heightClass }) {
                 } else {
                     try {
                         const preferred = await fetchBestBackdrop(movie.id)
-                        const chosen =
-                            preferred ||
-                            movie.backdrop_path ||
-                            movie.poster_path ||
-                            null
-
+                        const chosen = preferred || null
                         movieBackdropCache.set(movie.id, chosen)
 
                         if (chosen) {
@@ -781,9 +773,7 @@ function InlinePreviewCard({ movie, heightClass }) {
         }
     }
 
-    const resolvedBackdrop =
-        backdropPath || movie.backdrop_path || movie.poster_path || null
-    const bgSrc = resolvedBackdrop ? buildImg(resolvedBackdrop, 'w1280') : null
+    const bgSrc = backdropPath ? buildImg(backdropPath, 'w1280') : null
 
     const genres = (() => {
         const ids =
