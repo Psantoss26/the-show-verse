@@ -245,38 +245,46 @@ async function getShowImages(showId) {
 function pickBestBackdropByLangResVotes(list, opts = {}) {
     const {
         preferLangs = ['en', 'en-US'],
-        resolutionWindow = 0.98,
-        minWidth = 1200
+        minWidth = 1200,
     } = opts
 
     if (!Array.isArray(list) || list.length === 0) return null
 
-    const area = (img) => (img?.width || 0) * (img?.height || 0)
-    const lang = (img) => img?.iso_639_1 || null
+    // Normaliza 'en-US' -> 'en'
+    const norm = (v) => (v ? String(v).toLowerCase().split('-')[0] : null)
+    const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean))
+    const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1))
 
-    const sizeFiltered = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
-    const pool0 = sizeFiltered.length ? sizeFiltered : list
+    // Mantener orden + minWidth
+    const pool0 = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
+    const pool = pool0.length ? pool0 : list
 
-    const hasPreferred = pool0.some((b) => preferLangs.includes(lang(b)))
-    const pool1 = hasPreferred ? pool0.filter((b) => preferLangs.includes(lang(b))) : pool0
+    // ✅ SOLO 3 primeras EN (en orden). Si no hay EN, no devolvemos nada (siempre EN).
+    const top3en = []
+    for (const b of pool) {
+        if (isPreferredLang(b)) top3en.push(b)
+        if (top3en.length === 3) break
+    }
+    if (!top3en.length) return null
 
-    const maxArea = Math.max(...pool1.map(area))
-    const threshold = maxArea * (typeof resolutionWindow === 'number' ? resolutionWindow : 1.0)
-    const pool2 = pool1.filter((b) => area(b) >= threshold)
+    const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h
 
-    const sorted = [...pool2].sort((a, b) => {
-        const aA = area(a)
-        const bA = area(b)
-        if (bA !== aA) return bA - aA
-        const w = (b.width || 0) - (a.width || 0)
-        if (w !== 0) return w
-        const vc = (b.vote_count || 0) - (a.vote_count || 0)
-        if (vc !== 0) return vc
-        const va = (b.vote_average || 0) - (a.vote_average || 0)
-        return va
-    })
+    // Prioridades dentro de esas 3 EN
+    const b1080 = top3en.find((b) => isRes(b, 1920, 1080))
+    if (b1080) return b1080
 
-    return sorted[0] || null
+    const b1440 = top3en.find((b) => isRes(b, 2560, 1440))
+    if (b1440) return b1440
+
+    const b4k = top3en.find((b) => isRes(b, 3840, 2160))
+    if (b4k) return b4k
+
+    // ✅ si no hay 4K, intenta 1280x720
+    const b720 = top3en.find((b) => isRes(b, 1280, 720))
+    if (b720) return b720
+
+    // si no hay ninguna, primera de esas 3 EN
+    return top3en[0]
 }
 
 function pickBestPosterByLangThenResolution(list, opts = {}) {
