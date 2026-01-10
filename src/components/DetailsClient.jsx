@@ -4062,22 +4062,32 @@ export default function DetailsClient({
                                   </div>
 
                                   {/* ✅ Propiedades debajo, alineadas a la izquierda */}
-                                  <div className="mt-3 flex flex-wrap items-center gap-1.5 ml-[-4px]">
-                                    {v.type && (
-                                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
-                                        {v.type}
-                                      </span>
-                                    )}
-                                    {v.iso_639_1 && (
-                                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-200">
-                                        {v.iso_639_1.toUpperCase()}
-                                      </span>
-                                    )}
-                                    {v.official && (
-                                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200">
-                                        Official
-                                      </span>
-                                    )}
+                                  <div className="mt-3 flex items-center gap-1.5 w-full overflow-hidden">
+                                    <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar">
+
+                                      {/* Label de Oficial - Agregado shrink-0 */}
+                                      {v.official && (
+                                        <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200 flex items-center gap-0.5">
+                                          <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+                                          OFFICIAL
+                                        </span>
+                                      )}
+
+                                      {/* Label de Tipo (Trailer, Teaser, etc) - Agregado shrink-0 */}
+                                      {v.type && (
+                                        <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-zinc-300">
+                                          {v.type}
+                                        </span>
+                                      )}
+
+                                      {/* Label de Idioma - Agregado shrink-0 */}
+                                      {v.iso_639_1 && (
+                                        <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300">
+                                          {v.iso_639_1}
+                                        </span>
+                                      )}
+
+                                    </div>
                                   </div>
 
                                   {/* ✅ Fuente y fecha abajo, mismo margen izquierdo */}
