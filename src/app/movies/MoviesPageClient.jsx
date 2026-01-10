@@ -1,4 +1,4 @@
-// /src/components/MoviesPageClient.jsx
+// /src/app/movies/MoviesPageClient.jsx
 'use client'
 
 import { useRef, useEffect, useState } from 'react'
@@ -103,6 +103,33 @@ const MOVIE_GENRES = {
     53: 'Thriller',
     10752: 'Bélica',
     37: 'Western'
+}
+
+async function resolveTmdbSrc(filePath, sizes) {
+    if (!filePath) return null
+    for (const size of sizes) {
+        const url = buildImg(filePath, size)
+        // preloadImage ya devuelve true/false
+        const ok = await preloadImage(url)
+        if (ok) return url
+    }
+    return null
+}
+
+async function resolvePreviewSources(filePath) {
+    if (!filePath) return { src: null, blur: null }
+
+    // Intento “backdrop”: w1280 primero
+    const src =
+        (await resolveTmdbSrc(filePath, ['w1280', 'w780', 'w500', 'original'])) || null
+
+    if (!src) return { src: null, blur: null }
+
+    // Blur: tamaño más pequeño si hiciera falta
+    const blur =
+        (await resolveTmdbSrc(filePath, ['w780', 'w500', 'w342', 'original'])) || src
+
+    return { src, blur }
 }
 
 /* --------- Precargar imagen (resolve tras onload) --------- */
@@ -214,7 +241,7 @@ async function getMovieImages(movieId) {
         const url =
             `https://api.themoviedb.org/3/movie/${movieId}/images` +
             `?api_key=${apiKey}` +
-            `&include_image_language=en,en-US`
+            `&include_image_language=en,en-US,null`
 
         const r = await fetch(url, { cache: 'force-cache' })
         const j = await r.json()

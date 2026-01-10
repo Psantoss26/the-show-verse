@@ -219,7 +219,7 @@ async function getShowImages(showId) {
         const url =
             `https://api.themoviedb.org/3/tv/${showId}/images` +
             `?api_key=${apiKey}` +
-            `&include_image_language=en,en-US`
+            `&include_image_language=en,en-US,null`
 
         const r = await fetch(url, { cache: 'force-cache' })
         if (!r.ok) throw new Error('TMDb TV images error')
