@@ -25,6 +25,9 @@ import {
 const posterChoiceCache = new Map()
 const posterInFlight = new Map()
 
+const backdropChoiceCache = new Map()
+const backdropInFlight = new Map()
+
 // user ratings cache (IMPORTANT: do NOT cache "null" for long, or ratings won't refresh after voting)
 const userRatingCache = new Map() // key -> { v: number|null, t: number }
 const userRatingInFlight = new Map()
@@ -105,6 +108,77 @@ function pickBestPosterEN(posters) {
   })[0] || null
 }
 
+function pickBestBackdropByLangResVotes(list, opts = {}) {
+  const { preferLangs = ['en', 'en-US'], minWidth = 1200 } = opts
+  if (!Array.isArray(list) || list.length === 0) return null
+
+  // normaliza a 'en'
+  const norm = (v) => (v ? String(v).toLowerCase().split('-')[0] : null)
+  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean))
+  const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1))
+
+  // Mantener orden + minWidth (si no hay, cae al original)
+  const pool0 = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
+  const pool = pool0.length ? pool0 : list
+
+  // ✅ SOLO 3 primeras EN (en orden). Si no hay EN, devolvemos null (siempre EN)
+  const top3en = []
+  for (const b of pool) {
+    if (isPreferredLang(b)) top3en.push(b)
+    if (top3en.length === 3) break
+  }
+  if (!top3en.length) return null
+
+  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h
+
+  // Prioridades: 1920x1080, 2560x1440, 3840x2160, 1280x720, y si no la primera EN
+  const b1080 = top3en.find((b) => isRes(b, 1920, 1080))
+  if (b1080) return b1080
+
+  const b1440 = top3en.find((b) => isRes(b, 2560, 1440))
+  if (b1440) return b1440
+
+  const b4k = top3en.find((b) => isRes(b, 3840, 2160))
+  if (b4k) return b4k
+
+  const b720 = top3en.find((b) => isRes(b, 1280, 720))
+  if (b720) return b720
+
+  return top3en[0]
+}
+
+async function fetchBestBackdropEN(type, id) {
+  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
+  if (!apiKey || !type || !id) return null
+  try {
+    // EN only (tu criterio exige EN; si no hay, devuelve null)
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US`
+    const r = await fetch(url, { cache: 'force-cache' })
+    if (!r.ok) return null
+    const j = await r.json()
+    const best = pickBestBackdropByLangResVotes(j?.backdrops, { preferLangs: ['en', 'en-US'], minWidth: 1200 })
+    return best?.file_path || null
+  } catch {
+    return null
+  }
+}
+
+async function getBestBackdropCached(type, id) {
+  const key = `${type}:${id}`
+  if (backdropChoiceCache.has(key)) return backdropChoiceCache.get(key)
+  if (backdropInFlight.has(key)) return backdropInFlight.get(key)
+
+  const p = (async () => {
+    const chosen = await fetchBestBackdropEN(type, id)
+    backdropChoiceCache.set(key, chosen || null)
+    backdropInFlight.delete(key)
+    return chosen || null
+  })()
+
+  backdropInFlight.set(key, p)
+  return p
+}
+
 async function fetchBestPosterEN(type, id) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
   if (!apiKey || !type || !id) return null
@@ -136,11 +210,10 @@ async function getBestPosterCached(type, id) {
 }
 
 /**
- * SmartPoster:
- * - contenedor fijo (aspect-[2/3] en wrapper)
+ * SmartPoster (ahora soporta modo 'poster' o 'backdrop')
  * - skeleton + img superpuestos
  */
-function SmartPoster({ item, title }) {
+function SmartPoster({ item, title, mode = 'poster' }) {
   const type = item.media_type || (item.title ? 'movie' : 'tv')
   const id = item.id
 
@@ -150,9 +223,25 @@ function SmartPoster({ item, title }) {
   useEffect(() => {
     let abort = false
 
-    const load = async () => {
-      setReady(false)
+    // ✅ evita 1-frame con la imagen anterior (estirada)
+    setSrc(null)
+    setReady(false)
 
+    const load = async () => {
+      // BACKDROP MODE
+      if (mode === 'backdrop') {
+        const bestBackdrop = await getBestBackdropCached(type, id)
+        const finalPath = bestBackdrop || item.backdrop_path || item.poster_path || null
+        const url = finalPath ? buildImg(finalPath, 'w1280') : null
+        if (url) await preloadImage(url)
+        if (!abort) {
+          setSrc(url)
+          setReady(!!url)
+        }
+        return
+      }
+
+      // POSTER MODE
       const pref = getPosterPreference(type, id)
       if (pref) {
         const url = buildImg(pref, 'w500')
@@ -167,7 +256,6 @@ function SmartPoster({ item, title }) {
       const best = await getBestPosterCached(type, id)
       const finalPath = best || item.poster_path || item.backdrop_path || null
       const url = finalPath ? buildImg(finalPath, 'w500') : null
-
       if (url) await preloadImage(url)
       if (!abort) {
         setSrc(url)
@@ -179,7 +267,7 @@ function SmartPoster({ item, title }) {
     return () => {
       abort = true
     }
-  }, [type, id, item.poster_path, item.backdrop_path])
+  }, [mode, type, id, item.poster_path, item.backdrop_path])
 
   return (
     <div className="relative w-full h-full">
@@ -284,10 +372,7 @@ function Dropdown({ label, valueLabel, icon: Icon, children, className = '' }) {
   }, [open])
 
   return (
-    <div
-      ref={ref}
-      className={`relative ${open ? 'z-[9999]' : 'z-20'} ${className}`}
-    >
+    <div ref={ref} className={`relative ${open ? 'z-[9999]' : 'z-20'} ${className}`}>
       <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
         {label}
       </div>
@@ -326,12 +411,141 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between
-        ${active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
+      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between ${active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+        }`}
     >
       <span className="font-medium">{children}</span>
       {active && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
     </button>
+  )
+}
+
+function AllGlyph({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" />
+      <rect x="14" y="3" width="7" height="7" />
+      <rect x="14" y="14" width="7" height="7" />
+      <rect x="3" y="14" width="7" height="7" />
+    </svg>
+  )
+}
+
+function TvGlyph({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="15" rx="2" />
+      <path d="m17 2-5 5-5-5" />
+    </svg>
+  )
+}
+
+function PosterGlyph({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M9 7h6M9 12h6" opacity="0.5" />
+    </svg>
+  )
+}
+
+function BackdropGlyph({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 15l5.5-5.5L12 13l3.5-3.5L21 15" opacity="0.5" />
+    </svg>
+  )
+}
+
+// ✅ Tipo: Todo / Películas / Series (sin dropdown, solo iconos)
+function MediaTypeIconSwitch({ value, onChange, className = '', widthClass = 'w-full' }) {
+  const btnBase =
+    'relative z-10 w-1/3 h-full rounded-lg grid place-items-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+  const active = 'bg-white/10 text-white'
+  const inactive = 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+
+  return (
+    <div className={`${widthClass} ${className}`}>
+      <div className="h-10 rounded-xl bg-zinc-900 border border-zinc-800 p-1 flex items-center overflow-hidden">
+        <button
+          type="button"
+          aria-label="Todo"
+          title="Todo"
+          aria-pressed={value === 'all'}
+          onClick={() => onChange('all')}
+          className={`${btnBase} ${value === 'all' ? active : inactive}`}
+        >
+          <AllGlyph className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          aria-label="Películas"
+          title="Películas"
+          aria-pressed={value === 'movie'}
+          onClick={() => onChange('movie')}
+          className={`${btnBase} ${value === 'movie' ? active : inactive}`}
+        >
+          <Film className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          aria-label="Series"
+          title="Series"
+          aria-pressed={value === 'tv'}
+          onClick={() => onChange('tv')}
+          className={`${btnBase} ${value === 'tv' ? active : inactive}`}
+        >
+          <TvGlyph className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ✅ Vista: Portada / Backdrop (iconos, sin dropdown)
+function CoverModeIconSwitch({ value, onChange, className = '', showLabel = false, widthClass = 'w-[72px] sm:w-[86px]' }) {
+  const isBackdrop = value === 'backdrop'
+
+  const btnBase =
+    'relative z-10 w-1/2 h-full rounded-lg grid place-items-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+  const active = 'bg-white/10 text-white'
+  const inactive = 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+
+  return (
+    <div className={`${widthClass} ${className}`}>
+      {showLabel ? (
+        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
+          Vista
+        </div>
+      ) : null}
+
+      <div className="h-10 rounded-xl bg-zinc-900 border border-zinc-800 p-1 flex items-center overflow-hidden">
+        <button
+          type="button"
+          aria-label="Portada"
+          title="Portada"
+          aria-pressed={!isBackdrop}
+          onClick={() => onChange('poster')}
+          className={`${btnBase} ${!isBackdrop ? active : inactive}`}
+        >
+          <PosterGlyph className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          aria-label="Backdrop"
+          title="Backdrop"
+          aria-pressed={isBackdrop}
+          onClick={() => onChange('backdrop')}
+          className={`${btnBase} ${isBackdrop ? active : inactive}`}
+        >
+          <BackdropGlyph className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -341,11 +555,7 @@ function StatBox({ label, value, icon: Icon, imgSrc, colorClass }) {
     <div className="flex flex-col items-start min-w-0">
       <div className="flex items-center gap-1.5 mb-1 opacity-75 min-w-0">
         {imgSrc ? (
-          <img
-            src={imgSrc}
-            alt={label}
-            className="w-auto h-3 sm:h-3.5 object-contain opacity-85 shrink-0"
-          />
+          <img src={imgSrc} alt={label} className="w-auto h-3 sm:h-3.5 object-contain opacity-85 shrink-0" />
         ) : Icon ? (
           <Icon className={`w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 ${colorClass}`} />
         ) : null}
@@ -364,22 +574,15 @@ function StatBox({ label, value, icon: Icon, imgSrc, colorClass }) {
   )
 }
 
-/**
- * Cabecera de grupo: layout responsive
- * - Móvil: título en 2 líneas + stats en grid 2x2
- * - Desktop: mantiene look “premium” y alineación horizontal
- */
 function GroupDivider({ title, stats, count, total }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
 
   return (
     <div className="my-8 sm:my-10">
       <div className="relative overflow-hidden rounded-2xl bg-[#0a0a0a] border border-white/[0.08]">
-        {/* Fondo sutil */}
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/[0.03] via-transparent to-transparent opacity-50" />
 
         <div className="relative px-4 sm:px-6 py-4 sm:py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
-          {/* Título del grupo */}
           <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
             <div className="w-1.5 h-10 sm:h-12 bg-gradient-to-b from-red-500 to-red-600 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0" />
 
@@ -397,9 +600,7 @@ function GroupDivider({ title, stats, count, total }) {
             </div>
           </div>
 
-          {/* Stats */}
           <div className="pt-3 sm:pt-4 lg:pt-0 border-t border-white/5 lg:border-t-0 w-full lg:w-auto">
-            {/* Móvil: grid 2x2 | Desktop: fila */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-4">
               <StatBox label="IMDb" value={formatAvg(stats?.imdb?.avg)} imgSrc="/logo-IMDb.png" />
               <StatBox label="Trakt" value={formatAvg(stats?.trakt?.avg)} imgSrc="/logo-Trakt.png" />
@@ -659,9 +860,17 @@ export default function FavoritesPage() {
   const [groupBy, setGroupBy] = useState('none')
   const [sortBy, setSortBy] = useState('added_desc')
 
-  // Totals (TMDb)
-  const [totalMovie, setTotalMovie] = useState(0)
-  const [totalTv, setTotalTv] = useState(0)
+  // NUEVO: modo portada/backdrop (persistido)
+  const [coverMode, setCoverMode] = useState('poster') // 'poster' | 'backdrop'
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = window.localStorage.getItem('showverse:favorites:coverMode')
+    if (saved === 'poster' || saved === 'backdrop') setCoverMode(saved)
+  }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('showverse:favorites:coverMode', coverMode)
+  }, [coverMode])
 
   // ---- Infinite scroll UI ----
   const UI_BATCH = 21
@@ -674,6 +883,10 @@ export default function FavoritesPage() {
   const [nextTvPage, setNextTvPage] = useState(1)
   const [hasMoreMovie, setHasMoreMovie] = useState(true)
   const [hasMoreTv, setHasMoreTv] = useState(true)
+
+  // Totals (TMDb)
+  const [totalMovie, setTotalMovie] = useState(0)
+  const [totalTv, setTotalTv] = useState(0)
 
   // ---- Load-all (when filtering/sorting/grouping/searching) ----
   const [loadingAll, setLoadingAll] = useState(false)
@@ -710,6 +923,39 @@ export default function FavoritesPage() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // Detectar touch/coarse pointer (para hover en móvil con “tap para preview”)
+  const isTouchRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mql = window.matchMedia('(hover: none), (pointer: coarse)')
+    const apply = () => {
+      isTouchRef.current = !!mql.matches
+    }
+    apply()
+    mql.addEventListener?.('change', apply)
+    return () => mql.removeEventListener?.('change', apply)
+  }, [])
+
+  // “Hover” en móvil: card activa temporalmente
+  const [activeCardKey, setActiveCardKey] = useState(null)
+  const activeTimerRef = useRef(0)
+  const activateCard = useCallback((k) => {
+    setActiveCardKey(k)
+    if (typeof window !== 'undefined') {
+      window.clearTimeout(activeTimerRef.current)
+      activeTimerRef.current = window.setTimeout(() => setActiveCardKey(null), 2600)
+    }
+  }, [])
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined') window.clearTimeout(activeTimerRef.current)
+    }
+  }, [])
+  useEffect(() => {
+    // al cambiar de vista, cerramos cualquier overlay “activo”
+    setActiveCardKey(null)
+  }, [coverMode])
 
   // IMDb ratings
   const [imdbRatings, setImdbRatings] = useState({})
@@ -829,7 +1075,6 @@ export default function FavoritesPage() {
       setError(null)
       setLoadingMore(false)
 
-      // reset pagination + load-all flags
       setNextMoviePage(1)
       setNextTvPage(1)
       setHasMoreMovie(true)
@@ -933,7 +1178,6 @@ export default function FavoritesPage() {
           hasMoreMovieRef.current = mHas
           hasMoreTvRef.current = tHas
 
-          // mark fully loaded if already no more pages
           if (!mHas && !tHas) allLoadedRef.current = true
         }
       } catch {
@@ -1051,12 +1295,10 @@ export default function FavoritesPage() {
 
     if (typeFilter !== 'all') list = list.filter((i) => i.media_type === typeFilter)
 
-    // Search (EN + ES + fallback originals)
     const q = normText(query)
     if (q) {
       list = list.filter((i) => {
         const mediaType = i.media_type || (i.title ? 'movie' : 'tv')
-
         const candidates =
           mediaType === 'movie'
             ? [i.title, i._title_es, i._title_en, i.original_title]
@@ -1078,8 +1320,7 @@ export default function FavoritesPage() {
       return Number.isFinite(ts) ? ts : 0
     }
 
-    const getTitle = (i) =>
-      normText(i.title || i.name || i._title_es || i._name_es || i._title_en || i._name_en || '')
+    const getTitle = (i) => normText(i.title || i.name || i._title_es || i._name_es || i._title_en || i._name_en || '')
 
     const getImdb = (i) => imdbRatings?.[makeKey(i.media_type, i.id)]
     const getMy = (i) => myRatings?.[makeKey(i.media_type, i.id)]
@@ -1149,17 +1390,8 @@ export default function FavoritesPage() {
     })
 
     return list
-  }, [
-    items,
-    typeFilter,
-    query,
-    sortBy,
-    sortNeedsImdb ? imdbRatings : null,
-    sortNeedsTrakt ? traktScores : null,
-    sortNeedsMy ? myRatings : null,
-  ])
+  }, [items, typeFilter, query, sortBy, sortNeedsImdb ? imdbRatings : null, sortNeedsTrakt ? traktScores : null, sortNeedsMy ? myRatings : null])
 
-  // Si el usuario está filtrando/agrupando/ordenando/buscando, enseñamos toda la colección (optimización: sigue siendo lazy en carga remota)
   useEffect(() => {
     if (!wantsFullCollection) return
     setVisibleCount(Math.max(INITIAL_VISIBLE, processedItems.length))
@@ -1267,7 +1499,6 @@ export default function FavoritesPage() {
     nextTvPage,
   ])
 
-  // IntersectionObserver (solo dispara cuando el usuario ya ha hecho scroll)
   useEffect(() => {
     if (!canLoadMore) return
     const el = sentinelRef.current
@@ -1393,7 +1624,7 @@ export default function FavoritesPage() {
     )
   }, [authStatus, session, visibleItems, prefetchMyRating])
 
-  // Prefetch “Mi nota” para agrupar/ordenar por mi nota (toda la lista filtrada)
+  // Prefetch “Mi nota” para agrupar/ordenar por mi nota
   useEffect(() => {
     if (!needsMyForGrouping) return
     if (authStatus !== 'authenticated') return
@@ -1407,7 +1638,7 @@ export default function FavoritesPage() {
     )
   }, [needsMyForGrouping, authStatus, session, processedItems, prefetchMyRating])
 
-  // Prefetch IMDb cuando se necesita (agrupación/ordenación por IMDb) — sin límite y sin delay
+  // Prefetch IMDb cuando se necesita
   useEffect(() => {
     if (!needsImdb) return
     runPool(
@@ -1417,7 +1648,7 @@ export default function FavoritesPage() {
     )
   }, [needsImdb, processedItems, prefetchImdb])
 
-  // Prefetch Trakt cuando se necesita (agrupación/ordenación por Trakt) — sin límite
+  // Prefetch Trakt cuando se necesita
   useEffect(() => {
     if (!needsTrakt) return
     runPool(
@@ -1452,13 +1683,6 @@ export default function FavoritesPage() {
       const b = Math.floor(score)
       const hi = b === 10 ? '10' : `${b}.x`
       return { key: String(b), label: `${prefix} · ${hi}` }
-    }
-
-    const avgOf = (vals) => {
-      const nums = vals.filter((v) => typeof v === 'number' && !Number.isNaN(v))
-      if (!nums.length) return { avg: null, n: 0 }
-      const sum = nums.reduce((a, b) => a + b, 0)
-      return { avg: sum / nums.length, n: nums.length }
     }
 
     const groups = new Map()
@@ -1547,6 +1771,13 @@ export default function FavoritesPage() {
         return typeof val === 'number' ? val : null
       })
 
+      const avgOf = (vals) => {
+        const nums = vals.filter((v) => typeof v === 'number' && !Number.isNaN(v))
+        if (!nums.length) return { avg: null, n: 0 }
+        const sum = nums.reduce((a, b) => a + b, 0)
+        return { avg: sum / nums.length, n: nums.length }
+      }
+
       return {
         k,
         ...v,
@@ -1564,25 +1795,14 @@ export default function FavoritesPage() {
       const n = Number(k)
       return Number.isFinite(n) ? n : -999
     }
-
-    const sortNumDesc = (a, b) => {
-      const na = toNum(a.k)
-      const nb = toNum(b.k)
-      return nb - na
-    }
+    const sortNumDesc = (a, b) => toNum(b.k) - toNum(a.k)
 
     if (groupBy === 'year' || groupBy === 'decade' || groupBy.endsWith('rating') || groupBy === 'user_rating') {
       entries.sort(sortNumDesc)
     }
 
-    // pending y no al final (no = último)
     const rank = (k) => (k === 'no' ? 2 : k === 'pending' ? 1 : 0)
-    entries.sort((a, b) => {
-      const ra = rank(a.k)
-      const rb = rank(b.k)
-      if (ra !== rb) return ra - rb
-      return 0
-    })
+    entries.sort((a, b) => rank(a.k) - rank(b.k))
 
     return entries
   }, [groupBy, visibleItems, imdbRatings, traktScores, myRatings])
@@ -1616,9 +1836,8 @@ export default function FavoritesPage() {
       case 'title_desc':
         return 'Z - A'
       case 'title_asc':
-        return 'A - Z'
       default:
-        return 'Añadido (reciente)'
+        return 'A - Z'
     }
   }, [sortBy])
 
@@ -1640,6 +1859,128 @@ export default function FavoritesPage() {
         return 'Sin agrupar'
     }
   }, [groupBy])
+
+  // Grid class según vista
+  const gridClass = useMemo(() => {
+    if (coverMode === 'backdrop') {
+      // pedido: 4 por fila (en desktop) en vez de 5
+      return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-3 sm:gap-6'
+    }
+    return 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6'
+  }, [coverMode])
+
+  // Render de tarjeta (reutilizable para agrupado/no agrupado)
+  const renderCard = useCallback(
+    (item) => {
+      const isMovie = item.media_type === 'movie'
+      const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
+      const href = `/details/${mediaType}/${item.id}`
+      const title = isMovie ? item.title : item.name
+      const date = isMovie ? item.release_date : item.first_air_date
+      const year = date ? date.slice(0, 4) : ''
+      const k = makeKey(mediaType, item.id)
+      const imdbScore = imdbRatings[k]
+      const myScore = myRatings[k]
+      const myLabel = formatHalfSteps(myScore)
+
+      const cardKey = `${mediaType}:${item.id}`
+      const isActive = activeCardKey === cardKey
+
+      const onPrefetch = () => {
+        prefetchImdb(item)
+        prefetchMyRating(item)
+        prefetchTraktScore(item)
+      }
+
+      const onClick = (e) => {
+        // “hover” en móvil: primer tap muestra overlay; segundo tap navega
+        if (isTouchRef.current && !isActive) {
+          e.preventDefault()
+          e.stopPropagation()
+          onPrefetch()
+          activateCard(cardKey)
+          return
+        }
+      }
+
+      const wrapAspect = coverMode === 'backdrop' ? 'aspect-[16/9]' : 'aspect-[2/3]'
+      const hoverShadow = 'transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)]'
+      const ring = 'ring-1 ring-white/5'
+      const overlayBase = 'absolute inset-0 transition-opacity duration-300 flex flex-col justify-between'
+      const overlayOpacity = isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+
+      const topTransform = isActive ? 'translate-y-0' : '-translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0'
+      const bottomTransform = isActive ? 'translate-y-0' : 'translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0'
+
+      const myTransform = isActive
+        ? 'opacity-100 translate-y-0 scale-100'
+        : 'opacity-0 translate-y-1 scale-[0.98] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100'
+
+      return (
+        <Link
+          key={`${mediaType}-${item.id}`}
+          href={href}
+          className="group block relative w-full h-full"
+          title={title}
+          onMouseEnter={onPrefetch}
+          onFocus={onPrefetch}
+          onClick={onClick}
+        >
+          <div className={`relative ${wrapAspect} w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ${ring} ${hoverShadow} z-0`}>
+            <SmartPoster key={`${mediaType}:${item.id}:${coverMode}`} item={item} title={title} mode={coverMode} />
+
+            <div className={`${overlayBase} ${overlayOpacity}`}>
+              <div
+                className={`p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform ${topTransform} transition-transform duration-300`}
+              >
+                <span
+                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                    }`}
+                >
+                  {isMovie ? 'PELÍCULA' : 'SERIE'}
+                </span>
+
+                <div className="flex flex-col items-end gap-1">
+                  {item.vote_average > 0 && (
+                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                      <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">{item.vote_average.toFixed(1)}</span>
+                      <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
+                    </div>
+                  )}
+                  {typeof imdbScore === 'number' && imdbScore > 0 && (
+                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                      <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">{imdbScore.toFixed(1)}</span>
+                      <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                className={`p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform ${bottomTransform} transition-transform duration-300`}
+              >
+                <div className="flex items-end justify-between gap-3">
+                  <div className="min-w-0 text-left">
+                    <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">{title}</h3>
+                    {year && <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">{year}</p>}
+                  </div>
+
+                  {myLabel ? (
+                    <div className={`shrink-0 self-end transition-all duration-300 ${myTransform}`}>
+                      <span className="text-2xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">
+                        {myLabel}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Link>
+      )
+    },
+    [coverMode, imdbRatings, myRatings, activeCardKey, prefetchImdb, prefetchMyRating, prefetchTraktScore, activateCard]
+  )
 
   // --- UI states ---
   if (authStatus === 'checking') {
@@ -1683,284 +2024,279 @@ export default function FavoritesPage() {
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full xl:w-auto">
-            <Dropdown
-              label="Tipo"
-              valueLabel={typeFilter === 'all' ? 'Todo' : typeFilter === 'movie' ? 'Películas' : 'Series'}
-              icon={Film}
-            >
-              {({ close }) => (
-                <>
-                  <DropdownItem
-                    active={typeFilter === 'all'}
-                    onClick={() => {
-                      setTypeFilter('all')
-                      close()
-                    }}
-                  >
-                    Todo
-                  </DropdownItem>
-                  <DropdownItem
-                    active={typeFilter === 'movie'}
-                    onClick={() => {
-                      setTypeFilter('movie')
-                      close()
-                    }}
-                  >
-                    Películas
-                  </DropdownItem>
-                  <DropdownItem
-                    active={typeFilter === 'tv'}
-                    onClick={() => {
-                      setTypeFilter('tv')
-                      close()
-                    }}
-                  >
-                    Series
-                  </DropdownItem>
-                </>
-              )}
-            </Dropdown>
+          {/* Controles (desktop: todo en 1 línea; móvil: 2 líneas) */}
+          <div className="w-full xl:w-auto">
+            <div className="grid grid-cols-2 gap-3 sm:[grid-template-columns:minmax(0,1.35fr)_repeat(2,minmax(0,1fr))_minmax(0,1.25fr)]">
+              {/* ✅ Tipo + Vista juntos (iconos, sin dropdowns) */}
+              <div className="w-full">
+                <div className="flex items-end gap-2">
+                  {/* Tipo */}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
+                      Tipo
+                    </div>
+                    <MediaTypeIconSwitch
+                      value={typeFilter}
+                      onChange={(v) => startTransition(() => setTypeFilter(v))}
+                      widthClass="w-full"
+                    />
+                  </div>
 
-            <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Layers}>
-              {({ close }) => (
-                <>
-                  <DropdownItem
-                    active={groupBy === 'none'}
-                    onClick={() => {
-                      setGroupBy('none')
-                      close()
-                    }}
-                  >
-                    Sin agrupar
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'year'}
-                    onClick={() => {
-                      setGroupBy('year')
-                      close()
-                    }}
-                  >
-                    Año
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'decade'}
-                    onClick={() => {
-                      setGroupBy('decade')
-                      close()
-                    }}
-                  >
-                    Década
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'tmdb_rating'}
-                    onClick={() => {
-                      setGroupBy('tmdb_rating')
-                      close()
-                    }}
-                  >
-                    Nota TMDb
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'trakt_rating'}
-                    onClick={() => {
-                      setGroupBy('trakt_rating')
-                      close()
-                    }}
-                  >
-                    Nota Trakt
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'imdb_rating'}
-                    onClick={() => {
-                      setGroupBy('imdb_rating')
-                      close()
-                    }}
-                  >
-                    Nota IMDb
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'user_rating'}
-                    onClick={() => {
-                      setGroupBy('user_rating')
-                      close()
-                    }}
-                  >
-                    Mi nota
-                  </DropdownItem>
-                </>
-              )}
-            </Dropdown>
-
-            <Dropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown}>
-              {({ close }) => (
-                <>
-                  <DropdownItem
-                    active={sortBy === 'added_desc'}
-                    onClick={() => {
-                      setSortBy('added_desc')
-                      close()
-                    }}
-                  >
-                    Añadido (reciente)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'added_asc'}
-                    onClick={() => {
-                      setSortBy('added_asc')
-                      close()
-                    }}
-                  >
-                    Añadido (antiguo)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'tmdb_desc'}
-                    onClick={() => {
-                      setSortBy('tmdb_desc')
-                      close()
-                    }}
-                  >
-                    TMDb (alta)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'tmdb_asc'}
-                    onClick={() => {
-                      setSortBy('tmdb_asc')
-                      close()
-                    }}
-                  >
-                    TMDb (baja)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'trakt_desc'}
-                    onClick={() => {
-                      setSortBy('trakt_desc')
-                      close()
-                    }}
-                  >
-                    Trakt (alta)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'trakt_asc'}
-                    onClick={() => {
-                      setSortBy('trakt_asc')
-                      close()
-                    }}
-                  >
-                    Trakt (baja)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'imdb_desc'}
-                    onClick={() => {
-                      setSortBy('imdb_desc')
-                      close()
-                    }}
-                  >
-                    IMDb (alta)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'imdb_asc'}
-                    onClick={() => {
-                      setSortBy('imdb_asc')
-                      close()
-                    }}
-                  >
-                    IMDb (baja)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'my_desc'}
-                    onClick={() => {
-                      setSortBy('my_desc')
-                      close()
-                    }}
-                  >
-                    Mi nota (alta)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'my_asc'}
-                    onClick={() => {
-                      setSortBy('my_asc')
-                      close()
-                    }}
-                  >
-                    Mi nota (baja)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'year_desc'}
-                    onClick={() => {
-                      setSortBy('year_desc')
-                      close()
-                    }}
-                  >
-                    Año (reciente)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'year_asc'}
-                    onClick={() => {
-                      setSortBy('year_asc')
-                      close()
-                    }}
-                  >
-                    Año (antiguo)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'title_asc'}
-                    onClick={() => {
-                      setSortBy('title_asc')
-                      close()
-                    }}
-                  >
-                    A - Z
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'title_desc'}
-                    onClick={() => {
-                      setSortBy('title_desc')
-                      close()
-                    }}
-                  >
-                    Z - A
-                  </DropdownItem>
-                </>
-              )}
-            </Dropdown>
-
-            {/* Search (title EN/ES) */}
-            <div className="relative group z-10">
-              <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
-                Buscar
+                  {/* Vista */}
+                  <div className="shrink-0">
+                    <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
+                      Vista
+                    </div>
+                    <CoverModeIconSwitch
+                      value={coverMode}
+                      onChange={(v) => startTransition(() => setCoverMode(v))}
+                      showLabel={false}
+                      widthClass="w-[72px] sm:w-[86px]"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-zinc-300 transition-colors" />
-                <input
-                  type="text"
-                  placeholder="Buscar"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-all"
-                />
-                {query?.trim() ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] rounded-lg bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 transition"
-                  >
-                    Limpiar
-                  </button>
-                ) : null}
+
+              <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Layers}>
+                {({ close }) => (
+                  <>
+                    <DropdownItem
+                      active={groupBy === 'none'}
+                      onClick={() => {
+                        setGroupBy('none')
+                        close()
+                      }}
+                    >
+                      Sin agrupar
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={groupBy === 'year'}
+                      onClick={() => {
+                        setGroupBy('year')
+                        close()
+                      }}
+                    >
+                      Año
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={groupBy === 'decade'}
+                      onClick={() => {
+                        setGroupBy('decade')
+                        close()
+                      }}
+                    >
+                      Década
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={groupBy === 'tmdb_rating'}
+                      onClick={() => {
+                        setGroupBy('tmdb_rating')
+                        close()
+                      }}
+                    >
+                      Nota TMDb
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={groupBy === 'trakt_rating'}
+                      onClick={() => {
+                        setGroupBy('trakt_rating')
+                        close()
+                      }}
+                    >
+                      Nota Trakt
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={groupBy === 'imdb_rating'}
+                      onClick={() => {
+                        setGroupBy('imdb_rating')
+                        close()
+                      }}
+                    >
+                      Nota IMDb
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={groupBy === 'user_rating'}
+                      onClick={() => {
+                        setGroupBy('user_rating')
+                        close()
+                      }}
+                    >
+                      Mi nota
+                    </DropdownItem>
+                  </>
+                )}
+              </Dropdown>
+
+              <Dropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown}>
+                {({ close }) => (
+                  <>
+                    <DropdownItem
+                      active={sortBy === 'added_desc'}
+                      onClick={() => {
+                        setSortBy('added_desc')
+                        close()
+                      }}
+                    >
+                      Añadido (reciente)
+                    </DropdownItem>
+                    <DropdownItem
+                      active={sortBy === 'added_asc'}
+                      onClick={() => {
+                        setSortBy('added_asc')
+                        close()
+                      }}
+                    >
+                      Añadido (antiguo)
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={sortBy === 'tmdb_desc'}
+                      onClick={() => {
+                        setSortBy('tmdb_desc')
+                        close()
+                      }}
+                    >
+                      TMDb (alta)
+                    </DropdownItem>
+                    <DropdownItem
+                      active={sortBy === 'tmdb_asc'}
+                      onClick={() => {
+                        setSortBy('tmdb_asc')
+                        close()
+                      }}
+                    >
+                      TMDb (baja)
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={sortBy === 'trakt_desc'}
+                      onClick={() => {
+                        setSortBy('trakt_desc')
+                        close()
+                      }}
+                    >
+                      Trakt (alta)
+                    </DropdownItem>
+                    <DropdownItem
+                      active={sortBy === 'trakt_asc'}
+                      onClick={() => {
+                        setSortBy('trakt_asc')
+                        close()
+                      }}
+                    >
+                      Trakt (baja)
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={sortBy === 'imdb_desc'}
+                      onClick={() => {
+                        setSortBy('imdb_desc')
+                        close()
+                      }}
+                    >
+                      IMDb (alta)
+                    </DropdownItem>
+                    <DropdownItem
+                      active={sortBy === 'imdb_asc'}
+                      onClick={() => {
+                        setSortBy('imdb_asc')
+                        close()
+                      }}
+                    >
+                      IMDb (baja)
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={sortBy === 'my_desc'}
+                      onClick={() => {
+                        setSortBy('my_desc')
+                        close()
+                      }}
+                    >
+                      Mi nota (alta)
+                    </DropdownItem>
+                    <DropdownItem
+                      active={sortBy === 'my_asc'}
+                      onClick={() => {
+                        setSortBy('my_asc')
+                        close()
+                      }}
+                    >
+                      Mi nota (baja)
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={sortBy === 'year_desc'}
+                      onClick={() => {
+                        setSortBy('year_desc')
+                        close()
+                      }}
+                    >
+                      Año (reciente)
+                    </DropdownItem>
+                    <DropdownItem
+                      active={sortBy === 'year_asc'}
+                      onClick={() => {
+                        setSortBy('year_asc')
+                        close()
+                      }}
+                    >
+                      Año (antiguo)
+                    </DropdownItem>
+
+                    <DropdownItem
+                      active={sortBy === 'title_asc'}
+                      onClick={() => {
+                        setSortBy('title_asc')
+                        close()
+                      }}
+                    >
+                      A - Z
+                    </DropdownItem>
+                    <DropdownItem
+                      active={sortBy === 'title_desc'}
+                      onClick={() => {
+                        setSortBy('title_desc')
+                        close()
+                      }}
+                    >
+                      Z - A
+                    </DropdownItem>
+                  </>
+                )}
+              </Dropdown>
+
+              {/* Search */}
+              <div className="relative group z-10">
+                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
+                  Buscar
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-zinc-300 transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="Buscar"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-all"
+                  />
+                  {query?.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] rounded-lg bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 transition"
+                    >
+                      Limpiar
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
@@ -1992,209 +2328,34 @@ export default function FavoritesPage() {
           </div>
         ) : (
           <>
-            {groupedSections ? (
-              <div>
-                {groupedSections.map((section) => (
-                  <div key={`grp-${section.k}`}>
-                    <GroupDivider
-                      title={section.title}
-                      stats={section.stats}
-                      count={section.items.length}
-                      total={visibleItems.length}
-                    />
-
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6">
-                      {section.items.map((item) => {
-                        const isMovie = item.media_type === 'movie'
-                        const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
-                        const href = `/details/${mediaType}/${item.id}`
-                        const title = isMovie ? item.title : item.name
-                        const date = isMovie ? item.release_date : item.first_air_date
-                        const year = date ? date.slice(0, 4) : ''
-                        const key = makeKey(mediaType, item.id)
-                        const imdbScore = imdbRatings[key]
-                        const myScore = myRatings[key]
-                        const myLabel = formatHalfSteps(myScore)
-
-                        return (
-                          <Link
-                            key={`${mediaType}-${item.id}`}
-                            href={href}
-                            className="group block relative w-full h-full"
-                            title={title}
-                            onMouseEnter={() => {
-                              prefetchImdb(item)
-                              prefetchMyRating(item)
-                              prefetchTraktScore(item)
-                            }}
-                            onFocus={() => {
-                              prefetchImdb(item)
-                              prefetchMyRating(item)
-                              prefetchTraktScore(item)
-                            }}
-                          >
-                            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] z-0">
-                              <SmartPoster item={item} title={title} />
-
-                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
-                                <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                                  <span
-                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
-                                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                                      : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                                      }`}
-                                  >
-                                    {isMovie ? 'PELÍCULA' : 'SERIE'}
-                                  </span>
-
-                                  <div className="flex flex-col items-end gap-1">
-                                    {item.vote_average > 0 && (
-                                      <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                        <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                                          {item.vote_average.toFixed(1)}
-                                        </span>
-                                        <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
-                                      </div>
-                                    )}
-                                    {typeof imdbScore === 'number' && imdbScore > 0 && (
-                                      <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                        <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                                          {imdbScore.toFixed(1)}
-                                        </span>
-                                        <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                                  <div className="flex items-end justify-between gap-3">
-                                    <div className="min-w-0 text-left">
-                                      <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-md">
-                                        {title}
-                                      </h3>
-                                      {year && (
-                                        <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
-                                          {year}
-                                        </p>
-                                      )}
-                                    </div>
-
-                                    {myLabel ? (
-                                      <div className="shrink-0 self-end opacity-0 translate-y-1 scale-[0.98] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 transition-all duration-300">
-                                        <span className="text-2xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">
-                                          {myLabel}
-                                        </span>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6">
-                {visibleItems.map((item) => {
-                  const isMovie = item.media_type === 'movie'
-                  const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
-                  const href = `/details/${mediaType}/${item.id}`
-                  const title = isMovie ? item.title : item.name
-                  const date = isMovie ? item.release_date : item.first_air_date
-                  const year = date ? date.slice(0, 4) : ''
-                  const key = makeKey(mediaType, item.id)
-                  const imdbScore = imdbRatings[key]
-                  const myScore = myRatings[key]
-                  const myLabel = formatHalfSteps(myScore)
-
-                  return (
-                    <Link
-                      key={`${mediaType}-${item.id}`}
-                      href={href}
-                      className="group block relative w-full h-full"
-                      title={title}
-                      onMouseEnter={() => {
-                        prefetchImdb(item)
-                        prefetchMyRating(item)
-                        prefetchTraktScore(item)
-                      }}
-                      onFocus={() => {
-                        prefetchImdb(item)
-                        prefetchMyRating(item)
-                        prefetchTraktScore(item)
-                      }}
-                    >
-                      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] z-0">
-                        <SmartPoster item={item} title={title} />
-
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
-                          <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                            <span
-                              className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
-                                ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                                : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                                }`}
-                            >
-                              {isMovie ? 'PELÍCULA' : 'SERIE'}
-                            </span>
-
-                            <div className="flex flex-col items-end gap-1">
-                              {item.vote_average > 0 && (
-                                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                  <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                                    {item.vote_average.toFixed(1)}
-                                  </span>
-                                  <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
-                                </div>
-                              )}
-                              {typeof imdbScore === 'number' && imdbScore > 0 && (
-                                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                  <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                                    {imdbScore.toFixed(1)}
-                                  </span>
-                                  <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                            <div className="flex items-end justify-between gap-3">
-                              <div className="min-w-0 text-left">
-                                <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-md">
-                                  {title}
-                                </h3>
-                                {year && (
-                                  <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
-                                    {year}
-                                  </p>
-                                )}
-                              </div>
-
-                              {myLabel ? (
-                                <div className="shrink-0 self-end opacity-0 translate-y-1 scale-[0.98] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 transition-all duration-300">
-                                  <span className="text-2xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">
-                                    {myLabel}
-                                  </span>
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
+            <div className="relative">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={`covers-${coverMode}`}
+                  initial={{ opacity: 0, y: 10, scale: 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.985 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  className="will-change-transform"
+                >
+                  {groupedSections ? (
+                    <div>
+                      {groupedSections.map((section) => (
+                        <div key={`grp-${section.k}`}>
+                          <GroupDivider title={section.title} stats={section.stats} count={section.items.length} total={visibleItems.length} />
+                          <div className={gridClass}>{section.items.map(renderCard)}</div>
                         </div>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={gridClass}>{visibleItems.map(renderCard)}</div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
 
-            {/* Sentinel + Loader */}
-            <div ref={sentinelRef} className="h-10" />
+              {/* ✅ fuera del motion para que el observer no se “rompa” al cambiar vista */}
+              <div ref={sentinelRef} className="h-10" />
+            </div>
 
             {(loadingAll || loadingMore || canLoadMore) && (
               <div className="flex flex-col items-center justify-center py-10 gap-2">

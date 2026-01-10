@@ -1,7 +1,7 @@
 // /src/app/watchlist/page.jsx
 'use client'
 
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback, startTransition } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
@@ -24,6 +24,9 @@ import {
 // ================== UTILS & CACHE ==================
 const posterChoiceCache = new Map()
 const posterInFlight = new Map()
+
+const backdropChoiceCache = new Map()
+const backdropInFlight = new Map()
 
 // user ratings cache (IMPORTANT: do NOT cache "null" for long, or ratings won't refresh after voting)
 const userRatingCache = new Map() // key -> { v: number|null, t: number }
@@ -105,6 +108,73 @@ function pickBestPosterEN(posters) {
   })[0] || null
 }
 
+function pickBestBackdropByLangResVotes(list, opts = {}) {
+  const { preferLangs = ['en', 'en-US'], minWidth = 1200 } = opts
+  if (!Array.isArray(list) || list.length === 0) return null
+
+  const norm = (v) => (v ? String(v).toLowerCase().split('-')[0] : null)
+  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean))
+  const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1))
+
+  const pool0 = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
+  const pool = pool0.length ? pool0 : list
+
+  // ✅ SOLO 3 primeras EN (en orden). Si no hay EN => null (siempre EN)
+  const top3en = []
+  for (const b of pool) {
+    if (isPreferredLang(b)) top3en.push(b)
+    if (top3en.length === 3) break
+  }
+  if (!top3en.length) return null
+
+  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h
+
+  const b1080 = top3en.find((b) => isRes(b, 1920, 1080))
+  if (b1080) return b1080
+
+  const b1440 = top3en.find((b) => isRes(b, 2560, 1440))
+  if (b1440) return b1440
+
+  const b4k = top3en.find((b) => isRes(b, 3840, 2160))
+  if (b4k) return b4k
+
+  const b720 = top3en.find((b) => isRes(b, 1280, 720))
+  if (b720) return b720
+
+  return top3en[0]
+}
+
+async function fetchBestBackdropEN(type, id) {
+  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
+  if (!apiKey || !type || !id) return null
+  try {
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US`
+    const r = await fetch(url, { cache: 'force-cache' })
+    if (!r.ok) return null
+    const j = await r.json()
+    const best = pickBestBackdropByLangResVotes(j?.backdrops, { preferLangs: ['en', 'en-US'], minWidth: 1200 })
+    return best?.file_path || null
+  } catch {
+    return null
+  }
+}
+
+async function getBestBackdropCached(type, id) {
+  const key = `${type}:${id}`
+  if (backdropChoiceCache.has(key)) return backdropChoiceCache.get(key)
+  if (backdropInFlight.has(key)) return backdropInFlight.get(key)
+
+  const p = (async () => {
+    const chosen = await fetchBestBackdropEN(type, id)
+    backdropChoiceCache.set(key, chosen || null)
+    backdropInFlight.delete(key)
+    return chosen || null
+  })()
+
+  backdropInFlight.set(key, p)
+  return p
+}
+
 async function fetchBestPosterEN(type, id) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
   if (!apiKey || !type || !id) return null
@@ -136,11 +206,9 @@ async function getBestPosterCached(type, id) {
 }
 
 /**
- * SmartPoster:
- * - contenedor fijo (aspect-[2/3] en wrapper)
- * - skeleton + img superpuestos
+ * SmartPoster (soporta 'poster' o 'backdrop')
  */
-function SmartPoster({ item, title }) {
+function SmartPoster({ item, title, mode = 'poster' }) {
   const type = item.media_type || (item.title ? 'movie' : 'tv')
   const id = item.id
 
@@ -150,8 +218,22 @@ function SmartPoster({ item, title }) {
   useEffect(() => {
     let abort = false
 
+    // ✅ evita 1-frame con imagen anterior
+    setSrc(null)
+    setReady(false)
+
     const load = async () => {
-      setReady(false)
+      if (mode === 'backdrop') {
+        const bestBackdrop = await getBestBackdropCached(type, id)
+        const finalPath = bestBackdrop || item.backdrop_path || item.poster_path || null
+        const url = finalPath ? buildImg(finalPath, 'w1280') : null
+        if (url) await preloadImage(url)
+        if (!abort) {
+          setSrc(url)
+          setReady(!!url)
+        }
+        return
+      }
 
       const pref = getPosterPreference(type, id)
       if (pref) {
@@ -167,8 +249,8 @@ function SmartPoster({ item, title }) {
       const best = await getBestPosterCached(type, id)
       const finalPath = best || item.poster_path || item.backdrop_path || null
       const url = finalPath ? buildImg(finalPath, 'w500') : null
-
       if (url) await preloadImage(url)
+
       if (!abort) {
         setSrc(url)
         setReady(!!url)
@@ -179,7 +261,7 @@ function SmartPoster({ item, title }) {
     return () => {
       abort = true
     }
-  }, [type, id, item.poster_path, item.backdrop_path])
+  }, [mode, type, id, item.poster_path, item.backdrop_path])
 
   return (
     <div className="relative w-full h-full">
@@ -196,7 +278,7 @@ function SmartPoster({ item, title }) {
           alt={title}
           loading="lazy"
           decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 transition-transform duration-700 ease-out group-hover:scale-110 ${ready ? 'opacity-100' : 'opacity-0'
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${ready ? 'opacity-100' : 'opacity-0'
             }`}
         />
       ) : null}
@@ -252,6 +334,23 @@ function runPool(items, limit, worker) {
   })
 }
 
+function hasOwn(obj, key) {
+  return obj && Object.prototype.hasOwnProperty.call(obj, key)
+}
+
+/**
+ * status:
+ * - pending: todavía no se ha pedido / resuelto (undefined)
+ * - none: resuelto pero no existe nota (null)
+ * - value: number
+ */
+function getScoreStatus(mapObj, key) {
+  if (!hasOwn(mapObj, key)) return { status: 'pending', value: null }
+  const v = mapObj[key]
+  if (typeof v === 'number' && !Number.isNaN(v)) return { status: 'value', value: v }
+  return { status: 'none', value: null }
+}
+
 // ================== UI COMPONENTS ==================
 function Dropdown({ label, valueLabel, icon: Icon, children, className = '' }) {
   const [open, setOpen] = useState(false)
@@ -267,13 +366,8 @@ function Dropdown({ label, valueLabel, icon: Icon, children, className = '' }) {
   }, [open])
 
   return (
-    <div
-      ref={ref}
-      className={`relative ${open ? 'z-[9999]' : 'z-20'} ${className}`}
-    >
-      <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
-        {label}
-      </div>
+    <div ref={ref} className={`relative ${open ? 'z-[9999]' : 'z-20'} ${className}`}>
+      <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">{label}</div>
 
       <button
         type="button"
@@ -309,8 +403,8 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between
-        ${active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
+      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between ${active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+        }`}
     >
       <span className="font-medium">{children}</span>
       {active && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
@@ -318,7 +412,93 @@ function DropdownItem({ active, onClick, children }) {
   )
 }
 
-// Móvil mejorado (sin overflow) + logos
+function AllGlyph({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" />
+      <rect x="14" y="3" width="7" height="7" />
+      <rect x="14" y="14" width="7" height="7" />
+      <rect x="3" y="14" width="7" height="7" />
+    </svg>
+  )
+}
+function TvGlyph({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="15" rx="2" />
+      <path d="m17 2-5 5-5-5" />
+    </svg>
+  )
+}
+function PosterGlyph({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M9 7h6M9 12h6" opacity="0.5" />
+    </svg>
+  )
+}
+function BackdropGlyph({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 15l5.5-5.5L12 13l3.5-3.5L21 15" opacity="0.5" />
+    </svg>
+  )
+}
+
+// ✅ Tipo: Todo / Películas / Series
+function MediaTypeIconSwitch({ value, onChange, className = '', widthClass = 'w-full' }) {
+  const btnBase =
+    'relative z-10 w-1/3 h-full rounded-lg grid place-items-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+  const active = 'bg-white/10 text-white'
+  const inactive = 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+
+  return (
+    <div className={`${widthClass} ${className}`}>
+      <div className="h-10 rounded-xl bg-zinc-900 border border-zinc-800 p-1 flex items-center overflow-hidden">
+        <button type="button" aria-label="Todo" title="Todo" aria-pressed={value === 'all'} onClick={() => onChange('all')} className={`${btnBase} ${value === 'all' ? active : inactive}`}>
+          <AllGlyph className="w-4 h-4" />
+        </button>
+        <button type="button" aria-label="Películas" title="Películas" aria-pressed={value === 'movie'} onClick={() => onChange('movie')} className={`${btnBase} ${value === 'movie' ? active : inactive}`}>
+          <Film className="w-4 h-4" />
+        </button>
+        <button type="button" aria-label="Series" title="Series" aria-pressed={value === 'tv'} onClick={() => onChange('tv')} className={`${btnBase} ${value === 'tv' ? active : inactive}`}>
+          <TvGlyph className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ✅ Vista: Portada / Backdrop
+function CoverModeIconSwitch({ value, onChange, className = '', showLabel = false, widthClass = 'w-[72px] sm:w-[86px]' }) {
+  const isBackdrop = value === 'backdrop'
+
+  const btnBase =
+    'relative z-10 w-1/2 h-full rounded-lg grid place-items-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+  const active = 'bg-white/10 text-white'
+  const inactive = 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+
+  return (
+    <div className={`${widthClass} ${className}`}>
+      {showLabel ? (
+        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">Vista</div>
+      ) : null}
+
+      <div className="h-10 rounded-xl bg-zinc-900 border border-zinc-800 p-1 flex items-center overflow-hidden">
+        <button type="button" aria-label="Portada" title="Portada" aria-pressed={!isBackdrop} onClick={() => onChange('poster')} className={`${btnBase} ${!isBackdrop ? active : inactive}`}>
+          <PosterGlyph className="w-4 h-4" />
+        </button>
+        <button type="button" aria-label="Backdrop" title="Backdrop" aria-pressed={isBackdrop} onClick={() => onChange('backdrop')} className={`${btnBase} ${isBackdrop ? active : inactive}`}>
+          <BackdropGlyph className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Móvil mejorado + logos
 function StatBox({ label, value, icon: Icon, imgSrc, colorClass }) {
   return (
     <div className="flex flex-col items-start min-w-0">
@@ -329,15 +509,11 @@ function StatBox({ label, value, icon: Icon, imgSrc, colorClass }) {
           <Icon className={`w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 ${colorClass}`} />
         ) : null}
 
-        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">
-          {label}
-        </span>
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">{label}</span>
       </div>
 
       <div className="flex items-baseline gap-1.5 min-w-0">
-        <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight leading-none truncate">
-          {value}
-        </span>
+        <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight leading-none truncate">{value}</span>
       </div>
     </div>
   )
@@ -355,9 +531,7 @@ function GroupDivider({ title, stats, count, total }) {
           <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
             <div className="w-1.5 h-10 sm:h-12 bg-gradient-to-b from-blue-500 to-blue-600 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.35)] shrink-0" />
             <div className="min-w-0">
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight line-clamp-2 sm:line-clamp-1">
-                {title}
-              </h2>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight line-clamp-2 sm:line-clamp-1">{title}</h2>
               <div className="mt-1 text-xs sm:text-sm text-zinc-500 font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="text-zinc-300 font-bold">{count}</span>
                 <span>items</span>
@@ -373,12 +547,7 @@ function GroupDivider({ title, stats, count, total }) {
               <StatBox label="Trakt" value={formatAvg(stats?.trakt?.avg)} imgSrc="/logo-Trakt.png" />
               <StatBox label="TMDb" value={formatAvg(stats?.tmdb?.avg)} imgSrc="/logo-TMDb.png" />
               <div className="sm:pl-4 sm:border-l border-white/10">
-                <StatBox
-                  label="Tu media"
-                  value={formatAvg(stats?.my?.avg)}
-                  icon={Star}
-                  colorClass="text-amber-400 fill-amber-400"
-                />
+                <StatBox label="Tu media" value={formatAvg(stats?.my?.avg)} icon={Star} colorClass="text-amber-400 fill-amber-400" />
               </div>
             </div>
           </div>
@@ -388,7 +557,7 @@ function GroupDivider({ title, stats, count, total }) {
   )
 }
 
-// ================== TMDb account pagination (watchlist) ==================
+// ================== TMDb account pagination ==================
 function getSessionId(session) {
   if (!session) return null
   if (typeof session === 'string') return session
@@ -506,7 +675,6 @@ async function fetchAccountListPageBilingual({ accountId, sessionId, listKind, m
 function makeKey(mediaType, id) {
   return `${mediaType}:${id}`
 }
-
 function toTraktType(mediaType) {
   return mediaType === 'movie' ? 'movie' : 'show'
 }
@@ -626,9 +794,17 @@ export default function WatchlistPage() {
   const [groupBy, setGroupBy] = useState('none')
   const [sortBy, setSortBy] = useState('added_desc')
 
-  // Totals (TMDb)
-  const [totalMovie, setTotalMovie] = useState(0)
-  const [totalTv, setTotalTv] = useState(0)
+  // ✅ NUEVO: modo portada/backdrop (persistido)
+  const [coverMode, setCoverMode] = useState('poster') // 'poster' | 'backdrop'
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = window.localStorage.getItem('showverse:watchlist:coverMode')
+    if (saved === 'poster' || saved === 'backdrop') setCoverMode(saved)
+  }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('showverse:watchlist:coverMode', coverMode)
+  }, [coverMode])
 
   // ---- Infinite scroll UI ----
   const UI_BATCH = 21
@@ -642,6 +818,25 @@ export default function WatchlistPage() {
   const [hasMoreMovie, setHasMoreMovie] = useState(true)
   const [hasMoreTv, setHasMoreTv] = useState(true)
 
+  // Totals
+  const [totalMovie, setTotalMovie] = useState(0)
+  const [totalTv, setTotalTv] = useState(0)
+
+  // ---- Load-all (when filtering/sorting/grouping/searching) ----
+  const [loadingAll, setLoadingAll] = useState(false)
+  const allLoadedRef = useRef(false)
+  const loadingAllRef = useRef(false)
+
+  const nextMoviePageRef = useRef(nextMoviePage)
+  const nextTvPageRef = useRef(nextTvPage)
+  const hasMoreMovieRef = useRef(hasMoreMovie)
+  const hasMoreTvRef = useRef(hasMoreTv)
+
+  useEffect(() => { nextMoviePageRef.current = nextMoviePage }, [nextMoviePage])
+  useEffect(() => { nextTvPageRef.current = nextTvPage }, [nextTvPage])
+  useEffect(() => { hasMoreMovieRef.current = hasMoreMovie }, [hasMoreMovie])
+  useEffect(() => { hasMoreTvRef.current = hasMoreTv }, [hasMoreTv])
+
   // Dedup
   const seenRef = useRef(new Set())
 
@@ -654,6 +849,36 @@ export default function WatchlistPage() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // Detectar touch/coarse pointer
+  const isTouchRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mql = window.matchMedia('(hover: none), (pointer: coarse)')
+    const apply = () => { isTouchRef.current = !!mql.matches }
+    apply()
+    mql.addEventListener?.('change', apply)
+    return () => mql.removeEventListener?.('change', apply)
+  }, [])
+
+  // “Hover” en móvil: card activa temporalmente
+  const [activeCardKey, setActiveCardKey] = useState(null)
+  const activeTimerRef = useRef(0)
+  const activateCard = useCallback((k) => {
+    setActiveCardKey(k)
+    if (typeof window !== 'undefined') {
+      window.clearTimeout(activeTimerRef.current)
+      activeTimerRef.current = window.setTimeout(() => setActiveCardKey(null), 2600)
+    }
+  }, [])
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined') window.clearTimeout(activeTimerRef.current)
+    }
+  }, [])
+  useEffect(() => {
+    setActiveCardKey(null)
+  }, [coverMode])
 
   // IMDb ratings
   const [imdbRatings, setImdbRatings] = useState({})
@@ -673,15 +898,9 @@ export default function WatchlistPage() {
   const traktScoresRef = useRef({})
   const traktInFlightRef = useRef(new Set())
 
-  useEffect(() => {
-    imdbRatingsRef.current = imdbRatings
-  }, [imdbRatings])
-  useEffect(() => {
-    myRatingsRef.current = myRatings
-  }, [myRatings])
-  useEffect(() => {
-    traktScoresRef.current = traktScores
-  }, [traktScores])
+  useEffect(() => { imdbRatingsRef.current = imdbRatings }, [imdbRatings])
+  useEffect(() => { myRatingsRef.current = myRatings }, [myRatings])
+  useEffect(() => { traktScoresRef.current = traktScores }, [traktScores])
 
   useEffect(() => {
     unmountedRef.current = false
@@ -697,6 +916,22 @@ export default function WatchlistPage() {
     if (session && account?.id) setAuthStatus('authenticated')
     else setAuthStatus('anonymous')
   }, [session, account, hydrated])
+
+  const wantsFullCollection =
+    authStatus === 'authenticated' &&
+    (typeFilter !== 'all' || groupBy !== 'none' || sortBy !== 'added_desc' || !!query.trim())
+
+  const sortNeedsImdb = sortBy.startsWith('imdb_')
+  const sortNeedsTrakt = sortBy.startsWith('trakt_')
+  const sortNeedsMy = sortBy.startsWith('my_')
+
+  const groupNeedsImdb = groupBy === 'imdb_rating'
+  const groupNeedsTrakt = groupBy === 'trakt_rating'
+  const groupNeedsMy = groupBy === 'user_rating'
+
+  const needsImdb = sortNeedsImdb || groupNeedsImdb
+  const needsTrakt = sortNeedsTrakt || groupNeedsTrakt
+  const needsMyForGrouping = sortNeedsMy || groupNeedsMy
 
   // Reset visible when filters/group/sort change
   useEffect(() => {
@@ -719,9 +954,7 @@ export default function WatchlistPage() {
     refresh()
 
     const onFocus = () => refresh()
-    const onVis = () => {
-      if (document.visibilityState === 'visible') refresh()
-    }
+    const onVis = () => { if (document.visibilityState === 'visible') refresh() }
 
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVis)
@@ -743,6 +976,9 @@ export default function WatchlistPage() {
       setVisibleCount(INITIAL_VISIBLE)
       setTotalMovie(0)
       setTotalTv(0)
+      allLoadedRef.current = false
+      loadingAllRef.current = false
+      setLoadingAll(false)
       return
     }
 
@@ -758,6 +994,14 @@ export default function WatchlistPage() {
       setNextTvPage(1)
       setHasMoreMovie(true)
       setHasMoreTv(true)
+      nextMoviePageRef.current = 1
+      nextTvPageRef.current = 1
+      hasMoreMovieRef.current = true
+      hasMoreTvRef.current = true
+      allLoadedRef.current = false
+      loadingAllRef.current = false
+      setLoadingAll(false)
+
       seenRef.current = new Set()
 
       try {
@@ -786,13 +1030,7 @@ export default function WatchlistPage() {
         let tvPageLoaded = 1
 
         if (unique2.length < INITIAL_VISIBLE && m1.page < m1.total_pages) {
-          const m2 = await fetchAccountListPageBilingual({
-            accountId: account.id,
-            sessionId,
-            listKind: 'watchlist',
-            mediaType: 'movie',
-            page: 2,
-          })
+          const m2 = await fetchAccountListPageBilingual({ accountId: account.id, sessionId, listKind: 'watchlist', mediaType: 'movie', page: 2 })
           moviePageLoaded = 2
           for (const it of m2.results) {
             const k = `${it.media_type}:${it.id}`
@@ -804,13 +1042,7 @@ export default function WatchlistPage() {
         }
 
         if (unique2.length < INITIAL_VISIBLE && t1.page < t1.total_pages) {
-          const t2 = await fetchAccountListPageBilingual({
-            accountId: account.id,
-            sessionId,
-            listKind: 'watchlist',
-            mediaType: 'tv',
-            page: 2,
-          })
+          const t2 = await fetchAccountListPageBilingual({ accountId: account.id, sessionId, listKind: 'watchlist', mediaType: 'tv', page: 2 })
           tvPageLoaded = 2
           for (const it of t2.results) {
             const k = `${it.media_type}:${it.id}`
@@ -827,9 +1059,17 @@ export default function WatchlistPage() {
 
           setNextMoviePage(moviePageLoaded + 1)
           setNextTvPage(tvPageLoaded + 1)
+          nextMoviePageRef.current = moviePageLoaded + 1
+          nextTvPageRef.current = tvPageLoaded + 1
 
-          setHasMoreMovie(moviePageLoaded < m1.total_pages)
-          setHasMoreTv(tvPageLoaded < t1.total_pages)
+          const mHas = moviePageLoaded < m1.total_pages
+          const tHas = tvPageLoaded < t1.total_pages
+          setHasMoreMovie(mHas)
+          setHasMoreTv(tHas)
+          hasMoreMovieRef.current = mHas
+          hasMoreTvRef.current = tHas
+
+          if (!mHas && !tHas) allLoadedRef.current = true
         }
       } catch {
         if (!cancelled) setError('No se ha podido cargar tu lista de pendientes.')
@@ -839,9 +1079,7 @@ export default function WatchlistPage() {
     }
 
     load()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [authStatus, session, account])
 
   // External IDs helper
@@ -855,73 +1093,68 @@ export default function WatchlistPage() {
     return imdbId
   }, [])
 
-  const prefetchImdb = useCallback(
-    async (item) => {
-      if (!item?.id || typeof window === 'undefined') return
-      const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
-      const key = makeKey(mediaType, item.id)
-      if (imdbRatingsRef.current?.[key] !== undefined || imdbInFlightRef.current.has(key)) return
+  const prefetchImdb = useCallback(async (item, opts = {}) => {
+    if (!item?.id || typeof window === 'undefined') return
+    const delayMs = typeof opts?.delayMs === 'number' ? opts.delayMs : 150
 
-      imdbTimersRef.current[key] = window.setTimeout(async () => {
-        try {
-          imdbInFlightRef.current.add(key)
+    const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
+    const key = makeKey(mediaType, item.id)
 
-          const imdbId = await getImdbId(mediaType, item.id)
-          if (!imdbId) {
-            if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: null }))
-            return
-          }
+    if (hasOwn(imdbRatingsRef.current, key) || imdbInFlightRef.current.has(key)) return
 
-          const cached = readOmdbCache(imdbId)
-          if (cached?.imdbRating != null) {
-            if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: cached.imdbRating }))
-            if (cached?.fresh) return
-          }
-
-          const omdb = await fetchOmdbByImdb(imdbId)
-          const r = omdb?.imdbRating && omdb.imdbRating !== 'N/A' ? Number(omdb.imdbRating) : null
-          if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: r }))
-          writeOmdbCache(imdbId, { imdbRating: r })
-        } catch {
-          if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: null }))
-        } finally {
-          imdbInFlightRef.current.delete(key)
-        }
-      }, 150)
-    },
-    [getImdbId]
-  )
-
-  const prefetchMyRating = useCallback(
-    async (item) => {
-      const sessionId = getSessionId(session)
-      if (!item?.id || !sessionId) return
-      const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
-      const key = makeKey(mediaType, item.id)
-
-      if (myRatingsRef.current?.[key] !== undefined || myInFlightRef.current.has(key)) return
-
-      myInFlightRef.current.add(key)
+    const run = async () => {
       try {
-        const v = await getUnifiedUserRatingCached({
-          mediaType,
-          id: item.id,
-          sessionId,
-          getImdbId,
-        })
-        if (!unmountedRef.current) setMyRatings((p) => ({ ...p, [key]: v }))
+        imdbInFlightRef.current.add(key)
+
+        const imdbId = await getImdbId(mediaType, item.id)
+        if (!imdbId) {
+          if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: null }))
+          return
+        }
+
+        const cached = readOmdbCache(imdbId)
+        if (cached?.imdbRating != null) {
+          if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: cached.imdbRating }))
+          if (cached?.fresh) return
+        }
+
+        const omdb = await fetchOmdbByImdb(imdbId)
+        const r = omdb?.imdbRating && omdb.imdbRating !== 'N/A' ? Number(omdb.imdbRating) : null
+        if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: r }))
+        writeOmdbCache(imdbId, { imdbRating: r })
+      } catch {
+        if (!unmountedRef.current) setImdbRatings((p) => ({ ...p, [key]: null }))
       } finally {
-        myInFlightRef.current.delete(key)
+        imdbInFlightRef.current.delete(key)
       }
-    },
-    [session, getImdbId]
-  )
+    }
+
+    if (delayMs > 0) imdbTimersRef.current[key] = window.setTimeout(run, delayMs)
+    else await run()
+  }, [getImdbId])
+
+  const prefetchMyRating = useCallback(async (item) => {
+    const sessionId = getSessionId(session)
+    if (!item?.id || !sessionId) return
+    const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
+    const key = makeKey(mediaType, item.id)
+
+    if (hasOwn(myRatingsRef.current, key) || myInFlightRef.current.has(key)) return
+
+    myInFlightRef.current.add(key)
+    try {
+      const v = await getUnifiedUserRatingCached({ mediaType, id: item.id, sessionId, getImdbId })
+      if (!unmountedRef.current) setMyRatings((p) => ({ ...p, [key]: v }))
+    } finally {
+      myInFlightRef.current.delete(key)
+    }
+  }, [session, getImdbId])
 
   const prefetchTraktScore = useCallback(async (item) => {
     if (!item?.id) return
     const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
     const key = makeKey(mediaType, item.id)
-    if (traktScoresRef.current?.[key] !== undefined || traktInFlightRef.current.has(key)) return
+    if (hasOwn(traktScoresRef.current, key) || traktInFlightRef.current.has(key)) return
 
     traktInFlightRef.current.add(key)
     try {
@@ -941,15 +1174,10 @@ export default function WatchlistPage() {
     if (q) {
       list = list.filter((i) => {
         const mediaType = i.media_type || (i.title ? 'movie' : 'tv')
-        const candidates =
-          mediaType === 'movie'
-            ? [i.title, i._title_es, i._title_en, i.original_title]
-            : [i.name, i._name_es, i._name_en, i.original_name]
-
-        return candidates
-          .filter(Boolean)
-          .map(normText)
-          .some((t) => t.includes(q))
+        const candidates = mediaType === 'movie'
+          ? [i.title, i._title_es, i._title_en, i.original_title]
+          : [i.name, i._name_es, i._name_en, i.original_name]
+        return candidates.filter(Boolean).map(normText).some((t) => t.includes(q))
       })
     }
 
@@ -965,12 +1193,11 @@ export default function WatchlistPage() {
       return Number.isFinite(ts) ? ts : 0
     }
 
-    const getTitle = (i) =>
-      normText(i.title || i.name || i._title_es || i._name_es || i._title_en || i._name_en || '')
+    const getTitle = (i) => normText(i.title || i.name || i._title_es || i._name_es || i._title_en || i._name_en || '')
 
-    const getImdb = (i) => imdbRatingsRef.current?.[makeKey(i.media_type, i.id)]
-    const getMy = (i) => myRatingsRef.current?.[makeKey(i.media_type, i.id)]
-    const getTrakt = (i) => traktScoresRef.current?.[makeKey(i.media_type, i.id)]
+    const getImdb = (i) => imdbRatings?.[makeKey(i.media_type, i.id)]
+    const getMy = (i) => myRatings?.[makeKey(i.media_type, i.id)]
+    const getTrakt = (i) => traktScores?.[makeKey(i.media_type, i.id)]
 
     list.sort((a, b) => {
       const ya = getYear(a)
@@ -979,64 +1206,55 @@ export default function WatchlistPage() {
       const tb = getTitle(b)
 
       switch (sortBy) {
-        case 'added_desc':
-          return getAddedTs(b) - getAddedTs(a)
-        case 'added_asc':
-          return getAddedTs(a) - getAddedTs(b)
+        case 'added_desc': return getAddedTs(b) - getAddedTs(a)
+        case 'added_asc': return getAddedTs(a) - getAddedTs(b)
 
-        case 'year_desc':
-          return yb - ya
-        case 'year_asc':
-          return ya - yb
+        case 'year_desc': return yb - ya
+        case 'year_asc': return ya - yb
 
-        case 'tmdb_desc':
-          return (b.vote_average || 0) - (a.vote_average || 0)
-        case 'tmdb_asc':
-          return (a.vote_average || 0) - (b.vote_average || 0)
+        case 'tmdb_desc': return (b.vote_average || 0) - (a.vote_average || 0)
+        case 'tmdb_asc': return (a.vote_average || 0) - (b.vote_average || 0)
 
         case 'imdb_desc': {
-          const ib = getImdb(b)
-          const ia = getImdb(a)
+          const ib = getImdb(b); const ia = getImdb(a)
           return (typeof ib === 'number' ? ib : -1) - (typeof ia === 'number' ? ia : -1)
         }
         case 'imdb_asc': {
-          const ib = getImdb(b)
-          const ia = getImdb(a)
+          const ib = getImdb(b); const ia = getImdb(a)
           return (typeof ia === 'number' ? ia : 999) - (typeof ib === 'number' ? ib : 999)
         }
 
         case 'trakt_desc': {
-          const rb = getTrakt(b)
-          const ra = getTrakt(a)
+          const rb = getTrakt(b); const ra = getTrakt(a)
           return (typeof rb === 'number' ? rb : -1) - (typeof ra === 'number' ? ra : -1)
         }
         case 'trakt_asc': {
-          const rb = getTrakt(b)
-          const ra = getTrakt(a)
+          const rb = getTrakt(b); const ra = getTrakt(a)
           return (typeof ra === 'number' ? ra : 999) - (typeof rb === 'number' ? rb : 999)
         }
 
         case 'my_desc': {
-          const mb = getMy(b)
-          const ma = getMy(a)
+          const mb = getMy(b); const ma = getMy(a)
           return (typeof mb === 'number' ? mb : -1) - (typeof ma === 'number' ? ma : -1)
         }
         case 'my_asc': {
-          const mb = getMy(b)
-          const ma = getMy(a)
+          const mb = getMy(b); const ma = getMy(a)
           return (typeof ma === 'number' ? ma : 999) - (typeof mb === 'number' ? mb : 999)
         }
 
-        case 'title_desc':
-          return tb.localeCompare(ta)
+        case 'title_desc': return tb.localeCompare(ta)
         case 'title_asc':
-        default:
-          return ta.localeCompare(tb)
+        default: return ta.localeCompare(tb)
       }
     })
 
     return list
-  }, [items, typeFilter, query, sortBy])
+  }, [items, typeFilter, query, sortBy, sortNeedsImdb ? imdbRatings : null, sortNeedsTrakt ? traktScores : null, sortNeedsMy ? myRatings : null])
+
+  useEffect(() => {
+    if (!wantsFullCollection) return
+    setVisibleCount(Math.max(INITIAL_VISIBLE, processedItems.length))
+  }, [wantsFullCollection, processedItems.length])
 
   const visibleItems = useMemo(() => processedItems.slice(0, visibleCount), [processedItems, visibleCount])
 
@@ -1049,7 +1267,7 @@ export default function WatchlistPage() {
   const canLoadMore = visibleCount < processedItems.length || canFetchRemote
 
   const loadMore = useCallback(async () => {
-    if (loading || loadingMore) return
+    if (loading || loadingMore || loadingAll) return
     if (!canLoadMore) return
 
     if (visibleCount < processedItems.length) {
@@ -1068,26 +1286,10 @@ export default function WatchlistPage() {
     try {
       const tasks = []
       if (wantMovie) {
-        tasks.push(
-          fetchAccountListPageBilingual({
-            accountId: account.id,
-            sessionId,
-            listKind: 'watchlist',
-            mediaType: 'movie',
-            page: nextMoviePage,
-          }).then((res) => ({ kind: 'movie', res }))
-        )
+        tasks.push(fetchAccountListPageBilingual({ accountId: account.id, sessionId, listKind: 'watchlist', mediaType: 'movie', page: nextMoviePage }).then((res) => ({ kind: 'movie', res })))
       }
       if (wantTv) {
-        tasks.push(
-          fetchAccountListPageBilingual({
-            accountId: account.id,
-            sessionId,
-            listKind: 'watchlist',
-            mediaType: 'tv',
-            page: nextTvPage,
-          }).then((res) => ({ kind: 'tv', res }))
-        )
+        tasks.push(fetchAccountListPageBilingual({ accountId: account.id, sessionId, listKind: 'watchlist', mediaType: 'tv', page: nextTvPage }).then((res) => ({ kind: 'tv', res })))
       }
 
       const results = await Promise.all(tasks)
@@ -1125,18 +1327,9 @@ export default function WatchlistPage() {
       setLoadingMore(false)
     }
   }, [
-    loading,
-    loadingMore,
-    canLoadMore,
-    visibleCount,
-    processedItems.length,
-    session,
-    account,
-    typeFilter,
-    hasMoreMovie,
-    hasMoreTv,
-    nextMoviePage,
-    nextTvPage,
+    loading, loadingMore, loadingAll, canLoadMore,
+    visibleCount, processedItems.length, session, account,
+    typeFilter, hasMoreMovie, hasMoreTv, nextMoviePage, nextTvPage,
   ])
 
   useEffect(() => {
@@ -1144,63 +1337,130 @@ export default function WatchlistPage() {
     const el = sentinelRef.current
     if (!el) return
 
-    const obs = new IntersectionObserver(
-      (entries) => {
-        const first = entries[0]
-        if (!first?.isIntersecting) return
-        if (!userScrolledRef.current) return
-        loadMore()
-      },
-      { root: null, rootMargin: '300px 0px', threshold: 0 }
-    )
+    const obs = new IntersectionObserver((entries) => {
+      const first = entries[0]
+      if (!first?.isIntersecting) return
+      if (!userScrolledRef.current) return
+      loadMore()
+    }, { root: null, rootMargin: '300px 0px', threshold: 0 })
 
     obs.observe(el)
     return () => obs.disconnect()
   }, [loadMore, canLoadMore])
 
-  // Prefetch “Mi nota”
+  const ensureAllWatchlistLoaded = useCallback(async () => {
+    const sessionId = getSessionId(session)
+    if (!sessionId || !account?.id) return
+    if (loadingAllRef.current || allLoadedRef.current) return
+
+    loadingAllRef.current = true
+    setLoadingAll(true)
+
+    try {
+      let mPage = nextMoviePageRef.current
+      let tPage = nextTvPageRef.current
+      let mHas = hasMoreMovieRef.current
+      let tHas = hasMoreTvRef.current
+
+      while (mHas || tHas) {
+        const tasks = []
+        if (mHas) tasks.push(fetchAccountListPageBilingual({ accountId: account.id, sessionId, listKind: 'watchlist', mediaType: 'movie', page: mPage }).then((res) => ({ kind: 'movie', res })))
+        if (tHas) tasks.push(fetchAccountListPageBilingual({ accountId: account.id, sessionId, listKind: 'watchlist', mediaType: 'tv', page: tPage }).then((res) => ({ kind: 'tv', res })))
+        if (!tasks.length) break
+
+        const results = await Promise.all(tasks)
+
+        startTransition(() => {
+          setItems((prev) => {
+            const next = [...prev]
+            for (const r of results) {
+              for (const it of r.res.results || []) {
+                const k = `${it.media_type}:${it.id}`
+                if (!seenRef.current.has(k)) {
+                  seenRef.current.add(k)
+                  next.push(it)
+                }
+              }
+            }
+            return next
+          })
+        })
+
+        for (const r of results) {
+          if (r.kind === 'movie') { mHas = r.res.page < r.res.total_pages; mPage = r.res.page + 1 }
+          else { tHas = r.res.page < r.res.total_pages; tPage = r.res.page + 1 }
+        }
+
+        nextMoviePageRef.current = mPage
+        nextTvPageRef.current = tPage
+        hasMoreMovieRef.current = mHas
+        hasMoreTvRef.current = tHas
+
+        setNextMoviePage(mPage)
+        setNextTvPage(tPage)
+        setHasMoreMovie(mHas)
+        setHasMoreTv(tHas)
+      }
+
+      allLoadedRef.current = true
+    } finally {
+      loadingAllRef.current = false
+      setLoadingAll(false)
+    }
+  }, [session, account])
+
+  useEffect(() => {
+    if (!wantsFullCollection) return
+    if (loading) return
+    ensureAllWatchlistLoaded()
+  }, [wantsFullCollection, ensureAllWatchlistLoaded, loading])
+
+  // Prefetch “Mi nota” para UI (lo visible)
   useEffect(() => {
     if (authStatus !== 'authenticated') return
     const sessionId = getSessionId(session)
     if (!sessionId) return
-    const subset = visibleItems.slice(0, Math.min(visibleItems.length, INITIAL_VISIBLE))
 
     runPool(
-      subset.filter((it) => myRatingsRef.current?.[makeKey(it.media_type, it.id)] === undefined),
+      visibleItems.filter((it) => !hasOwn(myRatingsRef.current, makeKey(it.media_type, it.id))),
       6,
-      async (it) => {
-        await prefetchMyRating(it)
-      }
+      async (it) => prefetchMyRating(it)
     )
   }, [authStatus, session, visibleItems, prefetchMyRating])
 
-  // Prefetch IMDb + Trakt para medias / ordenaciones
+  // Prefetch “Mi nota” para agrupar/ordenar por mi nota
   useEffect(() => {
-    const subset = visibleItems.slice(0, Math.min(visibleItems.length, INITIAL_VISIBLE))
+    if (!needsMyForGrouping) return
+    if (authStatus !== 'authenticated') return
+    const sessionId = getSessionId(session)
+    if (!sessionId) return
 
-    const needsImdb = groupBy !== 'none' || sortBy.startsWith('imdb_') || groupBy === 'imdb_rating'
-    const needsTrakt = groupBy !== 'none' || sortBy.startsWith('trakt_') || groupBy === 'trakt_rating'
+    runPool(
+      processedItems.filter((it) => !hasOwn(myRatingsRef.current, makeKey(it.media_type, it.id))),
+      6,
+      async (it) => prefetchMyRating(it)
+    )
+  }, [needsMyForGrouping, authStatus, session, processedItems, prefetchMyRating])
 
-    if (needsImdb) {
-      runPool(
-        subset.slice(0, 28).filter((it) => imdbRatingsRef.current?.[makeKey(it.media_type, it.id)] === undefined),
-        2,
-        async (it) => {
-          await prefetchImdb(it)
-        }
-      )
-    }
+  // Prefetch IMDb cuando se necesita
+  useEffect(() => {
+    if (!needsImdb) return
+    runPool(
+      processedItems.filter((it) => !hasOwn(imdbRatingsRef.current, makeKey(it.media_type, it.id))),
+      2,
+      async (it) => prefetchImdb(it, { delayMs: 0 })
+    )
+  }, [needsImdb, processedItems, prefetchImdb])
 
-    if (needsTrakt) {
-      runPool(
-        subset.filter((it) => traktScoresRef.current?.[makeKey(it.media_type, it.id)] === undefined),
-        4,
-        async (it) => {
-          await prefetchTraktScore(it)
-        }
-      )
-    }
-  }, [visibleItems, groupBy, sortBy, prefetchImdb, prefetchTraktScore])
+  // Prefetch Trakt cuando se necesita
+  useEffect(() => {
+    if (!needsTrakt) return
+    runPool(
+      processedItems.filter((it) => !hasOwn(traktScoresRef.current, makeKey(it.media_type, it.id))),
+      4,
+      async (it) => prefetchTraktScore(it)
+    )
+  }, [needsTrakt, processedItems, prefetchTraktScore])
 
   const totalForHeader = useMemo(() => {
     if (typeFilter === 'movie') return totalMovie || 0
@@ -1229,13 +1489,6 @@ export default function WatchlistPage() {
       return { key: String(b), label: `${prefix} · ${hi}` }
     }
 
-    const avgOf = (vals) => {
-      const nums = vals.filter((v) => typeof v === 'number' && !Number.isNaN(v))
-      if (!nums.length) return { avg: null, n: 0 }
-      const sum = nums.reduce((a, b) => a + b, 0)
-      return { avg: sum / nums.length, n: nums.length }
-    }
-
     const groups = new Map()
 
     for (const it of visibleItems) {
@@ -1260,20 +1513,32 @@ export default function WatchlistPage() {
         gKey = out.key
         gLabel = out.label
       } else if (groupBy === 'imdb_rating') {
-        const r = clampNumber(imdbRatings?.[k])
-        const out = keyToScoreBucket('IMDb', r, 'int')
-        gKey = out.key
-        gLabel = out.label
+        const st = getScoreStatus(imdbRatings, k)
+        if (st.status === 'pending') { gKey = 'pending'; gLabel = 'IMDb · Cargando...' }
+        else if (st.status === 'none') { gKey = 'no'; gLabel = 'IMDb · Sin nota' }
+        else {
+          const out = keyToScoreBucket('IMDb', st.value, 'int')
+          gKey = out.key
+          gLabel = out.label
+        }
       } else if (groupBy === 'trakt_rating') {
-        const r = clampNumber(traktScores?.[k])
-        const out = keyToScoreBucket('Trakt', r, 'int')
-        gKey = out.key
-        gLabel = out.label
+        const st = getScoreStatus(traktScores, k)
+        if (st.status === 'pending') { gKey = 'pending'; gLabel = 'Trakt · Cargando...' }
+        else if (st.status === 'none') { gKey = 'no'; gLabel = 'Trakt · Sin nota' }
+        else {
+          const out = keyToScoreBucket('Trakt', st.value, 'int')
+          gKey = out.key
+          gLabel = out.label
+        }
       } else if (groupBy === 'user_rating') {
-        const r = clampNumber(myRatings?.[k])
-        const out = keyToScoreBucket('Mi nota', r, 'half')
-        gKey = out.key
-        gLabel = out.label
+        const st = getScoreStatus(myRatings, k)
+        if (st.status === 'pending') { gKey = 'pending'; gLabel = 'Mi nota · Cargando...' }
+        else if (st.status === 'none') { gKey = 'no'; gLabel = 'Mi nota · Sin nota' }
+        else {
+          const out = keyToScoreBucket('Mi nota', st.value, 'half')
+          gKey = out.key
+          gLabel = out.label
+        }
       }
 
       if (!groups.has(gKey)) groups.set(gKey, { title: gLabel, items: [] })
@@ -1282,9 +1547,28 @@ export default function WatchlistPage() {
 
     const entries = [...groups.entries()].map(([k, v]) => {
       const tmdbVals = v.items.map((it) => (typeof it.vote_average === 'number' ? it.vote_average : null))
-      const imdbVals = v.items.map((it) => imdbRatings?.[makeKey(it.media_type, it.id)] ?? null)
-      const traktVals = v.items.map((it) => traktScores?.[makeKey(it.media_type, it.id)] ?? null)
-      const myVals = v.items.map((it) => myRatings?.[makeKey(it.media_type, it.id)] ?? null)
+      const imdbVals = v.items.map((it) => {
+        const kk = makeKey(it.media_type, it.id)
+        const val = imdbRatings?.[kk]
+        return typeof val === 'number' ? val : null
+      })
+      const traktVals = v.items.map((it) => {
+        const kk = makeKey(it.media_type, it.id)
+        const val = traktScores?.[kk]
+        return typeof val === 'number' ? val : null
+      })
+      const myVals = v.items.map((it) => {
+        const kk = makeKey(it.media_type, it.id)
+        const val = myRatings?.[kk]
+        return typeof val === 'number' ? val : null
+      })
+
+      const avgOf = (vals) => {
+        const nums = vals.filter((v) => typeof v === 'number' && !Number.isNaN(v))
+        if (!nums.length) return { avg: null, n: 0 }
+        const sum = nums.reduce((a, b) => a + b, 0)
+        return { avg: sum / nums.length, n: nums.length }
+      }
 
       return {
         k,
@@ -1298,77 +1582,165 @@ export default function WatchlistPage() {
       }
     })
 
-    const sortNumDesc = (a, b) => {
-      const na = a.k === 'no' ? -999 : Number(a.k)
-      const nb = b.k === 'no' ? -999 : Number(b.k)
-      return nb - na
+    const toNum = (k) => {
+      if (k === 'no' || k === 'pending') return -999
+      const n = Number(k)
+      return Number.isFinite(n) ? n : -999
     }
+    const sortNumDesc = (a, b) => toNum(b.k) - toNum(a.k)
 
     if (groupBy === 'year' || groupBy === 'decade' || groupBy.endsWith('rating') || groupBy === 'user_rating') {
       entries.sort(sortNumDesc)
     }
 
-    entries.sort((a, b) => {
-      if (a.k === 'no') return 1
-      if (b.k === 'no') return -1
-      return 0
-    })
+    const rank = (k) => (k === 'no' ? 2 : k === 'pending' ? 1 : 0)
+    entries.sort((a, b) => rank(a.k) - rank(b.k))
 
     return entries
   }, [groupBy, visibleItems, imdbRatings, traktScores, myRatings])
 
   const sortLabel = useMemo(() => {
     switch (sortBy) {
-      case 'added_desc':
-        return 'Añadido (reciente)'
-      case 'added_asc':
-        return 'Añadido (antiguo)'
-      case 'year_desc':
-        return 'Año (reciente)'
-      case 'year_asc':
-        return 'Año (antiguo)'
-      case 'tmdb_desc':
-        return 'TMDb (alta)'
-      case 'tmdb_asc':
-        return 'TMDb (baja)'
-      case 'imdb_desc':
-        return 'IMDb (alta)'
-      case 'imdb_asc':
-        return 'IMDb (baja)'
-      case 'trakt_desc':
-        return 'Trakt (alta)'
-      case 'trakt_asc':
-        return 'Trakt (baja)'
-      case 'my_desc':
-        return 'Mi nota (alta)'
-      case 'my_asc':
-        return 'Mi nota (baja)'
-      case 'title_desc':
-        return 'Z - A'
+      case 'added_desc': return 'Añadido (reciente)'
+      case 'added_asc': return 'Añadido (antiguo)'
+      case 'year_desc': return 'Año (reciente)'
+      case 'year_asc': return 'Año (antiguo)'
+      case 'tmdb_desc': return 'TMDb (alta)'
+      case 'tmdb_asc': return 'TMDb (baja)'
+      case 'imdb_desc': return 'IMDb (alta)'
+      case 'imdb_asc': return 'IMDb (baja)'
+      case 'trakt_desc': return 'Trakt (alta)'
+      case 'trakt_asc': return 'Trakt (baja)'
+      case 'my_desc': return 'Mi nota (alta)'
+      case 'my_asc': return 'Mi nota (baja)'
+      case 'title_desc': return 'Z - A'
       case 'title_asc':
-      default:
-        return 'A - Z'
+      default: return 'A - Z'
     }
   }, [sortBy])
 
   const groupLabel = useMemo(() => {
     switch (groupBy) {
-      case 'year':
-        return 'Año'
-      case 'decade':
-        return 'Década'
-      case 'tmdb_rating':
-        return 'Nota TMDb'
-      case 'imdb_rating':
-        return 'Nota IMDb'
-      case 'trakt_rating':
-        return 'Nota Trakt'
-      case 'user_rating':
-        return 'Mi nota'
-      default:
-        return 'Sin agrupar'
+      case 'year': return 'Año'
+      case 'decade': return 'Década'
+      case 'tmdb_rating': return 'Nota TMDb'
+      case 'imdb_rating': return 'Nota IMDb'
+      case 'trakt_rating': return 'Nota Trakt'
+      case 'user_rating': return 'Mi nota'
+      default: return 'Sin agrupar'
     }
   }, [groupBy])
+
+  // Grid class según vista
+  const gridClass = useMemo(() => {
+    if (coverMode === 'backdrop') {
+      return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-3 sm:gap-6'
+    }
+    return 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6'
+  }, [coverMode])
+
+  const renderCard = useCallback((item) => {
+    const isMovie = item.media_type === 'movie'
+    const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
+    const href = `/details/${mediaType}/${item.id}`
+    const title = isMovie ? item.title : item.name
+    const date = isMovie ? item.release_date : item.first_air_date
+    const year = date ? date.slice(0, 4) : ''
+    const k = makeKey(mediaType, item.id)
+
+    const imdbScore = imdbRatings[k]
+    const myScore = myRatings[k]
+    const myLabel = formatHalfSteps(myScore)
+
+    const cardKey = `${mediaType}:${item.id}`
+    const isActive = activeCardKey === cardKey
+
+    const onPrefetch = () => {
+      prefetchImdb(item)
+      prefetchMyRating(item)
+      prefetchTraktScore(item)
+    }
+
+    const onClick = (e) => {
+      if (isTouchRef.current && !isActive) {
+        e.preventDefault()
+        e.stopPropagation()
+        onPrefetch()
+        activateCard(cardKey)
+        return
+      }
+    }
+
+    const wrapAspect = coverMode === 'backdrop' ? 'aspect-[16/9]' : 'aspect-[2/3]'
+    const hoverShadow = 'transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)]'
+    const ring = 'ring-1 ring-white/5'
+    const overlayBase = 'absolute inset-0 transition-opacity duration-300 flex flex-col justify-between'
+    const overlayOpacity = isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+
+    const topTransform = isActive ? 'translate-y-0' : '-translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0'
+    const bottomTransform = isActive ? 'translate-y-0' : 'translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0'
+
+    const myTransform = isActive
+      ? 'opacity-100 translate-y-0 scale-100'
+      : 'opacity-0 translate-y-1 scale-[0.98] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100'
+
+    return (
+      <Link
+        key={`${mediaType}-${item.id}`}
+        href={href}
+        className="group block relative w-full h-full"
+        title={title}
+        onMouseEnter={onPrefetch}
+        onFocus={onPrefetch}
+        onClick={onClick}
+      >
+        <div className={`relative ${wrapAspect} w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ${ring} ${hoverShadow} z-0`}>
+          <SmartPoster key={`${mediaType}:${item.id}:${coverMode}`} item={item} title={title} mode={coverMode} />
+
+          <div className={`${overlayBase} ${overlayOpacity}`}>
+            <div className={`p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform ${topTransform} transition-transform duration-300`}>
+              <span
+                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                  }`}
+              >
+                {isMovie ? 'PELÍCULA' : 'SERIE'}
+              </span>
+
+              <div className="flex flex-col items-end gap-1">
+                {item.vote_average > 0 && (
+                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                    <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">{item.vote_average.toFixed(1)}</span>
+                    <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
+                  </div>
+                )}
+                {typeof imdbScore === 'number' && imdbScore > 0 && (
+                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                    <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">{imdbScore.toFixed(1)}</span>
+                    <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className={`p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform ${bottomTransform} transition-transform duration-300`}>
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0 text-left">
+                  <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">{title}</h3>
+                  {year && <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">{year}</p>}
+                </div>
+
+                {myLabel ? (
+                  <div className={`shrink-0 self-end transition-all duration-300 ${myTransform}`}>
+                    <span className="text-2xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">{myLabel}</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    )
+  }, [coverMode, imdbRatings, myRatings, activeCardKey, prefetchImdb, prefetchMyRating, prefetchTraktScore, activateCard])
 
   // --- UI states ---
   if (authStatus === 'checking') {
@@ -1412,284 +1784,145 @@ export default function WatchlistPage() {
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full xl:w-auto">
-            <Dropdown
-              label="Tipo"
-              valueLabel={typeFilter === 'all' ? 'Todo' : typeFilter === 'movie' ? 'Películas' : 'Series'}
-              icon={Film}
-            >
-              {({ close }) => (
-                <>
-                  <DropdownItem
-                    active={typeFilter === 'all'}
-                    onClick={() => {
-                      setTypeFilter('all')
-                      close()
-                    }}
-                  >
-                    Todo
-                  </DropdownItem>
-                  <DropdownItem
-                    active={typeFilter === 'movie'}
-                    onClick={() => {
-                      setTypeFilter('movie')
-                      close()
-                    }}
-                  >
-                    Películas
-                  </DropdownItem>
-                  <DropdownItem
-                    active={typeFilter === 'tv'}
-                    onClick={() => {
-                      setTypeFilter('tv')
-                      close()
-                    }}
-                  >
-                    Series
-                  </DropdownItem>
-                </>
-              )}
-            </Dropdown>
+          {/* Controles (desktop: todo en 1 línea; móvil: 2 líneas) */}
+          <div className="w-full xl:w-auto">
+            <div className="grid grid-cols-2 gap-3 sm:[grid-template-columns:minmax(0,1.35fr)_repeat(2,minmax(0,1fr))_minmax(0,1.25fr)]">
+              {/* ✅ Tipo + Vista juntos (iconos) */}
+              <div className="w-full">
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
+                      Tipo
+                    </div>
+                    <MediaTypeIconSwitch
+                      value={typeFilter}
+                      onChange={(v) => startTransition(() => setTypeFilter(v))}
+                      widthClass="w-full"
+                    />
+                  </div>
 
-            <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Layers}>
-              {({ close }) => (
-                <>
-                  <DropdownItem
-                    active={groupBy === 'none'}
-                    onClick={() => {
-                      setGroupBy('none')
-                      close()
-                    }}
-                  >
-                    Sin agrupar
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'year'}
-                    onClick={() => {
-                      setGroupBy('year')
-                      close()
-                    }}
-                  >
-                    Año
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'decade'}
-                    onClick={() => {
-                      setGroupBy('decade')
-                      close()
-                    }}
-                  >
-                    Década
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'tmdb_rating'}
-                    onClick={() => {
-                      setGroupBy('tmdb_rating')
-                      close()
-                    }}
-                  >
-                    Nota TMDb
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'trakt_rating'}
-                    onClick={() => {
-                      setGroupBy('trakt_rating')
-                      close()
-                    }}
-                  >
-                    Nota Trakt
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'imdb_rating'}
-                    onClick={() => {
-                      setGroupBy('imdb_rating')
-                      close()
-                    }}
-                  >
-                    Nota IMDb
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={groupBy === 'user_rating'}
-                    onClick={() => {
-                      setGroupBy('user_rating')
-                      close()
-                    }}
-                  >
-                    Mi nota
-                  </DropdownItem>
-                </>
-              )}
-            </Dropdown>
-
-            <Dropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown}>
-              {({ close }) => (
-                <>
-                  <DropdownItem
-                    active={sortBy === 'added_desc'}
-                    onClick={() => {
-                      setSortBy('added_desc')
-                      close()
-                    }}
-                  >
-                    Añadido (reciente)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'added_asc'}
-                    onClick={() => {
-                      setSortBy('added_asc')
-                      close()
-                    }}
-                  >
-                    Añadido (antiguo)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'tmdb_desc'}
-                    onClick={() => {
-                      setSortBy('tmdb_desc')
-                      close()
-                    }}
-                  >
-                    TMDb (alta)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'tmdb_asc'}
-                    onClick={() => {
-                      setSortBy('tmdb_asc')
-                      close()
-                    }}
-                  >
-                    TMDb (baja)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'trakt_desc'}
-                    onClick={() => {
-                      setSortBy('trakt_desc')
-                      close()
-                    }}
-                  >
-                    Trakt (alta)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'trakt_asc'}
-                    onClick={() => {
-                      setSortBy('trakt_asc')
-                      close()
-                    }}
-                  >
-                    Trakt (baja)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'imdb_desc'}
-                    onClick={() => {
-                      setSortBy('imdb_desc')
-                      close()
-                    }}
-                  >
-                    IMDb (alta)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'imdb_asc'}
-                    onClick={() => {
-                      setSortBy('imdb_asc')
-                      close()
-                    }}
-                  >
-                    IMDb (baja)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'my_desc'}
-                    onClick={() => {
-                      setSortBy('my_desc')
-                      close()
-                    }}
-                  >
-                    Mi nota (alta)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'my_asc'}
-                    onClick={() => {
-                      setSortBy('my_asc')
-                      close()
-                    }}
-                  >
-                    Mi nota (baja)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'year_desc'}
-                    onClick={() => {
-                      setSortBy('year_desc')
-                      close()
-                    }}
-                  >
-                    Año (reciente)
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'year_asc'}
-                    onClick={() => {
-                      setSortBy('year_asc')
-                      close()
-                    }}
-                  >
-                    Año (antiguo)
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={sortBy === 'title_asc'}
-                    onClick={() => {
-                      setSortBy('title_asc')
-                      close()
-                    }}
-                  >
-                    A - Z
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortBy === 'title_desc'}
-                    onClick={() => {
-                      setSortBy('title_desc')
-                      close()
-                    }}
-                  >
-                    Z - A
-                  </DropdownItem>
-                </>
-              )}
-            </Dropdown>
-
-            {/* Search */}
-            <div className="relative group z-10">
-              <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
-                Buscar
+                  <div className="shrink-0">
+                    <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
+                      Vista
+                    </div>
+                    <CoverModeIconSwitch
+                      value={coverMode}
+                      onChange={(v) => startTransition(() => setCoverMode(v))}
+                      showLabel={false}
+                      widthClass="w-[72px] sm:w-[86px]"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-zinc-300 transition-colors" />
-                <input
-                  type="text"
-                  placeholder="Buscar"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-all"
-                />
-                {query?.trim() ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] rounded-lg bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 transition"
-                  >
-                    Limpiar
-                  </button>
-                ) : null}
+
+              <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Layers}>
+                {({ close }) => (
+                  <>
+                    <DropdownItem active={groupBy === 'none'} onClick={() => { setGroupBy('none'); close() }}>
+                      Sin agrupar
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === 'year'} onClick={() => { setGroupBy('year'); close() }}>
+                      Año
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === 'decade'} onClick={() => { setGroupBy('decade'); close() }}>
+                      Década
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === 'tmdb_rating'} onClick={() => { setGroupBy('tmdb_rating'); close() }}>
+                      Nota TMDb
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === 'trakt_rating'} onClick={() => { setGroupBy('trakt_rating'); close() }}>
+                      Nota Trakt
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === 'imdb_rating'} onClick={() => { setGroupBy('imdb_rating'); close() }}>
+                      Nota IMDb
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === 'user_rating'} onClick={() => { setGroupBy('user_rating'); close() }}>
+                      Mi nota
+                    </DropdownItem>
+                  </>
+                )}
+              </Dropdown>
+
+              <Dropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown}>
+                {({ close }) => (
+                  <>
+                    <DropdownItem active={sortBy === 'added_desc'} onClick={() => { setSortBy('added_desc'); close() }}>
+                      Añadido (reciente)
+                    </DropdownItem>
+                    <DropdownItem active={sortBy === 'added_asc'} onClick={() => { setSortBy('added_asc'); close() }}>
+                      Añadido (antiguo)
+                    </DropdownItem>
+
+                    <DropdownItem active={sortBy === 'tmdb_desc'} onClick={() => { setSortBy('tmdb_desc'); close() }}>
+                      TMDb (alta)
+                    </DropdownItem>
+                    <DropdownItem active={sortBy === 'tmdb_asc'} onClick={() => { setSortBy('tmdb_asc'); close() }}>
+                      TMDb (baja)
+                    </DropdownItem>
+
+                    <DropdownItem active={sortBy === 'trakt_desc'} onClick={() => { setSortBy('trakt_desc'); close() }}>
+                      Trakt (alta)
+                    </DropdownItem>
+                    <DropdownItem active={sortBy === 'trakt_asc'} onClick={() => { setSortBy('trakt_asc'); close() }}>
+                      Trakt (baja)
+                    </DropdownItem>
+
+                    <DropdownItem active={sortBy === 'imdb_desc'} onClick={() => { setSortBy('imdb_desc'); close() }}>
+                      IMDb (alta)
+                    </DropdownItem>
+                    <DropdownItem active={sortBy === 'imdb_asc'} onClick={() => { setSortBy('imdb_asc'); close() }}>
+                      IMDb (baja)
+                    </DropdownItem>
+
+                    <DropdownItem active={sortBy === 'my_desc'} onClick={() => { setSortBy('my_desc'); close() }}>
+                      Mi nota (alta)
+                    </DropdownItem>
+                    <DropdownItem active={sortBy === 'my_asc'} onClick={() => { setSortBy('my_asc'); close() }}>
+                      Mi nota (baja)
+                    </DropdownItem>
+
+                    <DropdownItem active={sortBy === 'year_desc'} onClick={() => { setSortBy('year_desc'); close() }}>
+                      Año (reciente)
+                    </DropdownItem>
+                    <DropdownItem active={sortBy === 'year_asc'} onClick={() => { setSortBy('year_asc'); close() }}>
+                      Año (antiguo)
+                    </DropdownItem>
+
+                    <DropdownItem active={sortBy === 'title_asc'} onClick={() => { setSortBy('title_asc'); close() }}>
+                      A - Z
+                    </DropdownItem>
+                    <DropdownItem active={sortBy === 'title_desc'} onClick={() => { setSortBy('title_desc'); close() }}>
+                      Z - A
+                    </DropdownItem>
+                  </>
+                )}
+              </Dropdown>
+
+              {/* Search */}
+              <div className="relative group z-10">
+                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
+                  Buscar
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-zinc-300 transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="Buscar"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-all"
+                  />
+                  {query?.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] rounded-lg bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 transition"
+                    >
+                      Limpiar
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
@@ -1721,214 +1954,50 @@ export default function WatchlistPage() {
           </div>
         ) : (
           <>
-            {groupedSections ? (
-              <div>
-                {groupedSections.map((section) => (
-                  <div key={`grp-${section.k}`}>
-                    <GroupDivider title={section.title} stats={section.stats} count={section.items.length} total={visibleItems.length} />
-
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6">
-                      {section.items.map((item) => {
-                        const isMovie = item.media_type === 'movie'
-                        const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
-                        const href = `/details/${mediaType}/${item.id}`
-                        const title = isMovie ? item.title : item.name
-                        const date = isMovie ? item.release_date : item.first_air_date
-                        const year = date ? date.slice(0, 4) : ''
-                        const key = makeKey(mediaType, item.id)
-                        const imdbScore = imdbRatings[key]
-                        const myScore = myRatings[key]
-                        const myLabel = formatHalfSteps(myScore)
-
-                        return (
-                          <Link
-                            key={`${mediaType}-${item.id}`}
-                            href={href}
-                            className="group block relative w-full h-full"
-                            title={title}
-                            onMouseEnter={() => {
-                              prefetchImdb(item)
-                              prefetchMyRating(item)
-                              prefetchTraktScore(item)
-                            }}
-                            onFocus={() => {
-                              prefetchImdb(item)
-                              prefetchMyRating(item)
-                              prefetchTraktScore(item)
-                            }}
-                          >
-                            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] z-0">
-                              <SmartPoster item={item} title={title} />
-
-                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
-                                <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                                  <span
-                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
-                                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                                      : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                                      }`}
-                                  >
-                                    {isMovie ? 'PELÍCULA' : 'SERIE'}
-                                  </span>
-
-                                  <div className="flex flex-col items-end gap-1">
-                                    {item.vote_average > 0 && (
-                                      <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                        <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                                          {item.vote_average.toFixed(1)}
-                                        </span>
-                                        <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
-                                      </div>
-                                    )}
-                                    {typeof imdbScore === 'number' && imdbScore > 0 && (
-                                      <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                        <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                                          {imdbScore.toFixed(1)}
-                                        </span>
-                                        <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                                  <div className="flex items-end justify-between gap-3">
-                                    <div className="min-w-0 text-left">
-                                      <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-md">
-                                        {title}
-                                      </h3>
-                                      {year && (
-                                        <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
-                                          {year}
-                                        </p>
-                                      )}
-                                    </div>
-
-                                    {myLabel ? (
-                                      <div className="shrink-0 self-end opacity-0 translate-y-1 scale-[0.98] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 transition-all duration-300">
-                                        <span className="text-2xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">
-                                          {myLabel}
-                                        </span>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6">
-                {visibleItems.map((item) => {
-                  const isMovie = item.media_type === 'movie'
-                  const mediaType = item.media_type || (isMovie ? 'movie' : 'tv')
-                  const href = `/details/${mediaType}/${item.id}`
-                  const title = isMovie ? item.title : item.name
-                  const date = isMovie ? item.release_date : item.first_air_date
-                  const year = date ? date.slice(0, 4) : ''
-                  const key = makeKey(mediaType, item.id)
-                  const imdbScore = imdbRatings[key]
-                  const myScore = myRatings[key]
-                  const myLabel = formatHalfSteps(myScore)
-
-                  return (
-                    <Link
-                      key={`${mediaType}-${item.id}`}
-                      href={href}
-                      className="group block relative w-full h-full"
-                      title={title}
-                      onMouseEnter={() => {
-                        prefetchImdb(item)
-                        prefetchMyRating(item)
-                        prefetchTraktScore(item)
-                      }}
-                      onFocus={() => {
-                        prefetchImdb(item)
-                        prefetchMyRating(item)
-                        prefetchTraktScore(item)
-                      }}
-                    >
-                      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] z-0">
-                        <SmartPoster item={item} title={title} />
-
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
-                          <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                            <span
-                              className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
-                                ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                                : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                                }`}
-                            >
-                              {isMovie ? 'PELÍCULA' : 'SERIE'}
-                            </span>
-
-                            <div className="flex flex-col items-end gap-1">
-                              {item.vote_average > 0 && (
-                                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                  <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                                    {item.vote_average.toFixed(1)}
-                                  </span>
-                                  <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
-                                </div>
-                              )}
-                              {typeof imdbScore === 'number' && imdbScore > 0 && (
-                                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                  <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                                    {imdbScore.toFixed(1)}
-                                  </span>
-                                  <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                            <div className="flex items-end justify-between gap-3">
-                              <div className="min-w-0 text-left">
-                                <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-md">
-                                  {title}
-                                </h3>
-                                {year && (
-                                  <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
-                                    {year}
-                                  </p>
-                                )}
-                              </div>
-
-                              {myLabel ? (
-                                <div className="shrink-0 self-end opacity-0 translate-y-1 scale-[0.98] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 transition-all duration-300">
-                                  <span className="text-2xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">
-                                    {myLabel}
-                                  </span>
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
+            <div className="relative">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={`covers-${coverMode}`}
+                  initial={{ opacity: 0, y: 10, scale: 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.985 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  className="will-change-transform"
+                >
+                  {groupedSections ? (
+                    <div>
+                      {groupedSections.map((section) => (
+                        <div key={`grp-${section.k}`}>
+                          <GroupDivider title={section.title} stats={section.stats} count={section.items.length} total={visibleItems.length} />
+                          <div className={gridClass}>{section.items.map(renderCard)}</div>
                         </div>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={gridClass}>{visibleItems.map(renderCard)}</div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
 
-            {/* Sentinel + Loader */}
-            <div ref={sentinelRef} className="h-10" />
-            {(loadingMore || canLoadMore) && (
-              <div className="flex items-center justify-center py-10">
-                {loadingMore ? (
+              {/* ✅ fuera del motion para que el observer no se rompa al cambiar vista */}
+              <div ref={sentinelRef} className="h-10" />
+            </div>
+
+            {(loadingAll || loadingMore || canLoadMore) && (
+              <div className="flex flex-col items-center justify-center py-10 gap-2">
+                {loadingAll ? (
+                  <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                    Cargando la colección completa para aplicar filtros…
+                  </div>
+                ) : loadingMore ? (
                   <div className="flex items-center gap-2 text-neutral-400 text-sm">
                     <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
                     Cargando más...
                   </div>
-                ) : (
+                ) : canLoadMore ? (
                   <div className="text-neutral-600 text-xs">Desliza para cargar más</div>
-                )}
+                ) : null}
               </div>
             )}
           </>

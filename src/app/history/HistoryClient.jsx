@@ -544,8 +544,6 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
 
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
     const baseTitle = getMainTitle(entry)
-
-    // ✅ En GRID no metemos T/E dentro del título para no duplicar
     const title = baseTitle
 
     const episodeTitle = type === 'show' && epMeta?.title ? epMeta.title : null
@@ -572,21 +570,74 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
         setConfirmDel(false)
     }
 
+    const disabledCls = busy ? 'opacity-60 pointer-events-none grayscale' : ''
+
+    const InfoContent = (
+        <>
+            <div className="flex items-center gap-2 mb-1">
+                <span
+                    className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${type === 'movie'
+                        ? 'bg-sky-500/20 text-sky-200'
+                        : 'bg-purple-500/20 text-purple-200'
+                        }`}
+                >
+                    {type === 'movie' ? 'Cine' : 'TV'}
+                </span>
+                <span className="text-[10px] text-zinc-300/80">{watchedTime}</span>
+            </div>
+
+            <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
+                {title}
+            </h5>
+
+            {/* Episodio (móvil: en 1-2 líneas suaves) */}
+            {type === 'show' && (epBadge || episodeTitle) && (
+                <div className="mt-0.5 text-[10px] text-zinc-200/80">
+                    {epBadge && <div className="leading-tight">{epBadge}</div>}
+                    {episodeTitle && (
+                        <div className="leading-tight line-clamp-1 text-zinc-200/70">
+                            {episodeTitle}
+                        </div>
+                    )}
+                </div>
+            )}
+        </>
+    )
+
     const CardInner = (
-        <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md hover:shadow-emerald-900/20 transition-all">
+        <div
+            className={[
+                // ✅ IMPORTANTE: hover SOLO en desktop para evitar "hover pegajoso" en móvil
+                'relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md',
+                'lg:hover:shadow-emerald-900/20 transition-all',
+                disabledCls,
+            ].join(' ')}
+        >
             <Poster entry={entry} className="w-full h-full" />
 
-            {/* ✅ Overlay: en móvil visible por defecto; en escritorio solo con hover */}
+            {/* ✅ MÓVIL: banda inferior (NO overlay completo, NO oscurece tanto) */}
             <div
                 className={[
-                    'absolute inset-0 bg-black/80',
-                    'opacity-100 lg:opacity-0 lg:group-hover:opacity-100',
-                    'transition-opacity flex flex-col justify-end p-3',
-                    confirmDel ? 'opacity-0 pointer-events-none' : '',
-                    busy ? 'opacity-60 pointer-events-none grayscale' : '',
+                    'absolute inset-x-0 bottom-0 z-10 lg:hidden',
+                    'p-3 pt-10',
+                    'bg-gradient-to-t from-black/85 via-black/40 to-transparent',
+                    'pointer-events-none',
+                    confirmDel ? 'opacity-0' : '',
                 ].join(' ')}
             >
-                <div className="transform translate-y-0 lg:translate-y-2 lg:group-hover:translate-y-0 transition-transform duration-300">
+                {InfoContent}
+            </div>
+
+            {/* ✅ DESKTOP: overlay completo solo con hover */}
+            <div
+                className={[
+                    'absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3',
+                    'bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity',
+                    confirmDel ? 'opacity-0 pointer-events-none' : '',
+                ].join(' ')}
+            >
+                <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                    {/* En desktop mostramos badge + título episodio en la misma línea (como ya tenías) */}
                     <div className="flex items-center gap-2 mb-1">
                         <span
                             className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${type === 'movie'
@@ -599,21 +650,12 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
                         <span className="text-[10px] text-zinc-400">{watchedTime}</span>
                     </div>
 
-                    {/* ✅ Título (sin T/E dentro) */}
                     <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
                         {title}
                     </h5>
 
-                    {/* ✅ MÓVIL: mantener lo que ya había (badge debajo del título) */}
-                    {type === 'show' && epBadge && (
-                        <div className="mt-0.5 lg:hidden text-[10px] text-zinc-400">
-                            {epBadge}
-                        </div>
-                    )}
-
-                    {/* ✅ ESCRITORIO: T03 · E03 + Título episodio en la misma línea (un pelín más grande) */}
                     {type === 'show' && (epBadge || episodeTitle) && (
-                        <div className="mt-0.5 hidden lg:flex items-center gap-2 text-[11px] text-zinc-300/90">
+                        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-300/90">
                             {epBadge && (
                                 <span className="shrink-0 font-medium text-zinc-200/90">
                                     {epBadge}
@@ -628,16 +670,23 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
                         </div>
                     )}
                 </div>
+            </div>
 
+            {/* ✅ Botón borrar: visible en móvil, en desktop solo al hover */}
+            {!confirmDel && (
                 <button
                     onClick={handleDeleteClick}
-                    className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-red-600 text-white rounded-full transition-colors backdrop-blur-sm"
+                    className={[
+                        'absolute top-2 right-2 z-20 p-2 rounded-full backdrop-blur-sm',
+                        'bg-black/40 hover:bg-red-600 text-white transition-colors',
+                        'opacity-100 lg:opacity-0 lg:group-hover:opacity-100',
+                    ].join(' ')}
                     title="Borrar"
                     aria-label="Borrar"
                 >
                     <Trash2 className="w-3.5 h-3.5" />
                 </button>
-            </div>
+            )}
 
             <AnimatePresence>
                 {confirmDel && (
@@ -645,7 +694,7 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 bg-black/95 z-20 flex flex-col items-center justify-center p-4 text-center"
+                        className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-4 text-center"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <p className="text-red-200 text-xs font-bold mb-3">¿Borrar?</p>
