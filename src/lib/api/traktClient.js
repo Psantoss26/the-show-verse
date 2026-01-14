@@ -38,6 +38,44 @@ function normalizeWatchedAtForApi(input) {
     return null
 }
 
+/**
+ * Normaliza watchedAt para endpoints de HISTORIAL (plays) en Trakt.
+ * Devuelve ISO completo (ej: 2026-01-14T12:34:56.000Z) o null.
+ */
+function normalizeWatchedAtForHistoryApi(input) {
+    if (input == null) return null
+
+    // Date
+    if (input instanceof Date && !Number.isNaN(input.getTime())) {
+        return input.toISOString()
+    }
+
+    const s = String(input).trim()
+    if (!s) return null
+
+    // YYYY-MM-DD -> medianoche UTC
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const d = new Date(`${s}T00:00:00.000Z`)
+        return Number.isNaN(d.getTime()) ? null : d.toISOString()
+    }
+
+    // DD/MM/YYYY o DD-MM-YYYY (por si llega así)
+    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+    if (m) {
+        const dd = String(parseInt(m[1], 10)).padStart(2, '0')
+        const mm = String(parseInt(m[2], 10)).padStart(2, '0')
+        const yyyy = m[3]
+        const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`)
+        return Number.isNaN(d.getTime()) ? null : d.toISOString()
+    }
+
+    // ISO o cualquier string parseable
+    const d = new Date(s)
+    if (!Number.isNaN(d.getTime())) return d.toISOString()
+
+    return null
+}
+
 export async function traktAuthStatus() {
     const res = await fetch('/api/trakt/auth/status', { cache: 'no-store' })
     const json = await safeJson(res)
@@ -257,4 +295,50 @@ export async function traktRemoveRating({ type, ids }) {
         throw new Error(data?.error || `Trakt remove rating failed (${res.status})`)
     }
     return data
+}
+
+// ✅ GET plays + (opcional) progreso desde startAt (rewatch run)
+export async function traktGetShowPlays({ tmdbId, startAt } = {}) {
+    const qs = new URLSearchParams({ tmdbId: String(tmdbId) })
+    if (startAt) qs.set('startAt', String(startAt))
+
+    const res = await fetch(`/api/trakt/show/plays?${qs.toString()}`, { cache: 'no-store' })
+    const json = await safeJson(res)
+    if (!res.ok) throw new Error(json?.error || `Trakt show plays HTTP ${res.status}`)
+    return json
+}
+
+// ✅ Añadir "visionado completo" (play) como HISTORIAL (ISO, no YYYY-MM-DD)
+export async function traktAddShowPlay({ tmdbId, watchedAt }) {
+    const watchedAtIso = normalizeWatchedAtForHistoryApi(watchedAt)
+    const payload = { tmdbId }
+    if (watchedAtIso) payload.watchedAt = watchedAtIso
+
+    const res = await fetch('/api/trakt/show/plays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+
+    const json = await safeJson(res)
+    if (!res.ok) throw new Error(json?.error || `Trakt add show play HTTP ${res.status}`)
+    return json
+}
+
+// ✅ Añadir play de episodio (rewatch-friendly) (ISO, no YYYY-MM-DD)
+export async function traktAddEpisodePlay({ tmdbId, season, episode, watchedAt }) {
+    const watchedAtIso = normalizeWatchedAtForHistoryApi(watchedAt)
+
+    const payload = { tmdbId, season, episode }
+    if (watchedAtIso) payload.watchedAt = watchedAtIso
+
+    const res = await fetch('/api/trakt/episode/play', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+
+    const json = await safeJson(res)
+    if (!res.ok) throw new Error(json?.error || `Trakt episode play HTTP ${res.status}`)
+    return json
 }
