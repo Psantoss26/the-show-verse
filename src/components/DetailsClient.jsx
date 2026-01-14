@@ -81,7 +81,10 @@ import {
   traktGetShowSeasons,
   traktGetStats,
   traktGetScoreboard,
-  traktSetRating
+  traktSetRating,
+  traktGetShowPlays,
+  traktAddShowPlay,
+  traktAddEpisodePlay
 } from '@/lib/api/traktClient'
 import DetailsSectionMenu from './DetailsSectionMenu'
 import {
@@ -1040,6 +1043,10 @@ export default function DetailsClient({
   // ✅ EPISODIOS VISTOS (solo TV)
   const [watchedBySeason, setWatchedBySeason] = useState({}) // { [seasonNumber]: [episodeNumber...] }
   const [episodeBusyKey, setEpisodeBusyKey] = useState('')   // "S1E3" etc
+  // ✅ NUEVO: historial de completados + rewatch "run"
+  const [showPlays, setShowPlays] = useState([])                 // fechas ISO (completados)
+  const [rewatchStartAt, setRewatchStartAt] = useState(null)     // ISO
+  const [rewatchWatchedBySeason, setRewatchWatchedBySeason] = useState(null) // { [sn]: [en...] }
 
   const [traktStats, setTraktStats] = useState(null)
   const [traktStatsLoading, setTraktStatsLoading] = useState(false)
@@ -1437,9 +1444,22 @@ export default function DetailsClient({
       if (!trakt?.connected) return
 
       try {
-        const r = await traktGetShowWatched({ tmdbId: id })
+        const tmdbIdNum = Number(id)
+        const [rWatched, rPlays] = await Promise.all([
+          traktGetShowWatched({ tmdbId: tmdbIdNum }),
+          traktGetShowPlays({ tmdbId: tmdbIdNum, startAt: rewatchStartAt || undefined }),
+        ])
         if (ignore) return
-        setWatchedBySeason(r?.watchedBySeason || {})
+
+        setWatchedBySeason(rWatched?.watchedBySeason || {})
+        await loadTraktShowPlays(rewatchStartAt || null)
+
+        setShowPlays(rPlays?.showPlays || rPlays?.plays || [])
+        if (rewatchStartAt) {
+          setRewatchWatchedBySeason(rPlays?.watchedBySeasonSince || {})
+        } else {
+          setRewatchWatchedBySeason(null)
+        }
       } catch {
         // no machacamos a {} aquí para no “borrar” UI si falla el refresh
       }
@@ -1447,7 +1467,7 @@ export default function DetailsClient({
 
     refreshOnOpen()
     return () => { ignore = true }
-  }, [traktEpisodesOpen, type, id, trakt?.connected])
+  }, [traktEpisodesOpen, type, id, trakt?.connected, rewatchStartAt])
 
   const toggleTraktWatched = async () => {
     if (!trakt.connected || traktBusy) return
@@ -1623,6 +1643,69 @@ export default function DetailsClient({
     }
   }
 
+  const onAddShowPlay = async (watchedAtIsoOrNull) => {
+    if (type !== 'tv') return
+    if (!trakt?.connected) return
+    if (episodeBusyKey) return
+
+    setEpisodeBusyKey(SHOW_BUSY_KEY)
+    try {
+      await traktAddShowPlay({ tmdbId: id, watchedAt: watchedAtIsoOrNull })
+      await reloadTraktStatus()
+
+      const fresh = await traktGetShowWatched({ tmdbId: id })
+      setWatchedBySeason(fresh?.watchedBySeason || {})
+
+      await loadTraktShowPlays(rewatchStartAt || null)
+    } finally {
+      setEpisodeBusyKey('')
+    }
+  }
+
+  const onStartShowRewatch = async (startedAtIsoOrNull) => {
+    if (type !== 'tv') return
+    if (!trakt?.connected) return
+
+    const startIso = startedAtIsoOrNull || new Date().toISOString()
+    setRewatchStartAt(startIso)
+
+    // persist opcional
+    try {
+      const k = `showverse:trakt:rewatchStartAt:${id}`
+      window.localStorage.setItem(k, startIso)
+    } catch { }
+
+    await loadTraktShowPlays(startIso)
+  }
+
+  const onAddEpisodePlay = async (season, episode, watchedAtIso) => {
+    if (type !== 'tv') return
+    if (!trakt?.connected) return
+    if (!rewatchStartAt) return
+    if (episodeBusyKey) return
+
+    const key = `S${season}E${episode}`
+    setEpisodeBusyKey(key)
+
+    try {
+      await traktAddEpisodePlay({
+        tmdbId: id,
+        season,
+        episode,
+        watchedAt: watchedAtIso || new Date().toISOString(),
+      })
+
+      // refresca progreso del run + (de rebote) showPlays
+      await loadTraktShowPlays(rewatchStartAt)
+
+      // opcional: mantener watchedBySeason global coherente
+      const fresh = await traktGetShowWatched({ tmdbId: id })
+      setWatchedBySeason(fresh?.watchedBySeason || {})
+    } finally {
+      setEpisodeBusyKey('')
+    }
+  }
+
   const collectionId =
     typeof data?.belongs_to_collection?.id === 'number'
       ? data.belongs_to_collection.id
@@ -1657,6 +1740,23 @@ export default function DetailsClient({
       alive = false
     }
   }, [collectionId])
+
+  useEffect(() => {
+    if (type !== 'tv') {
+      setRewatchStartAt(null)
+      setRewatchWatchedBySeason(null)
+      setShowPlays([])
+      return
+    }
+
+    try {
+      const saved = window.localStorage.getItem(rewatchStorageKey)
+      setRewatchStartAt(saved || null)
+    } catch {
+      setRewatchStartAt(null)
+    }
+    // No tocamos showPlays aquí: se cargan al abrir el modal
+  }, [type, id])
 
   // =====================================================
   // ✅ Extras: IMDb rating rápido + votos/premios en idle
@@ -2686,6 +2786,37 @@ export default function DetailsClient({
     },
     [menuH]
   )
+
+  const loadTraktShowPlays = useCallback(async (startAtIso = null) => {
+    if (type !== 'tv') return
+    if (!trakt?.connected) {
+      setShowPlays([])
+      setRewatchWatchedBySeason(null)
+      return
+    }
+
+    try {
+      const r = await traktGetShowPlays({ tmdbId: id, startAt: startAtIso || undefined })
+      setShowPlays(Array.isArray(r?.showPlays) ? r.showPlays : Array.isArray(r?.plays) ? r.plays : [])
+
+      if (startAtIso) {
+        setRewatchWatchedBySeason(r?.watchedBySeasonSince || {})
+      } else {
+        setRewatchWatchedBySeason(null)
+      }
+    } catch (e) {
+      // no rompas el modal si falla
+      setShowPlays([])
+      if (startAtIso) setRewatchWatchedBySeason({})
+    }
+  }, [id, type, trakt?.connected])
+
+  useEffect(() => {
+    if (type !== 'tv') return
+    if (!trakt?.connected) return
+    loadTraktShowPlays(rewatchStartAt || null)
+  }, [type, id, trakt?.connected, rewatchStartAt, loadTraktShowPlays])
+
 
   // Scroll-spy (qué sección está “activa”)
   useEffect(() => {
@@ -4947,6 +5078,13 @@ export default function DetailsClient({
         busyKey={episodeBusyKey}
         onToggleEpisodeWatched={toggleEpisodeWatched}
         onToggleShowWatched={onToggleShowWatched}
+        showPlays={showPlays}
+        showReleaseDate={data?.first_air_date || null}
+        onAddShowPlay={onAddShowPlay}
+        onStartShowRewatch={onStartShowRewatch}
+        rewatchStartAt={rewatchStartAt}
+        rewatchWatchedBySeason={rewatchWatchedBySeason}
+        onAddEpisodePlay={onAddEpisodePlay}
       />
 
       {/* ✅ MODAL: Añadir a lista */}
