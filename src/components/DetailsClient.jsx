@@ -139,7 +139,7 @@ import {
 } from '@/lib/details/videos'
 
 import { VisualMetaCard, SectionTitle, MetaItem, ScoreBadge, StatChip } from '@/components/details/DetailAtoms'
-import { CompactBadge, ExternalLinkButton, MiniStat, UnifiedRateButton } from '@/components/details/DetailHeaderBits'
+import { CompactBadge, ExternalLinkButton, MiniStat, UnifiedRateButton, ActionShareButton } from '@/components/details/DetailHeaderBits'
 
 import AddToListModal from '@/components/details/AddToListModal'
 import VideoModal from '@/components/details/VideoModal'
@@ -208,6 +208,19 @@ export default function DetailsClient({
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`
   const previewBackdropStorageKey = `showverse:${endpointType}:${id}:backdrop`
   const backgroundStorageKey = `showverse:${endpointType}:${id}:background`
+  // ✅ Rewatch (Trakt) persistente por show
+  const rewatchStorageKey = `showverse:trakt:rewatchStartAt:${id}`
+
+  // ✅ NUEVO: múltiples runs + vista activa del modal
+  const rewatchRunsStorageKey = `showverse:trakt:rewatchRuns:${id}`
+  const episodesViewStorageKey = `showverse:trakt:episodesView:${id}`
+
+  // runs: [{ id: startedAtISO, startedAt: ISO, label: string }]
+  const [rewatchRuns, setRewatchRuns] = useState([])
+  const [activeEpisodesView, setActiveEpisodesView] = useState('global') // 'global' | runId
+
+  // para poder “desmarcar” episodios en rewatch
+  const [rewatchHistoryByEpisode, setRewatchHistoryByEpisode] = useState({}) // { "S1E2": historyId }
 
   const [selectedPosterPath, setSelectedPosterPath] = useState(null)
   const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] = useState(null)
@@ -1040,6 +1053,13 @@ export default function DetailsClient({
   const [traktBusy, setTraktBusy] = useState('') // 'watched' | 'watchlist' | 'history' | ''
   const [traktWatchedOpen, setTraktWatchedOpen] = useState(false)
   const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false)
+
+
+  // ===== modal: cerrar limpiando estados transitorios =====
+  const closeTraktEpisodesModal = useCallback(() => {
+    setTraktEpisodesOpen(false)
+    setEpisodeBusyKey('') // evita que quede bloqueado al reabrir
+  }, [])
   // ✅ EPISODIOS VISTOS (solo TV)
   const [watchedBySeason, setWatchedBySeason] = useState({}) // { [seasonNumber]: [episodeNumber...] }
   const [episodeBusyKey, setEpisodeBusyKey] = useState('')   // "S1E3" etc
@@ -1051,6 +1071,22 @@ export default function DetailsClient({
   const [traktStats, setTraktStats] = useState(null)
   const [traktStatsLoading, setTraktStatsLoading] = useState(false)
   const [traktStatsError, setTraktStatsError] = useState('')
+
+  // ✅ Helper: cargar episodios vistos (TV) desde Trakt
+  const loadTraktShowWatched = useCallback(async () => {
+    if (type !== 'tv') return
+    if (!trakt?.connected) {
+      setWatchedBySeason({})
+      return
+    }
+
+    try {
+      const r = await traktGetShowWatched({ tmdbId: Number(id) })
+      setWatchedBySeason(r?.watchedBySeason || {})
+    } catch {
+      setWatchedBySeason({})
+    }
+  }, [type, id, trakt?.connected])
 
   const [tScoreboard, setTScoreboard] = useState({
     loading: false,
@@ -1412,27 +1448,39 @@ export default function DetailsClient({
   }, [id, traktType])
 
   useEffect(() => {
-    let ignore = false
+    loadTraktShowWatched()
+  }, [loadTraktShowWatched])
 
-    const loadEpisodeWatched = async () => {
-      if (type !== 'tv') return
-      if (!trakt?.connected) {
-        setWatchedBySeason({})
-        return
-      }
-
-      try {
-        const r = await traktGetShowWatched({ tmdbId: id })
-        if (ignore) return
-        setWatchedBySeason(r?.watchedBySeason || {})
-      } catch {
-        if (!ignore) setWatchedBySeason({})
-      }
+  const loadTraktShowPlays = useCallback(async (startAtIso = null) => {
+    if (type !== 'tv') return
+    if (!trakt?.connected) {
+      setShowPlays([])
+      setRewatchWatchedBySeason(null)
+      setRewatchHistoryByEpisode({})
+      return
     }
 
-    loadEpisodeWatched()
-    return () => { ignore = true }
-  }, [type, id, trakt?.connected])
+    try {
+      const r = await traktGetShowPlays({ tmdbId: id, startAt: startAtIso || undefined })
+
+      setShowPlays(Array.isArray(r?.showPlays) ? r.showPlays : Array.isArray(r?.plays) ? r.plays : [])
+
+      if (startAtIso) {
+        setRewatchWatchedBySeason(r?.watchedBySeasonSince || {})
+        // ✅ NUEVO: necesario para poder “desmarcar” en rewatch
+        setRewatchHistoryByEpisode(r?.historyIdsByEpisodeSince || {})
+      } else {
+        setRewatchWatchedBySeason(null)
+        setRewatchHistoryByEpisode({})
+      }
+    } catch (e) {
+      setShowPlays([])
+      if (startAtIso) {
+        setRewatchWatchedBySeason({})
+        setRewatchHistoryByEpisode({})
+      }
+    }
+  }, [id, type, trakt?.connected])
 
   // ✅ Refrescar episodios vistos al ABRIR el modal (evita que se quede en 0 o desincronizado)
   useEffect(() => {
@@ -1444,30 +1492,18 @@ export default function DetailsClient({
       if (!trakt?.connected) return
 
       try {
-        const tmdbIdNum = Number(id)
-        const [rWatched, rPlays] = await Promise.all([
-          traktGetShowWatched({ tmdbId: tmdbIdNum }),
-          traktGetShowPlays({ tmdbId: tmdbIdNum, startAt: rewatchStartAt || undefined }),
-        ])
+        await loadTraktShowWatched()
         if (ignore) return
 
-        setWatchedBySeason(rWatched?.watchedBySeason || {})
         await loadTraktShowPlays(rewatchStartAt || null)
-
-        setShowPlays(rPlays?.showPlays || rPlays?.plays || [])
-        if (rewatchStartAt) {
-          setRewatchWatchedBySeason(rPlays?.watchedBySeasonSince || {})
-        } else {
-          setRewatchWatchedBySeason(null)
-        }
       } catch {
-        // no machacamos a {} aquí para no “borrar” UI si falla el refresh
+        // no machacamos UI si falla
       }
     }
 
     refreshOnOpen()
     return () => { ignore = true }
-  }, [traktEpisodesOpen, type, id, trakt?.connected, rewatchStartAt])
+  }, [traktEpisodesOpen, type, trakt?.connected, rewatchStartAt, loadTraktShowWatched, loadTraktShowPlays])
 
   const toggleTraktWatched = async () => {
     if (!trakt.connected || traktBusy) return
@@ -1584,6 +1620,84 @@ export default function DetailsClient({
     }
   }
 
+  const toggleEpisodeRewatch = useCallback(async (seasonNumber, episodeNumber) => {
+    if (type !== 'tv') return
+    if (!trakt?.connected) return
+    if (!rewatchStartAt) return
+    if (episodeBusyKey) return
+
+    const key = `S${seasonNumber}E${episodeNumber}`
+    setEpisodeBusyKey(key)
+
+    const currentlyWatched = !!(rewatchWatchedBySeason?.[seasonNumber]?.includes(episodeNumber))
+    const next = !currentlyWatched
+
+    // optimista
+    setRewatchWatchedBySeason((prev) => {
+      const p = prev && typeof prev === 'object' ? prev : {}
+      const cur = new Set(p?.[seasonNumber] || [])
+      if (next) cur.add(episodeNumber)
+      else cur.delete(episodeNumber)
+      return { ...p, [seasonNumber]: Array.from(cur).sort((a, b) => a - b) }
+    })
+
+    try {
+      if (next) {
+        // ✅ añadir play (rewatch)
+        // IMPORTANTE: tu endpoint debería devolver historyId
+        const r = await traktAddEpisodePlay({
+          tmdbId: id,
+          season: seasonNumber,
+          episode: episodeNumber,
+          watchedAt: new Date().toISOString(),
+          startedAt: rewatchStartAt
+        })
+        const hid = r?.historyId || r?.id || null
+        if (hid) setRewatchHistoryByEpisode((p) => ({ ...(p || {}), [key]: hid }))
+      } else {
+        // ✅ quitar play (rewatch)
+        const hid = rewatchHistoryByEpisode?.[key]
+        if (!hid) {
+          // si no tienes historyId, sin backend extra no puedes desmarcar de forma fiable
+          throw new Error('No hay historyId para desmarcar este episodio en rewatch.')
+        }
+        await traktRemoveWatchPlay({ historyId: hid })
+        setRewatchHistoryByEpisode((p) => {
+          const nextMap = { ...(p || {}) }
+          delete nextMap[key]
+          return nextMap
+        })
+      }
+
+      // refresca run activo
+      await loadTraktShowPlays(rewatchStartAt)
+
+      // opcional: mantener global actualizado
+      const fresh = await traktGetShowWatched({ tmdbId: id })
+      setWatchedBySeason(fresh?.watchedBySeason || {})
+    } catch (e) {
+      // rollback
+      setRewatchWatchedBySeason((prev) => {
+        const p = prev && typeof prev === 'object' ? prev : {}
+        const cur = new Set(p?.[seasonNumber] || [])
+        if (!next) cur.add(episodeNumber)
+        else cur.delete(episodeNumber)
+        return { ...p, [seasonNumber]: Array.from(cur).sort((a, b) => a - b) }
+      })
+    } finally {
+      setEpisodeBusyKey('')
+    }
+  }, [
+    type,
+    trakt?.connected,
+    rewatchStartAt,
+    episodeBusyKey,
+    rewatchWatchedBySeason,
+    rewatchHistoryByEpisode,
+    id,
+    loadTraktShowPlays
+  ])
+
   const onToggleShowWatched = async (watchedAtOrNull) => {
     if (type !== 'tv') return
     if (!trakt?.connected) return
@@ -1671,8 +1785,7 @@ export default function DetailsClient({
 
     // persist opcional
     try {
-      const k = `showverse:trakt:rewatchStartAt:${id}`
-      window.localStorage.setItem(k, startIso)
+      window.localStorage.setItem(rewatchStorageKey, startIso)
     } catch { }
 
     await loadTraktShowPlays(startIso)
@@ -1746,17 +1859,61 @@ export default function DetailsClient({
       setRewatchStartAt(null)
       setRewatchWatchedBySeason(null)
       setShowPlays([])
+      setRewatchRuns([])
+      setActiveEpisodesView('global')
+      setRewatchHistoryByEpisode({})
       return
     }
 
     try {
-      const saved = window.localStorage.getItem(rewatchStorageKey)
-      setRewatchStartAt(saved || null)
+      // 1) Cargar runs (nuevo formato)
+      let runs = []
+      const rawRuns = window.localStorage.getItem(rewatchRunsStorageKey)
+      if (rawRuns) {
+        const parsed = JSON.parse(rawRuns)
+        if (Array.isArray(parsed)) runs = parsed
+      }
+
+      // 2) Compat: si no hay runs pero existe legacy rewatchStorageKey -> conviértelo
+      if (!runs.length) {
+        const legacy = window.localStorage.getItem(rewatchStorageKey)
+        if (legacy) {
+          runs = [{
+            id: legacy,
+            startedAt: legacy,
+            label: `Rewatch · ${legacy.slice(0, 10)}`
+          }]
+          try {
+            window.localStorage.setItem(rewatchRunsStorageKey, JSON.stringify(runs))
+          } catch { }
+        }
+      }
+
+      setRewatchRuns(runs)
+
+      // 3) Vista activa (global o run)
+      const savedView = window.localStorage.getItem(episodesViewStorageKey) || 'global'
+      const validView =
+        savedView === 'global' || runs.some(r => r?.id === savedView)
+          ? savedView
+          : 'global'
+
+      setActiveEpisodesView(validView)
+
+      // 4) Ajusta rewatchStartAt según vista
+      if (validView === 'global') {
+        setRewatchStartAt(null)
+      } else {
+        const run = runs.find(r => r.id === validView)
+        setRewatchStartAt(run?.startedAt || validView) // fallback
+      }
     } catch {
+      setRewatchRuns([])
+      setActiveEpisodesView('global')
       setRewatchStartAt(null)
+      setRewatchHistoryByEpisode({})
     }
-    // No tocamos showPlays aquí: se cargan al abrir el modal
-  }, [type, id])
+  }, [type, id, rewatchRunsStorageKey, rewatchStorageKey, episodesViewStorageKey])
 
   // =====================================================
   // ✅ Extras: IMDb rating rápido + votos/premios en idle
@@ -1916,6 +2073,70 @@ export default function DetailsClient({
       await sendTraktRating(value); // sendTraktRating ya maneja null internamente
     }
   };
+
+  const persistRuns = useCallback((nextRuns) => {
+    try { window.localStorage.setItem(rewatchRunsStorageKey, JSON.stringify(nextRuns || [])) } catch { }
+  }, [rewatchRunsStorageKey])
+
+  const changeEpisodesView = useCallback(async (viewId) => {
+    const v = viewId || 'global'
+    setActiveEpisodesView(v)
+    try { window.localStorage.setItem(episodesViewStorageKey, v) } catch { }
+
+    if (v === 'global') {
+      setRewatchStartAt(null)
+      await loadTraktShowPlays(null) // ✅ refresca a global
+      return
+    }
+
+    const run = (rewatchRuns || []).find(r => r?.id === v)
+    const startAt = run?.startedAt || v
+
+    setRewatchStartAt(startAt)
+    await loadTraktShowPlays(startAt) // ✅ refrescaFRESCO al cambiar de run
+  }, [episodesViewStorageKey, rewatchRuns, loadTraktShowPlays])
+
+  const createRewatchRun = useCallback(async (startedAtIsoOrNull) => {
+    const startedAt = startedAtIsoOrNull || new Date().toISOString()
+    const run = { id: startedAt, startedAt, label: `Rewatch · ${startedAt.slice(0, 10)}` }
+
+    setRewatchRuns(prev => {
+      const base = Array.isArray(prev) ? prev : []
+      const next = [run, ...base.filter(r => r?.id !== run.id)]
+      persistRuns(next)
+      return next
+    })
+
+    setActiveEpisodesView(run.id)
+    try { window.localStorage.setItem(episodesViewStorageKey, run.id) } catch { }
+    setRewatchStartAt(run.startedAt)
+
+    await loadTraktShowPlays(run.startedAt) // ✅ clave
+  }, [episodesViewStorageKey, persistRuns, loadTraktShowPlays])
+
+  const deleteRewatchRun = useCallback(async (runId) => {
+    if (!runId) return
+
+    setRewatchRuns(prev => {
+      const base = Array.isArray(prev) ? prev : []
+      const next = base.filter(r => r?.id !== runId)
+      persistRuns(next)
+      return next
+    })
+
+    const wasActive = activeEpisodesView === runId
+
+    setActiveEpisodesView(prev => {
+      const nextView = (prev === runId) ? 'global' : prev
+      try { window.localStorage.setItem(episodesViewStorageKey, nextView) } catch { }
+      return nextView
+    })
+
+    if (wasActive) {
+      setRewatchStartAt(null)
+      await loadTraktShowPlays(null) // ✅ vuelve a global “de verdad”
+    }
+  }, [activeEpisodesView, episodesViewStorageKey, persistRuns, loadTraktShowPlays])
 
   // Calculamos una nota "visual" única (prioridad Trakt si existe, sino TMDb)
   const unifiedUserRating = trakt.connected && trakt.rating
@@ -2402,18 +2623,6 @@ export default function DetailsClient({
     setActiveSection(null)
   }, [type, id])
 
-  // Helpers (ponlos cerca de tus helpers)
-  const mixedCount = (a, b) => {
-    const A = Number(a || 0)
-    const B = Number(b || 0)
-    if (A > 0 && B > 0) return `${A}+${B}`
-    if (A > 0) return A
-    if (B > 0) return B
-    return null
-  }
-
-  const sumCount = (...vals) => vals.reduce((acc, v) => acc + (Number(v || 0) || 0), 0)
-
   // Dentro del componente:
   const postersCount = imagesState?.posters?.length || 0
   const backdropsCount = imagesState?.backdrops?.length || 0
@@ -2786,37 +2995,6 @@ export default function DetailsClient({
     },
     [menuH]
   )
-
-  const loadTraktShowPlays = useCallback(async (startAtIso = null) => {
-    if (type !== 'tv') return
-    if (!trakt?.connected) {
-      setShowPlays([])
-      setRewatchWatchedBySeason(null)
-      return
-    }
-
-    try {
-      const r = await traktGetShowPlays({ tmdbId: id, startAt: startAtIso || undefined })
-      setShowPlays(Array.isArray(r?.showPlays) ? r.showPlays : Array.isArray(r?.plays) ? r.plays : [])
-
-      if (startAtIso) {
-        setRewatchWatchedBySeason(r?.watchedBySeasonSince || {})
-      } else {
-        setRewatchWatchedBySeason(null)
-      }
-    } catch (e) {
-      // no rompas el modal si falla
-      setShowPlays([])
-      if (startAtIso) setRewatchWatchedBySeason({})
-    }
-  }, [id, type, trakt?.connected])
-
-  useEffect(() => {
-    if (type !== 'tv') return
-    if (!trakt?.connected) return
-    loadTraktShowPlays(rewatchStartAt || null)
-  }, [type, id, trakt?.connected, rewatchStartAt, loadTraktShowPlays])
-
 
   // Scroll-spy (qué sección está “activa”)
   useEffect(() => {
@@ -3236,6 +3414,12 @@ export default function DetailsClient({
                   {listsPresenceLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ListVideo className="w-5 h-5" />}
                 </button>
               )}
+
+              {/* ✅ NUEVO: Botón de Compartir (Estilo Circular) */}
+              <ActionShareButton
+                title={title}
+                text={`Echa un vistazo a ${title} en The Show Verse`}
+              />
             </div>
 
             {/* ✅ 3. SCOREBOARD INTEGRADO */}
@@ -5065,26 +5249,39 @@ export default function DetailsClient({
       />
 
       <TraktEpisodesWatchedModal
+        key={`${id}-episodes-${traktEpisodesOpen ? 'open' : 'closed'}`}
         open={traktEpisodesOpen}
-        onClose={() => {
-          setTraktEpisodesOpen(false)
-          setEpisodeBusyKey('')
-        }}
-        tmdbId={id}
+        onClose={closeTraktEpisodesModal}
+
+        mediaType={type}
+        tmdbId={Number(id)}
         title={title}
-        connected={trakt.connected}
-        seasons={data?.seasons || []}
+        connected={!!trakt?.connected}
+
+        seasons={Array.isArray(data?.seasons) ? data.seasons : []}
         watchedBySeason={watchedBySeason}
+
         busyKey={episodeBusyKey}
+        episodeBusyKey={episodeBusyKey}
+
         onToggleEpisodeWatched={toggleEpisodeWatched}
+
+        // serie completa + plays
         onToggleShowWatched={onToggleShowWatched}
         showPlays={showPlays}
-        showReleaseDate={data?.first_air_date || null}
+        showReleaseDate={data?.first_air_date || data?.release_date || null}
         onAddShowPlay={onAddShowPlay}
-        onStartShowRewatch={onStartShowRewatch}
+
+        // rewatch runs + vista activa
+        rewatchRuns={rewatchRuns}
+        activeEpisodesView={activeEpisodesView}
+        onChangeEpisodesView={changeEpisodesView}
+        onCreateRewatchRun={createRewatchRun}
+        onDeleteRewatchRun={deleteRewatchRun}
+
         rewatchStartAt={rewatchStartAt}
         rewatchWatchedBySeason={rewatchWatchedBySeason}
-        onAddEpisodePlay={onAddEpisodePlay}
+        onToggleEpisodeRewatch={toggleEpisodeRewatch}
       />
 
       {/* ✅ MODAL: Añadir a lista */}
