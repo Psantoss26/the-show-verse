@@ -1,3 +1,4 @@
+// /src/app/details/person/[id]/page.jsx
 'use client'
 
 import { useEffect, useState } from 'react';

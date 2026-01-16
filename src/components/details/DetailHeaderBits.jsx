@@ -1,7 +1,8 @@
 // src/components/details/DetailHeaderBits.jsx
 'use client'
 
-import { Star } from 'lucide-react'
+import { useState } from 'react'
+import { Star, Share2, Check } from 'lucide-react'
 
 export function CompactBadge({
     logo,
@@ -203,5 +204,53 @@ export function UnifiedRateButton({ rating, loading, onRate, connected, onConnec
                 </select>
             )}
         </div>
+    )
+}
+
+export function ActionShareButton({ title, text, url }) {
+    const [copied, setCopied] = useState(false)
+
+    const handleShare = async () => {
+        const shareData = {
+            title: title,
+            text: text,
+            url: url || (typeof window !== 'undefined' ? window.location.href : '')
+        }
+
+        if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+            try {
+                await navigator.share(shareData)
+            } catch (err) {
+                // Cancelado por usuario
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(shareData.url)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+            } catch (err) {
+                console.error("Error al copiar", err)
+            }
+        }
+    }
+
+    return (
+        <button
+            onClick={handleShare}
+            className={`
+                w-12 h-12 rounded-full flex items-center justify-center transition-all border
+                ${copied
+                    ? 'border-green-500/50 bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                    : 'border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+                }
+            `}
+            title={copied ? "¡Enlace copiado!" : "Compartir"}
+        >
+            {copied ? (
+                <Check className="w-5 h-5" />
+            ) : (
+                <Share2 className="w-5 h-5" />
+            )}
+        </button>
     )
 }
