@@ -3422,8 +3422,8 @@ export default function DetailsClient({
 
               {/* ✅ NUEVO: Botón de Compartir (Estilo Circular) */}
               <ActionShareButton
-                title={title}
-                text={`Echa un vistazo a ${title} en The Show Verse`}
+                title={`The Show Verse | ${title}`}
+                text={yearIso ? `${title} (${yearIso})` : title}
                 url={shareUrl}
               />
             </div>
