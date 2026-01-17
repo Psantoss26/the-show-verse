@@ -32,9 +32,14 @@ async function fetchMovie(id) {
 }
 
 function pickOgImage(movie) {
-    // WhatsApp suele quedar mejor con backdrop horizontal
+    // OG: mejor horizontal (WhatsApp queda muy bien con 1.91:1)
     if (movie?.backdrop_path) return `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`
     if (movie?.poster_path) return `https://image.tmdb.org/t/p/w780${movie.poster_path}`
+    return null
+}
+
+function pickPoster(movie) {
+    if (movie?.poster_path) return `https://image.tmdb.org/t/p/w500${movie.poster_path}`
     return null
 }
 
@@ -105,38 +110,94 @@ export default async function ShareMoviePage({ params }) {
 
     const title = movie.title || 'Película'
     const year = (movie.release_date || '').slice(0, 4)
-    const ogImage = pickOgImage(movie)
+    const poster = pickPoster(movie)
 
     return (
-        <main className="min-h-screen bg-[#101010] text-white flex items-center justify-center p-6">
-            <div className="max-w-md w-full rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-5">
-                <div className="flex gap-4">
-                    {ogImage ? (
-                        <img
-                            src={ogImage}
-                            alt={title}
-                            className="w-28 h-20 object-cover rounded-xl border border-white/10 bg-black/30"
-                            loading="eager"
-                        />
-                    ) : (
-                        <div className="w-28 h-20 rounded-xl border border-white/10 bg-black/30" />
-                    )}
+        <main className="min-h-screen bg-[#0b0b0d] text-white flex items-center justify-center p-6">
+            <div className="w-full max-w-xl">
+                <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] shadow-[0_20px_60px_rgba(0,0,0,0.55)]">
+                    {/* Glow */}
+                    <div className="pointer-events-none absolute -inset-24 bg-[radial-gradient(circle_at_20%_10%,rgba(250,204,21,0.22),transparent_55%),radial-gradient(circle_at_80%_0%,rgba(16,185,129,0.18),transparent_55%)]" />
 
-                    <div className="min-w-0">
-                        <div className="text-lg font-black tracking-tight truncate">{title}</div>
-                        {year ? <div className="text-sm text-white/60 font-bold mt-1">{year}</div> : null}
+                    <div className="relative p-5 sm:p-6">
+                        <div className="flex gap-4 sm:gap-5 items-start">
+                            {/* Poster */}
+                            <div className="shrink-0">
+                                {poster ? (
+                                    <img
+                                        src={poster}
+                                        alt={title}
+                                        className="w-[92px] h-[138px] sm:w-[112px] sm:h-[168px] object-cover rounded-2xl border border-white/10 bg-black/30 shadow-[0_10px_30px_rgba(0,0,0,0.45)]"
+                                        loading="eager"
+                                    />
+                                ) : (
+                                    <div className="w-[92px] h-[138px] sm:w-[112px] sm:h-[168px] rounded-2xl border border-white/10 bg-black/30" />
+                                )}
+                            </div>
 
-                        <p className="text-sm text-white/70 mt-3 line-clamp-3">
-                            {movie.overview || 'Abriendo detalles…'}
-                        </p>
+                            {/* Text */}
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                    <div className="text-xl sm:text-2xl font-black tracking-tight truncate">
+                                        {title}
+                                    </div>
+                                    {year ? (
+                                        <span className="shrink-0 text-xs font-extrabold px-2 py-1 rounded-full bg-white/10 border border-white/10 text-white/80">
+                                            {year}
+                                        </span>
+                                    ) : null}
+                                </div>
 
-                        <Link
-                            href={`/details/movie/${id}`}
-                            className="inline-flex mt-4 px-4 h-10 items-center rounded-xl bg-yellow-500/15 border border-yellow-500/30 text-yellow-200 font-bold hover:bg-yellow-500/20"
-                        >
-                            Abrir detalles
-                        </Link>
+                                <div className="mt-2 text-sm text-white/65 line-clamp-3">
+                                    {movie.overview || 'Abriendo detalles…'}
+                                </div>
+
+                                <div className="mt-4 flex flex-wrap items-center gap-3">
+                                    <Link
+                                        href={`/details/movie/${id}`}
+                                        className="group inline-flex items-center justify-center gap-2 h-11 px-5 rounded-2xl
+                      bg-gradient-to-r from-yellow-400/25 to-emerald-400/15
+                      border border-yellow-400/35 text-yellow-100 font-extrabold
+                      hover:from-yellow-400/30 hover:to-emerald-400/20 hover:border-yellow-300/55
+                      shadow-[0_10px_30px_rgba(0,0,0,0.35)]
+                      transition-all active:scale-[0.98]"
+                                    >
+                                        <span className="text-base">Abrir detalles</span>
+                                        <span
+                                            aria-hidden
+                                            className="inline-flex items-center justify-center w-7 h-7 rounded-xl
+                        bg-black/35 border border-white/10
+                        transition-transform group-hover:translate-x-0.5"
+                                        >
+                                            <svg
+                                                width="16"
+                                                height="16"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="text-yellow-200"
+                                            >
+                                                <path
+                                                    d="M9 18L15 12L9 6"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2.4"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </span>
+                                    </Link>
+
+                                    <div className="text-xs font-bold text-white/45">
+                                        The Show Verse
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
+                    {/* bottom fade */}
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/35 to-transparent" />
                 </div>
             </div>
         </main>
