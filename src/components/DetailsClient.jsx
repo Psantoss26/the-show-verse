@@ -258,11 +258,6 @@ export default function DetailsClient({
     return s.startsWith('http://') || s.startsWith('https://') ? s : `https://${s}`
   }
 
-  const shareUrl =
-    typeof window !== 'undefined' && type === 'movie'
-      ? `${window.location.origin}/s/movie/${id}`
-      : undefined
-
   // =====================================================================
   // ✅ LISTAS (estado + modal + detección)
   // =====================================================================
@@ -3422,9 +3417,9 @@ export default function DetailsClient({
 
               {/* ✅ NUEVO: Botón de Compartir (Estilo Circular) */}
               <ActionShareButton
-                title={`The Show Verse | ${title}`}
-                text={yearIso ? `${title} (${yearIso})` : title}
-                url={shareUrl}
+                title={title}
+                text={`Echa un vistazo a ${title} en The Show Verse`}
+                url={typeof window !== 'undefined' ? `${window.location.origin}/details/movie/${id}` : undefined}
               />
             </div>
 
