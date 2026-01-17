@@ -41,10 +41,6 @@ async function fetchMovie(id) {
     return r.json()
 }
 
-function pickPoster(movie) {
-    return movie?.poster_path ? `https://image.tmdb.org/t/p/w780${movie.poster_path}` : null
-}
-
 function shortDesc(s) {
     const t = (s || '').trim()
     if (!t) return ''
@@ -57,20 +53,20 @@ export async function GET(_req, ctx) {
 
     const baseUrl = await getBaseUrlFromHeaders()
 
-    // ✅ IMPORTANTE: todo apunta a /details/movie/:id
+    // ✅ Compartes /details/... y los bots reciben este HTML por middleware rewrite
     const detailsUrl = `${baseUrl}/details/movie/${encodeURIComponent(id)}`
     const canonical = detailsUrl
 
     const movie = await fetchMovie(id)
-
     const titleRaw = movie?.title || 'Película'
     const year = (movie?.release_date || '').slice(0, 4)
+
+    // ✅ sin nombre del sitio en el título grande
     const shareTitle = `${titleRaw}${year ? ` (${year})` : ''}`
     const description = shortDesc(movie?.overview) || `Ver detalles de ${titleRaw}.`
 
-    // ✅ Solo poster como og:image
-    const poster = pickPoster(movie)
-    const ogImages = poster ? [{ url: poster, w: 780, h: 1170 }] : []
+    // ✅ Imagen OG CUADRADA (para que WhatsApp no recorte contenido)
+    const ogSquare = `${baseUrl}/s/movie/${encodeURIComponent(id)}/og.png`
 
     const html = `<!doctype html>
 <html lang="es">
@@ -89,21 +85,16 @@ export async function GET(_req, ctx) {
 <meta property="og:title" content="${esc(shareTitle)}"/>
 <meta property="og:description" content="${esc(description)}"/>
 
-${ogImages
-            .map(
-                (img) => `
-<meta property="og:image" content="${esc(img.url)}"/>
-<meta property="og:image:secure_url" content="${esc(img.url)}"/>
-<meta property="og:image:width" content="${img.w}"/>
-<meta property="og:image:height" content="${img.h}"/>
-<meta property="og:image:type" content="image/jpeg"/>`
-            )
-            .join('\n')}
+<meta property="og:image" content="${esc(ogSquare)}"/>
+<meta property="og:image:secure_url" content="${esc(ogSquare)}"/>
+<meta property="og:image:width" content="1024"/>
+<meta property="og:image:height" content="1024"/>
+<meta property="og:image:type" content="image/png"/>
 
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="${esc(shareTitle)}"/>
 <meta name="twitter:description" content="${esc(description)}"/>
-${poster ? `<meta name="twitter:image" content="${esc(poster)}"/>` : ''}
+<meta name="twitter:image" content="${esc(ogSquare)}"/>
 
 <!-- Humanos: redirige a detalles -->
 <meta http-equiv="refresh" content="0;url=${esc(detailsUrl)}"/>
