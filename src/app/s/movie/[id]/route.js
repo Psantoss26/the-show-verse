@@ -72,18 +72,23 @@ export async function GET(_req, ctx) {
     const shareTitle = `${titleRaw}${year ? ` (${year})` : ''}`
     const description = shortDesc(movie?.overview) || `Ver detalles de ${titleRaw}.`
 
-    // ✅ Preferimos BACKDROP (mejor para previews grandes); poster como fallback
+    // ✅ Forzar BACKDROP si existe. Si no, fallback a poster.
+    // ✅ Importante: SOLO una og:image para que WhatsApp no elija otra.
     const backdrop = pickBackdrop(movie)
     const poster = pickPoster(movie)
 
-    // ✅ Metemos ambas: primero backdrop, luego poster.
-    // Algunos clientes eligen la primera; otros la “mejor” según ratio.
-    const ogImages = [
-        ...(backdrop ? [{ url: backdrop, w: 1280, h: 720, type: 'image/jpeg' }] : []),
-        ...(poster ? [{ url: poster, w: 780, h: 1170, type: 'image/jpeg' }] : [])
-    ]
+    const chosen = backdrop || poster
 
-    const twitterImage = backdrop || poster || ''
+    const ogImages = chosen
+        ? [{
+            url: chosen,
+            w: backdrop ? 1280 : 780,
+            h: backdrop ? 720 : 1170,
+            type: 'image/jpeg'
+        }]
+        : []
+
+    const twitterImage = chosen || ''
 
     const html = `<!doctype html>
 <html lang="es">

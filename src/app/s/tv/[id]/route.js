@@ -72,16 +72,23 @@ export async function GET(_req, ctx) {
     const shareTitle = `${nameRaw}${year ? ` (${year})` : ''}`
     const description = shortDesc(tv?.overview) || `Ver detalles de ${nameRaw}.`
 
-    // ✅ Preferimos BACKDROP, poster como fallback
+    // ✅ Forzar BACKDROP si existe. Si no, fallback a poster.
+    // ✅ SOLO una og:image.
     const backdrop = pickBackdrop(tv)
     const poster = pickPoster(tv)
 
-    const ogImages = [
-        ...(backdrop ? [{ url: backdrop, w: 1280, h: 720, type: 'image/jpeg' }] : []),
-        ...(poster ? [{ url: poster, w: 780, h: 1170, type: 'image/jpeg' }] : [])
-    ]
+    const chosen = backdrop || poster
 
-    const twitterImage = backdrop || poster || ''
+    const ogImages = chosen
+        ? [{
+            url: chosen,
+            w: backdrop ? 1280 : 780,
+            h: backdrop ? 720 : 1170,
+            type: 'image/jpeg'
+        }]
+        : []
+
+    const twitterImage = chosen || ''
 
     const html = `<!doctype html>
 <html lang="es">
