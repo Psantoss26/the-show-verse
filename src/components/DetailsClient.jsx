@@ -258,6 +258,11 @@ export default function DetailsClient({
     return s.startsWith('http://') || s.startsWith('https://') ? s : `https://${s}`
   }
 
+  const shareUrl =
+    typeof window !== 'undefined' && type === 'movie'
+      ? `${window.location.origin}/share/movie/${id}`
+      : undefined
+
   // =====================================================================
   // ✅ LISTAS (estado + modal + detección)
   // =====================================================================
@@ -3419,6 +3424,7 @@ export default function DetailsClient({
               <ActionShareButton
                 title={title}
                 text={`Echa un vistazo a ${title} en The Show Verse`}
+                url={shareUrl}
               />
             </div>
 
