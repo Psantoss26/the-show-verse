@@ -41,6 +41,10 @@ async function fetchMovie(id) {
     return r.json()
 }
 
+function pickBackdrop(movie) {
+    return movie?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : null
+}
+
 function pickPoster(movie) {
     return movie?.poster_path ? `https://image.tmdb.org/t/p/w780${movie.poster_path}` : null
 }
@@ -68,9 +72,18 @@ export async function GET(_req, ctx) {
     const shareTitle = `${titleRaw}${year ? ` (${year})` : ''}`
     const description = shortDesc(movie?.overview) || `Ver detalles de ${titleRaw}.`
 
-    // ✅ Solo poster como og:image
+    // ✅ Preferimos BACKDROP (mejor para previews grandes); poster como fallback
+    const backdrop = pickBackdrop(movie)
     const poster = pickPoster(movie)
-    const ogImages = poster ? [{ url: poster, w: 780, h: 1170 }] : []
+
+    // ✅ Metemos ambas: primero backdrop, luego poster.
+    // Algunos clientes eligen la primera; otros la “mejor” según ratio.
+    const ogImages = [
+        ...(backdrop ? [{ url: backdrop, w: 1280, h: 720, type: 'image/jpeg' }] : []),
+        ...(poster ? [{ url: poster, w: 780, h: 1170, type: 'image/jpeg' }] : [])
+    ]
+
+    const twitterImage = backdrop || poster || ''
 
     const html = `<!doctype html>
 <html lang="es">
@@ -96,14 +109,14 @@ ${ogImages
 <meta property="og:image:secure_url" content="${esc(img.url)}"/>
 <meta property="og:image:width" content="${img.w}"/>
 <meta property="og:image:height" content="${img.h}"/>
-<meta property="og:image:type" content="image/jpeg"/>`
+<meta property="og:image:type" content="${img.type}"/>`
             )
             .join('\n')}
 
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="${esc(shareTitle)}"/>
 <meta name="twitter:description" content="${esc(description)}"/>
-${poster ? `<meta name="twitter:image" content="${esc(poster)}"/>` : ''}
+${twitterImage ? `<meta name="twitter:image" content="${esc(twitterImage)}"/>` : ''}
 
 <!-- Humanos: redirige a detalles -->
 <meta http-equiv="refresh" content="0;url=${esc(detailsUrl)}"/>
