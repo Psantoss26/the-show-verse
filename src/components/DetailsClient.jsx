@@ -260,7 +260,7 @@ export default function DetailsClient({
 
   const shareUrl =
     typeof window !== 'undefined' && type === 'movie'
-      ? `${window.location.origin}/share/movie/${id}?v=${Date.now()}`
+      ? `${window.location.origin}/s/movie/${id}`
       : undefined
 
   // =====================================================================
