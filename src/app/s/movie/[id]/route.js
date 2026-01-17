@@ -73,12 +73,9 @@ export async function GET(_req, ctx) {
 
     // ✅ Principal: POSTER (portada). Secundaria: BACKDROP.
     const poster = pickPoster(movie)
-    const backdrop = pickBackdrop(movie)
+    // const backdrop = pickBackdrop(movie) // opcional: lo puedes dejar para twitter si quieres
 
-    const ogImages = [
-        ...(poster ? [{ url: poster, w: 780, h: 1170 }] : []),
-        ...(backdrop ? [{ url: backdrop, w: 1280, h: 720 }] : [])
-    ]
+    const ogImages = poster ? [{ url: poster, w: 780, h: 1170 }] : []
 
     const html = `<!doctype html>
 <html lang="es">
@@ -110,7 +107,7 @@ ${ogImages
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="${esc(title)}"/>
 <meta name="twitter:description" content="${esc(description)}"/>
-${backdrop ? `<meta name="twitter:image" content="${esc(backdrop)}"/>` : poster ? `<meta name="twitter:image" content="${esc(poster)}"/>` : ''}
+${poster ? `<meta name="twitter:image" content="${esc(poster)}"/>` : ''}
 
 <!-- Para usuarios humanos: redirige a la página real -->
 <meta http-equiv="refresh" content="0;url=${esc(detailsUrl)}"/>
