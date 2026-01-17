@@ -1,9 +1,14 @@
 import { headers } from 'next/headers'
+import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
 const TMDB_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY
 const SITE_NAME = 'The Show Verse'
+
+// mismo regex que middleware (bots típicos)
+const BOT_UA =
+    /WhatsApp|facebookexternalhit|Facebot|Twitterbot|Slackbot|Discordbot|TelegramBot|LinkedInBot|Pinterest|Googlebot|bingbot/i
 
 function esc(s) {
     return String(s || '')
@@ -47,33 +52,39 @@ function shortDesc(s) {
     return t.length > 180 ? `${t.slice(0, 177)}…` : t
 }
 
-export async function GET(_req, ctx) {
+export async function GET(req, ctx) {
+    const h = await headers()
+    const ua = h.get('user-agent') || ''
+
     const params = ctx?.params && typeof ctx.params.then === 'function' ? await ctx.params : ctx.params
     const id = params?.id
 
     const baseUrl = await getBaseUrlFromHeaders()
 
-    // ✅ Compartes /details/... y los bots reciben este HTML por middleware rewrite
+    // ✅ URL REAL que vas a compartir
     const detailsUrl = `${baseUrl}/details/movie/${encodeURIComponent(id)}`
     const canonical = detailsUrl
+
+    // ✅ Humanos: no deberían ver /s/... nunca
+    if (!BOT_UA.test(ua)) {
+        return NextResponse.redirect(detailsUrl, 307)
+    }
 
     const movie = await fetchMovie(id)
     const titleRaw = movie?.title || 'Película'
     const year = (movie?.release_date || '').slice(0, 4)
 
-    // ✅ sin nombre del sitio en el título grande
     const shareTitle = `${titleRaw}${year ? ` (${year})` : ''}`
     const description = shortDesc(movie?.overview) || `Ver detalles de ${titleRaw}.`
 
-    // ✅ Imagen OG CUADRADA (para que WhatsApp no recorte contenido)
-    const ogSquare = `${baseUrl}/s/movie/${encodeURIComponent(id)}/og.png`
+    // ✅ Imagen cuadrada (no se recorta el contenido)
+    const ogSquare = `${baseUrl}/s/movie/${encodeURIComponent(id)}/og`
 
     const html = `<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-
 <title>${esc(shareTitle)}</title>
 <meta name="description" content="${esc(description)}"/>
 
@@ -95,9 +106,6 @@ export async function GET(_req, ctx) {
 <meta name="twitter:title" content="${esc(shareTitle)}"/>
 <meta name="twitter:description" content="${esc(description)}"/>
 <meta name="twitter:image" content="${esc(ogSquare)}"/>
-
-<!-- Humanos: redirige a detalles -->
-<meta http-equiv="refresh" content="0;url=${esc(detailsUrl)}"/>
 </head>
 <body></body>
 </html>`

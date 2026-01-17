@@ -20,7 +20,12 @@ export async function GET(_req, ctx) {
     const params = ctx?.params && typeof ctx.params.then === 'function' ? await ctx.params : ctx.params
     const id = params?.id
 
-    const m = await fetchMovie(id)
+    let m = null
+    try {
+        m = await fetchMovie(id)
+    } catch {
+        m = null
+    }
 
     const poster = m?.poster_path ? `https://image.tmdb.org/t/p/w500${m.poster_path}` : null
     const backdrop = m?.backdrop_path ? `https://image.tmdb.org/t/p/w780${m.backdrop_path}` : null
@@ -28,6 +33,9 @@ export async function GET(_req, ctx) {
     // ✅ Elegimos “lo mejor”: poster si existe, si no backdrop
     const mainImg = poster || backdrop
     const bgImg = backdrop || poster
+
+    // Fallback si TMDb falla (igual devolvemos PNG válido)
+    const title = m?.title || 'The Show Verse'
 
     return new ImageResponse(
         (
@@ -39,7 +47,9 @@ export async function GET(_req, ctx) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: '#0b0b0d'
+                    background: '#0b0b0d',
+                    color: 'white',
+                    fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial'
                 }}
             >
                 {/* Fondo blur */}
@@ -61,7 +71,7 @@ export async function GET(_req, ctx) {
                     />
                 ) : null}
 
-                {/* Overlay suave */}
+                {/* Overlay */}
                 <div
                     style={{
                         position: 'absolute',
@@ -87,20 +97,21 @@ export async function GET(_req, ctx) {
                         overflow: 'hidden'
                     }}
                 >
-                    {/* Imagen principal en "contain" => se ve ENTERA */}
                     {mainImg ? (
+                        // ✅ contain => la imagen se ve entera
                         <img
                             src={mainImg}
                             alt=""
                             width="820"
                             height="820"
-                            style={{
-                                width: '820px',
-                                height: '820px',
-                                objectFit: 'contain'
-                            }}
+                            style={{ width: '820px', height: '820px', objectFit: 'contain' }}
                         />
-                    ) : null}
+                    ) : (
+                        <div style={{ padding: '64px', textAlign: 'center' }}>
+                            <div style={{ fontSize: 48, fontWeight: 900 }}>{title}</div>
+                            <div style={{ marginTop: 16, fontSize: 22, opacity: 0.75 }}>Detalles de película</div>
+                        </div>
+                    )}
                 </div>
             </div>
         ),
