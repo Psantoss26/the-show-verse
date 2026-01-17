@@ -1,10 +1,30 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 
 export const runtime = 'nodejs'
 export const revalidate = 86400
 
 const SITE_NAME = 'The Show Verse'
+
+async function getBaseUrlFromHeaders() {
+    const h = await headers()
+    const protoRaw = h.get('x-forwarded-proto') || 'https'
+    const hostRaw = h.get('x-forwarded-host') || h.get('host') || ''
+
+    const proto = protoRaw.split(',')[0].trim()
+    const host = hostRaw.split(',')[0].trim()
+
+    if (host) return `${proto}://${host}`
+
+    // fallback (por si acaso)
+    return (
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        process.env.SITE_URL ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
+        'http://localhost:3000'
+    )
+}
 
 function getSiteUrl() {
     return (
@@ -49,55 +69,62 @@ function cleanDesc(s) {
     return txt.length > 180 ? `${txt.slice(0, 177)}…` : txt
 }
 
-export async function generateMetadata({ params }) {
+export async function generateMetadata({ params, searchParams }) {
     const { id } = await params
-    const siteUrl = getSiteUrl()
+
+    // searchParams a veces es sync; a veces la envuelve Next
+    const sp = searchParams && typeof searchParams.then === 'function' ? await searchParams : (searchParams || {})
+    const v = sp?.v ? String(sp.v) : null
+
+    const baseUrl = await getBaseUrlFromHeaders()
+    const canonicalUrl = v
+        ? `${baseUrl}/share/movie/${id}?v=${encodeURIComponent(v)}`
+        : `${baseUrl}/share/movie/${id}`
 
     const movie = await fetchMovie(id)
-
-    // fallback (por si falla TMDb)
     if (!movie) {
         return {
-            metadataBase: new URL(siteUrl),
-            title: SITE_NAME,
+            title: 'The Show Verse',
             description: 'Detalles de película',
-            openGraph: { title: SITE_NAME, siteName: SITE_NAME },
-            twitter: { card: 'summary' }
+            alternates: { canonical: canonicalUrl },
+            openGraph: { title: 'The Show Verse', url: canonicalUrl }
         }
     }
 
-    const title = movie.title || 'Película'
+    const titleRaw = movie.title || 'Película'
     const year = (movie.release_date || '').slice(0, 4)
-    const pageTitle = `${SITE_NAME} | ${title}${year ? ` (${year})` : ''}`
-    const description = cleanDesc(movie.overview) || `Ver detalles de ${title} en ${SITE_NAME}.`
+    const title = `The Show Verse | ${titleRaw}${year ? ` (${year})` : ''}`
 
-    const ogImage = pickOgImage(movie)
-    const canonicalPath = `/share/movie/${id}`
-    const canonicalAbs = new URL(canonicalPath, siteUrl).toString()
+    const description =
+        (movie.overview && movie.overview.trim().slice(0, 180).replace(/…/g, '...')) ||
+        `Ver detalles de ${titleRaw} en The Show Verse.`
+
+    const poster = movie.poster_path ? `https://image.tmdb.org/t/p/w780${movie.poster_path}` : null
+    const backdrop = movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : null
 
     return {
-        metadataBase: new URL(siteUrl),
-        title: pageTitle,
+        title,
         description,
-
-        alternates: { canonical: canonicalAbs },
+        alternates: { canonical: canonicalUrl },
 
         openGraph: {
             type: 'video.movie',
-            title: pageTitle,
+            title,
             description,
-            url: canonicalAbs,
-            siteName: SITE_NAME,
-            images: ogImage
-                ? [{ url: ogImage, width: 1280, height: 720, alt: pageTitle }]
-                : []
+            url: canonicalUrl,
+            siteName: 'The Show Verse',
+            // ✅ Poster primero (portada), backdrop después (por si el scraper prefiere horizontal)
+            images: [
+                ...(poster ? [{ url: poster, width: 780, height: 1170, alt: title }] : []),
+                ...(backdrop ? [{ url: backdrop, width: 1280, height: 720, alt: title }] : [])
+            ]
         },
 
         twitter: {
-            card: ogImage ? 'summary_large_image' : 'summary',
-            title: pageTitle,
+            card: 'summary_large_image',
+            title,
             description,
-            images: ogImage ? [ogImage] : []
+            images: backdrop ? [backdrop] : poster ? [poster] : []
         }
     }
 }

@@ -260,14 +260,7 @@ export default function DetailsClient({
 
   const shareUrl =
     typeof window !== 'undefined' && type === 'movie'
-      ? (() => {
-        const base = `${window.location.origin}/share/movie/${id}`
-        // ✅ WhatsApp cachea el preview: en vercel.app forzamos refresh del scraper
-        if (window.location.hostname.endsWith('vercel.app')) {
-          return `${base}?v=${Date.now()}`
-        }
-        return base
-      })()
+      ? `${window.location.origin}/share/movie/${id}?v=${Date.now()}`
       : undefined
 
   // =====================================================================
