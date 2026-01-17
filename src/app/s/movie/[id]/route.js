@@ -22,7 +22,6 @@ async function getBaseUrlFromHeaders() {
     const host = hostRaw.split(',')[0].trim()
     if (host) return `${proto}://${host}`
 
-    // fallback
     return (
         process.env.NEXT_PUBLIC_SITE_URL ||
         process.env.SITE_URL ||
@@ -37,7 +36,7 @@ async function fetchMovie(id) {
         `https://api.themoviedb.org/3/movie/${encodeURIComponent(id)}` +
         `?api_key=${encodeURIComponent(TMDB_KEY)}&language=es-ES`
 
-    const r = await fetch(url, { next: { revalidate: 86400 } }) // literal
+    const r = await fetch(url, { next: { revalidate: 86400 } })
     if (!r.ok) return null
     return r.json()
 }
@@ -68,24 +67,25 @@ export async function GET(_req, ctx) {
 
     const titleRaw = movie?.title || 'Película'
     const year = (movie?.release_date || '').slice(0, 4)
-    const title = `${SITE_NAME} | ${titleRaw}${year ? ` (${year})` : ''}`
-    const description = shortDesc(movie?.overview) || `Ver detalles de ${titleRaw} en ${SITE_NAME}.`
 
-    // ✅ Principal: POSTER (portada). Secundaria: BACKDROP.
+    // ✅ Solo título de la película (sin el nombre del sitio)
+    const shareTitle = `${titleRaw}${year ? ` (${year})` : ''}`
+
+    // ✅ Descripción sin tu brand (opcional)
+    const description = shortDesc(movie?.overview) || `Ver detalles de ${titleRaw}.`
+
+    // ✅ SOLO POSTER como og:image para que WhatsApp use portada
     const poster = pickPoster(movie)
-    const backdrop = pickBackdrop(movie)
 
-    const ogImages = [
-        ...(poster ? [{ url: poster, w: 780, h: 1170 }] : []),
-        ...(backdrop ? [{ url: backdrop, w: 1280, h: 720 }] : [])
-    ]
+    const ogImages = poster ? [{ url: poster, w: 780, h: 1170 }] : []
 
     const html = `<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>${esc(title)}</title>
+
+<title>${esc(shareTitle)}</title>
 <meta name="description" content="${esc(description)}"/>
 
 <link rel="canonical" href="${esc(canonical)}"/>
@@ -93,7 +93,7 @@ export async function GET(_req, ctx) {
 <meta property="og:site_name" content="${esc(SITE_NAME)}"/>
 <meta property="og:type" content="video.movie"/>
 <meta property="og:url" content="${esc(canonical)}"/>
-<meta property="og:title" content="${esc(title)}"/>
+<meta property="og:title" content="${esc(shareTitle)}"/>
 <meta property="og:description" content="${esc(description)}"/>
 
 ${ogImages
@@ -108,9 +108,9 @@ ${ogImages
             .join('\n')}
 
 <meta name="twitter:card" content="summary_large_image"/>
-<meta name="twitter:title" content="${esc(title)}"/>
+<meta name="twitter:title" content="${esc(shareTitle)}"/>
 <meta name="twitter:description" content="${esc(description)}"/>
-${backdrop ? `<meta name="twitter:image" content="${esc(backdrop)}"/>` : poster ? `<meta name="twitter:image" content="${esc(poster)}"/>` : ''}
+${poster ? `<meta name="twitter:image" content="${esc(poster)}"/>` : ''}
 
 <!-- Para usuarios humanos: redirige a la página real -->
 <meta http-equiv="refresh" content="0;url=${esc(detailsUrl)}"/>
