@@ -45,10 +45,6 @@ function pickPoster(movie) {
     return movie?.poster_path ? `https://image.tmdb.org/t/p/w780${movie.poster_path}` : null
 }
 
-function pickBackdrop(movie) {
-    return movie?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : null
-}
-
 function shortDesc(s) {
     const t = (s || '').trim()
     if (!t) return ''
@@ -60,23 +56,20 @@ export async function GET(_req, ctx) {
     const id = params?.id
 
     const baseUrl = await getBaseUrlFromHeaders()
-    const canonical = `${baseUrl}/s/movie/${encodeURIComponent(id)}`
+
+    // ✅ IMPORTANTE: todo apunta a /details/movie/:id
     const detailsUrl = `${baseUrl}/details/movie/${encodeURIComponent(id)}`
+    const canonical = detailsUrl
 
     const movie = await fetchMovie(id)
 
     const titleRaw = movie?.title || 'Película'
     const year = (movie?.release_date || '').slice(0, 4)
-
-    // ✅ Solo título de la película (sin el nombre del sitio)
     const shareTitle = `${titleRaw}${year ? ` (${year})` : ''}`
-
-    // ✅ Descripción sin tu brand (opcional)
     const description = shortDesc(movie?.overview) || `Ver detalles de ${titleRaw}.`
 
-    // ✅ SOLO POSTER como og:image para que WhatsApp use portada
+    // ✅ Solo poster como og:image
     const poster = pickPoster(movie)
-
     const ogImages = poster ? [{ url: poster, w: 780, h: 1170 }] : []
 
     const html = `<!doctype html>
@@ -112,7 +105,7 @@ ${ogImages
 <meta name="twitter:description" content="${esc(description)}"/>
 ${poster ? `<meta name="twitter:image" content="${esc(poster)}"/>` : ''}
 
-<!-- Para usuarios humanos: redirige a la página real -->
+<!-- Humanos: redirige a detalles -->
 <meta http-equiv="refresh" content="0;url=${esc(detailsUrl)}"/>
 </head>
 <body></body>
