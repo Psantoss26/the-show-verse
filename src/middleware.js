@@ -9,17 +9,23 @@ export function middleware(req) {
     if (!BOT_UA.test(ua)) return NextResponse.next()
 
     const { pathname } = req.nextUrl
+    const url = req.nextUrl.clone()
 
-    // ✅ Solo para movies (puedes ampliar luego a tv/person)
-    const m = pathname.match(/^\/details\/movie\/(\d+)\/?$/)
+    let m = pathname.match(/^\/details\/movie\/(\d+)\/?$/)
     if (m) {
-        const id = m[1]
-        const url = req.nextUrl.clone()
+        url.pathname = `/s/movie/${m[1]}`
+        return NextResponse.rewrite(url)
+    }
 
-        // ✅ Reescribe internamente a tu HTML OG ultraligero
-        url.pathname = `/s/movie/${id}`
+    m = pathname.match(/^\/details\/tv\/(\d+)\/?$/)
+    if (m) {
+        url.pathname = `/s/tv/${m[1]}`
+        return NextResponse.rewrite(url)
+    }
 
-        // (Opcional) no tocar search para que "details" sea exactamente igual
+    m = pathname.match(/^\/details\/person\/(\d+)\/?$/)
+    if (m) {
+        url.pathname = `/s/person/${m[1]}`
         return NextResponse.rewrite(url)
     }
 
