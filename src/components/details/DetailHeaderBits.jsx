@@ -211,26 +211,26 @@ export function ActionShareButton({ title, text, url }) {
     const [copied, setCopied] = useState(false)
 
     const handleShare = async () => {
-        const shareData = {
-            title: title,
-            text: text,
-            url: url || (typeof window !== 'undefined' ? window.location.href : '')
+        const finalUrl = url || (typeof window !== 'undefined' ? window.location.href : '')
+        if (!finalUrl) return
+
+        // ✅ En móvil/WhatsApp: comparte SOLO el link (los OG tags harán la preview)
+        if (navigator.share) {
+            try {
+                await navigator.share({ url: finalUrl })
+                return
+            } catch {
+                // cancelado o no soportado completamente → fallback a copiar
+            }
         }
 
-        if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-            try {
-                await navigator.share(shareData)
-            } catch (err) {
-                // Cancelado por usuario
-            }
-        } else {
-            try {
-                await navigator.clipboard.writeText(shareData.url)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
-            } catch (err) {
-                console.error("Error al copiar", err)
-            }
+        // Fallback: copiar
+        try {
+            await navigator.clipboard.writeText(finalUrl)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        } catch (err) {
+            console.error('Error al copiar', err)
         }
     }
 
@@ -238,19 +238,15 @@ export function ActionShareButton({ title, text, url }) {
         <button
             onClick={handleShare}
             className={`
-                w-12 h-12 rounded-full flex items-center justify-center transition-all border
-                ${copied
+        w-12 h-12 rounded-full flex items-center justify-center transition-all border
+        ${copied
                     ? 'border-green-500/50 bg-green-500/10 text-green-400 hover:bg-green-500/20'
                     : 'border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
                 }
-            `}
-            title={copied ? "¡Enlace copiado!" : "Compartir"}
+      `}
+            title={copied ? '¡Enlace copiado!' : 'Compartir'}
         >
-            {copied ? (
-                <Check className="w-5 h-5" />
-            ) : (
-                <Share2 className="w-5 h-5" />
-            )}
+            {copied ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
         </button>
     )
 }

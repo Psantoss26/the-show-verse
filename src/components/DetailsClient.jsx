@@ -3419,7 +3419,11 @@ export default function DetailsClient({
               <ActionShareButton
                 title={title}
                 text={`Echa un vistazo a ${title} en The Show Verse`}
-                url={typeof window !== 'undefined' ? `${window.location.origin}/details/movie/${id}` : undefined}
+                url={
+                  typeof window !== 'undefined'
+                    ? `${window.location.origin}/details/${type}/${id}`
+                    : undefined
+                }
               />
             </div>
 
