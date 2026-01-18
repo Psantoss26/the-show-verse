@@ -2528,8 +2528,68 @@ export default function DetailsClient({
     : null
 
   // ✅ Director (movie) — fallback si data no trae credits
+  // ✅ Director (movie) — fallback si data no trae credits
   const [movieDirector, setMovieDirector] = useState(null)
   const [movieDirectorsCrew, setMovieDirectorsCrew] = useState([])
+
+  useEffect(() => {
+    const isMovie = type === 'movie'
+    if (!isMovie || !id) {
+      setMovieDirectorsCrew([])
+      setMovieDirector(null)
+      return
+    }
+
+    // Función helper para formatear nombres: "Nolan, Spielberg"
+    const formatDirectorNames = (list) => {
+      if (!list || !list.length) return null
+      return list.map((d) => d.name).join(', ')
+    }
+
+    // 1) CASO A: Si ya vienen credits en "data" (Server Side)
+    const crew = data?.credits?.crew
+    if (Array.isArray(crew) && crew.length) {
+      const dirsCrew = crew.filter((c) => c?.job === 'Director' || c?.job === 'Co-Director')
+
+      setMovieDirectorsCrew(dirsCrew)
+      // ✅ FIX: Actualizamos también el string del nombre aquí
+      setMovieDirector(formatDirectorNames(dirsCrew))
+      return
+    }
+
+    // 2) CASO B: Si no vienen, pide credits a la API (Client Side Fallback)
+    const ac = new AbortController()
+
+      ; (async () => {
+        try {
+          const res = await fetch(`/api/tmdb/movies/${id}/credits`, {
+            signal: ac.signal,
+            cache: 'no-store',
+          })
+          const json = await res.json().catch(() => ({}))
+          if (!res.ok) {
+            setMovieDirectorsCrew([])
+            setMovieDirector(null)
+            return
+          }
+
+          const dirsCrew = (json?.crew || []).filter(
+            (c) => c?.job === 'Director' || c?.job === 'Co-Director'
+          )
+
+          setMovieDirectorsCrew(dirsCrew)
+          // ✅ FIX: Actualizamos también el string del nombre tras el fetch
+          setMovieDirector(formatDirectorNames(dirsCrew))
+        } catch (e) {
+          if (e?.name !== 'AbortError') {
+            setMovieDirectorsCrew([])
+            setMovieDirector(null)
+          }
+        }
+      })()
+
+    return () => ac.abort()
+  }, [type, id, data?.credits?.crew])
 
   useEffect(() => {
     const isMovie = type === 'movie'
