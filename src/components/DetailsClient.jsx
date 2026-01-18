@@ -1,4 +1,3 @@
-
 // src/components/DetailsClient.jsx
 'use client'
 
