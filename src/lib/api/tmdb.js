@@ -5,15 +5,19 @@ const IS_SERVER = typeof window === 'undefined'
 
 /* -------------------- Helper unificado -------------------- */
 function buildUrl(path, params = {}) {
-  const url = new URL(`${BASE_URL}${path}`)
-  // defaults
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+
+  const url = new URL(`${BASE_URL}${normalizedPath}`)
   url.searchParams.set('api_key', API_KEY || '')
+
   if (!('language' in params)) {
     url.searchParams.set('language', 'es-ES')
   }
+
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null) url.searchParams.set(k, String(v))
   })
+
   return url.toString()
 }
 
@@ -386,23 +390,34 @@ export async function getTvEpisodeRatings(tmdbId, { excludeSpecials = true } = {
 }
 
 /* -------------------- Cuenta: favoritos / watchlist -------------------- */
-export async function getMediaAccountStates(type, id, sessionId) {
-  if (!sessionId) return { favorite: false, watchlist: false, rated: null }
-  try {
-    const res = await fetch(
-      buildUrl(`/${type}/${id}/account_states`, { session_id: sessionId }),
-      { cache: 'no-store' }
-    )
-    const data = await res.json()
-    if (!res.ok) throw new Error(data?.status_message || 'Error account_states')
-    return {
-      favorite: !!data.favorite,
-      watchlist: !!data.watchlist,
-      rated: data.rated || null,
-    }
-  } catch (e) {
-    console.error('Error getMediaAccountStates:', e)
-    return { favorite: false, watchlist: false, rated: null }
+export async function getMediaAccountStates(type, id, sessionOrOpts) {
+  const empty = { favorite: false, watchlist: false, rated: null }
+
+  if (!API_KEY) return empty
+  if (!id) return empty
+
+  // account_states NO existe para "person"
+  if (type !== 'movie' && type !== 'tv') return empty
+
+  // Compat: acepta string (sessionId) o { sessionId, guestSessionId }
+  const params = {}
+  if (typeof sessionOrOpts === 'string' && sessionOrOpts) {
+    params.session_id = sessionOrOpts
+  } else if (sessionOrOpts?.sessionId) {
+    params.session_id = sessionOrOpts.sessionId
+  } else if (sessionOrOpts?.guestSessionId) {
+    params.guest_session_id = sessionOrOpts.guestSessionId
+  } else {
+    return empty
+  }
+
+  const data = await tmdb(`/${type}/${id}/account_states`, params, { cache: 'no-store' })
+  if (!data) return empty
+
+  return {
+    favorite: !!data.favorite,
+    watchlist: !!data.watchlist,
+    rated: data.rated ?? null,
   }
 }
 
@@ -529,13 +544,13 @@ export async function fetchTopRatedIMDb({ type = 'movie', pages = 3, limit = 20,
  */
 export const fetchPopularMedia = async ({ type = 'movie', language = 'es-ES' }) => {
   try {
-    const data = await tmdb(`${type}/popular`, { language, page: 1 });
-    return data?.results || [];
+    const data = await tmdb(`/${type}/popular`, { language, page: 1 })
+    return data?.results || []
   } catch (error) {
-    console.error(`Error fetching popular ${type}:`, error);
-    return [];
+    console.error(`Error fetching popular ${type}:`, error)
+    return []
   }
-};
+}
 
 /**
  * Obtiene medios por ID de género, ordenados por popularidad y con un mínimo de votos.

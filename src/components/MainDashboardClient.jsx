@@ -15,7 +15,9 @@ import {
     BookmarkMinus,
     Loader2,
     Play,
-    X
+    X,
+    FilmIcon,
+    TvIcon
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
@@ -899,8 +901,315 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     )
 }
 
+function InlinePreviewCardAnticipated({ movie, heightClass, backdropOverride }) {
+    const { session, account } = useAuth()
+
+    const [extras, setExtras] = useState({
+        runtime: null,
+        country: null,
+    })
+    const [backdropPath, setBackdropPath] = useState(null)
+    const [backdropReady, setBackdropReady] = useState(false)
+
+    const [loadingStates, setLoadingStates] = useState(false)
+    const [favorite, setFavorite] = useState(false)
+    const [watchlist, setWatchlist] = useState(false)
+    const [updating, setUpdating] = useState(false)
+    const [error, setError] = useState('')
+
+    const [showTrailer, setShowTrailer] = useState(false)
+    const [trailer, setTrailer] = useState(null)
+    const [trailerLoading, setTrailerLoading] = useState(false)
+    const trailerIframeRef = useRef(null)
+
+    useEffect(() => {
+        setShowTrailer(false)
+        setTrailer(null)
+        setTrailerLoading(false)
+    }, [movie?.id])
+
+    useEffect(() => {
+        let cancel = false
+        const load = async () => {
+            if (!movie || !session || !account?.id) {
+                setFavorite(false)
+                setWatchlist(false)
+                return
+            }
+            try {
+                setLoadingStates(true)
+                const st = await getMediaAccountStates('movie', movie.id, session)
+                if (!cancel) {
+                    setFavorite(!!st.favorite)
+                    setWatchlist(!!st.watchlist)
+                }
+            } catch {
+            } finally {
+                if (!cancel) setLoadingStates(false)
+            }
+        }
+        load()
+        return () => { cancel = true }
+    }, [movie, session, account])
+
+    useEffect(() => {
+        let abort = false
+        if (!movie) return
+
+        const loadAll = async () => {
+            // Backdrop (igual que tu preview normal)
+            const { backdrop: userBackdrop } = getArtworkPreference(movie.id)
+            if (userBackdrop) {
+                const url = buildImg(userBackdrop, 'w1280')
+                await preloadImage(url)
+                if (!abort) {
+                    setBackdropPath(userBackdrop)
+                    setBackdropReady(true)
+                }
+            } else if (backdropOverride) {
+                const url = buildImg(backdropOverride, 'w1280')
+                await preloadImage(url)
+                if (!abort) {
+                    setBackdropPath(backdropOverride)
+                    setBackdropReady(true)
+                }
+            } else {
+                const chosen = movie.backdrop_path || movie.poster_path || null
+                if (chosen) {
+                    const url = buildImg(chosen, 'w1280')
+                    await preloadImage(url)
+                    if (!abort) {
+                        setBackdropPath(chosen)
+                        setBackdropReady(true)
+                    }
+                } else if (!abort) {
+                    setBackdropPath(null)
+                    setBackdropReady(false)
+                }
+            }
+
+            // Extras: runtime + país (1 característica extra)
+            try {
+                const details = await getMovieDetails(movie.id).catch(() => null)
+                const runtime = details?.runtime ?? null
+                const country = details?.production_countries?.[0]?.name || null
+                if (!abort) setExtras({ runtime, country })
+            } catch {
+                if (!abort) setExtras({ runtime: null, country: null })
+            }
+        }
+
+        loadAll()
+        return () => { abort = true }
+    }, [movie, backdropOverride])
+
+    const href = `/details/movie/${movie.id}`
+
+    const requireLogin = () => {
+        if (!session || !account?.id) {
+            window.location.href = '/login'
+            return true
+        }
+        return false
+    }
+
+    const handleToggleFavorite = async (e) => {
+        e.stopPropagation()
+        if (requireLogin() || updating || !movie) return
+        try {
+            setUpdating(true)
+            setError('')
+            const next = !favorite
+            setFavorite(next)
+            await markAsFavorite({
+                accountId: account.id,
+                sessionId: session,
+                type: 'movie',
+                mediaId: movie.id,
+                favorite: next
+            })
+        } catch {
+            setFavorite((v) => !v)
+            setError('No se pudo actualizar favoritos.')
+        } finally {
+            setUpdating(false)
+        }
+    }
+
+    const handleToggleWatchlist = async (e) => {
+        e.stopPropagation()
+        if (requireLogin() || updating || !movie) return
+        try {
+            setUpdating(true)
+            setError('')
+            const next = !watchlist
+            setWatchlist(next)
+            await markInWatchlist({
+                accountId: account.id,
+                sessionId: session,
+                type: 'movie',
+                mediaId: movie.id,
+                watchlist: next
+            })
+        } catch {
+            setWatchlist((v) => !v)
+            setError('No se pudo actualizar pendientes.')
+        } finally {
+            setUpdating(false)
+        }
+    }
+
+    const handleToggleTrailer = async (e) => {
+        e.stopPropagation()
+        if (showTrailer) {
+            setShowTrailer(false)
+            return
+        }
+
+        try {
+            setTrailerLoading(true)
+            setError('')
+            const t = await getBestTrailerCached(movie.id)
+            if (!t?.key) {
+                setTrailer(null)
+                setShowTrailer(false)
+                setError('No hay trailer disponible para este título.')
+                return
+            }
+            setTrailer(t)
+            setShowTrailer(true)
+        } catch {
+            setTrailer(null)
+            setShowTrailer(false)
+            setError('No se pudo cargar el trailer.')
+        } finally {
+            setTrailerLoading(false)
+        }
+    }
+
+    const resolvedBackdrop =
+        backdropPath || movie.backdrop_path || movie.poster_path || null
+    const bgSrc = resolvedBackdrop ? buildImg(resolvedBackdrop, 'w1280') : null
+
+    const genres = (() => {
+        const ids = movie.genre_ids || (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : [])
+        const names = ids.map((id) => GENRES[id]).filter(Boolean)
+        return names.slice(0, 2).join(' • ')
+    })()
+
+    const release = movie?.release_date || null
+    const releaseText = release ? new Date(release).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : (yearOf(movie) || '—')
+
+    return (
+        <div
+            className={`rounded-lg overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
+            onClick={() => { window.location.href = href }}
+        >
+            <div className="relative w-full h-full bg-black">
+                {!showTrailer && !backdropReady && (
+                    <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
+                )}
+
+                {!showTrailer && backdropReady && bgSrc && (
+                    <img
+                        src={bgSrc}
+                        alt={movie.title || movie.name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                    />
+                )}
+
+                {showTrailer && (
+                    <>
+                        {(trailerLoading) && (
+                            <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
+                        )}
+                        {trailer?.key && (
+                            <div className="absolute inset-0 overflow-hidden">
+                                <iframe
+                                    key={trailer.key}
+                                    ref={trailerIframeRef}
+                                    className="absolute left-1/2 top-1/2 w-[140%] h-[180%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                                    src={`https://www.youtube-nocookie.com/embed/${trailer.key}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&controls=0&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1`}
+                                    title={`Trailer - ${movie.title || movie.name}`}
+                                    allow="autoplay; encrypted-media; picture-in-picture"
+                                    allowFullScreen={false}
+                                />
+                            </div>
+                        )}
+                    </>
+                )}
+
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2 bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95" />
+            </div>
+
+            <div className="w-full h-full bg-neutral-950/95 border-t border-neutral-800">
+                <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                        {/* ✅ META NUEVA SOLO PARA MÁS ESPERADAS */}
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-neutral-200">
+                            <span className="font-medium">{releaseText}</span>
+                            {extras?.runtime ? <span>• {formatRuntime(extras.runtime)}</span> : null}
+                            {extras?.country ? <span>• {extras.country}</span> : null}
+                        </div>
+
+                        {genres && (
+                            <div className="mt-1 text-[11px] sm:text-xs text-neutral-100/90 line-clamp-1">
+                                {genres}
+                            </div>
+                        )}
+
+                        {error && <p className="mt-1 text-[11px] text-red-400 line-clamp-1">{error}</p>}
+                    </div>
+
+                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                        <button
+                            onClick={handleToggleTrailer}
+                            disabled={trailerLoading}
+                            title={showTrailer ? 'Cerrar trailer' : 'Ver trailer'}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                        >
+                            {trailerLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : showTrailer ? <X className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                        </button>
+
+                        <button
+                            onClick={handleToggleFavorite}
+                            disabled={loadingStates || updating}
+                            title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                        >
+                            {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : favorite ? <HeartOff className="w-5 h-5" /> : <Heart className="w-5 h-5" />}
+                        </button>
+
+                        <button
+                            onClick={handleToggleWatchlist}
+                            disabled={loadingStates || updating}
+                            title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                        >
+                            {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : watchlist ? <BookmarkMinus className="w-5 h-5" /> : <BookmarkPlus className="w-5 h-5" />}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 /* ---------- Fila reusable ---------- */
-function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides, backdropOverrides }) {
+/* ---------- Fila reusable ---------- */
+function Row({
+    title,
+    items,
+    isMobile,
+    hydrated,
+    posterCacheRef,
+    posterOverrides,
+    backdropOverrides,
+    overridesReady,
+    previewKind = 'default', // ✅ 4C: selector de preview
+}) {
     if (!items || items.length === 0) return null
 
     const swiperRef = useRef(null)
@@ -949,7 +1258,7 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
         640: { slidesPerView: 4, spaceBetween: 14 },
         768: { slidesPerView: 'auto', spaceBetween: 14 },
         1024: { slidesPerView: 'auto', spaceBetween: 18 },
-        1280: { slidesPerView: 'auto', spaceBetween: 20 }
+        1280: { slidesPerView: 'auto', spaceBetween: 20 },
     }
 
     const swiperKey = `${title}-${hydrated ? 'h' : 's'}-${isMobile ? 'm' : 'd'}`
@@ -1007,10 +1316,23 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                                     : ''
 
                             const hasPosterOverride = Object.prototype.hasOwnProperty.call(posterOverrides || {}, m.id)
-                            const posterOverride = hasPosterOverride ? posterOverrides[m.id] : undefined
-
                             const hasBackdropOverride = Object.prototype.hasOwnProperty.call(backdropOverrides || {}, m.id)
-                            const backdropOverride = hasBackdropOverride ? backdropOverrides[m.id] : undefined
+
+                            // ✅ 4B: NO bloquees PosterImage si ya sabemos que NO hay override.
+                            // - undefined => aún no listo (loader)
+                            // - null => listo pero sin override
+                            // - string => override real
+                            const posterOverride = !overridesReady
+                                ? undefined
+                                : hasPosterOverride
+                                    ? posterOverrides[m.id]
+                                    : null
+
+                            const backdropOverride = !overridesReady
+                                ? undefined
+                                : hasBackdropOverride
+                                    ? backdropOverrides[m.id]
+                                    : null
 
                             return (
                                 <SwiperSlide key={m.id} className={isMobile ? 'select-none' : '!w-auto select-none'}>
@@ -1027,27 +1349,32 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                                                     key="preview"
                                                     initial={{ opacity: 0, scale: 0.98 }}
                                                     animate={{ opacity: 1, scale: 1 }}
-                                                    // CAMBIO: exit mucho más rápido para evitar lag (0.1s)
                                                     exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
-                                                    // CAMBIO: Transición de entrada rápida y lineal (0.2s) en vez de muelle
-                                                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                                                    transition={{ duration: 0.2, ease: 'easeInOut' }}
                                                     className="w-full h-full hidden sm:block"
                                                 >
-                                                    <InlinePreviewCard
-                                                        movie={m}
-                                                        heightClass={heightClassDesktop}
-                                                        backdropOverride={backdropOverride}
-                                                    />
+                                                    {/* ✅ 4C: preview por tipo */}
+                                                    {previewKind === 'anticipated' ? (
+                                                        <InlinePreviewCardAnticipated
+                                                            movie={m}
+                                                            heightClass={heightClassDesktop}
+                                                            backdropOverride={backdropOverride}
+                                                        />
+                                                    ) : (
+                                                        <InlinePreviewCard
+                                                            movie={m}
+                                                            heightClass={heightClassDesktop}
+                                                            backdropOverride={backdropOverride}
+                                                        />
+                                                    )}
                                                 </motion.div>
                                             ) : (
                                                 <motion.div
                                                     key="poster"
                                                     initial={{ opacity: 0, scale: 0.98 }}
                                                     animate={{ opacity: 1, scale: 1 }}
-                                                    // CAMBIO: exit muy rápido
                                                     exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
-                                                    // CAMBIO: entrada rápida (0.2s)
-                                                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                                                    transition={{ duration: 0.2, ease: 'easeInOut' }}
                                                     className="w-full h-full"
                                                 >
                                                     <Link href={`/details/movie/${m.id}`}>
@@ -1074,10 +1401,10 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                         type="button"
                         onClick={handlePrevClick}
                         className="absolute inset-y-0 left-0 w-28 z-30
-                        hidden sm:flex items-center justify-start
-                        bg-gradient-to-r from-black/80 via-black/55 to-transparent
-                        hover:from-black/95 hover:via-black/75
-                        transition-colors pointer-events-auto"
+              hidden sm:flex items-center justify-start
+              bg-gradient-to-r from-black/80 via-black/55 to-transparent
+              hover:from-black/95 hover:via-black/75
+              transition-colors pointer-events-auto"
                     >
                         <span className="ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ‹
@@ -1090,16 +1417,96 @@ function Row({ title, items, isMobile, hydrated, posterCacheRef, posterOverrides
                         type="button"
                         onClick={handleNextClick}
                         className="absolute inset-y-0 right-0 w-28 z-30
-                        hidden sm:flex items-center justify-end
-                        bg-gradient-to-l from-black/80 via-black/55 to-transparent
-                        hover:from-black/95 hover:via-black/75
-                        transition-colors pointer-events-auto"
+              hidden sm:flex items-center justify-end
+              bg-gradient-to-l from-black/80 via-black/55 to-transparent
+              hover:from-black/95 hover:via-black/75
+              transition-colors pointer-events-auto"
                     >
                         <span className="mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
                             ›
                         </span>
                     </button>
                 )}
+            </div>
+        </div>
+    )
+}
+
+function TraktMixedRow({ title, items, isMobile, hydrated }) {
+    if (!items || items.length === 0) return null
+
+    const breakpointsRow = {
+        0: { slidesPerView: 3, spaceBetween: 12 },
+        640: { slidesPerView: 4, spaceBetween: 14 },
+        768: { slidesPerView: 'auto', spaceBetween: 14 },
+        1024: { slidesPerView: 'auto', spaceBetween: 18 },
+        1280: { slidesPerView: 'auto', spaceBetween: 20 }
+    }
+
+    const heightClassDesktop = 'h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
+    const posterBoxClass = isMobile ? 'aspect-[2/3]' : heightClassDesktop
+    const swiperKey = `trakt-${title}-${hydrated ? 'h' : 's'}-${isMobile ? 'm' : 'd'}`
+
+    const formatMeta = (m) => {
+        const year = (m?.release_date || m?.first_air_date || '').slice(0, 4)
+        if (m?.media_type === 'tv') {
+            const eps = m?.number_of_episodes
+            return `${year || '—'}${eps ? ` • ${eps} eps.` : ''}`
+        }
+        const rt = m?.runtime
+        return `${year || '—'}${rt ? ` • ${formatRuntime(rt)}` : ''}`
+    }
+
+    return (
+        <div className="relative group">
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-100 mb-4 px-1 sm:px-0 tracking-tight">
+                {title}
+            </h3>
+
+            <div className={!hydrated ? 'pointer-events-none touch-none' : ''}>
+                <Swiper
+                    key={swiperKey}
+                    slidesPerView={3}
+                    spaceBetween={12}
+                    loop={false}
+                    watchOverflow={true}
+                    grabCursor={!isMobile}
+                    allowTouchMove={true}
+                    preventClicks={true}
+                    preventClicksPropagation={true}
+                    threshold={5}
+                    modules={[Navigation]}
+                    breakpoints={breakpointsRow}
+                    className="group relative"
+                >
+                    {items.map((m) => {
+                        const type = m?.media_type || 'movie'
+                        const href = `/details/${type}/${m.id}`
+                        const poster = m?.poster_path ? buildImg(m.poster_path, 'w342') : '/default-poster.png'
+
+                        return (
+                            <SwiperSlide key={`${type}-${m.id}`} className={isMobile ? 'select-none' : '!w-auto select-none'}>
+                                <div className={`relative flex-shrink-0 transition-all duration-300 ease-in-out ${isMobile ? 'w-full' : 'w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px]'} ${posterBoxClass}`}>
+                                    <Link href={href}>
+                                        <div className="w-full h-full">
+                                            <img
+                                                src={poster}
+                                                alt={m.title || m.name || ''}
+                                                className={`w-full ${posterBoxClass} object-cover rounded-lg`}
+                                                loading="lazy"
+                                                decoding="async"
+                                            />
+                                            <div className="mt-2 flex items-center gap-2 text-[11px] text-neutral-300">
+                                                {type === 'tv' ? <TvIcon className="w-3.5 h-3.5" /> : <FilmIcon className="w-3.5 h-3.5" />}
+                                                <span className="line-clamp-1">{formatMeta(m)}</span>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                </div>
+                            </SwiperSlide>
+                        )
+                    })}
+                </Swiper>
             </div>
         </div>
     )
@@ -1363,7 +1770,21 @@ export default function MainDashboardClient({ initialData }) {
     const dashboardData = initialData || {}
 
     const allMovieIds = useMemo(() => {
-        const keys = ['topRated', 'popular', 'trending', 'mind', 'action', 'us', 'cult', 'underrated', 'rising', 'recommended']
+        const keys = [
+            'topRated',
+            'popular',
+            'trending',
+            'mind',
+            'action',
+            'us',
+            'cult',
+            'underrated',
+            'rising',
+            'recommended',
+            'traktRecommended',
+            'traktAnticipated',
+            'traktTrending',
+        ]
         const set = new Set()
         for (const k of keys) {
             const arr = dashboardData?.[k] || []
@@ -1374,6 +1795,7 @@ export default function MainDashboardClient({ initialData }) {
 
     const [posterOverrides, setPosterOverrides] = useState({})
     const [backdropOverrides, setBackdropOverrides] = useState({})
+    const [overridesReady, setOverridesReady] = useState(false)
 
     useEffect(() => {
         let cancelled = false
@@ -1383,9 +1805,12 @@ export default function MainDashboardClient({ initialData }) {
                 if (!cancelled) {
                     setPosterOverrides({})
                     setBackdropOverrides({})
+                    setOverridesReady(true)
                 }
                 return
             }
+
+            if (!cancelled) setOverridesReady(false)
 
             try {
                 const [posters, backdrops] = await Promise.all([
@@ -1401,13 +1826,13 @@ export default function MainDashboardClient({ initialData }) {
                 console.error('Error cargando overrides (dashboard)', err)
                 setPosterOverrides({})
                 setBackdropOverrides({})
+            } finally {
+                if (!cancelled) setOverridesReady(true)
             }
         }
 
         loadOverrides()
-        return () => {
-            cancelled = true
-        }
+        return () => { cancelled = true }
     }, [allMovieIds])
 
     if (!dashboardData || Object.keys(dashboardData).length === 0) {
@@ -1424,17 +1849,143 @@ export default function MainDashboardClient({ initialData }) {
             />
 
             <div className="space-y-12">
-                <Row title="Populares" items={dashboardData.popular} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
-                <Row title="Tendencias semanales" items={dashboardData.trending} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
-                <Row title="Guiones complejos" items={dashboardData.mind} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
-                <Row title="Top acción" items={dashboardData.action} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
-                <Row title="Populares en EE.UU." items={dashboardData.us} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
-                <Row title="Películas de culto" items={dashboardData.cult} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
-                <Row title="Infravaloradas" items={dashboardData.underrated} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
-                <Row title="En ascenso" items={dashboardData.rising} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
+                {/* ✅ Trakt: Recomendado (preview normal) */}
+                <Row
+                    title="Recomendado"
+                    items={dashboardData.traktRecommended || []}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                />
+
+                {/* ✅ Trakt: Tendencias (preview normal) */}
+                <Row
+                    title="Tendencias (Trakt)"
+                    items={dashboardData.traktTrending || []}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                />
+
+                {/* ✅ Trakt: Más esperadas (preview nueva) */}
+                <Row
+                    title="Más esperadas"
+                    items={dashboardData.traktAnticipated || []}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                    previewKind="anticipated"
+                />
+
+                {/* ...el resto igual... */}
+                <Row
+                    title="Populares"
+                    items={dashboardData.popular}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                />
+
+                <Row
+                    title="Tendencias semanales"
+                    items={dashboardData.trending}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                />
+
+                <Row
+                    title="Guiones complejos"
+                    items={dashboardData.mind}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                />
+
+                <Row
+                    title="Top acción"
+                    items={dashboardData.action}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                />
+
+                <Row
+                    title="Populares en EE.UU."
+                    items={dashboardData.us}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                />
+
+                <Row
+                    title="Películas de culto"
+                    items={dashboardData.cult}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                />
+
+                <Row
+                    title="Infravaloradas"
+                    items={dashboardData.underrated}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                />
+
+                <Row
+                    title="En ascenso"
+                    items={dashboardData.rising}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                />
 
                 {dashboardData.recommended?.length > 0 && (
-                    <Row title="Recomendadas para ti" items={dashboardData.recommended} isMobile={isMobile} hydrated={hydrated} posterCacheRef={posterCacheRef} posterOverrides={posterOverrides} backdropOverrides={backdropOverrides} />
+                    <Row
+                        title="Recomendadas para ti"
+                        items={dashboardData.recommended}
+                        isMobile={isMobile}
+                        hydrated={hydrated}
+                        posterCacheRef={posterCacheRef}
+                        posterOverrides={posterOverrides}
+                        backdropOverrides={backdropOverrides}
+                        overridesReady={overridesReady}
+                    />
                 )}
             </div>
         </div>
