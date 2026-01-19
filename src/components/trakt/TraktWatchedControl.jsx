@@ -1,3 +1,4 @@
+// src/components/trakt/TraktWatchedControl.jsx
 'use client'
 
 import { Eye, EyeOff } from 'lucide-react'
@@ -6,10 +7,18 @@ export default function TraktWatchedControl({
     connected,
     watched,
     plays,
+    badge, // ✅ NUEVO: permite mostrar texto (ej: "47%") en el badge
     busy,
-    onOpen
+    onOpen,
 }) {
     const disabled = !connected || !!busy
+
+    const badgeText =
+        typeof badge === 'string' && badge.trim().length > 0
+            ? badge.trim()
+            : Number(plays || 0) > 0
+                ? String(plays)
+                : null
 
     return (
         <button
@@ -33,10 +42,13 @@ export default function TraktWatchedControl({
         >
             {watched ? <Eye className="w-6 h-6" /> : <EyeOff className="w-6 h-6" />}
 
-            {Number(plays || 0) > 0 && (
-                <span className="absolute -bottom-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold
-          bg-black/70 border border-white/15 text-white flex items-center justify-center">
-                    {plays}
+            {badgeText && (
+                <span
+                    className="absolute -bottom-1 -right-2 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold
+            bg-black/70 border border-black/70 text-white flex items-center justify-center"
+                    aria-label={`Progreso: ${badgeText}`}
+                >
+                    {badgeText}
                 </span>
             )}
         </button>

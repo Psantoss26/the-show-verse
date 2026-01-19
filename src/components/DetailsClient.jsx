@@ -1060,12 +1060,45 @@ export default function DetailsClient({
     setEpisodeBusyKey('') // evita que quede bloqueado al reabrir
   }, [])
   // ✅ EPISODIOS VISTOS (solo TV)
-  const [watchedBySeason, setWatchedBySeason] = useState({}) // { [seasonNumber]: [episodeNumber...] }
+  const [watchedBySeason, setWatchedBySeason] = useState({}) // { [seasonNumber]: [episodeNumber] }
+  const [watchedBySeasonLoaded, setWatchedBySeasonLoaded] = useState(false) // ✅ NUEVO
   const [episodeBusyKey, setEpisodeBusyKey] = useState('')   // "S1E3" etc
   // ✅ NUEVO: historial de completados + rewatch "run"
   const [showPlays, setShowPlays] = useState([])                 // fechas ISO (completados)
   const [rewatchStartAt, setRewatchStartAt] = useState(null)     // ISO
   const [rewatchWatchedBySeason, setRewatchWatchedBySeason] = useState(null) // { [sn]: [en...] }
+
+  // ✅ Badge del botón "visto" en series: % completado (sin especiales)
+  const tvProgressBadge = useMemo(() => {
+    if (endpointType !== 'tv') return null
+    if (!trakt?.connected) return null
+
+    // ✅ clave: mientras no cargue watchedBySeason, NO mostramos nada
+    if (!watchedBySeasonLoaded) return null
+
+    const seasonsList = Array.isArray(data?.seasons) ? data.seasons : []
+    const usable = seasonsList.filter(
+      (s) => typeof s?.season_number === 'number' && s.season_number > 0
+    )
+
+    // si aún no hay temporadas válidas, tampoco mostramos nada
+    if (usable.length === 0) return null
+
+    const totalEpisodes = usable.reduce(
+      (acc, s) => acc + Math.max(0, Number(s?.episode_count || 0)),
+      0
+    )
+    if (totalEpisodes <= 0) return '0%'
+
+    const watchedEpisodes = usable.reduce((acc, s) => {
+      const sn = s.season_number
+      const arr = watchedBySeason?.[sn]
+      return acc + (Array.isArray(arr) ? arr.length : 0)
+    }, 0)
+
+    const pct = Math.round((watchedEpisodes / totalEpisodes) * 100)
+    return `${Math.min(100, Math.max(0, pct))}%`
+  }, [endpointType, trakt?.connected, watchedBySeasonLoaded, data?.seasons, watchedBySeason])
 
   const [traktStats, setTraktStats] = useState(null)
   const [traktStatsLoading, setTraktStatsLoading] = useState(false)
@@ -1074,8 +1107,10 @@ export default function DetailsClient({
   // ✅ Helper: cargar episodios vistos (TV) desde Trakt
   const loadTraktShowWatched = useCallback(async () => {
     if (type !== 'tv') return
+
     if (!trakt?.connected) {
       setWatchedBySeason({})
+      setWatchedBySeasonLoaded(false)
       return
     }
 
@@ -1084,6 +1119,9 @@ export default function DetailsClient({
       setWatchedBySeason(r?.watchedBySeason || {})
     } catch {
       setWatchedBySeason({})
+    } finally {
+      // ✅ NUEVO: ya tenemos un estado definitivo (aunque sea 0%)
+      setWatchedBySeasonLoaded(true)
     }
   }, [type, id, trakt?.connected])
 
@@ -1403,6 +1441,10 @@ export default function DetailsClient({
     setTraktEpisodesOpen(false)
     setEpisodeBusyKey('')
     setTraktBusy('')
+
+    // Evitar que salga 0% al cambiar de serie antes de cargar
+    setWatchedBySeason({})
+    setWatchedBySeasonLoaded(false)
   }, [id, endpointType])
 
   useEffect(() => {
@@ -3427,7 +3469,13 @@ export default function DetailsClient({
               <TraktWatchedControl
                 connected={trakt.connected}
                 watched={trakt.watched}
-                plays={trakt.plays}
+
+                // ✅ importante: en TV no queremos que salga número (plays) mientras esperamos el %
+                plays={endpointType === 'tv' ? 0 : trakt.plays}
+
+                // ✅ sin fallback a '0%' (si tvProgressBadge es null, no se renderiza nada)
+                badge={endpointType === 'tv' ? tvProgressBadge : null}
+
                 busy={!!traktBusy}
                 onOpen={() => {
                   if (!trakt.connected) window.location.href = "/api/trakt/auth/start"
