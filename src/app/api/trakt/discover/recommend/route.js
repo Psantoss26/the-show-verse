@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-export const revalidate = 60 * 60 // 1h
+export const revalidate = 3600 // 1h
 
 const TRAKT_KEY =
     process.env.TRAKT_CLIENT_ID ||
