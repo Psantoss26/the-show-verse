@@ -519,11 +519,33 @@ function StatBox({ label, value, icon: Icon, imgSrc, colorClass }) {
   )
 }
 
+// Skeleton loader para las tarjetas
+function CardSkeleton({ mode = 'poster' }) {
+  const wrapAspect = mode === 'backdrop' ? 'aspect-[16/9]' : 'aspect-[2/3]'
+
+  return (
+    <div className={`relative ${wrapAspect} w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5`}>
+      <div className="absolute inset-0 bg-gradient-to-br from-neutral-800/50 via-neutral-900/50 to-neutral-800/50 animate-pulse" />
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"
+        style={{
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 2s infinite'
+        }}
+      />
+    </div>
+  )
+}
+
 function GroupDivider({ title, stats, count, total }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
 
   return (
-    <div className="my-8 sm:my-10">
+    <motion.div
+      className="my-8 sm:my-10"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
+    >
       <div className="relative overflow-hidden rounded-2xl bg-[#0a0a0a] border border-white/[0.08]">
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/[0.03] via-transparent to-transparent opacity-50" />
 
@@ -553,7 +575,7 @@ function GroupDivider({ title, stats, count, total }) {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -1639,7 +1661,7 @@ export default function WatchlistPage() {
     return 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-6'
   }, [coverMode])
 
-  const renderCard = useCallback((item) => {
+  const renderCard = useCallback((item, index) => {
     const isMovie = item.media_type === 'movie'
     const mediaType = item.media_type || (item.title ? 'movie' : 'tv')
     const href = `/details/${mediaType}/${item.id}`
@@ -1685,60 +1707,71 @@ export default function WatchlistPage() {
       : 'opacity-0 translate-y-1 scale-[0.98] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100'
 
     return (
-      <Link
+      <motion.div
         key={`${mediaType}-${item.id}`}
-        href={href}
-        className="group block relative w-full h-full"
-        title={title}
-        onMouseEnter={onPrefetch}
-        onFocus={onPrefetch}
-        onClick={onClick}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{
+          duration: 0.4,
+          delay: Math.min(index * 0.03, 0.6),
+          ease: [0.25, 0.1, 0.25, 1]
+        }}
+        layout
       >
-        <div className={`relative ${wrapAspect} w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ${ring} ${hoverShadow} z-0`}>
-          <SmartPoster key={`${mediaType}:${item.id}:${coverMode}`} item={item} title={title} mode={coverMode} />
+        <Link
+          href={href}
+          className="group block relative w-full h-full"
+          title={title}
+          onMouseEnter={onPrefetch}
+          onFocus={onPrefetch}
+          onClick={onClick}
+        >
+          <div className={`relative ${wrapAspect} w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ${ring} ${hoverShadow} z-0`}>
+            <SmartPoster key={`${mediaType}:${item.id}:${coverMode}`} item={item} title={title} mode={coverMode} />
 
-          <div className={`${overlayBase} ${overlayOpacity}`}>
-            <div className={`p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform ${topTransform} transition-transform duration-300`}>
-              <span
-                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                  }`}
-              >
-                {isMovie ? 'PELÍCULA' : 'SERIE'}
-              </span>
+            <div className={`${overlayBase} ${overlayOpacity}`}>
+              <div className={`p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform ${topTransform} transition-transform duration-300`}>
+                <span
+                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                    }`}
+                >
+                  {isMovie ? 'PELÍCULA' : 'SERIE'}
+                </span>
 
-              <div className="flex flex-col items-end gap-1">
-                {item.vote_average > 0 && (
-                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                    <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">{item.vote_average.toFixed(1)}</span>
-                    <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
-                  </div>
-                )}
-                {typeof imdbScore === 'number' && imdbScore > 0 && (
-                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                    <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">{imdbScore.toFixed(1)}</span>
-                    <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className={`p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform ${bottomTransform} transition-transform duration-300`}>
-              <div className="flex items-end justify-between gap-3">
-                <div className="min-w-0 text-left">
-                  <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">{title}</h3>
-                  {year && <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">{year}</p>}
+                <div className="flex flex-col items-end gap-1">
+                  {item.vote_average > 0 && (
+                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                      <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">{item.vote_average.toFixed(1)}</span>
+                      <img src="/logo-TMDb.png" alt="" className="w-auto h-2.5 opacity-100" />
+                    </div>
+                  )}
+                  {typeof imdbScore === 'number' && imdbScore > 0 && (
+                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                      <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">{imdbScore.toFixed(1)}</span>
+                      <img src="/logo-IMDb.png" alt="" className="w-auto h-3 opacity-100" />
+                    </div>
+                  )}
                 </div>
+              </div>
 
-                {myLabel ? (
-                  <div className={`shrink-0 self-end transition-all duration-300 ${myTransform}`}>
-                    <span className="text-2xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">{myLabel}</span>
+              <div className={`p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform ${bottomTransform} transition-transform duration-300`}>
+                <div className="flex items-end justify-between gap-3">
+                  <div className="min-w-0 text-left">
+                    <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">{title}</h3>
+                    {year && <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">{year}</p>}
                   </div>
-                ) : null}
+
+                  {myLabel ? (
+                    <div className={`shrink-0 self-end transition-all duration-300 ${myTransform}`}>
+                      <span className="text-2xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">{myLabel}</span>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </Link>
+        </Link>
+      </motion.div>
     )
   }, [coverMode, imdbRatings, myRatings, activeCardKey, prefetchImdb, prefetchMyRating, prefetchTraktScore, activateCard])
 
@@ -1773,7 +1806,12 @@ export default function WatchlistPage() {
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Header */}
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
+        <motion.div
+          className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-10"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+        >
           <div className="flex items-center gap-4">
             <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20">
               <Bookmark className="w-8 h-8 text-blue-500 fill-current" />
@@ -1926,14 +1964,37 @@ export default function WatchlistPage() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Content */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-32">
-            <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
-            <span className="text-neutral-500 text-sm font-medium animate-pulse">Cargando tu lista...</span>
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-4"
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+              <span className="text-neutral-400 text-sm font-medium">Cargando tu lista...</span>
+            </div>
+            <div className={gridClass}>
+              {Array.from({ length: INITIAL_VISIBLE }).map((_, i) => (
+                <motion.div
+                  key={`skeleton-${i}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.4,
+                    delay: Math.min(i * 0.02, 0.4),
+                    ease: 'easeOut'
+                  }}
+                >
+                  <CardSkeleton mode={coverMode} />
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
         ) : error ? (
           <div className="text-center py-20 text-red-400">{error}</div>
         ) : processedItems.length === 0 ? (
@@ -1958,10 +2019,13 @@ export default function WatchlistPage() {
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={`covers-${coverMode}`}
-                  initial={{ opacity: 0, y: 10, scale: 0.985 }}
+                  initial={{ opacity: 0, y: 15, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.985 }}
-                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  exit={{ opacity: 0, y: -15, scale: 0.98 }}
+                  transition={{
+                    duration: 0.35,
+                    ease: [0.25, 0.1, 0.25, 1]
+                  }}
                   className="will-change-transform"
                 >
                   {groupedSections ? (
@@ -1969,12 +2033,12 @@ export default function WatchlistPage() {
                       {groupedSections.map((section) => (
                         <div key={`grp-${section.k}`}>
                           <GroupDivider title={section.title} stats={section.stats} count={section.items.length} total={visibleItems.length} />
-                          <div className={gridClass}>{section.items.map(renderCard)}</div>
+                          <div className={gridClass}>{section.items.map((item, idx) => renderCard(item, idx))}</div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className={gridClass}>{visibleItems.map(renderCard)}</div>
+                    <div className={gridClass}>{visibleItems.map((item, idx) => renderCard(item, idx))}</div>
                   )}
                 </motion.div>
               </AnimatePresence>
@@ -2003,6 +2067,6 @@ export default function WatchlistPage() {
           </>
         )}
       </div>
-    </div>
+    </div >
   )
 }
