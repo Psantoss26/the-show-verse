@@ -57,10 +57,11 @@ function formatDateHeader(date, mode = 'day') {
 
 function formatWatchedLine(iso) {
     const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return { date: '', time: '' }
+    if (Number.isNaN(d.getTime())) return { date: '', time: '', dayMonth: '' }
     const dd = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d)
     const hh = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' }).format(d)
-    return { date: dd, time: hh }
+    const dayMonth = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' }).format(d)
+    return { date: dd, time: hh, dayMonth }
 }
 
 function getItemType(entry) {
@@ -213,6 +214,81 @@ async function mapLimit(arr, limit, fn) {
 // ----------------------------
 const tmdbCache = new Map()
 const tmdbInflight = new Map()
+const backdropCache = new Map()
+const backdropInflight = new Map()
+
+function preloadImage(src) {
+    return new Promise((resolve) => {
+        if (!src) return resolve(false)
+        const img = new Image()
+        img.onload = () => resolve(true)
+        img.onerror = () => resolve(false)
+        img.src = src
+    })
+}
+
+function pickBestBackdropByLangResVotes(list) {
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    const norm = (v) => (v ? String(v).toLowerCase().split('-')[0] : null)
+    const preferSet = new Set(['en'])
+    const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1))
+
+    const pool = list.filter((b) => (b?.width || 0) >= 1200)
+    const finalPool = pool.length ? pool : list
+
+    const top3en = []
+    for (const b of finalPool) {
+        if (isPreferredLang(b)) top3en.push(b)
+        if (top3en.length === 3) break
+    }
+    if (!top3en.length) return null
+
+    const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h
+    const b1080 = top3en.find((b) => isRes(b, 1920, 1080))
+    if (b1080) return b1080
+
+    const b1440 = top3en.find((b) => isRes(b, 2560, 1440))
+    if (b1440) return b1440
+
+    const b4k = top3en.find((b) => isRes(b, 3840, 2160))
+    if (b4k) return b4k
+
+    const b720 = top3en.find((b) => isRes(b, 1280, 720))
+    if (b720) return b720
+
+    return top3en[0]
+}
+
+async function fetchBestBackdropEN(type, id) {
+    if (!TMDB_API_KEY || !type || !id) return null
+    try {
+        const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,en-US`
+        const r = await fetch(url, { cache: 'force-cache' })
+        if (!r.ok) return null
+        const j = await r.json()
+        const best = pickBestBackdropByLangResVotes(j?.backdrops)
+        return best?.file_path || null
+    } catch {
+        return null
+    }
+}
+
+async function getBestBackdropCached(type, id) {
+    const key = `${type}:${id}`
+    if (backdropCache.has(key)) return backdropCache.get(key)
+    if (backdropInflight.has(key)) return backdropInflight.get(key)
+
+    const p = (async () => {
+        const chosen = await fetchBestBackdropEN(type, id)
+        backdropCache.set(key, chosen || null)
+        backdropInflight.delete(key)
+        return chosen || null
+    })()
+
+    backdropInflight.set(key, p)
+    return p
+}
 
 async function fetchTmdbPoster({ type, tmdbId }) {
     const t = type === 'show' ? 'tv' : 'movie'
@@ -459,6 +535,73 @@ function Poster({ entry, className = "" }) {
     )
 }
 
+// SmartPoster for Compact view - transitions from poster to backdrop on hover
+function SmartPoster({ entry, title, mode = 'poster' }) {
+    const type = getItemType(entry)
+    const id = getTmdbId(entry)
+    const [src, setSrc] = useState(null)
+    const [ready, setReady] = useState(false)
+
+    useEffect(() => {
+        let abort = false
+        setSrc(null)
+        setReady(false)
+
+        const load = async () => {
+            const tmdbType = type === 'show' ? 'tv' : 'movie'
+
+            // BACKDROP MODE
+            if (mode === 'backdrop') {
+                const bestBackdrop = await getBestBackdropCached(tmdbType, id)
+                const r = await fetchTmdbPoster({ type, tmdbId: id })
+                const finalPath = bestBackdrop || r?.backdrop_path || r?.poster_path || entry?.backdrop_path || entry?.poster_path || null
+                const url = finalPath ? `https://image.tmdb.org/t/p/w780${finalPath}` : null
+                if (url) await preloadImage(url)
+                if (!abort) {
+                    setSrc(url)
+                    setReady(!!url)
+                }
+                return
+            }
+
+            // POSTER MODE
+            const r = await fetchTmdbPoster({ type, tmdbId: id })
+            const finalPath = r?.poster_path || entry?.poster_path || entry?.backdrop_path || null
+            const url = finalPath ? `https://image.tmdb.org/t/p/w342${finalPath}` : null
+            if (url) await preloadImage(url)
+            if (!abort) {
+                setSrc(url)
+                setReady(!!url)
+            }
+        }
+
+        if (type && id) load()
+        return () => { abort = true }
+    }, [mode, type, id, entry])
+
+    return (
+        <div className="absolute inset-0 w-full h-full">
+            <div
+                className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${ready && src ? 'opacity-0' : 'opacity-100'
+                    }`}
+            >
+                <Film className="w-8 h-8 text-zinc-700" />
+            </div>
+
+            {src && (
+                <img
+                    src={src}
+                    alt={title}
+                    loading="lazy"
+                    decoding="async"
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${ready ? 'opacity-100' : 'opacity-0'
+                        }`}
+                />
+            )}
+        </div>
+    )
+}
+
 // Tarjeta modo LISTA
 function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
     const type = getItemType(entry)
@@ -550,7 +693,8 @@ function HistoryCompactCard({ entry, busy, onRemoveFromHistory, index = 0 }) {
     const title = baseTitle
     const episodeTitle = type === 'show' && epMeta?.title ? epMeta.title : null
     const epBadge = type === 'show' && epMeta ? formatEpisodeBadge(epMeta) : null
-    const { time: watchedTime } = formatWatchedLine(entry?.watched_at)
+    const { dayMonth } = formatWatchedLine(entry?.watched_at)
+    const year = getYear(entry)
     const href = useMemo(() => getDetailsHref(entry), [entry])
     const historyId = getHistoryId(entry)
     const [confirmDel, setConfirmDel] = useState(false)
@@ -562,30 +706,50 @@ function HistoryCompactCard({ entry, busy, onRemoveFromHistory, index = 0 }) {
     const disabledCls = busy ? 'opacity-60 pointer-events-none grayscale' : ''
 
     const CardInner = (
-        <div className={`relative aspect-[2/3] group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md transition-all ${disabledCls}`}>
+        <motion.div
+            className={`relative aspect-[2/3] compact-card group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md ${disabledCls}`}
+            whileHover={{
+                scale: 1.15,
+                zIndex: 50,
+                boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
+                borderColor: "rgba(16, 185, 129, 0.4)"
+            }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            style={{ transformOrigin: 'center center' }}
+        >
+            {/* ✅ Poster Image */}
             <Poster entry={entry} className="w-full h-full" />
 
-            {/* Overlay compacto */}
-            <div className="absolute inset-x-0 bottom-0 z-10 p-2 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
-                <div className="flex items-center gap-1.5 mb-1">
-                    <span className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === 'movie' ? 'bg-sky-500/20 text-sky-200' : 'bg-purple-500/20 text-purple-200'}`}>
-                        {type === 'movie' ? 'Cine' : 'TV'}
-                    </span>
-                    <span className="text-[9px] text-zinc-400">{watchedTime}</span>
+            {/* ✅ Desktop: Hover overlay with information */}
+            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${type === 'movie' ? 'bg-sky-500/40 text-sky-100' : 'bg-purple-500/40 text-purple-100'}`}>
+                            {type === 'movie' ? 'Película' : 'Serie'}
+                        </span>
+                        <span className="text-[9px] text-zinc-300/90 font-medium">{dayMonth}</span>
+                    </div>
+
+                    <h5 className="text-white font-bold text-xs leading-tight line-clamp-2 mb-1">{title}</h5>
+
+                    {type === 'show' && epBadge && (
+                        <div className="text-[10px] text-emerald-300 font-semibold">{epBadge}</div>
+                    )}
                 </div>
-
-                <h5 className="text-white font-bold text-[10px] leading-tight line-clamp-1">{title}</h5>
-
-                {type === 'show' && epBadge && (
-                    <div className="mt-0.5 text-[9px] text-zinc-300/80 line-clamp-1">{epBadge}</div>
-                )}
             </div>
 
-            {/* Botón borrar */}
+            {/* ✅ Mobile: Compact badge indicator */}
+            <div className="absolute top-2 left-2 z-10 lg:hidden">
+                <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded backdrop-blur-md ${type === 'movie' ? 'bg-sky-500/50 text-sky-50' : 'bg-purple-500/50 text-purple-50'}`}>
+                    {type === 'movie' ? 'M' : 'S'}
+                </span>
+            </div>
+
+            {/* ✅ Delete button - appears on hover */}
             {!confirmDel && (
                 <button
                     onClick={handleDeleteClick}
-                    className="absolute top-1.5 right-1.5 z-20 p-1.5 rounded-full backdrop-blur-sm bg-black/40 hover:bg-red-600 text-white transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                    className="absolute top-2 right-2 z-20 p-1.5 rounded-full backdrop-blur-md bg-black/40 hover:bg-red-600 text-white transition-all duration-200 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 pointer-events-auto border border-white/10 hover:border-transparent"
                     title="Borrar"
                     aria-label="Borrar"
                 >
@@ -593,26 +757,36 @@ function HistoryCompactCard({ entry, busy, onRemoveFromHistory, index = 0 }) {
                 </button>
             )}
 
+            {/* ✅ Delete confirmation overlay */}
             <AnimatePresence>
                 {confirmDel && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-2 text-center"
+                        transition={{ duration: 0.2 }}
+                        className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-3 text-center pointer-events-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <p className="text-red-200 text-[10px] font-bold mb-2">¿Borrar?</p>
-                        <div className="flex gap-1.5 w-full">
-                            <button onClick={handleCancel} className="flex-1 py-1 rounded bg-zinc-800 text-zinc-300 text-[10px] font-bold">No</button>
-                            <button onClick={handleConfirm} className="flex-1 py-1 rounded bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
-                                {busy ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : 'Sí'}
+                        <p className="text-red-200 text-[11px] font-bold mb-3">¿Eliminar del historial?</p>
+                        <div className="flex gap-2 w-full">
+                            <button
+                                onClick={handleCancel}
+                                className="flex-1 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleConfirm}
+                                className="flex-1 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                            >
+                                {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Trash2 className="w-3 h-3" /> Borrar</>}
                             </button>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+        </motion.div>
     )
 
     if (!href) return <div>{CardInner}</div>
@@ -642,7 +816,7 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
     const episodeTitle = type === 'show' && epMeta?.title ? epMeta.title : null
     const epBadge = type === 'show' && epMeta ? formatEpisodeBadge(epMeta) : null
 
-    const { time: watchedTime } = formatWatchedLine(entry?.watched_at)
+    const { dayMonth } = formatWatchedLine(entry?.watched_at)
     const href = useMemo(() => getDetailsHref(entry), [entry])
     const historyId = getHistoryId(entry)
     const [confirmDel, setConfirmDel] = useState(false)
@@ -676,7 +850,7 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
                 >
                     {type === 'movie' ? 'Cine' : 'TV'}
                 </span>
-                <span className="text-[10px] text-zinc-300/80">{watchedTime}</span>
+                <span className="text-[10px] text-zinc-300/80 font-medium">{dayMonth}</span>
             </div>
 
             <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
@@ -721,11 +895,11 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
                 {InfoContent}
             </div>
 
-            {/* ✅ DESKTOP: overlay completo solo con hover */}
+            {/* ✅ DESKTOP: overlay más sutil con menos blur */}
             <div
                 className={[
                     'absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3',
-                    'bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity',
+                    'bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300',
                     confirmDel ? 'opacity-0 pointer-events-none' : '',
                 ].join(' ')}
             >
@@ -734,13 +908,13 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
                     <div className="flex items-center gap-2 mb-1">
                         <span
                             className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${type === 'movie'
-                                ? 'bg-sky-500/20 text-sky-300'
-                                : 'bg-purple-500/20 text-purple-300'
+                                ? 'bg-sky-500/30 text-sky-200'
+                                : 'bg-purple-500/30 text-purple-200'
                                 }`}
                         >
                             {type === 'movie' ? 'Cine' : 'TV'}
                         </span>
-                        <span className="text-[10px] text-zinc-400">{watchedTime}</span>
+                        <span className="text-[10px] text-zinc-300 font-medium">{dayMonth}</span>
                     </div>
 
                     <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
@@ -750,13 +924,13 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
                     {type === 'show' && (epBadge || episodeTitle) && (
                         <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-300/90">
                             {epBadge && (
-                                <span className="shrink-0 font-medium text-zinc-200/90">
+                                <span className="shrink-0 font-medium text-emerald-300/90">
                                     {epBadge}
                                 </span>
                             )}
                             {epBadge && episodeTitle && <span className="text-zinc-500">•</span>}
                             {episodeTitle && (
-                                <span className="min-w-0 truncate text-zinc-300/85">
+                                <span className="min-w-0 truncate text-zinc-400">
                                     {episodeTitle}
                                 </span>
                             )}
@@ -1263,7 +1437,7 @@ export default function HistoryClient() {
                                                 ))}
                                             </div>
                                         ) : viewMode === 'compact' ? (
-                                            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2">
+                                            <div className="compact-cards-grid grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2">
                                                 {g.items.map((entry, idx) => (
                                                     <HistoryCompactCard
                                                         key={getHistoryId(entry) || `${getTmdbId(entry)}:${entry?.watched_at}:${Math.random()}`}
