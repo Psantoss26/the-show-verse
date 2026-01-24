@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect, memo } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -207,6 +207,34 @@ async function mapLimit(arr, limit, fn) {
     })
     await Promise.all(workers)
     return out
+}
+
+// Intersection Observer hook for lazy loading
+function useInView(options = {}) {
+    const [isInView, setIsInView] = useState(false)
+    const [hasBeenInView, setHasBeenInView] = useState(false)
+    const ref = useRef(null)
+
+    useEffect(() => {
+        const element = ref.current
+        if (!element) return
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                const inView = entry.isIntersecting
+                setIsInView(inView)
+                if (inView && !hasBeenInView) {
+                    setHasBeenInView(true)
+                }
+            },
+            { threshold: 0.01, rootMargin: '200px', ...options }
+        )
+
+        observer.observe(element)
+        return () => observer.disconnect()
+    }, [hasBeenInView, options.threshold, options.rootMargin])
+
+    return { ref, isInView, hasBeenInView }
 }
 
 // ----------------------------
@@ -603,7 +631,7 @@ function SmartPoster({ entry, title, mode = 'poster' }) {
 }
 
 // Tarjeta modo LISTA
-function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
+const HistoryItemCard = memo(function HistoryItemCard({ entry, busy, onRemoveFromHistory, index = 0, totalItems = 0 }) {
     const type = getItemType(entry)
 
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
@@ -618,15 +646,62 @@ function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
     const href = useMemo(() => getDetailsHref(entry), [entry])
     const historyId = getHistoryId(entry)
     const [confirmDel, setConfirmDel] = useState(false)
+    const [posterSrc, setPosterSrc] = useState(null)
+    const [backdropReady, setBackdropReady] = useState(false)
+    const { ref, hasBeenInView } = useInView({ threshold: 0.01, rootMargin: '300px' })
 
     const handleDeleteClick = (e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(true) }
     const handleConfirm = async (e) => { e.preventDefault(); e.stopPropagation(); await onRemoveFromHistory?.(entry, { historyId }) }
     const handleCancel = (e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(false) }
 
+    // ✅ Optimized backdrop loading with Intersection Observer
+    useEffect(() => {
+        if (!hasBeenInView) return
+        
+        let abort = false
+        const load = async () => {
+            const t = getItemType(entry)
+            const id = getTmdbId(entry)
+            if (!t || !id) return
+
+            const tmdbType = t === 'show' ? 'tv' : 'movie'
+            const bestBackdrop = await getBestBackdropCached(tmdbType, id)
+            const r = await fetchTmdbPoster({ type: t, tmdbId: id })
+            const finalPath = bestBackdrop || r?.backdrop_path || r?.poster_path || entry?.backdrop_path || entry?.poster_path || null
+            const url = finalPath ? `https://image.tmdb.org/t/p/w780${finalPath}` : null
+            
+            if (url) await preloadImage(url)
+            if (!abort) {
+                setPosterSrc(url)
+                setBackdropReady(!!url)
+            }
+        }
+        load()
+        return () => { abort = true }
+    }, [entry, hasBeenInView])
+
     const Content = (
         <div className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 pr-12 transition-all ${busy ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
             <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
-                <SmartPoster entry={entry} title={title} mode="backdrop" />
+                <div className="absolute inset-0 w-full h-full">
+                    <div
+                        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${backdropReady && posterSrc ? 'opacity-0' : 'opacity-100'
+                            }`}
+                    >
+                        <Film className="w-8 h-8 text-zinc-700" />
+                    </div>
+
+                    {posterSrc && (
+                        <img
+                            src={posterSrc}
+                            alt={title}
+                            loading="lazy"
+                            decoding="async"
+                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${backdropReady ? 'opacity-100' : 'opacity-0'
+                                }`}
+                        />
+                    )}
+                </div>
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 <div className="flex items-center gap-2">
@@ -677,18 +752,42 @@ function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
         </div>
     )
 
-    if (!href) return <div className="bg-zinc-900/30 border border-white/5 rounded-xl">{Content}</div>
+    // Reduce animation delay for large lists
+    const animDelay = totalItems > 20 ? Math.min(index * 0.02, 0.3) : index * 0.05
+    const shouldAnimate = index < 50 // Only animate first 50 items
+
+    if (!href) return (
+        <motion.div
+            ref={ref}
+            className="bg-zinc-900/30 border border-white/5 rounded-xl"
+            initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.25, delay: shouldAnimate ? animDelay : 0, ease: [0.25, 0.1, 0.25, 1] }}
+            layout
+        >
+            {Content}
+        </motion.div>
+    )
+    
     return (
-        <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div
+            ref={ref}
+            initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.25, delay: shouldAnimate ? animDelay : 0, ease: [0.25, 0.1, 0.25, 1] }}
+            layout
+        >
             <Link href={href} className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden">
                 {Content}
             </Link>
         </motion.div>
     )
-}
+})
 
 // Tarjeta modo COMPACT (vista intermedia)
-function HistoryCompactCard({ entry, busy, onRemoveFromHistory, index = 0 }) {
+const HistoryCompactCard = memo(function HistoryCompactCard({ entry, busy, onRemoveFromHistory, index = 0, totalItems = 0 }) {
     const type = getItemType(entry)
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
     const baseTitle = getMainTitle(entry)
@@ -791,13 +890,16 @@ function HistoryCompactCard({ entry, busy, onRemoveFromHistory, index = 0 }) {
         </motion.div>
     )
 
+    const animDelay = totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03
+    const shouldAnimate = index < 60
+
     if (!href) return <div>{CardInner}</div>
     return (
         <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+            transition={{ duration: 0.25, delay: shouldAnimate ? animDelay : 0, ease: [0.25, 0.1, 0.25, 1] }}
             layout
         >
             <Link href={href} className="block">
@@ -805,10 +907,10 @@ function HistoryCompactCard({ entry, busy, onRemoveFromHistory, index = 0 }) {
             </Link>
         </motion.div>
     )
-}
+})
 
 // Tarjeta modo GRID
-function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
+const HistoryGridCard = memo(function HistoryGridCard({ entry, busy, onRemoveFromHistory, index = 0, totalItems = 0 }) {
     const type = getItemType(entry)
 
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
@@ -987,13 +1089,23 @@ function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
         </div>
     )
 
+    const animDelay = totalItems > 20 ? Math.min(index * 0.015, 0.25) : index * 0.03
+    const shouldAnimate = index < 60
+
     if (!href) return <div>{CardInner}</div>
     return (
-        <Link href={href} className="block">
-            {CardInner}
-        </Link>
+        <motion.div
+            initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
+        >
+            <Link href={href} className="block">
+                {CardInner}
+            </Link>
+        </motion.div>
     )
-}
+})
 
 // ----------------------------
 // MAIN PAGE
@@ -1006,7 +1118,7 @@ export default function HistoryClient() {
     const [mutatingId, setMutatingId] = useState('')
 
     // UI States
-    const [viewMode, setViewMode] = useState('grid') // 'list' | 'grid' | 'compact' - Default to grid
+    const [viewMode, setViewMode] = useState('compact') // 'list' | 'grid' | 'compact' - Default to compact
     const [groupBy, setGroupBy] = useState('day')
     const [typeFilter, setTypeFilter] = useState('all')
     const [sortBy, setSortBy] = useState('date-desc') // 'date-desc' | 'date-asc' | 'title-asc' | 'title-desc'
@@ -1040,8 +1152,8 @@ export default function HistoryClient() {
             const { items } = normalizeHistoryResponse(json)
             const sorted = [...items].sort((a, b) => new Date(b?.watched_at) - new Date(a?.watched_at))
 
-            // ✅ Optimized: Increase concurrency from 10 to 20 for faster loading
-            const enriched = await mapLimit(sorted, 20, async (e) => {
+            // ✅ Optimized: Load only essential data, images loaded on-demand with Intersection Observer
+            const enriched = await mapLimit(sorted, 15, async (e) => {
                 const t = getItemType(e)
                 const id = getTmdbId(e)
                 if (!t || !id) return e
@@ -1435,6 +1547,7 @@ export default function HistoryClient() {
                                                         busy={mutatingId === `del:${getHistoryId(entry)}`}
                                                         onRemoveFromHistory={removeFromHistory}
                                                         index={idx}
+                                                        totalItems={g.items.length}
                                                     />
                                                 ))}
                                             </div>
@@ -1447,6 +1560,7 @@ export default function HistoryClient() {
                                                         busy={mutatingId === `del:${getHistoryId(entry)}`}
                                                         onRemoveFromHistory={removeFromHistory}
                                                         index={idx}
+                                                        totalItems={g.items.length}
                                                     />
                                                 ))}
                                             </div>
@@ -1459,6 +1573,7 @@ export default function HistoryClient() {
                                                         busy={mutatingId === `del:${getHistoryId(entry)}`}
                                                         onRemoveFromHistory={removeFromHistory}
                                                         index={idx}
+                                                        totalItems={g.items.length}
                                                     />
                                                 ))}
                                             </div>
