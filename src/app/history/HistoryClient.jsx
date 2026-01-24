@@ -624,11 +624,13 @@ function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
     const handleCancel = (e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(false) }
 
     const Content = (
-        <div className={`relative flex items-center gap-4 p-3 pr-12 transition-all ${busy ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
-            <Poster entry={entry} className="w-[60px] aspect-[2/3] rounded-md" />
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+        <div className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 pr-12 transition-all ${busy ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+            <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
+                <SmartPoster entry={entry} title={title} mode="backdrop" />
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 <div className="flex items-center gap-2">
-                    <h4 className="text-white font-bold text-sm leading-tight truncate">{title}</h4>
+                    <h4 className="text-white font-bold text-base leading-tight truncate">{title}</h4>
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-zinc-500">
@@ -1449,7 +1451,7 @@ export default function HistoryClient() {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <div className="space-y-2">
+                                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                                                 {g.items.map((entry, idx) => (
                                                     <HistoryItemCard
                                                         key={getHistoryId(entry) || `${getTmdbId(entry)}:${entry?.watched_at}:${Math.random()}`}
