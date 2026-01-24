@@ -464,7 +464,166 @@ function buildMonthGrid(year, month, weekStartsOn = 1) {
     return weeks
 }
 
-function CalendarPanel({ monthDate, onPrev, onNext, countsByDay, selectedYmd, onSelectYmd }) {
+// Vista de calendario con portadas
+function CalendarWithPosters({ monthDate, historyItems, onPrev, onNext, onClose }) {
+    const year = monthDate.getFullYear()
+    const month = monthDate.getMonth()
+    const weeks = useMemo(() => buildMonthGrid(year, month, 1), [year, month])
+    const monthLabel = useMemo(() => new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(monthDate), [monthDate])
+    const dow = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+
+    // Agrupar items por día
+    const itemsByDay = useMemo(() => {
+        const map = {}
+        historyItems.forEach(item => {
+            const key = ymdLocal(new Date(item?.watched_at || Date.now()))
+            if (!map[key]) map[key] = []
+            map[key].push(item)
+        })
+        return map
+    }, [historyItems])
+
+    return (
+        <div className="flex flex-col h-full gap-2 lg:gap-2.5">
+            <div className="flex items-center justify-between bg-zinc-900/40 border border-zinc-800 rounded-xl lg:rounded-2xl px-3 py-2 lg:px-4 lg:py-3 backdrop-blur-sm shrink-0">
+                <div className="flex items-center gap-2 lg:gap-3">
+                    <div className="p-1.5 lg:p-2 bg-emerald-500/10 rounded-lg lg:rounded-xl border border-emerald-500/20">
+                        <Calendar className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-500" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg lg:text-xl font-bold text-white capitalize leading-none">{monthLabel}</h2>
+                        <p className="hidden lg:block text-[10px] text-emerald-500/70 mt-0.5">Vista de calendario con portadas</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-1.5 lg:gap-2">
+                    <div className="flex gap-1 bg-zinc-900 rounded-lg lg:rounded-xl p-0.5 lg:p-1 border border-zinc-800">
+                        <button 
+                            onClick={onPrev} 
+                            className="p-1.5 lg:p-2 hover:bg-zinc-800 rounded-md lg:rounded-lg transition text-zinc-300 hover:text-white"
+                            title="Mes anterior"
+                        >
+                            <ChevronLeft className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                        </button>
+                        <button 
+                            onClick={onNext} 
+                            className="p-1.5 lg:p-2 hover:bg-zinc-800 rounded-md lg:rounded-lg transition text-zinc-300 hover:text-white"
+                            title="Mes siguiente"
+                        >
+                            <ChevronRight className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                        </button>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 lg:p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 rounded-lg lg:rounded-xl transition-all text-red-400 hover:text-red-300"
+                        title="Cerrar vista calendario"
+                    >
+                        <X className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 lg:gap-1.5 shrink-0">
+                {dow.map(d => (
+                    <div key={d} className="text-center text-[10px] lg:text-xs font-bold text-zinc-400 uppercase tracking-wider py-1 lg:py-1.5 bg-zinc-900/30 rounded-md border border-zinc-800/50">
+                        {d}
+                    </div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 lg:gap-1.5 flex-1 min-h-0">
+                {weeks.flat().map((d) => {
+                    const inMonth = d.getMonth() === month
+                    const key = ymdLocal(d)
+                    const items = key ? (itemsByDay[key] || []) : []
+                    const isToday = ymdLocal(new Date()) === key
+
+                    return (
+                        <div
+                            key={d.toISOString()}
+                            className={`flex flex-col rounded-lg lg:rounded-xl border-2 transition-all relative group ${
+                                !inMonth 
+                                    ? 'bg-zinc-900/10 border-zinc-800/20' 
+                                    : isToday 
+                                        ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/40 shadow-lg shadow-emerald-500/10' 
+                                        : 'bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-900/60'
+                            }`}
+                        >
+                            <div className={`p-1 lg:p-1.5 text-[10px] lg:text-xs font-bold flex items-center justify-between shrink-0 ${
+                                !inMonth ? 'text-zinc-700' : isToday ? 'text-emerald-400' : 'text-zinc-400 group-hover:text-zinc-300'
+                            }`}>
+                                <span>{d.getDate()}</span>
+                                {inMonth && items.length > 0 && (
+                                    <span className="text-[8px] lg:text-[9px] px-1 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+                                        {items.length}
+                                    </span>
+                                )}
+                            </div>
+                            
+                            {inMonth && items.length > 0 && (
+                                <div className="flex-1 flex items-center justify-center px-1 pb-1 lg:px-1.5 lg:pb-1.5 min-h-0">
+                                    <div className="relative w-full max-w-[55px] lg:max-w-[70px] aspect-[2/3]">
+                                        {items.slice(0, 5).map((item, idx) => {
+                                            const href = getDetailsHref(item)
+                                            const totalItems = Math.min(items.length, 5)
+                                            
+                                            return (
+                                                <Link
+                                                    key={`${getTmdbId(item)}-${idx}`}
+                                                    href={href || '#'}
+                                                    className="absolute inset-0 transition-all duration-300 ease-out"
+                                                    style={{
+                                                        transform: `translateX(${idx * 2}px) translateY(${idx * 2}px)`,
+                                                        zIndex: totalItems - idx,
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        const parent = e.currentTarget.parentElement
+                                                        if (!parent) return
+                                                        Array.from(parent.children).forEach((child, childIdx) => {
+                                                            if (childIdx < idx) {
+                                                                child.style.transform = `translateX(${childIdx * -25}px) translateY(0px) scale(0.95)`
+                                                                child.style.opacity = '0.7'
+                                                            } else if (childIdx === idx) {
+                                                                child.style.transform = 'translateX(0) translateY(-8px) scale(1.05)'
+                                                                child.style.opacity = '1'
+                                                            } else {
+                                                                child.style.transform = `translateX(${(childIdx - idx) * 25}px) translateY(0px) scale(0.95)`
+                                                                child.style.opacity = '0.7'
+                                                            }
+                                                        })
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        const parent = e.currentTarget.parentElement
+                                                        if (!parent) return
+                                                        Array.from(parent.children).forEach((child, childIdx) => {
+                                                            child.style.transform = `translateX(${childIdx * 2}px) translateY(${childIdx * 2}px)`
+                                                            child.style.opacity = '1'
+                                                        })
+                                                    }}
+                                                >
+                                                    <div className="w-full h-full rounded-md lg:rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-xl shadow-black/50 group-hover:border-emerald-500/30">
+                                                        <Poster entry={item} className="w-full h-full" />
+                                                    </div>
+                                                </Link>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {inMonth && items.length > 5 && (
+                                <div className="absolute bottom-1 right-1 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white text-[8px] lg:text-[9px] font-bold px-1 lg:px-1.5 py-0.5 rounded-md shadow-lg">
+                                    +{items.length - 5}
+                                </div>
+                            )}
+                        </div>
+                    )
+                })}
+            </div>
+        </div>
+    )
+}
+
+function CalendarPanel({ monthDate, onPrev, onNext, countsByDay, selectedYmd, onSelectYmd, onToggleCalendarView, showCalendarView }) {
     const year = monthDate.getFullYear()
     const month = monthDate.getMonth()
     const weeks = useMemo(() => buildMonthGrid(year, month, 1), [year, month])
@@ -524,6 +683,17 @@ function CalendarPanel({ monthDate, onPrev, onNext, countsByDay, selectedYmd, on
                     <RotateCcw className="w-4 h-4" /> Ver todo el mes
                 </button>
             )}
+
+            <button
+                onClick={onToggleCalendarView}
+                className={`mt-6 w-full py-3 text-sm font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
+                    showCalendarView
+                        ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                        : 'bg-zinc-800/80 text-zinc-300 hover:bg-zinc-800 hover:text-white border border-white/5'
+                }`}
+            >
+                <Calendar className="w-4 h-4" /> {showCalendarView ? 'Vista Normal' : 'Vista Calendario'}
+            </button>
         </div>
     )
 }
@@ -1132,6 +1302,7 @@ export default function HistoryClient() {
     const [selectedDay, setSelectedDay] = useState(null)
     const [isMobile, setIsMobile] = useState(false)
     const [filtersOpen, setFiltersOpen] = useState(true)
+    const [showCalendarView, setShowCalendarView] = useState(false)
 
     useEffect(() => {
         const mq = window.matchMedia('(max-width: 1024px)')
@@ -1393,7 +1564,7 @@ export default function HistoryClient() {
                 </motion.header>
 
                 {/* Layout Principal */}
-                <div className={`grid grid-cols-1 ${auth.connected ? 'xl:grid-cols-[1fr_380px]' : 'lg:grid-cols-1'} gap-8 items-start`}>
+                <div className={`grid grid-cols-1 ${auth.connected && !showCalendarView ? 'xl:grid-cols-[1fr_380px]' : 'lg:grid-cols-1'} gap-8 items-start`}>
 
                     {/* Izquierda */}
                     <motion.div
@@ -1715,8 +1886,8 @@ export default function HistoryClient() {
                         )}
                     </motion.div>
 
-                    {/* Derecha: Calendario (Solo visible en desktop) */}
-                    {auth.connected && (
+                    {/* Derecha: Calendario (Solo visible en desktop y cuando no está en vista calendario) */}
+                    {auth.connected && !showCalendarView && (
                         <motion.div
                             className="hidden xl:block space-y-6 sticky top-6"
                             initial={{ opacity: 0, x: 20 }}
@@ -1730,11 +1901,46 @@ export default function HistoryClient() {
                                 countsByDay={countsByDay}
                                 selectedYmd={selectedDay}
                                 onSelectYmd={setSelectedDay}
+                                onToggleCalendarView={() => setShowCalendarView(!showCalendarView)}
+                                showCalendarView={showCalendarView}
                             />
                         </motion.div>
                     )}
                 </div>
             </div>
+
+            {/* Modal de Vista de Calendario */}
+            <AnimatePresence>
+                {showCalendarView && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-2 lg:p-3 bg-black/90 backdrop-blur-md"
+                        onClick={() => setShowCalendarView(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                            transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+                            className="w-full max-w-[1900px] h-[98vh] flex flex-col bg-[#0a0a0a] rounded-2xl lg:rounded-3xl border border-zinc-800 shadow-2xl overflow-hidden"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex-1 flex flex-col p-3 lg:p-4 min-h-0">
+                                <CalendarWithPosters
+                                    monthDate={monthDate}
+                                    historyItems={filtered}
+                                    onPrev={() => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+                                    onNext={() => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+                                    onClose={() => setShowCalendarView(false)}
+                                />
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

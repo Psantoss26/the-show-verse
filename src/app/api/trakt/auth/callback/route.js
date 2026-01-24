@@ -73,8 +73,29 @@ export async function GET(req) {
 
     const tokenJson = await tokenRes.json().catch(() => null)
     if (!tokenRes.ok) {
+        console.error("❌ Trakt token exchange failed:", {
+            status: tokenRes.status,
+            statusText: tokenRes.statusText,
+            response: tokenJson,
+            redirectUri,
+            hasCode: !!code,
+            hasClientId: !!clientId,
+        })
+        
+        // Si es rate limit, dar un mensaje más amigable
+        if (tokenRes.status === 429) {
+            return NextResponse.json(
+                { 
+                    error: "Rate limit excedido", 
+                    message: "Has realizado demasiadas peticiones a Trakt. Por favor espera 1 hora antes de intentar de nuevo.",
+                    retryAfter: tokenRes.headers.get("Retry-After") || "3600"
+                },
+                { status: 429 }
+            )
+        }
+        
         return NextResponse.json(
-            { error: "Token exchange failed", details: tokenJson },
+            { error: "Token exchange failed", details: tokenJson, status: tokenRes.status },
             { status: 500 }
         )
     }
