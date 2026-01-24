@@ -642,7 +642,7 @@ const HistoryItemCard = memo(function HistoryItemCard({ entry, busy, onRemoveFro
     const title = inlineEp ? `${baseTitle} ${inlineEp}` : baseTitle
 
     const year = getYear(entry)
-    const { time: watchedTime } = formatWatchedLine(entry?.watched_at)
+    const { time: watchedTime, dayMonth } = formatWatchedLine(entry?.watched_at)
     const href = useMemo(() => getDetailsHref(entry), [entry])
     const historyId = getHistoryId(entry)
     const [confirmDel, setConfirmDel] = useState(false)
@@ -708,7 +708,7 @@ const HistoryItemCard = memo(function HistoryItemCard({ entry, busy, onRemoveFro
                     <h4 className="text-white font-bold text-base leading-tight truncate">{title}</h4>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
                     <span className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${type === 'movie' ? 'bg-sky-500/10 text-sky-500' : 'bg-purple-500/10 text-purple-500'}`}>
                         {type === 'movie' ? 'PELÍCULA' : 'SERIE'}
                     </span>
@@ -720,8 +720,8 @@ const HistoryItemCard = memo(function HistoryItemCard({ entry, busy, onRemoveFro
                     </span>
                 </div>
 
-                <div className="text-[11px] text-zinc-600 flex items-center gap-1.5 mt-0.5 font-mono">
-                    <RotateCcw className="w-3 h-3" /> {watchedTime}
+                <div className="text-xs text-zinc-500 flex items-center gap-1.5 mt-0.5 font-medium">
+                    <RotateCcw className="w-3 h-3" /> {dayMonth} · {watchedTime}
                 </div>
             </div>
 
@@ -824,17 +824,17 @@ const HistoryCompactCard = memo(function HistoryCompactCard({ entry, busy, onRem
             {/* ✅ Desktop: Hover overlay with information */}
             <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                    <div className="flex items-center gap-2 mb-1.5">
-                        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${type === 'movie' ? 'bg-sky-500/40 text-sky-100' : 'bg-purple-500/40 text-purple-100'}`}>
+                    <div className="flex items-center gap-2 mb-1 -ml-0.5">
+                        <span className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === 'movie' ? 'bg-sky-500/40 text-sky-100' : 'bg-purple-500/40 text-purple-100'}`}>
                             {type === 'movie' ? 'Película' : 'Serie'}
                         </span>
-                        <span className="text-[9px] text-zinc-300/90 font-medium">{dayMonth}</span>
+                        <span className="text-[8px] text-zinc-300/90 font-medium">{dayMonth}</span>
                     </div>
 
-                    <h5 className="text-white font-bold text-xs leading-tight line-clamp-2 mb-1">{title}</h5>
+                    <h5 className="text-white font-bold text-[10px] leading-tight line-clamp-2 mb-0.5">{title}</h5>
 
                     {type === 'show' && epBadge && (
-                        <div className="text-[10px] text-emerald-300 font-semibold">{epBadge}</div>
+                        <div className="text-[9px] text-emerald-300 font-semibold">{epBadge}</div>
                     )}
                 </div>
             </div>
@@ -947,9 +947,9 @@ const HistoryGridCard = memo(function HistoryGridCard({ entry, busy, onRemoveFro
 
     const InfoContent = (
         <>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 -ml-0.5">
                 <span
-                    className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${type === 'movie'
+                    className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === 'movie'
                         ? 'bg-sky-500/20 text-sky-200'
                         : 'bg-purple-500/20 text-purple-200'
                         }`}
@@ -1013,9 +1013,9 @@ const HistoryGridCard = memo(function HistoryGridCard({ entry, busy, onRemoveFro
             >
                 <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                     {/* En desktop mostramos badge + título episodio en la misma línea (como ya tenías) */}
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 -ml-0.5">
                         <span
-                            className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${type === 'movie'
+                            className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === 'movie'
                                 ? 'bg-sky-500/30 text-sky-200'
                                 : 'bg-purple-500/30 text-purple-200'
                                 }`}
