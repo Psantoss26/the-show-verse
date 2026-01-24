@@ -737,7 +737,7 @@ export default function HistoryClient() {
     const [mutatingId, setMutatingId] = useState('')
 
     // UI States
-    const [viewMode, setViewMode] = useState('list') // 'list' | 'grid'
+    const [viewMode, setViewMode] = useState('grid') // 'list' | 'grid' - Default to grid
     const [groupBy, setGroupBy] = useState('day')
     const [typeFilter, setTypeFilter] = useState('all')
     const [q, setQ] = useState('')
@@ -770,7 +770,8 @@ export default function HistoryClient() {
             const { items } = normalizeHistoryResponse(json)
             const sorted = [...items].sort((a, b) => new Date(b?.watched_at) - new Date(a?.watched_at))
 
-            const enriched = await mapLimit(sorted, 10, async (e) => {
+            // ✅ Optimized: Increase concurrency from 10 to 20 for faster loading
+            const enriched = await mapLimit(sorted, 20, async (e) => {
                 const t = getItemType(e)
                 const id = getTmdbId(e)
                 if (!t || !id) return e
@@ -885,49 +886,115 @@ export default function HistoryClient() {
             <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
 
                 {/* Header */}
-                <header className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
+                <motion.header
+                    className="mb-10"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                >
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                         <div>
                             <div className="flex items-center gap-3 mb-1">
-                                <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                <motion.div
+                                    className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20"
+                                    initial={{ scale: 0, rotate: -180 }}
+                                    animate={{ scale: 1, rotate: 0 }}
+                                    transition={{ duration: 0.6, delay: 0.2, type: 'spring', stiffness: 200 }}
+                                >
                                     <Eye className="w-6 h-6 text-emerald-500" />
-                                </div>
-                                <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">
+                                </motion.div>
+                                <motion.h1
+                                    className="text-3xl md:text-4xl font-black tracking-tight text-white"
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.3 }}
+                                >
                                     Historial
-                                </h1>
+                                </motion.h1>
                             </div>
-                            <p className="text-zinc-400 text-sm ml-12">Tu registro completo de visualizaciones en Trakt.</p>
+                            <motion.p
+                                className="text-zinc-400 text-sm ml-12"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.5, delay: 0.4 }}
+                            >
+                                Tu registro completo de visualizaciones en Trakt.
+                            </motion.p>
                         </div>
 
                         {auth.connected && (
-                            <button
+                            <motion.button
                                 onClick={() => loadHistory()}
                                 disabled={loading}
                                 className="flex items-center gap-2 px-5 py-2.5 bg-white text-black hover:bg-zinc-200 rounded-full text-sm font-bold transition disabled:opacity-50 shadow-lg shadow-white/5"
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.5 }}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
                             >
                                 <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                                 {loading ? 'Sincronizando...' : 'Sincronizar'}
-                            </button>
+                            </motion.button>
                         )}
                     </div>
 
                     {auth.connected && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <StatCard label="Total Vistos" value={stats.plays} loading={!historyLoaded} icon={CheckCircle2} colorClass="text-emerald-400 bg-emerald-500/10" />
-                            <StatCard label="Títulos Únicos" value={stats.unique} loading={!historyLoaded} icon={LayoutList} colorClass="text-purple-400 bg-purple-500/10" />
-                            <StatCard label="Películas" value={stats.movies} loading={!historyLoaded} icon={Film} colorClass="text-sky-400 bg-sky-500/10" />
-                            <StatCard label="Episodios" value={stats.shows} loading={!historyLoaded} icon={Tv} colorClass="text-pink-400 bg-pink-500/10" />
-                        </div>
+                        <motion.div
+                            className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: 0.6 }}
+                        >
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.7 }}
+                            >
+                                <StatCard label="Total Vistos" value={stats.plays} loading={!historyLoaded} icon={CheckCircle2} colorClass="text-emerald-400 bg-emerald-500/10" />
+                            </motion.div>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.8 }}
+                            >
+                                <StatCard label="Títulos Únicos" value={stats.unique} loading={!historyLoaded} icon={LayoutList} colorClass="text-purple-400 bg-purple-500/10" />
+                            </motion.div>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.9 }}
+                            >
+                                <StatCard label="Películas" value={stats.movies} loading={!historyLoaded} icon={Film} colorClass="text-sky-400 bg-sky-500/10" />
+                            </motion.div>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 1.0 }}
+                            >
+                                <StatCard label="Episodios" value={stats.shows} loading={!historyLoaded} icon={Tv} colorClass="text-pink-400 bg-pink-500/10" />
+                            </motion.div>
+                        </motion.div>
                     )}
-                </header>
+                </motion.header>
 
                 {/* Layout Principal */}
                 <div className={`grid grid-cols-1 ${auth.connected ? 'xl:grid-cols-[1fr_380px]' : 'lg:grid-cols-1'} gap-8 items-start`}>
 
                     {/* Izquierda */}
-                    <div className="space-y-6 min-w-0">
+                    <motion.div
+                        className="space-y-6 min-w-0"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, delay: 0.3 }}
+                    >
                         {auth.connected && (
-                            <div className="flex flex-col xl:flex-row gap-4">
+                            <motion.div
+                                className="flex flex-col xl:flex-row gap-4"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, delay: 0.5 }}
+                            >
                                 <div className="relative flex-1">
                                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                                     <input
@@ -974,7 +1041,7 @@ export default function HistoryClient() {
                                         </button>
                                     </div>
                                 </div>
-                            </div>
+                            </motion.div>
                         )}
 
                         {!auth.connected ? (
@@ -992,15 +1059,25 @@ export default function HistoryClient() {
                                 </button>
                             </div>
                         ) : (historyLoaded && filtered.length === 0 && !loading) ? (
-                            <div className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
+                            <motion.div
+                                className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4 }}
+                            >
                                 <LayoutList className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
                                 <p className="text-zinc-500 font-medium">No se encontraron resultados.</p>
                                 {q && <button onClick={() => setQ('')} className="mt-4 text-emerald-500 text-sm font-bold hover:underline">Limpiar búsqueda</button>}
-                            </div>
+                            </motion.div>
                         ) : (
                             <div className="space-y-8">
-                                {grouped.map((g) => (
-                                    <div key={g.key} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {grouped.map((g, groupIndex) => (
+                                    <motion.div
+                                        key={g.key}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
+                                    >
                                         <div className="flex items-center gap-4 mb-4">
                                             <h3 className="text-lg font-bold text-white capitalize">{formatDateHeader(g.date, groupBy)}</h3>
                                             <div className="h-px bg-zinc-800 flex-1" />
@@ -1030,15 +1107,20 @@ export default function HistoryClient() {
                                                 ))}
                                             </div>
                                         )}
-                                    </div>
+                                    </motion.div>
                                 ))}
                             </div>
                         )}
-                    </div>
+                    </motion.div>
 
                     {/* Derecha: Calendario (Solo visible en desktop) */}
                     {auth.connected && (
-                        <div className="hidden xl:block space-y-6 sticky top-6">
+                        <motion.div
+                            className="hidden xl:block space-y-6 sticky top-6"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.5, delay: 0.4 }}
+                        >
                             <CalendarPanel
                                 monthDate={monthDate}
                                 onPrev={() => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
@@ -1047,7 +1129,7 @@ export default function HistoryClient() {
                                 selectedYmd={selectedDay}
                                 onSelectYmd={setSelectedDay}
                             />
-                        </div>
+                        </motion.div>
                     )}
                 </div>
             </div>
