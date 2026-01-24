@@ -18,7 +18,11 @@ import {
     Filter,
     CheckCircle2,
     Eye,
-    Layers
+    Layers,
+    Grid3x3,
+    ArrowUpDown,
+    Calendar,
+    X
 } from 'lucide-react'
 
 import { traktAuthStatus, traktGetHistory } from '@/lib/api/traktClient'
@@ -538,6 +542,95 @@ function HistoryItemCard({ entry, busy, onRemoveFromHistory }) {
     )
 }
 
+// Tarjeta modo COMPACT (vista intermedia)
+function HistoryCompactCard({ entry, busy, onRemoveFromHistory, index = 0 }) {
+    const type = getItemType(entry)
+    const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
+    const baseTitle = getMainTitle(entry)
+    const title = baseTitle
+    const episodeTitle = type === 'show' && epMeta?.title ? epMeta.title : null
+    const epBadge = type === 'show' && epMeta ? formatEpisodeBadge(epMeta) : null
+    const { time: watchedTime } = formatWatchedLine(entry?.watched_at)
+    const href = useMemo(() => getDetailsHref(entry), [entry])
+    const historyId = getHistoryId(entry)
+    const [confirmDel, setConfirmDel] = useState(false)
+
+    const handleDeleteClick = (e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(true) }
+    const handleConfirm = async (e) => { e.preventDefault(); e.stopPropagation(); await onRemoveFromHistory?.(entry, { historyId }) }
+    const handleCancel = (e) => { e.preventDefault(); e.stopPropagation(); setConfirmDel(false) }
+
+    const disabledCls = busy ? 'opacity-60 pointer-events-none grayscale' : ''
+
+    const CardInner = (
+        <div className={`relative aspect-[2/3] group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md transition-all ${disabledCls}`}>
+            <Poster entry={entry} className="w-full h-full" />
+
+            {/* Overlay compacto */}
+            <div className="absolute inset-x-0 bottom-0 z-10 p-2 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+                <div className="flex items-center gap-1.5 mb-1">
+                    <span className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === 'movie' ? 'bg-sky-500/20 text-sky-200' : 'bg-purple-500/20 text-purple-200'}`}>
+                        {type === 'movie' ? 'Cine' : 'TV'}
+                    </span>
+                    <span className="text-[9px] text-zinc-400">{watchedTime}</span>
+                </div>
+
+                <h5 className="text-white font-bold text-[10px] leading-tight line-clamp-1">{title}</h5>
+
+                {type === 'show' && epBadge && (
+                    <div className="mt-0.5 text-[9px] text-zinc-300/80 line-clamp-1">{epBadge}</div>
+                )}
+            </div>
+
+            {/* Botón borrar */}
+            {!confirmDel && (
+                <button
+                    onClick={handleDeleteClick}
+                    className="absolute top-1.5 right-1.5 z-20 p-1.5 rounded-full backdrop-blur-sm bg-black/40 hover:bg-red-600 text-white transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                    title="Borrar"
+                    aria-label="Borrar"
+                >
+                    <Trash2 className="w-3 h-3" />
+                </button>
+            )}
+
+            <AnimatePresence>
+                {confirmDel && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-2 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-red-200 text-[10px] font-bold mb-2">¿Borrar?</p>
+                        <div className="flex gap-1.5 w-full">
+                            <button onClick={handleCancel} className="flex-1 py-1 rounded bg-zinc-800 text-zinc-300 text-[10px] font-bold">No</button>
+                            <button onClick={handleConfirm} className="flex-1 py-1 rounded bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
+                                {busy ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : 'Sí'}
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    )
+
+    if (!href) return <div>{CardInner}</div>
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+            layout
+        >
+            <Link href={href} className="block">
+                {CardInner}
+            </Link>
+        </motion.div>
+    )
+}
+
 // Tarjeta modo GRID
 function HistoryGridCard({ entry, busy, onRemoveFromHistory }) {
     const type = getItemType(entry)
@@ -737,9 +830,10 @@ export default function HistoryClient() {
     const [mutatingId, setMutatingId] = useState('')
 
     // UI States
-    const [viewMode, setViewMode] = useState('grid') // 'list' | 'grid' - Default to grid
+    const [viewMode, setViewMode] = useState('grid') // 'list' | 'grid' | 'compact' - Default to grid
     const [groupBy, setGroupBy] = useState('day')
     const [typeFilter, setTypeFilter] = useState('all')
+    const [sortBy, setSortBy] = useState('date-desc') // 'date-desc' | 'date-asc' | 'title-asc' | 'title-desc'
     const [q, setQ] = useState('')
     const [monthDate, setMonthDate] = useState(() => { const d = new Date(); d.setDate(1); return d })
     const [selectedDay, setSelectedDay] = useState(null)
@@ -824,6 +918,33 @@ export default function HistoryClient() {
         })
     }, [raw, q, typeFilter, selectedDay])
 
+    const sorted = useMemo(() => {
+        const items = [...filtered]
+
+        if (sortBy === 'date-desc') {
+            return items.sort((a, b) => new Date(b?.watched_at) - new Date(a?.watched_at))
+        }
+        if (sortBy === 'date-asc') {
+            return items.sort((a, b) => new Date(a?.watched_at) - new Date(b?.watched_at))
+        }
+        if (sortBy === 'title-asc') {
+            return items.sort((a, b) => {
+                const titleA = getMainTitle(a).toLowerCase()
+                const titleB = getMainTitle(b).toLowerCase()
+                return titleA.localeCompare(titleB)
+            })
+        }
+        if (sortBy === 'title-desc') {
+            return items.sort((a, b) => {
+                const titleA = getMainTitle(a).toLowerCase()
+                const titleB = getMainTitle(b).toLowerCase()
+                return titleB.localeCompare(titleA)
+            })
+        }
+
+        return items
+    }, [filtered, sortBy])
+
     const stats = useMemo(() => {
         const plays = filtered.length
         const uniqSet = new Set()
@@ -853,7 +974,7 @@ export default function HistoryClient() {
 
     const grouped = useMemo(() => {
         const map = new Map()
-        for (const e of filtered) {
+        for (const e of sorted) {
             const d = new Date(e?.watched_at)
             if (Number.isNaN(d.getTime())) continue
             let key
@@ -866,7 +987,7 @@ export default function HistoryClient() {
         }
         const keys = Array.from(map.keys()).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
         return keys.map((k) => ({ key: k, date: new Date(k), items: map.get(k) || [] }))
-    }, [filtered, groupBy])
+    }, [sorted, groupBy])
 
     if (auth.loading) {
         return (
@@ -1000,22 +1121,20 @@ export default function HistoryClient() {
                                     <input
                                         value={q}
                                         onChange={(e) => setQ(e.target.value)}
-                                        placeholder="Buscar..."
-                                        className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-zinc-600"
+                                        placeholder="Buscar por título..."
+                                        className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-zinc-600"
                                     />
+                                    {q && (
+                                        <button
+                                            onClick={() => setQ('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                                        >
+                                            <X className="w-3.5 h-3.5 text-zinc-500" />
+                                        </button>
+                                    )}
                                 </div>
 
-                                <div className="flex flex-wrap gap-4 items-center">
-                                    <InlineDropdown label="Agrupar" valueLabel={groupBy === 'day' ? 'Día' : groupBy === 'month' ? 'Mes' : 'Año'} icon={Layers}>
-                                        {({ close }) => (
-                                            <>
-                                                <DropdownItem active={groupBy === 'day'} onClick={() => { setGroupBy('day'); close() }}>Día</DropdownItem>
-                                                <DropdownItem active={groupBy === 'month'} onClick={() => { setGroupBy('month'); close() }}>Mes</DropdownItem>
-                                                <DropdownItem active={groupBy === 'year'} onClick={() => { setGroupBy('year'); close() }}>Año</DropdownItem>
-                                            </>
-                                        )}
-                                    </InlineDropdown>
-
+                                <div className="flex flex-wrap gap-3 items-center">
                                     <InlineDropdown label="Tipo" valueLabel={typeFilter === 'all' ? 'Todo' : typeFilter === 'movies' ? 'Películas' : 'Series'} icon={Filter}>
                                         {({ close }) => (
                                             <>
@@ -1026,16 +1145,63 @@ export default function HistoryClient() {
                                         )}
                                     </InlineDropdown>
 
-                                    <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
+                                    <InlineDropdown label="Agrupar" valueLabel={groupBy === 'day' ? 'Día' : groupBy === 'month' ? 'Mes' : 'Año'} icon={Layers}>
+                                        {({ close }) => (
+                                            <>
+                                                <DropdownItem active={groupBy === 'day'} onClick={() => { setGroupBy('day'); close() }}>Día</DropdownItem>
+                                                <DropdownItem active={groupBy === 'month'} onClick={() => { setGroupBy('month'); close() }}>Mes</DropdownItem>
+                                                <DropdownItem active={groupBy === 'year'} onClick={() => { setGroupBy('year'); close() }}>Año</DropdownItem>
+                                            </>
+                                        )}
+                                    </InlineDropdown>
+
+                                    <InlineDropdown
+                                        label="Ordenar"
+                                        valueLabel={
+                                            sortBy === 'date-desc' ? 'Más reciente' :
+                                                sortBy === 'date-asc' ? 'Más antiguo' :
+                                                    sortBy === 'title-asc' ? 'A-Z' : 'Z-A'
+                                        }
+                                        icon={ArrowUpDown}
+                                    >
+                                        {({ close }) => (
+                                            <>
+                                                <DropdownItem active={sortBy === 'date-desc'} onClick={() => { setSortBy('date-desc'); close() }}>Más reciente</DropdownItem>
+                                                <DropdownItem active={sortBy === 'date-asc'} onClick={() => { setSortBy('date-asc'); close() }}>Más antiguo</DropdownItem>
+                                                <DropdownItem active={sortBy === 'title-asc'} onClick={() => { setSortBy('title-asc'); close() }}>Título A-Z</DropdownItem>
+                                                <DropdownItem active={sortBy === 'title-desc'} onClick={() => { setSortBy('title-desc'); close() }}>Título Z-A</DropdownItem>
+                                            </>
+                                        )}
+                                    </InlineDropdown>
+
+                                    <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
                                         <button
                                             onClick={() => setViewMode('list')}
-                                            className={`px-4 h-full rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === 'list' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'list'
+                                                ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                                                }`}
+                                            title="Vista Lista"
                                         >
                                             <LayoutList className="w-4 h-4" />
                                         </button>
                                         <button
+                                            onClick={() => setViewMode('compact')}
+                                            className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'compact'
+                                                ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                                                }`}
+                                            title="Vista Compacta"
+                                        >
+                                            <Grid3x3 className="w-4 h-4" />
+                                        </button>
+                                        <button
                                             onClick={() => setViewMode('grid')}
-                                            className={`px-4 h-full rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === 'grid' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'grid'
+                                                ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                                                }`}
+                                            title="Vista Cuadrícula"
                                         >
                                             <LayoutGrid className="w-4 h-4" />
                                         </button>
@@ -1086,23 +1252,37 @@ export default function HistoryClient() {
 
                                         {viewMode === 'grid' ? (
                                             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                                                {g.items.map((entry) => (
+                                                {g.items.map((entry, idx) => (
                                                     <HistoryGridCard
                                                         key={getHistoryId(entry) || `${getTmdbId(entry)}:${entry?.watched_at}:${Math.random()}`}
                                                         entry={entry}
                                                         busy={mutatingId === `del:${getHistoryId(entry)}`}
                                                         onRemoveFromHistory={removeFromHistory}
+                                                        index={idx}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ) : viewMode === 'compact' ? (
+                                            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2">
+                                                {g.items.map((entry, idx) => (
+                                                    <HistoryCompactCard
+                                                        key={getHistoryId(entry) || `${getTmdbId(entry)}:${entry?.watched_at}:${Math.random()}`}
+                                                        entry={entry}
+                                                        busy={mutatingId === `del:${getHistoryId(entry)}`}
+                                                        onRemoveFromHistory={removeFromHistory}
+                                                        index={idx}
                                                     />
                                                 ))}
                                             </div>
                                         ) : (
                                             <div className="space-y-2">
-                                                {g.items.map((entry) => (
+                                                {g.items.map((entry, idx) => (
                                                     <HistoryItemCard
                                                         key={getHistoryId(entry) || `${getTmdbId(entry)}:${entry?.watched_at}:${Math.random()}`}
                                                         entry={entry}
                                                         busy={mutatingId === `del:${getHistoryId(entry)}`}
                                                         onRemoveFromHistory={removeFromHistory}
+                                                        index={idx}
                                                     />
                                                 ))}
                                             </div>
