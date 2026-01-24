@@ -401,11 +401,11 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
     }, [open])
 
     return (
-        <div ref={ref} className="relative shrink-0">
+        <div ref={ref} className="relative w-full lg:w-auto lg:shrink-0">
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className="h-11 inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 min-w-[140px]"
+                className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[140px]"
             >
                 <div className="flex items-center gap-2">
                     {Icon && <Icon className="w-4 h-4 text-emerald-500" />}
@@ -631,7 +631,7 @@ function SmartPoster({ entry, title, mode = 'poster' }) {
 }
 
 // Tarjeta modo LISTA
-const HistoryItemCard = memo(function HistoryItemCard({ entry, busy, onRemoveFromHistory, index = 0, totalItems = 0 }) {
+const HistoryItemCard = memo(function HistoryItemCard({ entry, busy, onRemoveFromHistory, index = 0, totalItems = 0, editMode = false, isMobile = false }) {
     const type = getItemType(entry)
 
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
@@ -725,7 +725,7 @@ const HistoryItemCard = memo(function HistoryItemCard({ entry, busy, onRemoveFro
                 </div>
             </div>
 
-            {!confirmDel && (
+            {!confirmDel && (!isMobile || editMode) && (
                 <button
                     onClick={handleDeleteClick}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors z-10 opacity-0 group-hover:opacity-100"
@@ -787,7 +787,7 @@ const HistoryItemCard = memo(function HistoryItemCard({ entry, busy, onRemoveFro
 })
 
 // Tarjeta modo COMPACT (vista intermedia)
-const HistoryCompactCard = memo(function HistoryCompactCard({ entry, busy, onRemoveFromHistory, index = 0, totalItems = 0 }) {
+const HistoryCompactCard = memo(function HistoryCompactCard({ entry, busy, onRemoveFromHistory, index = 0, totalItems = 0, editMode = false, isMobile = false }) {
     const type = getItemType(entry)
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
     const baseTitle = getMainTitle(entry)
@@ -839,15 +839,17 @@ const HistoryCompactCard = memo(function HistoryCompactCard({ entry, busy, onRem
                 </div>
             </div>
 
-            {/* ✅ Mobile: Compact badge indicator */}
-            <div className="absolute top-2 left-2 z-10 lg:hidden">
-                <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded backdrop-blur-md ${type === 'movie' ? 'bg-sky-500/50 text-sky-50' : 'bg-purple-500/50 text-purple-50'}`}>
-                    {type === 'movie' ? 'M' : 'S'}
-                </span>
-            </div>
+            {/* ✅ Mobile: Compact badge indicator - solo en editMode */}
+            {(!isMobile || editMode) && (
+                <div className="absolute top-2 left-2 z-10 lg:hidden">
+                    <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded backdrop-blur-md ${type === 'movie' ? 'bg-sky-500/50 text-sky-50' : 'bg-purple-500/50 text-purple-50'}`}>
+                        {type === 'movie' ? 'M' : 'S'}
+                    </span>
+                </div>
+            )}
 
-            {/* ✅ Delete button - appears on hover */}
-            {!confirmDel && (
+            {/* ✅ Delete button - appears on hover o en editMode mobile */}
+            {!confirmDel && (!isMobile || editMode) && (
                 <button
                     onClick={handleDeleteClick}
                     className="absolute top-2 right-2 z-20 p-1.5 rounded-full backdrop-blur-md bg-black/40 hover:bg-red-600 text-white transition-all duration-200 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 pointer-events-auto border border-white/10 hover:border-transparent"
@@ -910,7 +912,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({ entry, busy, onRem
 })
 
 // Tarjeta modo GRID
-const HistoryGridCard = memo(function HistoryGridCard({ entry, busy, onRemoveFromHistory, index = 0, totalItems = 0 }) {
+const HistoryGridCard = memo(function HistoryGridCard({ entry, busy, onRemoveFromHistory, index = 0, totalItems = 0, editMode = false, isMobile = false }) {
     const type = getItemType(entry)
 
     const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null
@@ -986,18 +988,20 @@ const HistoryGridCard = memo(function HistoryGridCard({ entry, busy, onRemoveFro
         >
             <Poster entry={entry} className="w-full h-full" />
 
-            {/* ✅ MÓVIL: banda inferior (NO overlay completo, NO oscurece tanto) */}
-            <div
-                className={[
-                    'absolute inset-x-0 bottom-0 z-10 lg:hidden',
-                    'p-3 pt-10',
-                    'bg-gradient-to-t from-black/85 via-black/40 to-transparent',
-                    'pointer-events-none',
-                    confirmDel ? 'opacity-0' : '',
-                ].join(' ')}
-            >
-                {InfoContent}
-            </div>
+            {/* ✅ MÓVIL: banda inferior - solo en editMode */}
+            {(!isMobile || editMode) && (
+                <div
+                    className={[
+                        'absolute inset-x-0 bottom-0 z-10 lg:hidden',
+                        'p-3 pt-10',
+                        'bg-gradient-to-t from-black/85 via-black/40 to-transparent',
+                        'pointer-events-none',
+                        confirmDel ? 'opacity-0' : '',
+                    ].join(' ')}
+                >
+                    {InfoContent}
+                </div>
+            )}
 
             {/* ✅ DESKTOP: overlay más sutil con menos blur */}
             <div
@@ -1043,8 +1047,8 @@ const HistoryGridCard = memo(function HistoryGridCard({ entry, busy, onRemoveFro
                 </div>
             </div>
 
-            {/* ✅ Botón borrar: visible en móvil, en desktop solo al hover */}
-            {!confirmDel && (
+            {/* ✅ Botón borrar: visible en móvil solo si editMode está activo, en desktop solo al hover */}
+            {!confirmDel && (!isMobile || editMode) && (
                 <button
                     onClick={handleDeleteClick}
                     className={[
@@ -1123,6 +1127,7 @@ export default function HistoryClient() {
     const [typeFilter, setTypeFilter] = useState('all')
     const [sortBy, setSortBy] = useState('date-desc') // 'date-desc' | 'date-asc' | 'title-asc' | 'title-desc'
     const [q, setQ] = useState('')
+    const [editMode, setEditMode] = useState(false)
     const [monthDate, setMonthDate] = useState(() => { const d = new Date(); d.setDate(1); return d })
     const [selectedDay, setSelectedDay] = useState(null)
     const [isMobile, setIsMobile] = useState(false)
@@ -1399,30 +1404,150 @@ export default function HistoryClient() {
                     >
                         {auth.connected && (
                             <motion.div
-                                className="flex flex-col xl:flex-row gap-4"
+                                className="space-y-3"
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.4, delay: 0.5 }}
                             >
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                                    <input
-                                        value={q}
-                                        onChange={(e) => setQ(e.target.value)}
-                                        placeholder="Buscar por título..."
-                                        className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-zinc-600"
-                                    />
-                                    {q && (
-                                        <button
-                                            onClick={() => setQ('')}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
-                                        >
-                                            <X className="w-3.5 h-3.5 text-zinc-500" />
-                                        </button>
-                                    )}
+                                {/* Móvil: Fila 1 - Búsqueda */}
+                                <div className="lg:hidden">
+                                    <div className="relative w-full">
+                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                                        <input
+                                            value={q}
+                                            onChange={(e) => setQ(e.target.value)}
+                                            placeholder="Buscar..."
+                                            className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-zinc-600"
+                                        />
+                                        {q && (
+                                            <button
+                                                onClick={() => setQ('')}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                                            >
+                                                <X className="w-3.5 h-3.5 text-zinc-500" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
-                                <div className="flex flex-wrap gap-3 items-center">
+                                {/* Móvil: Fila 2 - Tipo y Agrupar (50% cada uno) */}
+                                <div className="flex gap-2 lg:hidden">
+                                    <div className="flex-1">
+                                        <InlineDropdown label="Tipo" valueLabel={typeFilter === 'all' ? 'Todo' : typeFilter === 'movies' ? 'Películas' : 'Series'} icon={Filter}>
+                                            {({ close }) => (
+                                                <>
+                                                    <DropdownItem active={typeFilter === 'all'} onClick={() => { setTypeFilter('all'); close() }}>Todo</DropdownItem>
+                                                    <DropdownItem active={typeFilter === 'movies'} onClick={() => { setTypeFilter('movies'); close() }}>Películas</DropdownItem>
+                                                    <DropdownItem active={typeFilter === 'shows'} onClick={() => { setTypeFilter('shows'); close() }}>Series</DropdownItem>
+                                                </>
+                                            )}
+                                        </InlineDropdown>
+                                    </div>
+
+                                    <div className="flex-1">
+                                        <InlineDropdown label="Agrupar" valueLabel={groupBy === 'day' ? 'Día' : groupBy === 'month' ? 'Mes' : 'Año'} icon={Layers}>
+                                            {({ close }) => (
+                                                <>
+                                                    <DropdownItem active={groupBy === 'day'} onClick={() => { setGroupBy('day'); close() }}>Día</DropdownItem>
+                                                    <DropdownItem active={groupBy === 'month'} onClick={() => { setGroupBy('month'); close() }}>Mes</DropdownItem>
+                                                    <DropdownItem active={groupBy === 'year'} onClick={() => { setGroupBy('year'); close() }}>Año</DropdownItem>
+                                                </>
+                                            )}
+                                        </InlineDropdown>
+                                    </div>
+                                </div>
+
+                                {/* Móvil: Fila 3 - Ordenar + Selector vistas + Botón editar */}
+                                <div className="flex gap-2 lg:hidden">
+                                    <div className="flex-1">
+                                        <InlineDropdown
+                                            label="Orden"
+                                            valueLabel={
+                                                sortBy === 'date-desc' ? 'Reciente' :
+                                                    sortBy === 'date-asc' ? 'Antiguo' :
+                                                        sortBy === 'title-asc' ? 'A-Z' : 'Z-A'
+                                            }
+                                            icon={ArrowUpDown}
+                                        >
+                                            {({ close }) => (
+                                                <>
+                                                    <DropdownItem active={sortBy === 'date-desc'} onClick={() => { setSortBy('date-desc'); close() }}>Más reciente</DropdownItem>
+                                                    <DropdownItem active={sortBy === 'date-asc'} onClick={() => { setSortBy('date-asc'); close() }}>Más antiguo</DropdownItem>
+                                                    <DropdownItem active={sortBy === 'title-asc'} onClick={() => { setSortBy('title-asc'); close() }}>Título A-Z</DropdownItem>
+                                                    <DropdownItem active={sortBy === 'title-desc'} onClick={() => { setSortBy('title-desc'); close() }}>Título Z-A</DropdownItem>
+                                                </>
+                                            )}
+                                        </InlineDropdown>
+                                    </div>
+
+                                    <div className="flex flex-1 gap-2">
+                                        <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
+                                            <button
+                                                onClick={() => setViewMode('list')}
+                                                className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === 'list'
+                                                    ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                                                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                                                    }`}
+                                                title="Lista"
+                                            >
+                                                <LayoutList className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => setViewMode('compact')}
+                                                className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === 'compact'
+                                                    ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                                                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                                                    }`}
+                                                title="Compacta"
+                                            >
+                                                <Grid3x3 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => setViewMode('grid')}
+                                                className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === 'grid'
+                                                    ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                                                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                                                    }`}
+                                                title="Grid"
+                                            >
+                                                <LayoutGrid className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        <button
+                                            onClick={() => setEditMode(!editMode)}
+                                            className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 ${
+                                                editMode
+                                                    ? 'bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20'
+                                                    : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600'
+                                            }`}
+                                            title={editMode ? 'Cancelar' : 'Editar'}
+                                        >
+                                            {editMode ? <X className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Desktop: Una sola fila con todo */}
+                                <div className="hidden lg:flex gap-3">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                                        <input
+                                            value={q}
+                                            onChange={(e) => setQ(e.target.value)}
+                                            placeholder="Buscar por título..."
+                                            className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-zinc-600"
+                                        />
+                                        {q && (
+                                            <button
+                                                onClick={() => setQ('')}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                                            >
+                                                <X className="w-3.5 h-3.5 text-zinc-500" />
+                                            </button>
+                                        )}
+                                    </div>
+
                                     <InlineDropdown label="Tipo" valueLabel={typeFilter === 'all' ? 'Todo' : typeFilter === 'movies' ? 'Películas' : 'Series'} icon={Filter}>
                                         {({ close }) => (
                                             <>
@@ -1548,6 +1673,8 @@ export default function HistoryClient() {
                                                         onRemoveFromHistory={removeFromHistory}
                                                         index={idx}
                                                         totalItems={g.items.length}
+                                                        editMode={editMode}
+                                                        isMobile={isMobile}
                                                     />
                                                 ))}
                                             </div>
@@ -1561,6 +1688,8 @@ export default function HistoryClient() {
                                                         onRemoveFromHistory={removeFromHistory}
                                                         index={idx}
                                                         totalItems={g.items.length}
+                                                        editMode={editMode}
+                                                        isMobile={isMobile}
                                                     />
                                                 ))}
                                             </div>
@@ -1574,6 +1703,8 @@ export default function HistoryClient() {
                                                         onRemoveFromHistory={removeFromHistory}
                                                         index={idx}
                                                         totalItems={g.items.length}
+                                                        editMode={editMode}
+                                                        isMobile={isMobile}
                                                     />
                                                 ))}
                                             </div>
