@@ -467,7 +467,7 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile }) {
       onFocus={prefetchEnabled ? prefetchImdb : undefined}
       draggable={false}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-lg ring-1 ring-white/5 transition-transform duration-300 group-hover/card:scale-[1.02]">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-lg ring-1 ring-white/5 transition-transform duration-300 md:group-hover/card:scale-[1.02]">
         <TmdbImg
           filePath={posterPath}
           size="w500"
@@ -475,11 +475,13 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile }) {
           className="w-full h-full object-cover"
         />
 
-        {/* overlay: en móvil SIEMPRE visible (no depende de hover) */}
+        {/* overlay: en móvil OCULTO, solo visible en desktop con hover */}
         <div
           className={[
             "pointer-events-none absolute inset-0 transition-opacity duration-200",
-            isMobile ? "opacity-100" : "opacity-0 group-hover/card:opacity-100",
+            isMobile
+              ? "opacity-0"
+              : "opacity-0 md:group-hover/card:opacity-100",
           ].join(" ")}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
@@ -574,7 +576,9 @@ function buildInternalUrl(list) {
     return `/lists/trakt/${encodeURIComponent(u)}/${encodeURIComponent(String(key))}`;
   }
 
-  // Colecciones: no sabemos tu ruta interna real → mejor no romper
+  // Colecciones: ruta interna a vista detallada
+  if (src === "collections") return `/lists/collection/${list?.id}`;
+  
   return null;
 }
 
@@ -719,8 +723,8 @@ function GridListCard({ list, itemsState, ensureListItems, canUse, onDelete }) {
     <div ref={ref}>
       {/* ✅ antes: Link fijo a /lists/:id (rompía Trakt/Colecciones) */}
       <ListNavWrapper list={list} className="group block h-full">
-        <div className="h-full bg-zinc-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-white/10 hover:bg-zinc-900/60 transition-all flex flex-col relative">
-          <div className="aspect-video w-full bg-zinc-950 relative overflow-hidden group-hover:opacity-90 transition-opacity">
+        <div className="h-full bg-zinc-900/40 border border-white/5 rounded-2xl overflow-hidden md:hover:border-white/10 md:hover:bg-zinc-900/60 transition-all flex flex-col relative">
+          <div className="aspect-video w-full bg-zinc-950 relative overflow-hidden md:group-hover:opacity-90 transition-opacity">
             {isLoading ? (
               <div className="w-full h-full animate-pulse bg-zinc-900/40" />
             ) : (
@@ -736,7 +740,7 @@ function GridListCard({ list, itemsState, ensureListItems, canUse, onDelete }) {
 
           <div className="p-4 flex flex-col flex-1">
             <div className="flex justify-between items-start gap-2">
-              <h3 className="text-lg font-bold text-white leading-tight line-clamp-1 group-hover:text-purple-400 transition-colors">
+              <h3 className="text-lg font-bold text-white leading-tight line-clamp-1 md:group-hover:text-purple-400 transition-colors">
                 {list.name}
               </h3>
             </div>
@@ -750,7 +754,7 @@ function GridListCard({ list, itemsState, ensureListItems, canUse, onDelete }) {
           {canUse && (
             <button
               onClick={(e) => onDelete(e, list.id)}
-              className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-red-600/80 text-white/70 hover:text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+              className="absolute top-2 right-2 p-2 bg-black/50 md:hover:bg-red-600/80 text-white/70 md:hover:text-white rounded-full backdrop-blur-md transition-all opacity-0 md:group-hover:opacity-100 focus:opacity-100"
               title="Borrar lista"
             >
               <Trash2 className="w-4 h-4" />
@@ -949,6 +953,7 @@ export default function ListsPage() {
   const trakt = useTraktLists({ mode: traktMode });
   const [featuredCollections, setFeaturedCollections] = useState([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const [searchedCollections, setSearchedCollections] = useState([]);
 
   // Map: listId -> undefined (no pedido) | null (cargando) | Array(items)
   const [itemsMap, setItemsMap] = useState({});
@@ -971,19 +976,27 @@ export default function ListsPage() {
 
   // ✅ carga colecciones destacadas cuando toca
   useEffect(() => {
-    if (source !== "collections") return;
+    if (source !== "collections") {
+      setFeaturedCollections([]);
+      setSearchedCollections([]);
+      return;
+    }
+
+    // Limpiar búsqueda al cambiar a colecciones
+    setSearchedCollections([]);
+
     let alive = true;
     (async () => {
       try {
         setCollectionsLoading(true);
         const res = await fetch("/api/tmdb/collections/featured", {
-          cache: "force-cache",
+          cache: "no-store", // Cambiar a no-store para evitar problemas de caché
         });
         const j = await res.json().catch(() => ({}));
         if (!alive) return;
-        setFeaturedCollections(
-          Array.isArray(j?.collections) ? j.collections : [],
-        );
+        const cols = Array.isArray(j?.collections) ? j.collections : [];
+        console.log("📦 Colecciones cargadas:", cols.length, cols);
+        setFeaturedCollections(cols);
       } catch {
         if (alive) setFeaturedCollections([]);
       } finally {
@@ -994,6 +1007,43 @@ export default function ListsPage() {
       alive = false;
     };
   }, [source]);
+
+  // ✅ búsqueda dinámica de colecciones
+  useEffect(() => {
+    if (source !== "collections" || !deferredQuery.trim()) {
+      setSearchedCollections([]);
+      return;
+    }
+
+    let alive = true;
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        setCollectionsLoading(true);
+        const res = await fetch(
+          `/api/tmdb/collections/search?query=${encodeURIComponent(deferredQuery)}`,
+          { signal: controller.signal, cache: "force-cache" },
+        );
+        const j = await res.json().catch(() => ({}));
+        if (!alive) return;
+        setSearchedCollections(
+          Array.isArray(j?.collections) ? j.collections : [],
+        );
+      } catch (e) {
+        if (e?.name !== "AbortError" && alive) {
+          setSearchedCollections([]);
+        }
+      } finally {
+        if (alive) setCollectionsLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [source, deferredQuery]);
 
   // ✅ lista activa según fuente
   const activeLists = useMemo(() => {
@@ -1017,22 +1067,44 @@ export default function ListsPage() {
       }));
     }
 
-    const cols = Array.isArray(featuredCollections) ? featuredCollections : [];
+    // Colecciones: usar búsqueda si hay query, sino destacadas
+    const cols = deferredQuery.trim()
+      ? Array.isArray(searchedCollections)
+        ? searchedCollections
+        : []
+      : Array.isArray(featuredCollections)
+        ? featuredCollections
+        : [];
+
     return cols.map((c) => ({
       ...c,
       source: "collections",
       internalUrl: buildInternalUrl({ ...c, source: "collections" }), // null
       externalUrl: buildExternalUrl({ ...c, source: "collections" }),
     }));
-  }, [source, safeTmdbLists, trakt?.lists, featuredCollections]);
+  }, [
+    source,
+    safeTmdbLists,
+    trakt?.lists,
+    featuredCollections,
+    searchedCollections,
+    deferredQuery,
+  ]);
 
   const filtered = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
+
+    // Para colecciones, si hay búsqueda ya viene filtrado del servidor
+    if (source === "collections" && q) {
+      return sortLists(activeLists, sortMode);
+    }
+
+    // Para TMDb y Trakt, filtrar localmente
     const base = q
       ? activeLists.filter((l) => (l?.name || "").toLowerCase().includes(q))
       : activeLists;
     return sortLists(base, sortMode);
-  }, [activeLists, deferredQuery, sortMode]);
+  }, [activeLists, deferredQuery, sortMode, source]);
 
   const visibleCount = filtered.length;
 
@@ -1184,7 +1256,9 @@ export default function ListsPage() {
     if (source === "tmdb") refresh();
     else if (source === "trakt") trakt?.refresh?.();
     else {
-      // collections: re-fetch
+      // collections: limpiar búsqueda y re-fetch destacadas
+      setQuery("");
+      setSearchedCollections([]);
       setFeaturedCollections([]);
       setCollectionsLoading(true);
       fetch("/api/tmdb/collections/featured", { cache: "no-store" })
