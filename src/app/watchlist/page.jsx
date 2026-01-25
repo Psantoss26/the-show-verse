@@ -679,7 +679,7 @@ function CardSkeleton({ mode = "poster" }) {
   );
 }
 
-function GroupDivider({ title, stats, count, total }) {
+function GroupDivider({ title, stats, count, total, groupBy }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
 
   return (
@@ -710,29 +710,47 @@ function GroupDivider({ title, stats, count, total }) {
 
           <div className="pt-3 sm:pt-4 lg:pt-0 border-t border-white/5 lg:border-t-0 w-full lg:w-auto">
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-4">
-              <StatBox
-                label="IMDb"
-                value={formatAvg(stats?.imdb?.avg)}
-                imgSrc="/logo-IMDb.png"
-              />
-              <StatBox
-                label="Trakt"
-                value={formatAvg(stats?.trakt?.avg)}
-                imgSrc="/logo-Trakt.png"
-              />
-              <StatBox
-                label="TMDb"
-                value={formatAvg(stats?.tmdb?.avg)}
-                imgSrc="/logo-TMDb.png"
-              />
-              <div className="sm:pl-4 sm:border-l border-white/10">
-                <StatBox
-                  label="Tu media"
-                  value={formatAvg(stats?.my?.avg)}
-                  icon={Star}
-                  colorClass="text-amber-400 fill-amber-400"
-                />
-              </div>
+              {groupBy === "imdb_rating" &&
+                stats?.imdb?.avg != null &&
+                typeof stats.imdb.avg === "number" &&
+                !Number.isNaN(stats.imdb.avg) && (
+                  <StatBox
+                    label="IMDb"
+                    value={formatAvg(stats.imdb.avg)}
+                    imgSrc="/logo-IMDb.png"
+                  />
+                )}
+              {groupBy === "trakt_rating" &&
+                stats?.trakt?.avg != null &&
+                typeof stats.trakt.avg === "number" &&
+                !Number.isNaN(stats.trakt.avg) && (
+                  <StatBox
+                    label="Trakt"
+                    value={formatAvg(stats.trakt.avg)}
+                    imgSrc="/logo-Trakt.png"
+                  />
+                )}
+              {stats?.tmdb?.avg != null &&
+                typeof stats.tmdb.avg === "number" &&
+                !Number.isNaN(stats.tmdb.avg) && (
+                  <StatBox
+                    label="TMDb"
+                    value={formatAvg(stats.tmdb.avg)}
+                    imgSrc="/logo-TMDb.png"
+                  />
+                )}
+              {stats?.my?.avg != null &&
+                typeof stats.my.avg === "number" &&
+                !Number.isNaN(stats.my.avg) && (
+                  <div className="sm:pl-4 sm:border-l border-white/10">
+                    <StatBox
+                      label="Tu media"
+                      value={formatAvg(stats.my.avg)}
+                      icon={Star}
+                      colorClass="text-amber-400 fill-amber-400"
+                    />
+                  </div>
+                )}
             </div>
           </div>
         </div>
@@ -2717,6 +2735,7 @@ export default function WatchlistPage() {
                             stats={section.stats}
                             count={section.items.length}
                             total={visibleItems.length}
+                            groupBy={groupBy}
                           />
                           <div className={gridClass}>
                             {section.items.map((item, idx) =>
