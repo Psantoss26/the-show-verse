@@ -811,18 +811,43 @@ export default function WatchlistPage() {
   const [error, setError] = useState(null)
 
   // Filters / Group / Sort
-  const [typeFilter, setTypeFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState(() => {
+    if (typeof window === 'undefined') return 'all'
+    const saved = window.localStorage.getItem('showverse:watchlist:typeFilter')
+    return saved || 'all'
+  })
   const [query, setQuery] = useState('')
-  const [groupBy, setGroupBy] = useState('none')
-  const [sortBy, setSortBy] = useState('added_desc')
+  const [groupBy, setGroupBy] = useState(() => {
+    if (typeof window === 'undefined') return 'none'
+    const saved = window.localStorage.getItem('showverse:watchlist:groupBy')
+    return saved || 'none'
+  })
+  const [sortBy, setSortBy] = useState(() => {
+    if (typeof window === 'undefined') return 'added_desc'
+    const saved = window.localStorage.getItem('showverse:watchlist:sortBy')
+    return saved || 'added_desc'
+  })
 
   // ✅ NUEVO: modo portada/backdrop (persistido)
-  const [coverMode, setCoverMode] = useState('poster') // 'poster' | 'backdrop'
+  const [coverMode, setCoverMode] = useState(() => {
+    if (typeof window === 'undefined') return 'poster'
+    const saved = window.localStorage.getItem('showverse:watchlist:coverMode')
+    return saved === 'poster' || saved === 'backdrop' ? saved : 'poster'
+  })
+
+  // Persistir filtros en localStorage
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const saved = window.localStorage.getItem('showverse:watchlist:coverMode')
-    if (saved === 'poster' || saved === 'backdrop') setCoverMode(saved)
-  }, [])
+    window.localStorage.setItem('showverse:watchlist:typeFilter', typeFilter)
+  }, [typeFilter])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('showverse:watchlist:groupBy', groupBy)
+  }, [groupBy])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('showverse:watchlist:sortBy', sortBy)
+  }, [sortBy])
   useEffect(() => {
     if (typeof window === 'undefined') return
     window.localStorage.setItem('showverse:watchlist:coverMode', coverMode)
