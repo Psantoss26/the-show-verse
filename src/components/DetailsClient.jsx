@@ -6086,6 +6086,14 @@ export default function DetailsClient({
                     }}
                   >
                     {recommendations.slice(0, 15).map((rec) => {
+                      const recTitle = rec.title || rec.name;
+                      const recDate =
+                        rec.release_date || rec.first_air_date || "";
+                      const recYear = recDate ? recDate.slice(0, 4) : "";
+                      const isMovie = rec.media_type
+                        ? rec.media_type === "movie"
+                        : type === "movie";
+
                       const tmdbScore =
                         typeof rec.vote_average === "number" &&
                         rec.vote_average > 0
@@ -6102,48 +6110,77 @@ export default function DetailsClient({
                           <a
                             href={`/details/${rec.media_type || type}/${rec.id}`}
                             className="block group"
+                            onMouseEnter={() => prefetchRecImdb(rec)}
+                            onFocus={() => prefetchRecImdb(rec)}
                           >
-                            <div
-                              className="mt-3 relative rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:scale-105 hover:-translate-y-1 bg-black/40 aspect-[2/3]"
-                              onMouseEnter={() => prefetchRecImdb(rec)} // ✅ SOLO HOVER
-                              onFocus={() => prefetchRecImdb(rec)} // ✅ accesibilidad
-                            >
+                            <div className="mt-3 relative rounded-xl overflow-hidden shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] bg-neutral-900 aspect-[2/3]">
                               <img
                                 src={
                                   rec.poster_path
                                     ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
                                     : "/placeholder.png"
                                 }
-                                alt={rec.title || rec.name}
-                                className="w-full h-full object-cover"
+                                alt={recTitle}
+                                className="absolute inset-0 w-full h-full object-cover"
                               />
 
-                              <div className="absolute bottom-2 right-2 flex flex-row-reverse items-center gap-1 transform-gpu opacity-0 translate-y-2 translate-x-2 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300 ease-out">
-                                {tmdbScore && (
-                                  <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-emerald-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-75 group-hover:scale-110 group-hover:translate-y-0">
-                                    <img
-                                      src="/logo-TMDb.png"
-                                      alt="TMDb"
-                                      className="w-auto h-3"
-                                    />
-                                    <span className="text-emerald-400 text-[10px] font-bold font-mono">
-                                      {tmdbScore.toFixed(1)}
-                                    </span>
-                                  </div>
-                                )}
+                              {/* Overlay con gradientes */}
+                              <div className="absolute inset-0 transition-opacity duration-300 flex flex-col justify-between opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+                                {/* Top gradient con tipo y ratings */}
+                                <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
+                                  <span
+                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                                      isMovie
+                                        ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                                        : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                    }`}
+                                  >
+                                    {isMovie ? "PELÍCULA" : "SERIE"}
+                                  </span>
 
-                                {imdbScore != null && (
-                                  <div className="bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-yellow-500/60 flex items-center gap-1.5 shadow-xl transform-gpu scale-95 translate-y-1 transition-all duration-300 delay-150 group-hover:scale-110 group-hover:translate-y-0">
-                                    <img
-                                      src="/logo-IMDb.png"
-                                      alt="IMDb"
-                                      className="w-auto h-3"
-                                    />
-                                    <span className="text-yellow-400 text-[10px] font-bold font-mono">
-                                      {Number(imdbScore).toFixed(1)}
-                                    </span>
+                                  <div className="flex flex-col items-end gap-1">
+                                    {tmdbScore && (
+                                      <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                        <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
+                                          {tmdbScore.toFixed(1)}
+                                        </span>
+                                        <img
+                                          src="/logo-TMDb.png"
+                                          alt=""
+                                          className="w-auto h-2.5 opacity-100"
+                                        />
+                                      </div>
+                                    )}
+                                    {imdbScore != null && (
+                                      <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                        <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
+                                          {Number(imdbScore).toFixed(1)}
+                                        </span>
+                                        <img
+                                          src="/logo-IMDb.png"
+                                          alt=""
+                                          className="w-auto h-3 opacity-100"
+                                        />
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                </div>
+
+                                {/* Bottom gradient con título y año */}
+                                <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
+                                  <div className="flex items-end justify-between gap-3">
+                                    <div className="min-w-0 text-left">
+                                      <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">
+                                        {recTitle}
+                                      </h3>
+                                      {recYear && (
+                                        <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
+                                          {recYear}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </a>
