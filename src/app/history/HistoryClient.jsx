@@ -22,10 +22,11 @@ import {
     Grid3x3,
     ArrowUpDown,
     Calendar,
-    X
+    X,
+    LogOut
 } from 'lucide-react'
 
-import { traktAuthStatus, traktGetHistory } from '@/lib/api/traktClient'
+import { traktAuthStatus, traktGetHistory, traktDisconnect } from '@/lib/api/traktClient'
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
@@ -1347,6 +1348,23 @@ export default function HistoryClient() {
         }
     }, [])
 
+    const handleDisconnect = useCallback(async () => {
+        if (!window.confirm('¿Estás seguro de que quieres desconectar tu cuenta de Trakt?')) return
+        
+        try {
+            await traktDisconnect()
+            // Limpiar estado local
+            setAuth({ loading: false, connected: false })
+            setRaw([])
+            setHistoryLoaded(false)
+            // Redirigir a la página principal
+            window.location.href = '/'
+        } catch (error) {
+            console.error('Error desconectando Trakt:', error)
+            alert('Error al desconectar de Trakt. Por favor, inténtalo de nuevo.')
+        }
+    }, [])
+
     useEffect(() => { loadAuth() }, [loadAuth])
     useLayoutEffect(() => {
         if (!auth.loading && auth.connected) loadHistory()
@@ -1508,19 +1526,35 @@ export default function HistoryClient() {
                         </div>
 
                         {auth.connected && (
-                            <motion.button
-                                onClick={() => loadHistory()}
-                                disabled={loading}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-white text-black hover:bg-zinc-200 rounded-full text-sm font-bold transition disabled:opacity-50 shadow-lg shadow-white/5"
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.4, delay: 0.5 }}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                            >
-                                <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                                {loading ? 'Sincronizando...' : 'Sincronizar'}
-                            </motion.button>
+                            <div className="flex items-center gap-3">
+                                <motion.button
+                                    onClick={() => loadHistory()}
+                                    disabled={loading}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-white text-black hover:bg-zinc-200 rounded-full text-sm font-bold transition disabled:opacity-50 shadow-lg shadow-white/5"
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.4, delay: 0.5 }}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                    {loading ? 'Sincronizando...' : 'Sincronizar'}
+                                </motion.button>
+
+                                <motion.button
+                                    onClick={handleDisconnect}
+                                    disabled={loading}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-full text-sm font-bold transition disabled:opacity-50 shadow-lg shadow-red-500/5"
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.4, delay: 0.6 }}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    <LogOut className="w-4 h-4" />
+                                    Desconectar
+                                </motion.button>
+                            </div>
                         )}
                     </div>
 
