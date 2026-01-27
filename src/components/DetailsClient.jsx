@@ -545,9 +545,9 @@ export default function DetailsClient({
           const id = getListId(l);
           return id === lid
             ? {
-                ...l,
-                item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
-              }
+              ...l,
+              item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
+            }
             : l;
         }),
       );
@@ -1541,7 +1541,7 @@ export default function DetailsClient({
     try {
       const v = window.localStorage.getItem("showverse:trakt:sync") === "1";
       setSyncTrakt(v);
-    } catch {}
+    } catch { }
   }, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1550,7 +1550,7 @@ export default function DetailsClient({
         "showverse:trakt:sync",
         syncTrakt ? "1" : "0",
       );
-    } catch {}
+    } catch { }
   }, [syncTrakt]);
 
   const reloadTraktStatus = async () => {
@@ -2104,7 +2104,7 @@ export default function DetailsClient({
     // persist opcional
     try {
       window.localStorage.setItem(rewatchStorageKey, startIso);
-    } catch {}
+    } catch { }
 
     await loadTraktShowPlays(startIso);
   };
@@ -2210,7 +2210,7 @@ export default function DetailsClient({
               rewatchRunsStorageKey,
               JSON.stringify(runs),
             );
-          } catch {}
+          } catch { }
         }
       }
 
@@ -2434,7 +2434,7 @@ export default function DetailsClient({
           rewatchRunsStorageKey,
           JSON.stringify(nextRuns || []),
         );
-      } catch {}
+      } catch { }
     },
     [rewatchRunsStorageKey],
   );
@@ -2445,7 +2445,7 @@ export default function DetailsClient({
       setActiveEpisodesView(v);
       try {
         window.localStorage.setItem(episodesViewStorageKey, v);
-      } catch {}
+      } catch { }
 
       if (v === "global") {
         setRewatchStartAt(null);
@@ -2481,7 +2481,7 @@ export default function DetailsClient({
       setActiveEpisodesView(run.id);
       try {
         window.localStorage.setItem(episodesViewStorageKey, run.id);
-      } catch {}
+      } catch { }
       setRewatchStartAt(run.startedAt);
 
       await loadTraktShowPlays(run.startedAt); // ✅ clave
@@ -2506,7 +2506,7 @@ export default function DetailsClient({
         const nextView = prev === runId ? "global" : prev;
         try {
           window.localStorage.setItem(episodesViewStorageKey, nextView);
-        } catch {}
+        } catch { }
         return nextView;
       });
 
@@ -2669,8 +2669,8 @@ export default function DetailsClient({
   const seriesGraphUrl =
     type === "tv" && data?.id && (data.name || data.original_name)
       ? `https://seriesgraph.com/show/${data.id}-${slugifyForSeriesGraph(
-          data.original_name || data.name,
-        )}`
+        data.original_name || data.name,
+      )}`
       : null;
 
   const [traktHomepage, setTraktHomepage] = useState(null);
@@ -2752,7 +2752,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch {}
+    } catch { }
   }, [jwCacheKey]);
 
   // ✅ 1) hidratar desde cache para que el icono salga instantáneo en visitas posteriores
@@ -2763,7 +2763,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch {}
+    } catch { }
   }, [jwCacheKey]);
 
   useEffect(() => {
@@ -2778,7 +2778,7 @@ export default function DetailsClient({
       try {
         if (typeof window !== "undefined")
           window.localStorage.removeItem(jwCacheKey);
-      } catch {}
+      } catch { }
       return;
     }
 
@@ -2793,8 +2793,8 @@ export default function DetailsClient({
 
         const watchnow =
           watchLink &&
-          typeof watchLink === "string" &&
-          !watchLink.includes("themoviedb.org")
+            typeof watchLink === "string" &&
+            !watchLink.includes("themoviedb.org")
             ? watchLink
             : null;
 
@@ -2827,7 +2827,7 @@ export default function DetailsClient({
             if (resolved) window.localStorage.setItem(jwCacheKey, resolved);
             else window.localStorage.removeItem(jwCacheKey);
           }
-        } catch {}
+        } catch { }
       } catch (e) {
         if (ac.signal.aborted) return;
         setExtLinks((p) => ({
@@ -3356,21 +3356,21 @@ export default function DetailsClient({
     const extras =
       type === "movie"
         ? (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
-            .filter((d) => d?.id && d?.name)
-            .map((d, idx) => ({
-              ...d,
-              character: "Director",
-              // orden negativo para que vaya arriba si luego hay sort por order
-              order: -1000 + idx,
-            }))
+          .filter((d) => d?.id && d?.name)
+          .map((d, idx) => ({
+            ...d,
+            character: "Director",
+            // orden negativo para que vaya arriba si luego hay sort por order
+            order: -1000 + idx,
+          }))
         : type === "tv"
           ? (Array.isArray(tvCreators) ? tvCreators : [])
-              .filter((c) => c?.id && c?.name)
-              .map((c, idx) => ({
-                ...c,
-                character: "Creador",
-                order: -1000 + idx,
-              }))
+            .filter((c) => c?.id && c?.name)
+            .map((c, idx) => ({
+              ...c,
+              character: "Creador",
+              order: -1000 + idx,
+            }))
           : [];
 
     // 3) ¿Hay order real en el base? (si viene de TMDb normalmente sí)
@@ -3749,6 +3749,97 @@ export default function DetailsClient({
   // Icono NO IMAGE solo si ya hemos resuelto y NO hay poster (o falló)
   const showNoPoster = posterResolved && (!displayPosterPath || posterImgError);
 
+  // ====== Poster 3D Tilt / Shine ======
+  const posterWrapRef = useRef(null);
+  const posterCardRef = useRef(null);
+  const posterShineRef = useRef(null);
+  const posterRafRef = useRef(0);
+  const [poster3dEnabled, setPoster3dEnabled] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mq =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : null;
+
+    if (!mq) return;
+
+    const apply = () => setPoster3dEnabled(!mq.matches);
+    apply();
+
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", apply);
+      return () => mq.removeEventListener("change", apply);
+    }
+
+    // Safari viejo
+    mq.addListener?.(apply);
+    return () => mq.removeListener?.(apply);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (posterRafRef.current) cancelAnimationFrame(posterRafRef.current);
+    };
+  }, []);
+
+  const setPosterTilt = useCallback(
+    (clientX, clientY) => {
+      if (!poster3dEnabled) return;
+
+      const wrapper = posterWrapRef.current;
+      const card = posterCardRef.current;
+      const shine = posterShineRef.current;
+      if (!wrapper || !card || !shine) return;
+
+      const rect = wrapper.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      const maxRotate = 10;
+      const rotateX = ((y - centerY) / centerY) * -maxRotate;
+      const rotateY = ((x - centerX) / centerX) * maxRotate;
+
+      const moveX = (x / rect.width) * 100;
+      const moveY = (y / rect.height) * 100;
+
+      if (posterRafRef.current) cancelAnimationFrame(posterRafRef.current);
+      posterRafRef.current = requestAnimationFrame(() => {
+        card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.05, 1.05, 1.05)`;
+        shine.style.background = `radial-gradient(circle at ${moveX}% ${moveY}%, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0) 55%)`;
+        shine.style.opacity = "1";
+      });
+    },
+    [poster3dEnabled],
+  );
+
+  const resetPosterTilt = useCallback(() => {
+    const card = posterCardRef.current;
+    const shine = posterShineRef.current;
+
+    if (posterRafRef.current) cancelAnimationFrame(posterRafRef.current);
+    posterRafRef.current = requestAnimationFrame(() => {
+      if (card) {
+        card.style.transform = poster3dEnabled
+          ? "rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)"
+          : "none";
+      }
+      if (shine) shine.style.opacity = "0";
+    });
+  }, [poster3dEnabled]);
+
+  useEffect(() => {
+    // al cambiar de póster, resetea para evitar que se quede “inclinado”
+    resetPosterTilt();
+  }, [displayPosterPath, resetPosterTilt]);
+
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
       {/* --- BACKGROUND & OVERLAY --- */}
@@ -3799,27 +3890,56 @@ export default function DetailsClient({
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS --- */}
           <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10">
             {/* Poster Card */}
-            <div className="relative group rounded-xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.08)]">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setUseBackdrop((v) => !v);
+            <div
+              ref={posterWrapRef}
+              onMouseMove={(e) => setPosterTilt(e.clientX, e.clientY)}
+              onMouseLeave={resetPosterTilt}
+              onTouchMove={(e) => {
+                const t = e.touches?.[0];
+                if (!t) return;
+                setPosterTilt(t.clientX, t.clientY);
+              }}
+              onTouchEnd={resetPosterTilt}
+              className="relative group rounded-2xl shadow-2xl shadow-black/80 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_0_50px_rgba(255,255,255,0.10)]"
+              style={{
+                perspective: poster3dEnabled ? 1000 : undefined,
+                transformStyle: "preserve-3d",
+              }}
+            >
+              <div
+                ref={posterCardRef}
+                className={[
+                  "relative aspect-[2/3] rounded-2xl overflow-hidden cursor-pointer bg-neutral-900",
+                  poster3dEnabled ? "" : "transition-transform duration-500 hover:scale-[1.05]",
+                ].join(" ")}
+                style={{
+                  transformStyle: "preserve-3d",
+                  willChange: "transform",
+                  transition: poster3dEnabled ? "transform 0.12s ease-out" : undefined,
                 }}
-                className={`absolute top-2 right-2 z-20 p-2 rounded-full backdrop-blur-md border transition-all shadow-lg
-        opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto
-        ${
-          useBackdrop
-            ? "bg-yellow-500/20 border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/30"
-            : "bg-black/40 border-white/20 text-white/80 hover:bg-black/80 hover:text-white"
-        }`}
-                title={useBackdrop ? "Desactivar fondo" : "Activar fondo"}
               >
-                <ImageIcon className="w-4 h-4" />
-              </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setUseBackdrop((v) => !v);
+                  }}
+                  className={`absolute top-2 right-2 z-20 p-2 rounded-full backdrop-blur-md border transition-all shadow-lg
+opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto
+${useBackdrop
+                      ? "bg-yellow-500/20 border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/30"
+                      : "bg-black/40 border-white/20 text-white/80 hover:bg-black/80 hover:text-white"
+                    }`}
+                  title={useBackdrop ? "Desactivar fondo" : "Activar fondo"}
+                  style={{
+                    transform: "translateZ(24px)",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  <ImageIcon className="w-4 h-4" />
+                </button>
 
-              <div className="relative aspect-[2/3] bg-neutral-900">
                 {showPosterSkeleton && (
                   <div className="absolute inset-0 animate-pulse bg-neutral-800/60" />
                 )}
@@ -3841,9 +3961,9 @@ export default function DetailsClient({
                         setPosterImgError(true);
                         setPosterResolved(true);
                       }}
-                      className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-all duration-700
-          ${posterLowLoaded ? "opacity-100" : "opacity-0"}
-          group-hover:scale-[1.03] group-hover:saturate-110`}
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out
+${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"}
+group-hover:saturate-110`}
                     />
 
                     {/* HIGH: mejora de calidad encima */}
@@ -3854,10 +3974,13 @@ export default function DetailsClient({
                         loading="eager"
                         decoding="async"
                         onLoad={() => setPosterHighLoaded(true)}
-                        onError={() => {}}
-                        className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500
-            ${posterHighLoaded ? "opacity-100" : "opacity-0"}
-            group-hover:scale-[1.03] group-hover:saturate-110`}
+                        onError={() => { }}
+                        className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out
+${posterHighLoaded
+                            ? "opacity-100 scale-100 blur-0"
+                            : "opacity-0 scale-105 blur-sm"
+                          }
+group-hover:saturate-110`}
                       />
                     )}
                   </>
@@ -3868,6 +3991,19 @@ export default function DetailsClient({
                     <ImageOff className="w-10 h-10 text-neutral-700" />
                   </div>
                 )}
+
+                {/* Gradiente interno */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 pointer-events-none" />
+
+                {/* Shine dinámico (sigue al cursor) */}
+                <div
+                  ref={posterShineRef}
+                  className="absolute inset-0 opacity-0 transition-opacity duration-200 pointer-events-none mix-blend-overlay"
+                  style={{
+                    background:
+                      "linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.10) 25%, rgba(255,255,255,0.20) 30%, transparent 35%)",
+                  }}
+                />
               </div>
             </div>
 
@@ -3923,11 +4059,10 @@ export default function DetailsClient({
                   <>
                     <span className="text-white text-[10px]">●</span>
                     <span
-                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
-                        data.status === "Ended" || data.status === "Canceled"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      }`}
+                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${data.status === "Ended" || data.status === "Canceled"
+                        ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                        : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        }`}
                     >
                       {data.status}
                     </span>
@@ -3956,10 +4091,9 @@ export default function DetailsClient({
                 disabled={!preferredVideo}
                 className={`
                   w-12 h-12 rounded-full flex items-center justify-center transition-all transform-gpu hover:scale-110 shadow-lg group
-                  ${
-                    preferredVideo
-                      ? "bg-white text-black hover:bg-yellow-400"
-                      : "bg-white/10 text-white/30 cursor-not-allowed"
+                  ${preferredVideo
+                    ? "bg-white text-black hover:bg-yellow-400"
+                    : "bg-white/10 text-white/30 cursor-not-allowed"
                   }
                 `}
                 title={preferredVideo ? "Ver Tráiler" : "Sin Tráiler"}
@@ -3990,11 +4124,10 @@ export default function DetailsClient({
               <button
                 onClick={toggleFavorite}
                 disabled={favLoading}
-                className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${
-                  favorite
-                    ? "border-red-500/50 bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                    : "border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${favorite
+                  ? "border-red-500/50 bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                  : "border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
+                  }`}
                 title="Favorito"
               >
                 {favLoading ? (
@@ -4009,11 +4142,10 @@ export default function DetailsClient({
               <button
                 onClick={toggleWatchlist}
                 disabled={wlLoading}
-                className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${
-                  watchlist
-                    ? "border-blue-500/50 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
-                    : "border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${watchlist
+                  ? "border-blue-500/50 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                  : "border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
+                  }`}
                 title="Watchlist"
               >
                 {wlLoading ? (
@@ -4029,11 +4161,10 @@ export default function DetailsClient({
                 <button
                   onClick={openListsModal}
                   disabled={listsPresenceLoading}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${
-                    listActive
-                      ? "border-purple-500/50 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20"
-                      : "border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
-                  }`}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${listActive
+                    ? "border-purple-500/50 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20"
+                    : "border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
+                    }`}
                   title="Añadir a lista"
                 >
                   {listsPresenceLoading ? (
@@ -4113,20 +4244,20 @@ export default function DetailsClient({
                   {/* ✅ Rotten Tomatoes: SOLO desktop (>= sm) */}
                   {(tScoreboard?.external?.rtAudience != null ||
                     extras.rtScore != null) && (
-                    <div className="hidden sm:block">
-                      <CompactBadge
-                        logo="/logo-RottenTomatoes.png"
-                        value={
-                          tScoreboard?.external?.rtAudience != null
-                            ? Math.round(tScoreboard.external.rtAudience)
-                            : extras.rtScore != null
-                              ? Math.round(extras.rtScore)
-                              : null
-                        }
-                        suffix="%"
-                      />
-                    </div>
-                  )}
+                      <div className="hidden sm:block">
+                        <CompactBadge
+                          logo="/logo-RottenTomatoes.png"
+                          value={
+                            tScoreboard?.external?.rtAudience != null
+                              ? Math.round(tScoreboard.external.rtAudience)
+                              : extras.rtScore != null
+                                ? Math.round(extras.rtScore)
+                                : null
+                          }
+                          suffix="%"
+                        />
+                      </div>
+                    )}
 
                   {/* ✅ Metacritic: SOLO desktop (>= sm) */}
                   {extras.mcScore != null && (
@@ -4283,11 +4414,10 @@ export default function DetailsClient({
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-          ${
-            activeTab === tab.id
-              ? "text-white border-yellow-500"
-              : "text-zinc-500 border-transparent hover:text-zinc-300"
-          }`}
+          ${activeTab === tab.id
+                        ? "text-white border-yellow-500"
+                        : "text-zinc-500 border-transparent hover:text-zinc-300"
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -4522,11 +4652,10 @@ export default function DetailsClient({
                               type="button"
                               onClick={() => setActiveImagesTab(tab)}
                               className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
-              ${
-                activeImagesTab === tab
-                  ? "bg-white/10 text-white shadow"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
+              ${activeImagesTab === tab
+                                  ? "bg-white/10 text-white shadow"
+                                  : "text-zinc-400 hover:text-zinc-200"
+                                }`}
                               style={{ WebkitTapHighlightColor: "transparent" }}
                             >
                               {tab === "posters"
@@ -4946,19 +5075,19 @@ export default function DetailsClient({
 
                     const breakpoints = isPoster
                       ? {
-                          500: { slidesPerView: 3, spaceBetween: 14 },
-                          640: { slidesPerView: 4, spaceBetween: 14 },
-                          768: { slidesPerView: 5, spaceBetween: 16 },
-                          1024: { slidesPerView: 6, spaceBetween: 18 },
-                          1280: { slidesPerView: 7, spaceBetween: 18 },
-                        }
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        640: { slidesPerView: 4, spaceBetween: 14 },
+                        768: { slidesPerView: 5, spaceBetween: 16 },
+                        1024: { slidesPerView: 6, spaceBetween: 18 },
+                        1280: { slidesPerView: 7, spaceBetween: 18 },
+                      }
                       : {
-                          0: { slidesPerView: 4, spaceBetween: 12 },
-                          640: { slidesPerView: 4, spaceBetween: 14 },
-                          768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 5, spaceBetween: 18 },
-                          1280: { slidesPerView: 6, spaceBetween: 20 },
-                        };
+                        0: { slidesPerView: 4, spaceBetween: 12 },
+                        640: { slidesPerView: 4, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 5, spaceBetween: 18 },
+                        1280: { slidesPerView: 6, spaceBetween: 20 },
+                      };
 
                     return (
                       <div className="relative overflow-x-hidden overflow-y-visible">
@@ -5006,11 +5135,10 @@ export default function DetailsClient({
                                     }}
                                     className={`group relative w-full rounded-2xl overflow-hidden border cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
-                        ${
-                          isActive
-                            ? "border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]"
-                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30"
-                        }`}
+                        ${isActive
+                                        ? "border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]"
+                                        : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30"
+                                      }`}
                                     title="Seleccionar"
                                     style={{
                                       WebkitTapHighlightColor: "transparent",
@@ -5642,11 +5770,10 @@ export default function DetailsClient({
                           key={t.id}
                           type="button"
                           onClick={() => setTCommentsTab(t.id)}
-                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
-                            tCommentsTab === t.id
-                              ? "bg-zinc-700 text-white shadow-md"
-                              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-                          }`}
+                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${tCommentsTab === t.id
+                            ? "bg-zinc-700 text-white shadow-md"
+                            : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                            }`}
                         >
                           {t.label}
                         </button>
@@ -5782,11 +5909,10 @@ export default function DetailsClient({
                       <button
                         key={tab}
                         onClick={() => setTListsTab(tab)}
-                        className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${
-                          tListsTab === tab
-                            ? "bg-white text-black shadow-lg scale-105"
-                            : "text-zinc-400 hover:text-white hover:bg-white/5"
-                        }`}
+                        className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${tListsTab === tab
+                          ? "bg-white text-black shadow-lg scale-105"
+                          : "text-zinc-400 hover:text-white hover:bg-white/5"
+                          }`}
                       >
                         {tab}
                       </button>
@@ -6096,7 +6222,7 @@ export default function DetailsClient({
 
                       const tmdbScore =
                         typeof rec.vote_average === "number" &&
-                        rec.vote_average > 0
+                          rec.vote_average > 0
                           ? rec.vote_average
                           : null;
 
@@ -6129,11 +6255,10 @@ export default function DetailsClient({
                                 {/* Top gradient con tipo y ratings */}
                                 <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
                                   <span
-                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                                      isMovie
-                                        ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                        : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                    }`}
+                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
+                                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                      }`}
                                   >
                                     {isMovie ? "PELÍCULA" : "SERIE"}
                                   </span>
