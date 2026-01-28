@@ -1081,7 +1081,7 @@ export default function TraktEpisodesWatchedModal({
                               </button>
                             </div>
 
-                            <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed hidden sm:block">
+                            <p className="text-xs sm:text-sm text-zinc-400 line-clamp-2 leading-relaxed max-h-[2.8rem] overflow-hidden hidden sm:block">
                               {ep.overview}
                             </p>
                           </div>
