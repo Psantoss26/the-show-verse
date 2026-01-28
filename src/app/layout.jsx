@@ -18,10 +18,10 @@ export const metadata = {
   description: 'Tu plataforma de películas y series',
   icons: {
     icon: [
-      { url: '/TheShowVerse2.png', type: 'image/png', sizes: '32x32' },
-      { url: '/TheShowVerse2.png', type: 'image/png', sizes: '16x16' },
+      { url: '/favicon.ico' }, // pestañas + bookmarks (clásico)
+      { url: '/TheShowVerse2.png', type: 'image/png', sizes: '32x32' }, // fallback moderno
     ],
-    shortcut: ['/TheShowVerse2.png'],
+    shortcut: ['/favicon.ico'],
     apple: [{ url: '/TheShowVerse2.png', sizes: '180x180' }], // iOS (app)
   },
   manifest: '/site.webmanifest',
