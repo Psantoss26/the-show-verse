@@ -57,6 +57,16 @@ export default function LiquidButton({
       secondary: [134, 239, 172],
       glow: "rgba(34, 197, 94, 0.5)",
     },
+    teal: {
+      rgb: [20, 184, 166],
+      secondary: [153, 246, 228],
+      glow: "rgba(20, 184, 166, 0.5)",
+    },
+    orange: {
+      rgb: [249, 115, 22],
+      secondary: [253, 186, 116],
+      glow: "rgba(249, 115, 22, 0.5)",
+    },
   };
 
   const currentColors = colors[activeColor] || colors.blue;
