@@ -4090,6 +4090,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                 onClick={() => openVideo(preferredVideo)}
                 disabled={!preferredVideo}
                 activeColor="yellow"
+                groupId="details-actions"
                 className={preferredVideo ? "!bg-white !text-black" : ""}
                 title={preferredVideo ? "Ver Tráiler" : "Sin Tráiler"}
               >
@@ -4119,6 +4120,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                 disabled={favLoading}
                 active={favorite}
                 activeColor="red"
+                groupId="details-actions"
                 title="Favorito"
               >
                 {favLoading ? (
@@ -4135,6 +4137,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                 disabled={wlLoading}
                 active={watchlist}
                 activeColor="blue"
+                groupId="details-actions"
                 title="Watchlist"
               >
                 {wlLoading ? (
@@ -4152,6 +4155,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   disabled={listsPresenceLoading}
                   active={listActive}
                   activeColor="purple"
+                  groupId="details-actions"
                   title="Añadir a lista"
                 >
                   {listsPresenceLoading ? (
@@ -4181,7 +4185,8 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   setUseBackdrop((v) => !v);
                 }}
                 active={useBackdrop}
-                activeColor="yellow"
+                activeColor="green"
+                groupId="details-actions"
                 title={useBackdrop ? "Ocultar fondo" : "Mostrar fondo"}
               >
                 <ImageIcon className="w-5 h-5" />
