@@ -19,10 +19,10 @@ export const metadata = {
   icons: {
     icon: [
       { url: '/favicon.ico' }, // pestañas + bookmarks (clásico)
-      { url: '/icon.png', type: 'image/png', sizes: '32x32' }, // fallback moderno
+      { url: '/TheShowVerse2.png', type: 'image/png', sizes: '32x32' }, // fallback moderno
     ],
     shortcut: ['/favicon.ico'],
-    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }], // iOS (app)
+    apple: [{ url: '/TheShowVerse2.png', sizes: '180x180' }], // iOS (app)
   },
   manifest: '/site.webmanifest',
 }
