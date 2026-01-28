@@ -547,9 +547,9 @@ export default function DetailsClient({
           const id = getListId(l);
           return id === lid
             ? {
-                ...l,
-                item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
-              }
+              ...l,
+              item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
+            }
             : l;
         }),
       );
@@ -1572,7 +1572,7 @@ export default function DetailsClient({
     try {
       const v = window.localStorage.getItem("showverse:trakt:sync") === "1";
       setSyncTrakt(v);
-    } catch {}
+    } catch { }
   }, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1581,7 +1581,7 @@ export default function DetailsClient({
         "showverse:trakt:sync",
         syncTrakt ? "1" : "0",
       );
-    } catch {}
+    } catch { }
   }, [syncTrakt]);
 
   const reloadTraktStatus = async () => {
@@ -2135,7 +2135,7 @@ export default function DetailsClient({
     // persist opcional
     try {
       window.localStorage.setItem(rewatchStorageKey, startIso);
-    } catch {}
+    } catch { }
 
     await loadTraktShowPlays(startIso);
   };
@@ -2241,7 +2241,7 @@ export default function DetailsClient({
               rewatchRunsStorageKey,
               JSON.stringify(runs),
             );
-          } catch {}
+          } catch { }
         }
       }
 
@@ -2465,7 +2465,7 @@ export default function DetailsClient({
           rewatchRunsStorageKey,
           JSON.stringify(nextRuns || []),
         );
-      } catch {}
+      } catch { }
     },
     [rewatchRunsStorageKey],
   );
@@ -2476,7 +2476,7 @@ export default function DetailsClient({
       setActiveEpisodesView(v);
       try {
         window.localStorage.setItem(episodesViewStorageKey, v);
-      } catch {}
+      } catch { }
 
       if (v === "global") {
         setRewatchStartAt(null);
@@ -2512,7 +2512,7 @@ export default function DetailsClient({
       setActiveEpisodesView(run.id);
       try {
         window.localStorage.setItem(episodesViewStorageKey, run.id);
-      } catch {}
+      } catch { }
       setRewatchStartAt(run.startedAt);
 
       await loadTraktShowPlays(run.startedAt); // ✅ clave
@@ -2537,7 +2537,7 @@ export default function DetailsClient({
         const nextView = prev === runId ? "global" : prev;
         try {
           window.localStorage.setItem(episodesViewStorageKey, nextView);
-        } catch {}
+        } catch { }
         return nextView;
       });
 
@@ -2700,8 +2700,8 @@ export default function DetailsClient({
   const seriesGraphUrl =
     type === "tv" && data?.id && (data.name || data.original_name)
       ? `https://seriesgraph.com/show/${data.id}-${slugifyForSeriesGraph(
-          data.original_name || data.name,
-        )}`
+        data.original_name || data.name,
+      )}`
       : null;
 
   const [traktHomepage, setTraktHomepage] = useState(null);
@@ -2783,7 +2783,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch {}
+    } catch { }
   }, [jwCacheKey]);
 
   // ✅ 1) hidratar desde cache para que el icono salga instantáneo en visitas posteriores
@@ -2794,7 +2794,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch {}
+    } catch { }
   }, [jwCacheKey]);
 
   useEffect(() => {
@@ -2809,7 +2809,7 @@ export default function DetailsClient({
       try {
         if (typeof window !== "undefined")
           window.localStorage.removeItem(jwCacheKey);
-      } catch {}
+      } catch { }
       return;
     }
 
@@ -2824,8 +2824,8 @@ export default function DetailsClient({
 
         const watchnow =
           watchLink &&
-          typeof watchLink === "string" &&
-          !watchLink.includes("themoviedb.org")
+            typeof watchLink === "string" &&
+            !watchLink.includes("themoviedb.org")
             ? watchLink
             : null;
 
@@ -2858,7 +2858,7 @@ export default function DetailsClient({
             if (resolved) window.localStorage.setItem(jwCacheKey, resolved);
             else window.localStorage.removeItem(jwCacheKey);
           }
-        } catch {}
+        } catch { }
       } catch (e) {
         if (ac.signal.aborted) return;
         setExtLinks((p) => ({
@@ -3387,21 +3387,21 @@ export default function DetailsClient({
     const extras =
       type === "movie"
         ? (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
-            .filter((d) => d?.id && d?.name)
-            .map((d, idx) => ({
-              ...d,
-              character: "Director",
-              // orden negativo para que vaya arriba si luego hay sort por order
-              order: -1000 + idx,
-            }))
+          .filter((d) => d?.id && d?.name)
+          .map((d, idx) => ({
+            ...d,
+            character: "Director",
+            // orden negativo para que vaya arriba si luego hay sort por order
+            order: -1000 + idx,
+          }))
         : type === "tv"
           ? (Array.isArray(tvCreators) ? tvCreators : [])
-              .filter((c) => c?.id && c?.name)
-              .map((c, idx) => ({
-                ...c,
-                character: "Creador",
-                order: -1000 + idx,
-              }))
+            .filter((c) => c?.id && c?.name)
+            .map((c, idx) => ({
+              ...c,
+              character: "Creador",
+              order: -1000 + idx,
+            }))
           : [];
 
     // 3) ¿Hay order real en el base? (si viene de TMDb normalmente sí)
@@ -4012,7 +4012,7 @@ ${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"
                             decoding="async"
                             fetchPriority="high"
                             onLoad={() => setPosterHighLoaded(true)}
-                            onError={() => {}}
+                            onError={() => { }}
                             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-out
 ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
@@ -4087,11 +4087,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <>
                     <span className="text-white text-[10px]">●</span>
                     <span
-                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
-                        data.status === "Ended" || data.status === "Canceled"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      }`}
+                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${data.status === "Ended" || data.status === "Canceled"
+                        ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                        : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        }`}
                     >
                       {data.status}
                     </span>
@@ -4113,7 +4112,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
             </div>
 
             {/* 2. BARRA DE ACCIONES PRINCIPALES */}
-            <div className="flex flex-wrap items-center gap-3 mb-8 px-1">
+            <div className="flex flex-wrap items-center gap-2 mb-6 px-1">
               {/* Botón Tráiler */}
               <LiquidButton
                 onClick={() => openVideo(preferredVideo)}
@@ -4279,20 +4278,20 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* ✅ Rotten Tomatoes: SOLO desktop (>= sm) */}
                   {(tScoreboard?.external?.rtAudience != null ||
                     extras.rtScore != null) && (
-                    <div className="hidden sm:block">
-                      <CompactBadge
-                        logo="/logo-RottenTomatoes.png"
-                        value={
-                          tScoreboard?.external?.rtAudience != null
-                            ? Math.round(tScoreboard.external.rtAudience)
-                            : extras.rtScore != null
-                              ? Math.round(extras.rtScore)
-                              : null
-                        }
-                        suffix="%"
-                      />
-                    </div>
-                  )}
+                      <div className="hidden sm:block">
+                        <CompactBadge
+                          logo="/logo-RottenTomatoes.png"
+                          value={
+                            tScoreboard?.external?.rtAudience != null
+                              ? Math.round(tScoreboard.external.rtAudience)
+                              : extras.rtScore != null
+                                ? Math.round(extras.rtScore)
+                                : null
+                          }
+                          suffix="%"
+                        />
+                      </div>
+                    )}
 
                   {/* ✅ Metacritic: SOLO desktop (>= sm) */}
                   {extras.mcScore != null && (
@@ -4449,11 +4448,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-          ${
-            activeTab === tab.id
-              ? "text-white border-yellow-500"
-              : "text-zinc-500 border-transparent hover:text-zinc-300"
-          }`}
+          ${activeTab === tab.id
+                        ? "text-white border-yellow-500"
+                        : "text-zinc-500 border-transparent hover:text-zinc-300"
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -4692,11 +4690,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                               type="button"
                               onClick={() => setActiveImagesTab(tab)}
                               className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
-              ${
-                activeImagesTab === tab
-                  ? "bg-white/10 text-white shadow"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
+              ${activeImagesTab === tab
+                                  ? "bg-white/10 text-white shadow"
+                                  : "text-zinc-400 hover:text-zinc-200"
+                                }`}
                               style={{ WebkitTapHighlightColor: "transparent" }}
                             >
                               {tab === "posters"
@@ -5116,19 +5113,19 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                     const breakpoints = isPoster
                       ? {
-                          500: { slidesPerView: 3, spaceBetween: 14 },
-                          640: { slidesPerView: 4, spaceBetween: 14 },
-                          768: { slidesPerView: 5, spaceBetween: 16 },
-                          1024: { slidesPerView: 6, spaceBetween: 18 },
-                          1280: { slidesPerView: 7, spaceBetween: 18 },
-                        }
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        640: { slidesPerView: 4, spaceBetween: 14 },
+                        768: { slidesPerView: 5, spaceBetween: 16 },
+                        1024: { slidesPerView: 6, spaceBetween: 18 },
+                        1280: { slidesPerView: 7, spaceBetween: 18 },
+                      }
                       : {
-                          0: { slidesPerView: 4, spaceBetween: 12 },
-                          640: { slidesPerView: 4, spaceBetween: 14 },
-                          768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 5, spaceBetween: 18 },
-                          1280: { slidesPerView: 6, spaceBetween: 20 },
-                        };
+                        0: { slidesPerView: 4, spaceBetween: 12 },
+                        640: { slidesPerView: 4, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 5, spaceBetween: 18 },
+                        1280: { slidesPerView: 6, spaceBetween: 20 },
+                      };
 
                     return (
                       <div className="relative overflow-x-hidden overflow-y-visible">
@@ -5176,11 +5173,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     }}
                                     className={`group relative w-full rounded-2xl overflow-hidden border cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
-                        ${
-                          isActive
-                            ? "border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]"
-                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30"
-                        }`}
+                        ${isActive
+                                        ? "border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]"
+                                        : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30"
+                                      }`}
                                     title="Seleccionar"
                                     style={{
                                       WebkitTapHighlightColor: "transparent",
@@ -5812,11 +5808,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                           key={t.id}
                           type="button"
                           onClick={() => setTCommentsTab(t.id)}
-                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
-                            tCommentsTab === t.id
-                              ? "bg-zinc-700 text-white shadow-md"
-                              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-                          }`}
+                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${tCommentsTab === t.id
+                            ? "bg-zinc-700 text-white shadow-md"
+                            : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                            }`}
                         >
                           {t.label}
                         </button>
@@ -5952,11 +5947,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                       <button
                         key={tab}
                         onClick={() => setTListsTab(tab)}
-                        className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${
-                          tListsTab === tab
-                            ? "bg-white text-black shadow-lg scale-105"
-                            : "text-zinc-400 hover:text-white hover:bg-white/5"
-                        }`}
+                        className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${tListsTab === tab
+                          ? "bg-white text-black shadow-lg scale-105"
+                          : "text-zinc-400 hover:text-white hover:bg-white/5"
+                          }`}
                       >
                         {tab}
                       </button>
@@ -6266,7 +6260,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                       const tmdbScore =
                         typeof rec.vote_average === "number" &&
-                        rec.vote_average > 0
+                          rec.vote_average > 0
                           ? rec.vote_average
                           : null;
 
@@ -6299,11 +6293,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 {/* Top gradient con tipo y ratings */}
                                 <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
                                   <span
-                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                                      isMovie
-                                        ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                        : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                    }`}
+                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
+                                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                      }`}
                                   >
                                     {isMovie ? "PELÍCULA" : "SERIE"}
                                   </span>
