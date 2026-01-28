@@ -3529,6 +3529,8 @@ export default function DetailsClient({
   const [menuCompact, setMenuCompact] = useState(false);
   const [menuH, setMenuH] = useState(0);
   const [activeSectionId, setActiveSectionId] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isMenuSticky, setIsMenuSticky] = useState(false);
 
   const registerSection = useCallback(
     (sid) => (el) => {
@@ -3547,6 +3549,17 @@ export default function DetailsClient({
     const ro = new ResizeObserver(() => update());
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  // Detectar viewport móvil
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640); // sm breakpoint
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   useEffect(() => {
@@ -4619,20 +4632,25 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
           {/* sentinel para detectar cuándo el menú “pega” */}
           <div ref={sentinelRef} className="h-px w-full" />
 
-          {/* ✅ Sticky debajo del navbar */}
+          {/* ✅ Sticky debajo del navbar (desktop) o en top (móvil) */}
           <div
             ref={menuStickyRef}
-            className="sticky z-30 py-2"
-            style={{ 
-              top: STICKY_TOP,
-              willChange: 'transform',
-              backfaceVisibility: 'hidden',
+            className={`sticky z-50 transition-all duration-300 ${
+              isMobile && isMenuSticky ? 'py-3' : 'py-2'
+            }`}
+            style={{
+              top: isMobile && isMenuSticky ? 0 : STICKY_TOP,
+              willChange: "transform",
+              backfaceVisibility: "hidden",
+              backgroundColor: isMobile && isMenuSticky ? 'rgba(0, 0, 0, 0.95)' : 'transparent',
+              backdropFilter: isMobile && isMenuSticky ? 'blur(12px)' : 'none',
             }}
           >
             <DetailsSectionMenu
               items={sectionItems}
               activeId={activeSectionId}
               onChange={scrollToSection}
+              isCompact={isMobile && isMenuSticky}
             />
           </div>
 
