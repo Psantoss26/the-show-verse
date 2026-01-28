@@ -3755,90 +3755,102 @@ export default function DetailsClient({
   const posterShineRef = useRef(null);
   const posterRafRef = useRef(0);
   const [poster3dEnabled, setPoster3dEnabled] = useState(true);
+  // ====== Poster 3D Idle / Tilt (ORDEN CORRECTO) ======
+  const posterIdleRafRef = useRef(0);
+  const posterIsInteractingRef = useRef(false);
+  const posterIdleStartRef = useRef(0);
+  const posterTiltRef = useRef(null);          // ✅ el recuadro completo que se inclina
+  const posterAnimRafRef = useRef(0);          // ✅ un solo rAF
+  const posterTargetRef = useRef({ rx: 0, ry: 0, s: 1 });
+  const posterStateRef = useRef({ rx: 0, ry: 0, s: 1 });
+  const posterLastInputRef = useRef(0);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const POSTER_MAX = 12;         // grados
+  const POSTER_SCALE = 1.06;     // escala al hover
+  const POSTER_OVERSCAN = 1.02;  // ✅ mínimo para NO perder nitidez
+  const IDLE_DELAY = 220;        // ms sin interacción => idle
 
-    const mq =
-      typeof window.matchMedia === "function"
-        ? window.matchMedia("(prefers-reduced-motion: reduce)")
-        : null;
+  // Overscan
+  const posterImgOverscan = poster3dEnabled ? 1.12 : 1;
 
-    if (!mq) return;
+  const setPosterTargetFromPointer = useCallback((clientX, clientY) => {
+    if (!poster3dEnabled) return;
 
-    const apply = () => setPoster3dEnabled(!mq.matches);
-    apply();
+    const wrapper = posterWrapRef.current;
+    if (!wrapper) return;
 
-    if (typeof mq.addEventListener === "function") {
-      mq.addEventListener("change", apply);
-      return () => mq.removeEventListener("change", apply);
-    }
+    const rect = wrapper.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
 
-    // Safari viejo
-    mq.addListener?.(apply);
-    return () => mq.removeListener?.(apply);
-  }, []);
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
-  useEffect(() => {
-    return () => {
-      if (posterRafRef.current) cancelAnimationFrame(posterRafRef.current);
-    };
-  }, []);
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
 
-  const setPosterTilt = useCallback(
-    (clientX, clientY) => {
-      if (!poster3dEnabled) return;
+    const rx = ((y - cy) / cy) * -POSTER_MAX;
+    const ry = ((x - cx) / cx) * POSTER_MAX;
 
-      const wrapper = posterWrapRef.current;
-      const card = posterCardRef.current;
-      const shine = posterShineRef.current;
-      if (!wrapper || !card || !shine) return;
-
-      const rect = wrapper.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-
-      const x = clientX - rect.left;
-      const y = clientY - rect.top;
-
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-
-      const maxRotate = 10;
-      const rotateX = ((y - centerY) / centerY) * -maxRotate;
-      const rotateY = ((x - centerX) / centerX) * maxRotate;
-
-      const moveX = (x / rect.width) * 100;
-      const moveY = (y / rect.height) * 100;
-
-      if (posterRafRef.current) cancelAnimationFrame(posterRafRef.current);
-      posterRafRef.current = requestAnimationFrame(() => {
-        card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.05, 1.05, 1.05)`;
-        shine.style.background = `radial-gradient(circle at ${moveX}% ${moveY}%, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0) 55%)`;
-        shine.style.opacity = "1";
-      });
-    },
-    [poster3dEnabled],
-  );
-
-  const resetPosterTilt = useCallback(() => {
-    const card = posterCardRef.current;
-    const shine = posterShineRef.current;
-
-    if (posterRafRef.current) cancelAnimationFrame(posterRafRef.current);
-    posterRafRef.current = requestAnimationFrame(() => {
-      if (card) {
-        card.style.transform = poster3dEnabled
-          ? "rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)"
-          : "none";
-      }
-      if (shine) shine.style.opacity = "0";
-    });
+    posterTargetRef.current = { rx, ry, s: POSTER_SCALE };
+    posterLastInputRef.current =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
   }, [poster3dEnabled]);
 
+  const resetPosterTarget = useCallback(() => {
+    posterTargetRef.current = { rx: 0, ry: 0, s: 1 };
+    posterLastInputRef.current =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+  }, []);
+
   useEffect(() => {
-    // al cambiar de póster, resetea para evitar que se quede “inclinado”
-    resetPosterTilt();
-  }, [displayPosterPath, resetPosterTilt]);
+    if (!poster3dEnabled) return;
+
+    const el = posterTiltRef.current;
+    if (!el) return;
+
+    let mounted = true;
+
+    const loop = (t) => {
+      if (!mounted) return;
+
+      const now = t ?? (typeof performance !== "undefined" ? performance.now() : Date.now());
+      const idle = now - posterLastInputRef.current > IDLE_DELAY;
+
+      let target = posterTargetRef.current;
+
+      // ✅ Idle automático cuando no hay interacción (más visual pero estable)
+      if (idle) {
+        const dt = now / 1000;
+        target = {
+          rx: Math.sin(dt * 1.05) * 5.5,
+          ry: Math.cos(dt * 0.90) * 8.5,
+          s: 1.03 + Math.sin(dt * 1.60) * 0.01,
+        };
+      }
+
+      const cur = posterStateRef.current;
+
+      // ✅ LERP suave (fluido y responsivo)
+      const k = 0.14;
+      cur.rx += (target.rx - cur.rx) * k;
+      cur.ry += (target.ry - cur.ry) * k;
+      cur.s += (target.s - cur.s) * k;
+
+      el.style.transform =
+        `translateZ(0px) rotateX(${cur.rx.toFixed(3)}deg) rotateY(${cur.ry.toFixed(3)}deg) ` +
+        `scale3d(${cur.s.toFixed(4)}, ${cur.s.toFixed(4)}, ${cur.s.toFixed(4)})`;
+
+      posterAnimRafRef.current = requestAnimationFrame(loop);
+    };
+
+    posterAnimRafRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      mounted = false;
+      if (posterAnimRafRef.current) cancelAnimationFrame(posterAnimRafRef.current);
+      posterAnimRafRef.current = 0;
+    };
+  }, [poster3dEnabled, displayPosterPath]);
 
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
@@ -3890,120 +3902,94 @@ export default function DetailsClient({
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS --- */}
           <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10">
             {/* Poster Card */}
-            <div
-              ref={posterWrapRef}
-              onMouseMove={(e) => setPosterTilt(e.clientX, e.clientY)}
-              onMouseLeave={resetPosterTilt}
-              onTouchMove={(e) => {
-                const t = e.touches?.[0];
-                if (!t) return;
-                setPosterTilt(t.clientX, t.clientY);
-              }}
-              onTouchEnd={resetPosterTilt}
-              className="relative group rounded-2xl shadow-2xl shadow-black/80 border border-white/10 bg-black/40 transition-all duration-500 hover:shadow-[0_0_50px_rgba(255,255,255,0.10)]"
-              style={{
-                perspective: poster3dEnabled ? 1000 : undefined,
-                transformStyle: "preserve-3d",
-              }}
-            >
+            <div className="relative">
+
+              {/* Wrapper: solo perspectiva + captura puntero */}
               <div
-                ref={posterCardRef}
-                className={[
-                  "relative aspect-[2/3] rounded-2xl overflow-hidden cursor-pointer bg-neutral-900",
-                  poster3dEnabled ? "" : "transition-transform duration-500 hover:scale-[1.05]",
-                ].join(" ")}
+                ref={posterWrapRef}
+                onPointerMove={(e) => setPosterTargetFromPointer(e.clientX, e.clientY)}
+                onPointerLeave={resetPosterTarget}
+                onPointerDown={(e) => {
+                  // mejora tactil (evita pérdidas de tracking)
+                  e.currentTarget.setPointerCapture?.(e.pointerId);
+                  setPosterTargetFromPointer(e.clientX, e.clientY);
+                }}
+                className="relative"
                 style={{
+                  perspective: poster3dEnabled ? 1100 : undefined,
                   transformStyle: "preserve-3d",
-                  willChange: "transform",
-                  transition: poster3dEnabled ? "transform 0.12s ease-out" : undefined,
+                  touchAction: "none",
                 }}
               >
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setUseBackdrop((v) => !v);
-                  }}
-                  className={`absolute top-2 right-2 z-20 p-2 rounded-full backdrop-blur-md border transition-all shadow-lg
-opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto
-${useBackdrop
-                      ? "bg-yellow-500/20 border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/30"
-                      : "bg-black/40 border-white/20 text-white/80 hover:bg-black/80 hover:text-white"
-                    }`}
-                  title={useBackdrop ? "Desactivar fondo" : "Activar fondo"}
+                {/* ✅ Este es el recuadro completo que se inclina */}
+                <div
+                  ref={posterTiltRef}
+                  className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 will-change-transform"
                   style={{
-                    transform: "translateZ(24px)",
-                    WebkitTapHighlightColor: "transparent",
+                    transformStyle: "preserve-3d",
+                    backfaceVisibility: "hidden",
+                    WebkitBackfaceVisibility: "hidden",
+                    outline: "1px solid transparent",
+                    isolation: "isolate",
                   }}
                 >
-                  <ImageIcon className="w-4 h-4" />
-                </button>
+                  {/* (Opcional) borde suave sin sombreado encima */}
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10" />
 
-                {showPosterSkeleton && (
-                  <div className="absolute inset-0 animate-pulse bg-neutral-800/60" />
-                )}
-
-                {posterLowUrl && !posterImgError && (
-                  <>
-                    {/* LOW: aparece rápido */}
-                    <img
-                      src={posterLowUrl}
-                      alt={title}
-                      loading="eager"
-                      fetchPriority="high"
-                      decoding="async"
-                      onLoad={() => {
-                        setPosterLowLoaded(true);
-                        setPosterResolved(true);
-                      }}
-                      onError={() => {
-                        setPosterImgError(true);
-                        setPosterResolved(true);
-                      }}
-                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out
-${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"}
-group-hover:saturate-110`}
-                    />
-
-                    {/* HIGH: mejora de calidad encima */}
-                    {posterLowLoaded && posterHighUrl && (
-                      <img
-                        src={posterHighUrl}
-                        alt={title}
-                        loading="eager"
-                        decoding="async"
-                        onLoad={() => setPosterHighLoaded(true)}
-                        onError={() => { }}
-                        className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out
-${posterHighLoaded
-                            ? "opacity-100 scale-100 blur-0"
-                            : "opacity-0 scale-105 blur-sm"
-                          }
-group-hover:saturate-110`}
-                      />
+                  <div className="relative aspect-[2/3] bg-neutral-950">
+                    {showPosterSkeleton && (
+                      <div className="absolute inset-0 animate-pulse bg-neutral-800/60" />
                     )}
-                  </>
-                )}
 
-                {showNoPoster && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <ImageOff className="w-10 h-10 text-neutral-700" />
+                    {posterLowUrl && !posterImgError && (
+                      <>
+                        {/* LOW */}
+                        <img
+                          src={posterLowUrl}
+                          alt={title}
+                          loading="eager"
+                          fetchPriority="high"
+                          decoding="async"
+                          onLoad={() => {
+                            setPosterLowLoaded(true);
+                            setPosterResolved(true);
+                          }}
+                          onError={() => {
+                            setPosterImgError(true);
+                            setPosterResolved(true);
+                          }}
+                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out
+${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"}`}
+                          style={{ transform: `translateZ(0) scale(${POSTER_OVERSCAN})` }}
+                        />
+
+                        {/* HIGH */}
+                        {posterLowLoaded && posterHighUrl && (
+                          <img
+                            src={posterHighUrl}
+                            alt={title}
+                            loading="eager"
+                            decoding="async"
+                            fetchPriority="high"
+                            onLoad={() => setPosterHighLoaded(true)}
+                            onError={() => { }}
+                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-out
+${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
+                            style={{ transform: `translateZ(0) scale(${POSTER_OVERSCAN})` }}
+                          />
+                        )}
+                      </>
+                    )}
+
+                    {showNoPoster && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <ImageOff className="w-10 h-10 text-neutral-700" />
+                      </div>
+                    )}
+
+                    {/* ✅ Quitado: cualquier sombreado/shine superpuesto */}
                   </div>
-                )}
-
-                {/* Gradiente interno */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 pointer-events-none" />
-
-                {/* Shine dinámico (sigue al cursor) */}
-                <div
-                  ref={posterShineRef}
-                  className="absolute inset-0 opacity-0 transition-opacity duration-200 pointer-events-none mix-blend-overlay"
-                  style={{
-                    background:
-                      "linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.10) 25%, rgba(255,255,255,0.20) 30%, transparent 35%)",
-                  }}
-                />
+                </div>
               </div>
             </div>
 
@@ -4185,6 +4171,23 @@ group-hover:saturate-110`}
                     : undefined
                 }
               />
+
+              {/* ✅ Botón Mostrar/Ocultar Fondo */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setUseBackdrop((v) => !v);
+                }}
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors border ${useBackdrop
+                    ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20"
+                    : "border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
+                  }`}
+                title={useBackdrop ? "Ocultar fondo" : "Mostrar fondo"}
+              >
+                <ImageIcon className="w-5 h-5" />
+              </button>
             </div>
 
             {/* ✅ 3. SCOREBOARD INTEGRADO */}
