@@ -1,12 +1,12 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import '@/app/globals.css'
-import { useAuth } from '@/context/AuthContext'
-import UserAvatar from '@/components/auth/UserAvatar'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useState, useEffect, useRef, useMemo } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import "@/app/globals.css";
+import { useAuth } from "@/context/AuthContext";
+import UserAvatar from "@/components/auth/UserAvatar";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   FilmIcon,
   TvIcon,
@@ -19,207 +19,310 @@ import {
   Menu as MenuIcon,
   HomeIcon,
   Compass,
-  Activity
-} from 'lucide-react'
-import TraktHistoryNavButton from '@/components/trakt/TraktHistoryNavButton'
+  Activity,
+} from "lucide-react";
+import TraktHistoryNavButton from "@/components/trakt/TraktHistoryNavButton";
 
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
  * ==================================================================== */
-function SearchBar({ onResultClick }) {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState([])
-  const [showDropdown, setShowDropdown] = useState(false)
-  const searchRef = useRef(null)
+function SearchBar({ onResultClick, isMobile = false }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setShowDropdown(false)
+        setShowDropdown(false);
       }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   useEffect(() => {
     if (!query.trim()) {
-      setResults([])
-      setShowDropdown(false)
-      return
+      setResults([]);
+      setShowDropdown(false);
+      setIsSearching(false);
+      return;
     }
 
+    setIsSearching(true);
     const searchTimer = setTimeout(async () => {
       try {
         const res = await fetch(
           `https://api.themoviedb.org/3/search/multi?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(
-            query
-          )}`
-        )
-        const data = await res.json()
+            query,
+          )}`,
+        );
+        const data = await res.json();
         const filteredResults = (data.results || []).filter(
-          (item) => item.media_type !== 'person' || item.known_for_department === 'Acting'
-        )
-        setResults(filteredResults)
-        setShowDropdown(true)
+          (item) =>
+            item.media_type !== "person" ||
+            item.known_for_department === "Acting",
+        );
+        setResults(filteredResults);
+        setShowDropdown(true);
+        setIsSearching(false);
       } catch (err) {
-        console.error('Error buscando en TMDb:', err)
+        console.error("Error buscando en TMDb:", err);
+        setIsSearching(false);
       }
-    }, 300)
+    }, 300);
 
-    return () => clearTimeout(searchTimer)
-  }, [query])
+    return () => clearTimeout(searchTimer);
+  }, [query]);
 
   const handleResultClick = () => {
-    setShowDropdown(false)
-    setQuery('')
-    setResults([])
-    if (onResultClick) onResultClick()
-  }
+    setShowDropdown(false);
+    setQuery("");
+    setResults([]);
+    if (onResultClick) onResultClick();
+  };
+
+  const getBadgeStyles = (mediaType) => {
+    switch (mediaType) {
+      case "movie":
+        return "bg-blue-500/15 text-blue-300 border border-blue-500/30";
+      case "tv":
+        return "bg-purple-500/15 text-purple-300 border border-purple-500/30";
+      case "person":
+        return "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30";
+      default:
+        return "bg-neutral-500/15 text-neutral-300 border border-neutral-500/30";
+    }
+  };
+
+  const getMediaTypeLabel = (mediaType) => {
+    switch (mediaType) {
+      case "movie":
+        return "Película";
+      case "tv":
+        return "Serie";
+      case "person":
+        return "Persona";
+      default:
+        return mediaType;
+    }
+  };
 
   return (
-    <div className="relative w-full max-w-lg" ref={searchRef}>
-      <form onSubmit={(e) => e.preventDefault()} className="relative">
-        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 pointer-events-none" />
+    <div
+      className={`relative w-full ${isMobile ? "max-w-full" : "max-w-lg"}`}
+      ref={searchRef}
+    >
+      <form onSubmit={(e) => e.preventDefault()} className="relative group">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+          <SearchIcon
+            className={`w-5 h-5 transition-all duration-300 ${
+              query ? "text-blue-400" : "text-white"
+            }`}
+          />
+          {isSearching && (
+            <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+          )}
+        </div>
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.trim() && setShowDropdown(true)}
-          placeholder="Buscar películas, series o actores..."
-          className="w-full pl-11 pr-4 py-2.5 bg-neutral-800/70 border border-neutral-700 text-white rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-neutral-400"
+          placeholder={
+            isMobile ? "Buscar..." : "Buscar películas, series o actores..."
+          }
+          className={`w-full ${isSearching ? "pl-[4.5rem]" : "pl-11"} pr-4 ${isMobile ? "py-3.5 text-base" : "py-2.5 text-sm"} 
+            bg-neutral-900/60 border border-neutral-700/50 text-white rounded-full 
+            focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 focus:bg-neutral-900/80
+            hover:border-neutral-600/50 hover:bg-neutral-900/70
+            placeholder:text-neutral-500
+            transition-all duration-300 ease-out
+            shadow-lg shadow-black/20
+            backdrop-blur-xl`}
         />
+        {query && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setResults([]);
+              setShowDropdown(false);
+            }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-all"
+          >
+            <XIcon className="w-4 h-4" />
+          </button>
+        )}
       </form>
 
       <AnimatePresence>
         {showDropdown && results.length > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute top-full left-0 w-full bg-[#181818] text-white mt-2 rounded-2xl shadow-2xl max-h-[70vh] overflow-y-auto z-50 border border-[#2a2a2a] backdrop-blur-md no-scrollbar"
+            initial={{ opacity: 0, y: -10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className={`absolute top-full left-0 w-full bg-neutral-900/95 text-white ${isMobile ? "mt-3" : "mt-2"} rounded-2xl 
+              shadow-2xl shadow-black/40 max-h-[70vh] overflow-y-auto z-50 
+              border border-neutral-700/50 backdrop-blur-2xl no-scrollbar`}
           >
-            {results.map((item) => (
-              <Link
-                key={`${item.media_type}-${item.id}`}
-                href={`/details/${item.media_type}/${item.id}`}
-                onClick={handleResultClick}
-                className="flex items-center gap-4 px-4 py-3 hover:bg-[#2a2a2a] transition-colors cursor-pointer"
-              >
-                <img
-                  src={
-                    item.poster_path || item.profile_path
-                      ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
-                      : '/default-poster.png'
-                  }
-                  alt={item.title || item.name || 'Resultado'}
-                  className="w-12 h-16 rounded-md shadow-md object-cover"
-                />
-                <div>
-                  <p className="font-semibold text-base line-clamp-1">
-                    {item.title || item.name}
-                  </p>
-                  <p className="text-sm text-neutral-400 capitalize">
-                    {item.media_type === 'movie'
-                      ? 'Película'
-                      : item.media_type === 'tv'
-                        ? 'Serie'
-                        : item.media_type === 'person'
-                          ? 'Persona'
-                          : item.media_type}
-                  </p>
-                </div>
-              </Link>
-            ))}
+            <div className="p-2">
+              {results.slice(0, 8).map((item, index) => (
+                <Link
+                  key={`${item.media_type}-${item.id}`}
+                  href={`/details/${item.media_type}/${item.id}`}
+                  onClick={handleResultClick}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-neutral-800/60 active:bg-neutral-800/80 transition-all cursor-pointer group"
+                  >
+                    <div className="relative flex-shrink-0">
+                      <img
+                        src={
+                          item.poster_path || item.profile_path
+                            ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
+                            : "/default-poster.png"
+                        }
+                        alt={item.title || item.name || "Resultado"}
+                        className="w-12 h-16 rounded-lg shadow-lg object-cover border border-neutral-800 group-hover:border-neutral-700 transition-colors"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-base line-clamp-1 text-white group-hover:text-blue-300 transition-colors">
+                        {item.title || item.name}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBadgeStyles(item.media_type)}`}
+                        >
+                          {getMediaTypeLabel(item.media_type)}
+                        </span>
+                        {item.release_date && (
+                          <span className="text-xs text-neutral-500">
+                            {new Date(item.release_date).getFullYear()}
+                          </span>
+                        )}
+                        {item.first_air_date && (
+                          <span className="text-xs text-neutral-500">
+                            {new Date(item.first_air_date).getFullYear()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                </Link>
+              ))}
+            </div>
+            {results.length > 8 && (
+              <div className="px-4 py-2 text-center text-xs text-neutral-500 border-t border-neutral-800/50">
+                Mostrando 8 de {results.length} resultados
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
     </div>
-  )
+  );
 }
 
 /* ====================================================================
  * Navbar principal
  * ==================================================================== */
 export default function Navbar() {
-  const { account, hydrated } = useAuth()
-  const pathname = usePathname()
+  const { account, hydrated } = useAuth();
+  const pathname = usePathname();
 
-  const [showMobileSearch, setShowMobileSearch] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isActive = (href) =>
-    pathname === href || (href !== '/' && pathname?.startsWith(href))
+    pathname === href || (href !== "/" && pathname?.startsWith(href));
 
   const navLinkClass = (href) =>
-    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(href)
-      ? 'bg-white/10 text-white'
-      : 'text-neutral-400 hover:text-white hover:bg-white/5'
-    }`
+    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+      isActive(href)
+        ? "bg-white/10 text-white"
+        : "text-neutral-400 hover:text-white hover:bg-white/5"
+    }`;
 
-  const iconLinkClass = (href, tone = 'neutral') => {
-    const active = isActive(href)
+  const iconLinkClass = (href, tone = "neutral") => {
+    const active = isActive(href);
 
     const base =
-      'group p-2 rounded-full transition-all duration-200 ' +
-      'text-neutral-400 ' +
-      'hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 ' +
-      'focus:outline-none'
+      "group p-2 rounded-full transition-all duration-200 " +
+      "text-neutral-400 " +
+      "hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 " +
+      "focus:outline-none";
 
-    const ringBase = 'ring-1 ring-transparent'
+    const ringBase = "ring-1 ring-transparent";
 
     const tones = {
       red: {
-        hover: 'hover:text-red-300 hover:bg-red-500/10 hover:ring-red-500/30 hover:shadow-[0_0_18px_rgba(239,68,68,0.16)]',
-        active: 'text-red-200 bg-red-500/15 ring-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.20)]',
-        focus: 'focus-visible:ring-2 focus-visible:ring-red-500/30'
+        hover:
+          "hover:text-red-300 hover:bg-red-500/10 hover:ring-red-500/30 hover:shadow-[0_0_18px_rgba(239,68,68,0.16)]",
+        active:
+          "text-red-200 bg-red-500/15 ring-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.20)]",
+        focus: "focus-visible:ring-2 focus-visible:ring-red-500/30",
       },
       blue: {
-        hover: 'hover:text-sky-300 hover:bg-sky-500/10 hover:ring-sky-500/30 hover:shadow-[0_0_18px_rgba(14,165,233,0.16)]',
-        active: 'text-sky-200 bg-sky-500/15 ring-sky-500/35 shadow-[0_0_18px_rgba(14,165,233,0.20)]',
-        focus: 'focus-visible:ring-2 focus-visible:ring-sky-500/30'
+        hover:
+          "hover:text-sky-300 hover:bg-sky-500/10 hover:ring-sky-500/30 hover:shadow-[0_0_18px_rgba(14,165,233,0.16)]",
+        active:
+          "text-sky-200 bg-sky-500/15 ring-sky-500/35 shadow-[0_0_18px_rgba(14,165,233,0.20)]",
+        focus: "focus-visible:ring-2 focus-visible:ring-sky-500/30",
       },
       purple: {
-        hover: 'hover:text-fuchsia-300 hover:bg-fuchsia-500/10 hover:ring-fuchsia-500/30 hover:shadow-[0_0_18px_rgba(217,70,239,0.16)]',
-        active: 'text-fuchsia-200 bg-fuchsia-500/15 ring-fuchsia-500/35 shadow-[0_0_18px_rgba(217,70,239,0.20)]',
-        focus: 'focus-visible:ring-2 focus-visible:ring-fuchsia-500/30'
+        hover:
+          "hover:text-fuchsia-300 hover:bg-fuchsia-500/10 hover:ring-fuchsia-500/30 hover:shadow-[0_0_18px_rgba(217,70,239,0.16)]",
+        active:
+          "text-fuchsia-200 bg-fuchsia-500/15 ring-fuchsia-500/35 shadow-[0_0_18px_rgba(217,70,239,0.20)]",
+        focus: "focus-visible:ring-2 focus-visible:ring-fuchsia-500/30",
       },
       green: {
-        hover: 'hover:text-emerald-300 hover:bg-emerald-500/10 hover:ring-emerald-500/30 hover:shadow-[0_0_18px_rgba(16,185,129,0.16)]',
-        active: 'text-emerald-200 bg-emerald-500/15 ring-emerald-500/35 shadow-[0_0_18px_rgba(16,185,129,0.20)]',
-        focus: 'focus-visible:ring-2 focus-visible:ring-emerald-500/30'
+        hover:
+          "hover:text-emerald-300 hover:bg-emerald-500/10 hover:ring-emerald-500/30 hover:shadow-[0_0_18px_rgba(16,185,129,0.16)]",
+        active:
+          "text-emerald-200 bg-emerald-500/15 ring-emerald-500/35 shadow-[0_0_18px_rgba(16,185,129,0.20)]",
+        focus: "focus-visible:ring-2 focus-visible:ring-emerald-500/30",
       },
       amber: {
-        hover: 'hover:text-amber-300 hover:bg-amber-500/10 hover:ring-amber-500/30 hover:shadow-[0_0_18px_rgba(245,158,11,0.16)]',
-        active: 'text-amber-200 bg-amber-500/15 ring-amber-500/35 shadow-[0_0_18px_rgba(245,158,11,0.20)]',
-        focus: 'focus-visible:ring-2 focus-visible:ring-amber-500/30'
-      }
-    }
+        hover:
+          "hover:text-amber-300 hover:bg-amber-500/10 hover:ring-amber-500/30 hover:shadow-[0_0_18px_rgba(245,158,11,0.16)]",
+        active:
+          "text-amber-200 bg-amber-500/15 ring-amber-500/35 shadow-[0_0_18px_rgba(245,158,11,0.20)]",
+        focus: "focus-visible:ring-2 focus-visible:ring-amber-500/30",
+      },
+    };
 
-    const t = tones[tone] || tones.amber
-    const toneClass = active ? t.active : t.hover
+    const t = tones[tone] || tones.amber;
+    const toneClass = active ? t.active : t.hover;
 
-    return `${base} ${ringBase} ${toneClass} ${t.focus}`
-  }
+    return `${base} ${ringBase} ${toneClass} ${t.focus}`;
+  };
 
   const navLinkClassMobileBottom = (href) =>
-    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${isActive(href)
-      ? 'text-blue-400'
-      : 'text-neutral-400 hover:text-white'
-    }`
+    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${
+      isActive(href) ? "text-blue-400" : "text-neutral-400 hover:text-white"
+    }`;
 
   // Menú inferior fijo: 4 secciones. Si no hay sesión, fav/watchlist llevan a login.
-  const favHref = hydrated && account ? '/favorites' : '/login'
-  const watchHref = hydrated && account ? '/watchlist' : '/login'
+  const favHref = hydrated && account ? "/favorites" : "/login";
+  const watchHref = hydrated && account ? "/watchlist" : "/login";
 
   // Bloquear scroll cuando overlays están abiertos
   useEffect(() => {
-    const locked = showMobileSearch || mobileMenuOpen
-    document.body.style.overflow = locked ? 'hidden' : ''
+    const locked = showMobileSearch || mobileMenuOpen;
+    document.body.style.overflow = locked ? "hidden" : "";
     return () => {
-      document.body.style.overflow = ''
-    }
-  }, [showMobileSearch, mobileMenuOpen])
+      document.body.style.overflow = "";
+    };
+  }, [showMobileSearch, mobileMenuOpen]);
 
   return (
     <>
@@ -240,22 +343,40 @@ export default function Navbar() {
             </Link>
 
             <div className="flex items-center gap-4">
-              <Link href="/" className={navLinkClass('/')}>Inicio</Link>
-              <Link href="/movies" className={navLinkClass('/movies')}>Películas</Link>
-              <Link href="/series" className={navLinkClass('/series')}>Series</Link>
-              <Link href="/discover" className={navLinkClass('/discover')}>Descubrir</Link>
-              <Link href="/trakt" className={navLinkClass('/trakt')}>Trakt</Link>
+              <Link href="/" className={navLinkClass("/")}>
+                Inicio
+              </Link>
+              <Link href="/movies" className={navLinkClass("/movies")}>
+                Películas
+              </Link>
+              <Link href="/series" className={navLinkClass("/series")}>
+                Series
+              </Link>
+              <Link href="/discover" className={navLinkClass("/discover")}>
+                Descubrir
+              </Link>
+              <Link href="/trakt" className={navLinkClass("/trakt")}>
+                Trakt
+              </Link>
             </div>
           </div>
 
           {/* Derecha */}
           <div className="flex items-center gap-2 flex-shrink-0 pr-12">
             <div className="flex items-center gap-2">
-              <Link href="/lists" className={iconLinkClass('/lists', 'purple')} title="Listas">
+              <Link
+                href="/lists"
+                className={iconLinkClass("/lists", "purple")}
+                title="Listas"
+              >
                 <ListVideo className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
               </Link>
 
-              <Link href="/calendar" className={iconLinkClass('/calendar', 'amber')} title="Calendario">
+              <Link
+                href="/calendar"
+                className={iconLinkClass("/calendar", "amber")}
+                title="Calendario"
+              >
                 <CalendarDaysIcon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
               </Link>
 
@@ -263,11 +384,19 @@ export default function Navbar() {
 
               {hydrated && account && (
                 <>
-                  <Link href="/favorites" className={iconLinkClass('/favorites', 'red')} title="Favoritas">
+                  <Link
+                    href="/favorites"
+                    className={iconLinkClass("/favorites", "red")}
+                    title="Favoritas"
+                  >
                     <Heart className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
                   </Link>
 
-                  <Link href="/watchlist" className={iconLinkClass('/watchlist', 'blue')} title="Pendientes">
+                  <Link
+                    href="/watchlist"
+                    className={iconLinkClass("/watchlist", "blue")}
+                    title="Pendientes"
+                  >
                     <Bookmark className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
                   </Link>
                 </>
@@ -350,22 +479,25 @@ export default function Navbar() {
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
       <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black/95 backdrop-blur-md border-t border-neutral-800 flex items-center justify-around">
-        <Link href="/movies" className={navLinkClassMobileBottom('/movies')}>
+        <Link href="/movies" className={navLinkClassMobileBottom("/movies")}>
           <FilmIcon className="w-6 h-6" />
           <span className="text-xs">Películas</span>
         </Link>
 
-        <Link href="/series" className={navLinkClassMobileBottom('/series')}>
+        <Link href="/series" className={navLinkClassMobileBottom("/series")}>
           <TvIcon className="w-6 h-6" />
           <span className="text-xs">Series</span>
         </Link>
 
-        <Link href={favHref} className={navLinkClassMobileBottom('/favorites')}>
+        <Link href={favHref} className={navLinkClassMobileBottom("/favorites")}>
           <Heart className="w-6 h-6" />
           <span className="text-xs">Favoritas</span>
         </Link>
 
-        <Link href={watchHref} className={navLinkClassMobileBottom('/watchlist')}>
+        <Link
+          href={watchHref}
+          className={navLinkClassMobileBottom("/watchlist")}
+        >
           <Bookmark className="w-6 h-6" />
           <span className="text-xs">Pendientes</span>
         </Link>
@@ -385,7 +517,7 @@ export default function Navbar() {
               initial={{ x: -320 }}
               animate={{ x: 0 }}
               exit={{ x: -320 }}
-              transition={{ type: 'tween', duration: 0.22 }}
+              transition={{ type: "tween", duration: 0.22 }}
               className="h-full w-[280px] bg-[#0b0b0b] border-r border-neutral-800 p-4"
               onClick={(e) => e.stopPropagation()}
             >
@@ -417,8 +549,11 @@ export default function Navbar() {
                 <Link
                   href="/"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <HomeIcon className="w-5 h-5" />
                   <span>Inicio</span>
@@ -427,8 +562,11 @@ export default function Navbar() {
                 <Link
                   href="/movies"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/movies') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/movies")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <FilmIcon className="w-5 h-5" />
                   <span>Películas</span>
@@ -437,8 +575,11 @@ export default function Navbar() {
                 <Link
                   href="/series"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/series') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/series")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <TvIcon className="w-5 h-5" />
                   <span>Series</span>
@@ -447,8 +588,11 @@ export default function Navbar() {
                 <Link
                   href="/discover"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/discover') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/discover")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <Compass className="w-5 h-5" />
                   <span>Descubrir</span>
@@ -457,8 +601,11 @@ export default function Navbar() {
                 <Link
                   href="/trakt"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/trakt') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/trakt")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <Activity className="w-5 h-5" />
                   <span>Trakt</span>
@@ -474,8 +621,11 @@ export default function Navbar() {
                 <Link
                   href={favHref}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/favorites') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/favorites")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <Heart className="w-5 h-5" />
                   <span>Favoritas</span>
@@ -484,8 +634,11 @@ export default function Navbar() {
                 <Link
                   href={watchHref}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/watchlist') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/watchlist")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <Bookmark className="w-5 h-5" />
                   <span>Pendientes</span>
@@ -496,8 +649,11 @@ export default function Navbar() {
                 <Link
                   href="/lists"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/lists') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/lists")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <ListVideo className="w-5 h-5" />
                   <span>Listas</span>
@@ -506,8 +662,11 @@ export default function Navbar() {
                 <Link
                   href="/calendar"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive('/calendar') ? 'bg-white/10 text-white' : 'text-neutral-300 hover:bg-white/5'
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/calendar")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <CalendarDaysIcon className="w-5 h-5" />
                   <span>Calendario</span>
@@ -525,21 +684,36 @@ export default function Navbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg flex flex-col items-center gap-6 p-4 pt-10"
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col p-4 pt-4"
+            onClick={() => setShowMobileSearch(false)}
           >
-            <button
-              onClick={() => setShowMobileSearch(false)}
-              className="absolute top-4 right-4 text-neutral-400 hover:text-white"
-              aria-label="Cerrar búsqueda"
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: -20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="w-full"
+              onClick={(e) => e.stopPropagation()}
             >
-              <XIcon className="w-7 h-7" />
-            </button>
-            <div className="w-full max-w-lg">
-              <SearchBar onResultClick={() => setShowMobileSearch(false)} />
-            </div>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex-1">
+                  <SearchBar
+                    isMobile={true}
+                    onResultClick={() => setShowMobileSearch(false)}
+                  />
+                </div>
+                <button
+                  onClick={() => setShowMobileSearch(false)}
+                  className="flex-shrink-0 p-3 rounded-full bg-neutral-800/80 hover:bg-neutral-700/80 text-white transition-all active:scale-95 shadow-lg"
+                  aria-label="Cerrar búsqueda"
+                >
+                  <XIcon className="w-6 h-6" />
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
     </>
-  )
+  );
 }
