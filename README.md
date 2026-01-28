@@ -14,10 +14,11 @@
 
 ---
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Banner principal o logo del proyecto
 Tamaño recomendado: 1200x600px
 -->
+
 ![Banner Principal](docs/screenshots/banner.png)
 
 </div>
@@ -65,13 +66,14 @@ En la era del streaming múltiple (Netflix, HBO, Disney+, Amazon Prime...), nece
 ✅ **Rendimiento Optimizado** - Server-Side Rendering para carga instantánea  
 ✅ **Integración Multi-API** - Combina TMDb, Trakt y OMDb para datos completos  
 ✅ **100% Gratuito** - Sin paywalls ni limitaciones  
-✅ **Sincronización Trakt** - Tus datos siempre actualizados y portables  
+✅ **Sincronización Trakt** - Tus datos siempre actualizados y portables
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: GIF demo de la aplicación en uso
 Muestra navegación básica, hover effects, transiciones
 Tamaño recomendado: 800x450px, formato GIF o WebM
 -->
+
 ![Demo Animado](docs/screenshots/demo.gif)
 
 ---
@@ -115,12 +117,13 @@ Tamaño recomendado: 800x450px, formato GIF o WebM
 
 ### Dashboard Principal
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura del dashboard/home page
 Muestra el hero y las primeras secciones de contenido
 -->
+
 ![Dashboard Home](docs/screenshots/home-dashboard.png)
-*Vista principal con hero dinámico y secciones curadas*
+_Vista principal con hero dinámico y secciones curadas_
 
 ---
 
@@ -133,7 +136,7 @@ Muestra el hero y las primeras secciones de contenido
       📸 AÑADIR AQUÍ: Captura de detalles de película
       Muestra header, información principal y acciones
       -->
-      <img src="docs/screenshots/movie-details.png" alt="Detalles Película">
+      <img src=".docs/screenshots/movie-details.png" alt="Detalles Película">
       <p align="center"><em>Detalles completos de película</em></p>
     </td>
     <td width="50%">
@@ -141,7 +144,7 @@ Muestra el hero y las primeras secciones de contenido
       📸 AÑADIR AQUÍ: Captura de detalles de serie
       Muestra temporadas y episodios
       -->
-      <img src="docs/screenshots/series-details.png" alt="Detalles Serie">
+      <img src=".docs/screenshots/series-details.png" alt="Detalles Serie">
       <p align="center"><em>Gestión de temporadas y episodios</em></p>
     </td>
   </tr>
@@ -153,34 +156,37 @@ Muestra el hero y las primeras secciones de contenido
 
 #### Favoritos
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de página de favoritos
 Muestra la vista Grid con películas y series favoritas
 -->
+
 ![Favoritos](docs/screenshots/favorites.png)
-*Tus películas y series favoritas en vista Grid*
+_Tus películas y series favoritas en vista Grid_
 
 ---
 
 #### Watchlist
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de página de watchlist
 Muestra contenido pendiente por ver
 -->
+
 ![Watchlist](docs/screenshots/watchlist.png)
-*Lista de pendientes con filtros y vistas múltiples*
+_Lista de pendientes con filtros y vistas múltiples_
 
 ---
 
 #### Historial
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de página de historial
 Muestra estadísticas y contenido visto
 -->
+
 ![Historial](docs/screenshots/history.png)
-*Historial completo con estadísticas por período*
+_Historial completo con estadísticas por período_
 
 ---
 
@@ -219,34 +225,37 @@ Muestra estadísticas y contenido visto
 
 ### Búsqueda y Descubrimiento
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de página de discover
 Muestra filtros y resultados de búsqueda
 -->
+
 ![Búsqueda Avanzada](docs/screenshots/discover.png)
-*Búsqueda avanzada con filtros múltiples*
+_Búsqueda avanzada con filtros múltiples_
 
 ---
 
 ### Calendario
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de página de calendario
 Muestra vista mensual con marcadores
 -->
+
 ![Calendario](docs/screenshots/calendar.png)
-*Calendario mensual de estrenos y actividad*
+_Calendario mensual de estrenos y actividad_
 
 ---
 
 ### Detalles de Actor
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de página de actor
 Muestra biografía, filmografía e imágenes
 -->
+
 ![Detalles Actor](docs/screenshots/actor-details.png)
-*Información completa de actores y crew*
+_Información completa de actores y crew_
 
 ---
 
@@ -289,19 +298,21 @@ Muestra biografía, filmografía e imágenes
 
 ### Animaciones y Efectos
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: GIF de efectos hover
 Muestra hover en cards, transiciones, spotlight effect
 -->
-![Efectos Hover](docs/screenshots/hover-effects.gif)
-*Efectos hover premium y transiciones fluidas*
 
-<!-- 
+![Efectos Hover](docs/screenshots/hover-effects.gif)
+_Efectos hover premium y transiciones fluidas_
+
+<!--
 📸 AÑADIR AQUÍ: GIF de transiciones entre vistas
 Muestra cambio Grid → List → Compact
 -->
+
 ![Transiciones](docs/screenshots/view-transitions.gif)
-*Transiciones suaves entre vistas*
+_Transiciones suaves entre vistas_
 
 ---
 
@@ -309,13 +320,13 @@ Muestra cambio Grid → List → Compact
 
 ### Frontend
 
-| Tecnología | Versión | Uso |
-|------------|---------|-----|
-| **[Next.js](https://nextjs.org/)** | 16.0.7 | Framework React con SSR/ISR |
-| **[React](https://reactjs.org/)** | 19.2.1 | Biblioteca de UI components |
-| **[TypeScript](https://www.typescriptlang.org/)** | 5.0+ | Tipado estático y type safety |
-| **[Tailwind CSS](https://tailwindcss.com/)** | 4.0 | Framework de estilos utility-first |
-| **[Framer Motion](https://www.framer.com/motion/)** | 12.6.5 | Librería de animaciones |
+| Tecnología                                          | Versión | Uso                                |
+| --------------------------------------------------- | ------- | ---------------------------------- |
+| **[Next.js](https://nextjs.org/)**                  | 16.0.7  | Framework React con SSR/ISR        |
+| **[React](https://reactjs.org/)**                   | 19.2.1  | Biblioteca de UI components        |
+| **[TypeScript](https://www.typescriptlang.org/)**   | 5.0+    | Tipado estático y type safety      |
+| **[Tailwind CSS](https://tailwindcss.com/)**        | 4.0     | Framework de estilos utility-first |
+| **[Framer Motion](https://www.framer.com/motion/)** | 12.6.5  | Librería de animaciones            |
 
 ### Librerías Complementarias
 
@@ -437,6 +448,7 @@ Para habilitar la sincronización con Trakt:
    - Guarda y copia Client ID y Client Secret
 
 2. **Actualizar .env:**
+
    ```env
    TRAKT_CLIENT_ID=tu_client_id
    TRAKT_CLIENT_SECRET=tu_client_secret
@@ -487,14 +499,14 @@ Para desplegar en producción (ej. Vercel):
 
 ### Atajos de Teclado
 
-| Atajo | Acción |
-|-------|--------|
+| Atajo          | Acción                |
+| -------------- | --------------------- |
 | `Ctrl/Cmd + K` | Abrir búsqueda rápida |
-| `G → H` | Ir a Home |
-| `G → F` | Ir a Favoritos |
-| `G → W` | Ir a Watchlist |
-| `G → I` | Ir a Historial |
-| `Esc` | Cerrar modal/diálogo |
+| `G → H`        | Ir a Home             |
+| `G → F`        | Ir a Favoritos        |
+| `G → W`        | Ir a Watchlist        |
+| `G → I`        | Ir a Historial        |
+| `Esc`          | Cerrar modal/diálogo  |
 
 ---
 
@@ -505,6 +517,7 @@ Para desplegar en producción (ej. Vercel):
 **Uso:** Metadatos de películas, series, actores e imágenes
 
 **Endpoints principales:**
+
 - `/movie/{id}` - Detalles de película
 - `/tv/{id}` - Detalles de serie
 - `/person/{id}` - Información de actor
@@ -519,6 +532,7 @@ Para desplegar en producción (ej. Vercel):
 **Uso:** Autenticación, sincronización, historial y listas
 
 **Endpoints principales:**
+
 - `/oauth/token` - Autenticación OAuth
 - `/sync/favorites/movies` - Gestión de favoritos
 - `/sync/watchlist` - Gestión de watchlist
@@ -533,6 +547,7 @@ Para desplegar en producción (ej. Vercel):
 **Uso:** Ratings complementarios (IMDb, Rotten Tomatoes)
 
 **Endpoints principales:**
+
 - `/?i={imdb_id}` - Detalles por ID IMDb
 
 **Rate Limit:** 1000 requests/día (gratuito)
@@ -617,6 +632,7 @@ the-show-verse/
 **Ubicación:** `/`
 
 **Características:**
+
 - ✅ Hero dinámico con carrusel automático de películas top-rated
 - ✅ Selección inteligente de backdrops (idioma inglés, mejor resolución, más votos)
 - ✅ 10+ secciones de contenido curado:
@@ -634,9 +650,10 @@ the-show-verse/
 - ✅ Animaciones de entrada con stagger effect
 - ✅ Server-Side Rendering para SEO y performance
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura del hero con backdrop
 -->
+
 ![Dashboard Hero](docs/screenshots/feature-hero.png)
 
 ---
@@ -646,6 +663,7 @@ the-show-verse/
 **Ubicación:** `/discover`
 
 **Características:**
+
 - ✅ Búsqueda por texto (películas, series, actores)
 - ✅ Filtros avanzados:
   - Tipo de contenido (Movie/TV)
@@ -659,9 +677,10 @@ the-show-verse/
 - ✅ Vista Grid responsive
 - ✅ Persistencia de filtros en URL
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de filtros avanzados
 -->
+
 ![Filtros Avanzados](docs/screenshots/feature-filters.png)
 
 ---
@@ -671,6 +690,7 @@ the-show-verse/
 **Ubicación:** `/details/[type]/[id]`
 
 **Características:**
+
 - ✅ Header con backdrop, poster y información principal
 - ✅ Sinopsis completa en español
 - ✅ Metadatos: duración, fecha, géneros, rating
@@ -691,14 +711,16 @@ the-show-verse/
   - Gestión de episodios vistos
   - Estadísticas de progreso
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de header de detalles
 -->
+
 ![Detalles Header](docs/screenshots/feature-details-header.png)
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de cast y crew
 -->
+
 ![Cast y Crew](docs/screenshots/feature-cast.png)
 
 ---
@@ -708,6 +730,7 @@ the-show-verse/
 **Ubicación:** `/s/season/[show_id]/[season_number]`
 
 **Características:**
+
 - ✅ Lista completa de episodios de la temporada
 - ✅ Información por episodio:
   - Título y sinopsis
@@ -721,14 +744,16 @@ the-show-verse/
 - ✅ Grid de ratings por episodio
 - ✅ Modal de gestión avanzada de episodios
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de lista de episodios
 -->
+
 ![Episodios](docs/screenshots/feature-episodes.png)
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de modal de episodios vistos
 -->
+
 ![Modal Episodios](docs/screenshots/feature-episodes-modal.png)
 
 ---
@@ -738,6 +763,7 @@ the-show-verse/
 **Ubicación:** `/favorites`
 
 **Características:**
+
 - ✅ Sincronización bidireccional con Trakt.tv
 - ✅ Separación por pestañas: Movies / Shows
 - ✅ Contador total en navbar
@@ -748,9 +774,10 @@ the-show-verse/
 - ✅ Estados de carga con skeletons
 - ✅ Mensaje cuando está vacío
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de pestañas Movies/Shows
 -->
+
 ![Favoritos Tabs](docs/screenshots/feature-favorites-tabs.png)
 
 ---
@@ -760,6 +787,7 @@ the-show-verse/
 **Ubicación:** `/watchlist`
 
 **Características:**
+
 - ✅ Lista de pendientes por ver
 - ✅ Todas las funcionalidades de Favoritos
 - ✅ Añadir desde detalles o búsqueda
@@ -767,9 +795,10 @@ the-show-verse/
 - ✅ Sincronización con Trakt
 - ✅ Filtros y ordenación
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de watchlist con contador
 -->
+
 ![Watchlist](docs/screenshots/feature-watchlist.png)
 
 ---
@@ -779,6 +808,7 @@ the-show-verse/
 **Ubicación:** `/history`
 
 **Características:**
+
 - ✅ Registro completo de contenido visto
 - ✅ Estadísticas por período:
   - Esta semana
@@ -795,14 +825,16 @@ the-show-verse/
 - ✅ Vista Grid premium con hover effects
 - ✅ Vista List detallada con tabla
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de estadísticas de historial
 -->
+
 ![Historial Stats](docs/screenshots/feature-history-stats.png)
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: GIF del efecto spotlight en Compact
 -->
+
 ![Spotlight Effect](docs/screenshots/feature-spotlight.gif)
 
 ---
@@ -812,6 +844,7 @@ the-show-verse/
 **Ubicación:** `/calendar`
 
 **Características:**
+
 - ✅ Vista mensual interactiva
 - ✅ Marcadores de:
   - Estrenos de series que sigues
@@ -822,9 +855,10 @@ the-show-verse/
 - ✅ Colores diferenciados por tipo
 - ✅ Integración con Trakt calendar
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura del calendario con eventos
 -->
+
 ![Calendario Eventos](docs/screenshots/feature-calendar.png)
 
 ---
@@ -834,6 +868,7 @@ the-show-verse/
 **Ubicación:** `/lists`
 
 **Características:**
+
 - ✅ Explorador de listas populares de Trakt
 - ✅ Listas de usuarios seguidos
 - ✅ Creación de listas propias
@@ -842,9 +877,10 @@ the-show-verse/
 - ✅ Navegación entre items de la lista
 - ✅ Colecciones de TMDb (ej. Marvel Cinematic Universe)
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de explorador de listas
 -->
+
 ![Listas](docs/screenshots/feature-lists.png)
 
 ---
@@ -854,6 +890,7 @@ the-show-verse/
 **Ubicación:** `/s/person/[id]`
 
 **Características:**
+
 - ✅ Biografía completa
 - ✅ Fecha y lugar de nacimiento
 - ✅ Galería de fotos del actor
@@ -865,14 +902,16 @@ the-show-verse/
 - ✅ Enlaces externos (IMDb, TMDb)
 - ✅ Carruseles de known for (obras destacadas)
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de biografía de actor
 -->
+
 ![Actor Bio](docs/screenshots/feature-actor-bio.png)
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de filmografía
 -->
+
 ![Filmografía](docs/screenshots/feature-filmography.png)
 
 ---
@@ -880,6 +919,7 @@ the-show-verse/
 ### 🔐 Autenticación Trakt
 
 **Características:**
+
 - ✅ Flujo OAuth 2.0 completo
 - ✅ Botón de conexión en navbar
 - ✅ Redirección a Trakt para autorización
@@ -890,14 +930,16 @@ the-show-verse/
 - ✅ Menú de perfil con logout
 - ✅ Middleware de protección de rutas
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura del botón de login
 -->
+
 ![Trakt Login](docs/screenshots/feature-trakt-login.png)
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura del avatar y menú
 -->
+
 ![User Menu](docs/screenshots/feature-user-menu.png)
 
 ---
@@ -907,6 +949,7 @@ the-show-verse/
 #### Vista Grid
 
 **Características:**
+
 - Cuadrícula responsive (2-6 columnas según viewport)
 - Posters verticales con aspect ratio 2:3
 - Hover effect: scale + backdrop reveal
@@ -916,6 +959,7 @@ the-show-verse/
 #### Vista List
 
 **Características:**
+
 - Tabla con todas las columnas de información
 - Poster pequeño + título + año + rating + acciones
 - Ordenación por columna
@@ -925,15 +969,17 @@ the-show-verse/
 #### Vista Compact
 
 **Características:**
+
 - Posters horizontales muy pequeños
 - Máxima densidad de información
 - Hover expande a backdrop completo
 - Efecto spotlight (blur de adyacentes)
 - Ideal para listas largas
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: GIF comparando las 3 vistas
 -->
+
 ![Comparación Vistas](docs/screenshots/feature-views-comparison.gif)
 
 ---
@@ -973,18 +1019,21 @@ desktop: 1440px+     → 5-6 columnas
 ### Adaptaciones por Dispositivo
 
 **Mobile (< 640px):**
+
 - Navbar colapsada en hamburger menu
 - Carruseles con scroll horizontal táctil
 - Botones de acción en bottom sheet
 - Modales a pantalla completa
 
 **Tablet (640-1024px):**
+
 - Navbar completa con iconos
 - Grid de 3-4 columnas
 - Sidebar colapsable
 - Touch-optimized interactions
 
 **Desktop (1024px+):**
+
 - Navbar completa con texto
 - Grid de 5-6 columnas
 - Hover effects completos
@@ -996,27 +1045,28 @@ desktop: 1440px+     → 5-6 columnas
 
 ### Lighthouse Scores
 
-<!-- 
+<!--
 📸 AÑADIR AQUÍ: Captura de Lighthouse report
 -->
+
 ![Lighthouse](docs/screenshots/lighthouse-scores.png)
 
-| Métrica | Score | Estado |
-|---------|-------|--------|
-| ⚡ Performance | 92/100 | ✅ Excelente |
-| ♿ Accessibility | 88/100 | 🔄 Mejorando |
-| ✅ Best Practices | 95/100 | ✅ Excelente |
-| 🔍 SEO | 100/100 | ✅ Perfecto |
+| Métrica           | Score   | Estado       |
+| ----------------- | ------- | ------------ |
+| ⚡ Performance    | 92/100  | ✅ Excelente |
+| ♿ Accessibility  | 88/100  | 🔄 Mejorando |
+| ✅ Best Practices | 95/100  | ✅ Excelente |
+| 🔍 SEO            | 100/100 | ✅ Perfecto  |
 
 ### Core Web Vitals
 
-| Métrica | Valor | Objetivo | Estado |
-|---------|-------|----------|--------|
-| **LCP** (Largest Contentful Paint) | 1.8s | < 2.5s | ✅ |
-| **FID** (First Input Delay) | 45ms | < 100ms | ✅ |
-| **CLS** (Cumulative Layout Shift) | 0.05 | < 0.1 | ✅ |
-| **FCP** (First Contentful Paint) | 1.2s | < 1.8s | ✅ |
-| **TTI** (Time to Interactive) | 2.5s | < 3.8s | ✅ |
+| Métrica                            | Valor | Objetivo | Estado |
+| ---------------------------------- | ----- | -------- | ------ |
+| **LCP** (Largest Contentful Paint) | 1.8s  | < 2.5s   | ✅     |
+| **FID** (First Input Delay)        | 45ms  | < 100ms  | ✅     |
+| **CLS** (Cumulative Layout Shift)  | 0.05  | < 0.1    | ✅     |
+| **FCP** (First Contentful Paint)   | 1.2s  | < 1.8s   | ✅     |
+| **TTI** (Time to Interactive)      | 2.5s  | < 3.8s   | ✅     |
 
 ### Bundle Size
 
@@ -1100,17 +1150,20 @@ Page                                Size     First Load JS
 ### Guías de Estilo
 
 **Código:**
+
 - Sigue las reglas de ESLint configuradas
 - Usa TypeScript para nuevos componentes
 - Comenta código complejo
 - Mantén componentes pequeños y reutilizables
 
 **Commits:**
+
 - Usa [Conventional Commits](https://www.conventionalcommits.org/)
 - Formato: `tipo: descripción`
 - Tipos: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
 **Pull Requests:**
+
 - Descripción clara del cambio
 - Screenshots si hay cambios visuales
 - Tests si es posible
@@ -1119,6 +1172,7 @@ Page                                Size     First Load JS
 ### Reportar Bugs
 
 Usa [GitHub Issues](../../issues) con la plantilla de bug:
+
 - Descripción del problema
 - Pasos para reproducir
 - Comportamiento esperado vs actual
@@ -1128,6 +1182,7 @@ Usa [GitHub Issues](../../issues) con la plantilla de bug:
 ### Solicitar Features
 
 Usa [GitHub Issues](../../issues) con la plantilla de feature:
+
 - Descripción clara de la funcionalidad
 - Justificación (¿por qué es útil?)
 - Propuesta de implementación (opcional)

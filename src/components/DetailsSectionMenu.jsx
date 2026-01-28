@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useLayoutEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function DetailsSectionMenu({
   items = [],
@@ -75,25 +76,24 @@ export default function DetailsSectionMenu({
   return (
     <div className={["w-full", className].join(" ")}>
       <nav className={["mx-auto w-full", maxWidthClass].join(" ")}>
-        {/* ✅ Clip + capas controladas */}
         <div
           className={[
             "relative isolate overflow-hidden rounded-2xl sm:rounded-3xl",
-            "shadow-[0_8px_32px_rgba(0,0,0,0.4)]",
+            "shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
             "transform-gpu",
           ].join(" ")}
+          style={{ contain: 'layout style' }}
         >
-          {/* Fondo + blur dentro del help de overflow-hidden */}
           <div
             className={[
               "absolute inset-0 rounded-[inherit] backdrop-blur-xl",
-              "bg-black/85",
+              "bg-gradient-to-br from-black/90 via-black/85 to-black/90",
             ].join(" ")}
           />
 
           <div className="relative">
-            <div className="border-b border-white/5">
-              <div className="py-2">
+            <div>
+              <div className="py-2.5">
                 <div ref={containerRef} className="w-full overflow-hidden">
                   <div className="flex w-full justify-center">
                     <div
@@ -103,7 +103,7 @@ export default function DetailsSectionMenu({
                         fits
                           ? "w-full justify-between"
                           : "w-max justify-center",
-                        "gap-1 sm:gap-2",
+                        "gap-1.5 sm:gap-2",
                         "px-5 sm:px-7",
                       ].join(" ")}
                       style={{
@@ -112,60 +112,114 @@ export default function DetailsSectionMenu({
                         willChange: "transform",
                       }}
                     >
-                      {safeItems.map((item) => {
+                      {safeItems.map((item, index) => {
                         const Icon = item.icon;
                         const active = item.id === activeId;
 
                         return (
-                          <button
+                          <motion.button
                             key={item.id}
                             onClick={() => onChange?.(item.id)}
                             type="button"
                             aria-current={active ? "page" : undefined}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
                             className={[
-                              "group relative flex items-center justify-center rounded-lg",
-                              "px-2.5 py-2 sm:px-3 sm:py-2.5",
-                              "transition-all duration-200",
+                              "group relative flex items-center justify-center rounded-xl",
+                              "px-3 py-2 sm:px-3.5 sm:py-2.5",
+                              "transition-all duration-300 ease-out",
                               "outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/50",
-                              "hover:bg-white/5",
                               "whitespace-nowrap",
+                              active ? "" : "hover:bg-white/5",
                             ].join(" ")}
                             title={item.label}
                             aria-label={item.label}
                           >
-                            {active && (
-                              <div className="absolute inset-0 rounded-lg bg-white/10 shadow-inner" />
-                            )}
+                            <AnimatePresence mode="wait">
+                              {active && (
+                                <motion.div
+                                  layoutId="activeSectionBg"
+                                  initial={{ opacity: 0, scale: 0.9 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.9 }}
+                                  transition={{
+                                    type: "spring",
+                                    stiffness: 600,
+                                    damping: 25,
+                                  }}
+                                  className="absolute inset-0 rounded-xl bg-gradient-to-br from-yellow-500/15 via-yellow-400/8 to-orange-500/12 shadow-lg border border-yellow-500/20"
+                                />
+                              )}
+                            </AnimatePresence>
 
                             <div className="relative z-10 flex items-center gap-2">
                               {Icon && (
-                                <Icon
-                                  className={[
-                                    "h-5 w-5 transition-colors duration-300",
-                                    active
-                                      ? "text-yellow-400"
-                                      : "text-zinc-400 group-hover:text-zinc-200",
-                                  ].join(" ")}
-                                />
+                                <motion.div
+                                  animate={{
+                                    scale: active ? 1.08 : 1,
+                                    rotate: active ? [0, -3, 3, 0] : 0,
+                                  }}
+                                  transition={{
+                                    duration: 0.4,
+                                    ease: "easeOut",
+                                  }}
+                                >
+                                  <Icon
+                                    className={[
+                                      "h-5 w-5 transition-all duration-300",
+                                      active
+                                        ? "text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.6)]"
+                                        : "text-zinc-400 group-hover:text-zinc-200",
+                                    ].join(" ")}
+                                  />
+                                </motion.div>
                               )}
 
-                              <span
+                              <motion.span
+                                animate={{
+                                  scale: active ? 1.02 : 1,
+                                }}
+                                transition={{ duration: 0.3 }}
                                 className={[
                                   "hidden sm:inline",
-                                  "text-sm font-semibold tracking-wide uppercase transition-colors duration-300",
+                                  "text-sm font-semibold tracking-wider uppercase transition-all duration-300",
                                   active
-                                    ? "text-white"
+                                    ? "text-white font-bold"
                                     : "text-zinc-400 group-hover:text-zinc-200",
                                 ].join(" ")}
                               >
                                 {item.label}
-                              </span>
+                              </motion.span>
+
+                              {item.badge && (
+                                <motion.span
+                                  initial={{ scale: 0, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  transition={{ delay: 0.2, type: "spring", stiffness: 500 }}
+                                  className="ml-1 rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-400 border border-yellow-500/30"
+                                >
+                                  {item.badge}
+                                </motion.span>
+                              )}
                             </div>
 
-                            {active && (
-                              <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent opacity-80" />
-                            )}
-                          </button>
+                            <AnimatePresence>
+                              {active && (
+                                <motion.span
+                                  layoutId="activeSectionIndicator"
+                                  initial={{ scaleX: 0, opacity: 0 }}
+                                  animate={{ scaleX: 1, opacity: 1 }}
+                                  exit={{ scaleX: 0, opacity: 0 }}
+                                  transition={{
+                                    type: "spring",
+                                    stiffness: 600,
+                                    damping: 25,
+                                  }}
+                                  className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r from-yellow-500 via-yellow-400 to-orange-500 shadow-[0_0_8px_rgba(250,204,21,0.5)]"
+                                />
+                              )}
+                            </AnimatePresence>
+                          </motion.button>
                         );
                       })}
                     </div>
