@@ -43,7 +43,7 @@ export default function TraktWatchedControl({
 
             {badgeText && (
                 <span
-                    className="absolute -bottom-1 -right-2 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold
+                    className="absolute -bottom-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold
             bg-black/70 border border-black/70 text-white flex items-center justify-center z-10 pointer-events-none"
                     aria-label={`Progreso: ${badgeText}`}
                 >
