@@ -1202,7 +1202,7 @@ export default function DetailsClient({
       (acc, s) => acc + Math.max(0, Number(s?.episode_count || 0)),
       0,
     );
-    if (totalEpisodes <= 0) return "0%";
+    if (totalEpisodes <= 0) return null;
 
     const watchedEpisodes = usable.reduce((acc, s) => {
       const sn = s.season_number;
@@ -1211,7 +1211,9 @@ export default function DetailsClient({
     }, 0);
 
     const pct = Math.round((watchedEpisodes / totalEpisodes) * 100);
-    return `${Math.min(100, Math.max(0, pct))}%`;
+    const safePct = Math.min(100, Math.max(0, pct));
+    if (safePct <= 0) return null;
+    return `${safePct}%`;
   }, [
     endpointType,
     trakt?.connected,
