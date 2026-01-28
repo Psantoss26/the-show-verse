@@ -82,7 +82,7 @@ export default function DetailsSectionMenu({
             "shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
             "transform-gpu",
           ].join(" ")}
-          style={{ contain: 'layout style' }}
+          style={{ contain: "layout style" }}
         >
           <div
             className={[
@@ -139,13 +139,13 @@ export default function DetailsSectionMenu({
                               {active && (
                                 <motion.div
                                   layoutId="activeSectionBg"
-                                  initial={{ opacity: 0, scale: 0.9 }}
+                                  initial={{ opacity: 0, scale: 0.95 }}
                                   animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.9 }}
+                                  exit={{ opacity: 0, scale: 0.95 }}
                                   transition={{
                                     type: "spring",
-                                    stiffness: 600,
-                                    damping: 25,
+                                    stiffness: 800,
+                                    damping: 20,
                                   }}
                                   className="absolute inset-0 rounded-xl bg-gradient-to-br from-yellow-500/15 via-yellow-400/8 to-orange-500/12 shadow-lg border border-yellow-500/20"
                                 />
@@ -160,7 +160,7 @@ export default function DetailsSectionMenu({
                                     rotate: active ? [0, -3, 3, 0] : 0,
                                   }}
                                   transition={{
-                                    duration: 0.4,
+                                    duration: 0.2,
                                     ease: "easeOut",
                                   }}
                                 >
@@ -195,7 +195,10 @@ export default function DetailsSectionMenu({
                                 <motion.span
                                   initial={{ scale: 0, opacity: 0 }}
                                   animate={{ scale: 1, opacity: 1 }}
-                                  transition={{ delay: 0.2, type: "spring", stiffness: 500 }}
+                                  transition={{
+                                    duration: 0.15,
+                                    ease: "easeOut",
+                                  }}
                                   className="ml-1 rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-400 border border-yellow-500/30"
                                 >
                                   {item.badge}
@@ -212,8 +215,8 @@ export default function DetailsSectionMenu({
                                   exit={{ scaleX: 0, opacity: 0 }}
                                   transition={{
                                     type: "spring",
-                                    stiffness: 600,
-                                    damping: 25,
+                                    stiffness: 800,
+                                    damping: 20,
                                   }}
                                   className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r from-yellow-500 via-yellow-400 to-orange-500 shadow-[0_0_8px_rgba(250,204,21,0.5)]"
                                 />
