@@ -174,7 +174,7 @@ async function fetchBestBackdropEN(type, id) {
   if (!apiKey || !type || !id) return null;
   try {
     // EN only (tu criterio exige EN; si no hay, devuelve null)
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();

@@ -79,15 +79,16 @@ export default function DetailsSectionMenu({
         <div
           className={[
             "relative isolate overflow-hidden rounded-2xl sm:rounded-3xl",
-            "shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
+            "shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
             "transform-gpu",
           ].join(" ")}
           style={{ contain: "layout style" }}
         >
           <div
             className={[
-              "absolute inset-0 rounded-[inherit] backdrop-blur-xl",
-              "bg-gradient-to-br from-black/90 via-black/85 to-black/90",
+              "absolute inset-0 rounded-[inherit] backdrop-blur-2xl",
+              "bg-gradient-to-br from-black/40 via-black/30 to-black/35",
+              "border border-white/10",
             ].join(" ")}
           />
 
