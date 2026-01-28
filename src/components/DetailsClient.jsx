@@ -4622,8 +4622,12 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
           {/* ✅ Sticky debajo del navbar */}
           <div
             ref={menuStickyRef}
-            className="sticky z-30 pt-2"
-            style={{ top: STICKY_TOP }}
+            className="sticky z-30 py-2"
+            style={{ 
+              top: STICKY_TOP,
+              willChange: 'transform',
+              backfaceVisibility: 'hidden',
+            }}
           >
             <DetailsSectionMenu
               items={sectionItems}
