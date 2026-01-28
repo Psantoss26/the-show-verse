@@ -2357,7 +2357,7 @@ export default function FavoritesPage() {
   // --- UI states ---
   if (authStatus === "checking") {
     return (
-      <div className="min-h-screen bg-[#101010] overflow-y-scroll flex items-center justify-center">
+      <div className="min-h-screen bg-[#101010] flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-red-500" />
       </div>
     );
@@ -2365,7 +2365,7 @@ export default function FavoritesPage() {
 
   if (authStatus === "anonymous") {
     return (
-      <div className="min-h-screen bg-[#101010] overflow-y-scroll max-w-7xl mx-auto px-4 py-20 flex flex-col items-center justify-center text-center">
+      <div className="min-h-screen bg-[#101010] max-w-7xl mx-auto px-4 py-20 flex flex-col items-center justify-center text-center">
         <Heart className="w-16 h-16 text-neutral-700 mb-4" />
         <h1 className="text-3xl font-bold text-white mb-2">Favoritas</h1>
         <p className="text-neutral-400 mb-6">
@@ -2382,7 +2382,7 @@ export default function FavoritesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#101010] overflow-y-scroll text-gray-100 font-sans selection:bg-red-500/30">
+    <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-red-500/30">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-1/4 w-[600px] h-[600px] bg-red-600/5 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-10%] right-1/4 w-[500px] h-[500px] bg-indigo-600/5 rounded-full blur-[100px]" />
