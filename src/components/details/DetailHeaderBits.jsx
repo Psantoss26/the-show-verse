@@ -3,6 +3,7 @@
 
 import { useState } from 'react'
 import { Star, Share2, Check } from 'lucide-react'
+import LiquidButton from '../LiquidButton'
 
 export function CompactBadge({
     logo,
@@ -235,18 +236,15 @@ export function ActionShareButton({ title, text, url }) {
     }
 
     return (
-        <button
+        <LiquidButton
             onClick={handleShare}
-            className={`
-        w-12 h-12 rounded-full flex items-center justify-center transition-all border
-        ${copied
-                    ? 'border-green-500/50 bg-green-500/10 text-green-400 hover:bg-green-500/20'
-                    : 'border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
-                }
-      `}
+            active={true}
+            activeColor="teal"
+            groupId="details-actions"
+            className="flex-shrink-0"
             title={copied ? '¡Enlace copiado!' : 'Compartir'}
         >
             {copied ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
-        </button>
+        </LiquidButton>
     )
 }

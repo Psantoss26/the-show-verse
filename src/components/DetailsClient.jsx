@@ -4185,7 +4185,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   setUseBackdrop((v) => !v);
                 }}
                 active={useBackdrop}
-                activeColor="green"
+                activeColor="yellow"
                 groupId="details-actions"
                 title={useBackdrop ? "Ocultar fondo" : "Mostrar fondo"}
               >
