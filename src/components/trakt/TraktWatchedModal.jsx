@@ -14,6 +14,8 @@ import {
     Check,
     Clock,
     History
+    ,
+    Eye
 } from 'lucide-react'
 
 // --- Helpers de Fecha (Mismos que tenías) ---
@@ -378,7 +380,7 @@ export default function TraktWatchedModal({
                             <div className="space-y-3">
                                 {items.slice(0, 20).map((it) => {
                                     const isEditing = editingId === it.id
-                                    const { date, time } = formatFullWatched(it.watchedAt)
+                                    const { date } = formatFullWatched(it.watchedAt)
 
                                     return (
                                         <div
@@ -397,14 +399,11 @@ export default function TraktWatchedModal({
                                                         w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border
                                                         ${isEditing ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500' : 'bg-white/5 border-white/5 text-zinc-500'}
                                                     `}>
-                                                        {isEditing ? <Pencil className="w-5 h-5" /> : <Check className="w-5 h-5" />}
+                                                        {isEditing ? <Pencil className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                                     </div>
                                                     <div>
-                                                        <div className={`text-sm font-bold ${isEditing ? 'text-yellow-100' : 'text-zinc-200'}`}>
+                                                        <div className={`text-base sm:text-lg font-extrabold tracking-tight leading-tight ${isEditing ? 'text-yellow-100' : 'text-zinc-100'}`}>
                                                             {isEditing ? 'Editando fecha...' : date}
-                                                        </div>
-                                                        <div className="text-xs text-zinc-500 font-mono mt-0.5 flex items-center gap-1">
-                                                            {!isEditing && <>{time} · ID: {it.id.toString().slice(-4)}</>}
                                                         </div>
                                                     </div>
                                                 </div>
