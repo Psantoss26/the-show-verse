@@ -2253,10 +2253,17 @@ export default function FavoritesPage() {
           key={`${mediaType}-${item.id}`}
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
+          whileHover={{
+            scale: 1.06,
+            zIndex: 50,
+            boxShadow:
+              "0 10px 20px -5px rgb(0 0 0 / 0.4), 0 4px 8px -4px rgb(0 0 0 / 0.3)",
+            borderColor: "rgba(16, 185, 129, 0.25)",
+          }}
           transition={{
             duration: 0.4,
-            delay: Math.min(index * 0.03, 0.6),
             ease: [0.25, 0.1, 0.25, 1],
+            whileHover: { type: "spring", stiffness: 300, damping: 25 },
           }}
           layout
         >
