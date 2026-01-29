@@ -807,7 +807,14 @@ async function fetchAccountListPage({
   if (!r.ok) throw new Error(j?.status_message || "TMDb request failed");
 
   const results = Array.isArray(j?.results) ? j.results : [];
-  const withType = results.map((it) => ({ ...it, media_type: mediaType }));
+  // TMDb devuelve los items ordenados por created_at.desc pero no incluye ese campo
+  // Asignamos un índice sintético basado en el orden (página * 20 + índice)
+  const currentPage = j?.page || page || 1;
+  const withType = results.map((it, idx) => ({
+    ...it,
+    media_type: mediaType,
+    _added_index: (currentPage - 1) * 20 + idx,
+  }));
 
   return {
     page: j?.page || page || 1,
@@ -1564,9 +1571,10 @@ export default function FavoritesPage() {
     };
 
     const getAddedTs = (i) => {
-      const v = i?.created_at;
-      const ts = v ? Date.parse(v) : 0;
-      return Number.isFinite(ts) ? ts : 0;
+      // Usar el índice sintético que asignamos al cargar desde TMDb
+      // Como vienen ordenados desc, índices menores = más recientes
+      const idx = i?._added_index;
+      return typeof idx === "number" ? idx : 0;
     };
 
     const getTitle = (i) =>
@@ -1592,9 +1600,11 @@ export default function FavoritesPage() {
 
       switch (sortBy) {
         case "added_desc":
-          return getAddedTs(b) - getAddedTs(a);
-        case "added_asc":
+          // Índices menores = más recientes (viene descendente de TMDb)
           return getAddedTs(a) - getAddedTs(b);
+        case "added_asc":
+          // Índices mayores = más antiguos
+          return getAddedTs(b) - getAddedTs(a);
 
         case "year_desc":
           return yb - ya;
