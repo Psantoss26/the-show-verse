@@ -1577,10 +1577,26 @@ export default function HistoryClient() {
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
   // UI States
-  const [viewMode, setViewMode] = useState("compact"); // 'list' | 'grid' | 'compact' - Default to compact
-  const [groupBy, setGroupBy] = useState("day");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("date-desc"); // 'date-desc' | 'date-asc' | 'title-asc' | 'title-desc'
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window === "undefined") return "compact";
+    const saved = window.localStorage.getItem("showverse:history:viewMode");
+    return saved === "list" || saved === "grid" || saved === "compact" ? saved : "compact";
+  });
+  const [groupBy, setGroupBy] = useState(() => {
+    if (typeof window === "undefined") return "day";
+    const saved = window.localStorage.getItem("showverse:history:groupBy");
+    return saved || "day";
+  });
+  const [typeFilter, setTypeFilter] = useState(() => {
+    if (typeof window === "undefined") return "all";
+    const saved = window.localStorage.getItem("showverse:history:typeFilter");
+    return saved || "all";
+  });
+  const [sortBy, setSortBy] = useState(() => {
+    if (typeof window === "undefined") return "date-desc";
+    const saved = window.localStorage.getItem("showverse:history:sortBy");
+    return saved || "date-desc";
+  });
   const [q, setQ] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [monthDate, setMonthDate] = useState(() => {
@@ -1592,6 +1608,24 @@ export default function HistoryClient() {
   const [isMobile, setIsMobile] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [showCalendarView, setShowCalendarView] = useState(false);
+
+  // Persistir estados de UI en localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("showverse:history:viewMode", viewMode);
+  }, [viewMode]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("showverse:history:groupBy", groupBy);
+  }, [groupBy]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("showverse:history:typeFilter", typeFilter);
+  }, [typeFilter]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("showverse:history:sortBy", sortBy);
+  }, [sortBy]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1024px)");
