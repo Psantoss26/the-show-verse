@@ -17,6 +17,8 @@ const PLATFORM_URLS = {
   prime: "https://www.primevideo.com/search/ref=atv_nb_sug?phrase=",
   disney: "https://www.disneyplus.com/search?q=",
   hbo: "https://www.max.com/search?q=",
+  max: "https://www.max.com/search?q=",
+  "hbo-max": "https://www.max.com/search?q=",
   apple: "https://tv.apple.com/search?term=",
   movistar: "https://ver.movistarplus.es/buscar/",
   skyshowtime: "https://www.skyshowtime.com/search?query=",
@@ -34,11 +36,13 @@ const PLATFORM_URLS = {
 const JUSTWATCH_TO_TMDB_PROVIDER = {
   // Principales plataformas
   8: { tmdb_id: 8, logo_path: "/t2yyOv40HZeVlLjYsCsPHnWLk4W.jpg" }, // Netflix
-  9: { tmdb_id: 9, logo_path: "/emthp39XA2YScoYL1p0sdbAH2WA.jpg" }, // Amazon Prime Video
+  119: { tmdb_id: 119, logo_path: "/pvske1MyAoymrs5bguRfVqYiM9a.jpg" }, // Amazon Prime Video
   337: { tmdb_id: 337, logo_path: "/7rwgEs15tFwyR9NPQ5vpzxTj19Q.jpg" }, // Disney+
-  384: { tmdb_id: 384, logo_path: "/Ajqyt5aNxNGjmF9uOfxArGrdf3X.jpg" }, // HBO Max
+  384: { tmdb_id: 384, logo_path: "/Ajqyt5aNxNGjmF9uOfxArGrdf3X.jpg" }, // HBO Max (internacional)
+  1899: { tmdb_id: 1899, logo_path: "/jbe4gVSfRlbPTdESXhEKpornsfu.jpg" }, // HBO Max (España)
   350: { tmdb_id: 350, logo_path: "/6uhKBfmtzFqOcLousHwZuzcrScK.jpg" }, // Apple TV+
-  149: { tmdb_id: 149, logo_path: "/8z7rC8uIDaTM91X0ZfkRf04ydj2.jpg" }, // Movistar Plus+
+  2241: { tmdb_id: 2241, logo_path: "/jse4MOi92Jgetym7nbXFZZBI6LK.jpg" }, // Movistar Plus+ (principal)
+  149: { tmdb_id: 149, logo_path: "/f6TRLB3H4jDpFEZ0z2KWSSvu1SB.jpg" }, // Movistar Plus+ Ficción Total
   583: { tmdb_id: 583, logo_path: "/2ioan5BX5L9tz4fIGU93blTeFhv.jpg" }, // SkyShowtime
   63: { tmdb_id: 63, logo_path: "/cQQYtdaCg7vDo28JPru4v8Ypi8x.jpg" }, // Filmin
   531: { tmdb_id: 531, logo_path: "/xbhHHa1YgtpwhC8lb1NQ3ACVcLd.jpg" }, // Paramount+
@@ -47,7 +51,6 @@ const JUSTWATCH_TO_TMDB_PROVIDER = {
   35: { tmdb_id: 35, logo_path: "/5GEbAhFW2S5T8zVc1MNvz00pIzM.jpg" }, // Rakuten TV
 
   // Plataformas adicionales comunes en España
-  119: { tmdb_id: 119, logo_path: "/pZgeSWpfvD59x6sLFQevirwfF7E.jpg" }, // Amazon Prime Video (adicional)
   167: { tmdb_id: 167, logo_path: "/9TYc5ODeLxwRmxbUrhQSbqc72Nx.jpg" }, // FlixOlé
   3: { tmdb_id: 3, logo_path: "/tbEdP95K91o5eYHN4l3wtnr5HCJ.jpg" }, // Google Play Movies
   2: { tmdb_id: 2, logo_path: "/5vfrJQgNe9UnHVgVNAwZTy0Jo9o.jpg" }, // Apple iTunes
