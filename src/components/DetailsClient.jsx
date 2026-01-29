@@ -3753,10 +3753,38 @@ export default function DetailsClient({
     [type],
   );
 
-  // Cargar providers desde JustWatch
+  // Cargar providers desde JustWatch con caché en sessionStorage
   useEffect(() => {
     if (!title || !id) return;
 
+    const cacheKey = `streaming:${endpointType}:${id}`;
+    const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
+
+    // Intentar cargar desde caché primero
+    const loadFromCache = () => {
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const { providers, justwatchUrl, timestamp } = JSON.parse(cached);
+          const age = Date.now() - timestamp;
+
+          if (age < CACHE_TTL) {
+            setStreamingProviders(providers || []);
+            setJustwatchUrl(justwatchUrl || null);
+            setProvidersLoading(false);
+            return true;
+          }
+        }
+      } catch (error) {
+        console.error("Error loading providers from cache:", error);
+      }
+      return false;
+    };
+
+    // Si hay caché válido, usarlo y terminar
+    if (loadFromCache()) return;
+
+    // Si no hay caché, hacer la petición
     const fetchProviders = async () => {
       setProvidersLoading(true);
       try {
@@ -3779,8 +3807,25 @@ export default function DetailsClient({
 
         if (response.ok) {
           const result = await response.json();
-          setStreamingProviders(result.providers || []);
-          setJustwatchUrl(result.justwatchUrl || null);
+          const providers = result.providers || [];
+          const justwatchUrl = result.justwatchUrl || null;
+
+          setStreamingProviders(providers);
+          setJustwatchUrl(justwatchUrl);
+
+          // Guardar en caché
+          try {
+            sessionStorage.setItem(
+              cacheKey,
+              JSON.stringify({
+                providers,
+                justwatchUrl,
+                timestamp: Date.now(),
+              }),
+            );
+          } catch (error) {
+            console.error("Error saving providers to cache:", error);
+          }
         }
       } catch (error) {
         console.error("Error fetching streaming providers:", error);
