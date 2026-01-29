@@ -2200,7 +2200,6 @@ export default function WatchlistPage() {
             title={title}
             onMouseEnter={onPrefetch}
             onFocus={onPrefetch}
-            onClick={onClick}
           >
             <div
               className={`relative ${wrapAspect} w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ${ring} ${hoverShadow} z-0`}
