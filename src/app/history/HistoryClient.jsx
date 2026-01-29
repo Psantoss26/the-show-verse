@@ -972,7 +972,14 @@ const HistoryItemCard = memo(function HistoryItemCard({
   const title = inlineEp ? `${baseTitle} ${inlineEp}` : baseTitle;
 
   const year = getYear(entry);
-  const { time: watchedTime, dayMonth } = formatWatchedLine(entry?.watched_at);
+  const watchedDate = useMemo(() => {
+    const d = new Date(entry?.watched_at);
+    if (Number.isNaN(d.getTime())) return "";
+    return new Intl.DateTimeFormat("es-ES", {
+      day: "numeric",
+      month: "long",
+    }).format(d);
+  }, [entry?.watched_at]);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -1083,48 +1090,57 @@ const HistoryItemCard = memo(function HistoryItemCard({
           </span>
         </div>
 
-        <div className="text-xs text-zinc-500 flex items-center gap-1.5 mt-0.5 font-medium">
-          <RotateCcw className="w-3 h-3" /> {dayMonth} · {watchedTime}
+        <div className="text-xs text-zinc-400 flex items-center gap-1.5 mt-0.5 font-medium">
+          <RotateCcw className="w-3 h-3" /> {watchedDate}
         </div>
       </div>
 
+      {/* ✅ Botón borrar: visible en móvil solo si editMode, en desktop al hover */}
       {!confirmDel && (!isMobile || editMode) && (
         <button
           onClick={handleDeleteClick}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors z-10 opacity-0 group-hover:opacity-100"
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full backdrop-blur-sm bg-black/40 hover:bg-red-600 text-white transition-colors z-10 opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+          title="Borrar"
+          aria-label="Borrar"
         >
           <Trash2 className="w-4 h-4" />
         </button>
       )}
 
+      {/* ✅ Confirmación de borrado */}
       <AnimatePresence>
         {confirmDel && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="absolute inset-0 bg-black/95 z-20 flex items-center justify-end px-4 gap-3 rounded-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <span className="text-red-200 text-xs font-medium mr-auto">
-              ¿Eliminar?
+            <span className="text-red-200 text-xs lg:text-sm font-bold mr-auto">
+              <span className="lg:hidden">Eliminar</span>
+              <span className="hidden lg:inline">¿Eliminar del historial?</span>
             </span>
             <button
               onClick={handleCancel}
-              className="text-zinc-400 hover:text-white text-xs font-bold"
+              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold transition-colors flex items-center gap-1.5"
+              aria-label="Cancelar"
             >
-              Cancelar
+              <X className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Cancelar</span>
             </button>
             <button
               onClick={handleConfirm}
-              className="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2"
+              className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
+              aria-label="Borrar"
             >
               {busy ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Trash2 className="w-3 h-3" />
-              )}{" "}
-              Borrar
+                <Trash2 className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden lg:inline">Borrar</span>
             </button>
           </motion.div>
         )}
@@ -1295,27 +1311,30 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
             className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-3 text-center pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-red-200 text-[11px] font-bold mb-3">
-              ¿Eliminar del historial?
+            <p className="text-red-200 text-[11px] lg:text-xs font-bold mb-3">
+              <span className="lg:hidden">Eliminar</span>
+              <span className="hidden lg:inline">¿Eliminar del historial?</span>
             </p>
             <div className="flex gap-2 w-full">
               <button
                 onClick={handleCancel}
-                className="flex-1 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold transition-colors"
+                className="flex-1 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold transition-colors flex items-center justify-center gap-1"
+                aria-label="Cancelar"
               >
-                Cancelar
+                <X className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">Cancelar</span>
               </button>
               <button
                 onClick={handleConfirm}
                 className="flex-1 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                aria-label="Borrar"
               >
                 {busy ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  <>
-                    <Trash2 className="w-3 h-3" /> Borrar
-                  </>
+                  <Trash2 className="w-3.5 h-3.5" />
                 )}
+                <span className="hidden lg:inline">Borrar</span>
               </button>
             </div>
           </motion.div>
@@ -1516,28 +1535,41 @@ const HistoryGridCard = memo(function HistoryGridCard({
         </button>
       )}
 
+      {/* ✅ Confirmación de borrado */}
       <AnimatePresence>
         {confirmDel && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-4 text-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-red-200 text-xs font-bold mb-3">¿Borrar?</p>
+            <p className="text-red-200 text-xs lg:text-sm font-bold mb-3">
+              <span className="lg:hidden">Eliminar</span>
+              <span className="hidden lg:inline">¿Eliminar del historial?</span>
+            </p>
             <div className="flex gap-2 w-full">
               <button
                 onClick={handleCancel}
-                className="flex-1 py-1.5 rounded bg-zinc-800 text-zinc-300 text-xs font-bold"
+                className="flex-1 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                aria-label="Cancelar"
               >
-                No
+                <X className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">Cancelar</span>
               </button>
               <button
                 onClick={handleConfirm}
-                className="flex-1 py-1.5 rounded bg-red-600 text-white text-xs font-bold flex items-center justify-center"
+                className="flex-1 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                aria-label="Borrar"
               >
-                {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : "Sí"}
+                {busy ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden lg:inline">Borrar</span>
               </button>
             </div>
           </motion.div>
@@ -1580,7 +1612,9 @@ export default function HistoryClient() {
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return "compact";
     const saved = window.localStorage.getItem("showverse:history:viewMode");
-    return saved === "list" || saved === "grid" || saved === "compact" ? saved : "compact";
+    return saved === "list" || saved === "grid" || saved === "compact"
+      ? saved
+      : "compact";
   });
   const [groupBy, setGroupBy] = useState(() => {
     if (typeof window === "undefined") return "day";
