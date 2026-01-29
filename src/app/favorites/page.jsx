@@ -1147,42 +1147,17 @@ export default function FavoritesPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Detectar touch/coarse pointer (para hover en móvil con “tap para preview”)
-  const isTouchRef = useRef(false);
+  // Hover real (desktop/laptop). En móvil será false.
+  const [canHover, setCanHover] = useState(false);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mql = window.matchMedia("(hover: none), (pointer: coarse)");
-    const apply = () => {
-      isTouchRef.current = !!mql.matches;
-    };
+    const mql = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const apply = () => setCanHover(!!mql.matches);
     apply();
     mql.addEventListener?.("change", apply);
     return () => mql.removeEventListener?.("change", apply);
   }, []);
-
-  // “Hover” en móvil: card activa temporalmente
-  const [activeCardKey, setActiveCardKey] = useState(null);
-  const activeTimerRef = useRef(0);
-  const activateCard = useCallback((k) => {
-    setActiveCardKey(k);
-    if (typeof window !== "undefined") {
-      window.clearTimeout(activeTimerRef.current);
-      activeTimerRef.current = window.setTimeout(
-        () => setActiveCardKey(null),
-        2600,
-      );
-    }
-  }, []);
-  useEffect(() => {
-    return () => {
-      if (typeof window !== "undefined")
-        window.clearTimeout(activeTimerRef.current);
-    };
-  }, []);
-  useEffect(() => {
-    // al cambiar de vista, cerramos cualquier overlay “activo”
-    setActiveCardKey(null);
-  }, [coverMode]);
 
   // IMDb ratings
   const [imdbRatings, setImdbRatings] = useState({});
@@ -2206,24 +2181,10 @@ export default function FavoritesPage() {
       const myScore = myRatings[k];
       const myLabel = formatHalfSteps(myScore);
 
-      const cardKey = `${mediaType}:${item.id}`;
-      const isActive = activeCardKey === cardKey;
-
       const onPrefetch = () => {
         prefetchImdb(item);
         prefetchMyRating(item);
         prefetchTraktScore(item);
-      };
-
-      const onClick = (e) => {
-        // "hover" en móvil: primer tap muestra overlay; segundo tap navega
-        if (isTouchRef.current && !isActive) {
-          e.preventDefault();
-          e.stopPropagation();
-          onPrefetch();
-          activateCard(cardKey);
-          return;
-        }
       };
 
       const wrapAspect =
@@ -2233,33 +2194,34 @@ export default function FavoritesPage() {
       const ring = "ring-1 ring-white/5";
       const overlayBase =
         "absolute inset-0 transition-opacity duration-300 flex flex-col justify-between";
-      const overlayOpacity = isActive
-        ? "opacity-100"
-        : "opacity-0 [@media(hover:hover)]:group-hover:opacity-100 group-focus-within:opacity-100";
+      const overlayOpacity =
+        "opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100";
 
-      const topTransform = isActive
-        ? "translate-y-0"
-        : "-translate-y-2 [@media(hover:hover)]:group-hover:translate-y-0 group-focus-within:translate-y-0";
-      const bottomTransform = isActive
-        ? "translate-y-0"
-        : "translate-y-4 [@media(hover:hover)]:group-hover:translate-y-0 group-focus-within:translate-y-0";
+      const topTransform =
+        "-translate-y-2 [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-focus-within:translate-y-0";
 
-      const myTransform = isActive
-        ? "opacity-100 translate-y-0 scale-100"
-        : "opacity-0 translate-y-1 scale-[0.98] [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100";
+      const bottomTransform =
+        "translate-y-4 [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-focus-within:translate-y-0";
+
+      const myTransform =
+        "opacity-0 translate-y-1 scale-[0.98] [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-hover:scale-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-focus-within:translate-y-0 [@media(hover:hover)]:group-focus-within:scale-100";
 
       return (
         <motion.div
           key={`${mediaType}-${item.id}`}
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          whileHover={{
-            scale: 1.06,
-            zIndex: 50,
-            boxShadow:
-              "0 10px 20px -5px rgb(0 0 0 / 0.4), 0 4px 8px -4px rgb(0 0 0 / 0.3)",
-            borderColor: "rgba(16, 185, 129, 0.25)",
-          }}
+          whileHover={
+            canHover
+              ? {
+                  scale: 1.06,
+                  zIndex: 50,
+                  boxShadow:
+                    "0 10px 20px -5px rgb(0 0 0 / 0.4), 0 4px 8px -4px rgb(0 0 0 / 0.3)",
+                  borderColor: "rgba(16, 185, 129, 0.25)",
+                }
+              : undefined
+          }
           transition={{
             duration: 0.4,
             ease: [0.25, 0.1, 0.25, 1],
@@ -2273,7 +2235,6 @@ export default function FavoritesPage() {
             title={title}
             onMouseEnter={onPrefetch}
             onFocus={onPrefetch}
-            onClick={onClick}
           >
             <div
               className={`relative ${wrapAspect} w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ${ring} ${hoverShadow} z-0`}
@@ -2363,11 +2324,9 @@ export default function FavoritesPage() {
       coverMode,
       imdbRatings,
       myRatings,
-      activeCardKey,
       prefetchImdb,
       prefetchMyRating,
       prefetchTraktScore,
-      activateCard,
     ],
   );
 
