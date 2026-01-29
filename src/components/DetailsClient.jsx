@@ -4241,10 +4241,15 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                 badge={endpointType === "tv" ? tvProgressBadge : null}
                 busy={!!traktBusy}
                 onOpen={() => {
-                  if (!trakt.connected)
-                    window.location.href = "/api/trakt/auth/start";
-                  else if (endpointType === "tv") setTraktEpisodesOpen(true);
-                  else setTraktWatchedOpen(true);
+                  if (!trakt.connected) {
+                    window.location.assign(
+                      `/api/trakt/auth/start?next=/details/${type}/${id}`,
+                    );
+                  } else if (endpointType === "tv") {
+                    setTraktEpisodesOpen(true);
+                  } else {
+                    setTraktWatchedOpen(true);
+                  }
                 }}
               />
 
@@ -4363,8 +4368,36 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                           : undefined
                       }
                       href={trakt?.traktUrl}
+                      onClick={
+                        !trakt?.connected
+                          ? () =>
+                              window.location.assign(
+                                `/api/trakt/auth/start?next=/details/${type}/${id}`,
+                              )
+                          : undefined
+                      }
                     />
                   )}
+
+                  {/* Badge de Trakt cuando no está conectado pero hay score público */}
+                  {!traktDecimal &&
+                    !trakt?.connected &&
+                    tScoreboard?.rating && (
+                      <CompactBadge
+                        logo="/logo-Trakt.png"
+                        value={Number(tScoreboard.rating).toFixed(1)}
+                        sub={
+                          tScoreboard.votes
+                            ? formatCountShort(tScoreboard.votes)
+                            : undefined
+                        }
+                        onClick={() =>
+                          window.location.assign(
+                            `/api/trakt/auth/start?next=/details/${type}/${id}`,
+                          )
+                        }
+                      />
+                    )}
 
                   {extras.imdbRating && (
                     <CompactBadge
