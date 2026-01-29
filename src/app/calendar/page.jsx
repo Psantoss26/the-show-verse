@@ -284,19 +284,22 @@ function DateSelector({
 export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState(() => {
-    if (typeof window === "undefined") return "day";
-    const saved = window.localStorage.getItem("showverse:calendar:viewMode");
-    return saved || "day";
-  });
+  const [viewMode, setViewMode] = useState("day");
 
   const [selectedMovies, setSelectedMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Cargar modo de vista guardado solo en el cliente
+  useEffect(() => {
+    const saved = window.localStorage.getItem("showverse:calendar:viewMode");
+    if (saved && (saved === "day" || saved === "week" || saved === "month")) {
+      setViewMode(saved);
+    }
+  }, []);
+
   // Persistir modo de vista
   useEffect(() => {
-    if (typeof window === "undefined") return;
     window.localStorage.setItem("showverse:calendar:viewMode", viewMode);
   }, [viewMode]);
 
@@ -433,47 +436,44 @@ export default function CalendarPage() {
 
           {/* --- CONTROLES DE NAVEGACIÓN Y VISTA --- */}
           <div className="flex flex-col xl:flex-row gap-3 w-full xl:w-auto px-1 sm:px-0 xl:items-end">
-            {/* Dropdown Vista */}
-            <Dropdown
-              label="Vista"
-              valueLabel={viewLabel}
-              icon={CalendarDays}
-              className="w-full xl:w-[180px]"
-            >
-              {({ close }) => (
-                <>
-                  <DropdownItem
-                    active={viewMode === "day"}
-                    onClick={() => {
-                      setViewMode("day");
-                      close();
-                    }}
-                  >
-                    Día
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={viewMode === "week"}
-                    onClick={() => {
-                      setViewMode("week");
-                      close();
-                    }}
-                  >
-                    Semana
-                  </DropdownItem>
-
-                  <DropdownItem
-                    active={viewMode === "month"}
-                    onClick={() => {
-                      setViewMode("month");
-                      close();
-                    }}
-                  >
-                    Mes completo
-                  </DropdownItem>
-                </>
-              )}
-            </Dropdown>
+            {/* Menú Vista */}
+            <div className="w-full xl:w-auto">
+              <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
+                Vista
+              </div>
+              <div className="flex items-center gap-1.5 p-1 bg-zinc-900/50 rounded-xl border border-white/5">
+                <button
+                  onClick={() => setViewMode("day")}
+                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                    viewMode === "day"
+                      ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
+                >
+                  Día
+                </button>
+                <button
+                  onClick={() => setViewMode("week")}
+                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                    viewMode === "week"
+                      ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
+                >
+                  Semana
+                </button>
+                <button
+                  onClick={() => setViewMode("month")}
+                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                    viewMode === "month"
+                      ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
+                >
+                  Mes
+                </button>
+              </div>
+            </div>
 
             {/* Navegación período actual */}
             <div className="flex items-center gap-2 w-full xl:w-auto">
