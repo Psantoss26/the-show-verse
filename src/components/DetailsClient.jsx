@@ -282,8 +282,8 @@ export default function DetailsClient({
   const [activeImagesTab, setActiveImagesTab] = useState("posters");
 
   // ====== JUSTWATCH PROVIDERS ======
-  const [streamingProviders, setStreamingProviders] = useState(providers || []);
-  const [providersLoading, setProvidersLoading] = useState(false);
+  const [streamingProviders, setStreamingProviders] = useState([]);
+  const [providersLoading, setProvidersLoading] = useState(true);
   const [justwatchUrl, setJustwatchUrl] = useState(null);
 
   const imagesScrollRef = useRef(null);
