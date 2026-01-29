@@ -1131,42 +1131,6 @@ export default function WatchlistPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Detectar touch/coarse pointer
-  const isTouchRef = useRef(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mql = window.matchMedia("(hover: none), (pointer: coarse)");
-    const apply = () => {
-      isTouchRef.current = !!mql.matches;
-    };
-    apply();
-    mql.addEventListener?.("change", apply);
-    return () => mql.removeEventListener?.("change", apply);
-  }, []);
-
-  // “Hover” en móvil: card activa temporalmente
-  const [activeCardKey, setActiveCardKey] = useState(null);
-  const activeTimerRef = useRef(0);
-  const activateCard = useCallback((k) => {
-    setActiveCardKey(k);
-    if (typeof window !== "undefined") {
-      window.clearTimeout(activeTimerRef.current);
-      activeTimerRef.current = window.setTimeout(
-        () => setActiveCardKey(null),
-        2600,
-      );
-    }
-  }, []);
-  useEffect(() => {
-    return () => {
-      if (typeof window !== "undefined")
-        window.clearTimeout(activeTimerRef.current);
-    };
-  }, []);
-  useEffect(() => {
-    setActiveCardKey(null);
-  }, [coverMode]);
-
   // IMDb ratings
   const [imdbRatings, setImdbRatings] = useState({});
   const imdbRatingsRef = useRef({});
@@ -2183,23 +2147,10 @@ export default function WatchlistPage() {
       const myScore = myRatings[k];
       const myLabel = formatHalfSteps(myScore);
 
-      const cardKey = `${mediaType}:${item.id}`;
-      const isActive = activeCardKey === cardKey;
-
       const onPrefetch = () => {
         prefetchImdb(item);
         prefetchMyRating(item);
         prefetchTraktScore(item);
-      };
-
-      const onClick = (e) => {
-        if (isTouchRef.current && !isActive) {
-          e.preventDefault();
-          e.stopPropagation();
-          onPrefetch();
-          activateCard(cardKey);
-          return;
-        }
       };
 
       const wrapAspect =
@@ -2209,20 +2160,20 @@ export default function WatchlistPage() {
       const ring = "ring-1 ring-white/5";
       const overlayBase =
         "absolute inset-0 transition-opacity duration-300 flex flex-col justify-between";
-      const overlayOpacity = isActive
-        ? "opacity-100"
-        : "opacity-0 [@media(hover:hover)]:group-hover:opacity-100 group-focus-within:opacity-100";
 
-      const topTransform = isActive
-        ? "translate-y-0"
-        : "-translate-y-2 [@media(hover:hover)]:group-hover:translate-y-0 group-focus-within:translate-y-0";
-      const bottomTransform = isActive
-        ? "translate-y-0"
-        : "translate-y-4 [@media(hover:hover)]:group-hover:translate-y-0 group-focus-within:translate-y-0";
+      const overlayOpacity =
+        "opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100";
 
-      const myTransform = isActive
-        ? "opacity-100 translate-y-0 scale-100"
-        : "opacity-0 translate-y-1 scale-[0.98] [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100";
+      const topTransform =
+        "-translate-y-2 [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-focus-within:translate-y-0";
+
+      const bottomTransform =
+        "translate-y-4 [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-focus-within:translate-y-0";
+
+      const myTransform =
+        "opacity-0 translate-y-1 scale-[0.98] " +
+        "[@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-hover:scale-100 " +
+        "[@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-focus-within:translate-y-0 [@media(hover:hover)]:group-focus-within:scale-100";
 
       return (
         <motion.div
@@ -2339,11 +2290,9 @@ export default function WatchlistPage() {
       coverMode,
       imdbRatings,
       myRatings,
-      activeCardKey,
       prefetchImdb,
       prefetchMyRating,
       prefetchTraktScore,
-      activateCard,
     ],
   );
 
