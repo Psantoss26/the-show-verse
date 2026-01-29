@@ -1574,6 +1574,7 @@ export default function HistoryClient() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [raw, setRaw] = useState([]);
   const [mutatingId, setMutatingId] = useState("");
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
   // UI States
   const [viewMode, setViewMode] = useState("compact"); // 'list' | 'grid' | 'compact' - Default to compact
@@ -1646,23 +1647,18 @@ export default function HistoryClient() {
   }, []);
 
   const handleDisconnect = useCallback(async () => {
-    if (
-      !window.confirm(
-        "¿Estás seguro de que quieres desconectar tu cuenta de Trakt?",
-      )
-    )
-      return;
-
     try {
       await traktDisconnect();
       // Limpiar estado local
       setAuth({ loading: false, connected: false });
       setRaw([]);
       setHistoryLoaded(false);
+      setShowDisconnectModal(false);
       // Redirigir a la página principal
       window.location.href = "/";
     } catch (error) {
       console.error("Error desconectando Trakt:", error);
+      setShowDisconnectModal(false);
       alert("Error al desconectar de Trakt. Por favor, inténtalo de nuevo.");
     }
   }, []);
@@ -1867,7 +1863,7 @@ export default function HistoryClient() {
                 </motion.button>
 
                 <motion.button
-                  onClick={handleDisconnect}
+                  onClick={() => setShowDisconnectModal(true)}
                   disabled={loading}
                   className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-full text-sm font-bold transition disabled:opacity-50 shadow-lg shadow-red-500/5"
                   initial={{ opacity: 0, scale: 0.8 }}
@@ -2591,6 +2587,68 @@ export default function HistoryClient() {
                   }
                   onClose={() => setShowCalendarView(false)}
                 />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Confirmación de Desconexión */}
+      <AnimatePresence>
+        {showDisconnectModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowDisconnectModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="relative w-full max-w-md bg-neutral-900 rounded-2xl border border-white/10 shadow-2xl p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowDisconnectModal(false)}
+                className="absolute top-4 right-4 p-1 rounded-lg hover:bg-white/10 transition-colors"
+                title="Cerrar"
+              >
+                <X className="w-5 h-5 text-white/70" />
+              </button>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                    <LogOut className="w-6 h-6 text-red-400" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white">
+                    Desconectar de Trakt
+                  </h2>
+                </div>
+
+                <p className="text-sm text-white/70">
+                  ¿Estás seguro de que quieres desconectar tu cuenta de Trakt?
+                  Perderás el acceso a tu historial de visualizaciones y tendrás
+                  que volver a conectarte.
+                </p>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setShowDisconnectModal(false)}
+                    className="flex-1 py-2.5 px-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-lg transition-colors border border-white/10"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleDisconnect}
+                    className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg transition-colors"
+                  >
+                    Desconectar
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
