@@ -26,9 +26,9 @@ async function getTMDbTitle(tmdbId, type) {
     const endpoint = type === "movie" ? "movie" : "tv";
     const res = await fetch(
       `${TMDB_API}/${endpoint}/${tmdbId}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=es-ES`,
-      { next: { revalidate: 86400 } }
+      { next: { revalidate: 86400 } },
     );
-    
+
     if (res.ok) {
       const data = await res.json();
       return type === "movie" ? data.title : data.name;
@@ -37,6 +37,27 @@ async function getTMDbTitle(tmdbId, type) {
     console.error(`Error fetching TMDb title for ${type} ${tmdbId}:`, err);
   }
   return null;
+}
+
+async function getTMDbCredits(tmdbId, type) {
+  try {
+    const endpoint = type === "movie" ? "movie" : "tv";
+    const res = await fetch(
+      `${TMDB_API}/${endpoint}/${tmdbId}/credits?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=es-ES`,
+      { next: { revalidate: 86400 } },
+    );
+
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        cast: data.cast || [],
+        crew: data.crew || [],
+      };
+    }
+  } catch (err) {
+    console.error(`Error fetching TMDb credits for ${type} ${tmdbId}:`, err);
+  }
+  return { cast: [], crew: [] };
 }
 
 export async function GET() {
@@ -113,7 +134,7 @@ export async function GET() {
           }
         }
         return item;
-      })
+      }),
     );
 
     // Obtener series más vistas
@@ -143,7 +164,7 @@ export async function GET() {
           }
         }
         return item;
-      })
+      }),
     );
 
     // Obtener historial reciente para análisis temporal
@@ -156,12 +177,63 @@ export async function GET() {
 
     const history = historyRes.ok ? await historyRes.json() : [];
 
+    // Obtener créditos (actores y directores) de las películas más vistas
+    const actorCount = {};
+    const directorCount = {};
+
+    const creditsPromises = moviesWithSpanishTitles
+      .slice(0, 50)
+      .map(async (item) => {
+        const tmdbId = item.movie?.ids?.tmdb;
+        if (tmdbId) {
+          const credits = await getTMDbCredits(tmdbId, "movie");
+
+          // Contar actores (top 5 de cada película)
+          credits.cast.slice(0, 5).forEach((actor) => {
+            if (actor.name) {
+              actorCount[actor.id] = {
+                name: actor.name,
+                profile_path: actor.profile_path,
+                count: (actorCount[actor.id]?.count || 0) + 1,
+              };
+            }
+          });
+
+          // Contar directores
+          credits.crew
+            .filter((member) => member.job === "Director")
+            .forEach((director) => {
+              if (director.name) {
+                directorCount[director.id] = {
+                  name: director.name,
+                  profile_path: director.profile_path,
+                  count: (directorCount[director.id]?.count || 0) + 1,
+                };
+              }
+            });
+        }
+      });
+
+    await Promise.all(creditsPromises);
+
+    const topActors = Object.entries(actorCount)
+      .map(([id, data]) => ({ id: parseInt(id), ...data }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12);
+
+    const topDirectors = Object.entries(directorCount)
+      .map(([id, data]) => ({ id: parseInt(id), ...data }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
     return NextResponse.json({
       username,
       stats,
       watchedMovies: moviesWithSpanishTitles,
       watchedShows: showsWithSpanishTitles,
       history,
+      topActors,
+      topDirectors,
     });
   } catch (e) {
     console.error("Error in user-stats route:", e);
