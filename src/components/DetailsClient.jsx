@@ -704,7 +704,10 @@ export default function DetailsClient({
   const [imagesResFilter, setImagesResFilter] = useState("all"); // all | 720p | 1080p | 2k | 4k
   const [langES, setLangES] = useState(true);
   const [langEN, setLangEN] = useState(true);
-  const [artworkPreloadCount, setArtworkPreloadCount] = useState(8);
+  const [artworkPreloadCount, setArtworkPreloadCount] = useState(4);
+
+  // Render "a la vez": no mostramos la fila hasta tener precargadas las primeras N imágenes
+  const [artworkRowReady, setArtworkRowReady] = useState(false);
 
   // Panel móvil de filtros (Portadas y fondos)
   const [artworkControlsOpen, setArtworkControlsOpen] = useState(false);
@@ -780,12 +783,12 @@ export default function DetailsClient({
 
   const getArtworkSlidesPerView = (width, isPoster) => {
     if (isPoster) {
-      if (width >= 1280) return 8;
-      if (width >= 1024) return 7;
-      if (width >= 768) return 6;
-      if (width >= 640) return 5;
-      if (width >= 500) return 4;
-      return 4;
+      if (width >= 1280) return 7;
+      if (width >= 1024) return 6;
+      if (width >= 768) return 5;
+      if (width >= 640) return 4;
+      if (width >= 500) return 3;
+      return 3;
     }
     if (width >= 1280) return 6;
     if (width >= 1024) return 5;
@@ -927,8 +930,24 @@ export default function DetailsClient({
 
     const usable = filtered.length ? filtered : relaxed;
 
+    // Ordenar para poner el backdrop activo primero en Vista previa
+    const ordered = (() => {
+      if (isBackdropTab && activePath && usable.length > 0) {
+        const activeIdx = usable.findIndex((x) => x?.file_path === activePath);
+        if (activeIdx > 0) {
+          // Mover el activo al principio
+          return [
+            usable[activeIdx],
+            ...usable.slice(0, activeIdx),
+            ...usable.slice(activeIdx + 1),
+          ];
+        }
+      }
+      return usable;
+    })();
+
     return {
-      ordered: usable,
+      ordered,
       isPoster,
       isBackdropTab,
       isBackgroundTab,
@@ -953,6 +972,63 @@ export default function DetailsClient({
     data?.backdrop_path,
   ]);
 
+  // Precarga las primeras N imágenes de la fila actual y solo entonces mostramos el carrusel
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Mientras TMDb images está cargando, NO mostramos el carrusel
+    if (imagesLoading) {
+      setArtworkRowReady(false);
+      return;
+    }
+
+    const { ordered, size, isPoster } = artworkSelection;
+    if (!ordered || ordered.length === 0) {
+      setArtworkRowReady(true);
+      return;
+    }
+
+    const limit = Math.max(1, Math.min(ordered.length, artworkPreloadCount));
+    const urls = [];
+    for (let i = 0; i < limit; i += 1) {
+      const fp = ordered[i]?.file_path;
+      if (!fp) continue;
+      // Mantén tu precarga "rápida" (cache)
+      preloadTmdb(fp, size);
+      // Y además esperamos a que el navegador confirme carga
+      urls.push(`https://image.tmdb.org/t/p/${size}${fp}`);
+    }
+
+    if (!urls.length) {
+      setArtworkRowReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    setArtworkRowReady(false);
+
+    let done = 0;
+    const finishOne = () => {
+      done += 1;
+      if (!cancelled && done >= urls.length) setArtworkRowReady(true);
+    };
+
+    for (const url of urls) {
+      const img = new Image();
+      img.decoding = "async";
+      try {
+        img.fetchPriority = "high";
+      } catch {}
+      img.onload = finishOne;
+      img.onerror = finishOne; // si una falla, no bloqueamos toda la fila
+      img.src = url;
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [imagesLoading, artworkSelection, artworkPreloadCount]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -965,20 +1041,6 @@ export default function DetailsClient({
     updateCount();
     window.addEventListener("resize", updateCount);
     return () => window.removeEventListener("resize", updateCount);
-  }, [artworkSelection]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const { ordered, size, isPoster } = artworkSelection;
-    if (!ordered || ordered.length === 0) return;
-
-    const count = getArtworkSlidesPerView(window.innerWidth, isPoster);
-    const limit = Math.max(1, Math.min(ordered.length, count));
-
-    for (let i = 0; i < limit; i += 1) {
-      const fp = ordered[i]?.file_path;
-      if (fp) preloadTmdb(fp, size);
-    }
   }, [artworkSelection]);
 
   useLayoutEffect(() => {
@@ -5394,12 +5456,6 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                     )}
                   </AnimatePresence>
 
-                  {imagesLoading && (
-                    <div className="text-sm text-zinc-400 inline-flex items-center gap-2 mb-3">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Cargando
-                      imágenes…
-                    </div>
-                  )}
                   {!!imagesError && (
                     <div className="text-sm text-red-400 mb-3">
                       {imagesError}
@@ -5445,15 +5501,41 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
 
                     return (
                       <div className="relative overflow-x-hidden overflow-y-visible">
-                        <div>
+                        {/* Skeleton mientras se precargan las primeras N */}
+                        {!artworkRowReady && (
+                          <div
+                            className="grid pb-8 pt-3"
+                            style={{
+                              gridTemplateColumns: `repeat(${Math.min(artworkPreloadCount, isPoster ? 7 : 4)}, 1fr)`,
+                              gap: isPoster ? "18px" : "20px",
+                            }}
+                          >
+                            {Array.from({
+                              length: Math.min(
+                                artworkPreloadCount,
+                                isPoster ? 7 : 4,
+                              ),
+                            }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`rounded-2xl bg-white/5 animate-pulse ${aspect}`}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Carrusel: aparece "de golpe" cuando ya están cargadas */}
+                        <div
+                          style={{
+                            opacity: artworkRowReady ? 1 : 0,
+                            pointerEvents: artworkRowReady ? "auto" : "none",
+                          }}
+                        >
                           <Swiper
                             key={activeImagesTab}
                             spaceBetween={12}
                             slidesPerView={isBackdropLike ? 2 : 3}
                             breakpoints={breakpoints}
-                            watchSlidesProgress={false}
-                            preloadImages={true}
-                            speed={0}
                             className="pb-8"
                           >
                             {ordered.map((img, index) => {
