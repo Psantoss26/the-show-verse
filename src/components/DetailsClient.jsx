@@ -1004,6 +1004,18 @@ export default function DetailsClient({
       return;
     }
 
+    // Mostrar inmediatamente en cambios de tab (las imágenes ya están en cache del navegador)
+    const isCached = urls.every(url => {
+      const img = new Image();
+      img.src = url;
+      return img.complete;
+    });
+
+    if (isCached) {
+      setArtworkRowReady(true);
+      return;
+    }
+
     let cancelled = false;
     setArtworkRowReady(false);
 
@@ -5226,17 +5238,13 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                           </AnimatePresence>
                         </div>
 
-                        {/* Idioma (sin label superior) */}
+                        {/* Idioma (sin label) */}
                         {activeImagesTab !== "background" && (
                           <div
-                            className="h-10 md:h-11 flex items-center gap-2 px-2 rounded-xl bg-neutral-800/80 border border-white/10"
+                            className="h-10 md:h-11 flex items-center rounded-xl bg-neutral-800/80 border border-white/10 p-1"
                             title="Idioma"
                             aria-label="Idioma"
                           >
-                            <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90 px-1">
-                              IDI
-                            </span>
-
                             <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
                               <button
                                 type="button"
@@ -5298,7 +5306,7 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                     </div>
                   </div>
 
-                  {/* ✅ Panel móvil desplegable (sin labels superiores) */}
+                  {/* ✅ Panel móvil desplegable en 2 filas máximo */}
                   <AnimatePresence>
                     {artworkControlsOpen && (
                       <motion.div
@@ -5306,131 +5314,146 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
                         transition={{ duration: 0.16, ease: "easeOut" }}
-                        className="sm:hidden mb-4 rounded-xl overflow-hidden bg-neutral-800/80 shadow-lg border border-white/10"
+                        className="sm:hidden mb-4"
                       >
-                        <div className="p-3 space-y-3">
-                          {/* Tabs móvil */}
-                          <div className="flex bg-white/5 rounded-xl p-1 border border-white/10 w-fit">
-                            {["posters", "backdrops", "background"].map(
-                              (tab) => (
-                                <button
-                                  key={tab}
-                                  type="button"
-                                  onClick={() => setActiveImagesTab(tab)}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-                    ${activeImagesTab === tab ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
-                                  style={{
-                                    WebkitTapHighlightColor: "transparent",
-                                  }}
-                                >
-                                  {tab === "posters"
-                                    ? "Portada"
-                                    : tab === "backdrops"
-                                      ? "Vista previa"
-                                      : "Fondo"}
-                                </button>
-                              ),
-                            )}
-                          </div>
+                        <div>
+                          {/* Todo en una sola fila con iconos */}
+                          <div className="flex items-center gap-2">
+                            {/* Tabs con iconos - compacto */}
+                            <div className="flex bg-white/5 rounded-xl p-1 border border-white/10">
+                              <button
+                                type="button"
+                                onClick={() => setActiveImagesTab("posters")}
+                                className={`p-2 rounded-lg transition-all ${
+                                  activeImagesTab === "posters"
+                                    ? "bg-white/10 text-white shadow"
+                                    : "text-zinc-400 hover:text-zinc-200"
+                                }`}
+                                style={{ WebkitTapHighlightColor: "transparent" }}
+                                title="Portada"
+                              >
+                                <ImageIcon className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveImagesTab("backdrops")}
+                                className={`p-2 rounded-lg transition-all ${
+                                  activeImagesTab === "backdrops"
+                                    ? "bg-white/10 text-white shadow"
+                                    : "text-zinc-400 hover:text-zinc-200"
+                                }`}
+                                style={{ WebkitTapHighlightColor: "transparent" }}
+                                title="Vista previa"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveImagesTab("background")}
+                                className={`p-2 rounded-lg transition-all ${
+                                  activeImagesTab === "background"
+                                    ? "bg-white/10 text-white shadow"
+                                    : "text-zinc-400 hover:text-zinc-200"
+                                }`}
+                                style={{ WebkitTapHighlightColor: "transparent" }}
+                                title="Fondo"
+                              >
+                                <Layers className="w-4 h-4" />
+                              </button>
+                            </div>
 
-                          {/* Resolución móvil */}
-                          <div ref={resMenuRef} className="relative">
-                            <button
-                              type="button"
-                              onClick={() => setResMenuOpen((v) => !v)}
-                              className="h-10 w-full inline-flex items-center justify-between gap-2
+                            {/* Resolución móvil - más compacto */}
+                            <div ref={resMenuRef} className="relative flex-1">
+                              <button
+                                type="button"
+                                onClick={() => setResMenuOpen((v) => !v)}
+                                className="h-10 w-full inline-flex items-center justify-between gap-2
                   px-3 rounded-xl bg-black/35 border border-white/10
                   hover:bg-black/45 hover:border-white/15 transition text-sm text-zinc-200"
-                              title="Resolución"
-                              aria-label="Resolución"
-                              style={{ WebkitTapHighlightColor: "transparent" }}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
-                                  RES
+                                title="Resolución"
+                                aria-label="Resolución"
+                                style={{ WebkitTapHighlightColor: "transparent" }}
+                              >
+                                <span className="inline-flex items-center gap-2 truncate">
+                                  <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
+                                    RES
+                                  </span>
+                                  <span className="font-semibold truncate">
+                                    {imagesResFilter === "all"
+                                      ? "Todas"
+                                      : imagesResFilter === "720p"
+                                        ? "720p"
+                                        : imagesResFilter === "1080p"
+                                          ? "1080p"
+                                          : imagesResFilter === "2k"
+                                            ? "2K"
+                                            : "4K"}
+                                  </span>
                                 </span>
-                                <span className="font-semibold">
-                                  {imagesResFilter === "all"
-                                    ? "Todas"
-                                    : imagesResFilter === "720p"
-                                      ? "720p"
-                                      : imagesResFilter === "1080p"
-                                        ? "1080p"
-                                        : imagesResFilter === "2k"
-                                          ? "2K"
-                                          : "4K"}
-                                </span>
-                              </span>
-                              <ChevronDown
-                                className={`w-4 h-4 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
-                              />
-                            </button>
+                                <ChevronDown
+                                  className={`w-4 h-4 shrink-0 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
+                                />
+                              </button>
 
-                            <AnimatePresence>
-                              {resMenuOpen && (
-                                <motion.div
-                                  initial={{ opacity: 0, y: 6, scale: 0.98 }}
-                                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                                  exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                                  transition={{
-                                    duration: 0.14,
-                                    ease: "easeOut",
-                                  }}
-                                  className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
+                              <AnimatePresence>
+                                {resMenuOpen && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                                    transition={{
+                                      duration: 0.14,
+                                      ease: "easeOut",
+                                    }}
+                                    className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
                       border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
-                                >
-                                  <div className="py-1">
-                                    {[
-                                      { id: "all", label: "Todas" },
-                                      { id: "720p", label: "720p" },
-                                      { id: "1080p", label: "1080p" },
-                                      { id: "2k", label: "2K" },
-                                      { id: "4k", label: "4K" },
-                                    ].map((opt) => {
-                                      const active = imagesResFilter === opt.id;
-                                      return (
-                                        <button
-                                          key={opt.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setImagesResFilter(opt.id);
-                                            setResMenuOpen(false);
-                                          }}
-                                          className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
+                                  >
+                                    <div className="py-1">
+                                      {[
+                                        { id: "all", label: "Todas" },
+                                        { id: "720p", label: "720p" },
+                                        { id: "1080p", label: "1080p" },
+                                        { id: "2k", label: "2K" },
+                                        { id: "4k", label: "4K" },
+                                      ].map((opt) => {
+                                        const active = imagesResFilter === opt.id;
+                                        return (
+                                          <button
+                                            key={opt.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setImagesResFilter(opt.id);
+                                              setResMenuOpen(false);
+                                            }}
+                                            className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
                               transition ${active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5"}`}
-                                        >
-                                          <span className="font-semibold">
-                                            {opt.label}
-                                          </span>
-                                          {active && (
-                                            <Check className="w-4 h-4 text-emerald-300" />
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
+                                          >
+                                            <span className="font-semibold">
+                                              {opt.label}
+                                            </span>
+                                            {active && (
+                                              <Check className="w-4 h-4 text-emerald-300" />
+                                            )}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
 
-                          {/* Idioma móvil */}
-                          {activeImagesTab !== "background" && (
-                            <div
-                              className="h-10 flex items-center gap-2 px-2 rounded-xl bg-black/35 border border-white/10"
-                              title="Idioma"
-                              aria-label="Idioma"
-                            >
-                              <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90 px-1">
-                                IDI
-                              </span>
-
-                              <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                            {/* Idioma móvil - compacto */}
+                            {activeImagesTab !== "background" && (
+                              <div className="flex gap-1.5 bg-black/35 border border-white/10 rounded-xl p-1.5 h-10">
                                 <button
                                   type="button"
                                   onClick={() => setLangES((v) => !v)}
-                                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all
-                      ${langES ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
+                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${
+                                    langES
+                                      ? "bg-zinc-800 text-white"
+                                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                  }`}
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
@@ -5440,8 +5463,11 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                                 <button
                                   type="button"
                                   onClick={() => setLangEN((v) => !v)}
-                                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all
-                      ${langEN ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
+                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${
+                                    langEN
+                                      ? "bg-zinc-800 text-white"
+                                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                  }`}
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
@@ -5449,8 +5475,8 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                                   EN
                                 </button>
                               </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </motion.div>
                     )}
