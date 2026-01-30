@@ -627,18 +627,7 @@ export default function Navbar() {
                   <BarChart3 className="w-5 h-5" />
                   <span>Estadísticas</span>
                 </Link>
-                <Link
-                  href="/stats"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                    isActive("/stats")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
-                >
-                  <BarChart3 className="w-5 h-5" />
-                  <span>Estadísticas</span>
-                </Link>
+
                 <TraktHistoryNavButton
                   variant="drawer"
                   onClick={() => setMobileMenuOpen(false)}

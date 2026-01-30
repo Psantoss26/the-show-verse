@@ -96,6 +96,26 @@ export async function GET() {
       ? await watchedMoviesRes.json()
       : [];
 
+    // Enriquecer películas con títulos en español
+    const moviesWithSpanishTitles = await Promise.all(
+      watchedMovies.slice(0, 20).map(async (item) => {
+        const tmdbId = item.movie?.ids?.tmdb;
+        if (tmdbId) {
+          const spanishTitle = await getTMDbTitle(tmdbId, "movie");
+          if (spanishTitle) {
+            return {
+              ...item,
+              movie: {
+                ...item.movie,
+                title: spanishTitle,
+              },
+            };
+          }
+        }
+        return item;
+      })
+    );
+
     // Obtener series más vistas
     const watchedShowsRes = await fetch(
       `${TRAKT_API}/users/${username}/watched/shows?extended=full`,
@@ -105,6 +125,26 @@ export async function GET() {
     );
 
     const watchedShows = watchedShowsRes.ok ? await watchedShowsRes.json() : [];
+
+    // Enriquecer series con títulos en español
+    const showsWithSpanishTitles = await Promise.all(
+      watchedShows.slice(0, 20).map(async (item) => {
+        const tmdbId = item.show?.ids?.tmdb;
+        if (tmdbId) {
+          const spanishTitle = await getTMDbTitle(tmdbId, "tv");
+          if (spanishTitle) {
+            return {
+              ...item,
+              show: {
+                ...item.show,
+                title: spanishTitle,
+              },
+            };
+          }
+        }
+        return item;
+      })
+    );
 
     // Obtener historial reciente para análisis temporal
     const historyRes = await fetch(
@@ -119,8 +159,8 @@ export async function GET() {
     return NextResponse.json({
       username,
       stats,
-      watchedMovies,
-      watchedShows,
+      watchedMovies: moviesWithSpanishTitles,
+      watchedShows: showsWithSpanishTitles,
       history,
     });
   } catch (e) {
