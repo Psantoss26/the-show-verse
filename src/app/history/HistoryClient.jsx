@@ -1879,7 +1879,7 @@ export default function HistoryClient() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div className="flex items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-4">
               <motion.div
                 className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20"
@@ -1895,51 +1895,14 @@ export default function HistoryClient() {
                 <Eye className="w-8 h-8 text-emerald-500" />
               </motion.div>
               <div>
-                <div className="flex items-center gap-2">
-                  <motion.h1
-                    className="text-4xl font-black tracking-tight text-white"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.3 }}
-                  >
-                    Historial
-                  </motion.h1>
-
-                  {/* Botones solo iconos - SOLO MÓVIL al lado del título */}
-                  {auth.connected && (
-                    <div className="flex md:hidden items-center gap-2 ml-auto">
-                      <motion.button
-                        onClick={() => loadHistory()}
-                        disabled={loading}
-                        className="p-2.5 bg-white text-black hover:bg-zinc-200 rounded-full transition disabled:opacity-50 shadow-lg shadow-white/5"
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.4, delay: 0.5 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        title="Sincronizar"
-                      >
-                        <RotateCcw
-                          className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-                        />
-                      </motion.button>
-
-                      <motion.button
-                        onClick={() => setShowDisconnectModal(true)}
-                        disabled={loading}
-                        className="p-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-full transition disabled:opacity-50 shadow-lg shadow-red-500/5"
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.4, delay: 0.6 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        title="Desconectar"
-                      >
-                        <LogOut className="w-4 h-4" />
-                      </motion.button>
-                    </div>
-                  )}
-                </div>
+                <motion.h1
+                  className="text-4xl font-black tracking-tight text-white"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                >
+                  Historial
+                </motion.h1>
                 <motion.p
                   className="hidden md:block text-neutral-400 mt-1 font-medium"
                   initial={{ opacity: 0 }}
@@ -1950,6 +1913,41 @@ export default function HistoryClient() {
                 </motion.p>
               </div>
             </div>
+
+            {/* Botones solo iconos - SOLO MÓVIL a la derecha */}
+            {auth.connected && (
+              <div className="flex md:hidden items-center gap-2">
+                <motion.button
+                  onClick={() => loadHistory()}
+                  disabled={loading}
+                  className="p-2.5 bg-white text-black hover:bg-zinc-200 rounded-full transition disabled:opacity-50 shadow-lg shadow-white/5"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.5 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  title="Sincronizar"
+                >
+                  <RotateCcw
+                    className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                  />
+                </motion.button>
+
+                <motion.button
+                  onClick={() => setShowDisconnectModal(true)}
+                  disabled={loading}
+                  className="p-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-full transition disabled:opacity-50 shadow-lg shadow-red-500/5"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.6 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  title="Desconectar"
+                >
+                  <LogOut className="w-4 h-4" />
+                </motion.button>
+              </div>
+            )}
 
             {/* Botones con texto - SOLO DESKTOP en su posición original */}
             {auth.connected && (
