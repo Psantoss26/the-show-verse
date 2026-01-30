@@ -409,18 +409,20 @@ function StatCard({
   loading = false,
 }) {
   return (
-    <div className="flex-1 min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 backdrop-blur-sm transition hover:bg-zinc-900/70">
-      <div className={`p-2 rounded-full bg-white/5 mb-1 ${colorClass}`}>
-        <Icon className="w-4 h-4" />
+    <div className="flex-1 min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-1 py-2 md:p-4 flex flex-col items-center justify-center gap-0.5 md:gap-1 backdrop-blur-sm transition hover:bg-zinc-900/70">
+      <div
+        className={`p-1 md:p-2 rounded-full bg-white/5 mb-0.5 md:mb-1 ${colorClass}`}
+      >
+        <Icon className="w-3 h-3 md:w-4 md:h-4" />
       </div>
-      <div className="text-2xl font-black text-white tracking-tight">
+      <div className="text-base md:text-2xl font-black text-white tracking-tight">
         {loading ? (
-          <span className="inline-block h-7 w-12 rounded-lg bg-white/10 animate-pulse" />
+          <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" />
         ) : (
           value
         )}
       </div>
-      <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
+      <div className="text-[8px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight px-0.5">
         {label}
       </div>
     </div>
@@ -1901,9 +1903,44 @@ export default function HistoryClient() {
                 >
                   Historial
                 </motion.h1>
+                
+                {/* Botones solo iconos - SOLO MÓVIL al lado del título */}
+                {auth.connected && (
+                  <div className="flex md:hidden items-center gap-2 ml-auto">
+                    <motion.button
+                      onClick={() => loadHistory()}
+                      disabled={loading}
+                      className="p-2.5 bg-white text-black hover:bg-zinc-200 rounded-full transition disabled:opacity-50 shadow-lg shadow-white/5"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.4, delay: 0.5 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      title="Sincronizar"
+                    >
+                      <RotateCcw
+                        className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                      />
+                    </motion.button>
+
+                    <motion.button
+                      onClick={() => setShowDisconnectModal(true)}
+                      disabled={loading}
+                      className="p-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-full transition disabled:opacity-50 shadow-lg shadow-red-500/5"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.4, delay: 0.6 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      title="Desconectar"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </motion.button>
+                  </div>
+                )}
               </div>
               <motion.p
-                className="text-zinc-400 text-sm ml-12"
+                className="hidden md:block text-zinc-400 text-sm ml-12"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
@@ -1912,8 +1949,9 @@ export default function HistoryClient() {
               </motion.p>
             </div>
 
+            {/* Botones con texto - SOLO DESKTOP en su posición original */}
             {auth.connected && (
-              <div className="flex items-center gap-3">
+              <div className="hidden md:flex items-center gap-3">
                 <motion.button
                   onClick={() => loadHistory()}
                   disabled={loading}
@@ -1949,7 +1987,7 @@ export default function HistoryClient() {
 
           {auth.connected && (
             <motion.div
-              className="grid grid-cols-2 md:grid-cols-4 gap-4"
+              className="grid grid-cols-4 gap-2 md:gap-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.6 }}
