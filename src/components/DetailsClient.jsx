@@ -704,6 +704,7 @@ export default function DetailsClient({
   const [imagesResFilter, setImagesResFilter] = useState("all"); // all | 720p | 1080p | 2k | 4k
   const [langES, setLangES] = useState(true);
   const [langEN, setLangEN] = useState(true);
+  const [artworkPreloadCount, setArtworkPreloadCount] = useState(8);
 
   // Panel móvil de filtros (Portadas y fondos)
   const [artworkControlsOpen, setArtworkControlsOpen] = useState(false);
@@ -776,6 +777,209 @@ export default function DetailsClient({
     const h = Number(img?.height || 0);
     return w > 0 && h > 0 ? `${w}×${h}` : null;
   };
+
+  const getArtworkSlidesPerView = (width, isPoster) => {
+    if (isPoster) {
+      if (width >= 1280) return 8;
+      if (width >= 1024) return 7;
+      if (width >= 768) return 6;
+      if (width >= 640) return 5;
+      if (width >= 500) return 4;
+      return 4;
+    }
+    if (width >= 1280) return 6;
+    if (width >= 1024) return 5;
+    return 4;
+  };
+
+  const artworkSelection = useMemo(() => {
+    const rawList =
+      activeImagesTab === "posters"
+        ? imagesState?.posters
+        : imagesState?.backdrops;
+
+    const isPoster = activeImagesTab === "posters";
+    const isBackdropTab = activeImagesTab === "backdrops";
+    const isBackgroundTab = activeImagesTab === "background";
+    const aspect = isPoster ? "aspect-[2/3]" : "aspect-[16/9]";
+    const size = isPoster ? "w342" : "w780";
+
+    const currentPosterActive =
+      (selectedPosterPath ||
+        basePosterPath ||
+        data?.poster_path ||
+        data?.profile_path) ??
+      null;
+
+    // Usar el mismo criterio que MainDashboard para el backdrop de preview
+    const previewFallback = (() => {
+      const backdrops = imagesState?.backdrops || [];
+      if (!backdrops.length) return data?.backdrop_path || null;
+
+      const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
+      const isEN = (img) => {
+        const lang = norm(img?.iso_639_1);
+        return lang === "en";
+      };
+
+      // Filtrar por minWidth 1200
+      const pool = backdrops.filter((b) => (b?.width || 0) >= 1200);
+      const finalPool = pool.length ? pool : backdrops;
+
+      // Tomar las 3 primeras imágenes EN en orden original
+      const top3en = [];
+      for (const b of finalPool) {
+        if (isEN(b)) top3en.push(b);
+        if (top3en.length === 3) break;
+      }
+
+      // Si no hay EN, usar las 3 primeras del pool
+      const top3 = top3en.length ? top3en : finalPool.slice(0, 3);
+      if (!top3.length) return data?.backdrop_path || null;
+
+      // Buscar resoluciones específicas en orden de preferencia
+      // 1) 1920x1080 (Full HD)
+      const b1080 = top3.find((b) => b.width === 1920 && b.height === 1080);
+      if (b1080) return b1080.file_path;
+
+      // 2) 1712x964
+      const b1712 = top3.find((b) => b.width === 1712 && b.height === 964);
+      if (b1712) return b1712.file_path;
+
+      // 3) 4K 3840x2160
+      const b4k = top3.find((b) => b.width === 3840 && b.height === 2160);
+      if (b4k) return b4k.file_path;
+
+      // 4) Primera de esas 3
+      return top3[0]?.file_path || data?.backdrop_path || null;
+    })();
+
+    const currentPreviewActive = selectedPreviewBackdropPath || previewFallback;
+
+    const currentBackgroundActive =
+      (selectedBackgroundPath || baseBackdropPath || data?.backdrop_path) ??
+      null;
+
+    const activePath = isPoster
+      ? currentPosterActive
+      : isBackdropTab
+        ? currentPreviewActive
+        : currentBackgroundActive;
+
+    const withPath = (rawList || []).filter((img) => !!img?.file_path);
+
+    const normLang = (lang) =>
+      String(lang || "")
+        .trim()
+        .toLowerCase();
+
+    const isLangES = (lang) => lang === "es" || lang === "es-es";
+    const isLangEN = (lang) => lang === "en" || lang === "en-us";
+
+    const matchesLang = (img) => {
+      const lang = normLang(img?.iso_639_1);
+      if (!lang) return false;
+      return (langES && isLangES(lang)) || (langEN && isLangEN(lang));
+    };
+
+    const filtered = withPath.filter((img) => {
+      const fp = img?.file_path;
+      // Siempre incluir la imagen activa
+      if (fp === activePath) return true;
+
+      if (imagesResFilter !== "all") {
+        const b = imgResBucket(img);
+        const target = imagesResFilter === "2k" ? "2k" : imagesResFilter;
+        if (b !== target) return false;
+      }
+
+      if (isBackgroundTab) {
+        return !img?.iso_639_1;
+      }
+
+      if (isBackdropTab) {
+        // Vista previa: backdrops CON idioma (ES o EN, independiente de filtros)
+        const lang = normLang(img?.iso_639_1);
+        return isLangES(lang) || isLangEN(lang);
+      }
+
+      // Posters: solo ES/EN según filtros activos
+      return matchesLang(img);
+    });
+
+    const relaxed = (() => {
+      if (!withPath.length) return [];
+      if (isBackgroundTab) {
+        const neutral = withPath.filter((img) => !img?.iso_639_1);
+        return neutral.length ? neutral : withPath;
+      }
+      if (isBackdropTab) {
+        // Vista previa: priorizar backdrops con idioma
+        const withLang = withPath.filter((img) => !!img?.iso_639_1);
+        return withLang.length ? withLang : withPath;
+      }
+      if (isPoster) {
+        const neutral = withPath.filter((img) => !img?.iso_639_1);
+        return neutral.length ? neutral : withPath;
+      }
+      return withPath;
+    })();
+
+    const usable = filtered.length ? filtered : relaxed;
+
+    return {
+      ordered: usable,
+      isPoster,
+      isBackdropTab,
+      isBackgroundTab,
+      aspect,
+      size,
+      activePath,
+    };
+  }, [
+    activeImagesTab,
+    imagesState?.posters,
+    imagesState?.backdrops,
+    imagesResFilter,
+    langES,
+    langEN,
+    selectedPosterPath,
+    basePosterPath,
+    data?.poster_path,
+    data?.profile_path,
+    selectedPreviewBackdropPath,
+    selectedBackgroundPath,
+    baseBackdropPath,
+    data?.backdrop_path,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateCount = () => {
+      const { isPoster } = artworkSelection;
+      const count = getArtworkSlidesPerView(window.innerWidth, isPoster);
+      setArtworkPreloadCount(count);
+    };
+
+    updateCount();
+    window.addEventListener("resize", updateCount);
+    return () => window.removeEventListener("resize", updateCount);
+  }, [artworkSelection]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const { ordered, size, isPoster } = artworkSelection;
+    if (!ordered || ordered.length === 0) return;
+
+    const count = getArtworkSlidesPerView(window.innerWidth, isPoster);
+    const limit = Math.max(1, Math.min(ordered.length, count));
+
+    for (let i = 0; i < limit; i += 1) {
+      const fp = ordered[i]?.file_path;
+      if (fp) preloadTmdb(fp, size);
+    }
+  }, [artworkSelection]);
 
   useLayoutEffect(() => {
     setPosterResolved(false);
@@ -2654,6 +2858,33 @@ export default function DetailsClient({
     });
   };
 
+  const handleCyclePoster = () => {
+    // Obtener todas las portadas disponibles en el orden de la sección "Portadas y fondos"
+    const posters = imagesState?.posters || [];
+    if (posters.length === 0) return;
+
+    // Obtener la portada actual
+    const currentPoster =
+      selectedPosterPath ||
+      basePosterPath ||
+      data?.poster_path ||
+      data?.profile_path;
+
+    // Encontrar el índice actual
+    const currentIndex = posters.findIndex(
+      (img) => img?.file_path === currentPoster,
+    );
+
+    // Obtener la siguiente portada (ciclar al principio si llegamos al final)
+    const nextIndex =
+      currentIndex >= 0 ? (currentIndex + 1) % posters.length : 0;
+    const nextPoster = posters[nextIndex]?.file_path;
+
+    if (nextPoster) {
+      handleSelectPoster(nextPoster);
+    }
+  };
+
   const handleCopyImageUrl = async (filePath) => {
     const url = buildOriginalImageUrl(filePath);
     try {
@@ -3845,11 +4076,20 @@ export default function DetailsClient({
   const [posterLowLoaded, setPosterLowLoaded] = useState(false);
   const [posterHighLoaded, setPosterHighLoaded] = useState(false);
   const [posterImgError, setPosterImgError] = useState(false);
+  const [posterTransitioning, setPosterTransitioning] = useState(false);
 
   useEffect(() => {
+    setPosterTransitioning(true);
     setPosterLowLoaded(false);
     setPosterHighLoaded(false);
     setPosterImgError(false);
+
+    // Pequeño delay para que la transición sea más suave
+    const timer = setTimeout(() => {
+      setPosterTransitioning(false);
+    }, 50);
+
+    return () => clearTimeout(timer);
   }, [displayPosterPath]);
 
   const posterLowUrl = displayPosterPath
@@ -4085,8 +4325,8 @@ export default function DetailsClient({
                             setPosterImgError(true);
                             setPosterResolved(true);
                           }}
-                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out
-${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"}`}
+                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out
+${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
                             transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
                           }}
@@ -4102,8 +4342,8 @@ ${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"
                             fetchPriority="high"
                             onLoad={() => setPosterHighLoaded(true)}
                             onError={() => {}}
-                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-out
-${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
+                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-out
+${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
                               transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
                             }}
@@ -4315,17 +4555,17 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }
               />
 
-              {/* Botón Mostrar/Ocultar Fondo */}
+              {/* Botón Cambiar Portada */}
               <LiquidButton
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setUseBackdrop((v) => !v);
+                  handleCyclePoster();
                 }}
-                active={useBackdrop}
+                active={true}
                 activeColor="yellow"
                 groupId="details-actions"
-                title={useBackdrop ? "Ocultar fondo" : "Mostrar fondo"}
+                title="Cambiar portada"
               >
                 <ImageIcon className="w-5 h-5" />
               </LiquidButton>
@@ -5167,78 +5407,14 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   )}
 
                   {(() => {
-                    const rawList =
-                      activeImagesTab === "posters"
-                        ? imagesState?.posters
-                        : imagesState?.backdrops;
-
-                    const isPoster = activeImagesTab === "posters";
-                    const aspect = isPoster ? "aspect-[2/3]" : "aspect-[16/9]";
-                    const size = isPoster ? "w342" : "w780";
-
-                    const currentPosterActive =
-                      (selectedPosterPath ||
-                        basePosterPath ||
-                        data?.poster_path ||
-                        data?.profile_path) ??
-                      null;
-
-                    const previewFallback =
-                      pickBestBackdropByLangResVotes(imagesState?.backdrops)
-                        ?.file_path ||
-                      data?.backdrop_path ||
-                      null;
-
-                    const currentPreviewActive =
-                      selectedPreviewBackdropPath || previewFallback;
-
-                    const currentBackgroundActive =
-                      (selectedBackgroundPath ||
-                        baseBackdropPath ||
-                        data?.backdrop_path) ??
-                      null;
-
-                    const activePath =
-                      activeImagesTab === "posters"
-                        ? currentPosterActive
-                        : activeImagesTab === "backdrops"
-                          ? currentPreviewActive
-                          : currentBackgroundActive;
-
-                    const filtered = (rawList || []).filter((img) => {
-                      const fp = img?.file_path;
-                      if (!fp) return false;
-                      if (fp === activePath) return true;
-
-                      if (imagesResFilter !== "all") {
-                        const b = imgResBucket(img);
-                        const target =
-                          imagesResFilter === "2k" ? "2k" : imagesResFilter;
-                        if (b !== target) return false;
-                      }
-
-                      if (activeImagesTab === "background") {
-                        return !img?.iso_639_1;
-                      }
-
-                      const lang = (img?.iso_639_1 || "").toLowerCase();
-                      if (!lang) return false;
-                      const okES = lang === "es" && langES;
-                      const okEN = lang === "en" && langEN;
-                      return okES || okEN;
-                    });
-
-                    const ordered = (() => {
-                      const idx = (filtered || []).findIndex(
-                        (x) => x?.file_path === activePath,
-                      );
-                      if (idx <= 0) return filtered;
-                      return [
-                        filtered[idx],
-                        ...filtered.slice(0, idx),
-                        ...filtered.slice(idx + 1),
-                      ];
-                    })();
+                    const {
+                      ordered,
+                      isPoster,
+                      isBackdropTab,
+                      aspect,
+                      size,
+                      activePath,
+                    } = artworkSelection;
 
                     if (!ordered || ordered.length === 0) {
                       return (
@@ -5248,7 +5424,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                       );
                     }
 
-                    // ✅ 4 completos para backdrops (vista previa / fondo)
+                    // ✅ 2 en móvil y 4 en desktop para backdrops (vista previa / fondo)
                     const isBackdropLike = activeImagesTab !== "posters";
 
                     const breakpoints = isPoster
@@ -5260,11 +5436,11 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                           1280: { slidesPerView: 7, spaceBetween: 18 },
                         }
                       : {
-                          0: { slidesPerView: 4, spaceBetween: 12 },
-                          640: { slidesPerView: 4, spaceBetween: 14 },
+                          0: { slidesPerView: 2, spaceBetween: 12 },
+                          640: { slidesPerView: 3, spaceBetween: 14 },
                           768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 5, spaceBetween: 18 },
-                          1280: { slidesPerView: 6, spaceBetween: 20 },
+                          1024: { slidesPerView: 4, spaceBetween: 18 },
+                          1280: { slidesPerView: 4, spaceBetween: 20 },
                         };
 
                     return (
@@ -5273,16 +5449,33 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <Swiper
                             key={activeImagesTab}
                             spaceBetween={12}
-                            slidesPerView={isBackdropLike ? 4 : 3}
+                            slidesPerView={isBackdropLike ? 2 : 3}
                             breakpoints={breakpoints}
+                            watchSlidesProgress={false}
+                            preloadImages={true}
+                            speed={0}
                             className="pb-8"
                           >
-                            {ordered.map((img) => {
+                            {ordered.map((img, index) => {
                               const filePath = img?.file_path;
                               if (!filePath) return null;
 
                               const isActive = activePath === filePath;
                               const resText = imgResLabel(img);
+                              const isPriority = index < artworkPreloadCount;
+                              const imgAlt = isPoster
+                                ? `Portada de ${title}`
+                                : isBackdropTab
+                                  ? `Vista previa de ${title}`
+                                  : `Fondo de ${title}`;
+
+                              const imgSrc = `https://image.tmdb.org/t/p/${size}${filePath}`;
+                              const imgSrcSet = isPoster
+                                ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w342${filePath} 342w, https://image.tmdb.org/t/p/w500${filePath} 500w`
+                                : `https://image.tmdb.org/t/p/w300${filePath} 300w, https://image.tmdb.org/t/p/w780${filePath} 780w, https://image.tmdb.org/t/p/w1280${filePath} 1280w`;
+                              const imgSizes = isPoster
+                                ? "(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 140px"
+                                : "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px";
 
                               return (
                                 <SwiperSlide
@@ -5327,9 +5520,14 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       className={`w-full ${aspect} bg-black/40`}
                                     >
                                       <img
-                                        src={`https://image.tmdb.org/t/p/${size}${filePath}`}
-                                        alt="option"
-                                        loading="lazy"
+                                        src={imgSrc}
+                                        srcSet={imgSrcSet}
+                                        sizes={imgSizes}
+                                        alt={imgAlt}
+                                        loading={isPriority ? "eager" : "lazy"}
+                                        fetchPriority={
+                                          isPriority ? "high" : "auto"
+                                        }
                                         decoding="async"
                                         className="w-full h-full object-cover transition-transform duration-700 transform-gpu
                             group-hover:scale-[1.08]"
