@@ -263,6 +263,8 @@ export default function DetailsClient({
   const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] =
     useState(null);
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null);
+  const [prevBackgroundPath, setPrevBackgroundPath] = useState(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // ✅ Evita SSR/primer render con un poster “provisional”
   const [basePosterPath, setBasePosterPath] = useState(null);
@@ -2889,6 +2891,12 @@ export default function DetailsClient({
   };
 
   const handleSelectBackground = (filePath) => {
+    // Guardar la imagen anterior para el fade
+    setPrevBackgroundPath(
+      selectedBackgroundPath || baseBackdropPath || data?.backdrop_path,
+    );
+    setIsTransitioning(true);
+
     setSelectedBackgroundPath(filePath);
     if (typeof window !== "undefined") {
       filePath
@@ -2901,6 +2909,12 @@ export default function DetailsClient({
       kind: "background",
       filePath,
     });
+
+    // Terminar transición después de un breve delay
+    setTimeout(() => {
+      setIsTransitioning(false);
+      setPrevBackgroundPath(null);
+    }, 600);
   };
 
   const handleResetArtwork = () => {
@@ -2932,10 +2946,34 @@ export default function DetailsClient({
     });
   };
 
-  const handleCyclePoster = () => {
-    // Obtener todas las portadas disponibles en el orden de la sección "Portadas y fondos"
-    const posters = imagesState?.posters || [];
-    if (posters.length === 0) return;
+  const handleCyclePoster = async () => {
+    // Obtener las portadas FILTRADAS igual que en la sección "Portadas y fondos"
+    const rawPosters = imagesState?.posters || [];
+    if (rawPosters.length === 0) return;
+
+    // Aplicar los mismos filtros que artworkSelection
+    const normLang = (lang) =>
+      String(lang || "")
+        .trim()
+        .toLowerCase();
+    const isLangES = (lang) => lang === "es" || lang === "es-es";
+    const isLangEN = (lang) => lang === "en" || lang === "en-us";
+
+    const matchesLang = (img) => {
+      const lang = normLang(img?.iso_639_1);
+      if (!lang) return false;
+      return (langES && isLangES(lang)) || (langEN && isLangEN(lang));
+    };
+
+    const imgResBucket = (img) => {
+      const w = img?.width || 0;
+      const h = img?.height || 0;
+      if (w >= 3840 || h >= 2160) return "4k";
+      if (w >= 2048 || h >= 1080) return "2k";
+      if (w >= 1280 || h >= 720) return "1080p";
+      if (w >= 1024 || h >= 576) return "720p";
+      return "720p";
+    };
 
     // Obtener la portada actual
     const currentPoster =
@@ -2943,6 +2981,30 @@ export default function DetailsClient({
       basePosterPath ||
       data?.poster_path ||
       data?.profile_path;
+
+    const withPath = rawPosters.filter((img) => !!img?.file_path);
+
+    const filtered = withPath.filter((img) => {
+      const fp = img?.file_path;
+      if (fp === currentPoster) return true;
+
+      if (imagesResFilter !== "all") {
+        const b = imgResBucket(img);
+        const target = imagesResFilter === "2k" ? "2k" : imagesResFilter;
+        if (b !== target) return false;
+      }
+
+      return matchesLang(img);
+    });
+
+    const neutral = withPath.filter((img) => !img?.iso_639_1);
+    const posters = filtered.length
+      ? filtered
+      : neutral.length
+        ? neutral
+        : withPath;
+
+    if (posters.length === 0) return;
 
     // Encontrar el índice actual
     const currentIndex = posters.findIndex(
@@ -2954,8 +3016,69 @@ export default function DetailsClient({
       currentIndex >= 0 ? (currentIndex + 1) % posters.length : 0;
     const nextPoster = posters[nextIndex]?.file_path;
 
+    // También cambiar el fondo (backdrop) - usar backdrops SIN idioma (neutral)
+    const rawBackdrops = imagesState?.backdrops || [];
+    let nextBackdrop = null;
+
+    if (rawBackdrops.length > 0) {
+      const currentBackdrop =
+        selectedBackgroundPath || baseBackdropPath || data?.backdrop_path;
+
+      // Filtrar backdrops sin idioma (como en activeImagesTab === "background")
+      const neutralBackdrops = rawBackdrops.filter(
+        (img) => !!img?.file_path && !img?.iso_639_1,
+      );
+      const backdrops = neutralBackdrops.length
+        ? neutralBackdrops
+        : rawBackdrops.filter((img) => !!img?.file_path);
+
+      const currentBackdropIndex = backdrops.findIndex(
+        (img) => img?.file_path === currentBackdrop,
+      );
+
+      const nextBackdropIndex =
+        currentBackdropIndex >= 0
+          ? (currentBackdropIndex + 1) % backdrops.length
+          : 0;
+      nextBackdrop = backdrops[nextBackdropIndex]?.file_path;
+    }
+
+    // Precargar las imágenes antes de cambiarlas
+    const loadPromises = [];
+
+    if (nextPoster) {
+      loadPromises.push(
+        new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(true);
+          img.onerror = () => resolve(false);
+          img.src = `https://image.tmdb.org/t/p/w500${nextPoster}`;
+        }),
+      );
+    }
+
+    if (nextBackdrop) {
+      loadPromises.push(
+        new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(true);
+          img.onerror = () => resolve(false);
+          img.src = `https://image.tmdb.org/t/p/w1280${nextBackdrop}`;
+        }),
+      );
+    }
+
+    // Esperar a que todas las imágenes se carguen
+    if (loadPromises.length > 0) {
+      await Promise.all(loadPromises);
+    }
+
+    // Ahora cambiar ambas imágenes
     if (nextPoster) {
       handleSelectPoster(nextPoster);
+    }
+    if (nextBackdrop) {
+      handleSelectBackground(nextBackdrop);
     }
   };
 
@@ -4298,24 +4421,51 @@ export default function DetailsClient({
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a]">
         {useBackdrop && artworkInitialized && heroBackgroundPath ? (
           <>
+            {/* Imagen anterior (fade out) */}
+            {isTransitioning && prevBackgroundPath && (
+              <>
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-opacity duration-500"
+                  style={{
+                    backgroundImage: `url(https://image.tmdb.org/t/p/original${prevBackgroundPath})`,
+                    transform: "scale(1)",
+                    filter: "blur(14px) brightness(0.65) saturate(1.05)",
+                    opacity: 0,
+                  }}
+                />
+                <div
+                  className="absolute inset-0 bg-cover transition-opacity duration-500"
+                  style={{
+                    backgroundImage: `url(https://image.tmdb.org/t/p/original${prevBackgroundPath})`,
+                    backgroundPosition: "center top",
+                    transform: "scale(1)",
+                    transformOrigin: "center top",
+                    opacity: 0,
+                  }}
+                />
+              </>
+            )}
+
             {/* ✅ Capa base: SIEMPRE cubre (evita marcos laterales) */}
             <div
-              className="absolute inset-0 bg-cover bg-center"
+              className="absolute inset-0 bg-cover bg-center transition-opacity duration-500"
               style={{
                 backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 transform: "scale(1)",
                 filter: "blur(14px) brightness(0.65) saturate(1.05)",
+                opacity: isTransitioning ? 1 : 1,
               }}
             />
 
             {/* ✅ Capa detalle: zoom OUT (scale < 1) */}
             <div
-              className="absolute inset-0 bg-cover transition-opacity duration-1000"
+              className="absolute inset-0 bg-cover transition-opacity duration-500"
               style={{
                 backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 backgroundPosition: "center top",
                 transform: "scale(1)",
                 transformOrigin: "center top",
+                opacity: isTransitioning ? 1 : 1,
               }}
             />
           </>
@@ -4383,7 +4533,7 @@ export default function DetailsClient({
                     )}
 
                     {posterLowUrl && !posterImgError && (
-                      <>
+                      <div key={displayPosterPath} className="absolute inset-0">
                         {/* LOW */}
                         <img
                           src={posterLowUrl}
@@ -4423,7 +4573,7 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                             }}
                           />
                         )}
-                      </>
+                      </div>
                     )}
 
                     {showNoPoster && (
