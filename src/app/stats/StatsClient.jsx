@@ -29,6 +29,8 @@ export default function StatsClient() {
   const [watchedMovies, setWatchedMovies] = useState([]);
   const [watchedShows, setWatchedShows] = useState([]);
   const [historyData, setHistoryData] = useState([]);
+  const [topActors, setTopActors] = useState([]);
+  const [topDirectors, setTopDirectors] = useState([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [viewMode, setViewMode] = useState("overview");
 
@@ -49,6 +51,8 @@ export default function StatsClient() {
         setWatchedMovies(data.watchedMovies || []);
         setWatchedShows(data.watchedShows || []);
         setHistoryData(data.history || []);
+        setTopActors(data.topActors || []);
+        setTopDirectors(data.topDirectors || []);
       }
     } catch (err) {
       console.error("Error loading stats:", err);
@@ -457,7 +461,7 @@ export default function StatsClient() {
                           <span className="font-semibold capitalize">
                             {genre}
                           </span>
-                          <span className="text-white/60">{count}</span>
+                          <span className="text-white/60">{count} títulos</span>
                         </div>
                         <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                           <motion.div
@@ -470,6 +474,118 @@ export default function StatsClient() {
                           />
                         </div>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Top Actors */}
+              {topActors.length > 0 && (
+                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                  <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-blue-500" />
+                    Actores Más Vistos
+                  </h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {topActors.slice(0, 6).map((actor, index) => (
+                      <motion.div
+                        key={actor.id}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="group relative"
+                      >
+                        <Link
+                          href={`/details/person/${actor.id}`}
+                          onClick={() => window.scrollTo(0, 0)}
+                        >
+                          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-white/10 to-white/5 border border-white/10 hover:border-blue-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(59,130,246,0.3)] hover:scale-105 cursor-pointer">
+                            <div className="aspect-[2/3] relative">
+                              {actor.profile_path ? (
+                                <img
+                                  src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
+                                  alt={actor.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                                  <Users className="w-12 h-12 text-white/80" />
+                                </div>
+                              )}
+                              {/* Overlay gradient */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                            </div>
+
+                            {/* Nombre */}
+                            <div className="absolute bottom-0 left-0 right-0 p-3">
+                              <p className="font-bold text-sm text-white drop-shadow-lg line-clamp-2 leading-tight">
+                                {actor.name}
+                              </p>
+                              <p className="text-white/80 text-xs mt-0.5">
+                                {actor.count}{" "}
+                                {actor.count === 1 ? "película" : "películas"}
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Top Directors */}
+              {topDirectors.length > 0 && (
+                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                  <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                    <Award className="w-5 h-5 text-purple-500" />
+                    Directores Favoritos
+                  </h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {topDirectors.slice(0, 4).map((director, index) => (
+                      <motion.div
+                        key={director.id}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="group relative"
+                      >
+                        <Link
+                          href={`/details/person/${director.id}`}
+                          onClick={() => window.scrollTo(0, 0)}
+                        >
+                          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-white/10 to-white/5 border border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)] hover:scale-105 cursor-pointer">
+                            <div className="aspect-[2/3] relative">
+                              {director.profile_path ? (
+                                <img
+                                  src={`https://image.tmdb.org/t/p/w342${director.profile_path}`}
+                                  alt={director.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                                  <Award className="w-12 h-12 text-white/80" />
+                                </div>
+                              )}
+                              {/* Overlay gradient */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                            </div>
+
+                            {/* Nombre */}
+                            <div className="absolute bottom-0 left-0 right-0 p-3">
+                              <p className="font-bold text-sm text-white drop-shadow-lg line-clamp-2 leading-tight">
+                                {director.name}
+                              </p>
+                              <p className="text-white/80 text-xs mt-0.5">
+                                {director.count}{" "}
+                                {director.count === 1
+                                  ? "película"
+                                  : "películas"}
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
