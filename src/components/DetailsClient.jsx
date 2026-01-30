@@ -5586,12 +5586,12 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                                         else handleSelectBackground(filePath);
                                       }
                                     }}
-                                    className={`group relative w-full rounded-2xl overflow-hidden border cursor-pointer
+                                    className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
                         ${
                           isActive
-                            ? "border-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.28)]"
-                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30"
+                            ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
+                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
                         }`}
                                     title="Seleccionar"
                                     style={{
@@ -5617,7 +5617,7 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                                     </div>
 
                                     {isActive && (
-                                      <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 rounded-full shadow shadow-black" />
+                                      <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-400 rounded-full shadow-lg shadow-emerald-500/50 ring-2 ring-white/20" />
                                     )}
 
                                     {resText && (
