@@ -1005,7 +1005,7 @@ export default function DetailsClient({
     }
 
     // Mostrar inmediatamente en cambios de tab (las imágenes ya están en cache del navegador)
-    const isCached = urls.every(url => {
+    const isCached = urls.every((url) => {
       const img = new Image();
       img.src = url;
       return img.complete;
@@ -5329,7 +5329,9 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                                     ? "bg-white/10 text-white shadow"
                                     : "text-zinc-400 hover:text-zinc-200"
                                 }`}
-                                style={{ WebkitTapHighlightColor: "transparent" }}
+                                style={{
+                                  WebkitTapHighlightColor: "transparent",
+                                }}
                                 title="Portada"
                               >
                                 <ImageIcon className="w-4 h-4" />
@@ -5342,7 +5344,9 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                                     ? "bg-white/10 text-white shadow"
                                     : "text-zinc-400 hover:text-zinc-200"
                                 }`}
-                                style={{ WebkitTapHighlightColor: "transparent" }}
+                                style={{
+                                  WebkitTapHighlightColor: "transparent",
+                                }}
                                 title="Vista previa"
                               >
                                 <Eye className="w-4 h-4" />
@@ -5355,7 +5359,9 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                                     ? "bg-white/10 text-white shadow"
                                     : "text-zinc-400 hover:text-zinc-200"
                                 }`}
-                                style={{ WebkitTapHighlightColor: "transparent" }}
+                                style={{
+                                  WebkitTapHighlightColor: "transparent",
+                                }}
                                 title="Fondo"
                               >
                                 <Layers className="w-4 h-4" />
@@ -5372,7 +5378,9 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                   hover:bg-black/45 hover:border-white/15 transition text-sm text-zinc-200"
                                 title="Resolución"
                                 aria-label="Resolución"
-                                style={{ WebkitTapHighlightColor: "transparent" }}
+                                style={{
+                                  WebkitTapHighlightColor: "transparent",
+                                }}
                               >
                                 <span className="inline-flex items-center gap-2 truncate">
                                   <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
@@ -5416,7 +5424,8 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                                         { id: "2k", label: "2K" },
                                         { id: "4k", label: "4K" },
                                       ].map((opt) => {
-                                        const active = imagesResFilter === opt.id;
+                                        const active =
+                                          imagesResFilter === opt.id;
                                         return (
                                           <button
                                             key={opt.id}
