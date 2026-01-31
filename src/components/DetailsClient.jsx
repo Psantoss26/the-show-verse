@@ -293,6 +293,14 @@ export default function DetailsClient({
   const [baseBackdropPath, setBaseBackdropPath] = useState(null);
   const [artworkInitialized, setArtworkInitialized] = useState(false);
 
+  // ✅ Estados de carga de imagen (definidos aquí para estar disponibles en useLayoutEffect)
+  const [posterResolved, setPosterResolved] = useState(false);
+  const [posterLowLoaded, setPosterLowLoaded] = useState(false);
+  const [posterHighLoaded, setPosterHighLoaded] = useState(false);
+  const [posterImgError, setPosterImgError] = useState(false);
+  const [posterTransitioning, setPosterTransitioning] = useState(false);
+  const [prevPosterPath, setPrevPosterPath] = useState(null);
+
   const [imagesState, setImagesState] = useState(() => ({
     posters: data.poster_path
       ? [{ file_path: data.poster_path, from: "main" }]
@@ -576,9 +584,9 @@ export default function DetailsClient({
           const id = getListId(l);
           return id === lid
             ? {
-                ...l,
-                item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
-              }
+              ...l,
+              item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
+            }
             : l;
         }),
       );
@@ -823,42 +831,9 @@ export default function DetailsClient({
     const backdrops = imagesState?.backdrops || [];
     if (!backdrops.length) return data?.backdrop_path || null;
 
-    const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-    const isEN = (img) => {
-      const lang = norm(img?.iso_639_1);
-      return lang === "en";
-    };
-
-    // Filtrar por minWidth 1200
-    const pool = backdrops.filter((b) => (b?.width || 0) >= 1200);
-    const finalPool = pool.length ? pool : backdrops;
-
-    // Tomar las 3 primeras imágenes EN en orden original
-    const top3en = [];
-    for (const b of finalPool) {
-      if (isEN(b)) top3en.push(b);
-      if (top3en.length === 3) break;
-    }
-
-    // Si no hay EN, usar las 3 primeras del pool
-    const top3 = top3en.length ? top3en : finalPool.slice(0, 3);
-    if (!top3.length) return data?.backdrop_path || null;
-
-    // Buscar resoluciones específicas en orden de preferencia
-    // 1) 1920x1080 (Full HD)
-    const b1080 = top3.find((b) => b.width === 1920 && b.height === 1080);
-    if (b1080) return b1080.file_path;
-
-    // 2) 1712x964
-    const b1712 = top3.find((b) => b.width === 1712 && b.height === 964);
-    if (b1712) return b1712.file_path;
-
-    // 3) 4K 3840x2160
-    const b4k = top3.find((b) => b.width === 3840 && b.height === 2160);
-    if (b4k) return b4k.file_path;
-
-    // 4) Primera de esas 3
-    return top3[0]?.file_path || data?.backdrop_path || null;
+    // ✅ Usar la función importada que selecciona correctamente por ES/EN y calidad
+    const bestPath = pickBestBackdropForPreview(backdrops);
+    return bestPath || data?.backdrop_path || null;
   }, [imagesState?.backdrops, data?.backdrop_path]);
 
   const artworkSelection = useMemo(() => {
@@ -1057,7 +1032,7 @@ export default function DetailsClient({
       img.decoding = "async";
       try {
         img.fetchPriority = "high";
-      } catch {}
+      } catch { }
       img.onload = finishOne;
       img.onerror = finishOne; // si una falla, no bloqueamos toda la fila
       img.src = url;
@@ -1084,6 +1059,9 @@ export default function DetailsClient({
 
   useLayoutEffect(() => {
     setPosterResolved(false);
+    setPosterLowLoaded(false);
+    setPosterHighLoaded(false);
+    setPosterImgError(false);
     setArtworkInitialized(false);
 
     const initialPoster =
@@ -1103,7 +1081,8 @@ export default function DetailsClient({
 
     setBaseBackdropPath(initialBackdrop);
     setBasePosterPath(initialPoster);
-    setPosterResolved(!!initialPoster);
+    // ✅ NO activar posterResolved hasta que initArtwork termine
+    // setPosterResolved(!!initialPoster);
 
     setImagesState({
       posters: data.poster_path
@@ -1120,7 +1099,7 @@ export default function DetailsClient({
     setSelectedPosterPath(null);
     setSelectedPreviewBackdropPath(null);
     setSelectedBackgroundPath(null);
-    
+
     // ✅ NO resetear posterViewMode/posterLayoutMode - respetar la preferencia global
     // Ya se inicializan correctamente desde localStorage en el useState inicial
 
@@ -1144,7 +1123,8 @@ export default function DetailsClient({
         // ignore
       }
     }
-    setArtworkInitialized(true);
+    // ✅ NO activar artworkInitialized aquí - esperar a que initArtwork termine
+    // setArtworkInitialized(true);
   }, [
     id,
     endpointType,
@@ -1197,14 +1177,14 @@ export default function DetailsClient({
           const bestPreviewPath = asTmdbPath(bestBackdropForPreviewCalc);
 
           // ✅ Precargar backdrop de vista previa PRIMERO (si estamos en modo preview)
-          const savedGlobalMode = typeof window !== "undefined" 
+          const savedGlobalMode = typeof window !== "undefined"
             ? window.localStorage.getItem("showverse:global:posterViewMode")
             : null;
-          
+
           if (savedGlobalMode === "preview" && bestPreviewPath) {
             await preloadTmdb(bestPreviewPath, "w780");
           }
-          
+
           if (bestPosterPath) await preloadTmdb(bestPosterPath, "w780");
 
           if (!cancelled) {
@@ -1239,16 +1219,16 @@ export default function DetailsClient({
 
           const bestPoster = pickBestImage(posters);
           const bestBackdropForPreviewCalc = pickBestBackdropForPreview(backdrops);
-          
+
           // ✅ Precargar backdrop de vista previa PRIMERO (si estamos en modo preview)
-          const savedGlobalMode = typeof window !== "undefined" 
+          const savedGlobalMode = typeof window !== "undefined"
             ? window.localStorage.getItem("showverse:global:posterViewMode")
             : null;
-          
+
           if (savedGlobalMode === "preview" && bestBackdropForPreviewCalc?.file_path) {
             await preloadTmdb(bestBackdropForPreviewCalc.file_path, "w780");
           }
-          
+
           if (bestPoster?.file_path) {
             await preloadTmdb(bestPoster.file_path, "w780");
             poster = bestPoster.file_path;
@@ -1302,12 +1282,12 @@ export default function DetailsClient({
 
   const previewBackdropPath =
     asTmdbPath(selectedPreviewBackdropPath) ||
-    asTmdbPath(previewBackdropFallback) ||
+    (artworkInitialized ? asTmdbPath(previewBackdropFallback) : null) ||
     null;
 
   const displayPosterPath =
-    posterViewMode === "preview" && previewBackdropPath
-      ? previewBackdropPath
+    posterViewMode === "preview"
+      ? previewBackdropPath // ✅ Si estamos en preview, solo mostrar backdrop (o null si no está listo)
       : basePosterDisplayPath;
 
   const isBackdropPath = useCallback(
@@ -1937,7 +1917,7 @@ export default function DetailsClient({
     try {
       const v = window.localStorage.getItem("showverse:trakt:sync") === "1";
       setSyncTrakt(v);
-    } catch {}
+    } catch { }
   }, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1946,7 +1926,7 @@ export default function DetailsClient({
         "showverse:trakt:sync",
         syncTrakt ? "1" : "0",
       );
-    } catch {}
+    } catch { }
   }, [syncTrakt]);
 
   const reloadTraktStatus = async () => {
@@ -2500,7 +2480,7 @@ export default function DetailsClient({
     // persist opcional
     try {
       window.localStorage.setItem(rewatchStorageKey, startIso);
-    } catch {}
+    } catch { }
 
     await loadTraktShowPlays(startIso);
   };
@@ -2606,7 +2586,7 @@ export default function DetailsClient({
               rewatchRunsStorageKey,
               JSON.stringify(runs),
             );
-          } catch {}
+          } catch { }
         }
       }
 
@@ -2830,7 +2810,7 @@ export default function DetailsClient({
           rewatchRunsStorageKey,
           JSON.stringify(nextRuns || []),
         );
-      } catch {}
+      } catch { }
     },
     [rewatchRunsStorageKey],
   );
@@ -2841,7 +2821,7 @@ export default function DetailsClient({
       setActiveEpisodesView(v);
       try {
         window.localStorage.setItem(episodesViewStorageKey, v);
-      } catch {}
+      } catch { }
 
       if (v === "global") {
         setRewatchStartAt(null);
@@ -2877,7 +2857,7 @@ export default function DetailsClient({
       setActiveEpisodesView(run.id);
       try {
         window.localStorage.setItem(episodesViewStorageKey, run.id);
-      } catch {}
+      } catch { }
       setRewatchStartAt(run.startedAt);
 
       await loadTraktShowPlays(run.startedAt); // ✅ clave
@@ -2902,7 +2882,7 @@ export default function DetailsClient({
         const nextView = prev === runId ? "global" : prev;
         try {
           window.localStorage.setItem(episodesViewStorageKey, nextView);
-        } catch {}
+        } catch { }
         return nextView;
       });
 
@@ -3080,11 +3060,13 @@ export default function DetailsClient({
       });
 
     // ✅ 1) Si vamos a PREVIEW (backdrop), primero forzamos el layout (ratio/ancho)
-    // y esperamos un poco a que la tarjeta se redimensione antes de iniciar carga.
+    // y esperamos a que la tarjeta se redimensione antes de cambiar la imagen.
     if (nextMode === "preview") {
       setPosterLayoutMode("preview");
       await waitFrames();
-      await wait(250); // ✅ Aumentado a 250ms para que coincida mejor con la transición CSS
+      // ✅ Esperar a la MITAD de la transición CSS (250ms de 500ms)
+      // para que el aspect-ratio cambie primero
+      await wait(250);
       if (abortIfStale()) return;
     }
 
@@ -3098,15 +3080,16 @@ export default function DetailsClient({
     const applyMode = () => {
       if (abortIfStale()) return;
 
+      // ✅ Cambiar la imagen DESPUÉS de que el layout haya empezado a cambiar
       setPosterViewMode(nextMode);
 
-      // ✅ Si volvemos a POSTER, reducimos el layout un poco DESPUÉS del swap
-      // para que el cambio de ratio no rompa el diseño.
+      // ✅ Si volvemos a POSTER, reducimos el layout DESPUÉS del swap
       if (nextMode === "poster") {
+        // ✅ Esperar a la mitad de la transición antes de cambiar el layout
         setTimeout(() => {
           if (abortIfStale()) return;
           setPosterLayoutMode("poster");
-        }, 180);
+        }, 250);
       }
 
       safeFinish();
@@ -3123,7 +3106,7 @@ export default function DetailsClient({
       const img = new Image();
       const timeout = setTimeout(() => {
         resolve(false); // timeout: continuar de todas formas
-      }, 650); // esperamos un poco más para que el layout termine de asentarse
+      }, 400); // ✅ Timeout más corto ya que esperamos antes
 
       img.onload = () => {
         clearTimeout(timeout);
@@ -3158,7 +3141,7 @@ export default function DetailsClient({
       if (!posterToggleBusy) {
         setPosterLayoutMode(posterViewMode);
       }
-    } catch {}
+    } catch { }
   }, [posterViewMode, globalViewModeStorageKey, posterToggleBusy]);
 
   const handleCopyImageUrl = async (filePath) => {
@@ -3212,8 +3195,8 @@ export default function DetailsClient({
   const seriesGraphUrl =
     type === "tv" && data?.id && (data.name || data.original_name)
       ? `https://seriesgraph.com/show/${data.id}-${slugifyForSeriesGraph(
-          data.original_name || data.name,
-        )}`
+        data.original_name || data.name,
+      )}`
       : null;
 
   const [traktHomepage, setTraktHomepage] = useState(null);
@@ -3295,7 +3278,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch {}
+    } catch { }
   }, [jwCacheKey]);
 
   // ✅ 1) hidratar desde cache para que el icono salga instantáneo en visitas posteriores
@@ -3306,7 +3289,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch {}
+    } catch { }
   }, [jwCacheKey]);
 
   useEffect(() => {
@@ -3321,7 +3304,7 @@ export default function DetailsClient({
       try {
         if (typeof window !== "undefined")
           window.localStorage.removeItem(jwCacheKey);
-      } catch {}
+      } catch { }
       return;
     }
 
@@ -3336,8 +3319,8 @@ export default function DetailsClient({
 
         const watchnow =
           watchLink &&
-          typeof watchLink === "string" &&
-          !watchLink.includes("themoviedb.org")
+            typeof watchLink === "string" &&
+            !watchLink.includes("themoviedb.org")
             ? watchLink
             : null;
 
@@ -3370,7 +3353,7 @@ export default function DetailsClient({
             if (resolved) window.localStorage.setItem(jwCacheKey, resolved);
             else window.localStorage.removeItem(jwCacheKey);
           }
-        } catch {}
+        } catch { }
       } catch (e) {
         if (ac.signal.aborted) return;
         setExtLinks((p) => ({
@@ -3899,21 +3882,21 @@ export default function DetailsClient({
     const extras =
       type === "movie"
         ? (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
-            .filter((d) => d?.id && d?.name)
-            .map((d, idx) => ({
-              ...d,
-              character: "Director",
-              // orden negativo para que vaya arriba si luego hay sort por order
-              order: -1000 + idx,
-            }))
+          .filter((d) => d?.id && d?.name)
+          .map((d, idx) => ({
+            ...d,
+            character: "Director",
+            // orden negativo para que vaya arriba si luego hay sort por order
+            order: -1000 + idx,
+          }))
         : type === "tv"
           ? (Array.isArray(tvCreators) ? tvCreators : [])
-              .filter((c) => c?.id && c?.name)
-              .map((c, idx) => ({
-                ...c,
-                character: "Creador",
-                order: -1000 + idx,
-              }))
+            .filter((c) => c?.id && c?.name)
+            .map((c, idx) => ({
+              ...c,
+              character: "Creador",
+              order: -1000 + idx,
+            }))
           : [];
 
     // 3) ¿Hay order real en el base? (si viene de TMDb normalmente sí)
@@ -4348,12 +4331,7 @@ export default function DetailsClient({
     ? streamingProviders.slice(0, 6)
     : [];
 
-  const [posterResolved, setPosterResolved] = useState(false);
-  const [posterLowLoaded, setPosterLowLoaded] = useState(false);
-  const [posterHighLoaded, setPosterHighLoaded] = useState(false);
-  const [posterImgError, setPosterImgError] = useState(false);
-  const [posterTransitioning, setPosterTransitioning] = useState(false);
-  const [prevPosterPath, setPrevPosterPath] = useState(null);
+  // ✅ Refs para gestión de carga de poster (los estados están definidos al inicio)
   const prevDisplayPosterRef = useRef(null);
   const posterLoadTokenRef = useRef(0);
   const posterToggleSeqRef = useRef(0);
@@ -4363,49 +4341,67 @@ export default function DetailsClient({
     posterRequestedModeRef.current = posterViewMode;
   }, [posterViewMode]);
 
+  // ✅ Activar posterResolved cuando displayPosterPath esté disponible
+  useEffect(() => {
+    if (artworkInitialized && displayPosterPath && !posterResolved) {
+      setPosterResolved(true);
+    }
+  }, [artworkInitialized, displayPosterPath, posterResolved]);
+
   useEffect(() => {
     const prev = prevDisplayPosterRef.current;
     prevDisplayPosterRef.current = displayPosterPath;
     posterLoadTokenRef.current += 1;
 
-    if (prev && prev !== displayPosterPath) {
-      // Guardar la imagen anterior para crossfade
-      setPrevPosterPath(prev);
+    // ✅ Manejar cambio de imagen (incluyendo de null a valor)
+    if (prev !== displayPosterPath) {
+      // Si hay imagen anterior, guardarla para crossfade
+      if (prev) {
+        setPrevPosterPath(prev);
+      }
 
-      // ✅ No resetear los estados de carga si la imagen ya está precargada
-      const checkIfLoaded = () => {
-        const testImg = new Image();
-        testImg.src = `https://image.tmdb.org/t/p/w342${displayPosterPath}`;
-        return testImg.complete && testImg.naturalWidth > 0;
-      };
+      // ✅ Verificar si la nueva imagen ya está precargada
+      if (displayPosterPath) {
+        const checkIfLoaded = (size) => {
+          const testImg = new Image();
+          testImg.src = `https://image.tmdb.org/t/p/${size}${displayPosterPath}`;
+          return testImg.complete && testImg.naturalWidth > 0;
+        };
 
-      const isPreloaded = checkIfLoaded();
-      
-      // ✅ Si está precargada, transición instantánea. Si no, resetear estados
-      if (isPreloaded) {
-        setPosterLowLoaded(true);
-        setPosterHighLoaded(false);
+        const isLowPreloaded = checkIfLoaded('w342');
+        const isHighPreloaded = checkIfLoaded('w780');
+
+        // ✅ Si está precargada, marcar como cargada inmediatamente
+        if (isLowPreloaded) {
+          setPosterLowLoaded(true);
+          setPosterHighLoaded(isHighPreloaded); // ✅ También verificar HIGH
+        } else {
+          setPosterLowLoaded(false);
+          setPosterHighLoaded(false);
+        }
+
+        setPosterTransitioning(!!prev); // Solo transición si había imagen anterior
+        setPosterImgError(false);
+
+        // ✅ Limpiar transición después del tiempo configurado
+        if (prev) {
+          const timer = setTimeout(() => {
+            setPosterTransitioning(false);
+            setPrevPosterPath(null);
+          }, 500);
+
+          return () => {
+            clearTimeout(timer);
+          };
+        }
       } else {
+        // Si displayPosterPath es null, resetear estados
         setPosterLowLoaded(false);
         setPosterHighLoaded(false);
-      }
-      
-      setPosterTransitioning(true);
-      setPosterImgError(false);
-
-      // ✅ Transición más rápida (600ms) para mejor UX en cambios rápidos
-      const timer = setTimeout(() => {
         setPosterTransitioning(false);
         setPrevPosterPath(null);
-      }, 600);
-
-      return () => {
-        clearTimeout(timer);
-      };
+      }
     }
-
-    setPosterTransitioning(false);
-    setPrevPosterPath(null);
   }, [displayPosterPath]);
 
   const posterAspectIsBackdrop =
@@ -4487,6 +4483,7 @@ export default function DetailsClient({
       typeof performance !== "undefined" ? performance.now() : Date.now();
   }, []);
 
+  // ✅ Animación 3D del poster/backdrop
   useEffect(() => {
     if (!poster3dEnabled) return;
 
@@ -4494,6 +4491,10 @@ export default function DetailsClient({
     if (!el) return;
 
     let mounted = true;
+
+    // ✅ Resetear posterLastInputRef para que idle funcione inmediatamente al cambiar imagen
+    posterLastInputRef.current =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
 
     const loop = (t) => {
       if (!mounted) return;
@@ -4539,6 +4540,8 @@ export default function DetailsClient({
       posterAnimRafRef.current = 0;
     };
   }, [poster3dEnabled, displayPosterPath]);
+
+
 
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
@@ -4616,11 +4619,10 @@ export default function DetailsClient({
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 animate-in fade-in duration-700 slide-in-from-bottom-4 items-start">
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
-            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-all duration-500 ${
-              isBackdropPoster
-                ? "max-w-full lg:max-w-[600px]"
-                : "max-w-[280px] lg:max-w-[320px]"
-            }`}
+            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-all duration-500 ${isBackdropPoster
+              ? "max-w-full lg:max-w-[600px]"
+              : "max-w-[280px] lg:max-w-[320px]"
+              }`}
           >
             {/* Poster Card */}
             <div className="relative">
@@ -4653,15 +4655,15 @@ export default function DetailsClient({
                     WebkitBackfaceVisibility: "hidden",
                     outline: "1px solid transparent",
                     isolation: "isolate",
+                    // ✅ NO transition en transform - manejado por requestAnimationFrame
                   }}
                 >
                   {/* (Opcional) borde suave sin sombreado encima */}
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10" />
 
                   <div
-                    className={`relative bg-neutral-950 will-change-auto ${
-                      isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
-                    }`}
+                    className={`relative bg-neutral-950 will-change-auto ${isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
+                      }`}
                     style={{
                       transition: "aspect-ratio 500ms cubic-bezier(0.4, 0, 0.2, 1)",
                     }}
@@ -4669,7 +4671,7 @@ export default function DetailsClient({
                     {/* Imagen anterior (permanece visible durante la transición) */}
                     {prevPosterPath && posterTransitioning && (
                       <div
-                        className="absolute inset-0 transition-opacity duration-[600ms] ease-out"
+                        className="absolute inset-0 transition-opacity duration-500 ease-in-out"
                         style={{ opacity: posterLowLoaded ? 0 : 1 }}
                       >
                         <img
@@ -4704,7 +4706,7 @@ export default function DetailsClient({
                             setPosterImgError(true);
                             setPosterResolved(true);
                           }}
-                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[600ms] ease-in-out
+                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out
 ${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
                             transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
@@ -4726,8 +4728,8 @@ ${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"
                                 return;
                               setPosterHighLoaded(true);
                             }}
-                            onError={() => {}}
-                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[600ms] ease-out
+                            onError={() => { }}
+                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out
 ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
                               transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
@@ -4748,46 +4750,51 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
             </div>
 
             {/* Providers Grid + Enlaces Externos (cuando es backdrop) */}
-            {limitedProviders && limitedProviders.length > 0 && (
+            {(limitedProviders && limitedProviders.length > 0) || (isBackdropPoster && externalLinks.length > 0) ? (
               <div className="flex flex-row flex-nowrap justify-center items-center gap-3 w-full px-1 py-2 overflow-x-auto [scrollbar-width:none]">
-                {/* Providers */}
-                <div className="flex flex-row flex-nowrap items-center gap-2">
-                  {limitedProviders.map((p) => {
-                    const providerLink = p.url || justwatchUrl || "#";
-                    const hasValidLink = p.url || justwatchUrl;
+                {/* Providers - Solo si hay plataformas */}
+                {limitedProviders && limitedProviders.length > 0 && (
+                  <div className="flex flex-row flex-nowrap items-center gap-2">
+                    {limitedProviders.map((p) => {
+                      const providerLink = p.url || justwatchUrl || "#";
+                      const hasValidLink = p.url || justwatchUrl;
 
-                    return (
-                      <a
-                        key={p.provider_id}
-                        href={providerLink}
-                        target={hasValidLink ? "_blank" : undefined}
-                        rel={hasValidLink ? "noreferrer" : undefined}
-                        title={p.provider_name}
-                        className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
-                      >
-                        <img
-                          src={
-                            p.logo_path?.startsWith("http")
-                              ? p.logo_path
-                              : p.logo_path?.startsWith("/")
-                                ? `https://image.tmdb.org/t/p/original${p.logo_path}`
-                                : p.logo_path
-                          }
-                          alt={p.provider_name}
-                          className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5"
-                          onError={(e) => {
-                            e.target.style.display = "none";
-                          }}
-                        />
-                      </a>
-                    );
-                  })}
-                </div>
+                      return (
+                        <a
+                          key={p.provider_id}
+                          href={providerLink}
+                          target={hasValidLink ? "_blank" : undefined}
+                          rel={hasValidLink ? "noreferrer" : undefined}
+                          title={p.provider_name}
+                          className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
+                        >
+                          <img
+                            src={
+                              p.logo_path?.startsWith("http")
+                                ? p.logo_path
+                                : p.logo_path?.startsWith("/")
+                                  ? `https://image.tmdb.org/t/p/original${p.logo_path}`
+                                  : p.logo_path
+                            }
+                            alt={p.provider_name}
+                            className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                            }}
+                          />
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
 
-                {/* Barra vertical + Enlaces externos (solo cuando es backdrop) */}
+                {/* Barra vertical + Enlaces externos (cuando es backdrop) */}
                 {isBackdropPoster && externalLinks.length > 0 && (
                   <>
-                    <div className="w-px h-8 bg-white/20 flex-shrink-0" />
+                    {/* Separador solo si hay plataformas */}
+                    {limitedProviders && limitedProviders.length > 0 && (
+                      <div className="w-px h-8 bg-white/20 flex-shrink-0" />
+                    )}
                     <div className="flex flex-row flex-nowrap items-center gap-2">
                       {externalLinks.slice(0, 5).map((link) => (
                         <a
@@ -4812,13 +4819,12 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </>
                 )}
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* --- COLUMNA DERECHA: INFO (sin tabs cuando es backdrop) --- */}
-          <div className={`flex-1 flex flex-col min-w-0 w-full ${
-            isBackdropPoster ? "" : ""
-          }`}>
+          <div className={`flex-1 flex flex-col min-w-0 w-full ${isBackdropPoster ? "" : ""
+            }`}>
             {/* 1. TÍTULO Y CABECERA */}
             <div className="mb-5 px-1">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
@@ -4843,11 +4849,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <>
                     <span className="text-white text-[10px]">●</span>
                     <span
-                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
-                        data.status === "Ended" || data.status === "Canceled"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      }`}
+                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${data.status === "Ended" || data.status === "Canceled"
+                        ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                        : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        }`}
                     >
                       {data.status}
                     </span>
@@ -4987,7 +4992,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
               </LiquidButton>
             </div>
 
-           
+
             <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
               <div
                 className="
@@ -5027,9 +5032,9 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                       onClick={
                         !trakt?.connected
                           ? () =>
-                              window.location.assign(
-                                `/api/trakt/auth/start?next=/details/${type}/${id}`,
-                              )
+                            window.location.assign(
+                              `/api/trakt/auth/start?next=/details/${type}/${id}`,
+                            )
                           : undefined
                       }
                     />
@@ -5072,20 +5077,20 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* ✅ Rotten Tomatoes: SOLO desktop (>= sm) */}
                   {(tScoreboard?.external?.rtAudience != null ||
                     extras.rtScore != null) && (
-                    <div className="hidden sm:block">
-                      <CompactBadge
-                        logo="/logo-RottenTomatoes.png"
-                        value={
-                          tScoreboard?.external?.rtAudience != null
-                            ? Math.round(tScoreboard.external.rtAudience)
-                            : extras.rtScore != null
-                              ? Math.round(extras.rtScore)
-                              : null
-                        }
-                        suffix="%"
-                      />
-                    </div>
-                  )}
+                      <div className="hidden sm:block">
+                        <CompactBadge
+                          logo="/logo-RottenTomatoes.png"
+                          value={
+                            tScoreboard?.external?.rtAudience != null
+                              ? Math.round(tScoreboard.external.rtAudience)
+                              : extras.rtScore != null
+                                ? Math.round(extras.rtScore)
+                                : null
+                          }
+                          suffix="%"
+                        />
+                      </div>
+                    )}
 
                   {/* ✅ Metacritic: SOLO desktop (>= sm) */}
                   {extras.mcScore != null && (
@@ -5104,7 +5109,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <div className="w-px h-6 bg-white/10 shrink-0" />
                 )}
 
-                {/* ✅ B. Links externos - SOLO si NO es backdrop (para evitar duplicados) */}
+                {/* ✅ B. Links externos - SOLO si NO es backdrop (se muestran abajo con plataformas en modo backdrop) */}
                 {!isBackdropPoster && (
                   <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
                     {/* ✅ DESKTOP: iconos normales */}
@@ -5239,208 +5244,207 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
               <div>
                 {/* --- MENÚ DE NAVEGACIÓN --- */}
                 <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
-                {[
-                  { id: "details", label: "Detalles" },
-                  { id: "production", label: "Producción" },
-                  { id: "synopsis", label: "Sinopsis" },
-                  ...(extras.awards
-                    ? [{ id: "awards", label: "Premios" }]
-                    : []),
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-          ${
-            activeTab === tab.id
-              ? "text-white border-yellow-500"
-              : "text-zinc-500 border-transparent hover:text-zinc-300"
-          }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* --- ÁREA DE CONTENIDO --- */}
-              <div className="relative min-h-[100px]">
-                <AnimatePresence mode="wait">
-                  {/* 1. SINOPSIS */}
-                  {activeTab === "synopsis" && (
-                    <motion.div
-                      key="synopsis"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
+                  {[
+                    { id: "details", label: "Detalles" },
+                    { id: "production", label: "Producción" },
+                    { id: "synopsis", label: "Sinopsis" },
+                    ...(extras.awards
+                      ? [{ id: "awards", label: "Premios" }]
+                      : []),
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
+          ${activeTab === tab.id
+                          ? "text-white border-yellow-500"
+                          : "text-zinc-500 border-transparent hover:text-zinc-300"
+                        }`}
                     >
-                      <div className="p-5 rounded-2xl bg-white/5 border border-white/5">
-                        {data.tagline && (
-                          <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
-                            “{data.tagline}”
-                          </div>
-                        )}
-                        <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
-                          {data.overview || "No hay descripción disponible."}
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-                  {/* 2. DETALLES */}
-                  {activeTab === "details" && (
-                    <motion.div
-                      key="details"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                        <VisualMetaCard
-                          icon={type === "movie" ? FilmIcon : MonitorPlay}
-                          label="Título Original"
-                          value={
-                            type === "movie"
-                              ? data.original_title
-                              : data.original_name
-                          }
-                          expanded={true}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
+                {/* --- ÁREA DE CONTENIDO --- */}
+                <div className="relative min-h-[100px]">
+                  <AnimatePresence mode="wait">
+                    {/* 1. SINOPSIS */}
+                    {activeTab === "synopsis" && (
+                      <motion.div
+                        key="synopsis"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="p-5 rounded-2xl bg-white/5 border border-white/5">
+                          {data.tagline && (
+                            <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
+                              “{data.tagline}”
+                            </div>
+                          )}
+                          <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
+                            {data.overview || "No hay descripción disponible."}
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
 
-                        {/* Formato (solo TV) */}
-                        {type !== "movie" ? (
+                    {/* 2. DETALLES */}
+                    {activeTab === "details" && (
+                      <motion.div
+                        key="details"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
                           <VisualMetaCard
-                            icon={Layers}
-                            label="Formato"
+                            icon={type === "movie" ? FilmIcon : MonitorPlay}
+                            label="Título Original"
                             value={
-                              data.number_of_seasons
-                                ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
-                                : "—"
+                              type === "movie"
+                                ? data.original_title
+                                : data.original_name
                             }
+                            expanded={true}
                             className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
-                        ) : null}
 
-                        <VisualMetaCard
-                          icon={CalendarIcon}
-                          label={type === "movie" ? "Estreno" : "Inicio"}
-                          value={releaseDateValue || "—"}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
+                          {/* Formato (solo TV) */}
+                          {type !== "movie" ? (
+                            <VisualMetaCard
+                              icon={Layers}
+                              label="Formato"
+                              value={
+                                data.number_of_seasons
+                                  ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
+                                  : "—"
+                              }
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            />
+                          ) : null}
 
-                        {/* Finalización / Última emisión (solo TV) */}
-                        {type !== "movie" ? (
                           <VisualMetaCard
                             icon={CalendarIcon}
-                            label={
-                              data.status === "Ended"
-                                ? "Finalización"
-                                : "Última emisión"
-                            }
-                            value={lastAirDateValue || "En emisión"}
+                            label={type === "movie" ? "Estreno" : "Inicio"}
+                            value={releaseDateValue || "—"}
                             className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
-                        ) : null}
 
-                        {/* Presupuesto + Recaudación (solo Cine) */}
-                        {type === "movie" ? (
-                          <>
+                          {/* Finalización / Última emisión (solo TV) */}
+                          {type !== "movie" ? (
                             <VisualMetaCard
-                              icon={BadgeDollarSignIcon}
-                              label="Presupuesto"
-                              value={budgetValue || "—"}
+                              icon={CalendarIcon}
+                              label={
+                                data.status === "Ended"
+                                  ? "Finalización"
+                                  : "Última emisión"
+                              }
+                              value={lastAirDateValue || "En emisión"}
                               className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
-                            <VisualMetaCard
-                              icon={TrendingUp}
-                              label="Recaudación"
-                              value={revenueValue || "—"}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                            />
-                          </>
-                        ) : null}
-                      </div>
-                    </motion.div>
-                  )}
+                          ) : null}
 
-                  {/* 3. PRODUCCIÓN Y EQUIPO */}
-                  {activeTab === "production" && (
-                    <motion.div
-                      key="production"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                        {/* Director (Cine) / Creadores (TV) */}
-                        <VisualMetaCard
-                          icon={Users}
-                          label={type === "movie" ? "Director" : "Creadores"}
-                          value={
-                            type === "movie"
-                              ? movieDirector || "Desconocido"
-                              : createdByNames || "Desconocido"
-                          }
-                          expanded={true}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
+                          {/* Presupuesto + Recaudación (solo Cine) */}
+                          {type === "movie" ? (
+                            <>
+                              <VisualMetaCard
+                                icon={BadgeDollarSignIcon}
+                                label="Presupuesto"
+                                value={budgetValue || "—"}
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              />
+                              <VisualMetaCard
+                                icon={TrendingUp}
+                                label="Recaudación"
+                                value={revenueValue || "—"}
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              />
+                            </>
+                          ) : null}
+                        </div>
+                      </motion.div>
+                    )}
 
-                        {/* Canal (solo TV) */}
-                        {type !== "movie" ? (
+                    {/* 3. PRODUCCIÓN Y EQUIPO */}
+                    {activeTab === "production" && (
+                      <motion.div
+                        key="production"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                          {/* Director (Cine) / Creadores (TV) */}
                           <VisualMetaCard
-                            icon={MonitorPlay}
-                            label="Canal"
-                            value={network || "—"}
+                            icon={Users}
+                            label={type === "movie" ? "Director" : "Creadores"}
+                            value={
+                              type === "movie"
+                                ? movieDirector || "Desconocido"
+                                : createdByNames || "Desconocido"
+                            }
+                            expanded={true}
                             className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
-                        ) : null}
 
-                        {/* Producción (ambos) */}
-                        <VisualMetaCard
-                          icon={Building2}
-                          label="Producción"
-                          value={production || "—"}
-                          expanded={true}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                      </div>
-                    </motion.div>
-                  )}
+                          {/* Canal (solo TV) */}
+                          {type !== "movie" ? (
+                            <VisualMetaCard
+                              icon={MonitorPlay}
+                              label="Canal"
+                              value={network || "—"}
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            />
+                          ) : null}
 
-                  {/* 4. PREMIOS */}
-                  {activeTab === "awards" && extras.awards && (
-                    <motion.div
-                      key="awards"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-6">
-                        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
+                          {/* Producción (ambos) */}
+                          <VisualMetaCard
+                            icon={Building2}
+                            label="Producción"
+                            value={production || "—"}
+                            expanded={true}
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          />
+                        </div>
+                      </motion.div>
+                    )}
 
-                        <div className="flex items-start gap-4 relative z-10">
-                          <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
-                            <Trophy className="w-8 h-8" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-lg font-bold text-white mb-2">
-                              Reconocimientos
-                            </h3>
-                            <p className="text-base font-medium text-yellow-100/90 leading-relaxed whitespace-pre-line">
-                              {extras.awards}
-                            </p>
+                    {/* 4. PREMIOS */}
+                    {activeTab === "awards" && extras.awards && (
+                      <motion.div
+                        key="awards"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-6">
+                          <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
+
+                          <div className="flex items-start gap-4 relative z-10">
+                            <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
+                              <Trophy className="w-8 h-8" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-bold text-white mb-2">
+                                Reconocimientos
+                              </h3>
+                              <p className="text-base font-medium text-yellow-100/90 leading-relaxed whitespace-pre-line">
+                                {extras.awards}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
-            </div>
             )}
           </div>
         </div>
@@ -5462,11 +5466,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-        ${
-          activeTab === tab.id
-            ? "text-white border-yellow-500"
-            : "text-zinc-500 border-transparent hover:text-zinc-300"
-        }`}
+        ${activeTab === tab.id
+                      ? "text-white border-yellow-500"
+                      : "text-zinc-500 border-transparent hover:text-zinc-300"
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -5702,11 +5705,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                               type="button"
                               onClick={() => setActiveImagesTab(tab)}
                               className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
-              ${
-                activeImagesTab === tab
-                  ? "bg-white/10 text-white shadow"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
+              ${activeImagesTab === tab
+                                  ? "bg-white/10 text-white shadow"
+                                  : "text-zinc-400 hover:text-zinc-200"
+                                }`}
                               style={{ WebkitTapHighlightColor: "transparent" }}
                             >
                               {tab === "posters"
@@ -5883,11 +5885,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 type="button"
                                 onClick={() => setActiveImagesTab("posters")}
-                                className={`p-2 rounded-lg transition-all ${
-                                  activeImagesTab === "posters"
-                                    ? "bg-white/10 text-white shadow"
-                                    : "text-zinc-400 hover:text-zinc-200"
-                                }`}
+                                className={`p-2 rounded-lg transition-all ${activeImagesTab === "posters"
+                                  ? "bg-white/10 text-white shadow"
+                                  : "text-zinc-400 hover:text-zinc-200"
+                                  }`}
                                 style={{
                                   WebkitTapHighlightColor: "transparent",
                                 }}
@@ -5898,11 +5899,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 type="button"
                                 onClick={() => setActiveImagesTab("backdrops")}
-                                className={`p-2 rounded-lg transition-all ${
-                                  activeImagesTab === "backdrops"
-                                    ? "bg-white/10 text-white shadow"
-                                    : "text-zinc-400 hover:text-zinc-200"
-                                }`}
+                                className={`p-2 rounded-lg transition-all ${activeImagesTab === "backdrops"
+                                  ? "bg-white/10 text-white shadow"
+                                  : "text-zinc-400 hover:text-zinc-200"
+                                  }`}
                                 style={{
                                   WebkitTapHighlightColor: "transparent",
                                 }}
@@ -5913,11 +5913,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 type="button"
                                 onClick={() => setActiveImagesTab("background")}
-                                className={`p-2 rounded-lg transition-all ${
-                                  activeImagesTab === "background"
-                                    ? "bg-white/10 text-white shadow"
-                                    : "text-zinc-400 hover:text-zinc-200"
-                                }`}
+                                className={`p-2 rounded-lg transition-all ${activeImagesTab === "background"
+                                  ? "bg-white/10 text-white shadow"
+                                  : "text-zinc-400 hover:text-zinc-200"
+                                  }`}
                                 style={{
                                   WebkitTapHighlightColor: "transparent",
                                 }}
@@ -6017,11 +6016,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => setLangES((v) => !v)}
-                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${
-                                    langES
-                                      ? "bg-zinc-800 text-white"
-                                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                                  }`}
+                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${langES
+                                    ? "bg-zinc-800 text-white"
+                                    : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                    }`}
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
@@ -6031,11 +6029,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => setLangEN((v) => !v)}
-                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${
-                                    langEN
-                                      ? "bg-zinc-800 text-white"
-                                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                                  }`}
+                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${langEN
+                                    ? "bg-zinc-800 text-white"
+                                    : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                    }`}
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
@@ -6079,19 +6076,19 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                     const breakpoints = isPoster
                       ? {
-                          500: { slidesPerView: 3, spaceBetween: 14 },
-                          640: { slidesPerView: 4, spaceBetween: 14 },
-                          768: { slidesPerView: 5, spaceBetween: 16 },
-                          1024: { slidesPerView: 6, spaceBetween: 18 },
-                          1280: { slidesPerView: 7, spaceBetween: 18 },
-                        }
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        640: { slidesPerView: 4, spaceBetween: 14 },
+                        768: { slidesPerView: 5, spaceBetween: 16 },
+                        1024: { slidesPerView: 6, spaceBetween: 18 },
+                        1280: { slidesPerView: 7, spaceBetween: 18 },
+                      }
                       : {
-                          0: { slidesPerView: 2, spaceBetween: 12 },
-                          640: { slidesPerView: 3, spaceBetween: 14 },
-                          768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 4, spaceBetween: 18 },
-                          1280: { slidesPerView: 4, spaceBetween: 20 },
-                        };
+                        0: { slidesPerView: 2, spaceBetween: 12 },
+                        640: { slidesPerView: 3, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 4, spaceBetween: 18 },
+                        1280: { slidesPerView: 4, spaceBetween: 20 },
+                      };
 
                     return (
                       <div className="relative overflow-x-hidden overflow-y-visible">
@@ -6182,11 +6179,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     }}
                                     className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
-                        ${
-                          isActive
-                            ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
-                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
-                        }`}
+                        ${isActive
+                                        ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
+                                        : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
+                                      }`}
                                     title="Seleccionar"
                                     style={{
                                       WebkitTapHighlightColor: "transparent",
@@ -6823,11 +6819,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                           key={t.id}
                           type="button"
                           onClick={() => setTCommentsTab(t.id)}
-                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
-                            tCommentsTab === t.id
-                              ? "bg-zinc-700 text-white shadow-md"
-                              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-                          }`}
+                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${tCommentsTab === t.id
+                            ? "bg-zinc-700 text-white shadow-md"
+                            : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                            }`}
                         >
                           {t.label}
                         </button>
@@ -6963,11 +6958,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                       <button
                         key={tab}
                         onClick={() => setTListsTab(tab)}
-                        className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${
-                          tListsTab === tab
-                            ? "bg-white text-black shadow-lg scale-105"
-                            : "text-zinc-400 hover:text-white hover:bg-white/5"
-                        }`}
+                        className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${tListsTab === tab
+                          ? "bg-white text-black shadow-lg scale-105"
+                          : "text-zinc-400 hover:text-white hover:bg-white/5"
+                          }`}
                       >
                         {tab}
                       </button>
@@ -7277,7 +7271,7 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                       const tmdbScore =
                         typeof rec.vote_average === "number" &&
-                        rec.vote_average > 0
+                          rec.vote_average > 0
                           ? rec.vote_average
                           : null;
 
@@ -7310,11 +7304,10 @@ ${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 {/* Top gradient con tipo y ratings */}
                                 <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
                                   <span
-                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                                      isMovie
-                                        ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                        : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                    }`}
+                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
+                                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                      }`}
                                   >
                                     {isMovie ? "PELÍCULA" : "SERIE"}
                                   </span>
