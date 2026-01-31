@@ -16,8 +16,8 @@ export default function StarRating({
   max = 10,
 
   // ✅ NUEVO
-  min = 0.5,
-  step = 0.5,
+  min = 1,
+  step = 1,
 
   // ✅ Soporte props (Legacy/New)
   onRate,
