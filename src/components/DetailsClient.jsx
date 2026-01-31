@@ -4484,8 +4484,12 @@ export default function DetailsClient({
     !posterResolved ||
     (displayPosterPath && !posterLowLoaded && !posterImgError);
 
-  // Icono NO IMAGE solo si ya hemos resuelto y NO hay poster (o falló)
-  const showNoPoster = posterResolved && (!displayPosterPath || posterImgError);
+  // Icono NO IMAGE solo si ya hemos resuelto, NO hay poster (o falló) y NO estamos esperando carga inicial en modo preview
+  const showNoPoster =
+    posterResolved &&
+    (!displayPosterPath || posterImgError) &&
+    // Si estamos en preview, esperar a que termine initArtwork antes de declarar "No Image"
+    (posterViewMode !== "preview" || artworkInitialized);
 
   // ====== Poster 3D Tilt / Shine ======
   const posterWrapRef = useRef(null);
