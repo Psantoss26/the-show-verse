@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import {
+  getValidTraktToken,
+  setTraktCookies,
+  clearTraktCookies,
+} from "@/lib/trakt/server";
 
 const TRAKT_API = "https://api.trakt.tv";
 const TMDB_API = "https://api.themoviedb.org/3";
@@ -63,14 +68,20 @@ async function getTMDbCredits(tmdbId, type) {
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const accessToken = cookieStore.get("trakt_access_token")?.value;
 
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: "No Trakt access token found" },
+    // ✅ AUTH: Usar la lógica centralizada que refresca tokens si es necesario
+    const { token, refreshedTokens, shouldClear } = await getValidTraktToken(cookieStore);
+
+    if (!token) {
+      const res = NextResponse.json(
+        { error: "No Trakt access token found", notConnected: true },
         { status: 401 },
       );
+      if (shouldClear) clearTraktCookies(res);
+      return res;
     }
+
+    const accessToken = token;
 
     // Obtener información del usuario
     const userRes = await fetch(`${TRAKT_API}/users/settings`, {
@@ -78,10 +89,13 @@ export async function GET() {
     });
 
     if (!userRes.ok) {
-      return NextResponse.json(
-        { error: "Failed to fetch user info" },
+      const res = NextResponse.json(
+        { error: "Failed to fetch user info", notConnected: true },
         { status: userRes.status },
       );
+      // Si 401 (token revocado/inválido), limpiar
+      if (userRes.status === 401) clearTraktCookies(res);
+      return res;
     }
 
     const userInfo = await userRes.json();
@@ -226,7 +240,7 @@ export async function GET() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       username,
       stats,
       watchedMovies: moviesWithSpanishTitles,
@@ -235,6 +249,12 @@ export async function GET() {
       topActors,
       topDirectors,
     });
+
+    if (refreshedTokens) {
+      setTraktCookies(response, refreshedTokens);
+    }
+
+    return response;
   } catch (e) {
     console.error("Error in user-stats route:", e);
     return NextResponse.json(
