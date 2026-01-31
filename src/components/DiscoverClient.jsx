@@ -644,7 +644,12 @@ export default function DiscoverClient() {
                 list = applySeenFilter(list)
 
                 if (cancelled) return
-                setItems((prev) => (page === 1 ? list : [...prev, ...list]))
+                setItems((prev) => {
+                    if (page === 1) return list
+                    const existingKeys = new Set(prev.map((it) => `${it.media_type}-${it.id}`))
+                    const newItems = list.filter((it) => !existingKeys.has(`${it.media_type}-${it.id}`))
+                    return [...prev, ...newItems]
+                })
             } catch (e) {
                 if (!isAbortError(e) && !ac.signal.aborted) {
                     console.error(e)
