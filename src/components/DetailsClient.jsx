@@ -828,13 +828,31 @@ export default function DetailsClient({
   };
 
   const previewBackdropFallback = useMemo(() => {
-    const backdrops = imagesState?.backdrops || [];
-    if (!backdrops.length) return data?.backdrop_path || null;
+    // ✅ CRITERIO INTELIGENTE (COMO FAVORITOS/PENDIENTES)
+    // Buscamos activamente la mejor imagen (con idioma ES/EN) usando todas las fuentes disponibles.
 
-    // ✅ Usar la función importada que selecciona correctamente por ES/EN y calidad
-    const bestPath = pickBestBackdropForPreview(backdrops);
-    return bestPath || data?.backdrop_path || null;
-  }, [imagesState?.backdrops, data?.backdrop_path]);
+    // 1. Combinar todas las fuentes posibles de backdrops
+    // ⚠️ IMPORTANTE: Solo usamos data.images si artworkInitialized es true
+    // para evitar mostrar un backdrop que luego será reemplazado por uno mejor
+    const allBackdrops = [
+      ...(imagesState?.backdrops || []), // Cargadas dinámicamente
+      ...(artworkInitialized && data?.images?.backdrops ? data.images.backdrops : []) // Solo si ya terminamos
+    ];
+
+    // 2. Si tenemos candidatos, aplicar el filtro inteligente INMEDIATAMENTE
+    if (allBackdrops.length > 0) {
+      const bestPath = pickBestBackdropForPreview(allBackdrops);
+      if (bestPath) return bestPath;
+    }
+
+    // 3. ✨ SOLUCIÓN AL PARPADEO:
+    // Si todavía estamos inicializando (cargando imágenes extra), NO mostramos el genérico todavía.
+    // Preferimos esperar (skeleton) unos milisegundos a mostrar una imagen incorrecta y luego cambiarla.
+    if (!artworkInitialized) return null;
+
+    // 4. Fallback final: Si ya terminamos de cargar y no hubo nada mejor, usamos el genérico.
+    return data?.backdrop_path || null;
+  }, [imagesState?.backdrops, data?.images?.backdrops, data?.backdrop_path, artworkInitialized]);
 
   const artworkSelection = useMemo(() => {
     const rawList =
@@ -1088,9 +1106,7 @@ export default function DetailsClient({
       posters: data.poster_path
         ? [{ file_path: data.poster_path, from: "main" }]
         : [],
-      backdrops: data.backdrop_path
-        ? [{ file_path: data.backdrop_path, from: "main" }]
-        : [],
+      backdrops: [], // ✅ NO inicializar con data.backdrop_path - esperar a initArtwork
     });
     setImagesLoading(false);
     setImagesError("");
@@ -1281,8 +1297,8 @@ export default function DetailsClient({
     null;
 
   const previewBackdropPath =
-    asTmdbPath(selectedPreviewBackdropPath) ||
-    (artworkInitialized ? asTmdbPath(previewBackdropFallback) : null) ||
+    (artworkInitialized ? asTmdbPath(selectedPreviewBackdropPath) : null) ||
+    asTmdbPath(previewBackdropFallback) ||
     null;
 
   const displayPosterPath =
@@ -4343,10 +4359,54 @@ export default function DetailsClient({
 
   // ✅ Activar posterResolved cuando displayPosterPath esté disponible
   useEffect(() => {
-    if (artworkInitialized && displayPosterPath && !posterResolved) {
+    // ✅ Activar posterResolved INMEDIATAMENTE si tenemos un path válido (igual que el poster)
+    if (displayPosterPath && !posterResolved) {
       setPosterResolved(true);
     }
-  }, [artworkInitialized, displayPosterPath, posterResolved]);
+    // Incluimos artworkInitialized para evitar error de HMR "deps changed size"
+  }, [displayPosterPath, posterResolved, artworkInitialized]);
+
+  // ✅ Fallback automático: si backdrop falla, cambiar a poster
+  useEffect(() => {
+    if (posterImgError && posterViewMode === "preview" && basePosterDisplayPath) {
+      console.warn("Backdrop failed to load, falling back to poster");
+      setPosterViewMode("poster");
+      setPosterLayoutMode("poster");
+      // Resetear error para que el poster pueda cargar
+      setPosterImgError(false);
+      setPosterLowLoaded(false);
+      setPosterHighLoaded(false);
+    }
+  }, [posterImgError, posterViewMode, basePosterDisplayPath]);
+
+  // ✅ Fallback si no hay backdrop disponible en modo preview
+  useEffect(() => {
+    if (
+      posterViewMode === "preview" &&
+      artworkInitialized &&
+      !previewBackdropPath &&
+      basePosterDisplayPath
+    ) {
+      console.warn("No backdrop available, falling back to poster");
+      setPosterViewMode("poster");
+      setPosterLayoutMode("poster");
+    }
+  }, [posterViewMode, artworkInitialized, previewBackdropPath, basePosterDisplayPath]);
+
+  // ✅ Timeout de seguridad: si después de 3s no hay imagen en modo preview, cambiar a poster
+  useEffect(() => {
+    if (posterViewMode !== "preview" || posterResolved) return;
+
+    const timeoutId = setTimeout(() => {
+      if (!posterResolved && basePosterDisplayPath) {
+        console.warn("Backdrop loading timeout, falling back to poster");
+        setPosterViewMode("poster");
+        setPosterLayoutMode("poster");
+      }
+    }, 3000); // 3 segundos de timeout
+
+    return () => clearTimeout(timeoutId);
+  }, [posterViewMode, posterResolved, basePosterDisplayPath]);
 
   useEffect(() => {
     const prev = prevDisplayPosterRef.current;
