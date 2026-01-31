@@ -421,12 +421,12 @@ export default function CalendarPage() {
           {/* Título */}
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-rose-500" />
-              <span className="text-rose-400 font-bold uppercase tracking-widest text-xs">AGENDA</span>
+              <div className="h-px w-12 bg-yellow-500" />
+              <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">AGENDA</span>
             </div>
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
               Calendario
-              <span className="text-rose-500">.</span>
+              <span className="text-yellow-500">.</span>
             </h1>
             <p className="mt-2 text-zinc-400 max-w-lg text-lg">
               Consulta las fechas de emisión y próximos estrenos.
@@ -541,7 +541,7 @@ export default function CalendarPage() {
                   : "Mes tranquilo"}
             </h3>
             <p className="text-zinc-500 mt-2 max-w-md px-4">
-              No hay grandes estrenos registrados para{" "}
+              No hay estrenos registrados para{" "}
               <span className="text-yellow-400 font-bold capitalize">
                 {dateRangeLabel}
               </span>

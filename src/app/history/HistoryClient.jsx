@@ -2463,11 +2463,11 @@ export default function HistoryClient() {
 
             {!auth.connected ? (
               <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed">
-                <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-900/30 mb-6">
+                <div className="mb-6">
                   <img
                     src="/logo-Trakt.png"
-                    alt=""
-                    className="w-10 h-10 brightness-0 invert"
+                    alt="Trakt Logo"
+                    className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"
                   />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">
