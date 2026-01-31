@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3,
-  Calendar,
+  Calendar as CalendarIcon,
   Clock,
   Film,
   Tv,
@@ -12,173 +12,352 @@ import {
   Award,
   Sparkles,
   Activity,
-  PieChart,
-  Play,
+  PieChart as PieChartIcon,
   Star,
   Heart,
-  Eye,
   Users,
   Trophy,
   Target,
+  ArrowUp,
+  ArrowDown,
+  Timer,
+  Share2,
+  Library,
+  MessageSquare,
+  LogIn
 } from "lucide-react";
 import Link from "next/link";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  Legend,
+} from "recharts";
 
+// -----------------------------------------------------------------------------
+// COLORS & CONSTANTS
+// -----------------------------------------------------------------------------
+const COLORS = {
+  emerald: "#10b981",
+  blue: "#3b82f6",
+  purple: "#a855f7",
+  yellow: "#eab308",
+  pink: "#ec4899",
+  red: "#ef4444",
+  cyan: "#06b6d4",
+  orange: "#f97316",
+  slate: "#64748b",
+  background: "#18181b", // zinc-900
+};
+
+const CHART_THEME = {
+  background: "transparent",
+  text: "#a1a1aa", // zinc-400
+  grid: "#27272a", // zinc-800
+  tooltipBg: "#18181b",
+  tooltipBorder: "#27272a",
+};
+
+const COLOR_STYLES = {
+  emerald: { iconBg: "bg-emerald-500/10", iconText: "text-emerald-500", ring: "ring-emerald-500/20", glow: "bg-emerald-500/20", groupGlow: "group-hover:bg-emerald-500/30" },
+  blue: { iconBg: "bg-blue-500/10", iconText: "text-blue-500", ring: "ring-blue-500/20", glow: "bg-blue-500/20", groupGlow: "group-hover:bg-blue-500/30" },
+  purple: { iconBg: "bg-purple-500/10", iconText: "text-purple-500", ring: "ring-purple-500/20", glow: "bg-purple-500/20", groupGlow: "group-hover:bg-purple-500/30" },
+  yellow: { iconBg: "bg-yellow-500/10", iconText: "text-yellow-500", ring: "ring-yellow-500/20", glow: "bg-yellow-500/20", groupGlow: "group-hover:bg-yellow-500/30" },
+  pink: { iconBg: "bg-pink-500/10", iconText: "text-pink-500", ring: "ring-pink-500/20", glow: "bg-pink-500/20", groupGlow: "group-hover:bg-pink-500/30" },
+  orange: { iconBg: "bg-orange-500/10", iconText: "text-orange-500", ring: "ring-orange-500/20", glow: "bg-orange-500/20", groupGlow: "group-hover:bg-orange-500/30" },
+};
+
+
+// -----------------------------------------------------------------------------
+// DATA HELPERS
+// -----------------------------------------------------------------------------
+const processMonthlyActivity = (historyData) => {
+  const activity = {};
+  const now = new Date();
+
+  // Initialize last 12 months
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    activity[key] = {
+      date: key,
+      label: d.toLocaleDateString("es-ES", { month: "short" }),
+      movies: 0,
+      episodes: 0,
+      total: 0
+    };
+  }
+
+  historyData.forEach((item) => {
+    const date = new Date(item.watched_at);
+    // Ignore future dates or weird parsed dates
+    if (date > now) return;
+
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    if (activity[key]) {
+      if (item.type === "movie") activity[key].movies++;
+      else activity[key].episodes++;
+      activity[key].total++;
+    }
+  });
+
+  return Object.values(activity);
+};
+
+const processGenreDistribution = (historyData) => {
+  const counts = {};
+  historyData.forEach((item) => {
+    const genres = item.movie?.genres || item.show?.genres || [];
+    genres.forEach((g) => {
+      counts[g] = (counts[g] || 0) + 1;
+    });
+  });
+
+  return Object.entries(counts)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6); // Top 6 for Radar
+};
+
+const processRatings = (ratingDist) => {
+  return Object.entries(ratingDist)
+    .map(([rating, count]) => ({
+      name: rating,
+      value: count,
+    }))
+    .sort((a, b) => parseInt(a.name) - parseInt(b.name));
+};
+
+const processDayOfWeek = (historyData) => {
+  const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const counts = days.map(day => ({ name: day, value: 0 }));
+
+  historyData.forEach(item => {
+    const d = new Date(item.watched_at);
+    counts[d.getDay()].value++;
+  });
+  return counts;
+};
+
+const processHourOfDay = (historyData) => {
+  const counts = Array.from({ length: 24 }, (_, i) => ({ name: `${i}h`, value: 0 }));
+  historyData.forEach(item => {
+    const d = new Date(item.watched_at);
+    counts[d.getHours()].value++;
+  });
+  return counts;
+};
+
+// -----------------------------------------------------------------------------
+// COMPONENTS
+// -----------------------------------------------------------------------------
+
+function KPICard({ title, value, subtitle, icon: Icon, color, delay = 0 }) {
+  const styles = COLOR_STYLES[color] || COLOR_STYLES.emerald;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.5 }}
+      className="relative overflow-hidden p-6 rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl group hover:bg-zinc-900/80 transition-all duration-300"
+    >
+      <div className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity ${styles.iconText}`}>
+        <Icon className="w-24 h-24 transform rotate-12 -translate-y-4 translate-x-4" />
+      </div>
+
+      <div className="relative z-10 flex flex-col h-full justify-between">
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`p-2.5 rounded-xl ${styles.iconBg} ${styles.iconText} ring-1 ${styles.ring}`}>
+            <Icon className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">{title}</h3>
+        </div>
+
+        <div>
+          <div className="text-4xl font-black text-white tracking-tight leading-none mb-1">
+            {value}
+          </div>
+          {subtitle && (
+            <div className="text-sm font-medium text-zinc-500">
+              {subtitle}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Decorative gradient glow */}
+      <div className={`absolute -bottom-10 -left-10 w-32 h-32 rounded-full blur-3xl pointer-events-none transition-all ${styles.glow} ${styles.groupGlow}`} />
+    </motion.div>
+  );
+}
+
+function SectionTitle({ icon: Icon, title, subtitle }) {
+  return (
+    <div className="flex items-center gap-3 mb-6">
+      <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <h2 className="text-xl font-bold text-white">{title}</h2>
+        {subtitle && <p className="text-sm text-zinc-500">{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
+function CustomTooltip({ active, payload, label }) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-zinc-950/90 border border-white/10 rounded-xl p-3 shadow-xl backdrop-blur-md z-50">
+        <p className="font-bold text-white mb-2 text-sm">{label}</p>
+        <div className="space-y-1">
+          {payload.map((p, idx) => (
+            <div key={idx} className="flex items-center justify-between gap-4 text-xs">
+              <span className="flex items-center gap-2" style={{ color: p.color }}>
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+                {p.name}
+              </span>
+              <span className="font-mono font-bold text-zinc-300">
+                {p.value.toLocaleString()}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
+// -----------------------------------------------------------------------------
+// MAIN COMPONENT
+// -----------------------------------------------------------------------------
 export default function StatsClient() {
   const [loading, setLoading] = useState(true);
-  const [traktStats, setTraktStats] = useState(null);
-  const [watchedMovies, setWatchedMovies] = useState([]);
-  const [watchedShows, setWatchedShows] = useState([]);
-  const [historyData, setHistoryData] = useState([]);
-  const [topActors, setTopActors] = useState([]);
-  const [topDirectors, setTopDirectors] = useState([]);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [viewMode, setViewMode] = useState("overview");
+  const [notConnected, setNotConnected] = useState(false);
+  const [data, setData] = useState(null);
+  const [viewMode, setViewMode] = useState("overview"); // overview | patterns | yearly
 
   useEffect(() => {
-    loadStats();
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/trakt/user-stats", { cache: "no-store" });
+        if (res.status === 401) {
+          setNotConnected(true);
+          setLoading(false);
+          return;
+        }
+        if (res.ok) {
+          const json = await res.json();
+          setData(json);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
-  const loadStats = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/trakt/user-stats", {
-        cache: "no-store",
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setTraktStats(data.stats);
-        setWatchedMovies(data.watchedMovies || []);
-        setWatchedShows(data.watchedShows || []);
-        setHistoryData(data.history || []);
-        setTopActors(data.topActors || []);
-        setTopDirectors(data.topDirectors || []);
-      }
-    } catch (err) {
-      console.error("Error loading stats:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const stats = useMemo(() => {
-    if (!traktStats) return null;
+    if (!data) return null;
 
-    const movies = traktStats.movies || {};
-    const shows = traktStats.shows || {};
-    const episodes = traktStats.episodes || {};
-    const network = traktStats.network || {};
-    const ratings = traktStats.ratings || {};
+    // Safety checks for all nested properties
+    const tStats = data.stats || {};
+    const movies = tStats.movies || {};
+    const showStats = tStats.shows || {}; // Renamed to avoid confusion with topShows
+    const episodes = tStats.episodes || {};
+    const seasons = tStats.seasons || {};
+    const history = data.history || [];
 
-    const moviesMinutes = movies.minutes || 0;
-    const episodesMinutes = episodes.minutes || 0;
-    const totalMinutes = moviesMinutes + episodesMinutes;
+    const totalMinutes = (movies.minutes || 0) + (episodes.minutes || 0);
     const totalHours = Math.round(totalMinutes / 60);
-    const totalDays = Math.round(totalHours / 24);
 
-    const topMovies = [...watchedMovies]
-      .sort((a, b) => b.plays - a.plays)
-      .slice(0, 10);
+    const monthlyData = processMonthlyActivity(history);
+    const genreData = processGenreDistribution(history);
+    const ratingData = processRatings(tStats.ratings?.distribution || {});
+    const dayOfWeekData = processDayOfWeek(history);
+    const hourOfDayData = processHourOfDay(history);
 
-    const topShows = [...watchedShows]
-      .sort((a, b) => b.plays - a.plays)
-      .slice(0, 10);
+    const timeDistribution = [
+      { name: "Películas", value: movies.minutes || 0, color: COLORS.blue },
+      { name: "Series", value: episodes.minutes || 0, color: COLORS.purple },
+    ];
 
-    const genreCount = {};
-    historyData.forEach((item) => {
-      const genres = item.movie?.genres || item.show?.genres || [];
-      genres.forEach((genre) => {
-        genreCount[genre] = (genreCount[genre] || 0) + 1;
-      });
-    });
-    const topGenres = Object.entries(genreCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-
-    const decadeCount = {};
-    historyData.forEach((item) => {
-      const year = item.movie?.year || item.show?.year;
-      if (year) {
-        const decade = Math.floor(year / 10) * 10;
-        decadeCount[decade] = (decadeCount[decade] || 0) + 1;
-      }
-    });
-    const topDecades = Object.entries(decadeCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-
-    const monthlyActivity = {};
-    const now = new Date();
-    for (let i = 11; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      monthlyActivity[key] = 0;
-    }
-
-    historyData.forEach((item) => {
-      const watchedDate = new Date(item.watched_at);
-      const key = `${watchedDate.getFullYear()}-${String(watchedDate.getMonth() + 1).padStart(2, "0")}`;
-      if (monthlyActivity.hasOwnProperty(key)) {
-        monthlyActivity[key]++;
-      }
-    });
-
-    const years = [
-      ...new Set(
-        historyData.map((item) => new Date(item.watched_at).getFullYear()),
-      ),
-    ].sort((a, b) => b - a);
+    const totalComments = (movies.comments || 0) + (showStats.comments || 0) + (seasons.comments || 0) + (episodes.comments || 0);
+    const totalCollected = (movies.collected || 0) + (showStats.collected || 0) + (episodes.collected || 0);
 
     return {
-      moviesWatched: movies.watched || 0,
-      moviesPlays: movies.plays || 0,
-      moviesMinutes: moviesMinutes,
-      showsWatched: shows.watched || 0,
-      episodesWatched: episodes.watched || 0,
-      episodesPlays: episodes.plays || 0,
-      episodesMinutes: episodesMinutes,
+      raw: tStats,
+      history,
+      movies,
+      episodes,
+      showStats,
+      network: tStats.network || {},
+      ratings: tStats.ratings || {},
       totalMinutes,
       totalHours,
-      totalDays,
-      friends: network.friends || 0,
-      followers: network.followers || 0,
-      following: network.following || 0,
-      ratingsTotal: ratings.total || 0,
-      ratingsDistribution: ratings.distribution || {},
-      topMovies,
-      topShows,
-      topGenres,
-      topDecades,
-      monthlyActivity,
-      years,
+      totalDays: Math.floor(totalHours / 24),
+      totalComments,
+      totalCollected,
+      monthlyData,
+      genreData,
+      ratingData,
+      dayOfWeekData,
+      hourOfDayData,
+      timeDistribution,
+      topMovies: (data.watchedMovies || []).sort((a, b) => b.plays - a.plays).slice(0, 5),
+      topShows: (data.watchedShows || []).sort((a, b) => b.plays - a.plays).slice(0, 5),
+      years: [...new Set(history.map(h => new Date(h.watched_at).getFullYear()))].sort((a, b) => b - a),
+      topActors: (data.topActors || []).slice(0, 6)
     };
-  }, [traktStats, watchedMovies, watchedShows, historyData]);
-
-  const yearStats = useMemo(() => {
-    if (!historyData.length || !selectedYear) return null;
-
-    const yearData = historyData.filter(
-      (item) => new Date(item.watched_at).getFullYear() === selectedYear,
-    );
-
-    const movies = yearData.filter((item) => item.type === "movie");
-    const episodes = yearData.filter((item) => item.type === "episode");
-
-    return {
-      total: yearData.length,
-      movies: movies.length,
-      episodes: episodes.length,
-      shows: new Set(episodes.map((ep) => ep.show?.ids?.trakt).filter(Boolean))
-        .size,
-    };
-  }, [historyData, selectedYear]);
+  }, [data]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-white/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white/60">Cargando estadísticas de Trakt...</p>
+      <div className="flex h-screen w-full items-center justify-center bg-[#0a0a0a]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+          <p className="text-emerald-500/60 font-medium animate-pulse">Cargando datos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not Connected State
+  if (notConnected) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#0a0a0a] text-white p-4">
+        <div className="max-w-md w-full bg-zinc-900 border border-white/10 rounded-3xl p-8 text-center backdrop-blur-xl">
+          <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 ring-1 ring-emerald-500/20">
+            <Activity className="w-10 h-10 text-emerald-500" />
+          </div>
+          <h2 className="text-3xl font-black text-white mb-3">Conecta tu cuenta</h2>
+          <p className="text-zinc-400 mb-8 leading-relaxed">
+            Para ver tus estadísticas personales, historial detallado y patrones de visualización, necesitas conectar tu cuenta de Trakt.
+          </p>
+          <Link
+            href="/settings"
+            className="block w-full py-4 px-6 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all transform hover:scale-[1.02] shadow-xl shadow-emerald-500/20"
+          >
+            Ir a Configuración
+          </Link>
         </div>
       </div>
     );
@@ -186,67 +365,70 @@ export default function StatsClient() {
 
   if (!stats) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <div className="text-center">
-          <Activity className="w-16 h-16 text-white/20 mx-auto mb-4" />
-          <p className="text-white/60">No hay datos disponibles</p>
-          <p className="text-white/40 text-sm mt-2">
-            Conecta tu cuenta de Trakt para ver tus estadísticas
-          </p>
-        </div>
+      <div className="flex h-screen items-center justify-center bg-[#0a0a0a] text-white">
+        <p>No se pudieron cargar las estadísticas.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white pb-20">
-      <div className="fixed inset-0 bg-gradient-to-b from-emerald-950/20 via-transparent to-transparent pointer-events-none" />
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 pb-20 selection:bg-emerald-500/30">
+      {/* Background Ambience */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] mix-blend-screen" />
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] mix-blend-screen" />
+      </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-10"
+          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12"
         >
-          <div className="flex items-center gap-4 mb-2">
-            <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
-              <BarChart3 className="w-8 h-8 text-emerald-500" />
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-px w-12 bg-emerald-500" />
+              <span className="text-emerald-500 font-bold uppercase tracking-widest text-xs">Tu Perfil</span>
             </div>
-            <div>
-              <h1 className="text-4xl font-black tracking-tight">
-                Estadísticas
-              </h1>
-              <p className="text-neutral-400 mt-1">
-                Datos oficiales de Trakt personalizados
-              </p>
-            </div>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+              Estadísticas
+              <span className="text-emerald-500">.</span>
+            </h1>
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+              {stats.raw.movies.watched > 0 ? "¡Vaya ritmo llevas!" : "Empieza a marcar lo que ves."}
+            </p>
           </div>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="flex gap-2 mb-8 overflow-x-auto pb-2"
-        >
-          {[
-            { id: "overview", label: "General", icon: PieChart },
-            { id: "yearly", label: "Por Año", icon: Calendar },
-            { id: "wrapped", label: "Wrapped", icon: Sparkles },
-          ].map((mode) => (
-            <button
-              key={mode.id}
-              onClick={() => setViewMode(mode.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all ${
-                viewMode === mode.id
-                  ? "bg-emerald-500 text-black"
-                  : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <mode.icon className="w-4 h-4" />
-              {mode.label}
-            </button>
-          ))}
+          <div className="flex p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-x-auto">
+            {[
+              { id: "overview", label: "General", icon: PieChartIcon },
+              { id: "patterns", label: "Patrones", icon: TrendingUp },
+              { id: "yearly", label: "Histórico", icon: CalendarIcon },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setViewMode(tab.id)}
+                className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === tab.id
+                    ? "text-black"
+                    : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+              >
+                {viewMode === tab.id && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute inset-0 bg-emerald-500 rounded-xl"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </span>
+              </button>
+            ))}
+          </div>
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -256,594 +438,386 @@ export default function StatsClient() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5 }}
               className="space-y-8"
             >
-              {/* Stats Cards Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard
-                  icon={Clock}
-                  label="Tiempo Total"
+              {/* KPIs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <KPICard
+                  title="Tiempo Total"
                   value={`${stats.totalDays}d ${stats.totalHours % 24}h`}
                   subtitle={`${stats.totalHours.toLocaleString()} horas`}
+                  icon={Timer}
                   color="emerald"
+                  delay={0.1}
                 />
-                <StatCard
+                <KPICard
+                  title="Películas"
+                  value={stats.movies.watched.toLocaleString()}
+                  subtitle={`${stats.movies.plays.toLocaleString()} plays`}
                   icon={Film}
-                  label="Películas"
-                  value={stats.moviesWatched.toLocaleString()}
-                  subtitle={`${stats.moviesPlays.toLocaleString()} reproducciones`}
                   color="blue"
+                  delay={0.2}
                 />
-                <StatCard
+                <KPICard
+                  title="Episodios"
+                  value={stats.episodes.watched.toLocaleString()}
+                  subtitle={`${stats.raw.shows.watched.toLocaleString()} series`}
                   icon={Tv}
-                  label="Episodios"
-                  value={stats.episodesWatched.toLocaleString()}
-                  subtitle={`${stats.showsWatched} series`}
                   color="purple"
+                  delay={0.3}
                 />
-                <StatCard
-                  icon={Star}
-                  label="Valoraciones"
-                  value={stats.ratingsTotal.toLocaleString()}
-                  subtitle="ratings dados"
-                  color="yellow"
-                />
-              </div>
-
-              {/* Social Stats */}
-              <div className="grid grid-cols-3 gap-4">
-                <StatCard
-                  icon={Users}
-                  label="Seguidores"
-                  value={stats.followers.toLocaleString()}
-                  color="pink"
-                />
-                <StatCard
-                  icon={Heart}
-                  label="Siguiendo"
-                  value={stats.following.toLocaleString()}
-                  color="red"
-                />
-                <StatCard
-                  icon={Users}
-                  label="Amigos"
-                  value={stats.friends.toLocaleString()}
-                  color="amber"
+                <KPICard
+                  title="Colección"
+                  value={stats.totalCollected.toLocaleString()}
+                  subtitle="Items guardados"
+                  icon={Library}
+                  color="orange"
+                  delay={0.4}
                 />
               </div>
 
-              {/* Time Breakdown */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <Film className="w-5 h-5 text-blue-500" />
-                    Tiempo en Películas
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-3xl font-black">
-                        {Math.round(stats.moviesMinutes / 60)} h
-                      </span>
-                      <span className="text-white/60">
-                        {stats.moviesMinutes.toLocaleString()} minutos
-                      </span>
-                    </div>
-                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{
-                          width: `${(stats.moviesMinutes / stats.totalMinutes) * 100}%`,
-                        }}
-                        transition={{ duration: 1 }}
-                        className="h-full bg-gradient-to-r from-blue-500 to-blue-400"
-                      />
-                    </div>
-                    <p className="text-white/40 text-sm">
-                      {Math.round(
-                        (stats.moviesMinutes / stats.totalMinutes) * 100,
-                      )}
-                      % del tiempo total
-                    </p>
+              {/* Secondary KPIs */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5">
+                  <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500"><Star className="w-5 h-5" /></div>
+                  <div>
+                    <div className="text-xl font-bold">{stats.ratings.total}</div>
+                    <div className="text-xs text-zinc-500 uppercase font-bold">Valoraciones</div>
                   </div>
                 </div>
-
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <Tv className="w-5 h-5 text-purple-500" />
-                    Tiempo en Series
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-3xl font-black">
-                        {Math.round(stats.episodesMinutes / 60)} h
-                      </span>
-                      <span className="text-white/60">
-                        {stats.episodesMinutes.toLocaleString()} minutos
-                      </span>
-                    </div>
-                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{
-                          width: `${(stats.episodesMinutes / stats.totalMinutes) * 100}%`,
-                        }}
-                        transition={{ duration: 1 }}
-                        className="h-full bg-gradient-to-r from-purple-500 to-purple-400"
-                      />
-                    </div>
-                    <p className="text-white/40 text-sm">
-                      {Math.round(
-                        (stats.episodesMinutes / stats.totalMinutes) * 100,
-                      )}
-                      % del tiempo total
-                    </p>
+                <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5">
+                  <div className="p-2 bg-pink-500/10 rounded-lg text-pink-500"><MessageSquare className="w-5 h-5" /></div>
+                  <div>
+                    <div className="text-xl font-bold">{stats.totalComments}</div>
+                    <div className="text-xs text-zinc-500 uppercase font-bold">Comentarios</div>
+                  </div>
+                </div>
+                <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5">
+                  <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500"><Users className="w-5 h-5" /></div>
+                  <div>
+                    <div className="text-xl font-bold">{stats.network.followers}</div>
+                    <div className="text-xs text-zinc-500 uppercase font-bold">Seguidores</div>
+                  </div>
+                </div>
+                <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5">
+                  <div className="p-2 bg-red-500/10 rounded-lg text-red-500"><Heart className="w-5 h-5" /></div>
+                  <div>
+                    <div className="text-xl font-bold">{stats.network.friends}</div>
+                    <div className="text-xs text-zinc-500 uppercase font-bold">Amigos</div>
                   </div>
                 </div>
               </div>
 
-              {/* Top Movies */}
-              {stats.topMovies.length > 0 && (
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-yellow-500" />
-                    Películas Más Vistas
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {stats.topMovies.map((item, index) => (
-                      <Link
-                        key={item.movie.ids.trakt}
-                        href={`/details/movie/${item.movie.ids.tmdb}`}
-                        className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition group"
-                      >
-                        <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center font-black">
-                          {index + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold truncate group-hover:text-emerald-400 transition">
-                            {item.movie.title}
-                          </p>
-                          <p className="text-white/60 text-sm">
-                            {item.plays}{" "}
-                            {item.plays === 1
-                              ? "reproducción"
-                              : "reproducciones"}
-                          </p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Main Charts Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-              {/* Top Shows */}
-              {stats.topShows.length > 0 && (
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-purple-500" />
-                    Series Más Vistas
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {stats.topShows.map((item, index) => (
-                      <Link
-                        key={item.show.ids.trakt}
-                        href={`/details/tv/${item.show.ids.tmdb}`}
-                        className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition group"
-                      >
-                        <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center font-black">
-                          {index + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold truncate group-hover:text-emerald-400 transition">
-                            {item.show.title}
-                          </p>
-                          <p className="text-white/60 text-sm">
-                            {item.plays} episodios •{" "}
-                            {item.show.aired_episodes || 0} totales
-                          </p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
+                {/* Activity Chart - Spans 2 cols */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="lg:col-span-2 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+                  <SectionTitle icon={Activity} title="Actividad Mensual" subtitle="Visualizaciones en el último año" />
 
-              {/* Top Genres */}
-              {stats.topGenres.length > 0 && (
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <Award className="w-5 h-5 text-yellow-500" />
-                    Géneros Favoritos
-                  </h2>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={stats.monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={COLORS.emerald} stopOpacity={0.3} />
+                            <stop offset="95%" stopColor={COLORS.emerald} stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_THEME.grid} />
+                        <XAxis
+                          dataKey="label"
+                          stroke={CHART_THEME.text}
+                          tick={{ fill: CHART_THEME.text, fontSize: 12 }}
+                          tickLine={false}
+                          axisLine={false}
+                          dy={10}
+                        />
+                        <YAxis
+                          stroke={CHART_THEME.text}
+                          tick={{ fill: CHART_THEME.text, fontSize: 12 }}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }} />
+                        <Area
+                          type="monotone"
+                          dataKey="total"
+                          name="Total"
+                          stroke={COLORS.emerald}
+                          strokeWidth={3}
+                          fillOpacity={1}
+                          fill="url(#colorTotal)"
+                          animationDuration={1500}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </motion.div>
+
+                {/* Time Distribution */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center justify-center relative"
+                >
+                  <SectionTitle icon={Clock} title="Tiempo" />
+                  <div className="h-[250px] w-full relative">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={stats.timeDistribution}
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {stats.timeDistribution.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(0,0,0,0)" />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    {/* Center Text */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
+                      <span className="text-3xl font-black text-white">{stats.totalDays}</span>
+                      <span className="text-xs uppercase font-bold text-zinc-500 tracking-widest">Días</span>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* Top Content Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Top Movies */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.7 }}
+                  className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6"
+                >
+                  <SectionTitle icon={Film} title="Películas Top" subtitle="Las que más has visto" />
                   <div className="space-y-3">
-                    {stats.topGenres.map(([genre, count], index) => (
-                      <div key={genre}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-semibold capitalize">
-                            {genre}
-                          </span>
-                          <span className="text-white/60">{count} títulos</span>
+                    {stats.topMovies.map((item, idx) => (
+                      <Link key={idx} href={`/details/movie/${item.movie.ids.tmdb}`} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${idx === 0 ? 'bg-yellow-500 text-black' : 'bg-white/10 text-zinc-400'}`}>
+                          {idx + 1}
                         </div>
-                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{
-                              width: `${(count / stats.topGenres[0][1]) * 100}%`,
-                            }}
-                            transition={{ duration: 1, delay: index * 0.1 }}
-                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400"
-                          />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-zinc-200 truncate group-hover:text-emerald-400 transition">{item.movie.title}</h4>
+                          <p className="text-xs text-zinc-500">{item.plays} reproducciones</p>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Top Actors */}
-              {topActors.length > 0 && (
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-blue-500" />
-                    Actores Más Vistos
-                  </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {topActors.slice(0, 6).map((actor, index) => (
-                      <motion.div
-                        key={actor.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="group relative"
-                      >
-                        <Link
-                          href={`/details/person/${actor.id}`}
-                          onClick={() => window.scrollTo(0, 0)}
-                        >
-                          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-white/10 to-white/5 border border-white/10 hover:border-blue-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(59,130,246,0.3)] hover:scale-105 cursor-pointer">
-                            <div className="aspect-[2/3] relative">
-                              {actor.profile_path ? (
-                                <img
-                                  src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
-                                  alt={actor.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                                  <Users className="w-12 h-12 text-white/80" />
-                                </div>
-                              )}
-                              {/* Overlay gradient */}
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                            </div>
-
-                            {/* Nombre */}
-                            <div className="absolute bottom-0 left-0 right-0 p-3">
-                              <p className="font-bold text-sm text-white drop-shadow-lg line-clamp-2 leading-tight">
-                                {actor.name}
-                              </p>
-                              <p className="text-white/80 text-xs mt-0.5">
-                                {actor.count}{" "}
-                                {actor.count === 1 ? "película" : "películas"}
-                              </p>
-                            </div>
-                          </div>
-                        </Link>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Top Directors */}
-              {topDirectors.length > 0 && (
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                    <Award className="w-5 h-5 text-purple-500" />
-                    Directores Favoritos
-                  </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {topDirectors.slice(0, 4).map((director, index) => (
-                      <motion.div
-                        key={director.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="group relative"
-                      >
-                        <Link
-                          href={`/details/person/${director.id}`}
-                          onClick={() => window.scrollTo(0, 0)}
-                        >
-                          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-white/10 to-white/5 border border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)] hover:scale-105 cursor-pointer">
-                            <div className="aspect-[2/3] relative">
-                              {director.profile_path ? (
-                                <img
-                                  src={`https://image.tmdb.org/t/p/w342${director.profile_path}`}
-                                  alt={director.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                                  <Award className="w-12 h-12 text-white/80" />
-                                </div>
-                              )}
-                              {/* Overlay gradient */}
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                            </div>
-
-                            {/* Nombre */}
-                            <div className="absolute bottom-0 left-0 right-0 p-3">
-                              <p className="font-bold text-sm text-white drop-shadow-lg line-clamp-2 leading-tight">
-                                {director.name}
-                              </p>
-                              <p className="text-white/80 text-xs mt-0.5">
-                                {director.count}{" "}
-                                {director.count === 1
-                                  ? "película"
-                                  : "películas"}
-                              </p>
-                            </div>
-                          </div>
-                        </Link>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Top Decades */}
-              {stats.topDecades.length > 0 && (
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-blue-500" />
-                    Décadas Favoritas
-                  </h2>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    {stats.topDecades.map(([decade, count]) => (
-                      <div
-                        key={decade}
-                        className="bg-white/5 rounded-xl p-4 text-center border border-white/10 hover:bg-white/10 transition"
-                      >
-                        <div className="text-2xl font-black">{decade}s</div>
-                        <div className="text-white/60 text-sm mt-1">
-                          {count} títulos
+                        <div className="opacity-0 group-hover:opacity-100 transition text-emerald-500">
+                          <ArrowUp className="w-4 h-4 rotate-45" />
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
-                </div>
+                </motion.div>
+
+                {/* Top Shows */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.7 }}
+                  className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6"
+                >
+                  <SectionTitle icon={Tv} title="Series Top" subtitle="Tus maratones favoritos" />
+                  <div className="space-y-3">
+                    {stats.topShows.map((item, idx) => (
+                      <Link key={idx} href={`/details/tv/${item.show.ids.tmdb}`} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${idx === 0 ? 'bg-purple-500 text-black' : 'bg-white/10 text-zinc-400'}`}>
+                          {idx + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-zinc-200 truncate group-hover:text-purple-400 transition">{item.show.title}</h4>
+                          <p className="text-xs text-zinc-500">{item.plays} vistos</p>
+                        </div>
+                        <div className="opacity-0 group-hover:opacity-100 transition text-purple-500">
+                          <ArrowUp className="w-4 h-4 rotate-45" />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* Top People Row */}
+              {stats.topActors.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.65 }}
+                  className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                >
+                  <SectionTitle icon={Users} title="Actores Favoritos" subtitle="Las caras que más ves" />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                    {stats.topActors.map((person, idx) => (
+                      <Link key={person.id} href={`/details/person/${person.id}`} className="group relative">
+                        <div className="aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 mb-2 border border-white/5 group-hover:border-emerald-500/50 transition-all duration-300">
+                          {person.profile_path ? (
+                            <img
+                              src={`https://image.tmdb.org/t/p/w342${person.profile_path}`}
+                              alt={person.name}
+                              className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-600">
+                              <Users className="w-8 h-8" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition" />
+                          <div className="absolute bottom-0 left-0 right-0 p-2">
+                            <p className="text-white text-xs font-bold leading-tight truncate">{person.name}</p>
+                            <p className="text-emerald-400 text-[10px] font-medium">{person.count} pelis</p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </motion.div>
               )}
 
-              {/* Monthly Activity */}
-              <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-purple-500" />
-                  Actividad (Últimos 12 Meses)
-                </h2>
-                <div className="relative" style={{ height: "240px" }}>
-                  <div className="flex items-end justify-between gap-2 h-48 relative">
-                    {Object.entries(stats.monthlyActivity).map(
-                      ([month, count]) => {
-                        const maxCount = Math.max(
-                          ...Object.values(stats.monthlyActivity),
-                        );
-                        const heightPx =
-                          maxCount > 0 ? (count / maxCount) * 192 : 4;
-                        const [year, monthNum] = month.split("-");
-                        const monthName = new Date(
-                          year,
-                          parseInt(monthNum) - 1,
-                        ).toLocaleDateString("es", { month: "short" });
+            </motion.div>
+          )}
 
-                        return (
-                          <div
-                            key={month}
-                            className="flex-1 flex flex-col-reverse items-center gap-2 relative"
-                            style={{ height: "100%" }}
-                          >
-                            <div className="flex flex-col items-center gap-2">
-                              <motion.div
-                                initial={{ height: 0 }}
-                                animate={{ height: `${heightPx}px` }}
-                                transition={{
-                                  duration: 0.5,
-                                  delay:
-                                    Object.keys(stats.monthlyActivity).indexOf(
-                                      month,
-                                    ) * 0.05,
-                                }}
-                                className="w-full bg-gradient-to-t from-emerald-500 to-emerald-400 rounded-t-lg relative"
-                                style={{ minHeight: "4px" }}
-                                title={`${count} visualizaciones`}
-                              >
-                                {count > 0 && (
-                                  <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-white/80 whitespace-nowrap">
-                                    {count}
-                                  </div>
-                                )}
-                              </motion.div>
-                              <span className="text-[10px] text-white/40 uppercase font-bold">
-                                {monthName}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      },
-                    )}
+          {viewMode === "patterns" && (
+            <motion.div
+              key="patterns"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5 }}
+              className="space-y-8"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Hour of Day */}
+                <div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+                  <SectionTitle icon={Clock} title="Hora del Día" subtitle="¿Cuándo ves más contenido?" />
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stats.hourOfDayData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_THEME.grid} />
+                        <XAxis dataKey="name" stroke={CHART_THEME.text} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                        <Bar dataKey="value" fill={COLORS.purple} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Day of Week */}
+                <div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+                  <SectionTitle icon={CalendarIcon} title="Día de la Semana" subtitle="Tus días más activos" />
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stats.dayOfWeekData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_THEME.grid} />
+                        <XAxis dataKey="name" stroke={CHART_THEME.text} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                        <Bar dataKey="value" fill={COLORS.emerald} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
               </div>
 
-              {/* Ratings Distribution */}
-              {stats.ratingsTotal > 0 && (
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <Star className="w-5 h-5 text-yellow-500" />
-                    Distribución de Ratings
-                  </h2>
-                  <div className="space-y-2">
-                    {Object.entries(stats.ratingsDistribution)
-                      .sort((a, b) => parseInt(b[0]) - parseInt(a[0]))
-                      .map(([rating, count]) => {
-                        const percentage = (count / stats.ratingsTotal) * 100;
-                        return (
-                          <div key={rating} className="flex items-center gap-3">
-                            <span className="w-12 font-bold text-right">
-                              {rating} ⭐
-                            </span>
-                            <div className="flex-1 relative">
-                              <div className="h-8 bg-white/10 rounded-lg overflow-hidden">
-                                <motion.div
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${percentage}%` }}
-                                  transition={{ duration: 1 }}
-                                  className="h-full bg-gradient-to-r from-yellow-500 to-orange-500"
-                                />
-                              </div>
-                              {count > 0 && (
-                                <div className="absolute inset-0 flex items-center justify-start pl-3">
-                                  <span className="text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                                    {count}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                            <span className="w-16 text-white/60 text-sm text-right">
-                              {percentage.toFixed(1)}%
-                            </span>
-                          </div>
-                        );
-                      })}
+              {/* Genres & Ratings row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Genres - Radar */}
+                <motion.div
+                  className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                >
+                  <SectionTitle icon={Target} title="Gustos por Género" subtitle="Tus categorías más frecuentes" />
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart cx="50%" cy="50%" outerRadius="70%" data={stats.genreData}>
+                        <PolarGrid stroke={CHART_THEME.grid} />
+                        <PolarAngleAxis dataKey="name" tick={{ fill: CHART_THEME.text, fontSize: 10 }} />
+                        <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+                        <Radar
+                          name="Géneros"
+                          dataKey="value"
+                          stroke={COLORS.blue}
+                          fill={COLORS.blue}
+                          fillOpacity={0.4}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                      </RadarChart>
+                    </ResponsiveContainer>
                   </div>
-                </div>
-              )}
+                </motion.div>
+
+                {/* Ratings - Bar */}
+                <motion.div
+                  className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                >
+                  <SectionTitle icon={Award} title="Tus Puntuaciones" subtitle="Distribución de ratings (1-10)" />
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stats.ratingData} barSize={20}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_THEME.grid} />
+                        <XAxis
+                          dataKey="name"
+                          stroke={CHART_THEME.text}
+                          tick={{ fill: CHART_THEME.text, fontSize: 12 }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                        <Bar dataKey="value" name="Votos" radius={[4, 4, 0, 0]}>
+                          {stats.ratingData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={index > 6 ? COLORS.emerald : index > 4 ? COLORS.yellow : COLORS.red} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </motion.div>
+              </div>
             </motion.div>
           )}
 
           {viewMode === "yearly" && (
             <motion.div
               key="yearly"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.05 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col items-center justify-center py-20 text-center"
             >
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {stats.years.map((year) => (
-                  <button
-                    key={year}
-                    onClick={() => setSelectedYear(year)}
-                    className={`px-4 py-2 rounded-xl font-bold transition whitespace-nowrap ${
-                      selectedYear === year
-                        ? "bg-emerald-500 text-black"
-                        : "bg-white/5 text-white/60 hover:bg-white/10"
-                    }`}
-                  >
+              <div className="w-24 h-24 bg-zinc-900 rounded-full border border-white/10 flex items-center justify-center mb-6 relative">
+                <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-xl animate-pulse" />
+                <CalendarIcon className="w-10 h-10 text-zinc-400" />
+              </div>
+              <h2 className="text-3xl font-bold text-white mb-2">Histórico Detallado</h2>
+              <p className="text-zinc-500 max-w-md mx-auto mb-8">
+                Estamos preparando una vista cronológica completa para que explores tu historia año por año con un nivel de detalle increíble.
+              </p>
+              <div className="flex gap-2">
+                {stats.years.slice(0, 5).map(year => (
+                  <span key={year} className="px-4 py-2 rounded-lg bg-zinc-900 border border-white/10 text-zinc-400 font-mono text-sm">
                     {year}
-                  </button>
+                  </span>
                 ))}
-              </div>
-
-              {yearStats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <StatCard
-                    icon={Activity}
-                    label="Total"
-                    value={yearStats.total.toLocaleString()}
-                    color="emerald"
-                  />
-                  <StatCard
-                    icon={Film}
-                    label="Películas"
-                    value={yearStats.movies.toLocaleString()}
-                    color="blue"
-                  />
-                  <StatCard
-                    icon={Tv}
-                    label="Episodios"
-                    value={yearStats.episodes.toLocaleString()}
-                    color="purple"
-                  />
-                  <StatCard
-                    icon={Tv}
-                    label="Series"
-                    value={yearStats.shows.toLocaleString()}
-                    color="pink"
-                  />
-                </div>
-              )}
-
-              <div className="bg-white/5 rounded-2xl p-8 border border-white/10 text-center">
-                <Target className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold mb-2">
-                  Análisis detallado por año
-                </h3>
-                <p className="text-white/60">
-                  Gráficos mensuales y comparativas próximamente
-                </p>
-              </div>
-            </motion.div>
-          )}
-
-          {viewMode === "wrapped" && (
-            <motion.div
-              key="wrapped"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
-            >
-              <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl p-8 border border-white/10 text-center">
-                <Sparkles className="w-16 h-16 text-yellow-500 mx-auto mb-4 animate-pulse" />
-                <h3 className="text-3xl font-black mb-2">
-                  Wrapped {new Date().getFullYear()}
-                </h3>
-                <p className="text-white/60 mb-6">
-                  Tu resumen anual personalizado estilo Spotify
-                </p>
-                <div className="text-white/40 text-sm">
-                  🎬 Próximamente: slides interactivos con tus mejores momentos
-                  del año
-                </div>
+                {stats.years.length > 5 && <span className="px-4 py-2 text-zinc-600">...</span>}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
+
       </div>
     </div>
-  );
-}
-
-function StatCard({ icon: Icon, label, value, subtitle, color = "emerald" }) {
-  const colorClasses = {
-    emerald: "from-emerald-500/20 to-emerald-600/20 border-emerald-500/30",
-    blue: "from-blue-500/20 to-blue-600/20 border-blue-500/30",
-    purple: "from-purple-500/20 to-purple-600/20 border-purple-500/30",
-    pink: "from-pink-500/20 to-pink-600/20 border-pink-500/30",
-    yellow: "from-yellow-500/20 to-yellow-600/20 border-yellow-500/30",
-    red: "from-red-500/20 to-red-600/20 border-red-500/30",
-    amber: "from-amber-500/20 to-amber-600/20 border-amber-500/30",
-  };
-
-  const iconColorClasses = {
-    emerald: "text-emerald-400",
-    blue: "text-blue-400",
-    purple: "text-purple-400",
-    pink: "text-pink-400",
-    yellow: "text-yellow-400",
-    red: "text-red-400",
-    amber: "text-amber-400",
-  };
-
-  return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      className={`bg-gradient-to-br ${colorClasses[color]} rounded-2xl p-6 border`}
-    >
-      <Icon className={`w-6 h-6 ${iconColorClasses[color]} mb-3`} />
-      <div className="text-3xl font-black mb-1">{value}</div>
-      <div className="text-white/60 text-sm font-semibold">{label}</div>
-      {subtitle && <div className="text-white/40 text-xs mt-1">{subtitle}</div>}
-    </motion.div>
   );
 }
