@@ -292,9 +292,8 @@ function SmartPoster({ item, title, mode = "poster" }) {
   return (
     <div className="relative w-full h-full">
       <div
-        className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 transition-opacity duration-300 ${
-          ready && src ? "opacity-0" : "opacity-100"
-        }`}
+        className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 transition-opacity duration-300 ${ready && src ? "opacity-0" : "opacity-100"
+          }`}
       >
         <Film className="w-8 h-8 text-neutral-700" />
       </div>
@@ -305,9 +304,8 @@ function SmartPoster({ item, title, mode = "poster" }) {
           alt={title}
           loading="lazy"
           decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            ready ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${ready ? "opacity-100" : "opacity-0"
+            }`}
         />
       ) : null}
     </div>
@@ -340,7 +338,7 @@ const writeOmdbCache = (imdbId, patch) => {
       `showverse:omdb:${imdbId}`,
       JSON.stringify(next),
     );
-  } catch {}
+  } catch { }
 };
 
 // ================== small helpers ==================
@@ -356,7 +354,7 @@ function runPool(items, limit, worker) {
         const it = queue.shift();
         active++;
         Promise.resolve(worker(it))
-          .catch(() => {})
+          .catch(() => { })
           .finally(() => {
             active--;
             done++;
@@ -450,11 +448,10 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between ${
-        active
-          ? "bg-zinc-800 text-white"
-          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-      }`}
+      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between ${active
+        ? "bg-zinc-800 text-white"
+        : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+        }`}
     >
       <span className="font-medium">{children}</span>
       {active && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
@@ -1525,12 +1522,12 @@ export default function WatchlistPage() {
     const getTitle = (i) =>
       normText(
         i.title ||
-          i.name ||
-          i._title_es ||
-          i._name_es ||
-          i._title_en ||
-          i._name_en ||
-          "",
+        i.name ||
+        i._title_es ||
+        i._name_es ||
+        i._title_en ||
+        i._name_en ||
+        "",
       );
 
     const getImdb = (i) => imdbRatings?.[makeKey(i.media_type, i.id)];
@@ -2216,11 +2213,10 @@ export default function WatchlistPage() {
                   className={`p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform ${topTransform} transition-transform duration-300`}
                 >
                   <span
-                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                      isMovie
-                        ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                        : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                    }`}
+                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
+                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                      }`}
                   >
                     {isMovie ? "PELÍCULA" : "SERIE"}
                   </span>
@@ -2337,18 +2333,18 @@ export default function WatchlistPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
         >
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20">
-              <Bookmark className="w-8 h-8 text-blue-500 fill-current" />
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-px w-12 bg-cyan-500" />
+              <span className="text-cyan-400 font-bold uppercase tracking-widest text-xs">POR VER</span>
             </div>
-            <div>
-              <h1 className="text-4xl font-black text-white tracking-tight">
-                Pendientes
-              </h1>
-              <p className="text-neutral-400 mt-1 font-medium">
-                {totalForHeader} títulos en total
-              </p>
-            </div>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+              Pendientes
+              <span className="text-cyan-500">.</span>
+            </h1>
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+              Títulos guardados para ver más tarde.
+            </p>
           </div>
 
           {/* Controles (desktop: todo en 1 línea; móvil: 2 líneas) */}

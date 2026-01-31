@@ -610,22 +610,20 @@ function CalendarWithPosters({
           return (
             <div
               key={d.toISOString()}
-              className={`flex flex-col rounded-lg lg:rounded-xl border-2 transition-all relative group ${
-                !inMonth
-                  ? "bg-zinc-900/10 border-zinc-800/20"
-                  : isToday
-                    ? "bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/40 shadow-lg shadow-emerald-500/10"
-                    : "bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-900/60"
-              }`}
+              className={`flex flex-col rounded-lg lg:rounded-xl border-2 transition-all relative group ${!inMonth
+                ? "bg-zinc-900/10 border-zinc-800/20"
+                : isToday
+                  ? "bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/40 shadow-lg shadow-emerald-500/10"
+                  : "bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-900/60"
+                }`}
             >
               <div
-                className={`p-1 lg:p-1.5 text-[10px] lg:text-xs font-bold flex items-center justify-between shrink-0 ${
-                  !inMonth
-                    ? "text-zinc-700"
-                    : isToday
-                      ? "text-emerald-400"
-                      : "text-zinc-400 group-hover:text-zinc-300"
-                }`}
+                className={`p-1 lg:p-1.5 text-[10px] lg:text-xs font-bold flex items-center justify-between shrink-0 ${!inMonth
+                  ? "text-zinc-700"
+                  : isToday
+                    ? "text-emerald-400"
+                    : "text-zinc-400 group-hover:text-zinc-300"
+                  }`}
               >
                 <span>{d.getDate()}</span>
                 {inMonth && items.length > 0 && (
@@ -780,12 +778,11 @@ function CalendarPanel({
               disabled={!inMonth}
               className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all duration-200 text-sm font-bold
                 ${!inMonth ? "opacity-0 pointer-events-none" : "text-zinc-300"}
-                ${
-                  selected
-                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 z-10 scale-110"
-                    : isToday
-                      ? "bg-zinc-800 text-white border border-emerald-500/50"
-                      : "bg-zinc-900/50 hover:bg-zinc-800 hover:text-white hover:scale-105"
+                ${selected
+                  ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 z-10 scale-110"
+                  : isToday
+                    ? "bg-zinc-800 text-white border border-emerald-500/50"
+                    : "bg-zinc-900/50 hover:bg-zinc-800 hover:text-white hover:scale-105"
                 }`}
             >
               <span>{d.getDate()}</span>
@@ -808,11 +805,10 @@ function CalendarPanel({
 
       <button
         onClick={onToggleCalendarView}
-        className={`mt-6 w-full py-3 text-sm font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
-          showCalendarView
-            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-            : "bg-zinc-800/80 text-zinc-300 hover:bg-zinc-800 hover:text-white border border-white/5"
-        }`}
+        className={`mt-6 w-full py-3 text-sm font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${showCalendarView
+          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+          : "bg-zinc-800/80 text-zinc-300 hover:bg-zinc-800 hover:text-white border border-white/5"
+          }`}
       >
         <Calendar className="w-4 h-4" />{" "}
         {showCalendarView ? "Vista Normal" : "Vista Calendario"}
@@ -931,9 +927,8 @@ function SmartPoster({ entry, title, mode = "poster" }) {
   return (
     <div className="absolute inset-0 w-full h-full">
       <div
-        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
-          ready && src ? "opacity-0" : "opacity-100"
-        }`}
+        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${ready && src ? "opacity-0" : "opacity-100"
+          }`}
       >
         <Film className="w-8 h-8 text-zinc-700" />
       </div>
@@ -944,9 +939,8 @@ function SmartPoster({ entry, title, mode = "poster" }) {
           alt={title}
           loading="lazy"
           decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            ready ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${ready ? "opacity-100" : "opacity-0"
+            }`}
         />
       )}
     </div>
@@ -1051,9 +1045,8 @@ const HistoryItemCard = memo(function HistoryItemCard({
       <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
         <div className="absolute inset-0 w-full h-full">
           <div
-            className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
-              backdropReady && posterSrc ? "opacity-0" : "opacity-100"
-            }`}
+            className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${backdropReady && posterSrc ? "opacity-0" : "opacity-100"
+              }`}
           >
             <Film className="w-8 h-8 text-zinc-700" />
           </div>
@@ -1064,9 +1057,8 @@ const HistoryItemCard = memo(function HistoryItemCard({
               alt={title}
               loading="lazy"
               decoding="async"
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-                backdropReady ? "opacity-100" : "opacity-0"
-              }`}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${backdropReady ? "opacity-100" : "opacity-0"
+                }`}
             />
           )}
         </div>
@@ -1415,11 +1407,10 @@ const HistoryGridCard = memo(function HistoryGridCard({
     <>
       <div className="flex items-center gap-2 mb-1 -ml-0.5">
         <span
-          className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-            type === "movie"
-              ? "bg-sky-500/20 text-sky-200"
-              : "bg-purple-500/20 text-purple-200"
-          }`}
+          className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === "movie"
+            ? "bg-sky-500/20 text-sky-200"
+            : "bg-purple-500/20 text-purple-200"
+            }`}
         >
           {type === "movie" ? "Cine" : "TV"}
         </span>
@@ -1484,11 +1475,10 @@ const HistoryGridCard = memo(function HistoryGridCard({
           {/* En desktop mostramos badge + título episodio en la misma línea (como ya tenías) */}
           <div className="flex items-center gap-2 mb-1 -ml-0.5">
             <span
-              className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-                type === "movie"
-                  ? "bg-sky-500/30 text-sky-200"
-                  : "bg-purple-500/30 text-purple-200"
-              }`}
+              className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === "movie"
+                ? "bg-sky-500/30 text-sky-200"
+                : "bg-purple-500/30 text-purple-200"
+                }`}
             >
               {type === "movie" ? "Cine" : "TV"}
             </span>
@@ -1880,38 +1870,18 @@ export default function HistoryClient() {
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
           <div className="flex items-center justify-between gap-4 mb-8">
-            <div className="flex items-center gap-4">
-              <motion.div
-                className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20"
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{
-                  duration: 0.6,
-                  delay: 0.2,
-                  type: "spring",
-                  stiffness: 200,
-                }}
-              >
-                <Eye className="w-8 h-8 text-emerald-500" />
-              </motion.div>
-              <div>
-                <motion.h1
-                  className="text-4xl font-black tracking-tight text-white"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.3 }}
-                >
-                  Historial
-                </motion.h1>
-                <motion.p
-                  className="hidden md:block text-neutral-400 mt-1 font-medium"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.5, delay: 0.4 }}
-                >
-                  Tu registro completo de visualizaciones en Trakt.
-                </motion.p>
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-px w-12 bg-emerald-500" />
+                <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">REGISTRO</span>
               </div>
+              <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+                Historial
+                <span className="text-emerald-500">.</span>
+              </h1>
+              <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+                Registro cronológico de todo lo que has visto.
+              </p>
             </div>
 
             {/* Botones solo iconos - SOLO MÓVIL a la derecha */}
@@ -2245,33 +2215,30 @@ export default function HistoryClient() {
                     <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
                       <button
                         onClick={() => setViewMode("list")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                          viewMode === "list"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "list"
+                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                          }`}
                         title="Lista"
                       >
                         <LayoutList className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setViewMode("compact")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                          viewMode === "compact"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "compact"
+                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                          }`}
                         title="Compacta"
                       >
                         <Grid3x3 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setViewMode("grid")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                          viewMode === "grid"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "grid"
+                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                          }`}
                         title="Grid"
                       >
                         <LayoutGrid className="w-4 h-4" />
@@ -2280,11 +2247,10 @@ export default function HistoryClient() {
 
                     <button
                       onClick={() => setEditMode(!editMode)}
-                      className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 ${
-                        editMode
-                          ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                          : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600"
-                      }`}
+                      className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 ${editMode
+                        ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                        : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600"
+                        }`}
                       title={editMode ? "Cancelar" : "Editar"}
                     >
                       {editMode ? (
@@ -2462,33 +2428,30 @@ export default function HistoryClient() {
                   <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
                     <button
                       onClick={() => setViewMode("list")}
-                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                        viewMode === "list"
-                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
+                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "list"
+                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
                       title="Vista Lista"
                     >
                       <LayoutList className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setViewMode("compact")}
-                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                        viewMode === "compact"
-                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
+                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "compact"
+                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
                       title="Vista Compacta"
                     >
                       <Grid3x3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setViewMode("grid")}
-                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                        viewMode === "grid"
-                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
+                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "grid"
+                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
                       title="Vista Cuadrícula"
                     >
                       <LayoutGrid className="w-4 h-4" />

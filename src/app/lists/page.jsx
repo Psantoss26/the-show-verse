@@ -578,7 +578,7 @@ function buildInternalUrl(list) {
 
   // Colecciones: ruta interna a vista detallada
   if (src === "collections") return `/lists/collection/${list?.id}`;
-  
+
   return null;
 }
 
@@ -1332,16 +1332,18 @@ export default function ListsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
         >
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-purple-500/10 rounded-2xl border border-purple-500/20">
-              <ListVideo className="w-8 h-8 text-purple-500" />
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-px w-12 bg-amber-500" />
+              <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">TU COLECCIÓN</span>
             </div>
-            <div>
-              <h1 className="text-4xl font-black text-white tracking-tight">
-                {listsTitle}
-              </h1>
-              <p className="text-neutral-400 mt-1 font-medium">{subtitle}</p>
-            </div>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+              Mis Listas
+              <span className="text-amber-500">.</span>
+            </h1>
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+              Gestiona y organiza tus colecciones personales.
+            </p>
           </div>
 
           {/* Controles (desktop: todo en 1 línea; móvil: 3 filas) */}
@@ -1637,33 +1639,30 @@ export default function ListsPage() {
                   <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
                     <button
                       onClick={() => startTransition(() => setViewMode("grid"))}
-                      className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                        viewMode === "grid"
-                          ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
+                      className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "grid"
+                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
                       title="Cuadrícula"
                     >
                       <LayoutGrid className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => startTransition(() => setViewMode("rows"))}
-                      className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                        viewMode === "rows"
-                          ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
+                      className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "rows"
+                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
                       title="Filas"
                     >
                       <Rows className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => startTransition(() => setViewMode("list"))}
-                      className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                        viewMode === "list"
-                          ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
+                      className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "list"
+                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
                       title="Lista"
                     >
                       <StretchHorizontal className="w-4 h-4" />
@@ -1888,33 +1887,30 @@ export default function ListsPage() {
                 <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
                   <button
                     onClick={() => startTransition(() => setViewMode("grid"))}
-                    className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                      viewMode === "grid"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                    }`}
+                    className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "grid"
+                      ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                      }`}
                     title="Cuadrícula"
                   >
                     <LayoutGrid className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => startTransition(() => setViewMode("rows"))}
-                    className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                      viewMode === "rows"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                    }`}
+                    className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "rows"
+                      ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                      }`}
                     title="Filas"
                   >
                     <Rows className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => startTransition(() => setViewMode("list"))}
-                    className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                      viewMode === "list"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                    }`}
+                    className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "list"
+                      ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                      }`}
                     title="Lista"
                   >
                     <StretchHorizontal className="w-4 h-4" />
