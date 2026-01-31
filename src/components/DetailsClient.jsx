@@ -245,6 +245,8 @@ export default function DetailsClient({
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`;
   const previewBackdropStorageKey = `showverse:${endpointType}:${id}:backdrop`;
   const backgroundStorageKey = `showverse:${endpointType}:${id}:background`;
+  // ✅ PERSISTENCIA GLOBAL del modo de vista (poster/preview)
+  const globalViewModeStorageKey = "showverse:global:posterViewMode";
   // ✅ Rewatch (Trakt) persistente por show
   const rewatchStorageKey = `showverse:trakt:rewatchStartAt:${id}`;
 
@@ -262,6 +264,26 @@ export default function DetailsClient({
   const [selectedPosterPath, setSelectedPosterPath] = useState(null);
   const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] =
     useState(null);
+  // posterViewMode: controla QUÉ imagen se muestra (poster vs preview)
+  // ✅ Se inicializa desde localStorage global
+  const [posterViewMode, setPosterViewMode] = useState(() => {
+    if (typeof window === "undefined") return "poster";
+    try {
+      return window.localStorage.getItem(globalViewModeStorageKey) || "poster";
+    } catch {
+      return "poster";
+    }
+  });
+  // posterLayoutMode: controla el LAYOUT (ancho/ratio). Lo separamos para poder
+  // redimensionar antes de empezar a cargar la imagen de backdrop.
+  const [posterLayoutMode, setPosterLayoutMode] = useState(() => {
+    if (typeof window === "undefined") return "poster";
+    try {
+      return window.localStorage.getItem(globalViewModeStorageKey) || "poster";
+    } catch {
+      return "poster";
+    }
+  });
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null);
   const [prevBackgroundPath, setPrevBackgroundPath] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -797,6 +819,48 @@ export default function DetailsClient({
     return 4;
   };
 
+  const previewBackdropFallback = useMemo(() => {
+    const backdrops = imagesState?.backdrops || [];
+    if (!backdrops.length) return data?.backdrop_path || null;
+
+    const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
+    const isEN = (img) => {
+      const lang = norm(img?.iso_639_1);
+      return lang === "en";
+    };
+
+    // Filtrar por minWidth 1200
+    const pool = backdrops.filter((b) => (b?.width || 0) >= 1200);
+    const finalPool = pool.length ? pool : backdrops;
+
+    // Tomar las 3 primeras imágenes EN en orden original
+    const top3en = [];
+    for (const b of finalPool) {
+      if (isEN(b)) top3en.push(b);
+      if (top3en.length === 3) break;
+    }
+
+    // Si no hay EN, usar las 3 primeras del pool
+    const top3 = top3en.length ? top3en : finalPool.slice(0, 3);
+    if (!top3.length) return data?.backdrop_path || null;
+
+    // Buscar resoluciones específicas en orden de preferencia
+    // 1) 1920x1080 (Full HD)
+    const b1080 = top3.find((b) => b.width === 1920 && b.height === 1080);
+    if (b1080) return b1080.file_path;
+
+    // 2) 1712x964
+    const b1712 = top3.find((b) => b.width === 1712 && b.height === 964);
+    if (b1712) return b1712.file_path;
+
+    // 3) 4K 3840x2160
+    const b4k = top3.find((b) => b.width === 3840 && b.height === 2160);
+    if (b4k) return b4k.file_path;
+
+    // 4) Primera de esas 3
+    return top3[0]?.file_path || data?.backdrop_path || null;
+  }, [imagesState?.backdrops, data?.backdrop_path]);
+
   const artworkSelection = useMemo(() => {
     const rawList =
       activeImagesTab === "posters"
@@ -817,47 +881,7 @@ export default function DetailsClient({
       null;
 
     // Usar el mismo criterio que MainDashboard para el backdrop de preview
-    const previewFallback = (() => {
-      const backdrops = imagesState?.backdrops || [];
-      if (!backdrops.length) return data?.backdrop_path || null;
-
-      const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-      const isEN = (img) => {
-        const lang = norm(img?.iso_639_1);
-        return lang === "en";
-      };
-
-      // Filtrar por minWidth 1200
-      const pool = backdrops.filter((b) => (b?.width || 0) >= 1200);
-      const finalPool = pool.length ? pool : backdrops;
-
-      // Tomar las 3 primeras imágenes EN en orden original
-      const top3en = [];
-      for (const b of finalPool) {
-        if (isEN(b)) top3en.push(b);
-        if (top3en.length === 3) break;
-      }
-
-      // Si no hay EN, usar las 3 primeras del pool
-      const top3 = top3en.length ? top3en : finalPool.slice(0, 3);
-      if (!top3.length) return data?.backdrop_path || null;
-
-      // Buscar resoluciones específicas en orden de preferencia
-      // 1) 1920x1080 (Full HD)
-      const b1080 = top3.find((b) => b.width === 1920 && b.height === 1080);
-      if (b1080) return b1080.file_path;
-
-      // 2) 1712x964
-      const b1712 = top3.find((b) => b.width === 1712 && b.height === 964);
-      if (b1712) return b1712.file_path;
-
-      // 3) 4K 3840x2160
-      const b4k = top3.find((b) => b.width === 3840 && b.height === 2160);
-      if (b4k) return b4k.file_path;
-
-      // 4) Primera de esas 3
-      return top3[0]?.file_path || data?.backdrop_path || null;
-    })();
+    const previewFallback = previewBackdropFallback;
 
     const currentPreviewActive = selectedPreviewBackdropPath || previewFallback;
 
@@ -968,6 +992,7 @@ export default function DetailsClient({
     basePosterPath,
     data?.poster_path,
     data?.profile_path,
+    previewBackdropFallback,
     selectedPreviewBackdropPath,
     selectedBackgroundPath,
     baseBackdropPath,
@@ -1095,6 +1120,9 @@ export default function DetailsClient({
     setSelectedPosterPath(null);
     setSelectedPreviewBackdropPath(null);
     setSelectedBackgroundPath(null);
+    
+    // ✅ NO resetear posterViewMode/posterLayoutMode - respetar la preferencia global
+    // Ya se inicializan correctamente desde localStorage en el useState inicial
 
     setActiveTab("details");
     setActiveSection(null);
@@ -1123,6 +1151,9 @@ export default function DetailsClient({
     data?.poster_path,
     data?.backdrop_path,
     data?.profile_path,
+    posterStorageKey,
+    backgroundStorageKey,
+    previewBackdropStorageKey,
   ]);
 
   useEffect(() => {
@@ -1159,10 +1190,21 @@ export default function DetailsClient({
           const bestPoster = pickBestPosterTV(posters);
           const bestBackdropForBackground =
             pickBestBackdropTVNeutralFirst(backdrops);
+          const bestBackdropForPreviewCalc = pickBestBackdropForPreview(backdrops);
 
           const bestPosterPath = asTmdbPath(bestPoster);
           const bestBackdropPath = asTmdbPath(bestBackdropForBackground);
+          const bestPreviewPath = asTmdbPath(bestBackdropForPreviewCalc);
 
+          // ✅ Precargar backdrop de vista previa PRIMERO (si estamos en modo preview)
+          const savedGlobalMode = typeof window !== "undefined" 
+            ? window.localStorage.getItem("showverse:global:posterViewMode")
+            : null;
+          
+          if (savedGlobalMode === "preview" && bestPreviewPath) {
+            await preloadTmdb(bestPreviewPath, "w780");
+          }
+          
           if (bestPosterPath) await preloadTmdb(bestPosterPath, "w780");
 
           if (!cancelled) {
@@ -1196,6 +1238,17 @@ export default function DetailsClient({
           const backdrops = json.backdrops || [];
 
           const bestPoster = pickBestImage(posters);
+          const bestBackdropForPreviewCalc = pickBestBackdropForPreview(backdrops);
+          
+          // ✅ Precargar backdrop de vista previa PRIMERO (si estamos en modo preview)
+          const savedGlobalMode = typeof window !== "undefined" 
+            ? window.localStorage.getItem("showverse:global:posterViewMode")
+            : null;
+          
+          if (savedGlobalMode === "preview" && bestBackdropForPreviewCalc?.file_path) {
+            await preloadTmdb(bestBackdropForPreviewCalc.file_path, "w780");
+          }
+          
           if (bestPoster?.file_path) {
             await preloadTmdb(bestPoster.file_path, "w780");
             poster = bestPoster.file_path;
@@ -1241,11 +1294,38 @@ export default function DetailsClient({
     data?.profile_path,
   ]);
 
-  const displayPosterPath =
+  const basePosterDisplayPath =
     asTmdbPath(selectedPosterPath) ||
     asTmdbPath(basePosterPath) ||
     asTmdbPath(data?.poster_path || data?.profile_path) ||
     null;
+
+  const previewBackdropPath =
+    asTmdbPath(selectedPreviewBackdropPath) ||
+    asTmdbPath(previewBackdropFallback) ||
+    null;
+
+  const displayPosterPath =
+    posterViewMode === "preview" && previewBackdropPath
+      ? previewBackdropPath
+      : basePosterDisplayPath;
+
+  const isBackdropPath = useCallback(
+    (path) => {
+      if (!path) return false;
+      const backdrops = imagesState?.backdrops || [];
+      return backdrops.some((b) => b?.file_path === path);
+    },
+    [imagesState?.backdrops],
+  );
+
+  // ✅ Detectar si la portada actual se muestra como backdrop (horizontal)
+  // Nota: usamos posterLayoutMode para poder redimensionar la tarjeta ANTES
+  // de cambiar (y cargar) la imagen.
+  const isBackdropPoster = useMemo(
+    () => posterLayoutMode === "preview" || isBackdropPath(displayPosterPath),
+    [posterLayoutMode, displayPosterPath, isBackdropPath],
+  );
 
   const displayBackdropPath =
     asTmdbPath(selectedBackgroundPath) ||
@@ -2870,7 +2950,11 @@ export default function DetailsClient({
   }, [id, type]);
 
   // ====== Handlers Artwork ======
+  const [posterToggleBusy, setPosterToggleBusy] = useState(false);
+
   const handleSelectPoster = (filePath) => {
+    setPosterViewMode("poster");
+    setPosterLayoutMode("poster");
     setSelectedPosterPath(filePath);
     if (typeof window !== "undefined") {
       filePath
@@ -2921,6 +3005,8 @@ export default function DetailsClient({
     setSelectedPosterPath(null);
     setSelectedPreviewBackdropPath(null);
     setSelectedBackgroundPath(null);
+    setPosterViewMode("poster");
+    setPosterLayoutMode("poster");
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(posterStorageKey);
       window.localStorage.removeItem(previewBackdropStorageKey);
@@ -2946,141 +3032,134 @@ export default function DetailsClient({
     });
   };
 
-  const handleCyclePoster = async () => {
-    // Obtener las portadas FILTRADAS igual que en la sección "Portadas y fondos"
-    const rawPosters = imagesState?.posters || [];
-    if (rawPosters.length === 0) return;
+  const handleCyclePoster = useCallback(async () => {
+    // ✅ Alternar entre poster actual y backdrop de vista previa (sin sobrescribir)
+    const posterPath =
+      asTmdbPath(selectedPosterPath) ||
+      asTmdbPath(basePosterPath) ||
+      asTmdbPath(data?.poster_path || data?.profile_path) ||
+      null;
 
-    // Aplicar los mismos filtros que artworkSelection
-    const normLang = (lang) =>
-      String(lang || "")
-        .trim()
-        .toLowerCase();
-    const isLangES = (lang) => lang === "es" || lang === "es-es";
-    const isLangEN = (lang) => lang === "en" || lang === "en-us";
+    const previewPath =
+      asTmdbPath(selectedPreviewBackdropPath) ||
+      asTmdbPath(previewBackdropFallback) ||
+      null;
 
-    const matchesLang = (img) => {
-      const lang = normLang(img?.iso_639_1);
-      if (!lang) return false;
-      return (langES && isLangES(lang)) || (langEN && isLangEN(lang));
+    if (!posterPath || !previewPath) return;
+
+    // ✅ Determinar el siguiente modo basándose en el modo SOLICITADO.
+    // Esto permite clicks rápidos seguidos incluso si todavía no hemos cambiado
+    // posterViewMode (por ejemplo, mientras el layout se redimensiona).
+    const currentMode = posterRequestedModeRef.current || posterViewMode;
+    const nextMode = currentMode === "preview" ? "poster" : "preview";
+    const targetPath = nextMode === "preview" ? previewPath : posterPath;
+
+    // ✅ Incrementar secuencia ANTES de iniciar la transición
+    const seq = (posterToggleSeqRef.current += 1);
+    posterRequestedModeRef.current = nextMode;
+    setPosterToggleBusy(true);
+
+    const abortIfStale = () =>
+      posterToggleSeqRef.current !== seq || posterRequestedModeRef.current !== nextMode;
+
+    const safeFinish = () => {
+      if (posterToggleSeqRef.current === seq) {
+        // Pequeño delay para evitar parpadeos de estado busy
+        setTimeout(() => {
+          if (posterToggleSeqRef.current === seq) setPosterToggleBusy(false);
+        }, 150);
+      }
     };
 
-    const imgResBucket = (img) => {
-      const w = img?.width || 0;
-      const h = img?.height || 0;
-      if (w >= 3840 || h >= 2160) return "4k";
-      if (w >= 2048 || h >= 1080) return "2k";
-      if (w >= 1280 || h >= 720) return "1080p";
-      if (w >= 1024 || h >= 576) return "720p";
-      return "720p";
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    const waitFrames = () =>
+      new Promise((resolve) => {
+        if (typeof requestAnimationFrame !== "function") return resolve();
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      });
+
+    // ✅ 1) Si vamos a PREVIEW (backdrop), primero forzamos el layout (ratio/ancho)
+    // y esperamos un poco a que la tarjeta se redimensione antes de iniciar carga.
+    if (nextMode === "preview") {
+      setPosterLayoutMode("preview");
+      await waitFrames();
+      await wait(250); // ✅ Aumentado a 250ms para que coincida mejor con la transición CSS
+      if (abortIfStale()) return;
+    }
+
+    // ✅ Verificar si la imagen ya está en caché (instantáneo)
+    const checkCached = () => {
+      const testImg = new Image();
+      testImg.src = `https://image.tmdb.org/t/p/w780${targetPath}`;
+      return testImg.complete && testImg.naturalWidth > 0;
     };
 
-    // Obtener la portada actual
-    const currentPoster =
-      selectedPosterPath ||
-      basePosterPath ||
-      data?.poster_path ||
-      data?.profile_path;
+    const applyMode = () => {
+      if (abortIfStale()) return;
 
-    const withPath = rawPosters.filter((img) => !!img?.file_path);
+      setPosterViewMode(nextMode);
 
-    const filtered = withPath.filter((img) => {
-      const fp = img?.file_path;
-      if (fp === currentPoster) return true;
-
-      if (imagesResFilter !== "all") {
-        const b = imgResBucket(img);
-        const target = imagesResFilter === "2k" ? "2k" : imagesResFilter;
-        if (b !== target) return false;
+      // ✅ Si volvemos a POSTER, reducimos el layout un poco DESPUÉS del swap
+      // para que el cambio de ratio no rompa el diseño.
+      if (nextMode === "poster") {
+        setTimeout(() => {
+          if (abortIfStale()) return;
+          setPosterLayoutMode("poster");
+        }, 180);
       }
 
-      return matchesLang(img);
+      safeFinish();
+    };
+
+    // ✅ Si ya está en caché, cambiar sin precarga adicional
+    if (checkCached()) {
+      applyMode();
+      return;
+    }
+
+    // ✅ Precargar la imagen con timeout (evita esperas eternas)
+    await new Promise((resolve) => {
+      const img = new Image();
+      const timeout = setTimeout(() => {
+        resolve(false); // timeout: continuar de todas formas
+      }, 650); // esperamos un poco más para que el layout termine de asentarse
+
+      img.onload = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+      img.onerror = () => {
+        clearTimeout(timeout);
+        resolve(false);
+      };
+      img.src = `https://image.tmdb.org/t/p/w780${targetPath}`;
     });
 
-    const neutral = withPath.filter((img) => !img?.iso_639_1);
-    const posters = filtered.length
-      ? filtered
-      : neutral.length
-        ? neutral
-        : withPath;
+    applyMode();
+  }, [
+    selectedPosterPath,
+    basePosterPath,
+    data?.poster_path,
+    data?.profile_path,
+    selectedPreviewBackdropPath,
+    previewBackdropFallback,
+    posterViewMode,
+    globalViewModeStorageKey,
+  ]);
 
-    if (posters.length === 0) return;
-
-    // Encontrar el índice actual
-    const currentIndex = posters.findIndex(
-      (img) => img?.file_path === currentPoster,
-    );
-
-    // Obtener la siguiente portada (ciclar al principio si llegamos al final)
-    const nextIndex =
-      currentIndex >= 0 ? (currentIndex + 1) % posters.length : 0;
-    const nextPoster = posters[nextIndex]?.file_path;
-
-    // También cambiar el fondo (backdrop) - usar backdrops SIN idioma (neutral)
-    const rawBackdrops = imagesState?.backdrops || [];
-    let nextBackdrop = null;
-
-    if (rawBackdrops.length > 0) {
-      const currentBackdrop =
-        selectedBackgroundPath || baseBackdropPath || data?.backdrop_path;
-
-      // Filtrar backdrops sin idioma (como en activeImagesTab === "background")
-      const neutralBackdrops = rawBackdrops.filter(
-        (img) => !!img?.file_path && !img?.iso_639_1,
-      );
-      const backdrops = neutralBackdrops.length
-        ? neutralBackdrops
-        : rawBackdrops.filter((img) => !!img?.file_path);
-
-      const currentBackdropIndex = backdrops.findIndex(
-        (img) => img?.file_path === currentBackdrop,
-      );
-
-      const nextBackdropIndex =
-        currentBackdropIndex >= 0
-          ? (currentBackdropIndex + 1) % backdrops.length
-          : 0;
-      nextBackdrop = backdrops[nextBackdropIndex]?.file_path;
-    }
-
-    // Precargar las imágenes antes de cambiarlas
-    const loadPromises = [];
-
-    if (nextPoster) {
-      loadPromises.push(
-        new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve(true);
-          img.onerror = () => resolve(false);
-          img.src = `https://image.tmdb.org/t/p/w500${nextPoster}`;
-        }),
-      );
-    }
-
-    if (nextBackdrop) {
-      loadPromises.push(
-        new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve(true);
-          img.onerror = () => resolve(false);
-          img.src = `https://image.tmdb.org/t/p/w1280${nextBackdrop}`;
-        }),
-      );
-    }
-
-    // Esperar a que todas las imágenes se carguen
-    if (loadPromises.length > 0) {
-      await Promise.all(loadPromises);
-    }
-
-    // Ahora cambiar ambas imágenes
-    if (nextPoster) {
-      handleSelectPoster(nextPoster);
-    }
-    if (nextBackdrop) {
-      handleSelectBackground(nextBackdrop);
-    }
-  };
+  // ✅ Persistir el modo de vista globalmente y sincronizar layoutMode
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(globalViewModeStorageKey, posterViewMode);
+      // ✅ Sincronizar layoutMode cuando posterViewMode cambie (excepto durante transiciones)
+      // Esto asegura que ambos estados estén alineados después de navegaciones
+      if (!posterToggleBusy) {
+        setPosterLayoutMode(posterViewMode);
+      }
+    } catch {}
+  }, [posterViewMode, globalViewModeStorageKey, posterToggleBusy]);
 
   const handleCopyImageUrl = async (filePath) => {
     const url = buildOriginalImageUrl(filePath);
@@ -4269,25 +4348,70 @@ export default function DetailsClient({
     ? streamingProviders.slice(0, 6)
     : [];
 
-  const [posterResolved, setPosterResolved] = useState(false); // ya sabemos si hay poster o no
+  const [posterResolved, setPosterResolved] = useState(false);
   const [posterLowLoaded, setPosterLowLoaded] = useState(false);
   const [posterHighLoaded, setPosterHighLoaded] = useState(false);
   const [posterImgError, setPosterImgError] = useState(false);
   const [posterTransitioning, setPosterTransitioning] = useState(false);
+  const [prevPosterPath, setPrevPosterPath] = useState(null);
+  const prevDisplayPosterRef = useRef(null);
+  const posterLoadTokenRef = useRef(0);
+  const posterToggleSeqRef = useRef(0);
+  const posterRequestedModeRef = useRef("poster");
 
   useEffect(() => {
-    setPosterTransitioning(true);
-    setPosterLowLoaded(false);
-    setPosterHighLoaded(false);
-    setPosterImgError(false);
+    posterRequestedModeRef.current = posterViewMode;
+  }, [posterViewMode]);
 
-    // Pequeño delay para que la transición sea más suave
-    const timer = setTimeout(() => {
-      setPosterTransitioning(false);
-    }, 50);
+  useEffect(() => {
+    const prev = prevDisplayPosterRef.current;
+    prevDisplayPosterRef.current = displayPosterPath;
+    posterLoadTokenRef.current += 1;
 
-    return () => clearTimeout(timer);
+    if (prev && prev !== displayPosterPath) {
+      // Guardar la imagen anterior para crossfade
+      setPrevPosterPath(prev);
+
+      // ✅ No resetear los estados de carga si la imagen ya está precargada
+      const checkIfLoaded = () => {
+        const testImg = new Image();
+        testImg.src = `https://image.tmdb.org/t/p/w342${displayPosterPath}`;
+        return testImg.complete && testImg.naturalWidth > 0;
+      };
+
+      const isPreloaded = checkIfLoaded();
+      
+      // ✅ Si está precargada, transición instantánea. Si no, resetear estados
+      if (isPreloaded) {
+        setPosterLowLoaded(true);
+        setPosterHighLoaded(false);
+      } else {
+        setPosterLowLoaded(false);
+        setPosterHighLoaded(false);
+      }
+      
+      setPosterTransitioning(true);
+      setPosterImgError(false);
+
+      // ✅ Transición más rápida (600ms) para mejor UX en cambios rápidos
+      const timer = setTimeout(() => {
+        setPosterTransitioning(false);
+        setPrevPosterPath(null);
+      }, 600);
+
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+
+    setPosterTransitioning(false);
+    setPrevPosterPath(null);
   }, [displayPosterPath]);
+
+  const posterAspectIsBackdrop =
+    posterTransitioning && prevPosterPath
+      ? isBackdropPath(prevPosterPath)
+      : isBackdropPoster;
 
   const posterLowUrl = displayPosterPath
     ? `https://image.tmdb.org/t/p/w342${displayPosterPath}`
@@ -4295,6 +4419,7 @@ export default function DetailsClient({
   const posterHighUrl = displayPosterPath
     ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
     : null;
+  const posterLoadToken = posterLoadTokenRef.current;
 
   // Skeleton mientras:
   // - no hemos “resuelto” si hay poster
@@ -4489,8 +4614,14 @@ export default function DetailsClient({
             HEADER HERO SECTION (Diseño Final Solicitado)
            ================================================================= */}
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 animate-in fade-in duration-700 slide-in-from-bottom-4 items-start">
-          {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS --- */}
-          <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10">
+          {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
+          <div
+            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-all duration-500 ${
+              isBackdropPoster
+                ? "max-w-full lg:max-w-[600px]"
+                : "max-w-[280px] lg:max-w-[320px]"
+            }`}
+          >
             {/* Poster Card */}
             <div className="relative">
               {/* Wrapper: solo perspectiva + captura puntero */}
@@ -4527,9 +4658,29 @@ export default function DetailsClient({
                   {/* (Opcional) borde suave sin sombreado encima */}
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10" />
 
-                  <div className="relative aspect-[2/3] bg-neutral-950">
-                    {showPosterSkeleton && (
-                      <div className="absolute inset-0 animate-pulse bg-neutral-800/60" />
+                  <div
+                    className={`relative bg-neutral-950 will-change-auto ${
+                      isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
+                    }`}
+                    style={{
+                      transition: "aspect-ratio 500ms cubic-bezier(0.4, 0, 0.2, 1)",
+                    }}
+                  >
+                    {/* Imagen anterior (permanece visible durante la transición) */}
+                    {prevPosterPath && posterTransitioning && (
+                      <div
+                        className="absolute inset-0 transition-opacity duration-[600ms] ease-out"
+                        style={{ opacity: posterLowLoaded ? 0 : 1 }}
+                      >
+                        <img
+                          src={`https://image.tmdb.org/t/p/w780${prevPosterPath}`}
+                          alt={title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          style={{
+                            transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
+                          }}
+                        />
+                      </div>
                     )}
 
                     {posterLowUrl && !posterImgError && (
@@ -4542,15 +4693,19 @@ export default function DetailsClient({
                           fetchPriority="high"
                           decoding="async"
                           onLoad={() => {
+                            if (posterLoadTokenRef.current !== posterLoadToken)
+                              return;
                             setPosterLowLoaded(true);
                             setPosterResolved(true);
                           }}
                           onError={() => {
+                            if (posterLoadTokenRef.current !== posterLoadToken)
+                              return;
                             setPosterImgError(true);
                             setPosterResolved(true);
                           }}
-                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out
-${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"}`}
+                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[600ms] ease-in-out
+${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
                             transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
                           }}
@@ -4564,10 +4719,16 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-0" : posterLow
                             loading="eager"
                             decoding="async"
                             fetchPriority="high"
-                            onLoad={() => setPosterHighLoaded(true)}
+                            onLoad={() => {
+                              if (
+                                posterLoadTokenRef.current !== posterLoadToken
+                              )
+                                return;
+                              setPosterHighLoaded(true);
+                            }}
                             onError={() => {}}
-                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-out
-${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacity-0"}`}
+                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[600ms] ease-out
+${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
                               transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
                             }}
@@ -4576,61 +4737,88 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                       </div>
                     )}
 
-                    {showNoPoster && (
+                    {showNoPoster && !prevPosterPath && (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <ImageOff className="w-10 h-10 text-neutral-700" />
                       </div>
                     )}
-
-                    {/* ✅ Quitado: cualquier sombreado/shine superpuesto */}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Providers Grid */}
+            {/* Providers Grid + Enlaces Externos (cuando es backdrop) */}
             {limitedProviders && limitedProviders.length > 0 && (
-              // CAMBIO APLICADO: Añadido 'py-2' (padding vertical) para dar espacio al hover:scale
-              <div className="flex flex-row flex-nowrap justify-center items-center gap-2 w-full px-1 py-2 overflow-x-auto [scrollbar-width:none]">
-                {limitedProviders.map((p) => {
-                  const providerLink = p.url || justwatchUrl || "#";
-                  const hasValidLink = p.url || justwatchUrl;
+              <div className="flex flex-row flex-nowrap justify-center items-center gap-3 w-full px-1 py-2 overflow-x-auto [scrollbar-width:none]">
+                {/* Providers */}
+                <div className="flex flex-row flex-nowrap items-center gap-2">
+                  {limitedProviders.map((p) => {
+                    const providerLink = p.url || justwatchUrl || "#";
+                    const hasValidLink = p.url || justwatchUrl;
 
-                  return (
-                    <a
-                      key={p.provider_id}
-                      href={providerLink}
-                      target={hasValidLink ? "_blank" : undefined}
-                      rel={hasValidLink ? "noreferrer" : undefined}
-                      title={p.provider_name}
-                      // z-10 en hover asegura que se superponga si están muy juntos
-                      className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
-                    >
-                      <img
-                        src={
-                          p.logo_path?.startsWith("http")
-                            ? p.logo_path
-                            : p.logo_path?.startsWith("/")
-                              ? `https://image.tmdb.org/t/p/original${p.logo_path}`
-                              : p.logo_path
-                        }
-                        alt={p.provider_name}
-                        // Iconos ligeramente más pequeños en móvil (w-9) para que quepan 7 mejor
-                        className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5"
-                        onError={(e) => {
-                          // Fallback si falla la imagen
-                          e.target.style.display = "none";
-                        }}
-                      />
-                    </a>
-                  );
-                })}
+                    return (
+                      <a
+                        key={p.provider_id}
+                        href={providerLink}
+                        target={hasValidLink ? "_blank" : undefined}
+                        rel={hasValidLink ? "noreferrer" : undefined}
+                        title={p.provider_name}
+                        className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
+                      >
+                        <img
+                          src={
+                            p.logo_path?.startsWith("http")
+                              ? p.logo_path
+                              : p.logo_path?.startsWith("/")
+                                ? `https://image.tmdb.org/t/p/original${p.logo_path}`
+                                : p.logo_path
+                          }
+                          alt={p.provider_name}
+                          className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5"
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                          }}
+                        />
+                      </a>
+                    );
+                  })}
+                </div>
+
+                {/* Barra vertical + Enlaces externos (solo cuando es backdrop) */}
+                {isBackdropPoster && externalLinks.length > 0 && (
+                  <>
+                    <div className="w-px h-8 bg-white/20 flex-shrink-0" />
+                    <div className="flex flex-row flex-nowrap items-center gap-2">
+                      {externalLinks.slice(0, 5).map((link) => (
+                        <a
+                          key={link.id}
+                          href={link.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={link.label}
+                          className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
+                        >
+                          <img
+                            src={link.icon}
+                            alt={link.label}
+                            className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5 p-1"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                            }}
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
 
-          {/* --- COLUMNA DERECHA: INFO + TABS --- */}
-          <div className="flex-1 flex flex-col min-w-0 w-full">
+          {/* --- COLUMNA DERECHA: INFO (sin tabs cuando es backdrop) --- */}
+          <div className={`flex-1 flex flex-col min-w-0 w-full ${
+            isBackdropPoster ? "" : ""
+          }`}>
             {/* 1. TÍTULO Y CABECERA */}
             <div className="mb-5 px-1">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
@@ -4786,16 +4974,20 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                   e.stopPropagation();
                   handleCyclePoster();
                 }}
-                active={true}
+                active={posterViewMode === "preview"}
                 activeColor="yellow"
                 groupId="details-actions"
-                title="Cambiar portada"
+                title={posterViewMode === "preview" ? "Mostrar portada" : "Mostrar vista previa"}
               >
-                <ImageIcon className="w-5 h-5" />
+                {posterToggleBusy ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <ImageIcon className="w-5 h-5" />
+                )}
               </LiquidButton>
             </div>
 
-            {/* ✅ 3. SCOREBOARD INTEGRADO */}
+           
             <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
               <div
                 className="
@@ -4907,64 +5099,72 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                   )}
                 </div>
 
-                {/* ✅ SEPARADOR 1 (después de IMDb en móvil, porque es el último visible ahí) */}
-                <div className="w-px h-6 bg-white/10 shrink-0" />
+                {/* ✅ SEPARADOR 1 - SOLO si NO es backdrop */}
+                {!isBackdropPoster && (
+                  <div className="w-px h-6 bg-white/10 shrink-0" />
+                )}
 
-                {/* ✅ B. Links externos */}
-                <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
-                  {/* ✅ DESKTOP: iconos normales */}
-                  <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
-                    <div className="hidden sm:block">
+                {/* ✅ B. Links externos - SOLO si NO es backdrop (para evitar duplicados) */}
+                {!isBackdropPoster && (
+                  <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
+                    {/* ✅ DESKTOP: iconos normales */}
+                    <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
+                      <div className="hidden sm:block">
+                        <ExternalLinkButton
+                          icon="/logo-Web.png"
+                          href={officialSiteUrl}
+                        />
+                      </div>
+
                       <ExternalLinkButton
-                        icon="/logo-Web.png"
-                        href={officialSiteUrl}
+                        icon="/logoFilmaffinity.png"
+                        href={filmAffinitySearchUrl}
                       />
+                      <ExternalLinkButton
+                        icon="/logo-JustWatch.png"
+                        title="JustWatch"
+                        href={jwHref}
+                        fallbackHref={justWatchUrl}
+                      />
+
+                      {isMovie && (
+                        <ExternalLinkButton
+                          icon="/logo-Letterboxd.png"
+                          href={letterboxdUrl}
+                        />
+                      )}
+
+                      {type === "tv" && (
+                        <ExternalLinkButton
+                          icon="/logoseriesgraph.png"
+                          href={seriesGraphUrl}
+                        />
+                      )}
                     </div>
 
-                    <ExternalLinkButton
-                      icon="/logoFilmaffinity.png"
-                      href={filmAffinitySearchUrl}
-                    />
-                    <ExternalLinkButton
-                      icon="/logo-JustWatch.png"
-                      title="JustWatch"
-                      href={jwHref}
-                      fallbackHref={justWatchUrl}
-                    />
-
-                    {isMovie && (
-                      <ExternalLinkButton
-                        icon="/logo-Letterboxd.png"
-                        href={letterboxdUrl}
-                      />
-                    )}
-
-                    {type === "tv" && (
-                      <ExternalLinkButton
-                        icon="/logoseriesgraph.png"
-                        href={seriesGraphUrl}
-                      />
-                    )}
+                    {/* ✅ MÓVIL: botón "..." */}
+                    <button
+                      type="button"
+                      onClick={() => setExternalLinksOpen(true)}
+                      className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center
+                 border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
+                      title="Enlaces"
+                      aria-label="Abrir enlaces externos"
+                    >
+                      <MoreHorizontal className="w-5 h-5" />
+                    </button>
                   </div>
+                )}
 
-                  {/* ✅ MÓVIL: botón "..." */}
-                  <button
-                    type="button"
-                    onClick={() => setExternalLinksOpen(true)}
-                    className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center
-               border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
-                    title="Enlaces"
-                    aria-label="Abrir enlaces externos"
-                  >
-                    <MoreHorizontal className="w-5 h-5" />
-                  </button>
-                </div>
+                {/* ✅ SEPARADOR 2 - SOLO si NO es backdrop */}
+                {!isBackdropPoster && (
+                  <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
+                )}
 
-                {/* ✅ SEPARADOR 2 (antes del rating del usuario) */}
-                <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
-
-                {/* C. Puntuación Usuario */}
-                <div className="flex items-center gap-3 shrink-0">
+                {/* C. Puntuación Usuario - con margen automático cuando es backdrop */}
+                <div
+                  className={`flex items-center gap-3 shrink-0 ${isBackdropPoster ? "ml-auto" : ""}`}
+                >
                   <StarRating
                     rating={unifiedUserRating}
                     max={10}
@@ -5034,10 +5234,11 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
               )}
             </div>
 
-            {/* 4. CONTENEDOR TABS Y CONTENIDO */}
-            <div>
-              {/* --- MENÚ DE NAVEGACIÓN --- */}
-              <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
+            {/* 4. CONTENEDOR TABS Y CONTENIDO - Oculto si es backdrop (se muestra abajo) */}
+            {!isBackdropPoster && (
+              <div>
+                {/* --- MENÚ DE NAVEGACIÓN --- */}
+                <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
                 {[
                   { id: "details", label: "Detalles" },
                   { id: "production", label: "Producción" },
@@ -5240,8 +5441,216 @@ ${posterTransitioning ? "opacity-0" : posterHighLoaded ? "opacity-100" : "opacit
                 </AnimatePresence>
               </div>
             </div>
+            )}
           </div>
         </div>
+
+        {/* ✅ TABS Y CONTENIDO DEBAJO DE LA TARJETA (solo cuando es backdrop) */}
+        {isBackdropPoster && (
+          <div className="mt-8 w-full">
+            {/* --- MENÚ DE NAVEGACIÓN --- */}
+            <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
+              {[
+                { id: "details", label: "Detalles" },
+                { id: "production", label: "Producción" },
+                { id: "synopsis", label: "Sinopsis" },
+                ...(extras.awards
+                  ? [{ id: "awards", label: "Premios" }]
+                  : []),
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
+        ${
+          activeTab === tab.id
+            ? "text-white border-yellow-500"
+            : "text-zinc-500 border-transparent hover:text-zinc-300"
+        }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* --- ÁREA DE CONTENIDO --- */}
+            <div className="relative min-h-[100px]">
+              <AnimatePresence mode="wait">
+                {/* 1. SINOPSIS */}
+                {activeTab === "synopsis" && (
+                  <motion.div
+                    key="synopsis-backdrop"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="p-5 rounded-2xl bg-white/5 border border-white/5">
+                      {data.tagline && (
+                        <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
+                          "{data.tagline}"
+                        </div>
+                      )}
+                      <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
+                        {data.overview || "No hay descripción disponible."}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 2. DETALLES */}
+                {activeTab === "details" && (
+                  <motion.div
+                    key="details-backdrop"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                      <VisualMetaCard
+                        icon={type === "movie" ? FilmIcon : MonitorPlay}
+                        label="Título Original"
+                        value={
+                          type === "movie"
+                            ? data.original_title
+                            : data.original_name
+                        }
+                        expanded={true}
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                      />
+
+                      {type !== "movie" ? (
+                        <VisualMetaCard
+                          icon={Layers}
+                          label="Formato"
+                          value={
+                            data.number_of_seasons
+                              ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
+                              : "—"
+                          }
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                        />
+                      ) : null}
+
+                      <VisualMetaCard
+                        icon={CalendarIcon}
+                        label={type === "movie" ? "Estreno" : "Inicio"}
+                        value={releaseDateValue || "—"}
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                      />
+
+                      {type !== "movie" && lastAirDateValue && (
+                        <VisualMetaCard
+                          icon={CalendarIcon}
+                          label={
+                            data.status === "Ended"
+                              ? "Finalización"
+                              : "Última emisión"
+                          }
+                          value={lastAirDateValue}
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                        />
+                      )}
+
+                      {type === "movie" && (
+                        <>
+                          {budgetValue && (
+                            <VisualMetaCard
+                              icon={BadgeDollarSignIcon}
+                              label="Presupuesto"
+                              value={budgetValue}
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            />
+                          )}
+                          {revenueValue && (
+                            <VisualMetaCard
+                              icon={TrendingUp}
+                              label="Recaudación"
+                              value={revenueValue}
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            />
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 3. PRODUCCIÓN */}
+                {activeTab === "production" && (
+                  <motion.div
+                    key="production-backdrop"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                      <VisualMetaCard
+                        icon={Users}
+                        label={type === "movie" ? "Director" : "Creadores"}
+                        value={
+                          type === "movie"
+                            ? movieDirector || "Desconocido"
+                            : createdByNames || "Desconocido"
+                        }
+                        expanded={true}
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                      />
+
+                      {type !== "movie" && network && (
+                        <VisualMetaCard
+                          icon={MonitorPlay}
+                          label="Canal"
+                          value={network}
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                        />
+                      )}
+
+                      <VisualMetaCard
+                        icon={Building2}
+                        label="Producción"
+                        value={production || "—"}
+                        expanded={true}
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 4. PREMIOS */}
+                {activeTab === "awards" && extras.awards && (
+                  <motion.div
+                    key="awards-backdrop"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-6">
+                      <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
+
+                      <div className="flex items-start gap-4 relative z-10">
+                        <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
+                          <Trophy className="w-8 h-8" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-white mb-2">
+                            Reconocimientos
+                          </h3>
+                          <p className="text-base font-medium text-yellow-100/90 leading-relaxed whitespace-pre-line">
+                            {extras.awards}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
 
         {/* ===================================================== */}
         {/* ✅ MENÚ GLOBAL + CONTENIDO (tipo ActorDetails) */}
