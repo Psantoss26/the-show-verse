@@ -1334,12 +1334,12 @@ export default function ListsPage() {
         >
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-amber-500" />
-              <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">TU COLECCIÓN</span>
+              <div className="h-px w-12 bg-purple-500" />
+              <span className="text-purple-400 font-bold uppercase tracking-widest text-xs">TU COLECCIÓN</span>
             </div>
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
               Mis Listas
-              <span className="text-amber-500">.</span>
+              <span className="text-purple-500">.</span>
             </h1>
             <p className="mt-2 text-zinc-400 max-w-lg text-lg">
               Gestiona y organiza tus colecciones personales.

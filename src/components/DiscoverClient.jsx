@@ -114,7 +114,7 @@ function Chip({ active, children, onClick, className = '' }) {
             onClick={onClick}
             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border
         ${active
-                    ? 'bg-yellow-500 text-black border-yellow-500 font-bold shadow-[0_0_10px_rgba(234,179,8,0.3)]'
+                    ? 'bg-orange-500 text-black border-orange-500 font-bold shadow-[0_0_10px_rgba(249,115,22,0.3)]'
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
                 } ${className}`}
         >
@@ -127,8 +127,8 @@ function RadioRow({ name, value, checked, onChange, children, disabled = false }
     return (
         <label className={`flex items-center gap-3 py-2 cursor-pointer group ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
             <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors
-                ${checked ? 'border-yellow-500' : 'border-zinc-600 group-hover:border-zinc-400'}`}>
-                {checked && <div className="w-2 h-2 rounded-full bg-yellow-500" />}
+                ${checked ? 'border-orange-500' : 'border-zinc-600 group-hover:border-zinc-400'}`}>
+                {checked && <div className="w-2 h-2 rounded-full bg-orange-500" />}
             </div>
             <input
                 type="radio"
@@ -169,7 +169,7 @@ function DualRange({ min, max, valueMin, valueMax, onChange, step = 1, label }) 
         <div className="mt-1 group">
             <div className="flex items-center justify-between text-xs text-zinc-500 mb-3 font-medium group-hover:text-zinc-400 transition-colors">
                 <span>{label}</span>
-                <span className="font-mono text-yellow-500 font-bold tracking-tight">
+                <span className="font-mono text-orange-500 font-bold tracking-tight">
                     {minVal} - {maxVal}
                 </span>
             </div>
@@ -180,7 +180,7 @@ function DualRange({ min, max, valueMin, valueMax, onChange, step = 1, label }) 
 
                 {/* Track Activo */}
                 <div
-                    className="absolute top-1/2 h-1 bg-yellow-500 rounded-full -translate-y-1/2 transition-all duration-75"
+                    className="absolute top-1/2 h-1 bg-orange-500 rounded-full -translate-y-1/2 transition-all duration-75"
                     style={{ left: `${minPercent}%`, width: `${maxPercent - minPercent}%` }}
                 />
 
@@ -221,12 +221,12 @@ function SingleRange({ min, max, value, onChange, step = 1, label }) {
         <div className="mt-1 group">
             <div className="flex items-center justify-between text-xs text-zinc-500 mb-3 font-medium group-hover:text-zinc-400 transition-colors">
                 <span>{label}</span>
-                <span className="font-mono text-yellow-500 font-bold">{value}</span>
+                <span className="font-mono text-orange-500 font-bold">{value}</span>
             </div>
             <div className="relative h-5 w-full flex items-center">
                 <div className="absolute inset-x-0 h-1 bg-zinc-800 rounded-full"></div>
                 <div
-                    className="absolute h-1 bg-yellow-500 rounded-full left-0"
+                    className="absolute h-1 bg-orange-500 rounded-full left-0"
                     style={{ width: `${percent}%` }}
                 ></div>
                 <input
@@ -237,7 +237,7 @@ function SingleRange({ min, max, value, onChange, step = 1, label }) {
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
                 <div
-                    className="absolute h-3 w-3 bg-yellow-500 rounded-full pointer-events-none shadow-lg transition-all duration-75 group-hover:scale-125"
+                    className="absolute h-3 w-3 bg-orange-500 rounded-full pointer-events-none shadow-lg transition-all duration-75 group-hover:scale-125"
                     style={{ left: `${percent}%`, transform: 'translateX(-50%)' }}
                 />
             </div>
@@ -285,7 +285,7 @@ function SortMenu({ value, onChange }) {
                                 type="button"
                                 onClick={() => { onChange(opt.id); setOpen(false) }}
                                 className={`w-full text-left px-3 py-2 transition flex items-center justify-between gap-3
-                                    ${active ? 'bg-zinc-800 text-yellow-500' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
+                                    ${active ? 'bg-zinc-800 text-orange-500' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
                             >
                                 <span className="text-sm">{opt.label}</span>
                                 {active && <Check className="w-3.5 h-3.5" />}
@@ -300,7 +300,7 @@ function SortMenu({ value, onChange }) {
 
 function RatingBadge({ percent }) {
     const p = Math.max(0, Math.min(100, Math.round(percent || 0)))
-    let stroke = 'rgba(250, 204, 21, 1)' // Yellow
+    let stroke = 'rgba(249, 115, 22, 1)' // Orange
     if (p >= 70) stroke = 'rgba(16, 185, 129, 1)' // Green
     if (p < 40) stroke = 'rgba(239, 68, 68, 1)' // Red
 
@@ -357,7 +357,7 @@ function DiscoverCard({ item }) {
                         <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 mb-1">
                             {title}
                         </h3>
-                        <p className="text-yellow-500 font-medium text-xs">
+                        <p className="text-orange-500 font-medium text-xs">
                             {year || 'N/A'}
                         </p>
                     </div>
@@ -678,13 +678,19 @@ export default function DiscoverClient() {
     return (
         <div className="min-h-screen bg-black text-zinc-100 font-sans">
             <div className="max-w-[1800px] mx-auto p-4 lg:p-8">
-                <header className="mb-8 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
-                        <SlidersHorizontal className="w-5 h-5 text-yellow-500" />
-                    </div>
+                <header className="mb-8">
                     <div>
-                        <h1 className="text-3xl font-extrabold tracking-tight text-white">Descubrir</h1>
-                        <p className="text-zinc-500 text-sm">Filtra y busca grupos de películas y/o series con criterios avanzados.</p>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="h-px w-12 bg-orange-500" />
+                            <span className="text-orange-400 font-bold uppercase tracking-widest text-xs">EXPLORAR</span>
+                        </div>
+                        <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+                            Descubrir
+                            <span className="text-orange-500">.</span>
+                        </h1>
+                        <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+                            Filtra y busca películas o series con criterios avanzados.
+                        </p>
                     </div>
                 </header>
 
@@ -795,7 +801,7 @@ export default function DiscoverClient() {
                                 </div>
                             </Section>
 
-                            <Section title="Puntuación" right={<Star className="w-3 h-3 text-yellow-500" />}>
+                            <Section title="Puntuación" right={<Star className="w-3 h-3 text-orange-500" />}>
                                 <DualRange label="Puntuación (0-10)" min={0} max={10} step={0.5} valueMin={scoreRange[0]} valueMax={scoreRange[1]} onChange={setScoreRange} />
                                 <div className="mt-4"><SingleRange label="Mínimo de votos" min={0} max={500} step={10} value={minVotes} onChange={setMinVotes} /></div>
                             </Section>
