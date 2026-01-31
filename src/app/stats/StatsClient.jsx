@@ -118,16 +118,9 @@ const processMonthlyActivity = (historyData) => {
   return Object.values(activity);
 };
 
-const processGenreDistribution = (historyData) => {
-  const counts = {};
-  historyData.forEach((item) => {
-    const genres = item.movie?.genres || item.show?.genres || [];
-    genres.forEach((g) => {
-      counts[g] = (counts[g] || 0) + 1;
-    });
-  });
-
-  return Object.entries(counts)
+const processGenreDistribution = (genres) => {
+  if (!genres) return [];
+  return Object.entries(genres)
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 6); // Top 6 for Radar
@@ -220,11 +213,12 @@ function SectionTitle({ icon: Icon, title, subtitle }) {
   );
 }
 
-function CustomTooltip({ active, payload, label }) {
+function CustomTooltip({ active, payload, label, formatter }) {
   if (active && payload && payload.length) {
+    const title = label || (payload[0] && payload[0].name);
     return (
       <div className="bg-zinc-950/90 border border-white/10 rounded-xl p-3 shadow-xl backdrop-blur-md z-50">
-        <p className="font-bold text-white mb-2 text-sm">{label}</p>
+        <p className="font-bold text-white mb-2 text-sm">{title}</p>
         <div className="space-y-1">
           {payload.map((p, idx) => (
             <div key={idx} className="flex items-center justify-between gap-4 text-xs">
@@ -233,7 +227,7 @@ function CustomTooltip({ active, payload, label }) {
                 {p.name}
               </span>
               <span className="font-mono font-bold text-zinc-300">
-                {p.value.toLocaleString()}
+                {formatter ? formatter(p.value) : p.value.toLocaleString()}
               </span>
             </div>
           ))}
@@ -290,7 +284,7 @@ export default function StatsClient() {
     const totalHours = Math.round(totalMinutes / 60);
 
     const monthlyData = processMonthlyActivity(history);
-    const genreData = processGenreDistribution(history);
+    const genreData = processGenreDistribution(data.genres);
     const ratingData = processRatings(tStats.ratings?.distribution || {});
     const dayOfWeekData = processDayOfWeek(history);
     const hourOfDayData = processHourOfDay(history);
@@ -314,6 +308,7 @@ export default function StatsClient() {
       totalMinutes,
       totalHours,
       totalDays: Math.floor(totalHours / 24),
+      formattedTotalTime: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
       totalComments,
       totalCollected,
       monthlyData,
@@ -325,9 +320,16 @@ export default function StatsClient() {
       topMovies: (data.watchedMovies || []).sort((a, b) => b.plays - a.plays).slice(0, 5),
       topShows: (data.watchedShows || []).sort((a, b) => b.plays - a.plays).slice(0, 5),
       years: [...new Set(history.map(h => new Date(h.watched_at).getFullYear()))].sort((a, b) => b - a),
-      topActors: (data.topActors || []).slice(0, 6)
+      topActors: (data.topActors || []).slice(0, 6),
+      topDirectors: (data.topDirectors || []).slice(0, 6)
     };
   }, [data]);
+
+  const formatMinutes = (mins) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h ${m}m`;
+  };
 
   if (loading) {
     return (
@@ -411,8 +413,8 @@ export default function StatsClient() {
                 key={tab.id}
                 onClick={() => setViewMode(tab.id)}
                 className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === tab.id
-                    ? "text-black"
-                    : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  ? "text-black"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
                   }`}
               >
                 {viewMode === tab.id && (
@@ -569,7 +571,7 @@ export default function StatsClient() {
                   transition={{ delay: 0.3 }}
                   className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center justify-center relative"
                 >
-                  <SectionTitle icon={Clock} title="Tiempo" />
+                  <SectionTitle icon={Clock} title="Distribución de Tiempo" subtitle="Películas vs Series" />
                   <div className="h-[250px] w-full relative">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -584,14 +586,17 @@ export default function StatsClient() {
                             <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(0,0,0,0)" />
                           ))}
                         </Pie>
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip
+                          content={<CustomTooltip formatter={formatMinutes} />}
+                          wrapperStyle={{ zIndex: 1000 }}
+                        />
                         <Legend verticalAlign="bottom" height={36} iconType="circle" />
                       </PieChart>
                     </ResponsiveContainer>
                     {/* Center Text */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
-                      <span className="text-3xl font-black text-white">{stats.totalDays}</span>
-                      <span className="text-xs uppercase font-bold text-zinc-500 tracking-widest">Días</span>
+                      <span className="text-3xl font-black text-white">{stats.formattedTotalTime.split(" ")[0]}</span>
+                      <span className="text-sm font-bold text-zinc-500 uppercase tracking-widest">{stats.formattedTotalTime.split(" ")[1]}</span>
                     </div>
                   </div>
                 </motion.div>
@@ -688,6 +693,42 @@ export default function StatsClient() {
                 </motion.div>
               )}
 
+              {/* Top Directors Row */}
+              {stats.topDirectors.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                  className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl mt-6"
+                >
+                  <SectionTitle icon={Film} title="Directores Favoritos" subtitle="Los cineastas que más sigues" />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                    {stats.topDirectors.map((person, idx) => (
+                      <Link key={person.id} href={`/details/person/${person.id}`} className="group relative">
+                        <div className="aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 mb-2 border border-white/5 group-hover:border-emerald-500/50 transition-all duration-300">
+                          {person.profile_path ? (
+                            <img
+                              src={`https://image.tmdb.org/t/p/w342${person.profile_path}`}
+                              alt={person.name}
+                              className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-600">
+                              <Film className="w-8 h-8" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition" />
+                          <div className="absolute bottom-0 left-0 right-0 p-2">
+                            <p className="text-white text-xs font-bold leading-tight truncate">{person.name}</p>
+                            <p className="text-emerald-400 text-[10px] font-medium">{person.count} pelis</p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
             </motion.div>
           )}
 
@@ -741,9 +782,9 @@ export default function StatsClient() {
                   <SectionTitle icon={Target} title="Gustos por Género" subtitle="Tus categorías más frecuentes" />
                   <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart cx="50%" cy="50%" outerRadius="70%" data={stats.genreData}>
+                      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={stats.genreData}>
                         <PolarGrid stroke={CHART_THEME.grid} />
-                        <PolarAngleAxis dataKey="name" tick={{ fill: CHART_THEME.text, fontSize: 10 }} />
+                        <PolarAngleAxis dataKey="name" tick={{ fill: CHART_THEME.text, fontSize: 13, fontWeight: 500 }} />
                         <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
                         <Radar
                           name="Géneros"

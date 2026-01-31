@@ -161,6 +161,23 @@ export async function GET() {
 
     const watchedShows = watchedShowsRes.ok ? await watchedShowsRes.json() : [];
 
+    // Calcular estadísticas de géneros a partir de todo el historial visto
+    const genreCounts = {};
+
+    watchedMovies.forEach((item) => {
+      const genres = item.movie?.genres || [];
+      genres.forEach((genre) => {
+        genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+      });
+    });
+
+    watchedShows.forEach((item) => {
+      const genres = item.show?.genres || [];
+      genres.forEach((genre) => {
+        genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+      });
+    });
+
     // Enriquecer series con títulos en español
     const showsWithSpanishTitles = await Promise.all(
       watchedShows.slice(0, 20).map(async (item) => {
@@ -243,6 +260,7 @@ export async function GET() {
     const response = NextResponse.json({
       username,
       stats,
+      genres: genreCounts,
       watchedMovies: moviesWithSpanishTitles,
       watchedShows: showsWithSpanishTitles,
       history,
