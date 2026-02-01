@@ -148,9 +148,9 @@ export async function GET(request) {
         const encodedKey = encodeURIComponent(metadataKey);
         console.log(`[Plex] Encoded key: ${encodedKey}`);
         
-        // Usar la misma URL web para todos los dispositivos
-        // La app móvil de Plex interceptará automáticamente las URLs de app.plex.tv
-        const plexUrl = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
+        // Usar URL directa del servidor con token para que funcione en todos los dispositivos
+        // Esto funciona tanto en navegadores móviles como en la app de Plex
+        const plexUrl = `${PLEX_URL}/web/index.html#!/server/${serverMachineId}/details?key=${encodedKey}&X-Plex-Token=${PLEX_TOKEN}`;
 
         console.log(`[Plex] Match found for "${title}" (${type}):`, {
           title: matchedItem.title,
