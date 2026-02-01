@@ -324,6 +324,11 @@ export default function DetailsClient({
   const [providersLoading, setProvidersLoading] = useState(true);
   const [justwatchUrl, setJustwatchUrl] = useState(null);
 
+  // ====== PLEX INTEGRATION ======
+  const [plexAvailable, setPlexAvailable] = useState(false);
+  const [plexUrl, setPlexUrl] = useState(null);
+  const [plexLoading, setPlexLoading] = useState(true);
+
   const imagesScrollRef = useRef(null);
   const [isHoveredImages, setIsHoveredImages] = useState(false);
   const [canPrevImages, setCanPrevImages] = useState(false);
@@ -4349,9 +4354,108 @@ export default function DetailsClient({
     fetchProviders();
   }, [title, id, endpointType, yearIso, data.imdb_id]);
 
-  const limitedProviders = Array.isArray(streamingProviders)
-    ? streamingProviders.slice(0, 6)
-    : [];
+  // ====== PLEX: Cargar disponibilidad desde servidor local ======
+  useEffect(() => {
+    if (!title || !id) return;
+
+    // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
+    const cacheKey = `plex-v2:${endpointType}:${id}`;
+    const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
+
+    // Intentar cargar desde caché primero
+    const loadFromCache = () => {
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const { available, plexUrl, timestamp } = JSON.parse(cached);
+          const age = Date.now() - timestamp;
+
+          if (age < CACHE_TTL) {
+            setPlexAvailable(available || false);
+            setPlexUrl(plexUrl || null);
+            setPlexLoading(false);
+            return true;
+          }
+        }
+      } catch (error) {
+        console.error("Error loading Plex from cache:", error);
+      }
+      return false;
+    };
+
+    // Si hay caché válido, usarlo y terminar
+    if (loadFromCache()) return;
+
+    // Si no hay caché, hacer la petición
+    const fetchPlex = async () => {
+      setPlexLoading(true);
+      try {
+        const params = new URLSearchParams({
+          title: title,
+          type: endpointType,
+        });
+
+        if (yearIso) {
+          params.append("year", yearIso);
+        }
+
+        if (data.imdb_id) {
+          params.append("imdbId", data.imdb_id);
+        }
+
+        const response = await fetch(`/api/plex?${params.toString()}`);
+
+        if (response.ok) {
+          const result = await response.json();
+          const available = result.available || false;
+          const plexUrl = result.plexUrl || null;
+
+          setPlexAvailable(available);
+          setPlexUrl(plexUrl);
+
+          // Guardar en caché
+          try {
+            sessionStorage.setItem(
+              cacheKey,
+              JSON.stringify({
+                available,
+                plexUrl,
+                timestamp: Date.now(),
+              }),
+            );
+          } catch (error) {
+            console.error("Error saving Plex to cache:", error);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching Plex availability:", error);
+      } finally {
+        setPlexLoading(false);
+      }
+    };
+
+    fetchPlex();
+  }, [title, id, endpointType, yearIso, data.imdb_id]);
+
+  // ====== COMBINAR PROVIDERS: JustWatch + Plex ======
+  const limitedProviders = useMemo(() => {
+    const providers = Array.isArray(streamingProviders)
+      ? [...streamingProviders]
+      : [];
+
+    // Si Plex está disponible, agregarlo al final
+    if (plexAvailable && plexUrl) {
+      providers.push({
+        provider_id: "plex",
+        provider_name: "Plex",
+        logo_path: "/logo-Plex.png",
+        url: plexUrl,
+        isPlex: true,
+      });
+    }
+
+    return providers.slice(0, 6);
+  }, [streamingProviders, plexAvailable, plexUrl]);
 
   // ✅ Refs para gestión de carga de poster (los estados están definidos al inicio)
   const prevDisplayPosterRef = useRef(null);
@@ -4910,6 +5014,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {limitedProviders.map((p) => {
                       const providerLink = p.url || justwatchUrl || "#";
                       const hasValidLink = p.url || justwatchUrl;
+                      const isPlexProvider = p.isPlex === true;
 
                       return (
                         <a
@@ -4924,9 +5029,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             src={
                               p.logo_path?.startsWith("http")
                                 ? p.logo_path
-                                : p.logo_path?.startsWith("/")
-                                  ? `https://image.tmdb.org/t/p/original${p.logo_path}`
-                                  : p.logo_path
+                                : p.logo_path?.startsWith("/logo-")
+                                  ? p.logo_path
+                                  : p.logo_path?.startsWith("/")
+                                    ? `https://image.tmdb.org/t/p/original${p.logo_path}`
+                                    : p.logo_path
                             }
                             alt={p.provider_name}
                             className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5"
@@ -4934,6 +5041,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               e.target.style.display = "none";
                             }}
                           />
+                          {isPlexProvider && (
+                            <div 
+                              className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-black" 
+                              title="Disponible en tu servidor local" 
+                            />
+                          )}
                         </a>
                       );
                     })}

@@ -932,7 +932,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                             onClick={handleToggleTrailer}
                             disabled={trailerLoading}
                             title={showTrailer ? 'Cerrar trailer' : 'Ver trailer'}
-                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-600/80 to-blue-700/80 hover:from-blue-500 hover:to-blue-600 border border-blue-400/30 flex items-center justify-center text-white transition-all duration-200 disabled:opacity-60 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-yellow-500/90 to-yellow-600/90 hover:from-yellow-400 hover:to-yellow-500 border border-yellow-400/40 flex items-center justify-center text-black transition-all duration-200 disabled:opacity-60 shadow-lg shadow-yellow-500/30 hover:shadow-yellow-500/50"
                         >
                             {trailerLoading ? (
                                 <Loader2 className="w-4 h-4 animate-spin text-black" />
@@ -949,18 +949,16 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                             onClick={handleToggleFavorite}
                             disabled={loadingStates || updating}
                             title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center text-white transition-all duration-200 disabled:opacity-60 shadow-lg ${
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
                                 favorite 
-                                    ? 'bg-gradient-to-br from-red-600/80 to-red-700/80 hover:from-red-500 hover:to-red-600 border-red-400/30 shadow-red-500/20 hover:shadow-red-500/40' 
-                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20'
+                                    ? 'bg-gradient-to-br from-red-600/90 to-red-700/90 hover:from-red-500 hover:to-red-600 border-red-400/40 shadow-red-500/30 hover:shadow-red-500/50 text-white' 
+                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white'
                             }`}
                         >
                             {loadingStates || updating ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : favorite ? (
-                                <HeartOff className="w-5 h-5" />
                             ) : (
-                                <Heart className="w-5 h-5" />
+                                <Heart className={`w-5 h-5 ${favorite ? 'fill-current' : ''}`} />
                             )}
                         </motion.button>
 
@@ -970,18 +968,16 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                             onClick={handleToggleWatchlist}
                             disabled={loadingStates || updating}
                             title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
-                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center text-white transition-all duration-200 disabled:opacity-60 shadow-lg ${
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
                                 watchlist
-                                    ? 'bg-gradient-to-br from-blue-600/80 to-blue-700/80 hover:from-blue-500 hover:to-blue-600 border-blue-400/30 shadow-blue-500/20 hover:shadow-blue-500/40'
-                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20'
+                                    ? 'bg-gradient-to-br from-blue-600/90 to-blue-700/90 hover:from-blue-500 hover:to-blue-600 border-blue-400/40 shadow-blue-500/30 hover:shadow-blue-500/50 text-white'
+                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white'
                             }`}
                         >
                             {loadingStates || updating ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : watchlist ? (
-                                <BookmarkMinus className="w-5 h-5" />
                             ) : (
-                                <BookmarkPlus className="w-5 h-5" />
+                                <BookmarkPlus className={`w-5 h-5 ${watchlist ? 'fill-current' : ''}`} />
                             )}
                         </motion.button>
                     </motion.div>
@@ -1285,13 +1281,13 @@ function InlinePreviewCardAnticipated({ movie, heightClass, backdropOverride }) 
                             onClick={handleToggleFavorite}
                             disabled={loadingStates || updating}
                             title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center text-white transition-all duration-200 disabled:opacity-60 shadow-lg ${
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
                                 favorite 
-                                    ? 'bg-gradient-to-br from-red-600/80 to-red-700/80 hover:from-red-500 hover:to-red-600 border-red-400/30 shadow-red-500/20 hover:shadow-red-500/40' 
-                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20'
+                                    ? 'bg-gradient-to-br from-red-600/90 to-red-700/90 hover:from-red-500 hover:to-red-600 border-red-400/40 shadow-red-500/30 hover:shadow-red-500/50 text-white' 
+                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white'
                             }`}
                         >
-                            {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : favorite ? <HeartOff className="w-5 h-5" /> : <Heart className="w-5 h-5" />}
+                            {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className={`w-5 h-5 ${favorite ? 'fill-current' : ''}`} />}
                         </motion.button>
 
                         <motion.button
@@ -1300,13 +1296,13 @@ function InlinePreviewCardAnticipated({ movie, heightClass, backdropOverride }) 
                             onClick={handleToggleWatchlist}
                             disabled={loadingStates || updating}
                             title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
-                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center text-white transition-all duration-200 disabled:opacity-60 shadow-lg ${
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
                                 watchlist
-                                    ? 'bg-gradient-to-br from-blue-600/80 to-blue-700/80 hover:from-blue-500 hover:to-blue-600 border-blue-400/30 shadow-blue-500/20 hover:shadow-blue-500/40'
-                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20'
+                                    ? 'bg-gradient-to-br from-blue-600/90 to-blue-700/90 hover:from-blue-500 hover:to-blue-600 border-blue-400/40 shadow-blue-500/30 hover:shadow-blue-500/50 text-white'
+                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white'
                             }`}
                         >
-                            {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : watchlist ? <BookmarkMinus className="w-5 h-5" /> : <BookmarkPlus className="w-5 h-5" />}
+                            {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookmarkPlus className={`w-5 h-5 ${watchlist ? 'fill-current' : ''}`} />}
                         </motion.button>
                     </motion.div>
                 </div>
