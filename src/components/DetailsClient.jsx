@@ -4410,14 +4410,31 @@ export default function DetailsClient({
           const available = result.available || false;
           const plexUrl = result.plexUrl || null;
           const plexMobileUrl = result.plexMobileUrl || null;
+          const plexMobileFallback = result.plexMobileFallback || null;
 
           setPlexAvailable(available);
           
-          // Detectar si es móvil y usar la URL apropiada
+          // Detectar si es móvil
           const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-          const urlToUse = isMobile && plexMobileUrl ? plexMobileUrl : plexUrl;
           
-          setPlexUrl(urlToUse);
+          if (isMobile && plexMobileUrl) {
+            // Intentar abrir con el esquema plex:// primero
+            // Si falla, usar el fallback después de 1 segundo
+            setPlexUrl(plexMobileUrl);
+            
+            // Configurar fallback
+            if (plexMobileFallback) {
+              const timer = setTimeout(() => {
+                // Si después de 1 segundo no se abrió la app, usar fallback
+                window.location.href = plexMobileFallback;
+              }, 1000);
+              
+              // Limpiar el timer si se abre la app
+              window.addEventListener('blur', () => clearTimeout(timer), { once: true });
+            }
+          } else {
+            setPlexUrl(plexUrl);
+          }
 
           // Guardar en caché
           try {
@@ -4425,7 +4442,7 @@ export default function DetailsClient({
               cacheKey,
               JSON.stringify({
                 available,
-                plexUrl: urlToUse,
+                plexUrl: isMobile && plexMobileUrl ? plexMobileUrl : plexUrl,
                 timestamp: Date.now(),
               }),
             );
