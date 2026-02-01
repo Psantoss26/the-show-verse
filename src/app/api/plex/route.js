@@ -151,8 +151,8 @@ export async function GET(request) {
         // URL para navegador web
         const plexWebUrl = `${PLEX_URL}/web/index.html#!/server/${serverMachineId}/details?key=${encodedKey}&X-Plex-Token=${PLEX_TOKEN}`;
         
-        // Deep link para app móvil usando ratingKey directamente
-        const plexMobileUrl = `https://app.plex.tv/desktop/#!/media/${serverMachineId}/com.plexapp.plugins.library?key=%2Flibrary%2Fmetadata%2F${matchedItem.ratingKey}%26context=home`;
+        // Esquema plex:// para abrir directamente en la app móvil
+        const plexMobileUrl = `plex://details?key=/library/metadata/${matchedItem.ratingKey}`;
 
         console.log(`[Plex] Match found for "${title}" (${type}):`, {
           title: matchedItem.title,
