@@ -148,8 +148,9 @@ export async function GET(request) {
         const encodedKey = encodeURIComponent(metadataKey);
         console.log(`[Plex] Encoded key: ${encodedKey}`);
         
-        // Construir la URL usando el servidor directo con la key codificada
-        const plexWebUrl = `${PLEX_URL}/web/index.html#!/server/${serverMachineId}/details?key=${encodedKey}`;
+        // Usar app.plex.tv que es más confiable y compatible
+        // Este es el mismo formato que se usa cuando accedes manualmente desde el navegador
+        const plexWebUrl = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
 
         console.log(`[Plex] Match found for "${title}" (${type}):`, {
           title: matchedItem.title,
