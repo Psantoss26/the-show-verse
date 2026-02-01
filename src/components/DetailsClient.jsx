@@ -4409,15 +4409,9 @@ export default function DetailsClient({
           const result = await response.json();
           const available = result.available || false;
           const plexUrl = result.plexUrl || null;
-          const plexAppUrl = result.plexAppUrl || null;
 
           setPlexAvailable(available);
-          
-          // Detectar si es móvil para usar la URL de la app
-          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-          const urlToUse = isMobile && plexAppUrl ? plexAppUrl : plexUrl;
-          
-          setPlexUrl(urlToUse);
+          setPlexUrl(plexUrl);
 
           // Guardar en caché
           try {
@@ -4425,7 +4419,7 @@ export default function DetailsClient({
               cacheKey,
               JSON.stringify({
                 available,
-                plexUrl: urlToUse,
+                plexUrl,
                 timestamp: Date.now(),
               }),
             );
