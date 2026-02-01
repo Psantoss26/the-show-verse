@@ -301,6 +301,12 @@ export default function DetailsClient({
   const [posterTransitioning, setPosterTransitioning] = useState(false);
   const [prevPosterPath, setPrevPosterPath] = useState(null);
 
+  // ✅ Estados de carga para backdrop (misma lógica que poster)
+  const [backdropResolved, setBackdropResolved] = useState(false);
+  const [backdropLowLoaded, setBackdropLowLoaded] = useState(false);
+  const [backdropHighLoaded, setBackdropHighLoaded] = useState(false);
+  const [backdropImgError, setBackdropImgError] = useState(false);
+
   const [imagesState, setImagesState] = useState(() => ({
     posters: data.poster_path
       ? [{ file_path: data.poster_path, from: "main" }]
@@ -1241,8 +1247,8 @@ export default function DetailsClient({
             ? window.localStorage.getItem("showverse:global:posterViewMode")
             : null;
 
-          if (savedGlobalMode === "preview" && bestBackdropForPreviewCalc?.file_path) {
-            await preloadTmdb(bestBackdropForPreviewCalc.file_path, "w780");
+          if (savedGlobalMode === "preview" && bestBackdropForPreviewCalc) {
+            await preloadTmdb(bestBackdropForPreviewCalc, "w780");
           }
 
           if (bestPoster?.file_path) {
@@ -4464,30 +4470,95 @@ export default function DetailsClient({
     }
   }, [displayPosterPath]);
 
+  // ✅ Resetear estados de carga del backdrop cuando cambia la vista o la imagen
+  const prevDisplayBackdropRef = useRef(null);
+  const backdropLoadTokenRef = useRef(0);
+  const backdropLoadToken = backdropLoadTokenRef.current;
+
+  useEffect(() => {
+    const prev = prevDisplayBackdropRef.current;
+    prevDisplayBackdropRef.current = previewBackdropPath;
+    backdropLoadTokenRef.current += 1;
+
+    // Solo manejar cuando estamos en modo preview
+    if (posterViewMode === "preview") {
+      if (prev !== previewBackdropPath) {
+        // ✅ Verificar si la nueva imagen ya está precargada
+        if (previewBackdropPath) {
+          const checkIfLoaded = (size) => {
+            const testImg = new Image();
+            testImg.src = `https://image.tmdb.org/t/p/${size}${previewBackdropPath}`;
+            return testImg.complete && testImg.naturalWidth > 0;
+          };
+
+          const isLowPreloaded = checkIfLoaded('w780');
+          const isHighPreloaded = checkIfLoaded('w1280');
+
+          // ✅ Si está precargada, marcar como cargada inmediatamente
+          if (isLowPreloaded) {
+            setBackdropLowLoaded(true);
+            setBackdropHighLoaded(isHighPreloaded);
+            setBackdropResolved(true);
+          } else {
+            setBackdropLowLoaded(false);
+            setBackdropHighLoaded(false);
+          }
+
+          setBackdropImgError(false);
+        } else {
+          // Si previewBackdropPath es null, resetear estados
+          setBackdropLowLoaded(false);
+          setBackdropHighLoaded(false);
+        }
+      }
+    } else {
+      // Si no estamos en modo preview, resetear estados del backdrop
+      setBackdropLowLoaded(false);
+      setBackdropHighLoaded(false);
+      setBackdropImgError(false);
+      setBackdropResolved(false);
+    }
+  }, [previewBackdropPath, posterViewMode]);
+
   const posterAspectIsBackdrop =
     posterTransitioning && prevPosterPath
       ? isBackdropPath(prevPosterPath)
       : isBackdropPoster;
 
-  const posterLowUrl = displayPosterPath
-    ? `https://image.tmdb.org/t/p/w342${displayPosterPath}`
-    : null;
-  const posterHighUrl = displayPosterPath
-    ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
-    : null;
+  // ✅ URLs basadas en el modo de vista
+  const posterLowUrl = posterViewMode === "preview" && previewBackdropPath
+    ? `https://image.tmdb.org/t/p/w780${previewBackdropPath}`
+    : displayPosterPath
+      ? `https://image.tmdb.org/t/p/w342${displayPosterPath}`
+      : null;
+
+  const posterHighUrl = posterViewMode === "preview" && previewBackdropPath
+    ? `https://image.tmdb.org/t/p/w1280${previewBackdropPath}`
+    : displayPosterPath
+      ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
+      : null;
   const posterLoadToken = posterLoadTokenRef.current;
+
+  // ✅ Estados unificados: usar backdrop states si estamos en preview, sino poster states
+  const currentLowLoaded = posterViewMode === "preview" ? backdropLowLoaded : posterLowLoaded;
+  const currentHighLoaded = posterViewMode === "preview" ? backdropHighLoaded : posterHighLoaded;
+  const currentImgError = posterViewMode === "preview" ? backdropImgError : posterImgError;
+  const currentResolved = posterViewMode === "preview" ? backdropResolved : posterResolved;
+  const currentImagePath = posterViewMode === "preview" ? posterLowUrl : displayPosterPath;
+  const currentLoadToken = posterViewMode === "preview" ? backdropLoadToken : posterLoadToken;
+  const currentLoadTokenRef = posterViewMode === "preview" ? backdropLoadTokenRef : posterLoadTokenRef;
 
   // Skeleton mientras:
   // - no hemos “resuelto” si hay poster
   // - o existe poster pero aún no ha cargado el low
   const showPosterSkeleton =
-    !posterResolved ||
-    (displayPosterPath && !posterLowLoaded && !posterImgError);
+    !currentResolved ||
+    (currentImagePath && !currentLowLoaded && !currentImgError);
 
-  // Icono NO IMAGE solo si ya hemos resuelto, NO hay poster (o falló) y NO estamos esperando carga inicial en modo preview
+  // Icono NO IMAGE solo si ya hemos resuelto, NO hay imagen (o falló) y NO estamos esperando carga inicial en modo preview
   const showNoPoster =
-    posterResolved &&
-    (!displayPosterPath || posterImgError) &&
+    currentResolved &&
+    (!currentImagePath || currentImgError) &&
     // Si estamos en preview, esperar a que termine initArtwork antes de declarar "No Image"
     (posterViewMode !== "preview" || artworkInitialized);
 
@@ -4736,7 +4807,7 @@ export default function DetailsClient({
                     {prevPosterPath && posterTransitioning && (
                       <div
                         className="absolute inset-0 transition-opacity duration-500 ease-in-out"
-                        style={{ opacity: posterLowLoaded ? 0 : 1 }}
+                        style={{ opacity: currentLowLoaded ? 0 : 1 }}
                       >
                         <img
                           src={`https://image.tmdb.org/t/p/w780${prevPosterPath}`}
@@ -4749,7 +4820,7 @@ export default function DetailsClient({
                       </div>
                     )}
 
-                    {posterLowUrl && !posterImgError && (
+                    {posterLowUrl && !currentImgError && (
                       <div key={displayPosterPath} className="absolute inset-0">
                         {/* LOW */}
                         <img
@@ -4759,26 +4830,38 @@ export default function DetailsClient({
                           fetchPriority="high"
                           decoding="async"
                           onLoad={() => {
-                            if (posterLoadTokenRef.current !== posterLoadToken)
+                            if (currentLoadTokenRef.current !== currentLoadToken)
                               return;
-                            setPosterLowLoaded(true);
-                            setPosterResolved(true);
+                            // ✅ Usar el setState correcto según el modo
+                            if (posterViewMode === "preview") {
+                              setBackdropLowLoaded(true);
+                              setBackdropResolved(true);
+                            } else {
+                              setPosterLowLoaded(true);
+                              setPosterResolved(true);
+                            }
                           }}
                           onError={() => {
-                            if (posterLoadTokenRef.current !== posterLoadToken)
+                            if (currentLoadTokenRef.current !== currentLoadToken)
                               return;
-                            setPosterImgError(true);
-                            setPosterResolved(true);
+                            // ✅ Usar el setState correcto según el modo
+                            if (posterViewMode === "preview") {
+                              setBackdropImgError(true);
+                              setBackdropResolved(true);
+                            } else {
+                              setPosterImgError(true);
+                              setPosterResolved(true);
+                            }
                           }}
                           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out
-${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"}`}
+${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
                             transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
                           }}
                         />
 
                         {/* HIGH */}
-                        {posterLowLoaded && posterHighUrl && (
+                        {currentLowLoaded && posterHighUrl && (
                           <img
                             src={posterHighUrl}
                             alt={title}
@@ -4787,14 +4870,19 @@ ${posterHighLoaded ? "opacity-0" : posterLowLoaded ? "opacity-100" : "opacity-0"
                             fetchPriority="high"
                             onLoad={() => {
                               if (
-                                posterLoadTokenRef.current !== posterLoadToken
+                                currentLoadTokenRef.current !== currentLoadToken
                               )
                                 return;
-                              setPosterHighLoaded(true);
+                              // ✅ Usar el setState correcto según el modo
+                              if (posterViewMode === "preview") {
+                                setBackdropHighLoaded(true);
+                              } else {
+                                setPosterHighLoaded(true);
+                              }
                             }}
                             onError={() => { }}
                             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out
-${posterHighLoaded ? "opacity-100" : "opacity-0"}`}
+${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
                               transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
                             }}
