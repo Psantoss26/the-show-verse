@@ -150,7 +150,8 @@ export async function GET(request) {
         
         // Generar URLs para web y app móvil
         const plexWebUrl = `https://app.plex.tv/web/index.html#!/server/${serverMachineId}/details?key=${encodedKey}`;
-        const plexAppUrl = `plex://server/${serverMachineId}/details?key=${metadataKey}`;
+        // Formato correcto para abrir detalles en la app móvil de Plex
+        const plexAppUrl = `plex://preplay/?metadataKey=${encodeURIComponent(metadataKey)}&metadataType=0&server=${serverMachineId}`;
 
         console.log(`[Plex] Match found for "${title}" (${type}):`, {
           title: matchedItem.title,
