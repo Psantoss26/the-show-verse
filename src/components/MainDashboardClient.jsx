@@ -1974,7 +1974,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                         <div className={!hydrated ? 'pointer-events-none touch-none' : ''}>
                             <Swiper
                                 key={heroKey}
-                                slidesPerView={isMobile ? 1 : 4}
+                                slidesPerView={isMobile ? 1 : 3}
                                 spaceBetween={isMobile ? 12 : 16}
                                 autoplay={hydrated ? { delay: 5000 } : false}
                                 onSwiper={handleSwiper}
