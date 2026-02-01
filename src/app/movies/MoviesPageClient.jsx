@@ -1070,10 +1070,18 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     if (isTop10 && isMobile) {
         return (
             <div className="relative group">
-                {/* Título para Top 10 móvil */}
-                <h3 className="text-xl font-semibold mb-4 px-4">
-                    TOP 10
-                </h3>
+                {/* Título para Top 10 móvil con diseño igual a escritorio */}
+                <div className="mb-4 px-1 sm:px-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <div className="h-px w-8 bg-emerald-500" />
+                        <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+                            TOP 10
+                        </span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+                        Top 10 hoy en España<span className="text-emerald-500">.</span>
+                    </h3>
+                </div>
                 <Swiper
                     slidesPerView={1}
                     spaceBetween={14}
