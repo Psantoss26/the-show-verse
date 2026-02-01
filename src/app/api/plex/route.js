@@ -148,11 +148,13 @@ export async function GET(request) {
         const encodedKey = encodeURIComponent(metadataKey);
         console.log(`[Plex] Encoded key: ${encodedKey}`);
         
-        // URL para navegador web
-        const plexWebUrl = `${PLEX_URL}/web/index.html#!/server/${serverMachineId}/details?key=${encodedKey}&X-Plex-Token=${PLEX_TOKEN}`;
+        // URL para navegador web (desktop)
+        const plexWebUrl = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
         
-        // Esquema plex:// para abrir directamente en la app móvil
-        const plexMobileUrl = `plex://details?key=/library/metadata/${matchedItem.ratingKey}`;
+        // Para móvil, generar una URL que intente múltiples métodos de apertura
+        // Primero intenta el esquema plex://, luego fallback a app.plex.tv
+        const plexMobileUrl = `plex://server/${serverMachineId}/details?key=${metadataKey}`;
+        const plexMobileFallback = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
 
         console.log(`[Plex] Match found for "${title}" (${type}):`, {
           title: matchedItem.title,
@@ -163,6 +165,7 @@ export async function GET(request) {
           encodedKey,
           plexWebUrl,
           plexMobileUrl,
+          plexMobileFallback,
         });
 
         return NextResponse.json(
@@ -170,6 +173,7 @@ export async function GET(request) {
             available: true,
             plexUrl: plexWebUrl,
             plexMobileUrl: plexMobileUrl,
+            plexMobileFallback: plexMobileFallback,
             title: matchedItem.title,
             year: matchedItem.year,
             ratingKey: matchedItem.ratingKey,
