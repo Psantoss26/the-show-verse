@@ -4408,24 +4408,28 @@ export default function DetailsClient({
         if (response.ok) {
           const result = await response.json();
           const available = result.available || false;
-          const plexUrl = result.plexUrl || null;
+          const plexWebUrl = result.plexUrl || null;
           const plexMobileUrl = result.plexMobileUrl || null;
 
           setPlexAvailable(available);
           
-          // Detectar si es móvil y usar deep link directo a la app
-          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-          const urlToUse = isMobile && plexMobileUrl ? plexMobileUrl : plexUrl;
-          
-          setPlexUrl(urlToUse);
+          // Guardar ambas URLs en el estado como objeto
+          // La lógica de selección se hará al hacer clic
+          setPlexUrl({
+            web: plexWebUrl,
+            mobile: plexMobileUrl,
+          });
 
-          // Guardar en caché
+          // Guardar en caché ambas URLs
           try {
             sessionStorage.setItem(
               cacheKey,
               JSON.stringify({
                 available,
-                plexUrl: urlToUse,
+                plexUrl: {
+                  web: plexWebUrl,
+                  mobile: plexMobileUrl,
+                },
                 timestamp: Date.now(),
               }),
             );
@@ -4455,7 +4459,7 @@ export default function DetailsClient({
         provider_id: "plex",
         provider_name: "Plex",
         logo_path: "/logo-Plex.png",
-        url: plexUrl,
+        url: plexUrl, // Objeto con {web, mobile}
         isPlex: true,
       });
     }
@@ -5018,18 +5022,63 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {limitedProviders && limitedProviders.length > 0 && (
                   <div className="flex flex-row flex-nowrap items-center gap-2">
                     {limitedProviders.map((p) => {
-                      const providerLink = p.url || justwatchUrl || "#";
-                      const hasValidLink = p.url || justwatchUrl;
                       const isPlexProvider = p.isPlex === true;
+                      
+                      // Para Plex, manejar las URLs de forma especial
+                      let providerLink;
+                      let hasValidLink;
+                      
+                      if (isPlexProvider && p.url && typeof p.url === 'object') {
+                        // Para Plex, usar # como href ya que manejaremos el click con onClick
+                        providerLink = "#";
+                        hasValidLink = !!(p.url.web || p.url.mobile);
+                      } else {
+                        providerLink = p.url || justwatchUrl || "#";
+                        hasValidLink = p.url || justwatchUrl;
+                      }
+
+                      const handleClick = (e) => {
+                        if (isPlexProvider && p.url && typeof p.url === 'object') {
+                          e.preventDefault();
+                          
+                          // Detectar dispositivo táctil de forma robusta
+                          const isTouchDevice = (
+                            ('ontouchstart' in window) ||
+                            (navigator.maxTouchPoints > 0) ||
+                            (navigator.msMaxTouchPoints > 0)
+                          );
+                          
+                          // Seleccionar URL apropiada
+                          const urlToOpen = isTouchDevice && p.url.mobile 
+                            ? p.url.mobile 
+                            : p.url.web;
+                          
+                          if (!urlToOpen) {
+                            console.warn('[Plex] No URL available');
+                            return;
+                          }
+                          
+                          // En dispositivos táctiles, usar window.location.href para activar deep links
+                          // En escritorio, usar window.open para nueva pestaña
+                          if (isTouchDevice) {
+                            console.log('[Plex] Opening mobile app:', urlToOpen);
+                            window.location.href = urlToOpen;
+                          } else {
+                            console.log('[Plex] Opening web browser:', urlToOpen);
+                            window.open(urlToOpen, '_blank', 'noopener,noreferrer');
+                          }
+                        }
+                      };
 
                       return (
                         <a
                           key={p.provider_id}
                           href={providerLink}
-                          target={hasValidLink ? "_blank" : undefined}
-                          rel={hasValidLink ? "noreferrer" : undefined}
+                          target={hasValidLink && !isPlexProvider ? "_blank" : undefined}
+                          rel={hasValidLink && !isPlexProvider ? "noreferrer" : undefined}
+                          onClick={isPlexProvider ? handleClick : undefined}
                           title={p.provider_name}
-                          className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
+                          className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10 cursor-pointer"
                         >
                           <img
                             src={
