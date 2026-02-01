@@ -4358,8 +4358,8 @@ export default function DetailsClient({
   useEffect(() => {
     if (!title || !id) return;
 
-    // Cambiar clave de caché para forzar recarga con app.plex.tv
-    const cacheKey = `plex-v3:${endpointType}:${id}`;
+    // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
+    const cacheKey = `plex-v4:${endpointType}:${id}`;
     const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
 
     // Intentar cargar desde caché primero
@@ -4409,9 +4409,15 @@ export default function DetailsClient({
           const result = await response.json();
           const available = result.available || false;
           const plexUrl = result.plexUrl || null;
+          const plexAppUrl = result.plexAppUrl || null;
 
           setPlexAvailable(available);
-          setPlexUrl(plexUrl);
+          
+          // Detectar si es móvil para usar la URL de la app
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          const urlToUse = isMobile && plexAppUrl ? plexAppUrl : plexUrl;
+          
+          setPlexUrl(urlToUse);
 
           // Guardar en caché
           try {
@@ -4419,7 +4425,7 @@ export default function DetailsClient({
               cacheKey,
               JSON.stringify({
                 available,
-                plexUrl,
+                plexUrl: urlToUse,
                 timestamp: Date.now(),
               }),
             );
