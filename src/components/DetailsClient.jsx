@@ -4359,7 +4359,7 @@ export default function DetailsClient({
     if (!title || !id) return;
 
     // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
-    const cacheKey = `plex-v5:${endpointType}:${id}`;
+    const cacheKey = `plex-v6:${endpointType}:${id}`;
     const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
 
     // Intentar cargar desde caché primero
@@ -4409,9 +4409,15 @@ export default function DetailsClient({
           const result = await response.json();
           const available = result.available || false;
           const plexUrl = result.plexUrl || null;
+          const plexMobileUrl = result.plexMobileUrl || null;
 
           setPlexAvailable(available);
-          setPlexUrl(plexUrl);
+          
+          // Detectar si es móvil y usar deep link directo a la app
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          const urlToUse = isMobile && plexMobileUrl ? plexMobileUrl : plexUrl;
+          
+          setPlexUrl(urlToUse);
 
           // Guardar en caché
           try {
@@ -4419,7 +4425,7 @@ export default function DetailsClient({
               cacheKey,
               JSON.stringify({
                 available,
-                plexUrl,
+                plexUrl: urlToUse,
                 timestamp: Date.now(),
               }),
             );
