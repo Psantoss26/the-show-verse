@@ -148,10 +148,9 @@ export async function GET(request) {
         const encodedKey = encodeURIComponent(metadataKey);
         console.log(`[Plex] Encoded key: ${encodedKey}`);
         
-        // Generar URLs para web y app móvil
-        const plexWebUrl = `https://app.plex.tv/web/index.html#!/server/${serverMachineId}/details?key=${encodedKey}`;
-        // Formato correcto para abrir detalles en la app móvil de Plex
-        const plexAppUrl = `plex://preplay/?metadataKey=${encodeURIComponent(metadataKey)}&metadataType=0&server=${serverMachineId}`;
+        // Usar la misma URL web para todos los dispositivos
+        // La app móvil de Plex interceptará automáticamente las URLs de app.plex.tv
+        const plexUrl = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
 
         console.log(`[Plex] Match found for "${title}" (${type}):`, {
           title: matchedItem.title,
@@ -160,15 +159,13 @@ export async function GET(request) {
           originalKey: matchedItem.key,
           cleanedKey: metadataKey,
           encodedKey,
-          plexWebUrl,
-          plexAppUrl,
+          plexUrl,
         });
 
         return NextResponse.json(
           {
             available: true,
-            plexUrl: plexWebUrl,
-            plexAppUrl: plexAppUrl,
+            plexUrl: plexUrl,
             title: matchedItem.title,
             year: matchedItem.year,
             ratingKey: matchedItem.ratingKey,
