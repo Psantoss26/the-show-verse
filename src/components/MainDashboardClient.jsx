@@ -1934,6 +1934,24 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
             transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
             className="relative group mb-10 sm:mb-14"
         >
+            {/* Título de la sección */}
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                className="mb-5 px-1 sm:px-0"
+            >
+                <div className="flex items-center gap-2 mb-1.5">
+                    <div className="h-px w-8 bg-emerald-500" />
+                    <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+                        DESTACADAS
+                    </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+                    Mejores valoradas<span className="text-emerald-500">.</span>
+                </h3>
+            </motion.div>
+
             <div
                 className="relative"
                 onMouseEnter={() => setIsHoveredHero(true)}
@@ -1960,7 +1978,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                         <div className={!hydrated ? 'pointer-events-none touch-none' : ''}>
                             <Swiper
                                 key={heroKey}
-                                slidesPerView={isMobile ? 1 : 3}
+                                slidesPerView={isMobile ? 1 : 4}
                                 spaceBetween={isMobile ? 12 : 16}
                                 autoplay={hydrated ? { delay: 5000 } : false}
                                 onSwiper={handleSwiper}
@@ -1979,7 +1997,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                 className="group relative"
                                 breakpoints={{
                                     0: { slidesPerView: 1, spaceBetween: 12 },
-                                    1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 }
+                                    1024: { slidesPerView: isMobile ? 1 : 4, spaceBetween: 16 }
                                 }}
                             >
                                 {items.map((movie) => {
