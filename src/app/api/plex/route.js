@@ -148,9 +148,11 @@ export async function GET(request) {
         const encodedKey = encodeURIComponent(metadataKey);
         console.log(`[Plex] Encoded key: ${encodedKey}`);
         
-        // URL universal para todos los dispositivos
-        // Los navegadores móviles mostrarán automáticamente un prompt para abrir en la app
-        const plexUrl = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
+        // URL para navegador web
+        const plexWebUrl = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
+        
+        // Deep link directo para app móvil usando ratingKey
+        const plexMobileUrl = `plex://details?metadataId=${matchedItem.ratingKey}`;
 
         console.log(`[Plex] Match found for "${title}" (${type}):`, {
           title: matchedItem.title,
@@ -159,13 +161,15 @@ export async function GET(request) {
           originalKey: matchedItem.key,
           cleanedKey: metadataKey,
           encodedKey,
-          plexUrl,
+          plexWebUrl,
+          plexMobileUrl,
         });
 
         return NextResponse.json(
           {
             available: true,
-            plexUrl: plexUrl,
+            plexUrl: plexWebUrl,
+            plexMobileUrl: plexMobileUrl,
             title: matchedItem.title,
             year: matchedItem.year,
             ratingKey: matchedItem.ratingKey,
