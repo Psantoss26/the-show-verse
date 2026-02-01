@@ -148,13 +148,41 @@ export const pickBestBackdropTVNeutralFirst = (backs) => {
     return best?.file_path || null
 }
 
-export const pickBestBackdropForPreview = (backs) => {
-    const all = Array.isArray(backs) ? backs : []
-    if (!all.length) return null
+export const pickBestBackdropForPreview = (list, opts = {}) => {
+    const { preferLangs = ['en', 'en-US'], minWidth = 1200 } = opts
+    if (!Array.isArray(list) || list.length === 0) return null
 
-    const allowed = new Set(['es', 'en'])
-    const langBacks = all.filter((img) => allowed.has((img?.iso_639_1 || '').toLowerCase()))
+    // normaliza a 'en'
+    const norm = (v) => (v ? String(v).toLowerCase().split('-')[0] : null)
+    const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean))
+    const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1))
 
-    const best = pickBestImage(langBacks.length ? langBacks : all)
-    return best?.file_path || null
+    // Mantener orden + minWidth (si no hay, cae al original)
+    const pool0 = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
+    const pool = pool0.length ? pool0 : list
+
+    // ✅ SOLO 3 primeras EN (en orden). Si no hay EN, devolvemos null (siempre EN)
+    const top3en = []
+    for (const b of pool) {
+        if (isPreferredLang(b)) top3en.push(b)
+        if (top3en.length === 3) break
+    }
+    if (!top3en.length) return null
+
+    const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h
+
+    // Prioridades: 1920x1080, 2560x1440, 3840x2160, 1280x720, y si no la primera EN
+    const b1080 = top3en.find((b) => isRes(b, 1920, 1080))
+    if (b1080) return b1080.file_path
+
+    const b1440 = top3en.find((b) => isRes(b, 2560, 1440))
+    if (b1440) return b1440.file_path
+
+    const b4k = top3en.find((b) => isRes(b, 3840, 2160))
+    if (b4k) return b4k.file_path
+
+    const b720 = top3en.find((b) => isRes(b, 1280, 720))
+    if (b720) return b720.file_path
+
+    return top3en[0]?.file_path || null
 }

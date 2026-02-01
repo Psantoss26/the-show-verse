@@ -1,10 +1,10 @@
 // /src/components/MainDashboardClient.jsx
 'use client'
 
-import { useRef, useEffect, useState, useMemo } from 'react'
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Navigation, Autoplay } from 'swiper'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useInView } from 'framer-motion'
 import 'swiper/swiper-bundle.css'
 import Link from 'next/link'
 import { Anton } from 'next/font/google'
@@ -33,6 +33,47 @@ import { fetchOmdbByImdb } from '@/lib/api/omdb'
 import { fetchArtworkOverrides } from '@/lib/artworkApi'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
+
+/* =================== ANIMATION VARIANTS =================== */
+const fadeInUp = {
+    hidden: { opacity: 0, y: 40 },
+    visible: { 
+        opacity: 1, 
+        y: 0,
+        transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
+    }
+}
+
+const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1,
+            delayChildren: 0.1
+        }
+    }
+}
+
+const scaleIn = {
+    hidden: { opacity: 0, scale: 0.95 },
+    visible: { 
+        opacity: 1, 
+        scale: 1,
+        transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] }
+    }
+}
+
+const shimmer = {
+    animate: {
+        backgroundPosition: ['200% 0', '-200% 0'],
+        transition: {
+            duration: 8,
+            ease: 'linear',
+            repeat: Infinity
+        }
+    }
+}
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
 const useIsMobileLayout = (breakpointPx = 768) => {
@@ -411,27 +452,44 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
 
     if (!ready || !posterPath) {
         return (
-            // CAMBIO: rounded-3xl -> rounded-lg
-            <div className={`w-full ${boxClass} rounded-lg bg-neutral-800 animate-pulse`} />
+            <div className={`relative w-full ${boxClass} rounded-lg overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900`}>
+                <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                    variants={shimmer}
+                    animate="animate"
+                    style={{ backgroundSize: '200% 100%' }}
+                />
+            </div>
         )
     }
 
     if (!isMobile) {
         return (
-            // CAMBIO: rounded-3xl -> rounded-lg
-            <img
-                src={buildImg(posterPath, 'w342')}
-                alt={movie.title || movie.name}
-                className={`w-full ${boxClass} object-cover rounded-lg`}
-                loading="lazy"
-                decoding="async"
-            />
+            <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+                className="relative group/poster w-full h-full"
+            >
+                <img
+                    src={buildImg(posterPath, 'w342')}
+                    alt={movie.title || movie.name}
+                    className={`w-full ${boxClass} object-cover rounded-lg transition-all duration-300 group-hover/poster:shadow-2xl group-hover/poster:shadow-white/10`}
+                    loading="lazy"
+                    decoding="async"
+                />
+                <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover/poster:opacity-100 transition-opacity duration-300" />
+            </motion.div>
         )
     }
 
     return (
-        // CAMBIO: rounded-3xl -> rounded-lg
-        <div className={`relative w-full ${boxClass} rounded-lg overflow-hidden bg-neutral-900`}>
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className={`relative w-full ${boxClass} rounded-lg overflow-hidden bg-neutral-900 shadow-lg`}
+        >
             <img
                 src={buildImg(posterPath, 'w342')}
                 alt=""
@@ -447,7 +505,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
                 loading="lazy"
                 decoding="async"
             />
-        </div>
+        </motion.div>
     )
 }
 
@@ -734,16 +792,26 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
             : null
 
     return (
-        <div
-            // CAMBIO: rounded-3xl -> rounded-lg
-            className={`rounded-lg overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className={`rounded-lg overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-950 to-black text-white shadow-2xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer ring-1 ring-white/5 hover:ring-white/10 transition-all duration-300`}
             onClick={() => {
                 window.location.href = href
             }}
         >
             <div className="relative w-full h-full bg-black">
                 {!showTrailer && !backdropReady && (
-                    <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
+                    <div className="relative w-full h-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 overflow-hidden">
+                        <motion.div
+                            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                            variants={shimmer}
+                            animate="animate"
+                            style={{ backgroundSize: '200% 100%' }}
+                        />
+                    </div>
                 )}
 
                 {!showTrailer && backdropReady && bgSrc && (
@@ -796,13 +864,16 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                     </>
                 )}
 
-                <div
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-2
-                      bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95"
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-24
+                      bg-gradient-to-b from-transparent via-black/60 to-black/95"
                 />
             </div>
 
-            <div className="w-full h-full bg-neutral-950/95 border-t border-neutral-800">
+            <div className="w-full h-full bg-gradient-to-br from-neutral-950/98 to-black/98 border-t border-white/5 backdrop-blur-sm">
                 <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
                     <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
@@ -849,27 +920,40 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                         {error && <p className="mt-1 text-[11px] text-red-400 line-clamp-1">{error}</p>}
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                        <button
+                    <motion.div 
+                        className="flex items-center gap-2 sm:gap-3 flex-shrink-0"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 }}
+                    >
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={handleToggleTrailer}
                             disabled={trailerLoading}
                             title={showTrailer ? 'Cerrar trailer' : 'Ver trailer'}
-                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-600/80 to-blue-700/80 hover:from-blue-500 hover:to-blue-600 border border-blue-400/30 flex items-center justify-center text-white transition-all duration-200 disabled:opacity-60 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
                         >
                             {trailerLoading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <Loader2 className="w-4 h-4 animate-spin text-black" />
                             ) : showTrailer ? (
-                                <X className="w-5 h-5" />
+                                <X className="w-5 h-5 text-black" />
                             ) : (
-                                <Play className="w-5 h-5" />
+                                <Play className="w-5 h-5 ml-0.5 text-black" />
                             )}
-                        </button>
+                        </motion.button>
 
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={handleToggleFavorite}
                             disabled={loadingStates || updating}
                             title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center text-white transition-all duration-200 disabled:opacity-60 shadow-lg ${
+                                favorite 
+                                    ? 'bg-gradient-to-br from-red-600/80 to-red-700/80 hover:from-red-500 hover:to-red-600 border-red-400/30 shadow-red-500/20 hover:shadow-red-500/40' 
+                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20'
+                            }`}
                         >
                             {loadingStates || updating ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -878,13 +962,19 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                             ) : (
                                 <Heart className="w-5 h-5" />
                             )}
-                        </button>
+                        </motion.button>
 
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={handleToggleWatchlist}
                             disabled={loadingStates || updating}
                             title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
-                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center text-white transition-all duration-200 disabled:opacity-60 shadow-lg ${
+                                watchlist
+                                    ? 'bg-gradient-to-br from-blue-600/80 to-blue-700/80 hover:from-blue-500 hover:to-blue-600 border-blue-400/30 shadow-blue-500/20 hover:shadow-blue-500/40'
+                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20'
+                            }`}
                         >
                             {loadingStates || updating ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -893,11 +983,11 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                             ) : (
                                 <BookmarkPlus className="w-5 h-5" />
                             )}
-                        </button>
-                    </div>
+                        </motion.button>
+                    </motion.div>
                 </div>
             </div>
-        </div>
+        </motion.div>
     )
 }
 
@@ -1101,8 +1191,12 @@ function InlinePreviewCardAnticipated({ movie, heightClass, backdropOverride }) 
     const releaseText = release ? new Date(release).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : (yearOf(movie) || '—')
 
     return (
-        <div
-            className={`rounded-lg overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className={`rounded-lg overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-950 to-black text-white shadow-2xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer ring-1 ring-white/5 hover:ring-white/10 transition-all duration-300`}
             onClick={() => { window.location.href = href }}
         >
             <div className="relative w-full h-full bg-black">
@@ -1141,10 +1235,15 @@ function InlinePreviewCardAnticipated({ movie, heightClass, backdropOverride }) 
                     </>
                 )}
 
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2 bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95" />
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/60 to-black/95"
+                />
             </div>
 
-            <div className="w-full h-full bg-neutral-950/95 border-t border-neutral-800">
+            <div className="w-full h-full bg-gradient-to-br from-neutral-950/98 to-black/98 border-t border-white/5 backdrop-blur-sm">
                 <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
                     <div className="min-w-0 flex-1">
                         {/* ✅ META NUEVA SOLO PARA MÁS ESPERADAS */}
@@ -1163,37 +1262,56 @@ function InlinePreviewCardAnticipated({ movie, heightClass, backdropOverride }) 
                         {error && <p className="mt-1 text-[11px] text-red-400 line-clamp-1">{error}</p>}
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                        <button
+                    <motion.div 
+                        className="flex items-center gap-2 sm:gap-3 flex-shrink-0"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 }}
+                    >
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={handleToggleTrailer}
                             disabled={trailerLoading}
                             title={showTrailer ? 'Cerrar trailer' : 'Ver trailer'}
-                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-yellow-500/90 to-yellow-600/90 hover:from-yellow-400 hover:to-yellow-500 border border-yellow-400/40 flex items-center justify-center text-black transition-all duration-200 disabled:opacity-60 shadow-lg shadow-yellow-500/30 hover:shadow-yellow-500/50"
                         >
-                            {trailerLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : showTrailer ? <X className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                        </button>
+                            {trailerLoading ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : showTrailer ? <X className="w-5 h-5 text-black" /> : <Play className="w-5 h-5 ml-0.5 text-black" />}
+                        </motion.button>
 
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={handleToggleFavorite}
                             disabled={loadingStates || updating}
                             title={favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center text-white transition-all duration-200 disabled:opacity-60 shadow-lg ${
+                                favorite 
+                                    ? 'bg-gradient-to-br from-red-600/80 to-red-700/80 hover:from-red-500 hover:to-red-600 border-red-400/30 shadow-red-500/20 hover:shadow-red-500/40' 
+                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20'
+                            }`}
                         >
                             {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : favorite ? <HeartOff className="w-5 h-5" /> : <Heart className="w-5 h-5" />}
-                        </button>
+                        </motion.button>
 
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={handleToggleWatchlist}
                             disabled={loadingStates || updating}
                             title={watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
-                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-700/70 hover:bg-neutral-600/90 border border-neutral-600/60 flex items-center justify-center text-white transition-colors disabled:opacity-60"
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center text-white transition-all duration-200 disabled:opacity-60 shadow-lg ${
+                                watchlist
+                                    ? 'bg-gradient-to-br from-blue-600/80 to-blue-700/80 hover:from-blue-500 hover:to-blue-600 border-blue-400/30 shadow-blue-500/20 hover:shadow-blue-500/40'
+                                    : 'bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20'
+                            }`}
                         >
                             {loadingStates || updating ? <Loader2 className="w-4 h-4 animate-spin" /> : watchlist ? <BookmarkMinus className="w-5 h-5" /> : <BookmarkPlus className="w-5 h-5" />}
-                        </button>
-                    </div>
+                        </motion.button>
+                    </motion.div>
                 </div>
             </div>
-        </div>
+        </motion.div>
     )
 }
 
@@ -1212,11 +1330,67 @@ function Row({
 }) {
     if (!items || items.length === 0) return null
 
+    // ✅ Detectar si es una fila de género específico
+    const isGenreRow = ![
+        'Recomendado',
+        'Tendencias (Trakt)',
+        'Más esperadas',
+        'Populares',
+        'Tendencias semanales',
+        'Taquillazos imprescindibles',
+        'Premiadas y nominadas',
+        'Historias de venganza',
+        'Populares en EE.UU.',
+        'Películas de culto',
+        'Infravaloradas',
+        'En ascenso',
+        'Recomendadas para ti'
+    ].includes(title) && !title.includes('década') && !title.includes('Clásicos') && !title.includes('Favoritas') && !title.includes('Hits')
+
+    // ✅ Determinar etiqueta específica según el título
+    let labelText = null
+    if (title === 'Más esperadas') {
+        labelText = 'ANTICIPADAS'
+    } else if (title === 'Populares') {
+        labelText = 'POPULARES'
+    } else if (title === 'Tendencias semanales') {
+        labelText = 'TENDENCIAS'
+    } else if (isGenreRow) {
+        labelText = 'GÉNERO'
+    }
+
     const swiperRef = useRef(null)
+    const rowRef = useRef(null)
     const [isHoveredRow, setIsHoveredRow] = useState(false)
     const [canPrev, setCanPrev] = useState(false)
     const [canNext, setCanNext] = useState(false)
     const [hoveredId, setHoveredId] = useState(null)
+    const [hoveredIndex, setHoveredIndex] = useState(null)
+    const isInView = useInView(rowRef, { once: true, margin: '-100px' })
+    const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set())
+
+    // Precargar backdrops cuando el usuario está sobre la fila
+    useEffect(() => {
+        if (!isHoveredRow || !items || isMobile) return
+
+        const preloadBackdrops = async () => {
+            const toPreload = items.slice(0, 5).filter(m => !preloadedBackdrops.has(m.id))
+            
+            for (const movie of toPreload) {
+                const backdropOverride = backdropOverrides?.[movie.id]
+                const backdropPath = backdropOverride || movie.backdrop_path
+                
+                if (backdropPath) {
+                    const img = new Image()
+                    img.src = buildImg(backdropPath, 'w1280')
+                    setPreloadedBackdrops(prev => new Set([...prev, movie.id]))
+                }
+            }
+        }
+
+        const timer = setTimeout(preloadBackdrops, 300)
+        return () => clearTimeout(timer)
+    }, [isHoveredRow, items, isMobile, backdropOverrides, preloadedBackdrops])
 
     const hasActivePreview = !!hoveredId
     const heightClassDesktop = 'h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]'
@@ -1239,7 +1413,11 @@ function Row({
         e.stopPropagation()
         const swiper = swiperRef.current
         if (!swiper) return
-        swiper.slidePrev()
+        // Avanzar 3 slides en lugar de 1 para desktop
+        const slidesToMove = isMobile ? 1 : 3
+        for (let i = 0; i < slidesToMove; i++) {
+            swiper.slidePrev()
+        }
     }
 
     const handleNextClick = (e) => {
@@ -1247,7 +1425,11 @@ function Row({
         e.stopPropagation()
         const swiper = swiperRef.current
         if (!swiper) return
-        swiper.slideNext()
+        // Avanzar 3 slides en lugar de 1 para desktop
+        const slidesToMove = isMobile ? 1 : 3
+        for (let i = 0; i < slidesToMove; i++) {
+            swiper.slideNext()
+        }
     }
 
     const showPrev = (isHoveredRow || hasActivePreview) && canPrev
@@ -1264,10 +1446,29 @@ function Row({
     const swiperKey = `${title}-${hydrated ? 'h' : 's'}-${isMobile ? 'm' : 'd'}`
 
     return (
-        <div className="relative group">
-            <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-100 mb-4 px-1 sm:px-0 tracking-tight">
-                {title}
-            </h3>
+        <motion.div 
+            ref={rowRef}
+            initial="hidden"
+            animate={isInView ? "visible" : "hidden"}
+            variants={fadeInUp}
+            className="relative group"
+        >
+            <motion.div
+                variants={scaleIn}
+                className="mb-5 px-1 sm:px-0"
+            >
+                {labelText && (
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <div className="h-px w-8 bg-emerald-500" />
+                        <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+                            {labelText}
+                        </span>
+                    </div>
+                )}
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+                    {title}<span className="text-emerald-500">.</span>
+                </h3>
+            </motion.div>
 
             <div
                 className="relative"
@@ -1301,6 +1502,9 @@ function Row({
                         {items.map((m, i) => {
                             const isActive = hydrated && !isMobile && hoveredId === m.id
                             const isLast = i === items.length - 1
+                            const isSecondToLast = i === items.length - 2
+                            const isThirdToLast = i === items.length - 3
+                            const isNearEnd = isLast || isSecondToLast || isThirdToLast
 
                             const base = 'relative flex-shrink-0 transition-all duration-300 ease-in-out'
 
@@ -1310,10 +1514,26 @@ function Row({
                                     ? 'w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20'
                                     : 'w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10'
 
-                            const transformClass =
-                                !isMobile && isActive && isLast
-                                    ? 'sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]'
-                                    : ''
+                            // Determinar si el item activo está cerca del borde y calcular transformación
+                            let transformClass = ''
+                            if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0) {
+                                const activeIndex = hoveredIndex
+                                const totalItems = items.length
+                                
+                                // Si el item activo está en los últimos 3 items, desplazar todo hacia la izquierda
+                                if (activeIndex >= totalItems - 3) {
+                                    if (i <= activeIndex) {
+                                        // Items antes o igual al activo se desplazan a la izquierda
+                                        if (activeIndex === totalItems - 1) {
+                                            transformClass = 'sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]'
+                                        } else if (activeIndex === totalItems - 2) {
+                                            transformClass = 'sm:-translate-x-[130px] md:-translate-x-[180px] xl:-translate-x-[200px]'
+                                        } else if (activeIndex === totalItems - 3) {
+                                            transformClass = 'sm:-translate-x-[65px] md:-translate-x-[90px] xl:-translate-x-[100px]'
+                                        }
+                                    }
+                                }
+                            }
 
                             const hasPosterOverride = Object.prototype.hasOwnProperty.call(posterOverrides || {}, m.id)
                             const hasBackdropOverride = Object.prototype.hasOwnProperty.call(backdropOverrides || {}, m.id)
@@ -1337,21 +1557,28 @@ function Row({
                             return (
                                 <SwiperSlide key={m.id} className={isMobile ? 'select-none' : '!w-auto select-none'}>
                                     <div
-                                        className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass}`}
+                                        className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass} ${isActive ? 'overflow-visible' : 'overflow-hidden'}`}
                                         onMouseEnter={() => {
-                                            if (!isMobile) setHoveredId(m.id)
+                                            if (!isMobile) {
+                                                setHoveredId(m.id)
+                                                setHoveredIndex(i)
+                                            }
                                         }}
-                                        onMouseLeave={() => setHoveredId((prev) => (prev === m.id ? null : prev))}
+                                        onMouseLeave={() => {
+                                            setHoveredId((prev) => (prev === m.id ? null : prev))
+                                            setHoveredIndex(null)
+                                        }}
                                     >
-                                        <AnimatePresence initial={false} mode="wait">
+                                        <AnimatePresence initial={false} mode="popLayout">
                                             {isActive ? (
                                                 <motion.div
                                                     key="preview"
                                                     initial={{ opacity: 0, scale: 0.98 }}
                                                     animate={{ opacity: 1, scale: 1 }}
-                                                    exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
-                                                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                                                    exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.12 } }}
+                                                    transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
                                                     className="w-full h-full hidden sm:block"
+                                                    style={{ willChange: 'transform, opacity' }}
                                                 >
                                                     {/* ✅ 4C: preview por tipo */}
                                                     {previewKind === 'anticipated' ? (
@@ -1371,11 +1598,12 @@ function Row({
                                             ) : (
                                                 <motion.div
                                                     key="poster"
-                                                    initial={{ opacity: 0, scale: 0.98 }}
+                                                    initial={{ opacity: 0, scale: 0.95 }}
                                                     animate={{ opacity: 1, scale: 1 }}
-                                                    exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
-                                                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                                                    exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.12 } }}
+                                                    transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
                                                     className="w-full h-full"
+                                                    style={{ willChange: 'transform, opacity' }}
                                                 >
                                                     <Link href={`/details/movie/${m.id}`}>
                                                         <PosterImage
@@ -1396,44 +1624,92 @@ function Row({
                     </Swiper>
                 </div>
 
-                {showPrev && !isMobile && (
-                    <button
-                        type="button"
-                        onClick={handlePrevClick}
-                        className="absolute inset-y-0 left-0 w-28 z-30
-              hidden sm:flex items-center justify-start
-              bg-gradient-to-r from-black/80 via-black/55 to-transparent
-              hover:from-black/95 hover:via-black/75
-              transition-colors pointer-events-auto"
-                    >
-                        <span className="ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
-                            ‹
-                        </span>
-                    </button>
-                )}
+                <AnimatePresence>
+                    {showPrev && !isMobile && (
+                        <motion.button
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            type="button"
+                            onClick={handlePrevClick}
+                            className="absolute inset-y-0 left-0 w-32 z-30
+                  hidden sm:flex items-center justify-start
+                  bg-gradient-to-r from-black/90 via-black/70 to-transparent
+                  hover:from-black/95 hover:via-black/80
+                  transition-all duration-300 pointer-events-auto group/nav"
+                        >
+                            <motion.span 
+                                className="ml-6 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                                whileHover={{ x: -4 }}
+                            >
+                                ‹
+                            </motion.span>
+                        </motion.button>
+                    )}
+                </AnimatePresence>
 
-                {showNext && !isMobile && (
-                    <button
-                        type="button"
-                        onClick={handleNextClick}
-                        className="absolute inset-y-0 right-0 w-28 z-30
-              hidden sm:flex items-center justify-end
-              bg-gradient-to-l from-black/80 via-black/55 to-transparent
-              hover:from-black/95 hover:via-black/75
-              transition-colors pointer-events-auto"
-                    >
-                        <span className="mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
-                            ›
-                        </span>
-                    </button>
-                )}
+                <AnimatePresence>
+                    {showNext && !isMobile && (
+                        <motion.button
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            type="button"
+                            onClick={handleNextClick}
+                            className="absolute inset-y-0 right-0 w-32 z-30
+                  hidden sm:flex items-center justify-end
+                  bg-gradient-to-l from-black/90 via-black/70 to-transparent
+                  hover:from-black/95 hover:via-black/80
+                  transition-all duration-300 pointer-events-auto group/nav"
+                        >
+                            <motion.span 
+                                className="mr-6 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                                whileHover={{ x: 4 }}
+                            >
+                                ›
+                            </motion.span>
+                        </motion.button>
+                    )}
+                </AnimatePresence>
             </div>
-        </div>
+        </motion.div>
     )
 }
 
 function TraktMixedRow({ title, items, isMobile, hydrated }) {
     if (!items || items.length === 0) return null
+
+    // ✅ Detectar si es una fila de género específico
+    const isGenreRow = ![
+        'Recomendado',
+        'Tendencias (Trakt)',
+        'Más esperadas',
+        'Populares',
+        'Tendencias semanales',
+        'Taquillazos imprescindibles',
+        'Premiadas y nominadas',
+        'Historias de venganza',
+        'Populares en EE.UU.',
+        'Películas de culto',
+        'Infravaloradas',
+        'En ascenso',
+        'Recomendadas para ti'
+    ].includes(title) && !title.includes('década') && !title.includes('Clásicos') && !title.includes('Favoritas') && !title.includes('Hits')
+
+    // ✅ Determinar etiqueta específica según el título
+    let labelText = null
+    if (title === 'Más esperadas') {
+        labelText = 'ANTICIPADAS'
+    } else if (title === 'Populares') {
+        labelText = 'POPULARES'
+    } else if (title === 'Tendencias semanales') {
+        labelText = 'TENDENCIAS'
+    } else if (isGenreRow) {
+        labelText = 'GÉNERO'
+    }
+
+    const rowRef = useRef(null)
+    const isInView = useInView(rowRef, { once: true, margin: '-100px' })
 
     const breakpointsRow = {
         0: { slidesPerView: 3, spaceBetween: 12 },
@@ -1458,10 +1734,29 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
     }
 
     return (
-        <div className="relative group">
-            <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-100 mb-4 px-1 sm:px-0 tracking-tight">
-                {title}
-            </h3>
+        <motion.div
+            ref={rowRef}
+            initial="hidden"
+            animate={isInView ? "visible" : "hidden"}
+            variants={fadeInUp}
+            className="relative group"
+        >
+            <motion.div
+                variants={scaleIn}
+                className="mb-5 px-1 sm:px-0"
+            >
+                {labelText && (
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <div className="h-px w-8 bg-emerald-500" />
+                        <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+                            {labelText}
+                        </span>
+                    </div>
+                )}
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+                    {title}<span className="text-emerald-500">.</span>
+                </h3>
+            </motion.div>
 
             <div className={!hydrated ? 'pointer-events-none touch-none' : ''}>
                 <Swiper
@@ -1508,7 +1803,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
                     })}
                 </Swiper>
             </div>
-        </div>
+        </motion.div>
     )
 }
 
@@ -1517,9 +1812,11 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
     if (!items || items.length === 0) return null
 
     const swiperRef = useRef(null)
+    const heroRef = useRef(null)
     const [isHoveredHero, setIsHoveredHero] = useState(false)
     const [canPrev, setCanPrev] = useState(false)
     const [canNext, setCanNext] = useState(false)
+    const isInView = useInView(heroRef, { once: true, margin: '0px' })
 
     const [heroBackdrops, setHeroBackdrops] = useState({})
     const [heroLoaded, setHeroLoaded] = useState(false)
@@ -1611,6 +1908,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
         e.stopPropagation()
         const swiper = swiperRef.current
         if (!swiper) return
+        // Para el hero, avanzar 1 slide (ya que son imágenes grandes)
         swiper.slidePrev()
     }
 
@@ -1619,6 +1917,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
         e.stopPropagation()
         const swiper = swiperRef.current
         if (!swiper) return
+        // Para el hero, avanzar 1 slide (ya que son imágenes grandes)
         swiper.slideNext()
     }
 
@@ -1628,7 +1927,13 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
     const heroKey = `hero-${hydrated ? 'h' : 's'}-${isMobile ? 'm' : 'd'}`
 
     return (
-        <div className="relative group mb-10 sm:mb-14">
+        <motion.div
+            ref={heroRef}
+            initial={{ opacity: 0, y: 20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            className="relative group mb-10 sm:mb-14"
+        >
             <div
                 className="relative"
                 onMouseEnter={() => setIsHoveredHero(true)}
@@ -1639,9 +1944,15 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                         {items.slice(0, 1).map((movie) => (
                             <div
                                 key={movie.id}
-                                // CAMBIO: rounded-3xl -> rounded-xl
-                                className="w-full rounded-xl bg-neutral-900 aspect-[16/9] animate-pulse"
-                            />
+                                className="relative w-full rounded-xl bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 aspect-[16/9] overflow-hidden"
+                            >
+                                <motion.div
+                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                                    variants={shimmer}
+                                    animate="animate"
+                                    style={{ backgroundSize: '200% 100%' }}
+                                />
+                            </div>
                         ))}
                     </div>
                 ) : (
@@ -1690,8 +2001,11 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                     return (
                                         <SwiperSlide key={movie.id} className={slideClass}>
                                             <Link href={`/details/movie/${movie.id}`}>
-                                                {/* CAMBIO: rounded-3xl -> rounded-xl */}
-                                                <div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900">
+                                                <motion.div 
+                                                    className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero ring-1 ring-white/5 hover:ring-white/20 transition-all duration-300"
+                                                    whileHover={{ scale: 1.02 }}
+                                                    transition={{ duration: 0.3 }}
+                                                >
                                                     <img
                                                         src={buildImg(heroBackdrop, 'w780')}
                                                         alt=""
@@ -1708,13 +2022,14 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                                         )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
                                                         sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
                                                         alt={movie.title || movie.name}
-                                                        // CAMBIO: rounded-3xl -> rounded-xl
-                                                        className={`absolute inset-0 w-full h-full rounded-xl ${isMobile ? 'object-contain' : 'object-cover hover:scale-105'
-                                                            } transition-transform duration-500 ease-out`}
+                                                        className={`absolute inset-0 w-full h-full rounded-xl ${
+                                                            isMobile ? 'object-contain' : 'object-cover group-hover/hero:scale-105'
+                                                            } transition-transform duration-700 ease-out`}
                                                         loading="lazy"
                                                         decoding="async"
                                                     />
-                                                </div>
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
+                                                </motion.div>
                                             </Link>
                                         </SwiperSlide>
                                     )
@@ -1722,41 +2037,57 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                             </Swiper>
                         </div>
 
-                        {showPrev && !isMobile && (
-                            <button
-                                type="button"
-                                onClick={handlePrevClick}
-                                className="absolute inset-y-0 left-0 w-32 z-20
-                            hidden sm:flex items-center justify-start
-                            bg-gradient-to-r from-black/75 via-black/45 to-transparent
-                            hover:from-black/90 hover:via-black/65
-                            transition-colors pointer-events-auto"
-                            >
-                                <span className="ml-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
-                                    ‹
-                                </span>
-                            </button>
-                        )}
+                        <AnimatePresence>
+                            {showPrev && !isMobile && (
+                                <motion.button
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    type="button"
+                                    onClick={handlePrevClick}
+                                    className="absolute inset-y-0 left-0 w-36 z-20
+                                hidden sm:flex items-center justify-start
+                                bg-gradient-to-r from-black/90 via-black/70 to-transparent
+                                hover:from-black/95 hover:via-black/85
+                                transition-all duration-300 pointer-events-auto group/nav"
+                                >
+                                    <motion.span 
+                                        className="ml-7 text-5xl font-bold text-white drop-shadow-[0_0_14px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                                        whileHover={{ x: -5 }}
+                                    >
+                                        ‹
+                                    </motion.span>
+                                </motion.button>
+                            )}
+                        </AnimatePresence>
 
-                        {showNext && !isMobile && (
-                            <button
-                                type="button"
-                                onClick={handleNextClick}
-                                className="absolute inset-y-0 right-0 w-32 z-20
-                            hidden sm:flex items-center justify-end
-                            bg-gradient-to-l from-black/75 via-black/45 to-transparent
-                            hover:from-black/90 hover:via-black/65
-                            transition-colors pointer-events-auto"
-                            >
-                                <span className="mr-6 text-4xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
-                                    ›
-                                </span>
-                            </button>
-                        )}
+                        <AnimatePresence>
+                            {showNext && !isMobile && (
+                                <motion.button
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    type="button"
+                                    onClick={handleNextClick}
+                                    className="absolute inset-y-0 right-0 w-36 z-20
+                                hidden sm:flex items-center justify-end
+                                bg-gradient-to-l from-black/90 via-black/70 to-transparent
+                                hover:from-black/95 hover:via-black/85
+                                transition-all duration-300 pointer-events-auto group/nav"
+                                >
+                                    <motion.span 
+                                        className="mr-7 text-5xl font-bold text-white drop-shadow-[0_0_14px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                                        whileHover={{ x: 5 }}
+                                    >
+                                        ›
+                                    </motion.span>
+                                </motion.button>
+                            )}
+                        </AnimatePresence>
                     </>
                 )}
             </div>
-        </div>
+        </motion.div>
     )
 }
 
@@ -1840,7 +2171,7 @@ export default function MainDashboardClient({ initialData }) {
     }
 
     return (
-        <div className="px-6 py-6 text-white bg-black">
+        <div className="min-h-screen px-4 sm:px-6 py-6 sm:py-8 text-white bg-gradient-to-b from-black via-neutral-950 to-black">
             <TopRatedHero
                 items={dashboardData.topRated || []}
                 isMobile={isMobile}
@@ -1848,7 +2179,12 @@ export default function MainDashboardClient({ initialData }) {
                 backdropOverrides={backdropOverrides}
             />
 
-            <div className="space-y-12">
+            <motion.div 
+                className="space-y-14 sm:space-y-16"
+                variants={staggerContainer}
+                initial="hidden"
+                animate="visible"
+            >
                 {/* ✅ Trakt: Recomendado (preview normal) */}
                 <Row
                     title="Recomendado"
@@ -1987,7 +2323,7 @@ export default function MainDashboardClient({ initialData }) {
                         overridesReady={overridesReady}
                     />
                 )}
-            </div>
+            </motion.div>
         </div>
     )
 }

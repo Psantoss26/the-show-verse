@@ -4,7 +4,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Navigation } from 'swiper'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useInView } from 'framer-motion'
 import 'swiper/swiper-bundle.css'
 import Link from 'next/link'
 import { Anton } from 'next/font/google'
@@ -30,6 +30,16 @@ import {
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
 
 const anton = Anton({ weight: '400', subsets: ['latin'] })
+
+/* =================== ANIMATION VARIANTS =================== */
+const scaleIn = {
+    hidden: { opacity: 0, scale: 0.95 },
+    visible: { 
+        opacity: 1, 
+        scale: 1,
+        transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] }
+    }
+}
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
 const useIsMobileLayout = (breakpointPx = 768) => {
@@ -978,11 +988,36 @@ function InlinePreviewCard({ show, heightClass }) {
 function Row({ title, items, isMobile, posterCacheRef }) {
     if (!items || items.length === 0) return null
 
+    // ✅ Detectar si es una fila de género específico
+    const isGenreRow = ![
+        'Populares',
+        'Tendencias en series ahora mismo',
+        'Series imprescindibles según IMDb',
+        'En emisión ahora mismo',
+        'Aclamadas por la crítica',
+        'Top 10 hoy en España',
+        'En Emisión'
+    ].includes(title)
+
+    // ✅ Determinar etiqueta específica según el título
+    let labelText = null
+    if (title === 'Tendencias en series ahora mismo') {
+        labelText = 'TENDENCIAS'
+    } else if (title === 'Series imprescindibles según IMDb') {
+        labelText = 'IMPRESCINDIBLES'
+    } else if (title === 'Top 10 hoy en España') {
+        labelText = 'TOP 10'
+    } else if (isGenreRow) {
+        labelText = 'GÉNERO'
+    }
+
     const swiperRef = useRef(null)
+    const rowRef = useRef(null)
     const [isHoveredRow, setIsHoveredRow] = useState(false)
     const [canPrev, setCanPrev] = useState(false)
     const [canNext, setCanNext] = useState(false)
     const [hoveredId, setHoveredId] = useState(null)
+    const isInView = useInView(rowRef, { once: true, margin: '-100px' })
 
     const isTop10 = title === 'Top 10 hoy en España'
     const hasActivePreview = !!hoveredId
@@ -1063,16 +1098,25 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     }
 
     return (
-        <div className="relative group">
-            {/* ✅ LOGICA TITULOS: 
-               - Si es Top 10 -> NO MOSTRAR TÍTULO (null)
-               - Si NO es Top 10 -> Mostrar título neutro
-            */}
-            {!isTop10 && (
-                <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-100 mb-4 px-1 sm:px-0 tracking-tight">
-                    {title}
+        <div ref={rowRef} className="relative group">
+            <motion.div
+                initial="hidden"
+                animate={isInView ? "visible" : "hidden"}
+                variants={scaleIn}
+                className="mb-4 px-1 sm:px-0"
+            >
+                {labelText && (
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <div className="h-px w-8 bg-emerald-500" />
+                        <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+                            {labelText}
+                        </span>
+                    </div>
+                )}
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+                    {title}<span className="text-emerald-500">.</span>
                 </h3>
-            )}
+            </motion.div>
 
             <div
                 className="relative"
@@ -1255,7 +1299,7 @@ export default function SeriesPageClient({ initialData }) {
 
     return (
         <div className="px-6 py-6 text-white bg-black">
-            <div className="space-y-12 pt-6">
+            <div className="space-y-12 pt-2">
                 {dashboardData['Top 10 hoy en España']?.length ? (
                     <Row
                         title="Top 10 hoy en España"
