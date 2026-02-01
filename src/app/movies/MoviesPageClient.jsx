@@ -1070,7 +1070,10 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     if (isTop10 && isMobile) {
         return (
             <div className="relative group">
-                {/* CAMBIO: No mostramos el título en Top 10 móvil */}
+                {/* Título para Top 10 móvil */}
+                <h3 className="text-xl font-semibold mb-4 px-4">
+                    TOP 10
+                </h3>
                 <Swiper
                     slidesPerView={1}
                     spaceBetween={14}
