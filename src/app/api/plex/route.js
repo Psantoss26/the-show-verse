@@ -151,8 +151,10 @@ export async function GET(request) {
         // URL para navegador web
         const plexWebUrl = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
         
-        // Deep link directo para app móvil usando ratingKey
-        const plexMobileUrl = `plex://details?metadataId=${matchedItem.ratingKey}`;
+        // Deep link para app móvil con formato correcto que incluye servidor y metadataKey
+        // Formato: plex://preplay/?metadataKey=ENCODED_KEY&server=SERVER_ID
+        // Este formato asegura que la app móvil abra directamente los detalles del contenido
+        const plexMobileUrl = `plex://preplay/?metadataKey=${encodedKey}&server=${serverMachineId}`;
 
         console.log(`[Plex] Match found for "${title}" (${type}):`, {
           title: matchedItem.title,
@@ -161,6 +163,7 @@ export async function GET(request) {
           originalKey: matchedItem.key,
           cleanedKey: metadataKey,
           encodedKey,
+          serverMachineId,
           plexWebUrl,
           plexMobileUrl,
         });
