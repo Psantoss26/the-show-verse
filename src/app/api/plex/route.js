@@ -7,13 +7,12 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/plex
  *
- * Verifica si una película o serie está disponible en tu servidor Plex local
- *
  * Query params:
- * - title: Título de la película o serie (requerido)
- * - type: 'movie' o 'tv' (requerido)
- * - year: Año de lanzamiento (opcional)
- * - imdbId: ID de IMDB (opcional)
+ * - title: string (required)
+ * - type: 'movie' | 'tv' (required)
+ * - year: number (optional)
+ * - imdbId: string (optional, e.g. tt1234567)
+ * - tmdbId: string|number (optional)
  */
 export async function GET(request) {
   try {
@@ -22,11 +21,12 @@ export async function GET(request) {
     const title = searchParams.get("title");
     const type = searchParams.get("type") || "movie";
     const year = searchParams.get("year")
-      ? parseInt(searchParams.get("year"))
+      ? parseInt(searchParams.get("year"), 10)
       : null;
-    const imdbId = searchParams.get("imdbId");
 
-    // Validación
+    const imdbId = searchParams.get("imdbId"); // e.g. tt1234567
+    const tmdbId = searchParams.get("tmdbId"); // e.g. 550
+
     if (!title) {
       return NextResponse.json(
         { error: "Title parameter is required" },
@@ -41,10 +41,8 @@ export async function GET(request) {
       );
     }
 
-    // Configuración de Plex - Puedes poner estos valores en variables de entorno
-    const PLEX_URL =
-      process.env.PLEX_URL || "http://localhost:32400"; // URL de tu servidor Plex
-    const PLEX_TOKEN = process.env.PLEX_TOKEN || ""; // Token de autenticación de Plex
+    const PLEX_URL = process.env.PLEX_URL || "http://localhost:32400";
+    const PLEX_TOKEN = process.env.PLEX_TOKEN || "";
 
     if (!PLEX_TOKEN) {
       console.warn(
@@ -57,32 +55,53 @@ export async function GET(request) {
       });
     }
 
-    // Primero obtener el machineIdentifier del servidor
+    // Helper: intenta conseguir slug (para watch.plex.tv) vía metadata.provider.plex.tv
+    async function getPlexSlug({ imdbId, tmdbId, type }) {
+      const metadataType = type === "movie" ? 1 : 2; // 1 movie, 2 show
+      const guid =
+        imdbId ? `imdb://${imdbId}` : tmdbId ? `tmdb://${tmdbId}` : null;
+
+      if (!guid) return null;
+
+      const url = `https://metadata.provider.plex.tv/library/metadata/matches?guid=${encodeURIComponent(
+        guid,
+      )}&type=${metadataType}&X-Plex-Token=${encodeURIComponent(PLEX_TOKEN)}`;
+
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+      });
+
+      if (!res.ok) return null;
+
+      const data = await res.json();
+      const slug = data?.MediaContainer?.Metadata?.[0]?.slug;
+      return typeof slug === "string" && slug.trim() ? slug.trim() : null;
+    }
+
+    // machineIdentifier del servidor (para URLs tipo app.plex.tv)
     let machineIdentifier = null;
     try {
       const serverInfoUrl = `${PLEX_URL}/?X-Plex-Token=${PLEX_TOKEN}`;
       const serverInfoResponse = await fetch(serverInfoUrl, {
-        headers: {
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" },
       });
-      
+
       if (serverInfoResponse.ok) {
         const serverData = await serverInfoResponse.json();
-        machineIdentifier = serverData?.MediaContainer?.machineIdentifier;
+        machineIdentifier = serverData?.MediaContainer?.machineIdentifier ?? null;
       }
     } catch (err) {
       console.warn("Could not fetch server machine identifier:", err);
     }
 
     // Buscar en Plex
-    const searchUrl = `${PLEX_URL}/search?query=${encodeURIComponent(title)}&X-Plex-Token=${PLEX_TOKEN}`;
+    const searchUrl = `${PLEX_URL}/search?query=${encodeURIComponent(
+      title,
+    )}&X-Plex-Token=${PLEX_TOKEN}`;
 
     try {
       const response = await fetch(searchUrl, {
-        headers: {
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" },
       });
 
       if (!response.ok) {
@@ -91,26 +110,21 @@ export async function GET(request) {
 
       const data = await response.json();
 
-      // Buscar coincidencia en los resultados
       let matchedItem = null;
 
       if (data.MediaContainer?.Metadata) {
         for (const item of data.MediaContainer.Metadata) {
-          // Verificar tipo (movie/show)
           const itemType =
             item.type === "movie" ? "movie" : item.type === "show" ? "tv" : null;
           if (itemType !== type) continue;
 
-          // Verificar título
           const itemTitle = item.title?.toLowerCase();
           const searchTitle = title.toLowerCase();
           if (itemTitle !== searchTitle && !itemTitle?.includes(searchTitle))
             continue;
 
-          // Verificar año si está disponible
           if (year && item.year && Math.abs(item.year - year) > 1) continue;
 
-          // Verificar IMDB ID si está disponible
           if (imdbId) {
             const itemGuid = item.guid || "";
             if (
@@ -122,78 +136,73 @@ export async function GET(request) {
             }
           }
 
-          // Si llegamos aquí, es una coincidencia razonable
-          if (!matchedItem) {
-            matchedItem = item;
-          }
+          if (!matchedItem) matchedItem = item;
         }
       }
 
-      if (matchedItem) {
-        // Usar el machineIdentifier obtenido o el del item
-        const serverMachineId = machineIdentifier || matchedItem.machineIdentifier;
-        
-        // Construir URL para abrir Plex Web
-        // Para series, el key puede incluir /children, pero necesitamos la ruta base para detalles
-        let metadataKey = matchedItem.key || `/library/metadata/${matchedItem.ratingKey}`;
-        
-        // Si es una serie y el key incluye /children, eliminarlo para acceder a los detalles
-        if (type === 'tv' && metadataKey.endsWith('/children')) {
-          console.log(`[Plex] Removing /children from key for TV show: ${metadataKey}`);
-          metadataKey = metadataKey.replace('/children', '');
-          console.log(`[Plex] Cleaned key: ${metadataKey}`);
-        }
-        
-        // Codificar el key correctamente para la URL
-        const encodedKey = encodeURIComponent(metadataKey);
-        console.log(`[Plex] Encoded key: ${encodedKey}`);
-        
-        // URL para navegador web
-        const plexWebUrl = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
-        
-        // Deep link para app móvil con formato correcto que incluye servidor y metadataKey
-        // Formato: plex://preplay/?metadataKey=ENCODED_KEY&server=SERVER_ID
-        // Este formato asegura que la app móvil abra directamente los detalles del contenido
-        const plexMobileUrl = `plex://preplay/?metadataKey=${encodedKey}&server=${serverMachineId}`;
+      if (!matchedItem) {
+        return NextResponse.json({ available: false, plexUrl: null });
+      }
 
-        console.log(`[Plex] Match found for "${title}" (${type}):`, {
-          title: matchedItem.title,
-          type: matchedItem.type,
-          ratingKey: matchedItem.ratingKey,
-          originalKey: matchedItem.key,
-          cleanedKey: metadataKey,
-          encodedKey,
-          serverMachineId,
-          plexWebUrl,
-          plexMobileUrl,
+      const serverMachineId = machineIdentifier || matchedItem.machineIdentifier;
+
+      // metadata key base
+      let metadataKey =
+        matchedItem.key || `/library/metadata/${matchedItem.ratingKey}`;
+
+      // Si es serie y viene /children, limpiar para abrir ficha de la serie
+      if (type === "tv" && metadataKey.endsWith("/children")) {
+        metadataKey = metadataKey.replace("/children", "");
+      }
+
+      const encodedKey = encodeURIComponent(metadataKey);
+
+      // Web (desktop)
+      const plexWebUrl = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
+
+      // iOS deep link (preplay). Añadimos metadataType para máxima compatibilidad.
+      const metadataType = type === "movie" ? 1 : 2;
+      const plexMobileUrl = `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}&server=${serverMachineId}`;
+
+      // Android universal link (watch.plex.tv)
+      let plexUniversalUrl = null;
+      try {
+        const slug = await getPlexSlug({
+          imdbId,
+          tmdbId,
+          type,
         });
 
-        return NextResponse.json(
-          {
-            available: true,
-            plexUrl: plexWebUrl,
-            plexMobileUrl: plexMobileUrl,
-            title: matchedItem.title,
-            year: matchedItem.year,
-            ratingKey: matchedItem.ratingKey,
-            thumb: matchedItem.thumb
-              ? `${PLEX_URL}${matchedItem.thumb}?X-Plex-Token=${PLEX_TOKEN}`
-              : null,
-          },
-          {
-            status: 200,
-            headers: {
-              "Cache-Control":
-                "public, s-maxage=3600, stale-while-revalidate=7200",
-            },
-          },
-        );
+        if (slug) {
+          plexUniversalUrl =
+            type === "movie"
+              ? `https://watch.plex.tv/movie/${slug}`
+              : `https://watch.plex.tv/show/${slug}`;
+        }
+      } catch (e) {
+        console.warn("[Plex] Could not resolve watch.plex.tv slug:", e);
       }
 
-      return NextResponse.json({
-        available: false,
-        plexUrl: null,
-      });
+      return NextResponse.json(
+        {
+          available: true,
+          plexUrl: plexWebUrl,
+          plexMobileUrl,
+          plexUniversalUrl, // <- NUEVO (Android)
+          title: matchedItem.title,
+          year: matchedItem.year,
+          ratingKey: matchedItem.ratingKey,
+          thumb: matchedItem.thumb
+            ? `${PLEX_URL}${matchedItem.thumb}?X-Plex-Token=${PLEX_TOKEN}`
+            : null,
+        },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=7200",
+          },
+        },
+      );
     } catch (plexError) {
       console.error("Error connecting to Plex:", plexError);
       return NextResponse.json({
