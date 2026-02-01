@@ -4403,19 +4403,19 @@ export default function DetailsClient({
 
         if (response.ok) {
           const result = await response.json();
-const available = result.available || false;
+          const available = result.available || false;
 
-const plexWebUrl = result.plexUrl || null;
-const plexMobileUrl = result.plexMobileUrl || null;
-const plexMobilePlayUrl = result.plexMobilePlayUrl || null; // <-- NUEVO
+          const plexWebUrl = result.plexUrl || null;
+          const plexMobileUrl = result.plexMobileUrl || null; // iOS deep link
+          const plexUniversalUrl = result.plexUniversalUrl || null; // Android
 
-setPlexAvailable(available);
+          setPlexAvailable(available);
 
-setPlexUrl({
-  web: plexWebUrl,
-  mobile: plexMobileUrl,
-  mobilePlay: plexMobilePlayUrl, // <-- NUEVO
-});
+          setPlexUrl({
+            web: plexWebUrl,
+            mobile: plexMobileUrl,
+            universal: plexUniversalUrl,
+          });
 
           sessionStorage.setItem(
             cacheKey,
@@ -4424,7 +4424,7 @@ setPlexUrl({
               plexUrl: {
                 web: plexWebUrl,
                 mobile: plexMobileUrl,
-                mobilePlay: plexMobilePlayUrl,
+                universal: plexUniversalUrl,
               },
               timestamp: Date.now(),
             }),
@@ -5023,7 +5023,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       
                       if (isPlexProvider && p.url && typeof p.url === "object") {
                         providerLink = "#";
-                        hasValidLink = !!(p.url.web || p.url.mobile || p.url.mobilePlay);
+                        hasValidLink = !!(p.url.web || p.url.mobile || p.url.universal);
                       } else {
                         providerLink = p.url || justwatchUrl || "#";
                         hasValidLink = p.url || justwatchUrl;
@@ -5045,9 +5045,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           // - Android: universal link (watch.plex.tv) -> abre ficha correcta en app
                           // - iOS: plex://preplay -> abre ficha correcta en app
                           // - fallback: web
-                          const urlToOpen = isTouchDevice
-                          ? (p.url.mobile || p.url.mobilePlay || p.url.web)
-                          : p.url.web;
+                          const urlToOpen =
+                            (isAndroid && p.url.universal) ||
+                            (isIOS && p.url.mobile) ||
+                            p.url.web ||
+                            p.url.universal ||
+                            p.url.mobile;
 
                           if (!urlToOpen) {
                             console.warn("[Plex] No URL available");
@@ -5056,7 +5059,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                           // En móvil/tablet, usa navegación directa (mejor para app links)
                           if (isAndroid || isIOS) {
-                            window.location.assign(urlToOpen);
+                            window.location.href = urlToOpen;
                           } else {
                             window.open(urlToOpen, "_blank", "noopener,noreferrer");
                           }
