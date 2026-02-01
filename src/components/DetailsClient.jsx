@@ -4359,7 +4359,7 @@ export default function DetailsClient({
     if (!title || !id) return;
 
     // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
-    const cacheKey = `plex-v6:${endpointType}:${id}`;
+    const cacheKey = `plex-v7:${endpointType}:${id}`;
     const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
 
     // Intentar cargar desde caché primero
@@ -4393,49 +4393,42 @@ export default function DetailsClient({
         const params = new URLSearchParams({
           title: title,
           type: endpointType,
+          tmdbId: String(id), // <- NUEVO (para slug en Android)
         });
 
-        if (yearIso) {
-          params.append("year", yearIso);
-        }
-
-        if (data.imdb_id) {
-          params.append("imdbId", data.imdb_id);
-        }
+        if (yearIso) params.append("year", yearIso);
+        if (data.imdb_id) params.append("imdbId", data.imdb_id);
 
         const response = await fetch(`/api/plex?${params.toString()}`);
 
         if (response.ok) {
           const result = await response.json();
           const available = result.available || false;
+
           const plexWebUrl = result.plexUrl || null;
-          const plexMobileUrl = result.plexMobileUrl || null;
+          const plexMobileUrl = result.plexMobileUrl || null; // iOS deep link
+          const plexUniversalUrl = result.plexUniversalUrl || null; // Android
 
           setPlexAvailable(available);
-          
-          // Guardar ambas URLs en el estado como objeto
-          // La lógica de selección se hará al hacer clic
+
           setPlexUrl({
             web: plexWebUrl,
             mobile: plexMobileUrl,
+            universal: plexUniversalUrl,
           });
 
-          // Guardar en caché ambas URLs
-          try {
-            sessionStorage.setItem(
-              cacheKey,
-              JSON.stringify({
-                available,
-                plexUrl: {
-                  web: plexWebUrl,
-                  mobile: plexMobileUrl,
-                },
-                timestamp: Date.now(),
-              }),
-            );
-          } catch (error) {
-            console.error("Error saving Plex to cache:", error);
-          }
+          sessionStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              available,
+              plexUrl: {
+                web: plexWebUrl,
+                mobile: plexMobileUrl,
+                universal: plexUniversalUrl,
+              },
+              timestamp: Date.now(),
+            }),
+          );
         }
       } catch (error) {
         console.error("Error fetching Plex availability:", error);
@@ -5028,44 +5021,47 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       let providerLink;
                       let hasValidLink;
                       
-                      if (isPlexProvider && p.url && typeof p.url === 'object') {
-                        // Para Plex, usar # como href ya que manejaremos el click con onClick
+                      if (isPlexProvider && p.url && typeof p.url === "object") {
                         providerLink = "#";
-                        hasValidLink = !!(p.url.web || p.url.mobile);
+                        hasValidLink = !!(p.url.web || p.url.mobile || p.url.universal);
                       } else {
                         providerLink = p.url || justwatchUrl || "#";
                         hasValidLink = p.url || justwatchUrl;
                       }
 
                       const handleClick = (e) => {
-                        if (isPlexProvider && p.url && typeof p.url === 'object') {
+                        if (isPlexProvider && p.url && typeof p.url === "object") {
                           e.preventDefault();
-                          
-                          // Detectar dispositivo táctil de forma robusta
-                          const isTouchDevice = (
-                            ('ontouchstart' in window) ||
-                            (navigator.maxTouchPoints > 0) ||
-                            (navigator.msMaxTouchPoints > 0)
-                          );
-                          
-                          // Seleccionar URL apropiada
-                          const urlToOpen = isTouchDevice && p.url.mobile 
-                            ? p.url.mobile 
-                            : p.url.web;
-                          
+
+                          const ua = navigator.userAgent || "";
+                          const isAndroid = /Android/i.test(ua);
+
+                          // iPadOS a veces se identifica como Mac; esto lo detecta bien:
+                          const isIOS =
+                            /iPad|iPhone|iPod/i.test(ua) ||
+                            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+                          // Elección de URL:
+                          // - Android: universal link (watch.plex.tv) -> abre ficha correcta en app
+                          // - iOS: plex://preplay -> abre ficha correcta en app
+                          // - fallback: web
+                          const urlToOpen =
+                            (isAndroid && p.url.universal) ||
+                            (isIOS && p.url.mobile) ||
+                            p.url.web ||
+                            p.url.universal ||
+                            p.url.mobile;
+
                           if (!urlToOpen) {
-                            console.warn('[Plex] No URL available');
+                            console.warn("[Plex] No URL available");
                             return;
                           }
-                          
-                          // En dispositivos táctiles, usar window.location.href para activar deep links
-                          // En escritorio, usar window.open para nueva pestaña
-                          if (isTouchDevice) {
-                            console.log('[Plex] Opening mobile app:', urlToOpen);
+
+                          // En móvil/tablet, usa navegación directa (mejor para app links)
+                          if (isAndroid || isIOS) {
                             window.location.href = urlToOpen;
                           } else {
-                            console.log('[Plex] Opening web browser:', urlToOpen);
-                            window.open(urlToOpen, '_blank', 'noopener,noreferrer');
+                            window.open(urlToOpen, "_blank", "noopener,noreferrer");
                           }
                         }
                       };
