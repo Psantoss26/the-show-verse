@@ -148,9 +148,11 @@ export async function GET(request) {
         const encodedKey = encodeURIComponent(metadataKey);
         console.log(`[Plex] Encoded key: ${encodedKey}`);
         
-        // Usar URL directa del servidor con token para que funcione en todos los dispositivos
-        // Esto funciona tanto en navegadores móviles como en la app de Plex
-        const plexUrl = `${PLEX_URL}/web/index.html#!/server/${serverMachineId}/details?key=${encodedKey}&X-Plex-Token=${PLEX_TOKEN}`;
+        // URL para navegador web
+        const plexWebUrl = `${PLEX_URL}/web/index.html#!/server/${serverMachineId}/details?key=${encodedKey}&X-Plex-Token=${PLEX_TOKEN}`;
+        
+        // Deep link para app móvil usando ratingKey directamente
+        const plexMobileUrl = `https://app.plex.tv/desktop/#!/media/${serverMachineId}/com.plexapp.plugins.library?key=%2Flibrary%2Fmetadata%2F${matchedItem.ratingKey}%26context=home`;
 
         console.log(`[Plex] Match found for "${title}" (${type}):`, {
           title: matchedItem.title,
@@ -159,13 +161,15 @@ export async function GET(request) {
           originalKey: matchedItem.key,
           cleanedKey: metadataKey,
           encodedKey,
-          plexUrl,
+          plexWebUrl,
+          plexMobileUrl,
         });
 
         return NextResponse.json(
           {
             available: true,
-            plexUrl: plexUrl,
+            plexUrl: plexWebUrl,
+            plexMobileUrl: plexMobileUrl,
             title: matchedItem.title,
             year: matchedItem.year,
             ratingKey: matchedItem.ratingKey,
