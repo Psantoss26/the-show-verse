@@ -1993,7 +1993,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                 className="group relative"
                                 breakpoints={{
                                     0: { slidesPerView: 1, spaceBetween: 12 },
-                                    1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 }
+                                    1024: { slidesPerView: isMobile ? 1 : 4, spaceBetween: 16 }
                                 }}
                             >
                                 {items.map((movie) => {
