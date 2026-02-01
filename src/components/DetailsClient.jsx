@@ -4359,7 +4359,7 @@ export default function DetailsClient({
     if (!title || !id) return;
 
     // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
-    const cacheKey = `plex-v4:${endpointType}:${id}`;
+    const cacheKey = `plex-v5:${endpointType}:${id}`;
     const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
 
     // Intentar cargar desde caché primero
