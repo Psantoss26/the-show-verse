@@ -3,7 +3,7 @@
 
 import { useRef, useEffect, useState } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Navigation } from 'swiper'
+import { Navigation, FreeMode } from 'swiper'
 import { AnimatePresence, motion, useInView } from 'framer-motion'
 import 'swiper/swiper-bundle.css'
 import Link from 'next/link'
@@ -1091,7 +1091,8 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                     grabCursor={false}
                     preventClicks={true}
                     preventClicksPropagation={true}
-                    threshold={5}
+                    threshold={2}
+                    touchRatio={1.5}
                     modules={[Navigation]}
                     className="group relative"
                 >
@@ -1193,11 +1194,14 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                     loop={false}
                     watchOverflow={true}
                     grabCursor={!isMobile}
+                    simulateTouch={true}
                     allowTouchMove={true}
                     preventClicks={true}
                     preventClicksPropagation={true}
-                    threshold={5}
-                    modules={[Navigation]}
+                    threshold={isMobile ? 2 : 5}
+                    touchRatio={isMobile ? 1.5 : 1}
+                    freeMode={!isMobile ? { enabled: true, momentum: true, momentumRatio: 0.5 } : false}
+                    modules={[Navigation, FreeMode]}
                     className="group relative"
                     breakpoints={breakpointsRow}
                 >
