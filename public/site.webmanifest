@@ -9,12 +9,6 @@
     "icons": [
         {
             "src": "/logo-final.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any"
-        },
-        {
-            "src": "/logo-final.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
@@ -22,6 +16,12 @@
         {
             "src": "/logo-final.png",
             "sizes": "1024x1024",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/logo-final.png",
+            "sizes": "2048x2048",
             "type": "image/png",
             "purpose": "any maskable"
         }
