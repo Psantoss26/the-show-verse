@@ -8,13 +8,13 @@
     "description": "Tu plataforma de películas y series",
     "icons": [
         {
-            "src": "/TheShowVerse-conFondo.png",
+            "src": "/logo-final.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any maskable"
         },
         {
-            "src": "/TheShowVerse-conFondo.png",
+            "src": "/logo-final.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"
