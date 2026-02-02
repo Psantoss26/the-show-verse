@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 // ✅ Mejor: clave server-side
 const API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY
@@ -81,8 +82,7 @@ export async function GET(req) {
     const candidates = await tmdbDiscoverSeed({ type, pages })
 
     // ✅ Si no hay OMDb key, devolvemos “top” basado en TMDb (fallback)
-    if (!OMDB_KEY) {
-      const fallback = [...candidates]
+    if (!OMDB_KEY) {      console.warn('[IMDb Top-Rated] OMDB_KEY not configured, using TMDb fallback')      const fallback = [...candidates]
         .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0) || (b.vote_count || 0) - (a.vote_count || 0))
         .slice(0, limit)
 
