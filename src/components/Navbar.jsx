@@ -332,13 +332,13 @@ export default function Navbar() {
         {/* ---------------- Desktop ---------------- */}
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
           {/* Izquierda */}
-          <div className="flex items-center gap-6 flex-shrink-0 pl-6 -ml-10">
+          <div className="flex items-center gap-3 flex-shrink-0 pl-6 -ml-10">
             <Link href="/" className="block h-12 overflow-hidden flex-shrink-0">
               <div className="h-full w-[170px] flex items-center justify-center overflow-hidden">
                 <img
-                  src="/TheShowVerse2.png"
+                  src="/logo-TSV-sinFondo.png"
                   alt="The Show Verse"
-                  className="h-full w-auto object-contain scale-[2.2] origin-left"
+                  className="h-full w-auto object-contain scale-[2.6] origin-left"
                 />
               </div>
             </Link>
@@ -446,9 +446,9 @@ export default function Navbar() {
             <Link href="/" className="block h-10 overflow-hidden">
               <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
                 <img
-                  src="/TheShowVerse2.png"
+                  src="/logo-TSV-sinFondo.png"
                   alt="The Show Verse"
-                  className="h-full w-auto object-contain scale-[2.2] origin-center"
+                  className="h-full w-auto object-contain scale-[2.8] origin-center"
                 />
               </div>
             </Link>
@@ -533,9 +533,9 @@ export default function Navbar() {
                 >
                   <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
                     <img
-                      src="/TheShowVerse2.png"
+                      src="/logo-TSV-sinFondo.png"
                       alt="The Show Verse"
-                      className="h-full w-auto object-contain scale-[2.2] origin-center"
+                      className="h-full w-auto object-contain scale-[2.8] origin-center"
                     />
                   </div>
                 </Link>
