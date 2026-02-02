@@ -299,6 +299,13 @@ export default function Navbar() {
           "text-amber-200 bg-amber-500/15 ring-amber-500/35 shadow-[0_0_18px_rgba(245,158,11,0.20)]",
         focus: "focus-visible:ring-2 focus-visible:ring-amber-500/30",
       },
+      indigo: {
+        hover:
+          "hover:text-indigo-300 hover:bg-indigo-500/10 hover:ring-indigo-500/30 hover:shadow-[0_0_18px_rgba(99,102,241,0.16)]",
+        active:
+          "text-indigo-200 bg-indigo-500/15 ring-indigo-500/35 shadow-[0_0_18px_rgba(99,102,241,0.20)]",
+        focus: "focus-visible:ring-2 focus-visible:ring-indigo-500/30",
+      },
     };
 
     const t = tones[tone] || tones.amber;
@@ -356,15 +363,20 @@ export default function Navbar() {
               <Link href="/discover" className={navLinkClass("/discover")}>
                 Descubrir
               </Link>
-              <Link href="/stats" className={navLinkClass("/stats")}>
-                Estadísticas
-              </Link>
             </div>
           </div>
 
           {/* Derecha */}
           <div className="flex items-center gap-2 flex-shrink-0 pr-12">
             <div className="flex items-center gap-2">
+              <Link
+                href="/stats"
+                className={iconLinkClass("/stats", "indigo")}
+                title="Estadísticas"
+              >
+                <BarChart3 className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+              </Link>
+
               <Link
                 href="/lists"
                 className={iconLinkClass("/lists", "purple")}

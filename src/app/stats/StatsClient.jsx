@@ -24,7 +24,8 @@ import {
   Share2,
   Library,
   MessageSquare,
-  LogIn
+  LogIn,
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -344,18 +345,69 @@ export default function StatsClient() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#0a0a0a]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
-          <p className="text-emerald-500/60 font-medium animate-pulse">Cargando datos...</p>
-        </div>
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
       </div>
     );
   }
 
-  // Error State if no stats and connected
-  if (!notConnected && !stats) {
-    // Falls through to render header, but we need to handle content below
+  if (notConnected) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 pb-20">
+        {/* Background Ambience */}
+        <div className="fixed inset-0 pointer-events-none">
+          <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] mix-blend-screen" />
+          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] mix-blend-screen" />
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-px w-12 bg-indigo-500" />
+              <span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">Tu Perfil</span>
+            </div>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+              Estadísticas
+              <span className="text-indigo-500">.</span>
+            </h1>
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+              Tus estadísticas personalizadas de Trakt.
+            </p>
+          </motion.div>
+
+          <div className="flex items-center justify-center py-12 lg:py-24">
+            <div className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed">
+              <div className="mb-6">
+                <img
+                  src="/logo-Trakt.png"
+                  alt="Trakt Logo"
+                  className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"
+                />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">
+                Conecta tu cuenta de Trakt
+              </h2>
+              <p className="text-zinc-400 max-w-sm mb-8 text-sm">
+                Para ver tus estadísticas personales, historial detallado y patrones de visualización, necesitas iniciar sesión.
+              </p>
+              <button
+                onClick={() =>
+                  window.location.assign("/api/trakt/auth/start?next=/stats")
+                }
+                className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
+              >
+                Conectar ahora
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -388,66 +440,38 @@ export default function StatsClient() {
             </p>
           </div>
 
-          {!notConnected && (
-            <div className="flex p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-x-auto">
-              {[
-                { id: "overview", label: "General", icon: PieChartIcon },
-                { id: "patterns", label: "Patrones", icon: TrendingUp },
-                { id: "yearly", label: "Histórico", icon: CalendarIcon },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setViewMode(tab.id)}
-                  className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === tab.id
-                    ? "text-black"
-                    : "text-zinc-400 hover:text-white hover:bg-white/5"
-                    }`}
-                >
-                  {viewMode === tab.id && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute inset-0 bg-white rounded-xl"
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-2">
-                    <tab.icon className="w-4 h-4" />
-                    {tab.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-x-auto">
+            {[
+              { id: "overview", label: "General", icon: PieChartIcon },
+              { id: "patterns", label: "Patrones", icon: TrendingUp },
+              { id: "yearly", label: "Histórico", icon: CalendarIcon },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setViewMode(tab.id)}
+                className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === tab.id
+                  ? "text-black"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+              >
+                {viewMode === tab.id && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute inset-0 bg-white rounded-xl"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </span>
+              </button>
+            ))}
+          </div>
         </motion.div>
 
         {/* Content Area */}
-        {notConnected ? (
-          <div className="flex items-center justify-center py-12 lg:py-24">
-            <div className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed">
-              <div className="mb-6">
-                <img
-                  src="/logo-Trakt.png"
-                  alt="Trakt Logo"
-                  className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"
-                />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">
-                Conecta tu cuenta de Trakt
-              </h2>
-              <p className="text-zinc-400 max-w-sm mb-8 text-sm">
-                Para ver tus estadísticas personales, historial detallado y patrones de visualización, necesitas iniciar sesión.
-              </p>
-              <button
-                onClick={() =>
-                  window.location.assign("/api/trakt/auth/start?next=/stats")
-                }
-                className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
-              >
-                Conectar ahora
-              </button>
-            </div>
-          </div>
-        ) : !stats ? (
+        {!stats ? (
           <div className="flex h-64 items-center justify-center text-zinc-500">
             <p>No se pudieron cargar las estadísticas.</p>
           </div>

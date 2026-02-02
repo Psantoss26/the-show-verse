@@ -2024,32 +2024,32 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                                 <motion.div 
                                                     className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero"
                                                 >
-                                                        <img
-                                                            src={buildImg(heroBackdrop, 'w780')}
-                                                            alt=""
-                                                            aria-hidden="true"
-                                                            className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
-                                                            loading="lazy"
-                                                            decoding="async"
-                                                        />
-                                                        <img
-                                                            src={buildImg(heroBackdrop, 'w1280')}
-                                                            srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
-                                                                heroBackdrop,
-                                                                'w1280'
-                                                            )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
-                                                            sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
-                                                            alt={movie.title || movie.name}
-                                                            className={`absolute inset-0 w-full h-full rounded-xl ${
-                                                                isMobile ? 'object-contain' : 'object-cover'
-                                                                } transition-transform duration-700 ease-out group-hover/hero:scale-105`}
-                                                            loading="lazy"
-                                                            decoding="async"
-                                                        />
-                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
-                                                    </motion.div>
-                                                </Link>
-                                            </SwiperSlide>
+                                                    <img
+                                                        src={buildImg(heroBackdrop, 'w780')}
+                                                        alt=""
+                                                        aria-hidden="true"
+                                                        className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                    />
+                                                    <img
+                                                        src={buildImg(heroBackdrop, 'w1280')}
+                                                        srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
+                                                            heroBackdrop,
+                                                            'w1280'
+                                                        )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
+                                                        sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
+                                                        alt={movie.title || movie.name}
+                                                        className={`absolute inset-0 w-full h-full rounded-xl ${
+                                                            isMobile ? 'object-contain' : 'object-cover'
+                                                            } transition-transform duration-700 ease-out group-hover/hero:scale-105`}
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                    />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
+                                                </motion.div>
+                                            </Link>
+                                        </SwiperSlide>
                                     )
                                 })}
                             </Swiper>

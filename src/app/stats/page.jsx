@@ -8,13 +8,7 @@ export const metadata = {
 
 export default function StatsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="min-h-screen bg-[#0a0a0a]" />}>
       <StatsClient />
     </Suspense>
   );
