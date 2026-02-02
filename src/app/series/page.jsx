@@ -9,8 +9,6 @@ import {
 } from '@/lib/api/tmdb'
 
 export const dynamic = 'force-dynamic'
-export const revalidate = 3600
-
 export const revalidate = 1800 // 30 min
 
 /* ========= Utilidad para obtener la URL base en servidor ========= */
