@@ -10,6 +10,9 @@ import {
   fetchMovieSections
 } from '@/lib/api/tmdb'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 3600
+
 // Ajusta el revalidate según lo fresco que quieras el contenido
 export const revalidate = 1800 // 30 minutos
 
