@@ -1949,7 +1949,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
             </motion.div>
 
             <div
-                className="relative"
+                className="relative px-2"
                 onMouseEnter={() => setIsHoveredHero(true)}
                 onMouseLeave={() => setIsHoveredHero(false)}
             >
@@ -1990,7 +1990,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                 preventClicksPropagation={true}
                                 threshold={5}
                                 modules={[Navigation, Autoplay]}
-                                className="group relative"
+                                className="group relative -mx-2"
                                 breakpoints={{
                                     0: { slidesPerView: 1, spaceBetween: 12 },
                                     1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 }
@@ -2015,35 +2015,37 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                     return (
                                         <SwiperSlide key={movie.id} className={slideClass}>
                                             <Link href={`/details/movie/${movie.id}`}>
-                                                <motion.div 
-                                                    className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero ring-1 ring-white/5 hover:ring-white/20 transition-all duration-300"
-                                                    whileHover={{ scale: 1.02 }}
-                                                    transition={{ duration: 0.3 }}
-                                                >
-                                                    <img
-                                                        src={buildImg(heroBackdrop, 'w780')}
-                                                        alt=""
-                                                        aria-hidden="true"
-                                                        className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
-                                                        loading="lazy"
-                                                        decoding="async"
-                                                    />
-                                                    <img
-                                                        src={buildImg(heroBackdrop, 'w1280')}
-                                                        srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
-                                                            heroBackdrop,
-                                                            'w1280'
-                                                        )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
-                                                        sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
-                                                        alt={movie.title || movie.name}
-                                                        className={`absolute inset-0 w-full h-full rounded-xl ${
-                                                            isMobile ? 'object-contain' : 'object-cover group-hover/hero:scale-105'
-                                                            } transition-transform duration-700 ease-out`}
-                                                        loading="lazy"
-                                                        decoding="async"
-                                                    />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
-                                                </motion.div>
+                                                <div className="p-1">
+                                                    <motion.div 
+                                                        className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero ring-1 ring-white/5 hover:ring-white/20 transition-all duration-300"
+                                                        whileHover={{ scale: 1.015 }}
+                                                        transition={{ duration: 0.3 }}
+                                                    >
+                                                        <img
+                                                            src={buildImg(heroBackdrop, 'w780')}
+                                                            alt=""
+                                                            aria-hidden="true"
+                                                            className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
+                                                            loading="lazy"
+                                                            decoding="async"
+                                                        />
+                                                        <img
+                                                            src={buildImg(heroBackdrop, 'w1280')}
+                                                            srcSet={`${buildImg(heroBackdrop, 'w780')} 780w, ${buildImg(
+                                                                heroBackdrop,
+                                                                'w1280'
+                                                            )} 1280w, ${buildImg(heroBackdrop, 'original')} 2400w`}
+                                                            sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
+                                                            alt={movie.title || movie.name}
+                                                            className={`absolute inset-0 w-full h-full rounded-xl ${
+                                                                isMobile ? 'object-contain' : 'object-cover'
+                                                                } transition-transform duration-700 ease-out`}
+                                                            loading="lazy"
+                                                            decoding="async"
+                                                        />
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
+                                                    </motion.div>
+                                                </div>
                                             </Link>
                                         </SwiperSlide>
                                     )
@@ -2059,14 +2061,14 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                     exit={{ opacity: 0 }}
                                     type="button"
                                     onClick={handlePrevClick}
-                                    className="absolute inset-y-0 left-0 w-36 z-20
+                                    className="absolute inset-y-0 left-0 w-24 z-20
                                 hidden sm:flex items-center justify-start
-                                bg-gradient-to-r from-black/90 via-black/70 to-transparent
-                                hover:from-black/95 hover:via-black/85
+                                bg-gradient-to-r from-black/80 via-black/50 to-transparent
+                                hover:from-black/90 hover:via-black/70
                                 transition-all duration-300 pointer-events-auto group/nav"
                                 >
                                     <motion.span 
-                                        className="ml-7 text-5xl font-bold text-white drop-shadow-[0_0_14px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                                        className="ml-4 text-5xl font-bold text-white drop-shadow-[0_0_14px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
                                         whileHover={{ x: -5 }}
                                     >
                                         ‹
@@ -2083,14 +2085,14 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                     exit={{ opacity: 0 }}
                                     type="button"
                                     onClick={handleNextClick}
-                                    className="absolute inset-y-0 right-0 w-36 z-20
+                                    className="absolute inset-y-0 right-0 w-24 z-20
                                 hidden sm:flex items-center justify-end
-                                bg-gradient-to-l from-black/90 via-black/70 to-transparent
-                                hover:from-black/95 hover:via-black/85
+                                bg-gradient-to-l from-black/80 via-black/50 to-transparent
+                                hover:from-black/90 hover:via-black/70
                                 transition-all duration-300 pointer-events-auto group/nav"
                                 >
                                     <motion.span 
-                                        className="mr-7 text-5xl font-bold text-white drop-shadow-[0_0_14px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                                        className="mr-4 text-5xl font-bold text-white drop-shadow-[0_0_14px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
                                         whileHover={{ x: 5 }}
                                     >
                                         ›

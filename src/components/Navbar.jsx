@@ -332,9 +332,9 @@ export default function Navbar() {
         {/* ---------------- Desktop ---------------- */}
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
           {/* Izquierda */}
-          <div className="flex items-center gap-3 flex-shrink-0 pl-6 -ml-10">
+          <div className="flex items-center gap-8 flex-shrink-0 pl-6 -ml-10">
             <Link href="/" className="block h-12 overflow-hidden flex-shrink-0">
-              <div className="h-full w-[170px] flex items-center justify-center overflow-hidden">
+              <div className="h-full w-[120px] flex items-center justify-center overflow-hidden">
                 <img
                   src="/logo-TSV-sinFondo.png"
                   alt="The Show Verse"
@@ -522,34 +522,32 @@ export default function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: -320 }}
               transition={{ type: "tween", duration: 0.22 }}
-              className="h-full w-[280px] bg-[#0b0b0b] border-r border-neutral-800 p-4"
+              className="h-full w-[280px] bg-[#0b0b0b] border-r border-neutral-800 px-4 pt-2 pb-2"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <Link
                   href="/"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block h-10 overflow-hidden"
+                  className="flex-1 min-w-0 h-28"
                 >
-                  <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
-                    <img
-                      src="/logo-TSV-sinFondo.png"
-                      alt="The Show Verse"
-                      className="h-full w-auto object-contain scale-[2.8] origin-center"
-                    />
-                  </div>
+                  <img
+                    src="/logo-final-titulo-sinFondo.png"
+                    alt="The Show Verse"
+                    className="h-full w-full object-contain object-left"
+                  />
                 </Link>
 
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 rounded-full text-neutral-300 hover:text-white hover:bg-white/5 transition-colors"
+                  className="p-2 rounded-full text-neutral-300 hover:text-white hover:bg-white/5 transition-colors flex-shrink-0"
                   aria-label="Cerrar menú"
                 >
                   <XIcon className="w-6 h-6" />
                 </button>
               </div>
 
-              <div className="mt-5 space-y-2">
+              <div className="mt-0 space-y-2">
                 <Link
                   href="/"
                   onClick={() => setMobileMenuOpen(false)}
