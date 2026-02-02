@@ -338,7 +338,7 @@ export default function Navbar() {
                 <img
                   src="/logo-TSV-sinFondo.png"
                   alt="The Show Verse"
-                  className="h-full w-auto object-contain scale-[2.6] origin-left"
+                  className="h-full w-auto object-contain scale-[2.5] origin-left"
                 />
               </div>
             </Link>
