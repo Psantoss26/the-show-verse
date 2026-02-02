@@ -17,7 +17,13 @@ export const metadata = {
   title: 'The Show Verse',
   description: 'Tu plataforma de películas y series',
   manifest: '/site.webmanifest',
-  // Next.js detecta automáticamente icon.png y apple-icon.png en src/app/
+  icons: {
+    icon: [
+      { url: '/icon.png', sizes: '256x256', type: 'image/png' },
+      { url: '/icon.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icon.png', sizes: '1024x1024', type: 'image/png' }
+    ]
+  }
 }
 
 export default function RootLayout({ children }) {
