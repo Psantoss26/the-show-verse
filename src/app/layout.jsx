@@ -16,15 +16,8 @@ const ptSans = PT_Sans({
 export const metadata = {
   title: 'The Show Verse',
   description: 'Tu plataforma de películas y series',
-  icons: {
-    icon: [
-      { url: '/favicon.ico' }, // pestañas + bookmarks (clásico)
-      { url: '/TheShowVerse2.png', type: 'image/png', sizes: '32x32' }, // fallback moderno
-    ],
-    shortcut: ['/favicon.ico'],
-    apple: [{ url: '/TheShowVerse2.png', sizes: '180x180' }], // iOS (app)
-  },
   manifest: '/site.webmanifest',
+  // Next.js detecta automáticamente icon.png y apple-icon.png en src/app/
 }
 
 export default function RootLayout({ children }) {
