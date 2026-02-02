@@ -3,7 +3,7 @@
 
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Navigation, Autoplay } from 'swiper'
+import { Navigation, Autoplay, FreeMode } from 'swiper'
 import { AnimatePresence, motion, useInView } from 'framer-motion'
 import 'swiper/swiper-bundle.css'
 import Link from 'next/link'
@@ -1487,11 +1487,14 @@ function Row({
                         loop={false}
                         watchOverflow={true}
                         grabCursor={!isMobile}
+                        simulateTouch={true}
                         allowTouchMove={true}
                         preventClicks={true}
                         preventClicksPropagation={true}
-                        threshold={5}
-                        modules={[Navigation]}
+                        threshold={isMobile ? 2 : 5}
+                        touchRatio={isMobile ? 1.5 : 1}
+                        freeMode={!isMobile ? { enabled: true, momentum: true, momentumRatio: 0.5 } : false}
+                        modules={[Navigation, FreeMode]}
                         className="group relative"
                         breakpoints={breakpointsRow}
                     >
@@ -1949,7 +1952,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
             </motion.div>
 
             <div
-                className="relative px-2"
+                className="relative"
                 onMouseEnter={() => setIsHoveredHero(true)}
                 onMouseLeave={() => setIsHoveredHero(false)}
             >
@@ -1985,12 +1988,15 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                 loop={false}
                                 watchOverflow={true}
                                 grabCursor={!isMobile}
+                                simulateTouch={true}
                                 allowTouchMove={true}
                                 preventClicks={true}
                                 preventClicksPropagation={true}
-                                threshold={5}
-                                modules={[Navigation, Autoplay]}
-                                className="group relative -mx-2"
+                                threshold={isMobile ? 2 : 5}
+                                touchRatio={isMobile ? 1.5 : 1}
+                                freeMode={!isMobile ? { enabled: true, momentum: true, momentumRatio: 0.5 } : false}
+                                modules={[Navigation, Autoplay, FreeMode]}
+                                className="group relative"
                                 breakpoints={{
                                     0: { slidesPerView: 1, spaceBetween: 12 },
                                     1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 }
@@ -2015,12 +2021,9 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                     return (
                                         <SwiperSlide key={movie.id} className={slideClass}>
                                             <Link href={`/details/movie/${movie.id}`}>
-                                                <div className="p-1">
-                                                    <motion.div 
-                                                        className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero ring-1 ring-white/5 hover:ring-white/20 transition-all duration-300"
-                                                        whileHover={{ scale: 1.015 }}
-                                                        transition={{ duration: 0.3 }}
-                                                    >
+                                                <motion.div 
+                                                    className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero"
+                                                >
                                                         <img
                                                             src={buildImg(heroBackdrop, 'w780')}
                                                             alt=""
@@ -2039,15 +2042,14 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                                             alt={movie.title || movie.name}
                                                             className={`absolute inset-0 w-full h-full rounded-xl ${
                                                                 isMobile ? 'object-contain' : 'object-cover'
-                                                                } transition-transform duration-700 ease-out`}
+                                                                } transition-transform duration-700 ease-out group-hover/hero:scale-105`}
                                                             loading="lazy"
                                                             decoding="async"
                                                         />
                                                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
                                                     </motion.div>
-                                                </div>
-                                            </Link>
-                                        </SwiperSlide>
+                                                </Link>
+                                            </SwiperSlide>
                                     )
                                 })}
                             </Swiper>
@@ -2061,14 +2063,14 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                     exit={{ opacity: 0 }}
                                     type="button"
                                     onClick={handlePrevClick}
-                                    className="absolute inset-y-0 left-0 w-24 z-20
+                                    className="absolute inset-y-0 left-0 w-32 z-20
                                 hidden sm:flex items-center justify-start
-                                bg-gradient-to-r from-black/80 via-black/50 to-transparent
-                                hover:from-black/90 hover:via-black/70
-                                transition-all duration-300 pointer-events-auto group/nav"
+                                bg-gradient-to-r from-black/70 via-black/40 via-30% via-black/20 via-60% to-transparent
+                                hover:from-black/85 hover:via-black/55 hover:via-30% hover:via-black/30 hover:via-60%
+                                transition-all duration-500 pointer-events-auto group/nav backdrop-blur-[2px]"
                                 >
                                     <motion.span 
-                                        className="ml-4 text-5xl font-bold text-white drop-shadow-[0_0_14px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                                        className="ml-5 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
                                         whileHover={{ x: -5 }}
                                     >
                                         ‹
@@ -2085,14 +2087,14 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                                     exit={{ opacity: 0 }}
                                     type="button"
                                     onClick={handleNextClick}
-                                    className="absolute inset-y-0 right-0 w-24 z-20
+                                    className="absolute inset-y-0 right-0 w-32 z-20
                                 hidden sm:flex items-center justify-end
-                                bg-gradient-to-l from-black/80 via-black/50 to-transparent
-                                hover:from-black/90 hover:via-black/70
-                                transition-all duration-300 pointer-events-auto group/nav"
+                                bg-gradient-to-l from-black/70 via-black/40 via-30% via-black/20 via-60% to-transparent
+                                hover:from-black/85 hover:via-black/55 hover:via-30% hover:via-black/30 hover:via-60%
+                                transition-all duration-500 pointer-events-auto group/nav backdrop-blur-[2px]"
                                 >
                                     <motion.span 
-                                        className="mr-4 text-5xl font-bold text-white drop-shadow-[0_0_14px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                                        className="mr-5 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
                                         whileHover={{ x: 5 }}
                                     >
                                         ›
