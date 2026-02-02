@@ -82,7 +82,9 @@ export async function GET(req) {
     const candidates = await tmdbDiscoverSeed({ type, pages })
 
     // ✅ Si no hay OMDb key, devolvemos “top” basado en TMDb (fallback)
-    if (!OMDB_KEY) {      console.warn('[IMDb Top-Rated] OMDB_KEY not configured, using TMDb fallback')      const fallback = [...candidates]
+    if (!OMDB_KEY) {
+      console.warn('[IMDb Top-Rated] OMDB_KEY not configured, using TMDb fallback')
+      const fallback = [...candidates]
         .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0) || (b.vote_count || 0) - (a.vote_count || 0))
         .slice(0, limit)
 
