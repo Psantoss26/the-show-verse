@@ -595,9 +595,9 @@ export default function DetailsClient({
           const id = getListId(l);
           return id === lid
             ? {
-              ...l,
-              item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
-            }
+                ...l,
+                item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
+              }
             : l;
         }),
       );
@@ -847,7 +847,9 @@ export default function DetailsClient({
     // para evitar mostrar un backdrop que luego será reemplazado por uno mejor
     const allBackdrops = [
       ...(imagesState?.backdrops || []), // Cargadas dinámicamente
-      ...(artworkInitialized && data?.images?.backdrops ? data.images.backdrops : []) // Solo si ya terminamos
+      ...(artworkInitialized && data?.images?.backdrops
+        ? data.images.backdrops
+        : []), // Solo si ya terminamos
     ];
 
     // 2. Si tenemos candidatos, aplicar el filtro inteligente INMEDIATAMENTE
@@ -863,7 +865,12 @@ export default function DetailsClient({
 
     // 4. Fallback final: Si ya terminamos de cargar y no hubo nada mejor, usamos el genérico.
     return data?.backdrop_path || null;
-  }, [imagesState?.backdrops, data?.images?.backdrops, data?.backdrop_path, artworkInitialized]);
+  }, [
+    imagesState?.backdrops,
+    data?.images?.backdrops,
+    data?.backdrop_path,
+    artworkInitialized,
+  ]);
 
   const artworkSelection = useMemo(() => {
     const rawList =
@@ -1061,7 +1068,7 @@ export default function DetailsClient({
       img.decoding = "async";
       try {
         img.fetchPriority = "high";
-      } catch { }
+      } catch {}
       img.onload = finishOne;
       img.onerror = finishOne; // si una falla, no bloqueamos toda la fila
       img.src = url;
@@ -1197,16 +1204,18 @@ export default function DetailsClient({
           const bestPoster = pickBestPosterTV(posters);
           const bestBackdropForBackground =
             pickBestBackdropTVNeutralFirst(backdrops);
-          const bestBackdropForPreviewCalc = pickBestBackdropForPreview(backdrops);
+          const bestBackdropForPreviewCalc =
+            pickBestBackdropForPreview(backdrops);
 
           const bestPosterPath = asTmdbPath(bestPoster);
           const bestBackdropPath = asTmdbPath(bestBackdropForBackground);
           const bestPreviewPath = asTmdbPath(bestBackdropForPreviewCalc);
 
           // ✅ Precargar backdrop de vista previa PRIMERO (si estamos en modo preview)
-          const savedGlobalMode = typeof window !== "undefined"
-            ? window.localStorage.getItem("showverse:global:posterViewMode")
-            : null;
+          const savedGlobalMode =
+            typeof window !== "undefined"
+              ? window.localStorage.getItem("showverse:global:posterViewMode")
+              : null;
 
           if (savedGlobalMode === "preview" && bestPreviewPath) {
             await preloadTmdb(bestPreviewPath, "w780");
@@ -1245,12 +1254,14 @@ export default function DetailsClient({
           const backdrops = json.backdrops || [];
 
           const bestPoster = pickBestImage(posters);
-          const bestBackdropForPreviewCalc = pickBestBackdropForPreview(backdrops);
+          const bestBackdropForPreviewCalc =
+            pickBestBackdropForPreview(backdrops);
 
           // ✅ Precargar backdrop de vista previa PRIMERO (si estamos en modo preview)
-          const savedGlobalMode = typeof window !== "undefined"
-            ? window.localStorage.getItem("showverse:global:posterViewMode")
-            : null;
+          const savedGlobalMode =
+            typeof window !== "undefined"
+              ? window.localStorage.getItem("showverse:global:posterViewMode")
+              : null;
 
           if (savedGlobalMode === "preview" && bestBackdropForPreviewCalc) {
             await preloadTmdb(bestBackdropForPreviewCalc, "w780");
@@ -1944,7 +1955,7 @@ export default function DetailsClient({
     try {
       const v = window.localStorage.getItem("showverse:trakt:sync") === "1";
       setSyncTrakt(v);
-    } catch { }
+    } catch {}
   }, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1953,7 +1964,7 @@ export default function DetailsClient({
         "showverse:trakt:sync",
         syncTrakt ? "1" : "0",
       );
-    } catch { }
+    } catch {}
   }, [syncTrakt]);
 
   const reloadTraktStatus = async () => {
@@ -2507,7 +2518,7 @@ export default function DetailsClient({
     // persist opcional
     try {
       window.localStorage.setItem(rewatchStorageKey, startIso);
-    } catch { }
+    } catch {}
 
     await loadTraktShowPlays(startIso);
   };
@@ -2613,7 +2624,7 @@ export default function DetailsClient({
               rewatchRunsStorageKey,
               JSON.stringify(runs),
             );
-          } catch { }
+          } catch {}
         }
       }
 
@@ -2837,7 +2848,7 @@ export default function DetailsClient({
           rewatchRunsStorageKey,
           JSON.stringify(nextRuns || []),
         );
-      } catch { }
+      } catch {}
     },
     [rewatchRunsStorageKey],
   );
@@ -2848,7 +2859,7 @@ export default function DetailsClient({
       setActiveEpisodesView(v);
       try {
         window.localStorage.setItem(episodesViewStorageKey, v);
-      } catch { }
+      } catch {}
 
       if (v === "global") {
         setRewatchStartAt(null);
@@ -2884,7 +2895,7 @@ export default function DetailsClient({
       setActiveEpisodesView(run.id);
       try {
         window.localStorage.setItem(episodesViewStorageKey, run.id);
-      } catch { }
+      } catch {}
       setRewatchStartAt(run.startedAt);
 
       await loadTraktShowPlays(run.startedAt); // ✅ clave
@@ -2909,7 +2920,7 @@ export default function DetailsClient({
         const nextView = prev === runId ? "global" : prev;
         try {
           window.localStorage.setItem(episodesViewStorageKey, nextView);
-        } catch { }
+        } catch {}
         return nextView;
       });
 
@@ -3067,7 +3078,8 @@ export default function DetailsClient({
     setPosterToggleBusy(true);
 
     const abortIfStale = () =>
-      posterToggleSeqRef.current !== seq || posterRequestedModeRef.current !== nextMode;
+      posterToggleSeqRef.current !== seq ||
+      posterRequestedModeRef.current !== nextMode;
 
     const safeFinish = () => {
       if (posterToggleSeqRef.current === seq) {
@@ -3168,7 +3180,7 @@ export default function DetailsClient({
       if (!posterToggleBusy) {
         setPosterLayoutMode(posterViewMode);
       }
-    } catch { }
+    } catch {}
   }, [posterViewMode, globalViewModeStorageKey, posterToggleBusy]);
 
   const handleCopyImageUrl = async (filePath) => {
@@ -3222,8 +3234,8 @@ export default function DetailsClient({
   const seriesGraphUrl =
     type === "tv" && data?.id && (data.name || data.original_name)
       ? `https://seriesgraph.com/show/${data.id}-${slugifyForSeriesGraph(
-        data.original_name || data.name,
-      )}`
+          data.original_name || data.name,
+        )}`
       : null;
 
   const [traktHomepage, setTraktHomepage] = useState(null);
@@ -3305,7 +3317,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch { }
+    } catch {}
   }, [jwCacheKey]);
 
   // ✅ 1) hidratar desde cache para que el icono salga instantáneo en visitas posteriores
@@ -3316,7 +3328,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch { }
+    } catch {}
   }, [jwCacheKey]);
 
   useEffect(() => {
@@ -3331,7 +3343,7 @@ export default function DetailsClient({
       try {
         if (typeof window !== "undefined")
           window.localStorage.removeItem(jwCacheKey);
-      } catch { }
+      } catch {}
       return;
     }
 
@@ -3346,8 +3358,8 @@ export default function DetailsClient({
 
         const watchnow =
           watchLink &&
-            typeof watchLink === "string" &&
-            !watchLink.includes("themoviedb.org")
+          typeof watchLink === "string" &&
+          !watchLink.includes("themoviedb.org")
             ? watchLink
             : null;
 
@@ -3380,7 +3392,7 @@ export default function DetailsClient({
             if (resolved) window.localStorage.setItem(jwCacheKey, resolved);
             else window.localStorage.removeItem(jwCacheKey);
           }
-        } catch { }
+        } catch {}
       } catch (e) {
         if (ac.signal.aborted) return;
         setExtLinks((p) => ({
@@ -3909,21 +3921,21 @@ export default function DetailsClient({
     const extras =
       type === "movie"
         ? (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
-          .filter((d) => d?.id && d?.name)
-          .map((d, idx) => ({
-            ...d,
-            character: "Director",
-            // orden negativo para que vaya arriba si luego hay sort por order
-            order: -1000 + idx,
-          }))
-        : type === "tv"
-          ? (Array.isArray(tvCreators) ? tvCreators : [])
-            .filter((c) => c?.id && c?.name)
-            .map((c, idx) => ({
-              ...c,
-              character: "Creador",
+            .filter((d) => d?.id && d?.name)
+            .map((d, idx) => ({
+              ...d,
+              character: "Director",
+              // orden negativo para que vaya arriba si luego hay sort por order
               order: -1000 + idx,
             }))
+        : type === "tv"
+          ? (Array.isArray(tvCreators) ? tvCreators : [])
+              .filter((c) => c?.id && c?.name)
+              .map((c, idx) => ({
+                ...c,
+                character: "Creador",
+                order: -1000 + idx,
+              }))
           : [];
 
     // 3) ¿Hay order real en el base? (si viene de TMDb normalmente sí)
@@ -4360,7 +4372,7 @@ export default function DetailsClient({
 
     // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
     const cacheKey = `plex-v7:${endpointType}:${id}`;
-    const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
+    const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 días (1 semana)
 
     // Intentar cargar desde caché primero
     const loadFromCache = () => {
@@ -4481,7 +4493,11 @@ export default function DetailsClient({
 
   // ✅ Fallback automático: si backdrop falla, cambiar a poster
   useEffect(() => {
-    if (posterImgError && posterViewMode === "preview" && basePosterDisplayPath) {
+    if (
+      posterImgError &&
+      posterViewMode === "preview" &&
+      basePosterDisplayPath
+    ) {
       console.warn("Backdrop failed to load, falling back to poster");
       setPosterViewMode("poster");
       setPosterLayoutMode("poster");
@@ -4504,7 +4520,12 @@ export default function DetailsClient({
       setPosterViewMode("poster");
       setPosterLayoutMode("poster");
     }
-  }, [posterViewMode, artworkInitialized, previewBackdropPath, basePosterDisplayPath]);
+  }, [
+    posterViewMode,
+    artworkInitialized,
+    previewBackdropPath,
+    basePosterDisplayPath,
+  ]);
 
   // ✅ Timeout de seguridad: si después de 3s no hay imagen en modo preview, cambiar a poster
   useEffect(() => {
@@ -4541,8 +4562,8 @@ export default function DetailsClient({
           return testImg.complete && testImg.naturalWidth > 0;
         };
 
-        const isLowPreloaded = checkIfLoaded('w342');
-        const isHighPreloaded = checkIfLoaded('w780');
+        const isLowPreloaded = checkIfLoaded("w342");
+        const isHighPreloaded = checkIfLoaded("w780");
 
         // ✅ Si está precargada, marcar como cargada inmediatamente
         if (isLowPreloaded) {
@@ -4598,8 +4619,8 @@ export default function DetailsClient({
             return testImg.complete && testImg.naturalWidth > 0;
           };
 
-          const isLowPreloaded = checkIfLoaded('w780');
-          const isHighPreloaded = checkIfLoaded('w1280');
+          const isLowPreloaded = checkIfLoaded("w780");
+          const isHighPreloaded = checkIfLoaded("w1280");
 
           // ✅ Si está precargada, marcar como cargada inmediatamente
           if (isLowPreloaded) {
@@ -4633,27 +4654,36 @@ export default function DetailsClient({
       : isBackdropPoster;
 
   // ✅ URLs basadas en el modo de vista
-  const posterLowUrl = posterViewMode === "preview" && previewBackdropPath
-    ? `https://image.tmdb.org/t/p/w780${previewBackdropPath}`
-    : displayPosterPath
-      ? `https://image.tmdb.org/t/p/w342${displayPosterPath}`
-      : null;
+  const posterLowUrl =
+    posterViewMode === "preview" && previewBackdropPath
+      ? `https://image.tmdb.org/t/p/w780${previewBackdropPath}`
+      : displayPosterPath
+        ? `https://image.tmdb.org/t/p/w342${displayPosterPath}`
+        : null;
 
-  const posterHighUrl = posterViewMode === "preview" && previewBackdropPath
-    ? `https://image.tmdb.org/t/p/w1280${previewBackdropPath}`
-    : displayPosterPath
-      ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
-      : null;
+  const posterHighUrl =
+    posterViewMode === "preview" && previewBackdropPath
+      ? `https://image.tmdb.org/t/p/w1280${previewBackdropPath}`
+      : displayPosterPath
+        ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
+        : null;
   const posterLoadToken = posterLoadTokenRef.current;
 
   // ✅ Estados unificados: usar backdrop states si estamos en preview, sino poster states
-  const currentLowLoaded = posterViewMode === "preview" ? backdropLowLoaded : posterLowLoaded;
-  const currentHighLoaded = posterViewMode === "preview" ? backdropHighLoaded : posterHighLoaded;
-  const currentImgError = posterViewMode === "preview" ? backdropImgError : posterImgError;
-  const currentResolved = posterViewMode === "preview" ? backdropResolved : posterResolved;
-  const currentImagePath = posterViewMode === "preview" ? posterLowUrl : displayPosterPath;
-  const currentLoadToken = posterViewMode === "preview" ? backdropLoadToken : posterLoadToken;
-  const currentLoadTokenRef = posterViewMode === "preview" ? backdropLoadTokenRef : posterLoadTokenRef;
+  const currentLowLoaded =
+    posterViewMode === "preview" ? backdropLowLoaded : posterLowLoaded;
+  const currentHighLoaded =
+    posterViewMode === "preview" ? backdropHighLoaded : posterHighLoaded;
+  const currentImgError =
+    posterViewMode === "preview" ? backdropImgError : posterImgError;
+  const currentResolved =
+    posterViewMode === "preview" ? backdropResolved : posterResolved;
+  const currentImagePath =
+    posterViewMode === "preview" ? posterLowUrl : displayPosterPath;
+  const currentLoadToken =
+    posterViewMode === "preview" ? backdropLoadToken : posterLoadToken;
+  const currentLoadTokenRef =
+    posterViewMode === "preview" ? backdropLoadTokenRef : posterLoadTokenRef;
 
   // Skeleton mientras:
   // - no hemos “resuelto” si hay poster
@@ -4783,8 +4813,6 @@ export default function DetailsClient({
     };
   }, [poster3dEnabled, displayPosterPath]);
 
-
-
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
       {/* --- BACKGROUND & OVERLAY --- */}
@@ -4861,10 +4889,11 @@ export default function DetailsClient({
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 animate-in fade-in duration-700 slide-in-from-bottom-4 items-start">
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
-            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-all duration-500 ${isBackdropPoster
-              ? "max-w-full lg:max-w-[600px]"
-              : "max-w-[280px] lg:max-w-[320px]"
-              }`}
+            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-all duration-500 ${
+              isBackdropPoster
+                ? "max-w-full lg:max-w-[600px]"
+                : "max-w-[280px] lg:max-w-[320px]"
+            }`}
           >
             {/* Poster Card */}
             <div className="relative">
@@ -4904,10 +4933,12 @@ export default function DetailsClient({
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10" />
 
                   <div
-                    className={`relative bg-neutral-950 will-change-auto ${isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
-                      }`}
+                    className={`relative bg-neutral-950 will-change-auto ${
+                      isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
+                    }`}
                     style={{
-                      transition: "aspect-ratio 500ms cubic-bezier(0.4, 0, 0.2, 1)",
+                      transition:
+                        "aspect-ratio 500ms cubic-bezier(0.4, 0, 0.2, 1)",
                     }}
                   >
                     {/* Imagen anterior (permanece visible durante la transición) */}
@@ -4937,7 +4968,9 @@ export default function DetailsClient({
                           fetchPriority="high"
                           decoding="async"
                           onLoad={() => {
-                            if (currentLoadTokenRef.current !== currentLoadToken)
+                            if (
+                              currentLoadTokenRef.current !== currentLoadToken
+                            )
                               return;
                             // ✅ Usar el setState correcto según el modo
                             if (posterViewMode === "preview") {
@@ -4949,7 +4982,9 @@ export default function DetailsClient({
                             }
                           }}
                           onError={() => {
-                            if (currentLoadTokenRef.current !== currentLoadToken)
+                            if (
+                              currentLoadTokenRef.current !== currentLoadToken
+                            )
                               return;
                             // ✅ Usar el setState correcto según el modo
                             if (posterViewMode === "preview") {
@@ -4987,7 +5022,7 @@ ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-
                                 setPosterHighLoaded(true);
                               }
                             }}
-                            onError={() => { }}
+                            onError={() => {}}
                             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out
 ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
@@ -5009,28 +5044,41 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             </div>
 
             {/* Providers Grid + Enlaces Externos (cuando es backdrop) */}
-            {(limitedProviders && limitedProviders.length > 0) || (isBackdropPoster && externalLinks.length > 0) ? (
+            {(limitedProviders && limitedProviders.length > 0) ||
+            (isBackdropPoster && externalLinks.length > 0) ? (
               <div className="flex flex-row flex-nowrap justify-center items-center gap-3 w-full px-1 py-2 overflow-x-auto [scrollbar-width:none]">
                 {/* Providers - Solo si hay plataformas */}
                 {limitedProviders && limitedProviders.length > 0 && (
                   <div className="flex flex-row flex-nowrap items-center gap-2">
                     {limitedProviders.map((p) => {
                       const isPlexProvider = p.isPlex === true;
-                      
+
                       // Para Plex, manejar las URLs de forma especial
                       let providerLink;
                       let hasValidLink;
-                      
-                      if (isPlexProvider && p.url && typeof p.url === "object") {
+
+                      if (
+                        isPlexProvider &&
+                        p.url &&
+                        typeof p.url === "object"
+                      ) {
                         providerLink = "#";
-                        hasValidLink = !!(p.url.web || p.url.mobile || p.url.universal);
+                        hasValidLink = !!(
+                          p.url.web ||
+                          p.url.mobile ||
+                          p.url.universal
+                        );
                       } else {
                         providerLink = p.url || justwatchUrl || "#";
                         hasValidLink = p.url || justwatchUrl;
                       }
 
                       const handleClick = (e) => {
-                        if (isPlexProvider && p.url && typeof p.url === "object") {
+                        if (
+                          isPlexProvider &&
+                          p.url &&
+                          typeof p.url === "object"
+                        ) {
                           e.preventDefault();
 
                           const ua = navigator.userAgent || "";
@@ -5039,15 +5087,30 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           // iPadOS a veces se identifica como Mac; esto lo detecta bien:
                           const isIOS =
                             /iPad|iPhone|iPod/i.test(ua) ||
-                            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+                            (navigator.platform === "MacIntel" &&
+                              navigator.maxTouchPoints > 1);
+
+                          // Detectar tablets Android (que no son teléfonos)
+                          const isTablet =
+                            (isAndroid && !/mobile/i.test(ua)) ||
+                            /tablet|ipad/i.test(ua) ||
+                            (navigator.platform === "MacIntel" &&
+                              navigator.maxTouchPoints > 1);
+
+                          // Consideramos móvil/tablet como dispositivos que deben usar la app
+                          const isMobileOrTablet =
+                            isAndroid || isIOS || isTablet;
 
                           // Elección de URL:
-                          // - Android: universal link (watch.plex.tv) -> abre ficha correcta en app
-                          // - iOS: plex://preplay -> abre ficha correcta en app
-                          // - fallback: web
+                          // - Móvil/Tablet Android: universal link (watch.plex.tv) -> abre app
+                          // - Móvil/Tablet iOS: plex://preplay -> abre app
+                          // - Desktop: web browser
                           const urlToOpen =
-                            (isAndroid && p.url.universal) ||
-                            (isIOS && p.url.mobile) ||
+                            (isMobileOrTablet &&
+                              isAndroid &&
+                              p.url.universal) ||
+                            (isMobileOrTablet && isIOS && p.url.mobile) ||
+                            (!isMobileOrTablet && p.url.web) ||
                             p.url.web ||
                             p.url.universal ||
                             p.url.mobile;
@@ -5058,10 +5121,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           }
 
                           // En móvil/tablet, usa navegación directa (mejor para app links)
-                          if (isAndroid || isIOS) {
+                          if (isMobileOrTablet) {
                             window.location.href = urlToOpen;
                           } else {
-                            window.open(urlToOpen, "_blank", "noopener,noreferrer");
+                            window.open(
+                              urlToOpen,
+                              "_blank",
+                              "noopener,noreferrer",
+                            );
                           }
                         }
                       };
@@ -5070,8 +5137,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         <a
                           key={p.provider_id}
                           href={providerLink}
-                          target={hasValidLink && !isPlexProvider ? "_blank" : undefined}
-                          rel={hasValidLink && !isPlexProvider ? "noreferrer" : undefined}
+                          target={
+                            hasValidLink && !isPlexProvider
+                              ? "_blank"
+                              : undefined
+                          }
+                          rel={
+                            hasValidLink && !isPlexProvider
+                              ? "noreferrer"
+                              : undefined
+                          }
                           onClick={isPlexProvider ? handleClick : undefined}
                           title={p.provider_name}
                           className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10 cursor-pointer"
@@ -5093,9 +5168,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             }}
                           />
                           {isPlexProvider && (
-                            <div 
-                              className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-black" 
-                              title="Disponible en tu servidor local" 
+                            <div
+                              className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-black"
+                              title="Disponible en tu servidor local"
                             />
                           )}
                         </a>
@@ -5139,8 +5214,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           </div>
 
           {/* --- COLUMNA DERECHA: INFO (sin tabs cuando es backdrop) --- */}
-          <div className={`flex-1 flex flex-col min-w-0 w-full ${isBackdropPoster ? "" : ""
-            }`}>
+          <div
+            className={`flex-1 flex flex-col min-w-0 w-full ${
+              isBackdropPoster ? "" : ""
+            }`}
+          >
             {/* 1. TÍTULO Y CABECERA */}
             <div className="mb-5 px-1">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
@@ -5165,10 +5243,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <>
                     <span className="text-white text-[10px]">●</span>
                     <span
-                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${data.status === "Ended" || data.status === "Canceled"
-                        ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                        : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        }`}
+                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
+                        data.status === "Ended" || data.status === "Canceled"
+                          ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      }`}
                     >
                       {data.status}
                     </span>
@@ -5298,7 +5377,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 active={posterViewMode === "preview"}
                 activeColor="yellow"
                 groupId="details-actions"
-                title={posterViewMode === "preview" ? "Mostrar portada" : "Mostrar vista previa"}
+                title={
+                  posterViewMode === "preview"
+                    ? "Mostrar portada"
+                    : "Mostrar vista previa"
+                }
               >
                 {posterToggleBusy ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -5307,7 +5390,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
               </LiquidButton>
             </div>
-
 
             <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
               <div
@@ -5348,9 +5430,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       onClick={
                         !trakt?.connected
                           ? () =>
-                            window.location.assign(
-                              `/api/trakt/auth/start?next=/details/${type}/${id}`,
-                            )
+                              window.location.assign(
+                                `/api/trakt/auth/start?next=/details/${type}/${id}`,
+                              )
                           : undefined
                       }
                     />
@@ -5393,20 +5475,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* ✅ Rotten Tomatoes: SOLO desktop (>= sm) */}
                   {(tScoreboard?.external?.rtAudience != null ||
                     extras.rtScore != null) && (
-                      <div className="hidden sm:block">
-                        <CompactBadge
-                          logo="/logo-RottenTomatoes.png"
-                          value={
-                            tScoreboard?.external?.rtAudience != null
-                              ? Math.round(tScoreboard.external.rtAudience)
-                              : extras.rtScore != null
-                                ? Math.round(extras.rtScore)
-                                : null
-                          }
-                          suffix="%"
-                        />
-                      </div>
-                    )}
+                    <div className="hidden sm:block">
+                      <CompactBadge
+                        logo="/logo-RottenTomatoes.png"
+                        value={
+                          tScoreboard?.external?.rtAudience != null
+                            ? Math.round(tScoreboard.external.rtAudience)
+                            : extras.rtScore != null
+                              ? Math.round(extras.rtScore)
+                              : null
+                        }
+                        suffix="%"
+                      />
+                    </div>
+                  )}
 
                   {/* ✅ Metacritic: SOLO desktop (>= sm) */}
                   {extras.mcScore != null && (
@@ -5572,10 +5654,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-          ${activeTab === tab.id
-                          ? "text-white border-yellow-500"
-                          : "text-zinc-500 border-transparent hover:text-zinc-300"
-                        }`}
+          ${
+            activeTab === tab.id
+              ? "text-white border-yellow-500"
+              : "text-zinc-500 border-transparent hover:text-zinc-300"
+          }`}
                     >
                       {tab.label}
                     </button>
@@ -5774,18 +5857,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 { id: "details", label: "Detalles" },
                 { id: "production", label: "Producción" },
                 { id: "synopsis", label: "Sinopsis" },
-                ...(extras.awards
-                  ? [{ id: "awards", label: "Premios" }]
-                  : []),
+                ...(extras.awards ? [{ id: "awards", label: "Premios" }] : []),
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-        ${activeTab === tab.id
-                      ? "text-white border-yellow-500"
-                      : "text-zinc-500 border-transparent hover:text-zinc-300"
-                    }`}
+        ${
+          activeTab === tab.id
+            ? "text-white border-yellow-500"
+            : "text-zinc-500 border-transparent hover:text-zinc-300"
+        }`}
                 >
                   {tab.label}
                 </button>
@@ -6021,10 +6103,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               type="button"
                               onClick={() => setActiveImagesTab(tab)}
                               className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
-              ${activeImagesTab === tab
-                                  ? "bg-white/10 text-white shadow"
-                                  : "text-zinc-400 hover:text-zinc-200"
-                                }`}
+              ${
+                activeImagesTab === tab
+                  ? "bg-white/10 text-white shadow"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
                               style={{ WebkitTapHighlightColor: "transparent" }}
                             >
                               {tab === "posters"
@@ -6201,10 +6284,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 type="button"
                                 onClick={() => setActiveImagesTab("posters")}
-                                className={`p-2 rounded-lg transition-all ${activeImagesTab === "posters"
-                                  ? "bg-white/10 text-white shadow"
-                                  : "text-zinc-400 hover:text-zinc-200"
-                                  }`}
+                                className={`p-2 rounded-lg transition-all ${
+                                  activeImagesTab === "posters"
+                                    ? "bg-white/10 text-white shadow"
+                                    : "text-zinc-400 hover:text-zinc-200"
+                                }`}
                                 style={{
                                   WebkitTapHighlightColor: "transparent",
                                 }}
@@ -6215,10 +6299,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 type="button"
                                 onClick={() => setActiveImagesTab("backdrops")}
-                                className={`p-2 rounded-lg transition-all ${activeImagesTab === "backdrops"
-                                  ? "bg-white/10 text-white shadow"
-                                  : "text-zinc-400 hover:text-zinc-200"
-                                  }`}
+                                className={`p-2 rounded-lg transition-all ${
+                                  activeImagesTab === "backdrops"
+                                    ? "bg-white/10 text-white shadow"
+                                    : "text-zinc-400 hover:text-zinc-200"
+                                }`}
                                 style={{
                                   WebkitTapHighlightColor: "transparent",
                                 }}
@@ -6229,10 +6314,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 type="button"
                                 onClick={() => setActiveImagesTab("background")}
-                                className={`p-2 rounded-lg transition-all ${activeImagesTab === "background"
-                                  ? "bg-white/10 text-white shadow"
-                                  : "text-zinc-400 hover:text-zinc-200"
-                                  }`}
+                                className={`p-2 rounded-lg transition-all ${
+                                  activeImagesTab === "background"
+                                    ? "bg-white/10 text-white shadow"
+                                    : "text-zinc-400 hover:text-zinc-200"
+                                }`}
                                 style={{
                                   WebkitTapHighlightColor: "transparent",
                                 }}
@@ -6332,10 +6418,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => setLangES((v) => !v)}
-                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${langES
-                                    ? "bg-zinc-800 text-white"
-                                    : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                                    }`}
+                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${
+                                    langES
+                                      ? "bg-zinc-800 text-white"
+                                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                  }`}
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
@@ -6345,10 +6432,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => setLangEN((v) => !v)}
-                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${langEN
-                                    ? "bg-zinc-800 text-white"
-                                    : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                                    }`}
+                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${
+                                    langEN
+                                      ? "bg-zinc-800 text-white"
+                                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                  }`}
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
@@ -6392,19 +6480,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                     const breakpoints = isPoster
                       ? {
-                        500: { slidesPerView: 3, spaceBetween: 14 },
-                        640: { slidesPerView: 4, spaceBetween: 14 },
-                        768: { slidesPerView: 5, spaceBetween: 16 },
-                        1024: { slidesPerView: 6, spaceBetween: 18 },
-                        1280: { slidesPerView: 7, spaceBetween: 18 },
-                      }
+                          500: { slidesPerView: 3, spaceBetween: 14 },
+                          640: { slidesPerView: 4, spaceBetween: 14 },
+                          768: { slidesPerView: 5, spaceBetween: 16 },
+                          1024: { slidesPerView: 6, spaceBetween: 18 },
+                          1280: { slidesPerView: 7, spaceBetween: 18 },
+                        }
                       : {
-                        0: { slidesPerView: 2, spaceBetween: 12 },
-                        640: { slidesPerView: 3, spaceBetween: 14 },
-                        768: { slidesPerView: 4, spaceBetween: 16 },
-                        1024: { slidesPerView: 4, spaceBetween: 18 },
-                        1280: { slidesPerView: 4, spaceBetween: 20 },
-                      };
+                          0: { slidesPerView: 2, spaceBetween: 12 },
+                          640: { slidesPerView: 3, spaceBetween: 14 },
+                          768: { slidesPerView: 4, spaceBetween: 16 },
+                          1024: { slidesPerView: 4, spaceBetween: 18 },
+                          1280: { slidesPerView: 4, spaceBetween: 20 },
+                        };
 
                     return (
                       <div className="relative overflow-x-hidden overflow-y-visible">
@@ -6495,10 +6583,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     }}
                                     className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
-                        ${isActive
-                                        ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
-                                        : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
-                                      }`}
+                        ${
+                          isActive
+                            ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
+                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
+                        }`}
                                     title="Seleccionar"
                                     style={{
                                       WebkitTapHighlightColor: "transparent",
@@ -6741,7 +6830,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       )}
                     </div>
 
-                    <div className="p-6">{/* Sin mostrar error, directamente el contenido */}
+                    <div className="p-6">
+                      {/* Sin mostrar error, directamente el contenido */}
                       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                         {/* Columna Positiva */}
                         <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
@@ -7131,10 +7221,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           key={t.id}
                           type="button"
                           onClick={() => setTCommentsTab(t.id)}
-                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${tCommentsTab === t.id
-                            ? "bg-zinc-700 text-white shadow-md"
-                            : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-                            }`}
+                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
+                            tCommentsTab === t.id
+                              ? "bg-zinc-700 text-white shadow-md"
+                              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                          }`}
                         >
                           {t.label}
                         </button>
@@ -7255,173 +7346,176 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               {/* ✅ TRAKT: LISTAS - Solo mostrar si no hay error */}
               {!tLists.error && (
                 <section className="mb-12">
-                <div className="mb-6 flex items-center justify-between">
-                  <SectionTitle title="Listas Populares" icon={ListVideo} />
+                  <div className="mb-6 flex items-center justify-between">
+                    <SectionTitle title="Listas Populares" icon={ListVideo} />
 
-                  {/* Selector de Listas */}
-                  <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
-                    {["popular", "trending"].map((tab) => (
-                      <button
-                        key={tab}
-                        onClick={() => setTListsTab(tab)}
-                        className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${tListsTab === tab
-                          ? "bg-white text-black shadow-lg scale-105"
-                          : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    {/* Selector de Listas */}
+                    <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
+                      {["popular", "trending"].map((tab) => (
+                        <button
+                          key={tab}
+                          onClick={() => setTListsTab(tab)}
+                          className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${
+                            tListsTab === tab
+                              ? "bg-white text-black shadow-lg scale-105"
+                              : "text-zinc-400 hover:text-white hover:bg-white/5"
                           }`}
-                      >
-                        {tab}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                  {tLists.loading ? (
-                    <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
-                      <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-                      <span className="text-sm font-medium animate-pulse">
-                        Buscando listas y portadas...
-                      </span>
-                    </div>
-                  ) : (
-                    (tLists.items || []).map((row) => {
-                      const list = row?.list || row || {};
-                      const user = row?.user || list?.user || {};
-                      const previews = row?.previewPosters || [];
-
-                      const name = list?.name || "Lista";
-                      const itemCount = Number(
-                        list?.item_count || list?.items || 0,
-                      );
-                      const likes = Number(list?.likes || 0);
-                      const username = user?.username || user?.name || null;
-                      const slug = list?.ids?.slug || null;
-                      const traktId = list?.ids?.trakt || null;
-
-                      // ✅ Ruta interna (slug si existe; si no, traktId)
-                      const internalUrl =
-                        username && (slug || traktId)
-                          ? `/lists/trakt/${encodeURIComponent(username)}/${encodeURIComponent(String(slug || traktId))}`
-                          : null;
-
-                      // (opcional) enlace externo a Trakt, pero ya NO es el click principal
-                      const traktUrl =
-                        username && (slug || traktId)
-                          ? `https://trakt.tv/users/${username}/lists/${slug || traktId}`
-                          : null;
-
-                      const avatar =
-                        user?.images?.avatar?.full ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(username || "user")}&background=random`;
-
-                      const disabled = !internalUrl;
-
-                      return (
-                        <Link
-                          key={String(traktId || `${username}-${slug}` || name)}
-                          href={internalUrl || "#"}
-                          aria-disabled={disabled}
-                          className={[
-                            "group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500",
-                            "hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)]",
-                            disabled ? "pointer-events-none opacity-60" : "",
-                          ].join(" ")}
                         >
-                          {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS) */}
-                          <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
-                            {previews.length > 0 ? (
-                              <div className="h-full w-full flex items-center justify-center overflow-visible">
-                                <PosterStack posters={previews} />
-                              </div>
-                            ) : (
-                              <div className="flex h-full items-center justify-center opacity-10">
-                                <ListVideo className="h-20 w-20" />
-                              </div>
+                          {tab}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                    {tLists.loading ? (
+                      <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
+                        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                        <span className="text-sm font-medium animate-pulse">
+                          Buscando listas y portadas...
+                        </span>
+                      </div>
+                    ) : (
+                      (tLists.items || []).map((row) => {
+                        const list = row?.list || row || {};
+                        const user = row?.user || list?.user || {};
+                        const previews = row?.previewPosters || [];
+
+                        const name = list?.name || "Lista";
+                        const itemCount = Number(
+                          list?.item_count || list?.items || 0,
+                        );
+                        const likes = Number(list?.likes || 0);
+                        const username = user?.username || user?.name || null;
+                        const slug = list?.ids?.slug || null;
+                        const traktId = list?.ids?.trakt || null;
+
+                        // ✅ Ruta interna (slug si existe; si no, traktId)
+                        const internalUrl =
+                          username && (slug || traktId)
+                            ? `/lists/trakt/${encodeURIComponent(username)}/${encodeURIComponent(String(slug || traktId))}`
+                            : null;
+
+                        // (opcional) enlace externo a Trakt, pero ya NO es el click principal
+                        const traktUrl =
+                          username && (slug || traktId)
+                            ? `https://trakt.tv/users/${username}/lists/${slug || traktId}`
+                            : null;
+
+                        const avatar =
+                          user?.images?.avatar?.full ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(username || "user")}&background=random`;
+
+                        const disabled = !internalUrl;
+
+                        return (
+                          <Link
+                            key={String(
+                              traktId || `${username}-${slug}` || name,
                             )}
+                            href={internalUrl || "#"}
+                            aria-disabled={disabled}
+                            className={[
+                              "group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500",
+                              "hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)]",
+                              disabled ? "pointer-events-none opacity-60" : "",
+                            ].join(" ")}
+                          >
+                            {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS) */}
+                            <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
+                              {previews.length > 0 ? (
+                                <div className="h-full w-full flex items-center justify-center overflow-visible">
+                                  <PosterStack posters={previews} />
+                                </div>
+                              ) : (
+                                <div className="flex h-full items-center justify-center opacity-10">
+                                  <ListVideo className="h-20 w-20" />
+                                </div>
+                              )}
 
-                            {/* Botón externo (opcional) sin romper el Link */}
-                            {traktUrl && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  window.open(
-                                    traktUrl,
-                                    "_blank",
-                                    "noopener,noreferrer",
-                                  );
-                                }}
-                                className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-zinc-200 border border-white/10 hover:border-indigo-400/30 hover:text-white"
-                                title="Ver en Trakt"
-                              >
-                                Trakt
-                              </button>
-                            )}
-                          </div>
-
-                          {/* 2. CONTENIDO DE TEXTO */}
-                          <div className="relative flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
-                            <div>
-                              <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
-                                {name}
-                              </h4>
-
-                              {list?.description && (
-                                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
-                                  {stripHtml(list.description)}
-                                </p>
+                              {/* Botón externo (opcional) sin romper el Link */}
+                              {traktUrl && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    window.open(
+                                      traktUrl,
+                                      "_blank",
+                                      "noopener,noreferrer",
+                                    );
+                                  }}
+                                  className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-zinc-200 border border-white/10 hover:border-indigo-400/30 hover:text-white"
+                                  title="Ver en Trakt"
+                                >
+                                  Trakt
+                                </button>
                               )}
                             </div>
 
-                            {/* Footer */}
-                            <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <img
-                                  src={avatar}
-                                  alt={username || "user"}
-                                  className="h-6 w-6 rounded-full ring-1 ring-white/20"
-                                />
-                                <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px]">
-                                  {username || "—"}
-                                </span>
+                            {/* 2. CONTENIDO DE TEXTO */}
+                            <div className="relative flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
+                              <div>
+                                <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
+                                  {name}
+                                </h4>
+
+                                {list?.description && (
+                                  <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                                    {stripHtml(list.description)}
+                                  </p>
+                                )}
                               </div>
 
-                              <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
-                                <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
-                                  {itemCount} items
-                                </span>
-                                <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
-                                  <ThumbsUp className="h-3 w-3" /> {likes}
-                                </span>
+                              {/* Footer */}
+                              <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <img
+                                    src={avatar}
+                                    alt={username || "user"}
+                                    className="h-6 w-6 rounded-full ring-1 ring-white/20"
+                                  />
+                                  <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px]">
+                                    {username || "—"}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
+                                  <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
+                                    {itemCount} items
+                                  </span>
+                                  <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
+                                    <ThumbsUp className="h-3 w-3" /> {likes}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </Link>
-                      );
-                    })
-                  )}
-                </div>
-
-                {tLists.hasMore && (
-                  <div className="mt-8 flex justify-center">
-                    <button
-                      onClick={() =>
-                        setTLists((p) => ({ ...p, page: (p.page || 1) + 1 }))
-                      }
-                      className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold focus:outline-none"
-                    >
-                      <span className="absolute h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
-                      <span className="relative flex items-center gap-2 rounded-full bg-black px-6 py-2.5 transition-all duration-300 group-hover:bg-opacity-0">
-                        <span className="bg-gradient-to-r from-indigo-200 to-white bg-clip-text text-transparent group-hover:text-white">
-                          Cargar más listas
-                        </span>
-                        <ChevronDown className="h-4 w-4 text-indigo-300 group-hover:text-white" />
-                      </span>
-                    </button>
+                          </Link>
+                        );
+                      })
+                    )}
                   </div>
-                )}
-              </section>
+
+                  {tLists.hasMore && (
+                    <div className="mt-8 flex justify-center">
+                      <button
+                        onClick={() =>
+                          setTLists((p) => ({ ...p, page: (p.page || 1) + 1 }))
+                        }
+                        className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold focus:outline-none"
+                      >
+                        <span className="absolute h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+                        <span className="relative flex items-center gap-2 rounded-full bg-black px-6 py-2.5 transition-all duration-300 group-hover:bg-opacity-0">
+                          <span className="bg-gradient-to-r from-indigo-200 to-white bg-clip-text text-transparent group-hover:text-white">
+                            Cargar más listas
+                          </span>
+                          <ChevronDown className="h-4 w-4 text-indigo-300 group-hover:text-white" />
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </section>
               )}
             </section>
 
@@ -7578,7 +7672,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                       const tmdbScore =
                         typeof rec.vote_average === "number" &&
-                          rec.vote_average > 0
+                        rec.vote_average > 0
                           ? rec.vote_average
                           : null;
 
@@ -7611,10 +7705,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 {/* Top gradient con tipo y ratings */}
                                 <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
                                   <span
-                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
-                                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                      }`}
+                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                                      isMovie
+                                        ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                                        : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                    }`}
                                   >
                                     {isMovie ? "PELÍCULA" : "SERIE"}
                                   </span>
