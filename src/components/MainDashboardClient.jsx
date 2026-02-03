@@ -1323,6 +1323,7 @@ function Row({
     backdropOverrides,
     overridesReady,
     previewKind = 'default', // ✅ 4C: selector de preview
+    eager = false,
 }) {
     if (!items || items.length === 0) return null
 
@@ -1362,7 +1363,7 @@ function Row({
     const [canNext, setCanNext] = useState(false)
     const [hoveredId, setHoveredId] = useState(null)
     const [hoveredIndex, setHoveredIndex] = useState(null)
-    const isInView = useInView(rowRef, { once: true, margin: '-100px' })
+    const isInView = eager ? true : useInView(rowRef, { once: true, margin: '-100px' })
     const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set())
 
     // Precargar backdrops cuando el usuario está sobre la fila
@@ -2238,6 +2239,7 @@ export default function MainDashboardClient({ initialData }) {
                     backdropOverrides={backdropOverrides}
                     overridesReady={overridesReady}
                     previewKind="anticipated"
+                    eager={true}
                 />
 
                 {/* ...el resto igual... */}
@@ -2250,6 +2252,7 @@ export default function MainDashboardClient({ initialData }) {
                     posterOverrides={posterOverrides}
                     backdropOverrides={backdropOverrides}
                     overridesReady={overridesReady}
+                    eager={true}
                 />
 
                 <Row
