@@ -6707,45 +6707,41 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
             <section id="section-sentiment" ref={registerSection("sentiment")}>
               {/* ===================================================== */}
-              {/* ✅ TRAKT: SENTIMIENTOS (AI SUMMARY) */}
-              <section className="mb-12">
-                <SectionTitle
-                  title="Análisis de Sentimientos"
-                  icon={Sparkles}
-                />
+              {/* ✅ TRAKT: SENTIMIENTOS (AI SUMMARY) - Solo mostrar si no hay error */}
+              {!tSentiment.error && (
+                <section className="mb-12">
+                  <SectionTitle
+                    title="Análisis de Sentimientos"
+                    icon={Sparkles}
+                  />
 
-                <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
-                  {/* Header del bloque */}
-                  <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
-                    <div className="flex items-center gap-4">
-                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
-                        <img
-                          src="/logo-Trakt.png"
-                          alt="Trakt"
-                          className="h-full w-full object-cover"
-                        />
+                  <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
+                    {/* Header del bloque */}
+                    <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
+                      <div className="flex items-center gap-4">
+                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
+                          <img
+                            src="/logo-Trakt.png"
+                            alt="Trakt"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold leading-tight text-white">
+                            Trakt Community Pulse
+                          </h3>
+                          <p className="text-xs font-medium text-zinc-400">
+                            Resumen por IA basado en comentarios sobre{" "}
+                            <span className="text-zinc-200">{title}</span>
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-base font-bold leading-tight text-white">
-                          Trakt Community Pulse
-                        </h3>
-                        <p className="text-xs font-medium text-zinc-400">
-                          Resumen por IA basado en comentarios sobre{" "}
-                          <span className="text-zinc-200">{title}</span>
-                        </p>
-                      </div>
+                      {tSentiment.loading && (
+                        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+                      )}
                     </div>
-                    {tSentiment.loading && (
-                      <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
-                    )}
-                  </div>
 
-                  <div className="p-6">
-                    {tSentiment.error ? (
-                      <div className="rounded-xl bg-red-500/10 p-4 text-center text-sm font-medium text-red-400 border border-red-500/20">
-                        {tSentiment.error}
-                      </div>
-                    ) : (
+                    <div className="p-6">{/* Sin mostrar error, directamente el contenido */}
                       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                         {/* Columna Positiva */}
                         <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
@@ -6807,10 +6803,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           )}
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
-              </section>
+                </section>
+              )}
             </section>
 
             {type === "tv" && (
@@ -7150,14 +7146,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </div>
 
                   <div className="space-y-4 p-4 sm:p-6">
-                    {tComments.error && (
-                      <div className="text-center text-sm text-red-400">
-                        {tComments.error}
-                      </div>
-                    )}
-
                     {!tComments.loading &&
-                      !tComments.error &&
                       (tComments.items || []).length === 0 && (
                         <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
                           <MessageSquareIcon className="mb-2 h-8 w-8 opacity-20" />
@@ -7263,8 +7252,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
             <section id="section-lists" ref={registerSection("lists")}>
               {/* ===================================================== */}
-              {/* ✅ TRAKT: LISTAS (DISEÑO MEJORADO) */}
-              <section className="mb-12">
+              {/* ✅ TRAKT: LISTAS - Solo mostrar si no hay error */}
+              {!tLists.error && (
+                <section className="mb-12">
                 <div className="mb-6 flex items-center justify-between">
                   <SectionTitle title="Listas Populares" icon={ListVideo} />
 
@@ -7432,6 +7422,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </div>
                 )}
               </section>
+              )}
             </section>
 
             {collectionId && (

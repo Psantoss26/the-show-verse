@@ -58,8 +58,11 @@ export async function GET(request) {
     // Helper: intenta conseguir slug (para watch.plex.tv) vía metadata.provider.plex.tv
     async function getPlexSlug({ imdbId, tmdbId, type }) {
       const metadataType = type === "movie" ? 1 : 2; // 1 movie, 2 show
-      const guid =
-        imdbId ? `imdb://${imdbId}` : tmdbId ? `tmdb://${tmdbId}` : null;
+      const guid = imdbId
+        ? `imdb://${imdbId}`
+        : tmdbId
+          ? `tmdb://${tmdbId}`
+          : null;
 
       if (!guid) return null;
 
@@ -67,9 +70,15 @@ export async function GET(request) {
         guid,
       )}&type=${metadataType}&X-Plex-Token=${encodeURIComponent(PLEX_TOKEN)}`;
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+
       const res = await fetch(url, {
         headers: { Accept: "application/json" },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) return null;
 
@@ -82,16 +91,23 @@ export async function GET(request) {
     let machineIdentifier = null;
     try {
       const serverInfoUrl = `${PLEX_URL}/?X-Plex-Token=${PLEX_TOKEN}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+
       const serverInfoResponse = await fetch(serverInfoUrl, {
         headers: { Accept: "application/json" },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (serverInfoResponse.ok) {
         const serverData = await serverInfoResponse.json();
-        machineIdentifier = serverData?.MediaContainer?.machineIdentifier ?? null;
+        machineIdentifier =
+          serverData?.MediaContainer?.machineIdentifier ?? null;
       }
     } catch (err) {
-      console.warn("Could not fetch server machine identifier:", err);
+      // Silently fail - Plex not available
     }
 
     // Buscar en Plex
@@ -100,9 +116,15 @@ export async function GET(request) {
     )}&X-Plex-Token=${PLEX_TOKEN}`;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+
       const response = await fetch(searchUrl, {
         headers: { Accept: "application/json" },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Plex API error: ${response.status}`);
@@ -115,7 +137,11 @@ export async function GET(request) {
       if (data.MediaContainer?.Metadata) {
         for (const item of data.MediaContainer.Metadata) {
           const itemType =
-            item.type === "movie" ? "movie" : item.type === "show" ? "tv" : null;
+            item.type === "movie"
+              ? "movie"
+              : item.type === "show"
+                ? "tv"
+                : null;
           if (itemType !== type) continue;
 
           const itemTitle = item.title?.toLowerCase();
@@ -144,7 +170,8 @@ export async function GET(request) {
         return NextResponse.json({ available: false, plexUrl: null });
       }
 
-      const serverMachineId = machineIdentifier || matchedItem.machineIdentifier;
+      const serverMachineId =
+        machineIdentifier || matchedItem.machineIdentifier;
 
       // metadata key base
       let metadataKey =
@@ -199,16 +226,16 @@ export async function GET(request) {
         {
           status: 200,
           headers: {
-            "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=7200",
+            "Cache-Control":
+              "public, s-maxage=3600, stale-while-revalidate=7200",
           },
         },
       );
     } catch (plexError) {
-      console.error("Error connecting to Plex:", plexError);
+      // Silently fail - Plex not available or timeout
       return NextResponse.json({
         available: false,
         plexUrl: null,
-        error: "No se pudo conectar con Plex",
       });
     }
   } catch (error) {

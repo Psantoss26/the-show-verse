@@ -1194,8 +1194,9 @@ export default function WatchlistPage() {
 
   // Reset visible when filters/group/sort change
   useEffect(() => {
+    if (wantsFullCollection) return;
     setVisibleCount(INITIAL_VISIBLE);
-  }, [typeFilter, query, groupBy, sortBy]);
+  }, [typeFilter, query, groupBy, sortBy, wantsFullCollection]);
 
   // Clear rating caches + state when coming back
   useEffect(() => {

@@ -1222,8 +1222,9 @@ export default function FavoritesPage() {
 
   // Reset visible when filters/group/sort change
   useEffect(() => {
+    if (wantsFullCollection) return;
     setVisibleCount(INITIAL_VISIBLE);
-  }, [typeFilter, query, groupBy, sortBy]);
+  }, [typeFilter, query, groupBy, sortBy, wantsFullCollection]);
 
   // Clear rating caches + state when coming back (fix: rated something but still “sin nota”)
   useEffect(() => {
