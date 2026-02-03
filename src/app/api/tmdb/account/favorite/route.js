@@ -12,6 +12,53 @@ async function getAccount(sessionId) {
   return data
 }
 
+// Listar favoritos
+export async function GET(req) {
+  const cookieStore = cookies()
+  const sessionId = cookieStore.get('tmdb_session_id')?.value
+  const { searchParams } = new URL(req.url)
+  const type = searchParams.get('type') || 'movies' // 'movies' | 'tv'
+  const page = searchParams.get('page') || '1'
+
+  if (!sessionId) {
+    return new Response(JSON.stringify({ error: 'NO_SESSION' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const accountRes = await fetch(`${TMDB}/account?api_key=${API_KEY}&session_id=${sessionId}`, {
+    cache: 'no-store',
+  })
+  const accountData = await accountRes.json()
+  if (!accountRes.ok) {
+    return new Response(JSON.stringify({ error: accountData.status_message || 'TMDB_ACCOUNT_ERROR' }), {
+      status: accountRes.status,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const url =
+    type === 'tv'
+      ? `${TMDB}/account/${accountData.id}/favorite/tv?api_key=${API_KEY}&session_id=${sessionId}&page=${page}`
+      : `${TMDB}/account/${accountData.id}/favorite/movies?api_key=${API_KEY}&session_id=${sessionId}&page=${page}`
+
+  const res = await fetch(url, { cache: 'no-store' })
+  const data = await res.json()
+
+  if (!res.ok) {
+    return new Response(JSON.stringify({ error: data.status_message || 'TMDB_ERROR' }), {
+      status: res.status,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 export async function POST(req) {
   const cookieStore = cookies()
   const sessionId = cookieStore.get('tmdb_session_id')?.value
