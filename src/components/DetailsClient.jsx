@@ -5101,24 +5101,45 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const isMobileOrTablet =
                             isAndroid || isIOS || isTablet;
 
-                          // Elección de URL:
-                          // - Móvil/Tablet Android: universal link (watch.plex.tv) -> abre app
-                          // - Móvil/Tablet iOS: plex://preplay -> abre app
-                          // - Desktop: web browser
-                          const urlToOpen =
-                            (isMobileOrTablet &&
-                              isAndroid &&
-                              p.url.universal) ||
-                            (isMobileOrTablet && isIOS && p.url.mobile) ||
-                            (!isMobileOrTablet && p.url.web) ||
-                            p.url.web ||
-                            p.url.universal ||
-                            p.url.mobile;
+                          // Debug: ver qué se detectó
+                          console.log("[Plex Click Debug]", {
+                            userAgent: ua,
+                            isAndroid,
+                            isIOS,
+                            isTablet,
+                            isMobileOrTablet,
+                            availableUrls: {
+                              web: p.url.web,
+                              mobile: p.url.mobile,
+                              universal: p.url.universal,
+                            },
+                          });
+
+                          // Elección de URL según dispositivo:
+                          let urlToOpen;
+
+                          if (isMobileOrTablet) {
+                            // En móvil/tablet: priorizar URLs de app
+                            if (isAndroid) {
+                              // Android: universal link funciona mejor
+                              urlToOpen =
+                                p.url.universal || p.url.mobile || p.url.web;
+                            } else {
+                              // iOS/iPad: deep link funciona mejor
+                              urlToOpen =
+                                p.url.mobile || p.url.universal || p.url.web;
+                            }
+                          } else {
+                            // Desktop: solo URL web
+                            urlToOpen = p.url.web || p.url.universal;
+                          }
 
                           if (!urlToOpen) {
                             console.warn("[Plex] No URL available");
                             return;
                           }
+
+                          console.log("[Plex] Opening URL:", urlToOpen);
 
                           // En móvil/tablet, usa navegación directa (mejor para app links)
                           if (isMobileOrTablet) {
