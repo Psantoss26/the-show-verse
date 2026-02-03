@@ -5082,32 +5082,23 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           e.preventDefault();
 
                           const ua = navigator.userAgent || "";
+
+                          // Detectar si es dispositivo táctil (móvil/tablet)
+                          const isTouchDevice =
+                            "ontouchstart" in window ||
+                            navigator.maxTouchPoints > 0 ||
+                            navigator.msMaxTouchPoints > 0;
+
                           const isAndroid = /Android/i.test(ua);
+                          const isIOS = /iPad|iPhone|iPod/i.test(ua);
 
-                          // iPadOS a veces se identifica como Mac; esto lo detecta bien:
-                          const isIOS =
-                            /iPad|iPhone|iPod/i.test(ua) ||
-                            (navigator.platform === "MacIntel" &&
-                              navigator.maxTouchPoints > 1);
-
-                          // Detectar tablets Android (que no son teléfonos)
-                          const isTablet =
-                            (isAndroid && !/mobile/i.test(ua)) ||
-                            /tablet|ipad/i.test(ua) ||
-                            (navigator.platform === "MacIntel" &&
-                              navigator.maxTouchPoints > 1);
-
-                          // Consideramos móvil/tablet como dispositivos que deben usar la app
-                          const isMobileOrTablet =
-                            isAndroid || isIOS || isTablet;
-
-                          // Debug: ver qué se detectó
+                          // Debug
                           console.log("[Plex Click Debug]", {
                             userAgent: ua,
+                            isTouchDevice,
+                            maxTouchPoints: navigator.maxTouchPoints,
                             isAndroid,
                             isIOS,
-                            isTablet,
-                            isMobileOrTablet,
                             availableUrls: {
                               web: p.url.web,
                               mobile: p.url.mobile,
@@ -5118,19 +5109,23 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           // Elección de URL según dispositivo:
                           let urlToOpen;
 
-                          if (isMobileOrTablet) {
-                            // En móvil/tablet: priorizar URLs de app
+                          if (isTouchDevice) {
+                            // Dispositivo táctil: priorizar URLs de app
                             if (isAndroid) {
                               // Android: universal link funciona mejor
                               urlToOpen =
                                 p.url.universal || p.url.mobile || p.url.web;
-                            } else {
+                            } else if (isIOS) {
                               // iOS/iPad: deep link funciona mejor
                               urlToOpen =
                                 p.url.mobile || p.url.universal || p.url.web;
+                            } else {
+                              // Otro táctil: intentar universal primero
+                              urlToOpen =
+                                p.url.universal || p.url.mobile || p.url.web;
                             }
                           } else {
-                            // Desktop: solo URL web
+                            // Ordenador sin táctil: solo URL web
                             urlToOpen = p.url.web || p.url.universal;
                           }
 
@@ -5139,10 +5134,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             return;
                           }
 
-                          console.log("[Plex] Opening URL:", urlToOpen);
+                          console.log(
+                            "[Plex] Opening URL:",
+                            urlToOpen,
+                            "| Touch device:",
+                            isTouchDevice,
+                          );
 
-                          // En móvil/tablet, usa navegación directa (mejor para app links)
-                          if (isMobileOrTablet) {
+                          // En dispositivo táctil, usa navegación directa (mejor para app links)
+                          if (isTouchDevice) {
                             window.location.href = urlToOpen;
                           } else {
                             window.open(
