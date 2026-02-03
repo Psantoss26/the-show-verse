@@ -27,6 +27,9 @@ import TraktHistoryNavButton from "@/components/trakt/TraktHistoryNavButton";
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
  * ==================================================================== */
+/* ====================================================================
+ * Componente de Búsqueda Reutilizable (Lógica y UI)
+ * ==================================================================== */
 function SearchBar({ onResultClick, isMobile = false }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -116,47 +119,56 @@ function SearchBar({ onResultClick, isMobile = false }) {
       className={`relative w-full ${isMobile ? "max-w-full" : "max-w-lg"}`}
       ref={searchRef}
     >
-      <form onSubmit={(e) => e.preventDefault()} className="relative group">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+      <form onSubmit={(e) => e.preventDefault()} className="relative w-full">
+        <div
+          className={`
+            relative flex items-center w-full transition-all duration-300 ease-out
+            bg-[#1A1A1A] border border-white/10 rounded-full group
+            hover:bg-[#202020] hover:border-white/20
+            focus-within:bg-[#202020] focus-within:border-white/30 focus-within:ring-4 focus-within:ring-white/5
+            ${isMobile ? "h-12 pl-4 pr-3 shadow-2xl" : "h-11 pl-4 pr-3 shadow-lg"}
+          `}
+        >
+          {/* Lupa siempre blanca y visible */}
           <SearchIcon
-            className={`w-5 h-5 transition-all duration-300 ${
-              query ? "text-blue-400" : "text-white"
-            }`}
+            className="w-5 h-5 text-white flex-shrink-0 opacity-100 group-focus-within:scale-110 transition-transform duration-300"
+            strokeWidth={2.5}
           />
-          {isSearching && (
-            <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-          )}
+
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => query.trim() && setShowDropdown(true)}
+            placeholder={
+              isMobile ? "Buscar..." : "Buscar películas, series o actores..."
+            }
+            className={`
+              flex-1 w-full bg-transparent border-none focus:ring-0 shadow-none outline-none
+              text-white placeholder-neutral-400 text-sm font-medium ml-3 h-full
+            `}
+          />
+
+          <div className="flex items-center gap-2">
+            {isSearching && (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            )}
+
+            {query && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setResults([]);
+                  setShowDropdown(false);
+                }}
+                className="p-1 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-all"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => query.trim() && setShowDropdown(true)}
-          placeholder={
-            isMobile ? "Buscar..." : "Buscar películas, series o actores..."
-          }
-          className={`w-full ${isSearching ? "pl-[4.5rem]" : "pl-11"} pr-4 ${isMobile ? "py-3.5 text-base" : "py-2.5 text-sm"} 
-            bg-neutral-900/60 border border-neutral-700/50 text-white rounded-full 
-            focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 focus:bg-neutral-900/80
-            hover:border-neutral-600/50 hover:bg-neutral-900/70
-            placeholder:text-neutral-500
-            transition-all duration-300 ease-out
-            shadow-lg shadow-black/20
-            backdrop-blur-xl`}
-        />
-        {query && (
-          <button
-            type="button"
-            onClick={() => {
-              setQuery("");
-              setResults([]);
-              setShowDropdown(false);
-            }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-all"
-          >
-            <XIcon className="w-4 h-4" />
-          </button>
-        )}
       </form>
 
       <AnimatePresence>
@@ -166,9 +178,9 @@ function SearchBar({ onResultClick, isMobile = false }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className={`absolute top-full left-0 w-full bg-neutral-900/95 text-white ${isMobile ? "mt-3" : "mt-2"} rounded-2xl 
-              shadow-2xl shadow-black/40 max-h-[70vh] overflow-y-auto z-50 
-              border border-neutral-700/50 backdrop-blur-2xl no-scrollbar`}
+            className={`absolute top-full left-0 w-full bg-[#121212]/95 text-white ${isMobile ? "mt-3" : "mt-2"} rounded-2xl 
+              shadow-2xl shadow-black/50 max-h-[70vh] overflow-y-auto z-50 
+              border border-white/10 backdrop-blur-2xl no-scrollbar`}
           >
             <div className="p-2">
               {results.slice(0, 8).map((item, index) => (
@@ -181,7 +193,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.03 }}
-                    className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-neutral-800/60 active:bg-neutral-800/80 transition-all cursor-pointer group"
+                    className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-white/10 active:bg-white/15 transition-all cursor-pointer group"
                   >
                     <div className="relative flex-shrink-0">
                       <img
@@ -191,7 +203,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
                             : "/default-poster.png"
                         }
                         alt={item.title || item.name || "Resultado"}
-                        className="w-12 h-16 rounded-lg shadow-lg object-cover border border-neutral-800 group-hover:border-neutral-700 transition-colors"
+                        className="w-12 h-16 rounded-lg shadow-lg object-cover border border-white/10 group-hover:border-white/20 transition-colors"
                       />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -221,7 +233,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
               ))}
             </div>
             {results.length > 8 && (
-              <div className="px-4 py-2 text-center text-xs text-neutral-500 border-t border-neutral-800/50">
+              <div className="px-4 py-2 text-center text-xs text-neutral-500 border-t border-white/10">
                 Mostrando 8 de {results.length} resultados
               </div>
             )}
@@ -246,10 +258,9 @@ export default function Navbar() {
     pathname === href || (href !== "/" && pathname?.startsWith(href));
 
   const navLinkClass = (href) =>
-    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-      isActive(href)
-        ? "bg-white/10 text-white"
-        : "text-neutral-400 hover:text-white hover:bg-white/5"
+    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(href)
+      ? "bg-white/10 text-white"
+      : "text-neutral-400 hover:text-white hover:bg-white/5"
     }`;
 
   const iconLinkClass = (href, tone = "neutral") => {
@@ -315,8 +326,7 @@ export default function Navbar() {
   };
 
   const navLinkClassMobileBottom = (href) =>
-    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${
-      isActive(href) ? "text-blue-400" : "text-neutral-400 hover:text-white"
+    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${isActive(href) ? "text-blue-400" : "text-neutral-400 hover:text-white"
     }`;
 
   // Menú inferior fijo: 4 secciones. Si no hay sesión, fav/watchlist llevan a login.
@@ -467,11 +477,11 @@ export default function Navbar() {
           <div className="flex items-center gap-2 flex-shrink-0 pr-1">
             <button
               onClick={() => setShowMobileSearch(true)}
-              className="p-2 rounded-full transition-colors text-neutral-300 hover:text-white hover:bg-white/5"
+              className="p-2 rounded-full transition-colors text-white hover:bg-white/10"
               title="Buscar"
               aria-label="Buscar"
             >
-              <SearchIcon className="w-6 h-6" />
+              <SearchIcon className="w-6 h-6 text-white" />
             </button>
 
             {!hydrated ? (
@@ -560,11 +570,10 @@ export default function Navbar() {
                 <Link
                   href="/"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                    isActive("/")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/")
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-300 hover:bg-white/5"
+                    }`}
                 >
                   <HomeIcon className="w-5 h-5" />
                   <span>Inicio</span>
@@ -573,11 +582,10 @@ export default function Navbar() {
                 <Link
                   href="/movies"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                    isActive("/movies")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/movies")
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-300 hover:bg-white/5"
+                    }`}
                 >
                   <FilmIcon className="w-5 h-5" />
                   <span>Películas</span>
@@ -586,11 +594,10 @@ export default function Navbar() {
                 <Link
                   href="/series"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                    isActive("/series")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/series")
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-300 hover:bg-white/5"
+                    }`}
                 >
                   <TvIcon className="w-5 h-5" />
                   <span>Series</span>
@@ -599,11 +606,10 @@ export default function Navbar() {
                 <Link
                   href="/discover"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                    isActive("/discover")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/discover")
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-300 hover:bg-white/5"
+                    }`}
                 >
                   <Compass className="w-5 h-5" />
                   <span>Descubrir</span>
@@ -614,11 +620,10 @@ export default function Navbar() {
                 <Link
                   href="/stats"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                    isActive("/stats")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/stats")
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-300 hover:bg-white/5"
+                    }`}
                 >
                   <BarChart3 className="w-5 h-5" />
                   <span>Estadísticas</span>
@@ -634,11 +639,10 @@ export default function Navbar() {
                 <Link
                   href={favHref}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                    isActive("/favorites")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/favorites")
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-300 hover:bg-white/5"
+                    }`}
                 >
                   <Heart className="w-5 h-5" />
                   <span>Favoritas</span>
@@ -647,11 +651,10 @@ export default function Navbar() {
                 <Link
                   href={watchHref}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                    isActive("/watchlist")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/watchlist")
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-300 hover:bg-white/5"
+                    }`}
                 >
                   <Bookmark className="w-5 h-5" />
                   <span>Pendientes</span>
@@ -662,11 +665,10 @@ export default function Navbar() {
                 <Link
                   href="/lists"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                    isActive("/lists")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/lists")
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-300 hover:bg-white/5"
+                    }`}
                 >
                   <ListVideo className="w-5 h-5" />
                   <span>Listas</span>
@@ -675,11 +677,10 @@ export default function Navbar() {
                 <Link
                   href="/calendar"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                    isActive("/calendar")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/calendar")
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-300 hover:bg-white/5"
+                    }`}
                 >
                   <CalendarDaysIcon className="w-5 h-5" />
                   <span>Calendario</span>
