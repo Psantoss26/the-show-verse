@@ -5389,17 +5389,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </LiquidButton>
               )}
 
-              {/* Botón de Compartir */}
-              <ActionShareButton
-                title={title}
-                text={`Echa un vistazo a ${title} en The Show Verse`}
-                url={
-                  typeof window !== "undefined"
-                    ? `${window.location.origin}/details/${type}/${id}`
-                    : undefined
-                }
-              />
-
               {/* Botón Cambiar Portada */}
               <LiquidButton
                 onClick={(e) => {
@@ -5596,6 +5585,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {!isBackdropPoster && (
                   <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
                 )}
+
+                {/* Botón de Compartir */}
+                <ActionShareButton
+                  title={title}
+                  text={`Echa un vistazo a ${title} en The Show Verse`}
+                  url={
+                    typeof window !== "undefined"
+                      ? `${window.location.origin}/details/${type}/${id}`
+                      : undefined
+                  }
+                />
               </div>
               {/* Footer de Estadísticas (VISIBLE EN MÓVIL, SIN RECORTES) */}
               {!tScoreboard.loading && (
