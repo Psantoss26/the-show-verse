@@ -5326,6 +5326,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }}
               />
 
+              {/* Botón Puntuar */}
+              <StarRating
+                rating={unifiedUserRating}
+                max={10}
+                loading={accountStatesLoading || ratingLoading || !!traktBusy}
+                onRate={handleUnifiedRate}
+                connected={!!session || trakt.connected}
+                onConnect={() => {
+                  window.location.href = "/login";
+                }}
+              />
+
               <LiquidButton
                 onClick={toggleFavorite}
                 disabled={favLoading}
@@ -5584,22 +5596,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {!isBackdropPoster && (
                   <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
                 )}
-
-                {/* C. Puntuación Usuario - con margen automático cuando es backdrop */}
-                <div
-                  className={`flex items-center gap-3 shrink-0 ${isBackdropPoster ? "ml-auto" : ""}`}
-                >
-                  <StarRating
-                    rating={unifiedUserRating}
-                    max={10}
-                    loading={
-                      accountStatesLoading || ratingLoading || !!traktBusy
-                    }
-                    onRate={handleUnifiedRate}
-                    connected={!!session || trakt.connected}
-                    onConnect={() => (window.location.href = "/login")}
-                  />
-                </div>
               </div>
               {/* Footer de Estadísticas (VISIBLE EN MÓVIL, SIN RECORTES) */}
               {!tScoreboard.loading && (
