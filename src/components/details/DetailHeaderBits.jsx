@@ -255,15 +255,20 @@ export function ActionShareButton({ title, text, url }) {
   };
 
   return (
-    <LiquidButton
+    <button
+      type="button"
       onClick={handleShare}
-      active={true}
-      activeColor="teal"
-      groupId="details-actions"
-      className="flex-shrink-0"
+      className="group inline-flex items-center justify-center gap-2 rounded-xl border transition-all duration-300 p-2 sm:px-3 sm:py-2 bg-transparent border-white/10 text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
       title={copied ? "¡Enlace copiado!" : "Compartir"}
     >
-      {copied ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
-    </LiquidButton>
+      {copied ? (
+        <Check className="w-4 h-4 transition-transform group-hover:scale-110" />
+      ) : (
+        <Share2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+      )}
+      <span className="hidden sm:block text-sm font-medium">
+        {copied ? "Copiado" : "Compartir"}
+      </span>
+    </button>
   );
 }

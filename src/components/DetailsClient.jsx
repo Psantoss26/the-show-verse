@@ -5397,7 +5397,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   handleCyclePoster();
                 }}
                 active={posterViewMode === "preview"}
-                activeColor="yellow"
+                activeColor="orange"
                 groupId="details-actions"
                 title={
                   posterViewMode === "preview"
@@ -5586,16 +5586,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
                 )}
 
-                {/* Botón de Compartir */}
-                <ActionShareButton
-                  title={title}
-                  text={`Echa un vistazo a ${title} en The Show Verse`}
-                  url={
-                    typeof window !== "undefined"
-                      ? `${window.location.origin}/details/${type}/${id}`
-                      : undefined
-                  }
-                />
+                {/* ✅ Botón de Compartir - pegado al extremo derecho */}
+                <div className="ml-auto shrink-0">
+                  <ActionShareButton
+                    title={title}
+                    text={`Echa un vistazo a ${title} en The Show Verse`}
+                    url={
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/details/${type}/${id}`
+                        : undefined
+                    }
+                  />
+                </div>
               </div>
               {/* Footer de Estadísticas (VISIBLE EN MÓVIL, SIN RECORTES) */}
               {!tScoreboard.loading && (
