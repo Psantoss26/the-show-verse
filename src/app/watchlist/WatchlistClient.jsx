@@ -11,6 +11,9 @@ import {
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
+import { getExternalIds } from "@/lib/api/tmdb";
+import { fetchOmdbByImdb } from "@/lib/api/omdb";
+import { traktGetScoreboard } from "@/lib/api/traktClient";
 import {
   Loader2,
   Bookmark,
@@ -25,6 +28,7 @@ import {
   LayoutList,
   Grid3x3,
   LayoutGrid,
+  Layers3,
 } from "lucide-react";
 
 // ================== UTILS & CACHE ==================
@@ -34,8 +38,78 @@ const posterInFlight = new Map();
 const backdropChoiceCache = new Map();
 const backdropInFlight = new Map();
 
+// Persistent score cache - 30 days TTL
+const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Cache management for scores
+function readScoreCache(source) {
+  if (typeof window === "undefined") return new Map();
+  try {
+    const key = `showverse:scores:${source}`;
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return new Map();
+
+    const parsed = JSON.parse(raw);
+    const now = Date.now();
+    const cache = new Map();
+
+    // Filter out expired entries
+    Object.entries(parsed).forEach(([id, entry]) => {
+      if (entry.t && now - entry.t < SCORE_CACHE_TTL_MS) {
+        cache.set(id, entry.score);
+      }
+    });
+
+    return cache;
+  } catch {
+    return new Map();
+  }
+}
+
+function writeScoreCache(source, scoresMap) {
+  if (typeof window === "undefined") return;
+  try {
+    const key = `showverse:scores:${source}`;
+    const now = Date.now();
+    const data = {};
+
+    scoresMap.forEach((score, id) => {
+      data[id] = { score, t: now };
+    });
+
+    window.localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn("Failed to write score cache:", e);
+  }
+}
+
+function updateScoreCache(source, id, score) {
+  if (typeof window === "undefined") return;
+  try {
+    const key = `showverse:scores:${source}`;
+    const raw = window.localStorage.getItem(key);
+    const data = raw ? JSON.parse(raw) : {};
+
+    data[id] = { score, t: Date.now() };
+
+    window.localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn("Failed to update score cache:", e);
+  }
+}
+
 function buildImg(path, size = "w500") {
   return `https://image.tmdb.org/t/p/${size}${path}`;
+}
+
+function clampNumber(v) {
+  return typeof v === "number" && !Number.isNaN(v) ? v : null;
+}
+
+function formatAvg(v) {
+  if (typeof v !== "number" || Number.isNaN(v)) return "—";
+  const r = Math.round(v * 10) / 10;
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
 }
 
 function normText(s) {
@@ -271,6 +345,104 @@ function SmartPoster({ item, title, mode = "poster" }) {
         />
       ) : null}
     </div>
+  );
+}
+
+function StatBox({ label, value, icon: Icon, imgSrc, colorClass }) {
+  return (
+    <div className="flex flex-col items-start min-w-0">
+      <div className="flex items-center gap-1.5 mb-1 opacity-75 min-w-0">
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={label}
+            className="w-auto h-3 sm:h-3.5 object-contain opacity-85 shrink-0"
+          />
+        ) : Icon ? (
+          <Icon
+            className={`w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 ${colorClass}`}
+          />
+        ) : null}
+
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">
+          {label}
+        </span>
+      </div>
+
+      <div className="flex items-baseline gap-1.5 min-w-0">
+        <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight leading-none truncate">
+          {value}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function GroupDivider({ title, stats, count, total, groupBy }) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+
+  return (
+    <motion.div
+      className="my-8 sm:my-10"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+    >
+      <div className="relative overflow-hidden rounded-2xl bg-[#0a0a0a] border border-white/[0.08]">
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/[0.03] via-transparent to-transparent opacity-50" />
+
+        <div className="relative px-4 sm:px-6 py-4 sm:py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
+          <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
+            <div className="w-1.5 h-10 sm:h-12 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.4)] shrink-0" />
+
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight line-clamp-2 sm:line-clamp-1">
+                {title}
+              </h2>
+
+              <div className="mt-1 text-xs sm:text-sm text-zinc-500 font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-zinc-300 font-bold">{count}</span>
+                <span>items</span>
+                <span className="hidden sm:inline w-1 h-1 rounded-full bg-zinc-700" />
+                <span className="opacity-90">{pct}% del total</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-3 sm:pt-4 lg:pt-0 border-t border-white/5 lg:border-t-0 w-full lg:w-auto">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-4">
+              {stats?.imdb?.avg != null &&
+                typeof stats.imdb.avg === "number" &&
+                !Number.isNaN(stats.imdb.avg) && (
+                  <StatBox
+                    label="IMDb"
+                    value={formatAvg(stats.imdb.avg)}
+                    imgSrc="/logo-IMDb.png"
+                  />
+                )}
+              {stats?.trakt?.avg != null &&
+                typeof stats.trakt.avg === "number" &&
+                !Number.isNaN(stats.trakt.avg) && (
+                  <StatBox
+                    label="Trakt"
+                    value={formatAvg(stats.trakt.avg)}
+                    imgSrc="/logo-Trakt.png"
+                  />
+                )}
+              {stats?.tmdb?.avg != null &&
+                typeof stats.tmdb.avg === "number" &&
+                !Number.isNaN(stats.tmdb.avg) && (
+                  <StatBox
+                    label="TMDb"
+                    value={formatAvg(stats.tmdb.avg)}
+                    imgSrc="/logo-TMDb.png"
+                  />
+                )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -599,9 +771,13 @@ function WatchlistCard({ item, index = 0, totalItems = 0, viewMode = "grid", ima
 
 // ================== MAIN COMPONENT ==================
 export default function WatchlistClient() {
-  const { session, account } = useAuth();
+  const { session, account, hydrated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
+  const [imdbScores, setImdbScores] = useState(new Map());
+  const [traktScores, setTraktScores] = useState(new Map());
+  const [loadingImdb, setLoadingImdb] = useState(false);
+  const [loadingTrakt, setLoadingTrakt] = useState(false);
 
   // Filter states with localStorage persistence
   const [viewMode, setViewMode] = useState(() => {
@@ -628,6 +804,12 @@ export default function WatchlistClient() {
     return saved === "backdrop" ? "backdrop" : "poster";
   });
 
+  const [groupBy, setGroupBy] = useState(() => {
+    if (typeof window === "undefined") return "none";
+    const saved = window.localStorage.getItem("showverse:watchlist:groupBy");
+    return saved || "none";
+  });
+
   const [q, setQ] = useState("");
 
   // Persist filter states
@@ -650,6 +832,11 @@ export default function WatchlistClient() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("showverse:watchlist:imageMode", imageMode);
   }, [imageMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("showverse:watchlist:groupBy", groupBy);
+  }, [groupBy]);
 
   // Load watchlist
   useEffect(() => {
@@ -677,7 +864,15 @@ export default function WatchlistClient() {
         }
 
         const data = JSON.parse(text);
-        setItems(data?.watchlist || []);
+        const watchlist = data?.watchlist || [];
+
+        // Add index for sorting by added date (most recent first from API)
+        const watchlistWithIndex = watchlist.map((item, index) => ({
+          ...item,
+          _addedIndex: index,
+        }));
+
+        setItems(watchlistWithIndex);
       } catch (error) {
         console.error("Error loading watchlist:", error);
         setItems([]);
@@ -688,6 +883,187 @@ export default function WatchlistClient() {
 
     loadWatchlist();
   }, [session, account]);
+
+  // Load IMDb scores from cache on mount
+  useEffect(() => {
+    if (items.length === 0) return;
+
+    // Always load from cache to show stats in all grouping modes
+    const cachedScores = readScoreCache("imdb");
+    if (cachedScores.size > 0) {
+      setImdbScores(cachedScores);
+    }
+  }, [items]);
+
+  // Load Trakt scores from cache on mount
+  useEffect(() => {
+    if (items.length === 0) return;
+
+    // Always load from cache to show stats in all grouping modes
+    const cachedScores = readScoreCache("trakt");
+    if (cachedScores.size > 0) {
+      setTraktScores(cachedScores);
+    }
+  }, [items]);
+
+  // Load IMDb scores when grouping by IMDb rating
+  useEffect(() => {
+    if (groupBy !== "imdb_rating" || items.length === 0 || loadingImdb) return;
+
+    const loadImdbScores = async () => {
+      // Load from cache first and show immediately
+      const cachedScores = readScoreCache("imdb");
+      const scores = new Map(cachedScores);
+
+      // Show cached scores immediately
+      if (cachedScores.size > 0) {
+        setImdbScores(new Map(scores));
+      }
+
+      // Identify items that need fetching
+      const itemsToFetch = items.filter((item) => !cachedScores.has(String(item.id)));
+
+      if (itemsToFetch.length === 0) {
+        setLoadingImdb(false);
+        return;
+      }
+
+      setLoadingImdb(true);
+
+      try {
+        let fetchedCount = 0;
+        const newScores = new Map();
+
+        // Process items with limited concurrency (3 at a time)
+        const processItem = async (item) => {
+          const type = item.media_type || (item.title ? "movie" : "tv");
+
+          try {
+            const externalIds = await getExternalIds(type, item.id);
+            const imdbId = externalIds?.imdb_id;
+
+            if (imdbId) {
+              const omdbData = await fetchOmdbByImdb(imdbId);
+              const rating = omdbData?.imdbRating;
+
+              if (rating && rating !== "N/A") {
+                const numRating = parseFloat(rating);
+                if (!isNaN(numRating)) {
+                  scores.set(String(item.id), numRating);
+                  newScores.set(String(item.id), numRating);
+                  fetchedCount++;
+
+                  // Update state immediately for progressive display
+                  setImdbScores(new Map(scores));
+                }
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch IMDb score for ${item.id}:`, err);
+          }
+        };
+
+        // Process in batches of 3 concurrent requests
+        const batchSize = 3;
+        for (let i = 0; i < itemsToFetch.length; i += batchSize) {
+          const batch = itemsToFetch.slice(i, i + batchSize);
+          await Promise.all(batch.map(processItem));
+        }
+
+        // Save all new scores to cache at once
+        if (fetchedCount > 0) {
+          writeScoreCache("imdb", scores);
+        }
+      } catch (error) {
+        console.error("Error loading IMDb scores:", error);
+      } finally {
+        setLoadingImdb(false);
+      }
+    };
+
+    loadImdbScores();
+  }, [groupBy, items]);
+
+  // Load Trakt scores when grouping by Trakt rating
+  useEffect(() => {
+    if (groupBy !== "trakt_rating" || items.length === 0 || loadingTrakt) return;
+
+    const loadTraktScores = async () => {
+      // Load from cache first and show immediately
+      const cachedScores = readScoreCache("trakt");
+      const scores = new Map(cachedScores);
+
+      // Show cached scores immediately
+      if (cachedScores.size > 0) {
+        setTraktScores(new Map(scores));
+      }
+
+      // Identify items that need fetching
+      const itemsToFetch = items.filter((item) => !cachedScores.has(String(item.id)));
+
+      // For items without cache, use TMDb ratings as fallback immediately
+      itemsToFetch.forEach((item) => {
+        if (item.vote_average && typeof item.vote_average === "number" && !isNaN(item.vote_average)) {
+          scores.set(String(item.id), item.vote_average);
+        }
+      });
+
+      // Show TMDb fallback scores immediately
+      setTraktScores(new Map(scores));
+
+      if (itemsToFetch.length === 0) {
+        setLoadingTrakt(false);
+        return;
+      }
+
+      setLoadingTrakt(true);
+
+      try {
+        let fetchedCount = 0;
+        const newScores = new Map();
+
+        // Process items with limited concurrency (3 at a time)
+        const processItem = async (item) => {
+          const type = item.media_type || (item.title ? "movie" : "tv");
+
+          try {
+            const traktData = await traktGetScoreboard({ type, tmdbId: item.id });
+            const rating = traktData?.community?.rating;
+
+            if (rating && typeof rating === "number" && !isNaN(rating)) {
+              scores.set(String(item.id), rating);
+              newScores.set(String(item.id), rating);
+              fetchedCount++;
+
+              // Update state immediately for progressive display
+              setTraktScores(new Map(scores));
+            }
+          } catch (err) {
+            // Fallback to TMDb rating already set, just log warning
+            console.warn(`[Trakt] Failed to fetch score for ${item.id}, using TMDb fallback:`, err);
+          }
+        };
+
+        // Process in batches of 3 concurrent requests
+        const batchSize = 3;
+        for (let i = 0; i < itemsToFetch.length; i += batchSize) {
+          const batch = itemsToFetch.slice(i, i + batchSize);
+          await Promise.all(batch.map(processItem));
+        }
+
+        // Save all new scores to cache at once
+        if (fetchedCount > 0) {
+          writeScoreCache("trakt", scores);
+        }
+      } catch (error) {
+        console.error("Error loading Trakt scores:", error);
+      } finally {
+        setLoadingTrakt(false);
+      }
+    };
+
+    loadTraktScores();
+  }, [groupBy, items]);
 
   // Filter and sort
   const filtered = useMemo(() => {
@@ -726,6 +1102,14 @@ export default function WatchlistClient() {
     if (sortBy === "rating-asc") {
       return arr.sort((a, b) => (a.vote_average || 0) - (b.vote_average || 0));
     }
+    if (sortBy === "added-desc") {
+      // Most recent added first (lower index = more recent)
+      return arr.sort((a, b) => (a._addedIndex || 0) - (b._addedIndex || 0));
+    }
+    if (sortBy === "added-asc") {
+      // Oldest added first (higher index = older)
+      return arr.sort((a, b) => (b._addedIndex || 0) - (a._addedIndex || 0));
+    }
     return arr;
   }, [filtered, sortBy]);
 
@@ -739,6 +1123,141 @@ export default function WatchlistClient() {
     }
     return { total: filtered.length, movies, shows };
   }, [filtered]);
+
+  // Grouping logic (sin user_rating)
+  const grouped = useMemo(() => {
+    if (groupBy === "none") return null;
+
+    // Don't show grouped view while loading external scores
+    if (groupBy === "imdb_rating" && loadingImdb) return null;
+    if (groupBy === "trakt_rating" && loadingTrakt) return null;
+
+    const groups = new Map();
+
+    for (const item of sorted) {
+      let groupKey = "";
+      let groupLabel = "";
+
+      if (groupBy === "year") {
+        const year = (item.release_date || item.first_air_date || "").slice(0, 4);
+        groupKey = year || "Sin año";
+        groupLabel = year || "Sin año";
+      } else if (groupBy === "decade") {
+        const year = (item.release_date || item.first_air_date || "").slice(0, 4);
+        if (year) {
+          const decade = Math.floor(parseInt(year) / 10) * 10;
+          groupKey = decade.toString();
+          groupLabel = `${decade}s`;
+        } else {
+          groupKey = "Sin década";
+          groupLabel = "Sin década";
+        }
+      } else if (groupBy === "tmdb_rating") {
+        const rating = item.vote_average || 0;
+        const bucket = Math.floor(rating);
+        groupKey = bucket.toString();
+        groupLabel = `${bucket} - ${bucket + 1}`;
+      } else if (groupBy === "imdb_rating") {
+        const rating = imdbScores.get(String(item.id)) || 0;
+        if (!rating) {
+          groupKey = "no_imdb";
+          groupLabel = "Sin puntuación IMDb";
+        } else {
+          const bucket = Math.floor(rating);
+          groupKey = bucket.toString();
+          groupLabel = `${bucket} - ${bucket + 1}`;
+        }
+      } else if (groupBy === "trakt_rating") {
+        const rating = traktScores.get(String(item.id)) || 0;
+        if (!rating) {
+          groupKey = "no_trakt";
+          groupLabel = "Sin puntuación Trakt";
+        } else {
+          const bucket = Math.floor(rating);
+          groupKey = bucket.toString();
+          groupLabel = `${bucket} - ${bucket + 1}`;
+        }
+      }
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          key: groupKey,
+          label: groupLabel,
+          items: [],
+          stats: {
+            tmdb: { sum: 0, count: 0, avg: 0 },
+            imdb: { sum: 0, count: 0, avg: 0 },
+            trakt: { sum: 0, count: 0, avg: 0 },
+          },
+        });
+      }
+
+      const group = groups.get(groupKey);
+      group.items.push(item);
+
+      // Calculate stats
+      if (item.vote_average) {
+        group.stats.tmdb.sum += item.vote_average;
+        group.stats.tmdb.count++;
+      }
+      const imdbRating = imdbScores.get(String(item.id));
+      if (imdbRating) {
+        group.stats.imdb.sum += imdbRating;
+        group.stats.imdb.count++;
+      }
+      const traktRating = traktScores.get(String(item.id));
+      if (traktRating) {
+        group.stats.trakt.sum += traktRating;
+        group.stats.trakt.count++;
+      }
+    }
+
+    // Calculate averages
+    for (const group of groups.values()) {
+      if (group.stats.tmdb.count > 0) {
+        group.stats.tmdb.avg = group.stats.tmdb.sum / group.stats.tmdb.count;
+      }
+      if (group.stats.imdb.count > 0) {
+        group.stats.imdb.avg = group.stats.imdb.sum / group.stats.imdb.count;
+      }
+      if (group.stats.trakt.count > 0) {
+        group.stats.trakt.avg = group.stats.trakt.sum / group.stats.trakt.count;
+      }
+    }
+
+    // Sort groups
+    const groupsArray = Array.from(groups.values());
+    if (groupBy === "year" || groupBy === "decade") {
+      groupsArray.sort((a, b) => {
+        if (a.key === "Sin año" || a.key === "Sin década") return 1;
+        if (b.key === "Sin año" || b.key === "Sin década") return -1;
+        return parseInt(b.key) - parseInt(a.key);
+      });
+    } else if (groupBy.includes("rating")) {
+      groupsArray.sort((a, b) => {
+        // Put groups without ratings at the end
+        const aNoRating = ["no_imdb", "no_trakt"].includes(a.key);
+        const bNoRating = ["no_imdb", "no_trakt"].includes(b.key);
+
+        if (aNoRating && !bNoRating) return 1;
+        if (!aNoRating && bNoRating) return -1;
+        if (aNoRating && bNoRating) return 0;
+
+        return parseInt(b.key) - parseInt(a.key);
+      });
+    }
+
+    return groupsArray;
+  }, [sorted, groupBy, imdbScores, traktScores, loadingImdb, loadingTrakt]);
+
+  if (!hydrated) {
+    // Still checking authentication, show nothing or loader
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
 
   if (!session || !account) {
     return (
@@ -882,11 +1401,53 @@ export default function WatchlistClient() {
             </div>
             <div className="flex-1">
               <InlineDropdown
+                label="Agrupar"
+                valueLabel={
+                  groupBy === "none" ? "Sin agrupar" :
+                  groupBy === "year" ? "Año" :
+                  groupBy === "decade" ? "Década" :
+                  groupBy === "tmdb_rating" ? "TMDb" :
+                  groupBy === "imdb_rating" ? "IMDb" : "Trakt"
+                }
+                icon={Layers3}
+              >
+                {({ close }) => (
+                  <>
+                    <DropdownItem active={groupBy === "none"} onClick={() => { setGroupBy("none"); close(); }}>
+                      Sin agrupar
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === "year"} onClick={() => { setGroupBy("year"); close(); }}>
+                      Por año
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === "decade"} onClick={() => { setGroupBy("decade"); close(); }}>
+                      Por década
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === "tmdb_rating"} onClick={() => { setGroupBy("tmdb_rating"); close(); }}>
+                      Puntuación TMDb
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === "imdb_rating"} onClick={() => { setGroupBy("imdb_rating"); close(); }}>
+                      Puntuación IMDb
+                    </DropdownItem>
+                    <DropdownItem active={groupBy === "trakt_rating"} onClick={() => { setGroupBy("trakt_rating"); close(); }}>
+                      Puntuación Trakt
+                    </DropdownItem>
+                  </>
+                )}
+              </InlineDropdown>
+            </div>
+          </div>
+
+          <div className="flex gap-2 lg:hidden">
+            <div className="flex-1">
+              <InlineDropdown
                 label="Orden"
                 valueLabel={
                   sortBy === "title-asc" ? "A-Z" :
                   sortBy === "title-desc" ? "Z-A" :
-                  sortBy === "rating-desc" ? "Mejor" : "Peor"
+                  sortBy === "rating-desc" ? "Mejor" :
+                  sortBy === "rating-asc" ? "Peor" :
+                  sortBy === "added-desc" ? "Reciente" :
+                  sortBy === "added-asc" ? "Antiguo" : "A-Z"
                 }
                 icon={ArrowUpDown}
               >
@@ -903,6 +1464,12 @@ export default function WatchlistClient() {
                     </DropdownItem>
                     <DropdownItem active={sortBy === "rating-asc"} onClick={() => { setSortBy("rating-asc"); close(); }}>
                       Valoración ↑
+                    </DropdownItem>
+                    <DropdownItem active={sortBy === "added-desc"} onClick={() => { setSortBy("added-desc"); close(); }}>
+                      Añadido reciente
+                    </DropdownItem>
+                    <DropdownItem active={sortBy === "added-asc"} onClick={() => { setSortBy("added-asc"); close(); }}>
+                      Añadido antiguo
                     </DropdownItem>
                   </>
                 )}
@@ -1015,7 +1582,10 @@ export default function WatchlistClient() {
               valueLabel={
                 sortBy === "title-asc" ? "A-Z" :
                 sortBy === "title-desc" ? "Z-A" :
-                sortBy === "rating-desc" ? "Mejor valorado" : "Peor valorado"
+                sortBy === "rating-desc" ? "Mejor valorado" :
+                sortBy === "rating-asc" ? "Peor valorado" :
+                sortBy === "added-desc" ? "Añadido reciente" :
+                sortBy === "added-asc" ? "Añadido antiguo" : "A-Z"
               }
               icon={ArrowUpDown}
             >
@@ -1032,6 +1602,47 @@ export default function WatchlistClient() {
                   </DropdownItem>
                   <DropdownItem active={sortBy === "rating-asc"} onClick={() => { setSortBy("rating-asc"); close(); }}>
                     Valoración más baja
+                  </DropdownItem>
+                  <DropdownItem active={sortBy === "added-desc"} onClick={() => { setSortBy("added-desc"); close(); }}>
+                    Añadido reciente
+                  </DropdownItem>
+                  <DropdownItem active={sortBy === "added-asc"} onClick={() => { setSortBy("added-asc"); close(); }}>
+                    Añadido antiguo
+                  </DropdownItem>
+                </>
+              )}
+            </InlineDropdown>
+
+            <InlineDropdown
+              label="Agrupar"
+              valueLabel={
+                groupBy === "none" ? "Sin agrupar" :
+                groupBy === "year" ? "Por año" :
+                groupBy === "decade" ? "Por década" :
+                groupBy === "tmdb_rating" ? "TMDb" :
+                groupBy === "imdb_rating" ? "IMDb" : "Trakt"
+              }
+              icon={Layers3}
+            >
+              {({ close }) => (
+                <>
+                  <DropdownItem active={groupBy === "none"} onClick={() => { setGroupBy("none"); close(); }}>
+                    Sin agrupar
+                  </DropdownItem>
+                  <DropdownItem active={groupBy === "year"} onClick={() => { setGroupBy("year"); close(); }}>
+                    Por año
+                  </DropdownItem>
+                  <DropdownItem active={groupBy === "decade"} onClick={() => { setGroupBy("decade"); close(); }}>
+                    Por década
+                  </DropdownItem>
+                  <DropdownItem active={groupBy === "tmdb_rating"} onClick={() => { setGroupBy("tmdb_rating"); close(); }}>
+                    Puntuación TMDb
+                  </DropdownItem>
+                  <DropdownItem active={groupBy === "imdb_rating"} onClick={() => { setGroupBy("imdb_rating"); close(); }}>
+                    Puntuación IMDb
+                  </DropdownItem>
+                  <DropdownItem active={groupBy === "trakt_rating"} onClick={() => { setGroupBy("trakt_rating"); close(); }}>
+                    Puntuación Trakt
                   </DropdownItem>
                 </>
               )}
@@ -1098,9 +1709,15 @@ export default function WatchlistClient() {
         </motion.div>
 
         {/* Content */}
-        {loading ? (
-          <div className="flex items-center justify-center py-24">
+        {loading || (groupBy === "imdb_rating" && loadingImdb) || (groupBy === "trakt_rating" && loadingTrakt) ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+            {loadingImdb && groupBy === "imdb_rating" && (
+              <p className="text-zinc-500 text-sm">Cargando puntuaciones de IMDb...</p>
+            )}
+            {loadingTrakt && groupBy === "trakt_rating" && (
+              <p className="text-zinc-500 text-sm">Cargando puntuaciones de Trakt...</p>
+            )}
           </div>
         ) : sorted.length === 0 ? (
           <motion.div
@@ -1120,6 +1737,50 @@ export default function WatchlistClient() {
               </button>
             )}
           </motion.div>
+        ) : grouped ? (
+          // Grouped view
+          <div className="space-y-8">
+            {grouped.map((group) => (
+              <div key={group.key}>
+                <GroupDivider
+                  title={group.label}
+                  count={group.items.length}
+                  total={sorted.length}
+                  stats={group.stats}
+                  groupBy={groupBy}
+                />
+                <AnimatePresence mode="wait">
+                  {viewMode === "list" ? (
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
+                      {group.items.map((item, idx) => (
+                        <WatchlistCard key={item.id} item={item} index={idx} totalItems={group.items.length} viewMode="list" imageMode={imageMode} />
+                      ))}
+                    </div>
+                  ) : viewMode === "compact" ? (
+                    <div className={`grid gap-2 mt-6 ${
+                      imageMode === "backdrop"
+                        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
+                        : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
+                    }`}>
+                      {group.items.map((item, idx) => (
+                        <WatchlistCard key={item.id} item={item} index={idx} totalItems={group.items.length} viewMode="compact" imageMode={imageMode} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={`grid gap-3 mt-6 ${
+                      imageMode === "backdrop"
+                        ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+                        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
+                    }`}>
+                      {group.items.map((item, idx) => (
+                        <WatchlistCard key={item.id} item={item} index={idx} totalItems={group.items.length} viewMode="grid" imageMode={imageMode} />
+                      ))}
+                    </div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+          </div>
         ) : (
           <AnimatePresence mode="wait">
             {viewMode === "list" ? (
