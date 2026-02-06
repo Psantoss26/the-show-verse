@@ -4924,6 +4924,7 @@ export default function DetailsClient({
           } else {
             setBackdropLowLoaded(false);
             setBackdropHighLoaded(false);
+            setBackdropResolved(true);
           }
 
           setBackdropImgError(false);
