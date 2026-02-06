@@ -27,9 +27,6 @@ import TraktHistoryNavButton from "@/components/trakt/TraktHistoryNavButton";
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
  * ==================================================================== */
-/* ====================================================================
- * Componente de Búsqueda Reutilizable (Lógica y UI)
- * ==================================================================== */
 function SearchBar({ onResultClick, isMobile = false }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
