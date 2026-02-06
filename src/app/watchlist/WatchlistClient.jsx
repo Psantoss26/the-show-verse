@@ -19,6 +19,7 @@ import {
   Star,
   X,
   Filter,
+  SlidersHorizontal,
   LayoutList,
   Grid3x3,
   LayoutGrid,
@@ -1084,6 +1085,7 @@ export default function WatchlistClient() {
   });
 
   const [q, setQ] = useState("");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Persist filter states
   useEffect(() => {
@@ -1688,14 +1690,14 @@ export default function WatchlistClient() {
 
         {/* Filters */}
         <motion.div
-          className="space-y-3 mb-6"
+          className="sticky top-16 z-30 space-y-3 mb-6 bg-[#050505] py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
-          {/* Mobile: 3 rows */}
-          <div className="lg:hidden">
-            <div className="relative w-full">
+          {/* Mobile: search + toggle */}
+          <div className="flex gap-2 lg:hidden">
+            <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
                 value={q}
@@ -1712,9 +1714,32 @@ export default function WatchlistClient() {
                 </button>
               )}
             </div>
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
+                mobileFiltersOpen
+                  ? "bg-blue-500/20 border-blue-500/40 text-blue-400"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
           </div>
 
-          <div className="flex gap-2 lg:hidden">
+          {/* Mobile: collapsible filters */}
+          <AnimatePresence>
+            {mobileFiltersOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className="overflow-hidden lg:hidden"
+              >
+                <div className="space-y-3 pt-1">
+
+          <div className="flex gap-2">
             <div className="flex-1">
               <InlineDropdown
                 label="Tipo"
@@ -1851,7 +1876,7 @@ export default function WatchlistClient() {
             </div>
           </div>
 
-          <div className="flex gap-2 lg:hidden">
+          <div className="flex gap-2">
             <div className="flex-1">
               <InlineDropdown
                 label="Orden"
@@ -1932,9 +1957,6 @@ export default function WatchlistClient() {
                 )}
               </InlineDropdown>
             </div>
-          </div>
-
-          <div className="flex gap-2 lg:hidden">
             <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
               <button
                 onClick={() => setViewMode("list")}
@@ -1993,6 +2015,11 @@ export default function WatchlistClient() {
               </button>
             </div>
           </div>
+
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Desktop: Single row */}
           <div className="hidden lg:flex gap-3">
