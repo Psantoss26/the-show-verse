@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(git show:*)",
+      "Bash(npx next lint:*)",
+      "Bash(npx next build:*)"
+    ]
+  }
+}

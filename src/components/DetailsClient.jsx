@@ -1663,7 +1663,7 @@ export default function DetailsClient({
 
       // Sincronizacion opcional hacia Trakt (skipSync evita bucle infinito)
       if (!skipSync && syncTrakt && trakt.connected) {
-        await setTraktRatingSafe(Math.round(value));
+        await setTraktRatingSafe(Math.ceil(value));
       }
     } catch (err) {
       setRatingError(err?.message || "Error");
@@ -1705,7 +1705,7 @@ export default function DetailsClient({
       return;
     }
     // Trakt acepta valores enteros de 1 a 10
-    await setTraktRatingSafe(value == null ? null : Math.round(value));
+    await setTraktRatingSafe(value == null ? null : Math.ceil(value));
 
     // Sincronizacion opcional hacia TMDb (skipSync evita bucle infinito)
     if (syncTrakt && session && TMDB_API_KEY) {
@@ -3204,9 +3204,9 @@ export default function DetailsClient({
     ],
   );
 
-  // Puntuacion unificada del usuario: prioriza Trakt si esta conectado, sino TMDb
+  // Puntuacion unificada del usuario: prioriza TMDb (con decimal) sobre Trakt (redondeado)
   const unifiedUserRating =
-    trakt.connected && trakt.rating ? trakt.rating : userRating;
+    userRating ?? (trakt.connected && trakt.rating ? trakt.rating : null);
 
   // ====== RATINGS DE EPISODIOS (solo TV) ======
   const [ratings, setRatings] = useState(null); // Ratings por episodio

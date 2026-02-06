@@ -238,7 +238,11 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
 
   const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
   const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
-  const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1));
+  const isPreferredLang = (img) => {
+    // Excluir explícitamente imágenes sin idioma
+    if (img?.iso_639_1 === null || img?.iso_639_1 === undefined) return false;
+    return preferSet.has(norm(img?.iso_639_1));
+  };
 
   const pool0 =
     minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
@@ -746,22 +750,125 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
 }
 
 // ================== CARD COMPONENTS ==================
-function FavoriteCard({ item, index = 0, totalItems = 0, viewMode = "grid", imageMode = "poster" }) {
+function FavoriteCard({
+  item,
+  index = 0,
+  totalItems = 0,
+  viewMode = "grid",
+  imageMode = "poster",
+  imdbScore: initialImdbScore,
+  traktScore: initialTraktScore,
+}) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const title = item.title || item.name || "Sin título";
-  const year = item.release_date?.slice(0, 4) || item.first_air_date?.slice(0, 4) || "";
+  const year =
+    item.release_date?.slice(0, 4) || item.first_air_date?.slice(0, 4) || "";
   const rating = item.vote_average ? item.vote_average.toFixed(1) : null;
+  const userRating = item.user_rating || null;
+  const genreIds = item.genre_ids || [];
+  const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
+  const firstGenre = genreIds.length > 0 ? genreMap[genreIds[0]] : null;
 
-  const animDelay = totalItems > 20 ? Math.min(index * 0.015, 0.25) : index * 0.03;
+  const [imdbScore, setImdbScore] = useState(initialImdbScore);
+  const [traktScore, setTraktScore] = useState(initialTraktScore);
+  const [loadingScores, setLoadingScores] = useState(false);
+
+  const animDelay =
+    totalItems > 20 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = index < 60;
 
-  const href = type === "movie" ? `/details/movie/${item.id}` : `/details/tv/${item.id}`;
+  const href =
+    type === "movie" ? `/details/movie/${item.id}` : `/details/tv/${item.id}`;
 
   // Determine which image mode to use based on viewMode and imageMode preference
   const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
 
   // Dynamic aspect ratio based on image mode
-  const aspectRatio = effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
+  const aspectRatio =
+    effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
+
+  // Load scores on hover if not in cache
+  const handleHover = useCallback(async () => {
+    if (loadingScores || (imdbScore && traktScore)) return;
+
+    setLoadingScores(true);
+
+    try {
+      const itemId = String(item.id);
+
+      // Load IMDb score if not available
+      if (!imdbScore) {
+        const cachedImdb = readScoreCache("imdb");
+        if (cachedImdb.has(itemId)) {
+          setImdbScore(cachedImdb.get(itemId));
+        } else {
+          // Fetch from API
+          try {
+            const externalIds = await getExternalIds(type, item.id);
+            const imdbId = externalIds?.imdb_id;
+
+            if (imdbId) {
+              const omdbData = await fetchOmdbByImdb(imdbId);
+              const imdbRating = omdbData?.imdbRating;
+
+              if (imdbRating && imdbRating !== "N/A") {
+                const numRating = parseFloat(imdbRating);
+                if (!isNaN(numRating)) {
+                  setImdbScore(numRating);
+                  updateScoreCache("imdb", itemId, numRating);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch IMDb score for ${item.id}:`, err);
+          }
+        }
+      }
+
+      // Load Trakt score if not available
+      if (!traktScore) {
+        const cachedTrakt = readScoreCache("trakt");
+        if (cachedTrakt.has(itemId)) {
+          setTraktScore(cachedTrakt.get(itemId));
+        } else {
+          // Fetch from API
+          try {
+            const traktData = await traktGetScoreboard({
+              type,
+              tmdbId: item.id,
+            });
+            const traktRating = traktData?.community?.rating;
+
+            if (
+              traktRating &&
+              typeof traktRating === "number" &&
+              !isNaN(traktRating)
+            ) {
+              setTraktScore(traktRating);
+              updateScoreCache("trakt", itemId, traktRating);
+            } else if (rating) {
+              // Fallback to TMDb rating
+              const tmdbRating = parseFloat(rating);
+              if (!isNaN(tmdbRating)) {
+                setTraktScore(tmdbRating);
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch Trakt score for ${item.id}:`, err);
+            // Fallback to TMDb rating
+            if (rating) {
+              const tmdbRating = parseFloat(rating);
+              if (!isNaN(tmdbRating)) {
+                setTraktScore(tmdbRating);
+              }
+            }
+          }
+        }
+      }
+    } finally {
+      setLoadingScores(false);
+    }
+  }, [imdbScore, traktScore, loadingScores, item.id, type, rating]);
 
   if (viewMode === "list") {
     return (
@@ -782,7 +889,11 @@ function FavoriteCard({ item, index = 0, totalItems = 0, viewMode = "grid", imag
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
             <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
-              <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+              <SmartPoster
+                item={item}
+                title={title}
+                mode={effectiveImageMode}
+              />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               <div className="flex items-center gap-2">
@@ -793,7 +904,9 @@ function FavoriteCard({ item, index = 0, totalItems = 0, viewMode = "grid", imag
               <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
                 <span
                   className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${
-                    type === "movie" ? "bg-sky-500/10 text-sky-500" : "bg-purple-500/10 text-purple-500"
+                    type === "movie"
+                      ? "bg-sky-500/10 text-sky-500"
+                      : "bg-purple-500/10 text-purple-500"
                   }`}
                 >
                   {type === "movie" ? "PELÍCULA" : "SERIE"}
@@ -840,34 +953,89 @@ function FavoriteCard({ item, index = 0, totalItems = 0, viewMode = "grid", imag
             whileHover={{
               scale: 1.15,
               zIndex: 50,
-              boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
+              boxShadow:
+                "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
               borderColor: "rgba(239, 68, 68, 0.4)",
             }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             style={{ transformOrigin: "center center" }}
+            onMouseEnter={handleHover}
           >
             <SmartPoster item={item} title={title} mode={effectiveImageMode} />
-            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                <div className="flex items-center gap-2 mb-1 -ml-0.5">
-                  <span
-                    className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-                      type === "movie" ? "bg-sky-500/40 text-sky-100" : "bg-purple-500/40 text-purple-100"
-                    }`}
-                  >
-                    {type === "movie" ? "Película" : "Serie"}
-                  </span>
-                  {year && <span className="text-[8px] text-zinc-300/90 font-medium">{year}</span>}
+            {/* Overlay con gradientes */}
+            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              {/* Top gradient con tipo y ratings */}
+              <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                <span
+                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                    type === "movie"
+                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                  }`}
+                >
+                  {type === "movie" ? "PELÍCULA" : "SERIE"}
+                </span>
+
+                <div className="flex flex-col items-end gap-1">
+                  {rating && (
+                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                      <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
+                        {rating}
+                      </span>
+                      <img
+                        src="/logo-TMDb.png"
+                        alt=""
+                        className="w-auto h-2.5 opacity-100"
+                      />
+                    </div>
+                  )}
+                  {imdbScore && (
+                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                      <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
+                        {imdbScore}
+                      </span>
+                      <img
+                        src="/logo-IMDb.png"
+                        alt=""
+                        className="w-auto h-3 opacity-100"
+                      />
+                    </div>
+                  )}
+                  {traktScore && (
+                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                      <span className="text-pink-400 text-xs font-black font-mono tracking-tight">
+                        {typeof traktScore === "number"
+                          ? traktScore.toFixed(1)
+                          : traktScore}
+                      </span>
+                      <img
+                        src="/logo-Trakt.png"
+                        alt=""
+                        className="w-auto h-2.5 opacity-100"
+                      />
+                    </div>
+                  )}
                 </div>
-                <h5 className="text-white font-bold text-[10px] leading-tight line-clamp-2 mb-0.5">
-                  {title}
-                </h5>
-                {rating && (
-                  <div className="text-[9px] text-amber-300 font-semibold flex items-center gap-1">
-                    <Star className="w-2.5 h-2.5 fill-amber-300" />
-                    {rating}
+              </div>
+
+              {/* Bottom gradient con título y año */}
+              <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                <div className="flex items-end justify-between gap-3">
+                  <div className="min-w-0 text-left flex-1">
+                    <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs">
+                      {title}
+                    </h3>
+                    <p className="text-yellow-500 text-[10px] font-bold mt-0.5 drop-shadow-md">
+                      {year}
+                      {firstGenre && ` • ${firstGenre}`}
+                    </p>
                   </div>
-                )}
+                  {userRating && (
+                    <span className="text-yellow-400 text-lg font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
+                      {userRating}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -885,20 +1053,32 @@ function FavoriteCard({ item, index = 0, totalItems = 0, viewMode = "grid", imag
       transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
     >
       <Link href={href} className="block">
-        <div className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-red-900/20 transition-all`}>
+        <div
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-red-900/20 transition-all`}
+          onMouseEnter={handleHover}
+        >
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+          {/* Mobile overlay - bottom only */}
           <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
             <div className="flex items-center gap-2 mb-1 -ml-0.5">
               <span
                 className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-                  type === "movie" ? "bg-sky-500/20 text-sky-200" : "bg-purple-500/20 text-purple-200"
+                  type === "movie"
+                    ? "bg-sky-500/20 text-sky-200"
+                    : "bg-purple-500/20 text-purple-200"
                 }`}
               >
                 {type === "movie" ? "Cine" : "TV"}
               </span>
-              {year && <span className="text-[10px] text-zinc-300/80 font-medium">{year}</span>}
+              {year && (
+                <span className="text-[10px] text-zinc-300/80 font-medium">
+                  {year}
+                </span>
+              )}
             </div>
-            <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">{title}</h5>
+            <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
+              {title}
+            </h5>
             {rating && (
               <div className="mt-0.5 text-[10px] text-amber-300/90 flex items-center gap-1">
                 <Star className="w-2.5 h-2.5 fill-amber-300" />
@@ -906,25 +1086,80 @@ function FavoriteCard({ item, index = 0, totalItems = 0, viewMode = "grid", imag
               </div>
             )}
           </div>
-          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-              <div className="flex items-center gap-2 mb-1 -ml-0.5">
-                <span
-                  className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-                    type === "movie" ? "bg-sky-500/30 text-sky-200" : "bg-purple-500/30 text-purple-200"
-                  }`}
-                >
-                  {type === "movie" ? "Cine" : "TV"}
-                </span>
-                {year && <span className="text-[10px] text-zinc-300 font-medium">{year}</span>}
+          {/* Overlay con gradientes */}
+          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            {/* Top gradient con tipo y ratings */}
+            <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+              <span
+                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                  type === "movie"
+                    ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                    : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                }`}
+              >
+                {type === "movie" ? "PELÍCULA" : "SERIE"}
+              </span>
+
+              <div className="flex flex-col items-end gap-1">
+                {rating && (
+                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                    <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
+                      {rating}
+                    </span>
+                    <img
+                      src="/logo-TMDb.png"
+                      alt=""
+                      className="w-auto h-2.5 opacity-100"
+                    />
+                  </div>
+                )}
+                {imdbScore && (
+                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                    <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
+                      {imdbScore}
+                    </span>
+                    <img
+                      src="/logo-IMDb.png"
+                      alt=""
+                      className="w-auto h-3 opacity-100"
+                    />
+                  </div>
+                )}
+                {traktScore && (
+                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                    <span className="text-pink-400 text-xs font-black font-mono tracking-tight">
+                      {typeof traktScore === "number"
+                        ? traktScore.toFixed(1)
+                        : traktScore}
+                    </span>
+                    <img
+                      src="/logo-Trakt.png"
+                      alt=""
+                      className="w-auto h-2.5 opacity-100"
+                    />
+                  </div>
+                )}
               </div>
-              <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">{title}</h5>
-              {rating && (
-                <div className="mt-0.5 text-[11px] text-amber-300/90 flex items-center gap-1">
-                  <Star className="w-3 h-3 fill-amber-300" />
-                  {rating}
+            </div>
+
+            {/* Bottom gradient con título y año */}
+            <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0 text-left flex-1">
+                  <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm">
+                    {title}
+                  </h3>
+                  <p className="text-yellow-500 text-xs font-bold mt-0.5 drop-shadow-md">
+                    {year}
+                    {firstGenre && ` • ${firstGenre}`}
+                  </p>
                 </div>
-              )}
+                {userRating && (
+                  <span className="text-yellow-400 text-xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
+                    {userRating}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -944,11 +1179,17 @@ export default function FavoritesClient() {
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
 
+  // Watch history for sorting
+  const [watchDates, setWatchDates] = useState(new Map());
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   // Filter states with localStorage persistence
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return "grid";
     const saved = window.localStorage.getItem("showverse:favorites:viewMode");
-    return saved === "list" || saved === "grid" || saved === "compact" ? saved : "grid";
+    return saved === "list" || saved === "grid" || saved === "compact"
+      ? saved
+      : "grid";
   });
 
   const [typeFilter, setTypeFilter] = useState(() => {
@@ -1021,7 +1262,11 @@ export default function FavoritesClient() {
         ]);
 
         if (!favResponse.ok) {
-          console.error("API error:", favResponse.status, favResponse.statusText);
+          console.error(
+            "API error:",
+            favResponse.status,
+            favResponse.statusText,
+          );
           setItems([]);
           return;
         }
@@ -1099,7 +1344,9 @@ export default function FavoritesClient() {
       }
 
       // Identify items that need fetching
-      const itemsToFetch = items.filter((item) => !cachedScores.has(String(item.id)));
+      const itemsToFetch = items.filter(
+        (item) => !cachedScores.has(String(item.id)),
+      );
 
       if (itemsToFetch.length === 0) {
         setLoadingImdb(false);
@@ -1164,7 +1411,8 @@ export default function FavoritesClient() {
 
   // Load Trakt scores when grouping by Trakt rating
   useEffect(() => {
-    if (groupBy !== "trakt_rating" || items.length === 0 || loadingTrakt) return;
+    if (groupBy !== "trakt_rating" || items.length === 0 || loadingTrakt)
+      return;
 
     const loadTraktScores = async () => {
       // Load from cache first and show immediately
@@ -1177,11 +1425,17 @@ export default function FavoritesClient() {
       }
 
       // Identify items that need fetching
-      const itemsToFetch = items.filter((item) => !cachedScores.has(String(item.id)));
+      const itemsToFetch = items.filter(
+        (item) => !cachedScores.has(String(item.id)),
+      );
 
       // For items without cache, use TMDb ratings as fallback immediately
       itemsToFetch.forEach((item) => {
-        if (item.vote_average && typeof item.vote_average === "number" && !isNaN(item.vote_average)) {
+        if (
+          item.vote_average &&
+          typeof item.vote_average === "number" &&
+          !isNaN(item.vote_average)
+        ) {
           scores.set(String(item.id), item.vote_average);
         }
       });
@@ -1205,7 +1459,10 @@ export default function FavoritesClient() {
           const type = item.media_type || (item.title ? "movie" : "tv");
 
           try {
-            const traktData = await traktGetScoreboard({ type, tmdbId: item.id });
+            const traktData = await traktGetScoreboard({
+              type,
+              tmdbId: item.id,
+            });
             const rating = traktData?.community?.rating;
 
             if (rating && typeof rating === "number" && !isNaN(rating)) {
@@ -1218,7 +1475,10 @@ export default function FavoritesClient() {
             }
           } catch (err) {
             // Fallback to TMDb rating already set, just log warning
-            console.warn(`[Trakt] Failed to fetch score for ${item.id}, using TMDb fallback:`, err);
+            console.warn(
+              `[Trakt] Failed to fetch score for ${item.id}, using TMDb fallback:`,
+              err,
+            );
           }
         };
 
@@ -1242,6 +1502,59 @@ export default function FavoritesClient() {
 
     loadTraktScores();
   }, [groupBy, items]);
+
+  // Load watch history for sorting
+  useEffect(() => {
+    if (items.length === 0) return;
+    if (!sortBy.startsWith("watched-")) return;
+    if (loadingHistory) return;
+
+    const loadWatchHistory = async () => {
+      setLoadingHistory(true);
+
+      try {
+        // Fetch all watch history from Trakt
+        const response = await fetch("/api/trakt/history?type=all&limit=1000");
+        if (!response.ok) {
+          console.warn("Failed to load watch history");
+          setLoadingHistory(false);
+          return;
+        }
+
+        const data = await response.json();
+        if (!data.connected || !Array.isArray(data.items)) {
+          setLoadingHistory(false);
+          return;
+        }
+
+        // Build a map of tmdbId -> last watched date
+        const watchMap = new Map();
+
+        for (const entry of data.items) {
+          const key = `${entry.type}:${entry.tmdbId}`;
+          const watched_at = entry.watched_at;
+
+          if (!watched_at) continue;
+
+          // Keep the most recent watch date for each item
+          if (
+            !watchMap.has(key) ||
+            new Date(watched_at) > new Date(watchMap.get(key))
+          ) {
+            watchMap.set(key, watched_at);
+          }
+        }
+
+        setWatchDates(watchMap);
+      } catch (error) {
+        console.error("Error loading watch history:", error);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    loadWatchHistory();
+  }, [sortBy, items]);
 
   // Filter and sort
   const filtered = useMemo(() => {
@@ -1288,8 +1601,50 @@ export default function FavoritesClient() {
       // Oldest added first (higher index = older)
       return arr.sort((a, b) => (b._addedIndex || 0) - (a._addedIndex || 0));
     }
+    if (sortBy === "watched-desc") {
+      // Most recently watched first
+      return arr.sort((a, b) => {
+        const typeA = a.media_type || (a.title ? "movie" : "tv");
+        const typeB = b.media_type || (b.title ? "movie" : "tv");
+        // Normalize: Trakt uses "show" but TMDb uses "tv"
+        const normalizedTypeA = typeA === "tv" ? "show" : typeA;
+        const normalizedTypeB = typeB === "tv" ? "show" : typeB;
+        const keyA = `${normalizedTypeA}:${a.id}`;
+        const keyB = `${normalizedTypeB}:${b.id}`;
+        const dateA = watchDates.get(keyA);
+        const dateB = watchDates.get(keyB);
+
+        // Items without watch date go to the end
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+
+        return new Date(dateB) - new Date(dateA);
+      });
+    }
+    if (sortBy === "watched-asc") {
+      // Oldest watched first
+      return arr.sort((a, b) => {
+        const typeA = a.media_type || (a.title ? "movie" : "tv");
+        const typeB = b.media_type || (b.title ? "movie" : "tv");
+        // Normalize: Trakt uses "show" but TMDb uses "tv"
+        const normalizedTypeA = typeA === "tv" ? "show" : typeA;
+        const normalizedTypeB = typeB === "tv" ? "show" : typeB;
+        const keyA = `${normalizedTypeA}:${a.id}`;
+        const keyB = `${normalizedTypeB}:${b.id}`;
+        const dateA = watchDates.get(keyA);
+        const dateB = watchDates.get(keyB);
+
+        // Items without watch date go to the end
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+
+        return new Date(dateA) - new Date(dateB);
+      });
+    }
     return arr;
-  }, [filtered, sortBy]);
+  }, [filtered, sortBy, watchDates]);
 
   const stats = useMemo(() => {
     let movies = 0;
@@ -1313,95 +1668,121 @@ export default function FavoritesClient() {
     const groups = new Map();
 
     for (const item of sorted) {
-      let groupKey = "";
-      let groupLabel = "";
-
-      if (groupBy === "year") {
-        const year = (item.release_date || item.first_air_date || "").slice(0, 4);
-        groupKey = year || "Sin año";
-        groupLabel = year || "Sin año";
-      } else if (groupBy === "decade") {
-        const year = (item.release_date || item.first_air_date || "").slice(0, 4);
-        if (year) {
-          const decade = Math.floor(parseInt(year) / 10) * 10;
-          groupKey = decade.toString();
-          groupLabel = `${decade}s`;
-        } else {
-          groupKey = "Sin década";
-          groupLabel = "Sin década";
+      const processGroup = (groupKey, groupLabel) => {
+        if (!groups.has(groupKey)) {
+          groups.set(groupKey, {
+            key: groupKey,
+            label: groupLabel,
+            items: [],
+            stats: {
+              tmdb: { sum: 0, count: 0, avg: 0 },
+              imdb: { sum: 0, count: 0, avg: 0 },
+              trakt: { sum: 0, count: 0, avg: 0 },
+              my: { sum: 0, count: 0, avg: 0 },
+            },
+          });
         }
-      } else if (groupBy === "tmdb_rating") {
-        const rating = item.vote_average || 0;
-        const bucket = Math.floor(rating);
-        groupKey = bucket.toString();
-        groupLabel = `${bucket} - ${bucket + 1}`;
-      } else if (groupBy === "imdb_rating") {
-        const rating = imdbScores.get(String(item.id)) || 0;
-        if (!rating) {
-          groupKey = "no_imdb";
-          groupLabel = "Sin puntuación IMDb";
+
+        const group = groups.get(groupKey);
+        group.items.push(item);
+
+        // Calculate stats
+        if (item.vote_average) {
+          group.stats.tmdb.sum += item.vote_average;
+          group.stats.tmdb.count++;
+        }
+        if (item.user_rating) {
+          group.stats.my.sum += item.user_rating;
+          group.stats.my.count++;
+        }
+        const imdbRating = imdbScores.get(String(item.id));
+        if (imdbRating) {
+          group.stats.imdb.sum += imdbRating;
+          group.stats.imdb.count++;
+        }
+        const traktRating = traktScores.get(String(item.id));
+        if (traktRating) {
+          group.stats.trakt.sum += traktRating;
+          group.stats.trakt.count++;
+        }
+      };
+
+      if (groupBy === "genre") {
+        const type = item.media_type || (item.title ? "movie" : "tv");
+        const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
+        const genreIds = item.genre_ids || [];
+
+        if (genreIds.length === 0) {
+          processGroup("no_genre", "Sin género");
         } else {
+          // Add item to each genre group it belongs to
+          genreIds.forEach((genreId) => {
+            const genreName = genreMap[genreId] || `Género ${genreId}`;
+            processGroup(String(genreId), genreName);
+          });
+        }
+      } else {
+        let groupKey = "";
+        let groupLabel = "";
+
+        if (groupBy === "year") {
+          const year = (item.release_date || item.first_air_date || "").slice(
+            0,
+            4,
+          );
+          groupKey = year || "Sin año";
+          groupLabel = year || "Sin año";
+        } else if (groupBy === "decade") {
+          const year = (item.release_date || item.first_air_date || "").slice(
+            0,
+            4,
+          );
+          if (year) {
+            const decade = Math.floor(parseInt(year) / 10) * 10;
+            groupKey = decade.toString();
+            groupLabel = `${decade}s`;
+          } else {
+            groupKey = "Sin década";
+            groupLabel = "Sin década";
+          }
+        } else if (groupBy === "tmdb_rating") {
+          const rating = item.vote_average || 0;
           const bucket = Math.floor(rating);
           groupKey = bucket.toString();
           groupLabel = `${bucket} - ${bucket + 1}`;
+        } else if (groupBy === "imdb_rating") {
+          const rating = imdbScores.get(String(item.id)) || 0;
+          if (!rating) {
+            groupKey = "no_imdb";
+            groupLabel = "Sin puntuación IMDb";
+          } else {
+            const bucket = Math.floor(rating);
+            groupKey = bucket.toString();
+            groupLabel = `${bucket} - ${bucket + 1}`;
+          }
+        } else if (groupBy === "trakt_rating") {
+          const rating = traktScores.get(String(item.id)) || 0;
+          if (!rating) {
+            groupKey = "no_trakt";
+            groupLabel = "Sin puntuación Trakt";
+          } else {
+            const bucket = Math.floor(rating);
+            groupKey = bucket.toString();
+            groupLabel = `${bucket} - ${bucket + 1}`;
+          }
+        } else if (groupBy === "user_rating") {
+          const rating = item.user_rating || 0;
+          if (!rating) {
+            groupKey = "unrated";
+            groupLabel = "Sin puntuar";
+          } else {
+            const bucket = Math.floor(rating);
+            groupKey = bucket.toString();
+            groupLabel = `${bucket}`;
+          }
         }
-      } else if (groupBy === "trakt_rating") {
-        const rating = traktScores.get(String(item.id)) || 0;
-        if (!rating) {
-          groupKey = "no_trakt";
-          groupLabel = "Sin puntuación Trakt";
-        } else {
-          const bucket = Math.floor(rating);
-          groupKey = bucket.toString();
-          groupLabel = `${bucket} - ${bucket + 1}`;
-        }
-      } else if (groupBy === "user_rating") {
-        const rating = item.user_rating || 0;
-        if (!rating) {
-          groupKey = "unrated";
-          groupLabel = "Sin puntuar";
-        } else {
-          const bucket = Math.floor(rating);
-          groupKey = bucket.toString();
-          groupLabel = `${bucket}`;
-        }
-      }
 
-      if (!groups.has(groupKey)) {
-        groups.set(groupKey, {
-          key: groupKey,
-          label: groupLabel,
-          items: [],
-          stats: {
-            tmdb: { sum: 0, count: 0, avg: 0 },
-            imdb: { sum: 0, count: 0, avg: 0 },
-            trakt: { sum: 0, count: 0, avg: 0 },
-            my: { sum: 0, count: 0, avg: 0 },
-          },
-        });
-      }
-
-      const group = groups.get(groupKey);
-      group.items.push(item);
-
-      // Calculate stats
-      if (item.vote_average) {
-        group.stats.tmdb.sum += item.vote_average;
-        group.stats.tmdb.count++;
-      }
-      if (item.user_rating) {
-        group.stats.my.sum += item.user_rating;
-        group.stats.my.count++;
-      }
-      const imdbRating = imdbScores.get(String(item.id));
-      if (imdbRating) {
-        group.stats.imdb.sum += imdbRating;
-        group.stats.imdb.count++;
-      }
-      const traktRating = traktScores.get(String(item.id));
-      if (traktRating) {
-        group.stats.trakt.sum += traktRating;
-        group.stats.trakt.count++;
+        processGroup(groupKey, groupLabel);
       }
     }
 
@@ -1441,6 +1822,13 @@ export default function FavoritesClient() {
 
         return parseInt(b.key) - parseInt(a.key);
       });
+    } else if (groupBy === "genre") {
+      // Sort alphabetically by genre name, but "Sin género" at the end
+      groupsArray.sort((a, b) => {
+        if (a.key === "no_genre") return 1;
+        if (b.key === "no_genre") return -1;
+        return a.label.localeCompare(b.label);
+      });
     }
 
     return groupsArray;
@@ -1461,7 +1849,9 @@ export default function FavoritesClient() {
         <div className="text-center">
           <Heart className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Inicia sesión</h2>
-          <p className="text-zinc-500 mb-6">Necesitas iniciar sesión para ver tus favoritos</p>
+          <p className="text-zinc-500 mb-6">
+            Necesitas iniciar sesión para ver tus favoritos
+          </p>
           <Link
             href="/login"
             className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition"
@@ -1492,7 +1882,9 @@ export default function FavoritesClient() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <div className="h-px w-12 bg-red-500" />
-                <span className="text-red-400 font-bold uppercase tracking-widest text-xs">COLECCIÓN</span>
+                <span className="text-red-400 font-bold uppercase tracking-widest text-xs">
+                  COLECCIÓN
+                </span>
               </div>
               <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
                 Favoritos<span className="text-red-500">.</span>
@@ -1514,7 +1906,11 @@ export default function FavoritesClient() {
                 <Heart className="w-3 h-3 md:w-4 md:h-4 fill-red-400" />
               </div>
               <div className="text-base md:text-2xl font-black text-white tracking-tight">
-                {loading ? <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" /> : stats.total}
+                {loading ? (
+                  <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" />
+                ) : (
+                  stats.total
+                )}
               </div>
               <div className="text-[8px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight px-0.5">
                 Total
@@ -1525,7 +1921,11 @@ export default function FavoritesClient() {
                 <Film className="w-3 h-3 md:w-4 md:h-4" />
               </div>
               <div className="text-base md:text-2xl font-black text-white tracking-tight">
-                {loading ? <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" /> : stats.movies}
+                {loading ? (
+                  <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" />
+                ) : (
+                  stats.movies
+                )}
               </div>
               <div className="text-[8px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight px-0.5">
                 Películas
@@ -1536,7 +1936,11 @@ export default function FavoritesClient() {
                 <TvGlyph className="w-3 h-3 md:w-4 md:h-4 text-purple-400" />
               </div>
               <div className="text-base md:text-2xl font-black text-white tracking-tight">
-                {loading ? <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" /> : stats.shows}
+                {loading ? (
+                  <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" />
+                ) : (
+                  stats.shows
+                )}
               </div>
               <div className="text-[8px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight px-0.5">
                 Series
@@ -1577,18 +1981,42 @@ export default function FavoritesClient() {
             <div className="flex-1">
               <InlineDropdown
                 label="Tipo"
-                valueLabel={typeFilter === "all" ? "Todo" : typeFilter === "movies" ? "Películas" : "Series"}
+                valueLabel={
+                  typeFilter === "all"
+                    ? "Todo"
+                    : typeFilter === "movies"
+                      ? "Películas"
+                      : "Series"
+                }
                 icon={Filter}
               >
                 {({ close }) => (
                   <>
-                    <DropdownItem active={typeFilter === "all"} onClick={() => { setTypeFilter("all"); close(); }}>
+                    <DropdownItem
+                      active={typeFilter === "all"}
+                      onClick={() => {
+                        setTypeFilter("all");
+                        close();
+                      }}
+                    >
                       Todo
                     </DropdownItem>
-                    <DropdownItem active={typeFilter === "movies"} onClick={() => { setTypeFilter("movies"); close(); }}>
+                    <DropdownItem
+                      active={typeFilter === "movies"}
+                      onClick={() => {
+                        setTypeFilter("movies");
+                        close();
+                      }}
+                    >
                       Películas
                     </DropdownItem>
-                    <DropdownItem active={typeFilter === "shows"} onClick={() => { setTypeFilter("shows"); close(); }}>
+                    <DropdownItem
+                      active={typeFilter === "shows"}
+                      onClick={() => {
+                        setTypeFilter("shows");
+                        close();
+                      }}
+                    >
                       Series
                     </DropdownItem>
                   </>
@@ -1599,36 +2027,96 @@ export default function FavoritesClient() {
               <InlineDropdown
                 label="Agrupar"
                 valueLabel={
-                  groupBy === "none" ? "Sin agrupar" :
-                  groupBy === "year" ? "Año" :
-                  groupBy === "decade" ? "Década" :
-                  groupBy === "tmdb_rating" ? "TMDb" :
-                  groupBy === "imdb_rating" ? "IMDb" :
-                  groupBy === "trakt_rating" ? "Trakt" : "Mis notas"
+                  groupBy === "none"
+                    ? "Sin agrupar"
+                    : groupBy === "year"
+                      ? "Año"
+                      : groupBy === "decade"
+                        ? "Década"
+                        : groupBy === "genre"
+                          ? "Género"
+                          : groupBy === "tmdb_rating"
+                            ? "TMDb"
+                            : groupBy === "imdb_rating"
+                              ? "IMDb"
+                              : groupBy === "trakt_rating"
+                                ? "Trakt"
+                                : "Mis notas"
                 }
                 icon={Layers3}
               >
                 {({ close }) => (
                   <>
-                    <DropdownItem active={groupBy === "none"} onClick={() => { setGroupBy("none"); close(); }}>
+                    <DropdownItem
+                      active={groupBy === "none"}
+                      onClick={() => {
+                        setGroupBy("none");
+                        close();
+                      }}
+                    >
                       Sin agrupar
                     </DropdownItem>
-                    <DropdownItem active={groupBy === "year"} onClick={() => { setGroupBy("year"); close(); }}>
+                    <DropdownItem
+                      active={groupBy === "year"}
+                      onClick={() => {
+                        setGroupBy("year");
+                        close();
+                      }}
+                    >
                       Por año
                     </DropdownItem>
-                    <DropdownItem active={groupBy === "decade"} onClick={() => { setGroupBy("decade"); close(); }}>
+                    <DropdownItem
+                      active={groupBy === "decade"}
+                      onClick={() => {
+                        setGroupBy("decade");
+                        close();
+                      }}
+                    >
                       Por década
                     </DropdownItem>
-                    <DropdownItem active={groupBy === "tmdb_rating"} onClick={() => { setGroupBy("tmdb_rating"); close(); }}>
+                    <DropdownItem
+                      active={groupBy === "genre"}
+                      onClick={() => {
+                        setGroupBy("genre");
+                        close();
+                      }}
+                    >
+                      Por género
+                    </DropdownItem>
+                    <DropdownItem
+                      active={groupBy === "tmdb_rating"}
+                      onClick={() => {
+                        setGroupBy("tmdb_rating");
+                        close();
+                      }}
+                    >
                       Puntuación TMDb
                     </DropdownItem>
-                    <DropdownItem active={groupBy === "imdb_rating"} onClick={() => { setGroupBy("imdb_rating"); close(); }}>
+                    <DropdownItem
+                      active={groupBy === "imdb_rating"}
+                      onClick={() => {
+                        setGroupBy("imdb_rating");
+                        close();
+                      }}
+                    >
                       Puntuación IMDb
                     </DropdownItem>
-                    <DropdownItem active={groupBy === "trakt_rating"} onClick={() => { setGroupBy("trakt_rating"); close(); }}>
+                    <DropdownItem
+                      active={groupBy === "trakt_rating"}
+                      onClick={() => {
+                        setGroupBy("trakt_rating");
+                        close();
+                      }}
+                    >
                       Puntuación Trakt
                     </DropdownItem>
-                    <DropdownItem active={groupBy === "user_rating"} onClick={() => { setGroupBy("user_rating"); close(); }}>
+                    <DropdownItem
+                      active={groupBy === "user_rating"}
+                      onClick={() => {
+                        setGroupBy("user_rating");
+                        close();
+                      }}
+                    >
                       Mis puntuaciones
                     </DropdownItem>
                   </>
@@ -1642,34 +2130,99 @@ export default function FavoritesClient() {
               <InlineDropdown
                 label="Orden"
                 valueLabel={
-                  sortBy === "title-asc" ? "A-Z" :
-                  sortBy === "title-desc" ? "Z-A" :
-                  sortBy === "rating-desc" ? "Mejor" :
-                  sortBy === "rating-asc" ? "Peor" :
-                  sortBy === "added-desc" ? "Reciente" :
-                  sortBy === "added-asc" ? "Antiguo" : "A-Z"
+                  sortBy === "title-asc"
+                    ? "A-Z"
+                    : sortBy === "title-desc"
+                      ? "Z-A"
+                      : sortBy === "rating-desc"
+                        ? "Mejor"
+                        : sortBy === "rating-asc"
+                          ? "Peor"
+                          : sortBy === "added-desc"
+                            ? "Reciente"
+                            : sortBy === "added-asc"
+                              ? "Antiguo"
+                              : sortBy === "watched-desc"
+                                ? "Vista +"
+                                : sortBy === "watched-asc"
+                                  ? "Vista -"
+                                  : "A-Z"
                 }
                 icon={ArrowUpDown}
               >
                 {({ close }) => (
                   <>
-                    <DropdownItem active={sortBy === "title-asc"} onClick={() => { setSortBy("title-asc"); close(); }}>
+                    <DropdownItem
+                      active={sortBy === "title-asc"}
+                      onClick={() => {
+                        setSortBy("title-asc");
+                        close();
+                      }}
+                    >
                       Título A-Z
                     </DropdownItem>
-                    <DropdownItem active={sortBy === "title-desc"} onClick={() => { setSortBy("title-desc"); close(); }}>
+                    <DropdownItem
+                      active={sortBy === "title-desc"}
+                      onClick={() => {
+                        setSortBy("title-desc");
+                        close();
+                      }}
+                    >
                       Título Z-A
                     </DropdownItem>
-                    <DropdownItem active={sortBy === "rating-desc"} onClick={() => { setSortBy("rating-desc"); close(); }}>
+                    <DropdownItem
+                      active={sortBy === "rating-desc"}
+                      onClick={() => {
+                        setSortBy("rating-desc");
+                        close();
+                      }}
+                    >
                       Valoración ↓
                     </DropdownItem>
-                    <DropdownItem active={sortBy === "rating-asc"} onClick={() => { setSortBy("rating-asc"); close(); }}>
+                    <DropdownItem
+                      active={sortBy === "rating-asc"}
+                      onClick={() => {
+                        setSortBy("rating-asc");
+                        close();
+                      }}
+                    >
                       Valoración ↑
                     </DropdownItem>
-                    <DropdownItem active={sortBy === "added-desc"} onClick={() => { setSortBy("added-desc"); close(); }}>
+                    <DropdownItem
+                      active={sortBy === "added-desc"}
+                      onClick={() => {
+                        setSortBy("added-desc");
+                        close();
+                      }}
+                    >
                       Añadido reciente
                     </DropdownItem>
-                    <DropdownItem active={sortBy === "added-asc"} onClick={() => { setSortBy("added-asc"); close(); }}>
+                    <DropdownItem
+                      active={sortBy === "added-asc"}
+                      onClick={() => {
+                        setSortBy("added-asc");
+                        close();
+                      }}
+                    >
                       Añadido antiguo
+                    </DropdownItem>
+                    <DropdownItem
+                      active={sortBy === "watched-desc"}
+                      onClick={() => {
+                        setSortBy("watched-desc");
+                        close();
+                      }}
+                    >
+                      Vista reciente
+                    </DropdownItem>
+                    <DropdownItem
+                      active={sortBy === "watched-asc"}
+                      onClick={() => {
+                        setSortBy("watched-asc");
+                        close();
+                      }}
+                    >
+                      Vista antigua
                     </DropdownItem>
                   </>
                 )}
@@ -1759,18 +2312,42 @@ export default function FavoritesClient() {
 
             <InlineDropdown
               label="Tipo"
-              valueLabel={typeFilter === "all" ? "Todo" : typeFilter === "movies" ? "Películas" : "Series"}
+              valueLabel={
+                typeFilter === "all"
+                  ? "Todo"
+                  : typeFilter === "movies"
+                    ? "Películas"
+                    : "Series"
+              }
               icon={Filter}
             >
               {({ close }) => (
                 <>
-                  <DropdownItem active={typeFilter === "all"} onClick={() => { setTypeFilter("all"); close(); }}>
+                  <DropdownItem
+                    active={typeFilter === "all"}
+                    onClick={() => {
+                      setTypeFilter("all");
+                      close();
+                    }}
+                  >
                     Todo
                   </DropdownItem>
-                  <DropdownItem active={typeFilter === "movies"} onClick={() => { setTypeFilter("movies"); close(); }}>
+                  <DropdownItem
+                    active={typeFilter === "movies"}
+                    onClick={() => {
+                      setTypeFilter("movies");
+                      close();
+                    }}
+                  >
                     Películas
                   </DropdownItem>
-                  <DropdownItem active={typeFilter === "shows"} onClick={() => { setTypeFilter("shows"); close(); }}>
+                  <DropdownItem
+                    active={typeFilter === "shows"}
+                    onClick={() => {
+                      setTypeFilter("shows");
+                      close();
+                    }}
+                  >
                     Series
                   </DropdownItem>
                 </>
@@ -1780,34 +2357,99 @@ export default function FavoritesClient() {
             <InlineDropdown
               label="Ordenar"
               valueLabel={
-                sortBy === "title-asc" ? "A-Z" :
-                sortBy === "title-desc" ? "Z-A" :
-                sortBy === "rating-desc" ? "Mejor valorado" :
-                sortBy === "rating-asc" ? "Peor valorado" :
-                sortBy === "added-desc" ? "Añadido reciente" :
-                sortBy === "added-asc" ? "Añadido antiguo" : "A-Z"
+                sortBy === "title-asc"
+                  ? "A-Z"
+                  : sortBy === "title-desc"
+                    ? "Z-A"
+                    : sortBy === "rating-desc"
+                      ? "Mejor valorado"
+                      : sortBy === "rating-asc"
+                        ? "Peor valorado"
+                        : sortBy === "added-desc"
+                          ? "Añadido reciente"
+                          : sortBy === "added-asc"
+                            ? "Añadido antiguo"
+                            : sortBy === "watched-desc"
+                              ? "Vista reciente"
+                              : sortBy === "watched-asc"
+                                ? "Vista antigua"
+                                : "A-Z"
               }
               icon={ArrowUpDown}
             >
               {({ close }) => (
                 <>
-                  <DropdownItem active={sortBy === "title-asc"} onClick={() => { setSortBy("title-asc"); close(); }}>
+                  <DropdownItem
+                    active={sortBy === "title-asc"}
+                    onClick={() => {
+                      setSortBy("title-asc");
+                      close();
+                    }}
+                  >
                     Título A-Z
                   </DropdownItem>
-                  <DropdownItem active={sortBy === "title-desc"} onClick={() => { setSortBy("title-desc"); close(); }}>
+                  <DropdownItem
+                    active={sortBy === "title-desc"}
+                    onClick={() => {
+                      setSortBy("title-desc");
+                      close();
+                    }}
+                  >
                     Título Z-A
                   </DropdownItem>
-                  <DropdownItem active={sortBy === "rating-desc"} onClick={() => { setSortBy("rating-desc"); close(); }}>
+                  <DropdownItem
+                    active={sortBy === "rating-desc"}
+                    onClick={() => {
+                      setSortBy("rating-desc");
+                      close();
+                    }}
+                  >
                     Valoración más alta
                   </DropdownItem>
-                  <DropdownItem active={sortBy === "rating-asc"} onClick={() => { setSortBy("rating-asc"); close(); }}>
+                  <DropdownItem
+                    active={sortBy === "rating-asc"}
+                    onClick={() => {
+                      setSortBy("rating-asc");
+                      close();
+                    }}
+                  >
                     Valoración más baja
                   </DropdownItem>
-                  <DropdownItem active={sortBy === "added-desc"} onClick={() => { setSortBy("added-desc"); close(); }}>
+                  <DropdownItem
+                    active={sortBy === "added-desc"}
+                    onClick={() => {
+                      setSortBy("added-desc");
+                      close();
+                    }}
+                  >
                     Añadido reciente
                   </DropdownItem>
-                  <DropdownItem active={sortBy === "added-asc"} onClick={() => { setSortBy("added-asc"); close(); }}>
+                  <DropdownItem
+                    active={sortBy === "added-asc"}
+                    onClick={() => {
+                      setSortBy("added-asc");
+                      close();
+                    }}
+                  >
                     Añadido antiguo
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === "watched-desc"}
+                    onClick={() => {
+                      setSortBy("watched-desc");
+                      close();
+                    }}
+                  >
+                    Vista reciente
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === "watched-asc"}
+                    onClick={() => {
+                      setSortBy("watched-asc");
+                      close();
+                    }}
+                  >
+                    Vista antigua
                   </DropdownItem>
                 </>
               )}
@@ -1816,36 +2458,96 @@ export default function FavoritesClient() {
             <InlineDropdown
               label="Agrupar"
               valueLabel={
-                groupBy === "none" ? "Sin agrupar" :
-                groupBy === "year" ? "Por año" :
-                groupBy === "decade" ? "Por década" :
-                groupBy === "tmdb_rating" ? "TMDb" :
-                groupBy === "imdb_rating" ? "IMDb" :
-                groupBy === "trakt_rating" ? "Trakt" : "Mis puntuaciones"
+                groupBy === "none"
+                  ? "Sin agrupar"
+                  : groupBy === "year"
+                    ? "Por año"
+                    : groupBy === "decade"
+                      ? "Por década"
+                      : groupBy === "genre"
+                        ? "Por género"
+                        : groupBy === "tmdb_rating"
+                          ? "TMDb"
+                          : groupBy === "imdb_rating"
+                            ? "IMDb"
+                            : groupBy === "trakt_rating"
+                              ? "Trakt"
+                              : "Mis puntuaciones"
               }
               icon={Layers3}
             >
               {({ close }) => (
                 <>
-                  <DropdownItem active={groupBy === "none"} onClick={() => { setGroupBy("none"); close(); }}>
+                  <DropdownItem
+                    active={groupBy === "none"}
+                    onClick={() => {
+                      setGroupBy("none");
+                      close();
+                    }}
+                  >
                     Sin agrupar
                   </DropdownItem>
-                  <DropdownItem active={groupBy === "year"} onClick={() => { setGroupBy("year"); close(); }}>
+                  <DropdownItem
+                    active={groupBy === "year"}
+                    onClick={() => {
+                      setGroupBy("year");
+                      close();
+                    }}
+                  >
                     Por año
                   </DropdownItem>
-                  <DropdownItem active={groupBy === "decade"} onClick={() => { setGroupBy("decade"); close(); }}>
+                  <DropdownItem
+                    active={groupBy === "decade"}
+                    onClick={() => {
+                      setGroupBy("decade");
+                      close();
+                    }}
+                  >
                     Por década
                   </DropdownItem>
-                  <DropdownItem active={groupBy === "tmdb_rating"} onClick={() => { setGroupBy("tmdb_rating"); close(); }}>
+                  <DropdownItem
+                    active={groupBy === "genre"}
+                    onClick={() => {
+                      setGroupBy("genre");
+                      close();
+                    }}
+                  >
+                    Por género
+                  </DropdownItem>
+                  <DropdownItem
+                    active={groupBy === "tmdb_rating"}
+                    onClick={() => {
+                      setGroupBy("tmdb_rating");
+                      close();
+                    }}
+                  >
                     Puntuación TMDb
                   </DropdownItem>
-                  <DropdownItem active={groupBy === "imdb_rating"} onClick={() => { setGroupBy("imdb_rating"); close(); }}>
+                  <DropdownItem
+                    active={groupBy === "imdb_rating"}
+                    onClick={() => {
+                      setGroupBy("imdb_rating");
+                      close();
+                    }}
+                  >
                     Puntuación IMDb
                   </DropdownItem>
-                  <DropdownItem active={groupBy === "trakt_rating"} onClick={() => { setGroupBy("trakt_rating"); close(); }}>
+                  <DropdownItem
+                    active={groupBy === "trakt_rating"}
+                    onClick={() => {
+                      setGroupBy("trakt_rating");
+                      close();
+                    }}
+                  >
                     Puntuación Trakt
                   </DropdownItem>
-                  <DropdownItem active={groupBy === "user_rating"} onClick={() => { setGroupBy("user_rating"); close(); }}>
+                  <DropdownItem
+                    active={groupBy === "user_rating"}
+                    onClick={() => {
+                      setGroupBy("user_rating");
+                      close();
+                    }}
+                  >
                     Mis puntuaciones
                   </DropdownItem>
                 </>
@@ -1913,14 +2615,20 @@ export default function FavoritesClient() {
         </motion.div>
 
         {/* Content */}
-        {loading || (groupBy === "imdb_rating" && loadingImdb) || (groupBy === "trakt_rating" && loadingTrakt) ? (
+        {loading ||
+        (groupBy === "imdb_rating" && loadingImdb) ||
+        (groupBy === "trakt_rating" && loadingTrakt) ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
             {loadingImdb && groupBy === "imdb_rating" && (
-              <p className="text-zinc-500 text-sm">Cargando puntuaciones de IMDb...</p>
+              <p className="text-zinc-500 text-sm">
+                Cargando puntuaciones de IMDb...
+              </p>
             )}
             {loadingTrakt && groupBy === "trakt_rating" && (
-              <p className="text-zinc-500 text-sm">Cargando puntuaciones de Trakt...</p>
+              <p className="text-zinc-500 text-sm">
+                Cargando puntuaciones de Trakt...
+              </p>
             )}
           </div>
         ) : sorted.length === 0 ? (
@@ -1931,7 +2639,9 @@ export default function FavoritesClient() {
             transition={{ duration: 0.4 }}
           >
             <Heart className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
-            <p className="text-zinc-500 font-medium">No se encontraron favoritos.</p>
+            <p className="text-zinc-500 font-medium">
+              No se encontraron favoritos.
+            </p>
             {q && (
               <button
                 onClick={() => setQ("")}
@@ -1957,27 +2667,58 @@ export default function FavoritesClient() {
                   {viewMode === "list" ? (
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
                       {group.items.map((item, idx) => (
-                        <FavoriteCard key={item.id} item={item} index={idx} totalItems={group.items.length} viewMode="list" imageMode={imageMode} />
+                        <FavoriteCard
+                          key={item.id}
+                          item={item}
+                          index={idx}
+                          totalItems={group.items.length}
+                          viewMode="list"
+                          imageMode={imageMode}
+                          imdbScore={imdbScores.get(String(item.id))}
+                          traktScore={traktScores.get(String(item.id))}
+                        />
                       ))}
                     </div>
                   ) : viewMode === "compact" ? (
-                    <div className={`grid gap-2 mt-6 ${
-                      imageMode === "backdrop"
-                        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
-                        : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
-                    }`}>
+                    <div
+                      className={`grid gap-2 mt-6 ${
+                        imageMode === "backdrop"
+                          ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
+                          : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
+                      }`}
+                    >
                       {group.items.map((item, idx) => (
-                        <FavoriteCard key={item.id} item={item} index={idx} totalItems={group.items.length} viewMode="compact" imageMode={imageMode} />
+                        <FavoriteCard
+                          key={item.id}
+                          item={item}
+                          index={idx}
+                          totalItems={group.items.length}
+                          viewMode="compact"
+                          imageMode={imageMode}
+                          imdbScore={imdbScores.get(String(item.id))}
+                          traktScore={traktScores.get(String(item.id))}
+                        />
                       ))}
                     </div>
                   ) : (
-                    <div className={`grid gap-3 mt-6 ${
-                      imageMode === "backdrop"
-                        ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
-                        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
-                    }`}>
+                    <div
+                      className={`grid gap-3 mt-6 ${
+                        imageMode === "backdrop"
+                          ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+                          : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
+                      }`}
+                    >
                       {group.items.map((item, idx) => (
-                        <FavoriteCard key={item.id} item={item} index={idx} totalItems={group.items.length} viewMode="grid" imageMode={imageMode} />
+                        <FavoriteCard
+                          key={item.id}
+                          item={item}
+                          index={idx}
+                          totalItems={group.items.length}
+                          viewMode="grid"
+                          imageMode={imageMode}
+                          imdbScore={imdbScores.get(String(item.id))}
+                          traktScore={traktScores.get(String(item.id))}
+                        />
                       ))}
                     </div>
                   )}
@@ -1990,27 +2731,58 @@ export default function FavoritesClient() {
             {viewMode === "list" ? (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {sorted.map((item, idx) => (
-                  <FavoriteCard key={item.id} item={item} index={idx} totalItems={sorted.length} viewMode="list" imageMode={imageMode} />
+                  <FavoriteCard
+                    key={item.id}
+                    item={item}
+                    index={idx}
+                    totalItems={sorted.length}
+                    viewMode="list"
+                    imageMode={imageMode}
+                    imdbScore={imdbScores.get(String(item.id))}
+                    traktScore={traktScores.get(String(item.id))}
+                  />
                 ))}
               </div>
             ) : viewMode === "compact" ? (
-              <div className={`grid gap-2 ${
-                imageMode === "backdrop"
-                  ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
-                  : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
-              }`}>
+              <div
+                className={`grid gap-2 ${
+                  imageMode === "backdrop"
+                    ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
+                    : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
+                }`}
+              >
                 {sorted.map((item, idx) => (
-                  <FavoriteCard key={item.id} item={item} index={idx} totalItems={sorted.length} viewMode="compact" imageMode={imageMode} />
+                  <FavoriteCard
+                    key={item.id}
+                    item={item}
+                    index={idx}
+                    totalItems={sorted.length}
+                    viewMode="compact"
+                    imageMode={imageMode}
+                    imdbScore={imdbScores.get(String(item.id))}
+                    traktScore={traktScores.get(String(item.id))}
+                  />
                 ))}
               </div>
             ) : (
-              <div className={`grid gap-3 ${
-                imageMode === "backdrop"
-                  ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
-                  : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
-              }`}>
+              <div
+                className={`grid gap-3 ${
+                  imageMode === "backdrop"
+                    ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+                    : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
+                }`}
+              >
                 {sorted.map((item, idx) => (
-                  <FavoriteCard key={item.id} item={item} index={idx} totalItems={sorted.length} viewMode="grid" imageMode={imageMode} />
+                  <FavoriteCard
+                    key={item.id}
+                    item={item}
+                    index={idx}
+                    totalItems={sorted.length}
+                    viewMode="grid"
+                    imageMode={imageMode}
+                    imdbScore={imdbScores.get(String(item.id))}
+                    traktScore={traktScores.get(String(item.id))}
+                  />
                 ))}
               </div>
             )}
