@@ -1031,7 +1031,7 @@ function FavoriteCard({
                     </p>
                   </div>
                   {userRating && (
-                    <span className="text-yellow-400 text-lg font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
+                    <span className="text-yellow-400 text-2xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
                       {userRating}
                     </span>
                   )}
@@ -1155,7 +1155,7 @@ function FavoriteCard({
                   </p>
                 </div>
                 {userRating && (
-                  <span className="text-yellow-400 text-xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
+                  <span className="text-yellow-400 text-2xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
                     {userRating}
                   </span>
                 )}
@@ -1776,9 +1776,9 @@ export default function FavoritesClient() {
             groupKey = "unrated";
             groupLabel = "Sin puntuar";
           } else {
-            const bucket = Math.floor(rating);
+            const bucket = Math.floor(rating * 2) / 2; // 0.5 steps
             groupKey = bucket.toString();
-            groupLabel = `${bucket}`;
+            groupLabel = Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
           }
         }
 
@@ -1820,7 +1820,7 @@ export default function FavoritesClient() {
         if (!aNoRating && bNoRating) return -1;
         if (aNoRating && bNoRating) return 0;
 
-        return parseInt(b.key) - parseInt(a.key);
+        return parseFloat(b.key) - parseFloat(a.key);
       });
     } else if (groupBy === "genre") {
       // Sort alphabetically by genre name, but "Sin género" at the end
