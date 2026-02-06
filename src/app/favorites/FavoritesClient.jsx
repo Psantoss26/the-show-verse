@@ -394,9 +394,8 @@ function SmartPoster({ item, title, mode = "poster" }) {
   return (
     <div className="relative w-full h-full">
       <div
-        className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 transition-opacity duration-300 ${
-          ready && src ? "opacity-0" : "opacity-100"
-        }`}
+        className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 transition-opacity duration-300 ${ready && src ? "opacity-0" : "opacity-100"
+          }`}
       >
         <Film className="w-8 h-8 text-neutral-700" />
       </div>
@@ -407,9 +406,8 @@ function SmartPoster({ item, title, mode = "poster" }) {
           alt={title}
           loading="lazy"
           decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            ready ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${ready ? "opacity-100" : "opacity-0"
+            }`}
         />
       ) : null}
     </div>
@@ -443,7 +441,7 @@ const writeOmdbCache = (imdbId, patch) => {
       `showverse:omdb:${imdbId}`,
       JSON.stringify(next),
     );
-  } catch {}
+  } catch { }
 };
 
 function runPool(items, limit, worker) {
@@ -458,7 +456,7 @@ function runPool(items, limit, worker) {
         const it = queue.shift();
         active++;
         Promise.resolve(worker(it))
-          .catch(() => {})
+          .catch(() => { })
           .finally(() => {
             active--;
             done++;
@@ -674,75 +672,73 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
 
   return (
     <motion.div
-      className="my-8 sm:my-10"
+      className="my-4 sm:my-8"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
-      <div className="relative overflow-hidden rounded-2xl bg-[#0a0a0a] border border-white/[0.08]">
+      <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-[#0a0a0a] border border-white/[0.08]">
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/[0.03] via-transparent to-transparent opacity-50" />
 
-        <div className="relative px-4 sm:px-6 py-4 sm:py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
-          <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
-            <div className="w-1.5 h-10 sm:h-12 bg-gradient-to-b from-red-500 to-red-600 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0" />
+        <div className="relative px-3 sm:px-6 py-2.5 sm:py-5 flex items-center justify-between gap-3 sm:gap-6">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+            <div className="w-1 sm:w-1.5 h-8 sm:h-12 bg-gradient-to-b from-red-500 to-red-600 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0" />
 
-            <div className="min-w-0">
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight line-clamp-2 sm:line-clamp-1">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base sm:text-2xl font-black tracking-tight text-white leading-tight line-clamp-1">
                 {title}
               </h2>
 
-              <div className="mt-1 text-xs sm:text-sm text-zinc-500 font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2">
                 <span className="text-zinc-300 font-bold">{count}</span>
                 <span>items</span>
-                <span className="hidden sm:inline w-1 h-1 rounded-full bg-zinc-700" />
-                <span className="opacity-90">{pct}% del total</span>
+                <span className="w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full bg-zinc-700" />
+                <span className="opacity-90">{pct}%</span>
               </div>
             </div>
           </div>
 
-          <div className="pt-3 sm:pt-4 lg:pt-0 border-t border-white/5 lg:border-t-0 w-full lg:w-auto">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-4">
-              {stats?.imdb?.avg != null &&
-                typeof stats.imdb.avg === "number" &&
-                !Number.isNaN(stats.imdb.avg) && (
-                  <StatBox
-                    label="IMDb"
-                    value={formatAvg(stats.imdb.avg)}
-                    imgSrc="/logo-IMDb.png"
-                  />
-                )}
-              {stats?.trakt?.avg != null &&
-                typeof stats.trakt.avg === "number" &&
-                !Number.isNaN(stats.trakt.avg) && (
-                  <StatBox
-                    label="Trakt"
-                    value={formatAvg(stats.trakt.avg)}
-                    imgSrc="/logo-Trakt.png"
-                  />
-                )}
-              {stats?.tmdb?.avg != null &&
-                typeof stats.tmdb.avg === "number" &&
-                !Number.isNaN(stats.tmdb.avg) && (
-                  <StatBox
-                    label="TMDb"
-                    value={formatAvg(stats.tmdb.avg)}
-                    imgSrc="/logo-TMDb.png"
-                  />
-                )}
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            {stats?.imdb?.avg != null &&
+              typeof stats.imdb.avg === "number" &&
+              !Number.isNaN(stats.imdb.avg) && (
+                <StatBox
+                  label="IMDb"
+                  value={formatAvg(stats.imdb.avg)}
+                  imgSrc="/logo-IMDb.png"
+                />
+              )}
+            {stats?.trakt?.avg != null &&
+              typeof stats.trakt.avg === "number" &&
+              !Number.isNaN(stats.trakt.avg) && (
+                <StatBox
+                  label="Trakt"
+                  value={formatAvg(stats.trakt.avg)}
+                  imgSrc="/logo-Trakt.png"
+                />
+              )}
+            {stats?.tmdb?.avg != null &&
+              typeof stats.tmdb.avg === "number" &&
+              !Number.isNaN(stats.tmdb.avg) && (
+                <StatBox
+                  label="TMDb"
+                  value={formatAvg(stats.tmdb.avg)}
+                  imgSrc="/logo-TMDb.png"
+                />
+              )}
 
-              {stats?.my?.avg != null &&
-                typeof stats.my.avg === "number" &&
-                !Number.isNaN(stats.my.avg) && (
-                  <div className="sm:pl-4 sm:border-l border-white/10">
-                    <StatBox
-                      label="Tu media"
-                      value={formatAvg(stats.my.avg)}
-                      icon={Star}
-                      colorClass="text-amber-400 fill-amber-400"
-                    />
-                  </div>
-                )}
-            </div>
+            {stats?.my?.avg != null &&
+              typeof stats.my.avg === "number" &&
+              !Number.isNaN(stats.my.avg) && (
+                <div className="sm:pl-4 sm:border-l border-white/10">
+                  <StatBox
+                    label="Tu media"
+                    value={formatAvg(stats.my.avg)}
+                    icon={Star}
+                    colorClass="text-amber-400 fill-amber-400"
+                  />
+                </div>
+              )}
           </div>
         </div>
       </div>
@@ -904,11 +900,10 @@ function FavoriteCard({
               </div>
               <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
                 <span
-                  className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${
-                    type === "movie"
-                      ? "bg-sky-500/10 text-sky-500"
-                      : "bg-purple-500/10 text-purple-500"
-                  }`}
+                  className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${type === "movie"
+                    ? "bg-sky-500/10 text-sky-500"
+                    : "bg-purple-500/10 text-purple-500"
+                    }`}
                 >
                   {type === "movie" ? "PELÍCULA" : "SERIE"}
                 </span>
@@ -968,11 +963,10 @@ function FavoriteCard({
               {/* Top gradient con tipo y ratings */}
               <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                 <span
-                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                    type === "movie"
-                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                  }`}
+                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${type === "movie"
+                    ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                    : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                    }`}
                 >
                   {type === "movie" ? "PELÍCULA" : "SERIE"}
                 </span>
@@ -1063,11 +1057,10 @@ function FavoriteCard({
           <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
             <div className="flex items-center gap-2 mb-1 -ml-0.5">
               <span
-                className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-                  type === "movie"
-                    ? "bg-sky-500/20 text-sky-200"
-                    : "bg-purple-500/20 text-purple-200"
-                }`}
+                className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === "movie"
+                  ? "bg-sky-500/20 text-sky-200"
+                  : "bg-purple-500/20 text-purple-200"
+                  }`}
               >
                 {type === "movie" ? "Cine" : "TV"}
               </span>
@@ -1092,11 +1085,10 @@ function FavoriteCard({
             {/* Top gradient con tipo y ratings */}
             <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
               <span
-                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                  type === "movie"
-                    ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                    : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                }`}
+                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${type === "movie"
+                  ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                  : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                  }`}
               >
                 {type === "movie" ? "PELÍCULA" : "SERIE"}
               </span>
@@ -1953,7 +1945,7 @@ export default function FavoritesClient() {
 
         {/* Filters */}
         <motion.div
-          className="sticky top-16 z-30 space-y-3 mb-6 bg-[#050505] py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+          className="sticky top-16 z-40 space-y-3 mb-6 bg-[#050505] py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -1980,11 +1972,10 @@ export default function FavoritesClient() {
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
-                mobileFiltersOpen
-                  ? "bg-red-500/20 border-red-500/40 text-red-400"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
-              }`}
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${mobileFiltersOpen
+                ? "bg-red-500/20 border-red-500/40 text-red-400"
+                : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
             </button>
@@ -1998,319 +1989,303 @@ export default function FavoritesClient() {
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="overflow-hidden lg:hidden"
+                className="lg:hidden overflow-visible"
               >
                 <div className="space-y-3 pt-1">
 
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <InlineDropdown
-                label="Tipo"
-                valueLabel={
-                  typeFilter === "all"
-                    ? "Todo"
-                    : typeFilter === "movies"
-                      ? "Películas"
-                      : "Series"
-                }
-                icon={Filter}
-              >
-                {({ close }) => (
-                  <>
-                    <DropdownItem
-                      active={typeFilter === "all"}
-                      onClick={() => {
-                        setTypeFilter("all");
-                        close();
-                      }}
-                    >
-                      Todo
-                    </DropdownItem>
-                    <DropdownItem
-                      active={typeFilter === "movies"}
-                      onClick={() => {
-                        setTypeFilter("movies");
-                        close();
-                      }}
-                    >
-                      Películas
-                    </DropdownItem>
-                    <DropdownItem
-                      active={typeFilter === "shows"}
-                      onClick={() => {
-                        setTypeFilter("shows");
-                        close();
-                      }}
-                    >
-                      Series
-                    </DropdownItem>
-                  </>
-                )}
-              </InlineDropdown>
-            </div>
-            <div className="flex-1">
-              <InlineDropdown
-                label="Agrupar"
-                valueLabel={
-                  groupBy === "none"
-                    ? "Sin agrupar"
-                    : groupBy === "year"
-                      ? "Año"
-                      : groupBy === "decade"
-                        ? "Década"
-                        : groupBy === "genre"
-                          ? "Género"
-                          : groupBy === "tmdb_rating"
-                            ? "TMDb"
-                            : groupBy === "imdb_rating"
-                              ? "IMDb"
-                              : groupBy === "trakt_rating"
-                                ? "Trakt"
-                                : "Mis notas"
-                }
-                icon={Layers3}
-              >
-                {({ close }) => (
-                  <>
-                    <DropdownItem
-                      active={groupBy === "none"}
-                      onClick={() => {
-                        setGroupBy("none");
-                        close();
-                      }}
-                    >
-                      Sin agrupar
-                    </DropdownItem>
-                    <DropdownItem
-                      active={groupBy === "year"}
-                      onClick={() => {
-                        setGroupBy("year");
-                        close();
-                      }}
-                    >
-                      Por año
-                    </DropdownItem>
-                    <DropdownItem
-                      active={groupBy === "decade"}
-                      onClick={() => {
-                        setGroupBy("decade");
-                        close();
-                      }}
-                    >
-                      Por década
-                    </DropdownItem>
-                    <DropdownItem
-                      active={groupBy === "genre"}
-                      onClick={() => {
-                        setGroupBy("genre");
-                        close();
-                      }}
-                    >
-                      Por género
-                    </DropdownItem>
-                    <DropdownItem
-                      active={groupBy === "tmdb_rating"}
-                      onClick={() => {
-                        setGroupBy("tmdb_rating");
-                        close();
-                      }}
-                    >
-                      Puntuación TMDb
-                    </DropdownItem>
-                    <DropdownItem
-                      active={groupBy === "imdb_rating"}
-                      onClick={() => {
-                        setGroupBy("imdb_rating");
-                        close();
-                      }}
-                    >
-                      Puntuación IMDb
-                    </DropdownItem>
-                    <DropdownItem
-                      active={groupBy === "trakt_rating"}
-                      onClick={() => {
-                        setGroupBy("trakt_rating");
-                        close();
-                      }}
-                    >
-                      Puntuación Trakt
-                    </DropdownItem>
-                    <DropdownItem
-                      active={groupBy === "user_rating"}
-                      onClick={() => {
-                        setGroupBy("user_rating");
-                        close();
-                      }}
-                    >
-                      Mis puntuaciones
-                    </DropdownItem>
-                  </>
-                )}
-              </InlineDropdown>
-            </div>
-          </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <InlineDropdown
+                        label="Tipo"
+                        valueLabel={
+                          typeFilter === "all"
+                            ? "Todo"
+                            : typeFilter === "movies"
+                              ? "Películas"
+                              : "Series"
+                        }
+                        icon={Filter}
+                      >
+                        {({ close }) => (
+                          <>
+                            <DropdownItem
+                              active={typeFilter === "all"}
+                              onClick={() => {
+                                setTypeFilter("all");
+                                close();
+                              }}
+                            >
+                              Todo
+                            </DropdownItem>
+                            <DropdownItem
+                              active={typeFilter === "movies"}
+                              onClick={() => {
+                                setTypeFilter("movies");
+                                close();
+                              }}
+                            >
+                              Películas
+                            </DropdownItem>
+                            <DropdownItem
+                              active={typeFilter === "shows"}
+                              onClick={() => {
+                                setTypeFilter("shows");
+                                close();
+                              }}
+                            >
+                              Series
+                            </DropdownItem>
+                          </>
+                        )}
+                      </InlineDropdown>
+                    </div>
+                    <div className="flex-1">
+                      <InlineDropdown
+                        label="Agrupar"
+                        valueLabel={
+                          groupBy === "none"
+                            ? "Sin agrupar"
+                            : groupBy === "year"
+                              ? "Año"
+                              : groupBy === "decade"
+                                ? "Década"
+                                : groupBy === "genre"
+                                  ? "Género"
+                                  : groupBy === "tmdb_rating"
+                                    ? "TMDb"
+                                    : groupBy === "imdb_rating"
+                                      ? "IMDb"
+                                      : groupBy === "trakt_rating"
+                                        ? "Trakt"
+                                        : "Mis notas"
+                        }
+                        icon={Layers3}
+                      >
+                        {({ close }) => (
+                          <>
+                            <DropdownItem
+                              active={groupBy === "none"}
+                              onClick={() => {
+                                setGroupBy("none");
+                                close();
+                              }}
+                            >
+                              Sin agrupar
+                            </DropdownItem>
+                            <DropdownItem
+                              active={groupBy === "year"}
+                              onClick={() => {
+                                setGroupBy("year");
+                                close();
+                              }}
+                            >
+                              Por año
+                            </DropdownItem>
+                            <DropdownItem
+                              active={groupBy === "decade"}
+                              onClick={() => {
+                                setGroupBy("decade");
+                                close();
+                              }}
+                            >
+                              Por década
+                            </DropdownItem>
+                            <DropdownItem
+                              active={groupBy === "genre"}
+                              onClick={() => {
+                                setGroupBy("genre");
+                                close();
+                              }}
+                            >
+                              Por género
+                            </DropdownItem>
+                            <DropdownItem
+                              active={groupBy === "tmdb_rating"}
+                              onClick={() => {
+                                setGroupBy("tmdb_rating");
+                                close();
+                              }}
+                            >
+                              Puntuación TMDb
+                            </DropdownItem>
+                            <DropdownItem
+                              active={groupBy === "imdb_rating"}
+                              onClick={() => {
+                                setGroupBy("imdb_rating");
+                                close();
+                              }}
+                            >
+                              Puntuación IMDb
+                            </DropdownItem>
+                            <DropdownItem
+                              active={groupBy === "trakt_rating"}
+                              onClick={() => {
+                                setGroupBy("trakt_rating");
+                                close();
+                              }}
+                            >
+                              Puntuación Trakt
+                            </DropdownItem>
+                            <DropdownItem
+                              active={groupBy === "user_rating"}
+                              onClick={() => {
+                                setGroupBy("user_rating");
+                                close();
+                              }}
+                            >
+                              Mis puntuaciones
+                            </DropdownItem>
+                          </>
+                        )}
+                      </InlineDropdown>
+                    </div>
+                  </div>
 
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <InlineDropdown
-                label="Orden"
-                valueLabel={
-                  sortBy === "title-asc"
-                    ? "A-Z"
-                    : sortBy === "title-desc"
-                      ? "Z-A"
-                      : sortBy === "rating-desc"
-                        ? "Mejor"
-                        : sortBy === "rating-asc"
-                          ? "Peor"
-                          : sortBy === "added-desc"
-                            ? "Reciente"
-                            : sortBy === "added-asc"
-                              ? "Antiguo"
-                              : sortBy === "watched-desc"
-                                ? "Vista +"
-                                : sortBy === "watched-asc"
-                                  ? "Vista -"
-                                  : "A-Z"
-                }
-                icon={ArrowUpDown}
-              >
-                {({ close }) => (
-                  <>
-                    <DropdownItem
-                      active={sortBy === "title-asc"}
-                      onClick={() => {
-                        setSortBy("title-asc");
-                        close();
-                      }}
-                    >
-                      Título A-Z
-                    </DropdownItem>
-                    <DropdownItem
-                      active={sortBy === "title-desc"}
-                      onClick={() => {
-                        setSortBy("title-desc");
-                        close();
-                      }}
-                    >
-                      Título Z-A
-                    </DropdownItem>
-                    <DropdownItem
-                      active={sortBy === "rating-desc"}
-                      onClick={() => {
-                        setSortBy("rating-desc");
-                        close();
-                      }}
-                    >
-                      Valoración ↓
-                    </DropdownItem>
-                    <DropdownItem
-                      active={sortBy === "rating-asc"}
-                      onClick={() => {
-                        setSortBy("rating-asc");
-                        close();
-                      }}
-                    >
-                      Valoración ↑
-                    </DropdownItem>
-                    <DropdownItem
-                      active={sortBy === "added-desc"}
-                      onClick={() => {
-                        setSortBy("added-desc");
-                        close();
-                      }}
-                    >
-                      Añadido reciente
-                    </DropdownItem>
-                    <DropdownItem
-                      active={sortBy === "added-asc"}
-                      onClick={() => {
-                        setSortBy("added-asc");
-                        close();
-                      }}
-                    >
-                      Añadido antiguo
-                    </DropdownItem>
-                    <DropdownItem
-                      active={sortBy === "watched-desc"}
-                      onClick={() => {
-                        setSortBy("watched-desc");
-                        close();
-                      }}
-                    >
-                      Vista reciente
-                    </DropdownItem>
-                    <DropdownItem
-                      active={sortBy === "watched-asc"}
-                      onClick={() => {
-                        setSortBy("watched-asc");
-                        close();
-                      }}
-                    >
-                      Vista antigua
-                    </DropdownItem>
-                  </>
-                )}
-              </InlineDropdown>
-            </div>
-            <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
-              <button
-                onClick={() => setViewMode("list")}
-                className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                  viewMode === "list"
-                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                }`}
-              >
-                <Layers className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode("compact")}
-                className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                  viewMode === "compact"
-                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                }`}
-              >
-                <AllGlyph className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                  viewMode === "grid"
-                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                }`}
-              >
-                <PosterGlyph className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
-              <button
-                onClick={() => setImageMode("poster")}
-                className={`px-2.5 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                  imageMode === "poster"
-                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                }`}
-                title="Vista Poster"
-              >
-                <PosterGlyph className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setImageMode("backdrop")}
-                className={`px-2.5 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                  imageMode === "backdrop"
-                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                }`}
-                title="Vista Backdrop"
-              >
-                <BackdropGlyph className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <InlineDropdown
+                        label="Orden"
+                        valueLabel={
+                          sortBy === "title-asc"
+                            ? "A-Z"
+                            : sortBy === "title-desc"
+                              ? "Z-A"
+                              : sortBy === "rating-desc"
+                                ? "Mejor"
+                                : sortBy === "rating-asc"
+                                  ? "Peor"
+                                  : sortBy === "added-desc"
+                                    ? "Reciente"
+                                    : sortBy === "added-asc"
+                                      ? "Antiguo"
+                                      : sortBy === "watched-desc"
+                                        ? "Vista +"
+                                        : sortBy === "watched-asc"
+                                          ? "Vista -"
+                                          : "A-Z"
+                        }
+                        icon={ArrowUpDown}
+                      >
+                        {({ close }) => (
+                          <>
+                            <DropdownItem
+                              active={sortBy === "title-asc"}
+                              onClick={() => {
+                                setSortBy("title-asc");
+                                close();
+                              }}
+                            >
+                              Título A-Z
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortBy === "title-desc"}
+                              onClick={() => {
+                                setSortBy("title-desc");
+                                close();
+                              }}
+                            >
+                              Título Z-A
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortBy === "rating-desc"}
+                              onClick={() => {
+                                setSortBy("rating-desc");
+                                close();
+                              }}
+                            >
+                              Valoración ↓
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortBy === "rating-asc"}
+                              onClick={() => {
+                                setSortBy("rating-asc");
+                                close();
+                              }}
+                            >
+                              Valoración ↑
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortBy === "added-desc"}
+                              onClick={() => {
+                                setSortBy("added-desc");
+                                close();
+                              }}
+                            >
+                              Añadido reciente
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortBy === "added-asc"}
+                              onClick={() => {
+                                setSortBy("added-asc");
+                                close();
+                              }}
+                            >
+                              Añadido antiguo
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortBy === "watched-desc"}
+                              onClick={() => {
+                                setSortBy("watched-desc");
+                                close();
+                              }}
+                            >
+                              Vista reciente
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortBy === "watched-asc"}
+                              onClick={() => {
+                                setSortBy("watched-asc");
+                                close();
+                              }}
+                            >
+                              Vista antigua
+                            </DropdownItem>
+                          </>
+                        )}
+                      </InlineDropdown>
+                    </div>
+                    <div className="flex-1 flex gap-2">
+                      <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center flex-1">
+                        <button
+                          onClick={() => setViewMode("list")}
+                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "list"
+                            ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                            }`}
+                        >
+                          <Layers className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setViewMode("compact")}
+                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "compact"
+                            ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                            }`}
+                        >
+                          <AllGlyph className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setViewMode("grid")}
+                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "grid"
+                            ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                            }`}
+                        >
+                          <PosterGlyph className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setImageMode(imageMode === "poster" ? "backdrop" : "poster")}
+                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${imageMode === "backdrop"
+                          ? "bg-red-500/20 border-red-500/40 text-red-400"
+                          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                          }`}
+                        title={imageMode === "poster" ? "Cambiar a Backdrop" : "Cambiar a Poster"}
+                      >
+                        {imageMode === "poster" ? <PosterGlyph className="w-4 h-4" /> : <BackdropGlyph className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
 
                 </div>
               </motion.div>
@@ -2584,31 +2559,28 @@ export default function FavoritesClient() {
             <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
               <button
                 onClick={() => setViewMode("list")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                  viewMode === "list"
-                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "list"
+                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                  }`}
               >
                 <Layers className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("compact")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                  viewMode === "compact"
-                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "compact"
+                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                  }`}
               >
                 <AllGlyph className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("grid")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                  viewMode === "grid"
-                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "grid"
+                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                  }`}
               >
                 <PosterGlyph className="w-4 h-4" />
               </button>
@@ -2617,22 +2589,20 @@ export default function FavoritesClient() {
             <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
               <button
                 onClick={() => setImageMode("poster")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                  imageMode === "poster"
-                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${imageMode === "poster"
+                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                  }`}
                 title="Vista Poster"
               >
                 <PosterGlyph className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setImageMode("backdrop")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                  imageMode === "backdrop"
-                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${imageMode === "backdrop"
+                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                  }`}
                 title="Vista Backdrop"
               >
                 <BackdropGlyph className="w-4 h-4" />
@@ -2643,8 +2613,8 @@ export default function FavoritesClient() {
 
         {/* Content */}
         {loading ||
-        (groupBy === "imdb_rating" && loadingImdb) ||
-        (groupBy === "trakt_rating" && loadingTrakt) ? (
+          (groupBy === "imdb_rating" && loadingImdb) ||
+          (groupBy === "trakt_rating" && loadingTrakt) ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
             {loadingImdb && groupBy === "imdb_rating" && (
@@ -2708,11 +2678,10 @@ export default function FavoritesClient() {
                     </div>
                   ) : viewMode === "compact" ? (
                     <div
-                      className={`grid gap-2 mt-6 ${
-                        imageMode === "backdrop"
-                          ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
-                          : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
-                      }`}
+                      className={`grid gap-2 mt-6 ${imageMode === "backdrop"
+                        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
+                        : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
+                        }`}
                     >
                       {group.items.map((item, idx) => (
                         <FavoriteCard
@@ -2729,11 +2698,10 @@ export default function FavoritesClient() {
                     </div>
                   ) : (
                     <div
-                      className={`grid gap-3 mt-6 ${
-                        imageMode === "backdrop"
-                          ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
-                          : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
-                      }`}
+                      className={`grid gap-3 mt-6 ${imageMode === "backdrop"
+                        ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+                        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
+                        }`}
                     >
                       {group.items.map((item, idx) => (
                         <FavoriteCard
@@ -2772,11 +2740,10 @@ export default function FavoritesClient() {
               </div>
             ) : viewMode === "compact" ? (
               <div
-                className={`grid gap-2 ${
-                  imageMode === "backdrop"
-                    ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
-                    : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
-                }`}
+                className={`grid gap-2 ${imageMode === "backdrop"
+                  ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
+                  : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
+                  }`}
               >
                 {sorted.map((item, idx) => (
                   <FavoriteCard
@@ -2793,11 +2760,10 @@ export default function FavoritesClient() {
               </div>
             ) : (
               <div
-                className={`grid gap-3 ${
-                  imageMode === "backdrop"
-                    ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
-                    : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
-                }`}
+                className={`grid gap-3 ${imageMode === "backdrop"
+                  ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+                  : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
+                  }`}
               >
                 {sorted.map((item, idx) => (
                   <FavoriteCard
