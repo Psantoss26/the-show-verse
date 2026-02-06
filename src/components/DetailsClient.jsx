@@ -1,6 +1,14 @@
 // src/components/DetailsClient.jsx
+// ---------------------------------------------------------------------------
+// Componente principal de detalle de pelicula/serie.
+// Renderiza toda la pagina de detalle: poster, backdrop, metadatos,
+// puntuaciones (TMDb, Trakt, IMDb, RT, Metacritic), gestion de listas,
+// episodios, temporadas, colecciones, comentarios, cast, recomendaciones,
+// integracion con Trakt (watched, rewatch, plays) y Plex.
+// ---------------------------------------------------------------------------
 "use client";
 
+// -- Hooks de React --
 import {
   useRef,
   useState,
@@ -10,15 +18,23 @@ import {
   useCallback,
   useTransition,
 } from "react";
+
+// -- Navegacion de Next.js --
 import { useRouter } from "next/navigation";
+
+// -- Carrusel Swiper --
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/swiper-bundle.css";
+
+// -- Animaciones con Framer Motion --
 import { AnimatePresence, motion } from "framer-motion";
+
+// -- Componentes internos del proyecto --
 import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
 import { saveArtworkOverride } from "@/lib/artworkApi";
 import Link from "next/link";
 
-// Nuevos componentes de animación
+// Componentes de animacion reutilizables para secciones con entrada animada
 import {
   AnimatedSection,
   FadeIn,
@@ -26,6 +42,8 @@ import {
   StaggerContainer,
   StaggerItem,
 } from "@/components/details/AnimatedSection";
+
+// Skeletons de carga para cada tipo de seccion (poster, tarjeta, marcador, grid)
 import {
   PosterSkeleton,
   CardSkeleton,
@@ -33,6 +51,7 @@ import {
   GridSkeleton,
 } from "@/components/details/LoadingSkeleton";
 
+// -- Iconos de Lucide React usados en todo el componente --
 import {
   CalendarIcon,
   ClockIcon,
@@ -77,9 +96,10 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 
+// Boton con efecto liquido para acciones principales
 import LiquidButton from "@/components/LiquidButton";
 
-/* === cuenta / api === */
+// -- Autenticacion y APIs de cuenta (TMDb) --
 import { useAuth } from "@/context/AuthContext";
 import {
   getMediaAccountStates,
@@ -87,11 +107,12 @@ import {
   markInWatchlist,
   getExternalIds,
 } from "@/lib/api/tmdb";
-import { fetchOmdbByImdb } from "@/lib/api/omdb";
-import StarRating from "./StarRating";
-import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
-import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
-import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
+import { fetchOmdbByImdb } from "@/lib/api/omdb"; // Datos extra de OMDb (IMDb rating, premios, RT, MC)
+import StarRating from "./StarRating"; // Componente de puntuacion con estrellas
+import TraktWatchedControl from "@/components/trakt/TraktWatchedControl"; // Boton de marcar visto en Trakt
+import TraktWatchedModal from "@/components/trakt/TraktWatchedModal"; // Modal de historial de visionados
+import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal"; // Modal de episodios vistos
+// -- API client de Trakt: estado, visionados, ratings, comentarios, listas, temporadas --
 import {
   traktGetItemStatus,
   traktSetWatched,
@@ -110,7 +131,11 @@ import {
   traktAddShowPlay,
   traktAddEpisodePlay,
 } from "@/lib/api/traktClient";
+
+// Menu lateral/sticky de navegacion por secciones
 import DetailsSectionMenu from "./DetailsSectionMenu";
+
+// Cache de datos OMDb en localStorage para evitar peticiones repetidas
 import {
   readOmdbCache,
   writeOmdbCache,
@@ -118,6 +143,7 @@ import {
   extractOmdbExtraScores,
 } from "@/lib/details/omdbCache";
 
+// -- Utilidades de imagenes TMDb: seleccion inteligente de poster/backdrop --
 import {
   mergeUniqueImages,
   buildOriginalImageUrl,
@@ -131,6 +157,7 @@ import {
   pickBestBackdropForPreview,
 } from "@/lib/details/tmdbImages";
 
+// -- Funciones de formato: numeros, fechas, HTML, conteos --
 import {
   formatShortNumber,
   slugifyForSeriesGraph,
@@ -143,8 +170,10 @@ import {
   sumCount,
 } from "@/lib/details/formatters";
 
+// Analisis de sentimiento: extrae pros/contras de comentarios de Trakt
 import { buildSentimentFromComments } from "@/lib/details/sentiment";
 
+// -- Gestion de listas de usuario en TMDb (CRUD) --
 import {
   tmdbFetchAllUserLists,
   tmdbListItemStatus,
@@ -152,6 +181,7 @@ import {
   tmdbCreateList,
 } from "@/lib/details/tmdbListsClient";
 
+// -- Utilidades de video: filtrado, ranking, URLs de embed/thumbnail --
 import {
   uniqBy,
   isPlayableVideo,
@@ -162,6 +192,7 @@ import {
   pickPreferredVideo,
 } from "@/lib/details/videos";
 
+// -- Componentes atomicos para la UI de detalle --
 import {
   VisualMetaCard,
   SectionTitle,
@@ -177,16 +208,27 @@ import {
   ActionShareButton,
 } from "@/components/details/DetailHeaderBits";
 
+// -- Modales del componente --
 import AddToListModal from "@/components/details/AddToListModal";
 import VideoModal from "@/components/details/VideoModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 
+// ---------------------------------------------------------------------------
+// CONSTANTES GLOBALES
+// ---------------------------------------------------------------------------
+
+// Clave de API de TMDb inyectada como variable de entorno publica
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
-const PUBLIC_SCORE_CACHE = new Map(); // key -> { ts, data }
-const TTL = 1000 * 60 * 5; // 5 min
+// Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
+const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
+const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 
+/**
+ * Obtiene el scoreboard publico (puntuaciones agregadas de multiples fuentes).
+ * Llama al endpoint /api/scoreboard/public con type, id e imdbId.
+ */
 async function fetchPublicScoreboard({ type, id, imdbId, signal }) {
   const url = `/api/scoreboard/public?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&imdb=${encodeURIComponent(imdbId || "")}`;
   const r = await fetch(url, { signal });
@@ -195,7 +237,22 @@ async function fetchPublicScoreboard({ type, id, imdbId, signal }) {
 }
 
 // =====================================================================
+// COMPONENTE PRINCIPAL: DetailsClient
+// =====================================================================
 
+/**
+ * DetailsClient - Componente principal de la pagina de detalle.
+ *
+ * Props:
+ * @param {string}  type            - Tipo de contenido: "movie" o "tv"
+ * @param {string}  id              - ID de TMDb del contenido
+ * @param {Object}  data            - Objeto completo de datos de TMDb (titulo, sinopsis, fechas, etc.)
+ * @param {Array}   recommendations - Lista de contenido recomendado similar
+ * @param {Array}   castData        - Datos del reparto (actores, directores)
+ * @param {Object}  providers       - Proveedores de streaming disponibles
+ * @param {string}  watchLink       - URL directa para ver el contenido
+ * @param {Array}   reviews         - Resenas de usuarios de TMDb
+ */
 export default function DetailsClient({
   type,
   id,
@@ -208,10 +265,12 @@ export default function DetailsClient({
 }) {
   const router = useRouter();
 
-  const title = data.title || data.name;
-  const endpointType = type === "tv" ? "tv" : "movie";
-  const yearIso = (data.release_date || data.first_air_date || "")?.slice(0, 4);
+  // -- Datos basicos derivados de las props --
+  const title = data.title || data.name; // Peliculas usan "title", series usan "name"
+  const endpointType = type === "tv" ? "tv" : "movie"; // Tipo normalizado para endpoints de API
+  const yearIso = (data.release_date || data.first_air_date || "")?.slice(0, 4); // Ano de estreno
 
+  // URLs de TMDb para enlace externo y pagina de "donde ver"
   const tmdbDetailUrl =
     type && id ? `https://www.themoviedb.org/${type}/${id}` : null;
 
@@ -219,53 +278,62 @@ export default function DetailsClient({
     watchLink ||
     (type && id ? `https://www.themoviedb.org/${type}/${id}/watch` : null);
 
-  const [showAdminImages, setShowAdminImages] = useState(false);
-  const [reviewLimit, setReviewLimit] = useState(2);
-  const [useBackdrop, setUseBackdrop] = useState(true);
+  // -- Estado general de la UI --
+  const [showAdminImages, setShowAdminImages] = useState(false); // Panel admin de imagenes (solo admin)
+  const [reviewLimit, setReviewLimit] = useState(2); // Numero de resenas visibles (expandible)
+  const [useBackdrop, setUseBackdrop] = useState(true); // Alternar entre backdrop y poster como fondo
 
+  // -- Autenticacion y permisos --
   const { session, account } = useAuth();
   const isAdmin =
     account?.username === "psantos26" || account?.name === "psantos26";
 
-  const [favLoading, setFavLoading] = useState(false);
-  const [wlLoading, setWlLoading] = useState(false);
-  const [favorite, setFavorite] = useState(false);
-  const [watchlist, setWatchlist] = useState(false);
+  // -- Estado de favoritos y watchlist (TMDb) --
+  const [favLoading, setFavLoading] = useState(false); // Cargando accion de favorito
+  const [wlLoading, setWlLoading] = useState(false); // Cargando accion de watchlist
+  const [favorite, setFavorite] = useState(false); // Es favorito del usuario
+  const [watchlist, setWatchlist] = useState(false); // Esta en la watchlist del usuario
 
-  const [userRating, setUserRating] = useState(null);
+  // -- Puntuacion del usuario en TMDb --
+  const [userRating, setUserRating] = useState(null); // Rating actual (1-10)
   const [ratingLoading, setRatingLoading] = useState(false);
   const [ratingError, setRatingError] = useState("");
 
+  // Indica si se estan cargando los estados de cuenta (favorito, watchlist, rating)
   const [accountStatesLoading, setAccountStatesLoading] = useState(false);
 
-  // ✅ Resumen plegable (por defecto oculto)
+  // Pestana activa en la seccion de metadatos (details/produccion/sinopsis/premios)
   const [activeTab, setActiveTab] = useState("details");
 
-  // ====== PREFERENCIAS DE IMÁGENES ======
+  // ====== CLAVES DE LOCALSTORAGE PARA PREFERENCIAS DE IMAGENES ======
+  // Cada clave es unica por tipo de contenido e ID para persistir selecciones del usuario
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`;
   const previewBackdropStorageKey = `showverse:${endpointType}:${id}:backdrop`;
   const backgroundStorageKey = `showverse:${endpointType}:${id}:background`;
-  // ✅ PERSISTENCIA GLOBAL del modo de vista (poster/preview)
+  // Modo de vista global (poster o preview) - se comparte entre todos los contenidos
   const globalViewModeStorageKey = "showverse:global:posterViewMode";
-  // ✅ Rewatch (Trakt) persistente por show
+  // Claves de rewatch (Trakt) persistentes por show
   const rewatchStorageKey = `showverse:trakt:rewatchStartAt:${id}`;
 
-  // ✅ NUEVO: múltiples runs + vista activa del modal
+  // Claves para multiples rewatches (runs) y vista activa del modal de episodios
   const rewatchRunsStorageKey = `showverse:trakt:rewatchRuns:${id}`;
   const episodesViewStorageKey = `showverse:trakt:episodesView:${id}`;
 
-  // runs: [{ id: startedAtISO, startedAt: ISO, label: string }]
+  // Lista de runs de rewatch: [{ id, startedAt, label }]
   const [rewatchRuns, setRewatchRuns] = useState([]);
-  const [activeEpisodesView, setActiveEpisodesView] = useState("global"); // 'global' | runId
+  // Vista activa en el modal de episodios: "global" (todos) o el ID de un run especifico
+  const [activeEpisodesView, setActiveEpisodesView] = useState("global");
 
-  // para poder “desmarcar” episodios en rewatch
-  const [rewatchHistoryByEpisode, setRewatchHistoryByEpisode] = useState({}); // { "S1E2": historyId }
+  // Mapa de historial por episodio en rewatch para poder desmarcar: { "S1E2": historyId }
+  const [rewatchHistoryByEpisode, setRewatchHistoryByEpisode] = useState({});
 
+  // -- Rutas de imagen seleccionadas por el usuario --
   const [selectedPosterPath, setSelectedPosterPath] = useState(null);
   const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] =
     useState(null);
-  // posterViewMode: controla QUÉ imagen se muestra (poster vs preview)
-  // ✅ Se inicializa desde localStorage global
+
+  // posterViewMode: controla QUE imagen se muestra (poster vertical vs preview horizontal).
+  // Se inicializa desde localStorage global para mantener la preferencia del usuario.
   const [posterViewMode, setPosterViewMode] = useState(() => {
     if (typeof window === "undefined") return "poster";
     try {
@@ -274,8 +342,10 @@ export default function DetailsClient({
       return "poster";
     }
   });
-  // posterLayoutMode: controla el LAYOUT (ancho/ratio). Lo separamos para poder
-  // redimensionar antes de empezar a cargar la imagen de backdrop.
+
+  // posterLayoutMode: controla el LAYOUT (ancho/ratio) de forma separada.
+  // Esto permite redimensionar el contenedor antes de cargar la imagen de backdrop,
+  // evitando saltos visuales durante la transicion.
   const [posterLayoutMode, setPosterLayoutMode] = useState(() => {
     if (typeof window === "undefined") return "poster";
     try {
@@ -284,29 +354,34 @@ export default function DetailsClient({
       return "poster";
     }
   });
-  const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null);
-  const [prevBackgroundPath, setPrevBackgroundPath] = useState(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // ✅ Evita SSR/primer render con un poster “provisional”
+  // -- Imagen de fondo (background) con transicion suave --
+  const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null);
+  const [prevBackgroundPath, setPrevBackgroundPath] = useState(null); // Fondo anterior (para crossfade)
+  const [isTransitioning, setIsTransitioning] = useState(false); // Animacion de cambio de fondo activa
+
+  // -- Imagenes base: evitan SSR/primer render con un poster provisional --
   const [basePosterPath, setBasePosterPath] = useState(null);
   const [baseBackdropPath, setBaseBackdropPath] = useState(null);
-  const [artworkInitialized, setArtworkInitialized] = useState(false);
+  const [artworkInitialized, setArtworkInitialized] = useState(false); // Se pone a true tras la carga inicial
 
-  // ✅ Estados de carga de imagen (definidos aquí para estar disponibles en useLayoutEffect)
-  const [posterResolved, setPosterResolved] = useState(false);
-  const [posterLowLoaded, setPosterLowLoaded] = useState(false);
-  const [posterHighLoaded, setPosterHighLoaded] = useState(false);
-  const [posterImgError, setPosterImgError] = useState(false);
-  const [posterTransitioning, setPosterTransitioning] = useState(false);
-  const [prevPosterPath, setPrevPosterPath] = useState(null);
+  // -- Estados de carga progresiva del poster --
+  // Se usan para mostrar primero una version de baja calidad y luego la alta
+  const [posterResolved, setPosterResolved] = useState(false); // Ruta del poster determinada
+  const [posterLowLoaded, setPosterLowLoaded] = useState(false); // Imagen baja calidad cargada
+  const [posterHighLoaded, setPosterHighLoaded] = useState(false); // Imagen alta calidad cargada
+  const [posterImgError, setPosterImgError] = useState(false); // Error al cargar poster
+  const [posterTransitioning, setPosterTransitioning] = useState(false); // Transicion entre posters
+  const [prevPosterPath, setPrevPosterPath] = useState(null); // Poster anterior (para crossfade)
 
-  // ✅ Estados de carga para backdrop (misma lógica que poster)
+  // -- Estados de carga progresiva del backdrop (misma logica que poster) --
   const [backdropResolved, setBackdropResolved] = useState(false);
   const [backdropLowLoaded, setBackdropLowLoaded] = useState(false);
   const [backdropHighLoaded, setBackdropHighLoaded] = useState(false);
   const [backdropImgError, setBackdropImgError] = useState(false);
 
+  // -- Estado de imagenes disponibles (posters y backdrops) --
+  // Se inicializa con la imagen principal de TMDb y se enriquece con fetchs adicionales
   const [imagesState, setImagesState] = useState(() => ({
     posters: data.poster_path
       ? [{ file_path: data.poster_path, from: "main" }]
@@ -317,23 +392,28 @@ export default function DetailsClient({
   }));
   const [imagesLoading, setImagesLoading] = useState(false);
   const [imagesError, setImagesError] = useState("");
-  const [activeImagesTab, setActiveImagesTab] = useState("posters");
+  const [activeImagesTab, setActiveImagesTab] = useState("posters"); // "posters" | "backdrops" | "backgrounds"
 
-  // ====== JUSTWATCH PROVIDERS ======
-  const [streamingProviders, setStreamingProviders] = useState([]);
+  // ====== PROVEEDORES DE STREAMING (JustWatch) ======
+  const [streamingProviders, setStreamingProviders] = useState([]); // Lista de servicios disponibles
   const [providersLoading, setProvidersLoading] = useState(true);
-  const [justwatchUrl, setJustwatchUrl] = useState(null);
+  const [justwatchUrl, setJustwatchUrl] = useState(null); // URL directa a JustWatch
 
-  // ====== PLEX INTEGRATION ======
-  const [plexAvailable, setPlexAvailable] = useState(false);
-  const [plexUrl, setPlexUrl] = useState(null);
+  // ====== INTEGRACION CON PLEX ======
+  const [plexAvailable, setPlexAvailable] = useState(false); // Contenido disponible en Plex local
+  const [plexUrl, setPlexUrl] = useState(null); // URL para abrir en Plex (web/app)
   const [plexLoading, setPlexLoading] = useState(true);
 
+  // -- Refs y estado para scroll horizontal de la galeria de imagenes --
   const imagesScrollRef = useRef(null);
   const [isHoveredImages, setIsHoveredImages] = useState(false);
-  const [canPrevImages, setCanPrevImages] = useState(false);
-  const [canNextImages, setCanNextImages] = useState(false);
+  const [canPrevImages, setCanPrevImages] = useState(false); // Hay scroll a la izquierda
+  const [canNextImages, setCanNextImages] = useState(false); // Hay scroll a la derecha
 
+  /**
+   * Extrae la ruta de TMDb de un valor que puede ser string o { file_path }.
+   * Devuelve null si el valor no es valido.
+   */
   const asTmdbPath = (v) => {
     if (!v) return null;
     if (typeof v === "string") return v;
@@ -342,6 +422,9 @@ export default function DetailsClient({
     return null;
   };
 
+  /**
+   * Normaliza una URL anadiendo https:// si no tiene protocolo.
+   */
   const normalizeUrl = (u) => {
     if (!u) return null;
     const s = String(u).trim();
@@ -352,33 +435,45 @@ export default function DetailsClient({
   };
 
   // =====================================================================
-  // ✅ LISTAS (estado + modal + detección)
+  // LISTAS DE USUARIO (TMDb) - solo disponible para peliculas
+  // Permite agregar peliculas a listas personalizadas, crear nuevas listas,
+  // y detectar en que listas ya esta presente la pelicula.
   // =====================================================================
 
+  // Las listas de TMDb solo funcionan para peliculas (no series) y requieren API key
   const canUseLists = endpointType === "movie" && !!TMDB_API_KEY;
 
+  // -- Estado del modal de listas --
   const [listModalOpen, setListModalOpen] = useState(false);
   const [listsLoading, setListsLoading] = useState(false);
   const [listsError, setListsError] = useState("");
-  const [userLists, setUserLists] = useState([]);
-  const [listQuery, setListQuery] = useState("");
+  const [userLists, setUserLists] = useState([]); // Todas las listas del usuario
+  const [listQuery, setListQuery] = useState(""); // Filtro de busqueda en el modal
 
+  // Mapa de pertenencia: { listId: true/false } indica si la pelicula esta en cada lista
   const [membershipMap, setMembershipMap] = useState({});
   const [listsPresenceLoading, setListsPresenceLoading] = useState(false);
-  const [busyListId, setBusyListId] = useState(null);
+  const [busyListId, setBusyListId] = useState(null); // Lista en proceso de modificacion
 
+  // -- Estado para crear nueva lista desde el modal --
   const [createOpen, setCreateOpen] = useState(false);
   const [creatingList, setCreatingList] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [newListDesc, setNewListDesc] = useState("");
 
+  // Ref del wrapper de rating para detectar clicks fuera en movil
   const ratingWrapRef = useRef(null);
 
-  const [supportsHover, setSupportsHover] = useState(false);
-  const [mobileClearOpen, setMobileClearOpen] = useState(false);
+  // -- Deteccion de capacidades del dispositivo --
+  const [supportsHover, setSupportsHover] = useState(false); // true = desktop con raton
+  const [mobileClearOpen, setMobileClearOpen] = useState(false); // Boton de limpiar rating visible en movil
 
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
 
+  /**
+   * Extrae un ID consistente de una lista (puede venir como objeto o como valor directo).
+   * Soporta formatos de TMDb y Trakt.
+   */
   const getListId = useCallback((lOrId) => {
     if (lOrId == null) return null;
     if (typeof lOrId === "string" || typeof lOrId === "number")
@@ -389,10 +484,12 @@ export default function DetailsClient({
     return id != null ? String(id) : null;
   }, []);
 
+  // Detecta las capacidades del dispositivo: hover (desktop) y viewport movil.
+  // Usa matchMedia para reaccionar a cambios en tiempo real (ej. rotar tablet).
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // hover/puntero fino => desktop
+    // hover + puntero fino => escritorio con raton
     const mqHover = window.matchMedia("(hover: hover) and (pointer: fine)");
     const updateHover = () => setSupportsHover(!!mqHover.matches);
     updateHover();
@@ -400,7 +497,7 @@ export default function DetailsClient({
       mqHover.addEventListener("change", updateHover);
     else mqHover.addListener(updateHover);
 
-    // viewport móvil (ajusta breakpoint si quieres)
+    // Viewport movil (breakpoint sm = 640px)
     const mqMobile = window.matchMedia("(max-width: 640px)");
     const updateMobile = () => setIsMobileViewport(!!mqMobile.matches);
     updateMobile();
@@ -419,13 +516,13 @@ export default function DetailsClient({
     };
   }, []);
 
+  // Si pasamos a desktop, cerramos el boton de limpiar rating movil
   useEffect(() => {
-    // si pasamos a desktop, cerramos el modo móvil del botón
     if (supportsHover) setMobileClearOpen(false);
   }, [supportsHover]);
 
+  // Cierra el boton de limpiar rating al tocar fuera del wrapper en movil
   useEffect(() => {
-    // cerrar al tocar fuera en móvil
     if (supportsHover || !mobileClearOpen) return;
     const onDown = (e) => {
       if (!ratingWrapRef.current) return;
@@ -435,18 +532,25 @@ export default function DetailsClient({
     return () => document.removeEventListener("pointerdown", onDown);
   }, [supportsHover, mobileClearOpen]);
 
+  // ID numerico de la pelicula (necesario para la API de listas de TMDb)
   const movieId = useMemo(() => {
     const n = Number(id);
     return Number.isFinite(n) ? n : null;
   }, [id]);
 
+  // Comprueba si la pelicula esta en alguna lista del usuario
   const inAnyList = useMemo(() => {
     const vals = Object.values(membershipMap || {});
     return vals.some(Boolean);
   }, [membershipMap]);
 
+  // Indicador visual: la pelicula esta en al menos una lista (y ya se cargo la presencia)
   const listActive = !listsPresenceLoading && inAnyList;
 
+  /**
+   * Redirige a login si el usuario no esta autenticado.
+   * Devuelve true si se redirigió (para abortar la accion en curso).
+   */
   const requireLogin = () => {
     if (!session || !account?.id) {
       window.location.href = "/login";
@@ -455,6 +559,10 @@ export default function DetailsClient({
     return false;
   };
 
+  /**
+   * Carga las listas del usuario desde TMDb si aun no se han cargado.
+   * Usa un abortRef para cancelar si el componente se desmonta.
+   */
   const loadListsIfNeeded = async ({ abortRef } = {}) => {
     if (!session || !account?.id) return [];
     if (!canUseLists) return [];
@@ -472,6 +580,14 @@ export default function DetailsClient({
     return lists;
   };
 
+  /**
+   * Comprueba en cuales listas esta presente la pelicula actual.
+   * Realiza peticiones en paralelo (concurrencia 5) para cada lista del usuario.
+   * @param {Object} options
+   * @param {Array}  options.lists    - Listas a comprobar (si no se pasa, las carga)
+   * @param {boolean} options.silent  - true = no muestra spinner de carga principal
+   * @param {Object} options.abortRef - Referencia para cancelar si se desmonta
+   */
   const loadPresenceForLists = async ({
     lists,
     silent = false,
@@ -533,6 +649,8 @@ export default function DetailsClient({
     }
   };
 
+  // Carga la presencia en listas al montar o al cambiar de contenido/sesion.
+  // Se ejecuta en modo silencioso (sin spinner principal).
   useEffect(() => {
     const abortRef = { current: false };
     if (!session || !account?.id || !canUseLists || !movieId) {
@@ -548,6 +666,7 @@ export default function DetailsClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, account?.id, canUseLists, movieId]);
 
+  // Abre el modal de listas: carga listas y presencia
   const openListsModal = async () => {
     if (requireLogin()) return;
     if (!canUseLists || !movieId) return;
@@ -560,6 +679,7 @@ export default function DetailsClient({
     await loadPresenceForLists({ silent: false, abortRef });
   };
 
+  // Cierra el modal y resetea todos los estados temporales
   const closeListsModal = () => {
     setListModalOpen(false);
     setListQuery("");
@@ -569,6 +689,7 @@ export default function DetailsClient({
     setNewListDesc("");
   };
 
+  // Agrega la pelicula a una lista especifica con actualizacion optimista del estado
   const handleAddToSpecificList = async (listId) => {
     if (!session || !account?.id || !movieId) return;
     if (!canUseLists) return;
@@ -588,7 +709,7 @@ export default function DetailsClient({
         sessionId: session,
       });
 
-      // ✅ optimista
+      // Actualizacion optimista: marca como presente antes de confirmar
       setMembershipMap((prev) => ({ ...(prev || {}), [lid]: true }));
       setUserLists((prev) =>
         (prev || []).map((l) => {
@@ -608,6 +729,7 @@ export default function DetailsClient({
     }
   };
 
+  // Crea una nueva lista en TMDb y agrega la pelicula actual
   const handleCreateListAndAdd = async () => {
     if (!session || !account?.id || !movieId) return;
     if (!canUseLists) return;
@@ -637,7 +759,7 @@ export default function DetailsClient({
         sessionId: session,
       });
 
-      // refresca listas (para que aparezca y con count correcto)
+      // Refresca todas las listas del usuario para reflejar la nueva lista
       const lists = await tmdbFetchAllUserLists({
         apiKey: TMDB_API_KEY,
         accountId: account.id,
@@ -646,7 +768,7 @@ export default function DetailsClient({
       });
       setUserLists(lists);
 
-      // marca presencia
+      // Marca la pelicula como presente en la nueva lista
       setMembershipMap((prev) => ({ ...(prev || {}), [newListId]: true }));
 
       setCreateOpen(false);
@@ -660,36 +782,45 @@ export default function DetailsClient({
   };
 
   // =====================================================================
-  // ✅ VIDEOS / TRAILERS
+  // VIDEOS / TRAILERS
+  // Carga videos desde TMDb (en espanol e ingles), los fusiona, ordena
+  // por relevancia y permite reproducirlos en un modal.
   // =====================================================================
 
-  const [videos, setVideos] = useState([]);
+  const [videos, setVideos] = useState([]); // Lista de videos disponibles
   const [videosLoading, setVideosLoading] = useState(false);
   const [videosError, setVideosError] = useState("");
   const [videoModalOpen, setVideoModalOpen] = useState(false);
-  const [activeVideo, setActiveVideo] = useState(null);
+  const [activeVideo, setActiveVideo] = useState(null); // Video seleccionado para el modal
 
+  // Selecciona automaticamente el mejor video (trailer oficial preferido)
   const preferredVideo = useMemo(() => pickPreferredVideo(videos), [videos]);
 
+  // Abre el modal de video con el video seleccionado
   const openVideo = (v) => {
     if (!v) return;
     setActiveVideo(v);
     setVideoModalOpen(true);
   };
 
+  // Cierra el modal de video
   const closeVideo = () => {
     setVideoModalOpen(false);
     setActiveVideo(null);
   };
 
+  // Resetea el modal de video al cambiar de contenido
   useEffect(() => {
     setVideoModalOpen(false);
     setActiveVideo(null);
   }, [id, endpointType]);
 
+  // Carga los videos de TMDb en espanol e ingles, los fusiona eliminando
+  // duplicados, filtra los reproducibles y los ordena por relevancia.
   useEffect(() => {
     let ignore = false;
 
+    // Fetch seguro que devuelve array vacio en caso de error
     const safeFetchVideos = async (language) => {
       if (!TMDB_API_KEY) return [];
       try {
@@ -742,27 +873,30 @@ export default function DetailsClient({
   }, [id, endpointType]);
 
   // =====================================================================
+  // FILTROS DE PORTADAS Y FONDOS
+  // Controla la galeria de imagenes con filtros de resolucion e idioma.
+  // =====================================================================
 
-  // ====== Filtros Portadas y fondos ======
-  const [imagesResFilter, setImagesResFilter] = useState("all"); // all | 720p | 1080p | 2k | 4k
-  const [langES, setLangES] = useState(true);
-  const [langEN, setLangEN] = useState(true);
-  const [artworkPreloadCount, setArtworkPreloadCount] = useState(4);
+  const [imagesResFilter, setImagesResFilter] = useState("all"); // Filtro de resolucion: all | 720p | 1080p | 2k | 4k
+  const [langES, setLangES] = useState(true); // Mostrar imagenes en espanol
+  const [langEN, setLangEN] = useState(true); // Mostrar imagenes en ingles
+  const [artworkPreloadCount, setArtworkPreloadCount] = useState(4); // Numero de imagenes a precargar antes de mostrar
 
-  // Render "a la vez": no mostramos la fila hasta tener precargadas las primeras N imágenes
+  // Controla si la fila de artwork esta lista para mostrarse (precarga completada)
   const [artworkRowReady, setArtworkRowReady] = useState(false);
 
-  // Panel móvil de filtros (Portadas y fondos)
+  // Panel movil de filtros (colapsable)
   const [artworkControlsOpen, setArtworkControlsOpen] = useState(false);
 
-  // Wrapper para detectar click fuera / cerrar panel
+  // Ref del wrapper de controles de artwork para detectar click fuera
   const artworkControlsWrapRef = useRef(null);
 
+  // Cierra el panel de filtros de artwork y el menu de resolucion con Escape
+  // o al hacer click/touch fuera del wrapper
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") {
         setArtworkControlsOpen(false);
-        // si tienes el dropdown de resolución abierto, también lo cerramos
         setResMenuOpen?.(false);
       }
     };
@@ -787,10 +921,11 @@ export default function DetailsClient({
     };
   }, []);
 
+  // -- Dropdown de resolucion --
   const [resMenuOpen, setResMenuOpen] = useState(false);
   const resMenuRef = useRef(null);
 
-  // Cierra el menú al hacer click fuera
+  // Cierra el menu de resolucion al hacer click fuera
   useEffect(() => {
     if (!resMenuOpen) return;
     const onDown = (e) => {
@@ -801,14 +936,18 @@ export default function DetailsClient({
     return () => document.removeEventListener("mousedown", onDown);
   }, [resMenuOpen]);
 
-  // Cierra el menú si cambias de tab
+  // Cierra el menu de resolucion al cambiar de pestana de imagenes
   useEffect(() => {
     setResMenuOpen(false);
   }, [activeImagesTab]);
 
+  // -- Utilidades de resolucion de imagen --
+
+  // Devuelve el lado mas largo de una imagen (ancho o alto)
   const imgLongSide = (img) =>
     Math.max(Number(img?.width || 0), Number(img?.height || 0));
 
+  // Clasifica la resolucion de una imagen en categorias: 4k, 2k, 1080p, 720p, sd
   const imgResBucket = (img) => {
     const long = imgLongSide(img);
     if (long >= 3840) return "4k";
@@ -818,12 +957,14 @@ export default function DetailsClient({
     return "sd";
   };
 
+  // Formatea las dimensiones de una imagen como "WxH" para mostrar en la UI
   const imgResLabel = (img) => {
     const w = Number(img?.width || 0);
     const h = Number(img?.height || 0);
     return w > 0 && h > 0 ? `${w}×${h}` : null;
   };
 
+  // Calcula el numero de slides visibles en el carrusel segun el viewport y tipo de imagen
   const getArtworkSlidesPerView = (width, isPoster) => {
     if (isPoster) {
       if (width >= 1280) return 7;
@@ -838,32 +979,34 @@ export default function DetailsClient({
     return 4;
   };
 
+  /**
+   * Selecciona el mejor backdrop para el modo preview.
+   * Combina todas las fuentes de backdrops disponibles y usa un algoritmo
+   * inteligente que prioriza imagenes con idioma ES/EN y buena resolucion.
+   * Evita parpadeos: no devuelve fallback generico hasta que la inicializacion termine.
+   */
   const previewBackdropFallback = useMemo(() => {
-    // ✅ CRITERIO INTELIGENTE (COMO FAVORITOS/PENDIENTES)
-    // Buscamos activamente la mejor imagen (con idioma ES/EN) usando todas las fuentes disponibles.
-
-    // 1. Combinar todas las fuentes posibles de backdrops
-    // ⚠️ IMPORTANTE: Solo usamos data.images si artworkInitialized es true
-    // para evitar mostrar un backdrop que luego será reemplazado por uno mejor
+    // 1. Combinar todas las fuentes posibles de backdrops.
+    //    Solo usamos data.images si artworkInitialized es true
+    //    para evitar mostrar un backdrop que luego sera reemplazado.
     const allBackdrops = [
-      ...(imagesState?.backdrops || []), // Cargadas dinámicamente
+      ...(imagesState?.backdrops || []),
       ...(artworkInitialized && data?.images?.backdrops
         ? data.images.backdrops
-        : []), // Solo si ya terminamos
+        : []),
     ];
 
-    // 2. Si tenemos candidatos, aplicar el filtro inteligente INMEDIATAMENTE
+    // 2. Aplicar el filtro inteligente para encontrar el mejor backdrop
     if (allBackdrops.length > 0) {
       const bestPath = pickBestBackdropForPreview(allBackdrops);
       if (bestPath) return bestPath;
     }
 
-    // 3. ✨ SOLUCIÓN AL PARPADEO:
-    // Si todavía estamos inicializando (cargando imágenes extra), NO mostramos el genérico todavía.
-    // Preferimos esperar (skeleton) unos milisegundos a mostrar una imagen incorrecta y luego cambiarla.
+    // 3. Si aun estamos inicializando, devolvemos null (se muestra skeleton)
+    //    para evitar parpadeo de imagen incorrecta que luego se reemplaza.
     if (!artworkInitialized) return null;
 
-    // 4. Fallback final: Si ya terminamos de cargar y no hubo nada mejor, usamos el genérico.
+    // 4. Fallback final: si ya terminamos y no hay nada mejor, usamos el generico
     return data?.backdrop_path || null;
   }, [
     imagesState?.backdrops,
@@ -872,6 +1015,11 @@ export default function DetailsClient({
     artworkInitialized,
   ]);
 
+  /**
+   * Procesa y filtra la galeria de artwork segun la pestana activa (posters/backdrops/background),
+   * filtros de resolucion e idioma. Devuelve la lista ordenada, el aspect ratio,
+   * el tamano de imagen y la ruta activa actual.
+   */
   const artworkSelection = useMemo(() => {
     const rawList =
       activeImagesTab === "posters"
@@ -891,7 +1039,7 @@ export default function DetailsClient({
         data?.profile_path) ??
       null;
 
-    // Usar el mismo criterio que MainDashboard para el backdrop de preview
+    // Backdrop de preview: misma logica de seleccion que MainDashboard
     const previewFallback = previewBackdropFallback;
 
     const currentPreviewActive = selectedPreviewBackdropPath || previewFallback;
@@ -922,10 +1070,10 @@ export default function DetailsClient({
       return (langES && isLangES(lang)) || (langEN && isLangEN(lang));
     };
 
+    // Filtrar imagenes por resolucion e idioma, siempre incluyendo la imagen activa
     const filtered = withPath.filter((img) => {
       const fp = img?.file_path;
-      // Siempre incluir la imagen activa
-      if (fp === activePath) return true;
+      if (fp === activePath) return true; // Siempre incluir la imagen activa
 
       if (imagesResFilter !== "all") {
         const b = imgResBucket(img);
@@ -947,6 +1095,7 @@ export default function DetailsClient({
       return matchesLang(img);
     });
 
+    // Fallback relajado: si los filtros son demasiado restrictivos, se relajan
     const relaxed = (() => {
       if (!withPath.length) return [];
       if (isBackgroundTab) {
@@ -954,7 +1103,7 @@ export default function DetailsClient({
         return neutral.length ? neutral : withPath;
       }
       if (isBackdropTab) {
-        // Vista previa: priorizar backdrops con idioma
+        // Vista previa: priorizar backdrops que tienen idioma asignado
         const withLang = withPath.filter((img) => !!img?.iso_639_1);
         return withLang.length ? withLang : withPath;
       }
@@ -967,7 +1116,7 @@ export default function DetailsClient({
 
     const usable = filtered.length ? filtered : relaxed;
 
-    // Ordenar para poner el backdrop activo primero en Vista previa
+    // Reordenar: en Vista previa, el backdrop activo va primero
     const ordered = (() => {
       if (isBackdropTab && activePath && usable.length > 0) {
         const activeIdx = usable.findIndex((x) => x?.file_path === activePath);
@@ -1010,11 +1159,13 @@ export default function DetailsClient({
     data?.backdrop_path,
   ]);
 
-  // Precarga las primeras N imágenes de la fila actual y solo entonces mostramos el carrusel
+  // Precarga las primeras N imagenes de la fila actual.
+  // No muestra el carrusel hasta que todas las imagenes visibles esten cargadas
+  // para evitar que aparezcan una por una (efecto "pop-in").
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Mientras TMDb images está cargando, NO mostramos el carrusel
+    // Mientras las imagenes de TMDb estan cargando, ocultamos el carrusel
     if (imagesLoading) {
       setArtworkRowReady(false);
       return;
@@ -1031,9 +1182,9 @@ export default function DetailsClient({
     for (let i = 0; i < limit; i += 1) {
       const fp = ordered[i]?.file_path;
       if (!fp) continue;
-      // Mantén tu precarga "rápida" (cache)
+      // Precarga rapida (cache en memoria JS)
       preloadTmdb(fp, size);
-      // Y además esperamos a que el navegador confirme carga
+      // Tambien esperamos la carga real del navegador
       urls.push(`https://image.tmdb.org/t/p/${size}${fp}`);
     }
 
@@ -1042,7 +1193,7 @@ export default function DetailsClient({
       return;
     }
 
-    // Mostrar inmediatamente en cambios de tab (las imágenes ya están en cache del navegador)
+    // Si las imagenes ya estan en cache del navegador, mostrar inmediatamente
     const isCached = urls.every((url) => {
       const img = new Image();
       img.src = url;
@@ -1070,7 +1221,7 @@ export default function DetailsClient({
         img.fetchPriority = "high";
       } catch {}
       img.onload = finishOne;
-      img.onerror = finishOne; // si una falla, no bloqueamos toda la fila
+      img.onerror = finishOne; // Si una falla, no bloqueamos toda la fila
       img.src = url;
     }
 
@@ -1079,6 +1230,7 @@ export default function DetailsClient({
     };
   }, [imagesLoading, artworkSelection, artworkPreloadCount]);
 
+  // Recalcula cuantas imagenes precargar al cambiar el tamano del viewport
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -1093,6 +1245,12 @@ export default function DetailsClient({
     return () => window.removeEventListener("resize", updateCount);
   }, [artworkSelection]);
 
+  /**
+   * useLayoutEffect de inicializacion de artwork.
+   * Resetea todos los estados de imagen y carga las preferencias guardadas
+   * del usuario desde localStorage (poster, backdrop, background seleccionados).
+   * Se ejecuta antes del paint para evitar flashes visuales.
+   */
   useLayoutEffect(() => {
     setPosterResolved(false);
     setPosterLowLoaded(false);
@@ -1117,14 +1275,13 @@ export default function DetailsClient({
 
     setBaseBackdropPath(initialBackdrop);
     setBasePosterPath(initialPoster);
-    // ✅ NO activar posterResolved hasta que initArtwork termine
-    // setPosterResolved(!!initialPoster);
+    // No activar posterResolved hasta que initArtwork termine
 
     setImagesState({
       posters: data.poster_path
         ? [{ file_path: data.poster_path, from: "main" }]
         : [],
-      backdrops: [], // ✅ NO inicializar con data.backdrop_path - esperar a initArtwork
+      backdrops: [], // No inicializar con data.backdrop_path - esperar a initArtwork
     });
     setImagesLoading(false);
     setImagesError("");
@@ -1134,8 +1291,8 @@ export default function DetailsClient({
     setSelectedPreviewBackdropPath(null);
     setSelectedBackgroundPath(null);
 
-    // ✅ NO resetear posterViewMode/posterLayoutMode - respetar la preferencia global
-    // Ya se inicializan correctamente desde localStorage en el useState inicial
+    // No resetear posterViewMode/posterLayoutMode - respetar la preferencia global
+    // Ya se inicializan desde localStorage en el useState inicial
 
     setActiveTab("details");
     setActiveSection(null);
@@ -1157,8 +1314,7 @@ export default function DetailsClient({
         // ignore
       }
     }
-    // ✅ NO activar artworkInitialized aquí - esperar a que initArtwork termine
-    // setArtworkInitialized(true);
+    // No activar artworkInitialized aqui - esperar a que initArtwork termine
   }, [
     id,
     endpointType,
@@ -1170,6 +1326,12 @@ export default function DetailsClient({
     previewBackdropStorageKey,
   ]);
 
+  /**
+   * Inicializacion asincrona del artwork.
+   * Para series TV: carga imagenes extra de todas las temporadas y selecciona las mejores.
+   * Para peliculas sin imagenes SSR: carga imagenes desde la API de TMDb.
+   * Precarga las imagenes seleccionadas en el tamano adecuado.
+   */
   useEffect(() => {
     let cancelled = false;
 
@@ -1211,7 +1373,7 @@ export default function DetailsClient({
           const bestBackdropPath = asTmdbPath(bestBackdropForBackground);
           const bestPreviewPath = asTmdbPath(bestBackdropForPreviewCalc);
 
-          // ✅ Precargar backdrop de vista previa PRIMERO (si estamos en modo preview)
+          // Precargar backdrop de vista previa primero si estamos en modo preview
           const savedGlobalMode =
             typeof window !== "undefined"
               ? window.localStorage.getItem("showverse:global:posterViewMode")
@@ -1227,13 +1389,14 @@ export default function DetailsClient({
             if (bestPosterPath) poster = bestPosterPath;
             if (bestBackdropPath) backdrop = bestBackdropPath;
 
+            // Fusionar imagenes nuevas con las existentes (sin duplicados)
             setImagesState((prev) => ({
               posters: mergeUniqueImages(prev.posters, posters),
               backdrops: mergeUniqueImages(prev.backdrops, backdrops),
             }));
           }
         } catch (e) {
-          if (!cancelled) console.error("Error cargando imágenes TV:", e);
+          if (!cancelled) console.error("Error cargando imagenes TV:", e);
         } finally {
           if (!cancelled) setImagesLoading(false);
         }
@@ -1257,7 +1420,7 @@ export default function DetailsClient({
           const bestBackdropForPreviewCalc =
             pickBestBackdropForPreview(backdrops);
 
-          // ✅ Precargar backdrop de vista previa PRIMERO (si estamos en modo preview)
+          // Precargar backdrop de vista previa primero si estamos en modo preview
           const savedGlobalMode =
             typeof window !== "undefined"
               ? window.localStorage.getItem("showverse:global:posterViewMode")
@@ -1286,7 +1449,7 @@ export default function DetailsClient({
       }
 
       if (!cancelled) {
-        // NO sobrescribas si ya había un póster base (evita el “swap” al terminar de cargar)
+        // No sobrescribir si ya habia un poster base (evita el "swap" visual)
         if (poster) {
           setBasePosterPath((prev) => prev || asTmdbPath(poster));
         }
@@ -1312,22 +1475,29 @@ export default function DetailsClient({
     data?.profile_path,
   ]);
 
+  // ---------------------------------------------------------------------------
+  // RUTAS DE IMAGEN PARA VISUALIZACION
+  // Cadena de prioridad: seleccion del usuario > calculada > datos de TMDb
+  // ---------------------------------------------------------------------------
+
+  // Poster a mostrar: seleccion manual > calculado > datos originales
   const basePosterDisplayPath =
     asTmdbPath(selectedPosterPath) ||
     asTmdbPath(basePosterPath) ||
     asTmdbPath(data?.poster_path || data?.profile_path) ||
     null;
 
+  // Backdrop para modo preview: seleccion manual > fallback inteligente
   const previewBackdropPath =
     (artworkInitialized ? asTmdbPath(selectedPreviewBackdropPath) : null) ||
     asTmdbPath(previewBackdropFallback) ||
     null;
 
+  // Imagen principal del poster: en modo preview muestra backdrop, si no el poster
   const displayPosterPath =
-    posterViewMode === "preview"
-      ? previewBackdropPath // ✅ Si estamos en preview, solo mostrar backdrop (o null si no está listo)
-      : basePosterDisplayPath;
+    posterViewMode === "preview" ? previewBackdropPath : basePosterDisplayPath;
 
+  // Comprueba si una ruta pertenece a la lista de backdrops (no posters)
   const isBackdropPath = useCallback(
     (path) => {
       if (!path) return false;
@@ -1337,41 +1507,46 @@ export default function DetailsClient({
     [imagesState?.backdrops],
   );
 
-  // ✅ Detectar si la portada actual se muestra como backdrop (horizontal)
-  // Nota: usamos posterLayoutMode para poder redimensionar la tarjeta ANTES
-  // de cambiar (y cargar) la imagen.
+  // Detecta si la portada actual se muestra como backdrop (horizontal).
+  // Usa posterLayoutMode (no posterViewMode) para redimensionar la tarjeta
+  // antes de cambiar la imagen, evitando saltos de layout.
   const isBackdropPoster = useMemo(
     () => posterLayoutMode === "preview" || isBackdropPath(displayPosterPath),
     [posterLayoutMode, displayPosterPath, isBackdropPath],
   );
 
+  // Backdrop de fondo: seleccion manual > calculado > datos originales
   const displayBackdropPath =
     asTmdbPath(selectedBackgroundPath) ||
     asTmdbPath(baseBackdropPath) ||
     asTmdbPath(data?.backdrop_path) ||
     null;
 
+  // Mejor poster neutro (sin texto/idioma) para uso en movil como fondo
   const mobileNeutralPosterPath = useMemo(() => {
     const best =
       pickBestNeutralPosterByResVotes(imagesState?.posters || [])?.file_path ||
       null;
     if (best) return best;
-    // fallback: primera sin idioma si no hay metadata de tamaños/votos
+    // Fallback: primera imagen sin idioma si no hay metadata de tamanos/votos
     return (
       (imagesState?.posters || []).find((p) => p?.file_path && !p?.iso_639_1)
         ?.file_path || null
     );
   }, [imagesState?.posters]);
 
+  // Selecciona la imagen de fondo del hero segun el viewport:
+  // - Desktop: usa el backdrop horizontal
+  // - Movil: usa un poster neutro (sin texto) para mejor visualizacion vertical
   const heroBackgroundPath = (() => {
     if (!useBackdrop || !artworkInitialized) return null;
 
-    // desktop: tu lógica actual
+    // Desktop: usa el backdrop horizontal seleccionado
     const desktop = displayBackdropPath;
 
-    // móvil: si NO hay override, preferimos poster sin idioma
+    // Movil: prioriza poster sin idioma, pero respeta seleccion manual del usuario
     const mobile =
-      selectedBackgroundPath || // si el usuario eligió un fondo manual, respétalo
+      selectedBackgroundPath || // Si el usuario eligio un fondo manual, respetarlo
       mobileNeutralPosterPath ||
       basePosterPath ||
       data.poster_path ||
@@ -1382,12 +1557,15 @@ export default function DetailsClient({
     return isMobileViewport ? mobile : desktop;
   })();
 
-  // ====== Account States ======
+  // =====================================================================
+  // ESTADOS DE CUENTA (TMDb)
+  // Carga el estado de favorito, watchlist y puntuacion del usuario.
+  // =====================================================================
   useEffect(() => {
     let cancel = false;
 
     const load = async () => {
-      // si no hay sesión, no hay nada que cargar para “tu puntuación”
+      // Sin sesion activa no hay datos de cuenta que cargar
       if (!session || !account?.id) {
         setAccountStatesLoading(false);
         return;
@@ -1408,7 +1586,7 @@ export default function DetailsClient({
             : null;
         setUserRating(ratedValue);
       } catch {
-        // si falla, al menos dejamos de “cargar” para no bloquear la UI
+        // Si falla, al menos dejamos de "cargar" para no bloquear la UI
       } finally {
         if (!cancel) setAccountStatesLoading(false);
       }
@@ -1420,6 +1598,7 @@ export default function DetailsClient({
     };
   }, [type, id, session, account?.id]);
 
+  // Alterna el estado de favorito con actualizacion optimista (cambio inmediato + rollback si falla)
   const toggleFavorite = async () => {
     if (requireLogin() || favLoading) return;
     try {
@@ -1440,6 +1619,7 @@ export default function DetailsClient({
     }
   };
 
+  // Alterna el estado de watchlist con actualizacion optimista
   const toggleWatchlist = async () => {
     if (requireLogin() || wlLoading) return;
     try {
@@ -1460,6 +1640,12 @@ export default function DetailsClient({
     }
   };
 
+  /**
+   * Envia una puntuacion a TMDb y opcionalmente sincroniza con Trakt.
+   * @param {number} value - Valor de la puntuacion (1-10)
+   * @param {Object} options
+   * @param {boolean} options.skipSync - true para no sincronizar con Trakt (evita bucles)
+   */
   const sendTmdbRating = async (value, { skipSync = false } = {}) => {
     if (requireLogin() || ratingLoading || !TMDB_API_KEY) return;
     try {
@@ -1475,7 +1661,7 @@ export default function DetailsClient({
       });
       if (!res.ok) throw new Error("Error al guardar puntuación en TMDb");
 
-      // ✅ sync opcional hacia Trakt (sin bucle)
+      // Sincronizacion opcional hacia Trakt (skipSync evita bucle infinito)
       if (!skipSync && syncTrakt && trakt.connected) {
         await setTraktRatingSafe(Math.round(value));
       }
@@ -1486,6 +1672,7 @@ export default function DetailsClient({
     }
   };
 
+  // Elimina la puntuacion del usuario en TMDb y opcionalmente sincroniza con Trakt
   const clearTmdbRating = async ({ skipSync = false } = {}) => {
     if (requireLogin() || ratingLoading || userRating == null || !TMDB_API_KEY)
       return;
@@ -1511,27 +1698,37 @@ export default function DetailsClient({
     }
   };
 
+  // Envia una puntuacion a Trakt y opcionalmente sincroniza con TMDb
   const sendTraktRating = async (value) => {
     if (!trakt.connected) {
       window.location.href = "/api/trakt/auth/start";
       return;
     }
-    // value Trakt: 1..10 entero
+    // Trakt acepta valores enteros de 1 a 10
     await setTraktRatingSafe(value == null ? null : Math.round(value));
 
-    // ✅ sync opcional hacia TMDb (sin bucle)
+    // Sincronizacion opcional hacia TMDb (skipSync evita bucle infinito)
     if (syncTrakt && session && TMDB_API_KEY) {
       if (value == null) await clearTmdbRating({ skipSync: true });
       else await sendTmdbRating(value, { skipSync: true });
     }
   };
 
+  // Elimina la puntuacion en Trakt
   const clearTraktRating = async () => {
     await sendTraktRating(null);
   };
 
+  // Tipo de contenido para la API de Trakt ("show" para series, "movie" para peliculas)
   const traktType = endpointType === "tv" ? "show" : "movie";
 
+  // =====================================================================
+  // INTEGRACION CON TRAKT
+  // Estado completo de la conexion con Trakt: visto, historial, rating,
+  // watchlist, progreso de episodios, comentarios, listas y estadisticas.
+  // =====================================================================
+
+  // Estado principal de Trakt para este contenido
   const [trakt, setTrakt] = useState({
     loading: false,
     connected: false,
@@ -1547,30 +1744,33 @@ export default function DetailsClient({
     error: "",
   });
 
-  const [traktBusy, setTraktBusy] = useState(""); // 'watched' | 'watchlist' | 'history' | ''
-  const [traktWatchedOpen, setTraktWatchedOpen] = useState(false);
-  const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false);
+  const [traktBusy, setTraktBusy] = useState(""); // Accion en curso: 'watched' | 'watchlist' | 'history' | ''
+  const [traktWatchedOpen, setTraktWatchedOpen] = useState(false); // Modal de historial de visionados abierto
+  const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false); // Modal de episodios vistos abierto
 
-  // ===== modal: cerrar limpiando estados transitorios =====
+  // Cierra el modal de episodios limpiando estados transitorios
   const closeTraktEpisodesModal = useCallback(() => {
     setTraktEpisodesOpen(false);
-    setEpisodeBusyKey(""); // evita que quede bloqueado al reabrir
+    setEpisodeBusyKey(""); // Evita que quede bloqueado al reabrir
   }, []);
-  // ✅ EPISODIOS VISTOS (solo TV)
-  const [watchedBySeason, setWatchedBySeason] = useState({}); // { [seasonNumber]: [episodeNumber] }
-  const [watchedBySeasonLoaded, setWatchedBySeasonLoaded] = useState(false); // ✅ NUEVO
-  const [episodeBusyKey, setEpisodeBusyKey] = useState(""); // "S1E3" etc
-  // ✅ NUEVO: historial de completados + rewatch "run"
-  const [showPlays, setShowPlays] = useState([]); // fechas ISO (completados)
-  const [rewatchStartAt, setRewatchStartAt] = useState(null); // ISO
-  const [rewatchWatchedBySeason, setRewatchWatchedBySeason] = useState(null); // { [sn]: [en...] }
 
-  // ✅ Badge del botón "visto" en series: % completado (sin especiales)
+  // -- Episodios vistos por temporada (solo TV) --
+  const [watchedBySeason, setWatchedBySeason] = useState({}); // { seasonNumber: [episodeNumber, ...] }
+  const [watchedBySeasonLoaded, setWatchedBySeasonLoaded] = useState(false); // true cuando se cargo el estado
+  const [episodeBusyKey, setEpisodeBusyKey] = useState(""); // Episodio en proceso: "S1E3"
+
+  // -- Historial de completados y rewatch --
+  const [showPlays, setShowPlays] = useState([]); // Fechas ISO de cada visionado completo
+  const [rewatchStartAt, setRewatchStartAt] = useState(null); // Fecha ISO de inicio del rewatch actual
+  const [rewatchWatchedBySeason, setRewatchWatchedBySeason] = useState(null); // Episodios vistos en el rewatch actual
+
+  // Badge de progreso para el boton "visto" en series: calcula el % de episodios vistos
+  // (excluyendo especiales, solo temporadas regulares)
   const tvProgressBadge = useMemo(() => {
     if (endpointType !== "tv") return null;
     if (!trakt?.connected) return null;
 
-    // ✅ clave: mientras no cargue watchedBySeason, NO mostramos nada
+    // Mientras no se haya cargado el estado de episodios vistos, no mostrar nada
     if (!watchedBySeasonLoaded) return null;
 
     const seasonsList = Array.isArray(data?.seasons) ? data.seasons : [];
@@ -1578,7 +1778,7 @@ export default function DetailsClient({
       (s) => typeof s?.season_number === "number" && s.season_number > 0,
     );
 
-    // si aún no hay temporadas válidas, tampoco mostramos nada
+    // Si aun no hay temporadas validas, no mostrar nada
     if (usable.length === 0) return null;
 
     const totalEpisodes = usable.reduce(
@@ -1605,19 +1805,19 @@ export default function DetailsClient({
     watchedBySeason,
   ]);
 
-  // ✅ NUEVO: Sincronizar trakt.watched con watchedBySeason para series
-  // Cuando hay episodios vistos, trakt.watched debe ser true
+  // Sincroniza trakt.watched con el estado real de episodios vistos.
+  // Si hay al menos un episodio visto, trakt.watched debe ser true.
   useEffect(() => {
     if (endpointType !== "tv") return;
     if (!trakt?.connected) return;
     if (!watchedBySeasonLoaded) return;
 
-    // Calcular si hay algún episodio visto
+    // Comprobar si hay algun episodio visto en cualquier temporada
     const hasAnyWatchedEpisode = Object.values(watchedBySeason).some(
       (episodes) => Array.isArray(episodes) && episodes.length > 0,
     );
 
-    // Actualizar trakt.watched si no coincide
+    // Actualizar el estado de trakt.watched si no coincide con la realidad
     if (hasAnyWatchedEpisode !== trakt.watched) {
       setTrakt((prev) => ({
         ...prev,
@@ -1632,11 +1832,12 @@ export default function DetailsClient({
     watchedBySeason,
   ]);
 
+  // -- Estadisticas de Trakt (watchers, plays, etc.) --
   const [traktStats, setTraktStats] = useState(null);
   const [traktStatsLoading, setTraktStatsLoading] = useState(false);
   const [traktStatsError, setTraktStatsError] = useState("");
 
-  // ✅ Helper: cargar episodios vistos (TV) desde Trakt
+  // Carga los episodios vistos de una serie desde la API de Trakt
   const loadTraktShowWatched = useCallback(async () => {
     if (type !== "tv") return;
 
@@ -1652,39 +1853,43 @@ export default function DetailsClient({
     } catch {
       setWatchedBySeason({});
     } finally {
-      // ✅ NUEVO: ya tenemos un estado definitivo (aunque sea 0%)
+      // Marcar como cargado (aunque sea 0%) para que el badge de progreso se muestre
       setWatchedBySeasonLoaded(true);
     }
   }, [type, id, trakt?.connected]);
 
+  // -- Scoreboard de la comunidad (puntuaciones agregadas de multiples fuentes) --
   const [tScoreboard, setTScoreboard] = useState({
     loading: false,
     error: "",
     found: false,
-    rating: null, // community rating (0..10)
-    votes: null, // community votes
+    rating: null, // Puntuacion de la comunidad (0..10)
+    votes: null, // Numero de votos de la comunidad
     stats: {
-      watchers: null,
-      plays: null,
-      collectors: null, // lo usamos como "libraries"
-      comments: null,
-      lists: null,
-      favorited: null,
+      watchers: null, // Usuarios que estan viendo ahora
+      plays: null, // Numero total de reproducciones
+      collectors: null, // Usuarios que lo tienen en su biblioteca
+      comments: null, // Numero de comentarios
+      lists: null, // Numero de listas que lo incluyen
+      favorited: null, // Usuarios que lo marcaron como favorito
     },
     external: {
-      rtAudience: null, // 🔌 preparado (si lo devuelves)
-      justwatchRank: null, // 🔌 preparado (si lo devuelves)
-      justwatchDelta: null, // 🔌 preparado (si lo devuelves)
+      rtAudience: null, // Rotten Tomatoes audiencia (reservado)
+      justwatchRank: null, // Ranking en JustWatch (reservado)
+      justwatchDelta: null, // Cambio en el ranking (reservado)
       justwatchCountry: "ES",
     },
   });
 
+  // Clave especial para indicar que una accion afecta al show completo (no un episodio)
   const SHOW_BUSY_KEY = "SHOW";
 
   // =====================================================================
-  // ✅ TRAKT COMMUNITY: Sentimientos / Comentarios / Temporadas / Listas
+  // TRAKT COMMUNITY: Sentimientos / Comentarios / Temporadas / Listas
+  // Datos publicos de la comunidad de Trakt (no requiere autenticacion).
   // =====================================================================
 
+  // -- Analisis de sentimiento: pros y contras extraidos de comentarios --
   const [tSentiment, setTSentiment] = useState({
     loading: false,
     error: "",
@@ -1693,7 +1898,8 @@ export default function DetailsClient({
     sourceCount: 0,
   });
 
-  const [tCommentsTab, setTCommentsTab] = useState("likes30"); // likes30 | likesAll | recent
+  // -- Comentarios de Trakt con paginacion y pestanas --
+  const [tCommentsTab, setTCommentsTab] = useState("likes30"); // "likes30" (top 30 dias) | "likesAll" (top historico) | "recent"
   const [tComments, setTComments] = useState({
     loading: false,
     error: "",
@@ -1703,13 +1909,15 @@ export default function DetailsClient({
     total: 0,
   });
 
+  // -- Temporadas de Trakt (datos de temporadas para series TV) --
   const [tSeasons, setTSeasons] = useState({
     loading: false,
     error: "",
     items: [],
   });
 
-  const [tListsTab, setTListsTab] = useState("popular"); // popular | trending (lo mostramos como "Following")
+  // -- Listas de Trakt con paginacion (popular/trending) --
+  const [tListsTab, setTListsTab] = useState("popular"); // "popular" | "trending"
   const [tLists, setTLists] = useState({
     loading: false,
     error: "",
@@ -1719,7 +1927,7 @@ export default function DetailsClient({
     total: 0,
   });
 
-  // Reset al cambiar de título
+  // Resetear todos los datos de la comunidad de Trakt al cambiar de contenido
   useEffect(() => {
     setTSentiment({
       loading: false,
@@ -1749,7 +1957,7 @@ export default function DetailsClient({
     setTListsTab("popular");
   }, [id, traktType]);
 
-  // 1) Sentimientos (derivados de comentarios top)
+  // Carga el analisis de sentimiento (pros/contras) de los 50 comentarios mas votados
   useEffect(() => {
     let ignore = false;
 
@@ -1789,9 +1997,10 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, traktType]); // público: no depende de conexión
+  }, [id, traktType]); // Datos publicos: no depende de conexion del usuario
 
-  // 2) Comentarios (tabs)
+  // Carga los comentarios de Trakt segun la pestana activa.
+  // likes30: top con likes de los ultimos 30 dias. likesAll: top historico. recent: mas recientes.
   useEffect(() => {
     let ignore = false;
 
@@ -1802,7 +2011,7 @@ export default function DetailsClient({
         const isLikes30 = tCommentsTab === "likes30";
         const sort = tCommentsTab === "recent" ? "newest" : "likes";
 
-        // Para likes30: pedimos más y filtramos por fecha
+        // Para likes30: pedimos mas y filtramos por fecha (ultimos 30 dias)
         const reqLimit = isLikes30 ? 50 : 20;
         const page = isLikes30 ? 1 : tComments.page;
 
@@ -1829,7 +2038,7 @@ export default function DetailsClient({
             const t = new Date(c?.created_at || 0).getTime();
             return Number.isFinite(t) && t >= cutoff;
           });
-          // Mantén máximo 20 para UI (puedes subirlo si quieres)
+          // Limitar a 20 comentarios para la UI
           items = items.slice(0, 20);
         }
 
@@ -1858,7 +2067,7 @@ export default function DetailsClient({
     };
   }, [id, traktType, tCommentsTab, tComments.page]);
 
-  // si cambia tab => resetea paginación
+  // Resetear paginacion de comentarios al cambiar de pestana
   useEffect(() => {
     setTComments((p) => ({
       ...p,
@@ -1869,7 +2078,7 @@ export default function DetailsClient({
     }));
   }, [tCommentsTab]);
 
-  // 3) Temporadas (solo show)
+  // Carga las temporadas de la serie desde Trakt (con datos extendidos)
   useEffect(() => {
     let ignore = false;
     const load = async () => {
@@ -1898,7 +2107,7 @@ export default function DetailsClient({
     };
   }, [id, type]);
 
-  // 4) Listas (popular / trending)
+  // Carga las listas de Trakt que contienen este contenido (popular o trending)
   useEffect(() => {
     let ignore = false;
 
@@ -1945,11 +2154,16 @@ export default function DetailsClient({
     };
   }, [id, traktType, tListsTab, tLists.page]);
 
+  // Resetear paginacion de listas al cambiar de pestana
   useEffect(() => {
     setTLists((p) => ({ ...p, items: [], page: 1, hasMore: false, total: 0 }));
   }, [tListsTab]);
 
+  // -- Sincronizacion TMDb <-> Trakt --
+  // Preferencia del usuario: si esta activa, los ratings se sincronizan entre ambas plataformas
   const [syncTrakt, setSyncTrakt] = useState(false);
+
+  // Cargar preferencia de sincronizacion desde localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -1957,6 +2171,8 @@ export default function DetailsClient({
       setSyncTrakt(v);
     } catch {}
   }, []);
+
+  // Guardar preferencia de sincronizacion en localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -1967,6 +2183,7 @@ export default function DetailsClient({
     } catch {}
   }, [syncTrakt]);
 
+  // Recarga el estado de Trakt (visto, rating, historial, watchlist) para el contenido actual
   const reloadTraktStatus = async () => {
     setTrakt((p) => ({ ...p, loading: true, error: "" }));
     const json = await traktGetItemStatus({ type: traktType, tmdbId: id });
@@ -1987,6 +2204,7 @@ export default function DetailsClient({
     });
   };
 
+  // Carga el scoreboard de Trakt (rating de la comunidad y estadisticas de uso)
   useEffect(() => {
     let ignore = false;
 
@@ -2001,7 +2219,7 @@ export default function DetailsClient({
         const votes =
           typeof r?.community?.votes === "number" ? r.community.votes : null;
 
-        // stats (si vienen)
+        // Extraer estadisticas de uso de la comunidad
         const st = r?.stats || {};
         setTScoreboard({
           loading: false,
@@ -2043,6 +2261,7 @@ export default function DetailsClient({
     };
   }, [id, traktType]);
 
+  // Carga las estadisticas detalladas de Trakt (watchers, plays, collectors, etc.)
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -2055,7 +2274,7 @@ export default function DetailsClient({
         const res = await traktGetStats({ type: traktType, tmdbId: id });
         if (cancelled) return;
 
-        // res puede venir como { stats } o directamente stats según lo implementes:
+        // El formato de respuesta puede variar: { stats } o directamente stats
         setTraktStats(res?.stats ?? res ?? null);
       } catch (e) {
         if (cancelled) return;
@@ -2073,23 +2292,27 @@ export default function DetailsClient({
     };
   }, [id, traktType]);
 
+  // Resetear estados de Trakt al cambiar de contenido
   useEffect(() => {
     setTraktWatchedOpen(false);
     setTraktEpisodesOpen(false);
     setEpisodeBusyKey("");
     setTraktBusy("");
 
-    // Evitar que salga 0% al cambiar de serie antes de cargar
+    // Resetear episodios para evitar mostrar 0% mientras carga la nueva serie
     setWatchedBySeason({});
     setWatchedBySeasonLoaded(false);
   }, [id, endpointType]);
 
+  // Recargar estado de Trakt al abrir el modal de historial
   useEffect(() => {
     if (!traktWatchedOpen) return;
     reloadTraktStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traktWatchedOpen]);
 
+  // Carga inicial del estado de Trakt para el contenido actual
+  // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
     let ignore = false;
 
@@ -2129,10 +2352,16 @@ export default function DetailsClient({
     };
   }, [id, traktType]);
 
+  // Trigger para cargar episodios vistos cuando cambian las dependencias
   useEffect(() => {
     loadTraktShowWatched();
   }, [loadTraktShowWatched]);
 
+  /**
+   * Carga los plays (visionados completos) de la serie desde Trakt.
+   * Opcionalmente filtra por fecha de inicio (para rewatches).
+   * Tambien carga los episodios vistos en el rewatch actual.
+   */
   const loadTraktShowPlays = useCallback(
     async (startAtIso = null) => {
       if (type !== "tv") return;
@@ -2159,7 +2388,7 @@ export default function DetailsClient({
 
         if (startAtIso) {
           setRewatchWatchedBySeason(r?.watchedBySeasonSince || {});
-          // ✅ NUEVO: necesario para poder “desmarcar” en rewatch
+          // Guardar los historyIds para poder desmarcar episodios en rewatch
           setRewatchHistoryByEpisode(r?.historyIdsByEpisodeSince || {});
         } else {
           setRewatchWatchedBySeason(null);
@@ -2176,7 +2405,8 @@ export default function DetailsClient({
     [id, type, trakt?.connected],
   );
 
-  // ✅ Refrescar episodios vistos al ABRIR el modal (evita que se quede en 0 o desincronizado)
+  // Refrescar episodios vistos y plays al abrir el modal de episodios
+  // (evita que se quede desincronizado con el estado real de Trakt)
   useEffect(() => {
     let ignore = false;
 
@@ -2208,6 +2438,7 @@ export default function DetailsClient({
     loadTraktShowPlays,
   ]);
 
+  // Alterna el estado de "visto" del contenido completo en Trakt
   const toggleTraktWatched = async () => {
     if (!trakt.connected || traktBusy) return;
     setTraktBusy("watched");
@@ -2225,6 +2456,7 @@ export default function DetailsClient({
     }
   };
 
+  // Agrega un nuevo visionado (play) con fecha especifica al historial de Trakt
   const handleTraktAddPlay = async (yyyyMmDd) => {
     if (!trakt.connected || traktBusy) return;
     setTraktBusy("history");
@@ -2240,6 +2472,7 @@ export default function DetailsClient({
     }
   };
 
+  // Actualiza la fecha de un visionado existente en el historial de Trakt
   const handleTraktUpdatePlay = async (historyId, yyyyMmDd) => {
     if (!trakt.connected || traktBusy) return;
     setTraktBusy("history");
@@ -2256,6 +2489,7 @@ export default function DetailsClient({
     }
   };
 
+  // Elimina un visionado del historial de Trakt por su historyId
   const handleTraktRemovePlay = async (historyId) => {
     if (!trakt.connected || traktBusy) return;
     setTraktBusy("history");
@@ -2267,6 +2501,7 @@ export default function DetailsClient({
     }
   };
 
+  // Establece o elimina la puntuacion del usuario en Trakt de forma segura
   const setTraktRatingSafe = async (valueOrNull) => {
     if (!trakt.connected || traktBusy) return;
     setTraktBusy("rating");
@@ -2286,6 +2521,10 @@ export default function DetailsClient({
     }
   };
 
+  /**
+   * Marca/desmarca un episodio individual como visto en Trakt.
+   * Usa actualizacion optimista con rollback en caso de error.
+   */
   const toggleEpisodeWatched = async (seasonNumber, episodeNumber) => {
     if (type !== "tv") return;
     if (!trakt?.connected) return;
@@ -2298,7 +2537,7 @@ export default function DetailsClient({
       !!watchedBySeason?.[seasonNumber]?.includes(episodeNumber);
     const next = !currentlyWatched;
 
-    // ✅ optimista
+    // Actualizacion optimista: cambiar UI antes de confirmar con el servidor
     setWatchedBySeason((prev) => {
       const cur = new Set(prev?.[seasonNumber] || []);
       if (next) cur.add(episodeNumber);
@@ -2315,16 +2554,16 @@ export default function DetailsClient({
         watchedAt: null,
       });
 
-      // ✅ Si el endpoint ya devuelve watchedBySeason (con el fix del backend), úsalo
+      // Si el endpoint devuelve el estado actualizado directamente, usarlo
       if (r?.watchedBySeason) {
         setWatchedBySeason(r.watchedBySeason);
       } else {
-        // ✅ Fallback robusto: refetch del estado real
+        // Fallback: recargar el estado completo desde Trakt
         const fresh = await traktGetShowWatched({ tmdbId: id });
         setWatchedBySeason(fresh?.watchedBySeason || {});
       }
     } catch {
-      // rollback si falla
+      // Rollback: revertir cambio optimista si falla la peticion
       setWatchedBySeason((prev) => {
         const cur = new Set(prev?.[seasonNumber] || []);
         if (!next) cur.add(episodeNumber);
@@ -2339,6 +2578,11 @@ export default function DetailsClient({
     }
   };
 
+  /**
+   * Marca/desmarca un episodio en el contexto de un rewatch.
+   * A diferencia de toggleEpisodeWatched, este agrega un nuevo play con fecha
+   * y asocia el historyId para poder desmarcarlo despues.
+   */
   const toggleEpisodeRewatch = useCallback(
     async (seasonNumber, episodeNumber) => {
       if (type !== "tv") return;
@@ -2353,7 +2597,7 @@ export default function DetailsClient({
         !!rewatchWatchedBySeason?.[seasonNumber]?.includes(episodeNumber);
       const next = !currentlyWatched;
 
-      // optimista
+      // Actualizacion optimista del estado de rewatch
       setRewatchWatchedBySeason((prev) => {
         const p = prev && typeof prev === "object" ? prev : {};
         const cur = new Set(p?.[seasonNumber] || []);
@@ -2364,8 +2608,7 @@ export default function DetailsClient({
 
       try {
         if (next) {
-          // ✅ añadir play (rewatch)
-          // IMPORTANTE: tu endpoint debería devolver historyId
+          // Agregar play de rewatch: el endpoint devuelve el historyId
           const r = await traktAddEpisodePlay({
             tmdbId: id,
             season: seasonNumber,
@@ -2377,10 +2620,10 @@ export default function DetailsClient({
           if (hid)
             setRewatchHistoryByEpisode((p) => ({ ...(p || {}), [key]: hid }));
         } else {
-          // ✅ quitar play (rewatch)
+          // Quitar play de rewatch: necesita el historyId guardado
           const hid = rewatchHistoryByEpisode?.[key];
           if (!hid) {
-            // si no tienes historyId, sin backend extra no puedes desmarcar de forma fiable
+            // Sin historyId no se puede desmarcar de forma fiable
             throw new Error(
               "No hay historyId para desmarcar este episodio en rewatch.",
             );
@@ -2393,14 +2636,14 @@ export default function DetailsClient({
           });
         }
 
-        // refresca run activo
+        // Refrescar estado del run activo de rewatch
         await loadTraktShowPlays(rewatchStartAt);
 
-        // opcional: mantener global actualizado
+        // Mantener el estado global actualizado tambien
         const fresh = await traktGetShowWatched({ tmdbId: id });
         setWatchedBySeason(fresh?.watchedBySeason || {});
       } catch (e) {
-        // rollback
+        // Rollback del estado optimista
         setRewatchWatchedBySeason((prev) => {
           const p = prev && typeof prev === "object" ? prev : {};
           const cur = new Set(p?.[seasonNumber] || []);
@@ -2427,6 +2670,7 @@ export default function DetailsClient({
     ],
   );
 
+  // Marca/desmarca TODA la serie como vista (todos los episodios de todas las temporadas)
   const onToggleShowWatched = async (watchedAtOrNull) => {
     if (type !== "tv") return;
     if (!trakt?.connected) return;
@@ -2464,7 +2708,7 @@ export default function DetailsClient({
       if (!res.ok)
         throw new Error(json?.error || "Error marcando serie en Trakt");
 
-      // ✅ Optimista: actualiza watchedBySeason según episode_count
+      // Actualizacion optimista: marcar todos los episodios segun episode_count
       setWatchedBySeason(() => {
         if (!watchedAtOrNull) return {};
         const next = {};
@@ -2478,7 +2722,7 @@ export default function DetailsClient({
         return next;
       });
 
-      // ✅ Refresca el estado real (por si Trakt devuelve algo distinto)
+      // Refrescar el estado real desde Trakt (por si difiere del optimista)
       await reloadTraktStatus();
       const fresh = await traktGetShowWatched({ tmdbId: tmdbIdNum });
       setWatchedBySeason(fresh?.watchedBySeason || {});
@@ -2489,6 +2733,7 @@ export default function DetailsClient({
     }
   };
 
+  // Agrega un visionado completo de la serie en Trakt (play de toda la serie)
   const onAddShowPlay = async (watchedAtIsoOrNull) => {
     if (type !== "tv") return;
     if (!trakt?.connected) return;
@@ -2508,6 +2753,7 @@ export default function DetailsClient({
     }
   };
 
+  // Inicia un nuevo rewatch de la serie con fecha de inicio
   const onStartShowRewatch = async (startedAtIsoOrNull) => {
     if (type !== "tv") return;
     if (!trakt?.connected) return;
@@ -2515,7 +2761,7 @@ export default function DetailsClient({
     const startIso = startedAtIsoOrNull || new Date().toISOString();
     setRewatchStartAt(startIso);
 
-    // persist opcional
+    // Persistir fecha de inicio del rewatch en localStorage
     try {
       window.localStorage.setItem(rewatchStorageKey, startIso);
     } catch {}
@@ -2523,6 +2769,7 @@ export default function DetailsClient({
     await loadTraktShowPlays(startIso);
   };
 
+  // Agrega un play individual de un episodio en un rewatch
   const onAddEpisodePlay = async (season, episode, watchedAtIso) => {
     if (type !== "tv") return;
     if (!trakt?.connected) return;
@@ -2540,16 +2787,21 @@ export default function DetailsClient({
         watchedAt: watchedAtIso || new Date().toISOString(),
       });
 
-      // refresca progreso del run + (de rebote) showPlays
+      // Refrescar progreso del run activo
       await loadTraktShowPlays(rewatchStartAt);
 
-      // opcional: mantener watchedBySeason global coherente
+      // Mantener watchedBySeason global coherente
       const fresh = await traktGetShowWatched({ tmdbId: id });
       setWatchedBySeason(fresh?.watchedBySeason || {});
     } finally {
       setEpisodeBusyKey("");
     }
   };
+
+  // =====================================================================
+  // COLECCION DE PELICULAS
+  // Si la pelicula pertenece a una coleccion (ej. saga), carga sus datos.
+  // =====================================================================
 
   const collectionId =
     typeof data?.belongs_to_collection?.id === "number"
@@ -2559,6 +2811,7 @@ export default function DetailsClient({
   const [collectionData, setCollectionData] = useState(null);
   const [collectionLoading, setCollectionLoading] = useState(false);
 
+  // Carga los datos de la coleccion si la pelicula pertenece a una
   useEffect(() => {
     if (!collectionId) {
       setCollectionData(null);
@@ -2588,6 +2841,8 @@ export default function DetailsClient({
     };
   }, [collectionId]);
 
+  // Carga las runs de rewatch desde localStorage.
+  // Incluye migracion del formato legacy (un unico rewatch) al nuevo formato (multiples runs).
   useEffect(() => {
     if (type !== "tv") {
       setRewatchStartAt(null);
@@ -2600,7 +2855,7 @@ export default function DetailsClient({
     }
 
     try {
-      // 1) Cargar runs (nuevo formato)
+      // 1. Cargar runs del nuevo formato
       let runs = [];
       const rawRuns = window.localStorage.getItem(rewatchRunsStorageKey);
       if (rawRuns) {
@@ -2608,7 +2863,7 @@ export default function DetailsClient({
         if (Array.isArray(parsed)) runs = parsed;
       }
 
-      // 2) Compat: si no hay runs pero existe legacy rewatchStorageKey -> conviértelo
+      // 2. Compatibilidad: migrar formato legacy (un solo rewatch) al nuevo formato
       if (!runs.length) {
         const legacy = window.localStorage.getItem(rewatchStorageKey);
         if (legacy) {
@@ -2630,7 +2885,7 @@ export default function DetailsClient({
 
       setRewatchRuns(runs);
 
-      // 3) Vista activa (global o run)
+      // 3. Restaurar la vista activa (global o un run especifico)
       const savedView =
         window.localStorage.getItem(episodesViewStorageKey) || "global";
       const validView =
@@ -2640,7 +2895,7 @@ export default function DetailsClient({
 
       setActiveEpisodesView(validView);
 
-      // 4) Ajusta rewatchStartAt según vista
+      // 4. Ajustar rewatchStartAt segun la vista activa
       if (validView === "global") {
         setRewatchStartAt(null);
       } else {
@@ -2661,9 +2916,12 @@ export default function DetailsClient({
     episodesViewStorageKey,
   ]);
 
-  // =====================================================
-  // ✅ Extras: IMDb rating rápido + votos/premios en idle
-  // =====================================================
+  // =====================================================================
+  // DATOS EXTRA: IMDb, Rotten Tomatoes, Metacritic y Premios
+  // Carga ratings de OMDb (IMDb, RT, MC) con cache en localStorage.
+  // Los votos y premios se cargan en idle (requestIdleCallback) para no
+  // bloquear la UI.
+  // =====================================================================
 
   const [extras, setExtras] = useState({
     imdbRating: null,
@@ -2674,8 +2932,11 @@ export default function DetailsClient({
   });
   const [imdbVotesLoading, setImdbVotesLoading] = useState(false);
 
+  // ID de IMDb resuelto (puede venir directo de TMDb o cargarse via getExternalIds)
   const [resolvedImdbId, setResolvedImdbId] = useState(null);
 
+  // Carga datos de OMDb: rating IMDb, votos, premios, RT y Metacritic.
+  // Usa cache en localStorage para evitar peticiones repetidas.
   useEffect(() => {
     let abort = false;
 
@@ -2693,7 +2954,7 @@ export default function DetailsClient({
 
     const run = async () => {
       try {
-        // reset “suave” al cambiar de título
+        // Reset suave al cambiar de contenido
         setExtras({
           imdbRating: null,
           imdbVotes: null,
@@ -2703,21 +2964,21 @@ export default function DetailsClient({
         });
         setImdbVotesLoading(false);
 
-        // ✅ NUEVO: resetea el imdbId resuelto para este título
+        // Resetear el imdbId resuelto para este contenido
         setResolvedImdbId(null);
 
         const imdbId = await resolveImdbId();
 
-        // ✅ NUEVO: si el effect ya se canceló, salimos
+        // Si el effect se cancelo (cambio de contenido), salir
         if (abort) return;
 
-        // ✅ NUEVO: guarda el imdbId resuelto (o null) para usarlo en links/badges
+        // Guardar el imdbId resuelto para usarlo en enlaces y badges
         setResolvedImdbId(imdbId || null);
 
-        // ✅ NUEVO: si no hay imdbId, no seguimos (no se puede pedir OMDb)
+        // Sin imdbId no se puede consultar OMDb
         if (!imdbId) return;
 
-        // ✅ cache instantáneo
+        // Intentar cargar datos desde cache de localStorage
         const cached = readOmdbCache(imdbId);
         if (cached?.imdbRating != null) {
           setExtras((prev) => ({ ...prev, imdbRating: cached.imdbRating }));
@@ -2735,7 +2996,7 @@ export default function DetailsClient({
           setExtras((prev) => ({ ...prev, mcScore: cached.mcScore }));
         }
 
-        // si el cache está fresco y ya hay rating/votos, no hace falta pedir nada
+        // Si el cache esta fresco y completo, no hacer peticion de red
         if (
           cached?.fresh &&
           cached?.imdbRating != null &&
@@ -2743,7 +3004,7 @@ export default function DetailsClient({
         )
           return;
 
-        // ✅ pide OMDb (rating primero)
+        // Peticion a OMDb para obtener datos frescos
         const omdb = await fetchOmdbByImdb(imdbId);
         if (abort) return;
 
@@ -2754,7 +3015,7 @@ export default function DetailsClient({
 
         const { rtScore, mcScore } = extractOmdbExtraScores(omdb);
 
-        // ✅ pinta lo “rápido” cuanto antes (IMDb + RT + MC)
+        // Mostrar datos rapidos primero (IMDb + RT + MC)
         setExtras((prev) => ({
           ...prev,
           imdbRating: Number.isFinite(imdbRating) ? imdbRating : null,
@@ -2768,7 +3029,7 @@ export default function DetailsClient({
           mcScore,
         });
 
-        // votos/premios en idle
+        // Votos y premios se cargan en idle para no bloquear la UI
         setImdbVotesLoading(true);
         runIdle(() => {
           if (abort) return;
@@ -2807,7 +3068,7 @@ export default function DetailsClient({
           });
           setImdbVotesLoading(false);
 
-          // ✅ NUEVO: también resetea el resolvedImdbId si hay error
+          // Resetear el resolvedImdbId si hay error
           setResolvedImdbId(null);
         }
       }
@@ -2819,28 +3080,31 @@ export default function DetailsClient({
     };
   }, [type, id, data?.imdb_id, data?.external_ids?.imdb_id, endpointType]);
 
-  // Lógica unificada para puntuar en ambos sitios
+  /**
+   * Puntuacion unificada: envia la puntuacion a TMDb y Trakt simultaneamente.
+   * Si no hay sesion, redirige a login.
+   */
   const handleUnifiedRate = async (value) => {
-    // Si no está conectado a nada, redirigir a login (TMDb es la base)
+    // Sin sesion activa, redirigir a login
     if (!session) {
       window.location.href = "/login";
       return;
     }
 
-    // 1. Gestionar TMDb
+    // 1. Enviar a TMDb (skipSync para evitar doble sincronizacion)
     if (value === null) {
       await clearTmdbRating({ skipSync: true });
     } else {
       await sendTmdbRating(value, { skipSync: true });
     }
 
-    // 2. Gestionar Trakt (si está conectado)
+    // 2. Enviar a Trakt si esta conectado (Trakt usa null para borrar)
     if (trakt.connected) {
-      // Trakt usa null para borrar, o número entero
       await sendTraktRating(value); // sendTraktRating ya maneja null internamente
     }
   };
 
+  // Persiste las runs de rewatch en localStorage
   const persistRuns = useCallback(
     (nextRuns) => {
       try {
@@ -2853,6 +3117,7 @@ export default function DetailsClient({
     [rewatchRunsStorageKey],
   );
 
+  // Cambia la vista de episodios entre "global" y un run de rewatch especifico
   const changeEpisodesView = useCallback(
     async (viewId) => {
       const v = viewId || "global";
@@ -2863,7 +3128,7 @@ export default function DetailsClient({
 
       if (v === "global") {
         setRewatchStartAt(null);
-        await loadTraktShowPlays(null); // ✅ refresca a global
+        await loadTraktShowPlays(null); // Refrescar a vista global
         return;
       }
 
@@ -2871,11 +3136,12 @@ export default function DetailsClient({
       const startAt = run?.startedAt || v;
 
       setRewatchStartAt(startAt);
-      await loadTraktShowPlays(startAt); // ✅ refrescaFRESCO al cambiar de run
+      await loadTraktShowPlays(startAt); // Refrescar al cambiar de run
     },
     [episodesViewStorageKey, rewatchRuns, loadTraktShowPlays],
   );
 
+  // Crea un nuevo run de rewatch con fecha de inicio y lo establece como vista activa
   const createRewatchRun = useCallback(
     async (startedAtIsoOrNull) => {
       const startedAt = startedAtIsoOrNull || new Date().toISOString();
@@ -2898,11 +3164,12 @@ export default function DetailsClient({
       } catch {}
       setRewatchStartAt(run.startedAt);
 
-      await loadTraktShowPlays(run.startedAt); // ✅ clave
+      await loadTraktShowPlays(run.startedAt); // Cargar datos del run
     },
     [episodesViewStorageKey, persistRuns, loadTraktShowPlays],
   );
 
+  // Elimina un run de rewatch y vuelve a vista global si era el activo
   const deleteRewatchRun = useCallback(
     async (runId) => {
       if (!runId) return;
@@ -2926,7 +3193,7 @@ export default function DetailsClient({
 
       if (wasActive) {
         setRewatchStartAt(null);
-        await loadTraktShowPlays(null); // ✅ vuelve a global “de verdad”
+        await loadTraktShowPlays(null); // Volver a vista global
       }
     },
     [
@@ -2937,14 +3204,16 @@ export default function DetailsClient({
     ],
   );
 
-  // Calculamos una nota "visual" única (prioridad Trakt si existe, sino TMDb)
+  // Puntuacion unificada del usuario: prioriza Trakt si esta conectado, sino TMDb
   const unifiedUserRating =
     trakt.connected && trakt.rating ? trakt.rating : userRating;
 
-  // ====== Ratings Episodios (TV) ======
-  const [ratings, setRatings] = useState(null);
+  // ====== RATINGS DE EPISODIOS (solo TV) ======
+  const [ratings, setRatings] = useState(null); // Ratings por episodio
   const [ratingsError, setRatingsError] = useState(null);
   const [ratingsLoading, setRatingsLoading] = useState(false);
+
+  // Carga los ratings de episodios para series TV (excluyendo especiales)
   useEffect(() => {
     let ignore = false;
     async function load() {
@@ -2967,9 +3236,15 @@ export default function DetailsClient({
     };
   }, [id, type]);
 
-  // ====== Handlers Artwork ======
-  const [posterToggleBusy, setPosterToggleBusy] = useState(false);
+  // =====================================================================
+  // HANDLERS DE SELECCION DE ARTWORK
+  // Permiten al usuario elegir poster, preview backdrop y fondo.
+  // Cada seleccion se persiste en localStorage y se guarda en la API.
+  // =====================================================================
 
+  const [posterToggleBusy, setPosterToggleBusy] = useState(false); // Transicion de poster en curso
+
+  // Selecciona un poster especifico y lo persiste
   const handleSelectPoster = (filePath) => {
     setPosterViewMode("poster");
     setPosterLayoutMode("poster");
@@ -2982,6 +3257,7 @@ export default function DetailsClient({
     saveArtworkOverride({ type: endpointType, id, kind: "poster", filePath });
   };
 
+  // Selecciona un backdrop para el modo preview y lo persiste
   const handleSelectPreviewBackdrop = (filePath) => {
     setSelectedPreviewBackdropPath(filePath);
     if (typeof window !== "undefined") {
@@ -2992,6 +3268,7 @@ export default function DetailsClient({
     saveArtworkOverride({ type: endpointType, id, kind: "backdrop", filePath });
   };
 
+  // Selecciona una imagen de fondo con transicion crossfade suave
   const handleSelectBackground = (filePath) => {
     // Guardar la imagen anterior para el fade
     setPrevBackgroundPath(
@@ -3012,13 +3289,14 @@ export default function DetailsClient({
       filePath,
     });
 
-    // Terminar transición después de un breve delay
+    // Terminar transicion de crossfade despues de 600ms
     setTimeout(() => {
       setIsTransitioning(false);
       setPrevBackgroundPath(null);
     }, 600);
   };
 
+  // Resetea todas las selecciones de artwork a los valores por defecto
   const handleResetArtwork = () => {
     setSelectedPosterPath(null);
     setSelectedPreviewBackdropPath(null);
@@ -3050,8 +3328,14 @@ export default function DetailsClient({
     });
   };
 
+  /**
+   * Cicla entre modo poster y preview con animacion de layout.
+   * 1) Si va a preview: primero cambia el layout (aspect-ratio) y luego la imagen.
+   * 2) Si va a poster: primero cambia la imagen y luego reduce el layout.
+   * Usa una secuencia incremental para manejar clicks rapidos y cancelar transiciones obsoletas.
+   */
   const handleCyclePoster = useCallback(async () => {
-    // ✅ Alternar entre poster actual y backdrop de vista previa (sin sobrescribir)
+    // Alternar entre poster actual y backdrop de vista previa (sin sobrescribir)
     const posterPath =
       asTmdbPath(selectedPosterPath) ||
       asTmdbPath(basePosterPath) ||
@@ -3065,14 +3349,14 @@ export default function DetailsClient({
 
     if (!posterPath || !previewPath) return;
 
-    // ✅ Determinar el siguiente modo basándose en el modo SOLICITADO.
+    // Determinar el siguiente modo basandose en el modo solicitado
     // Esto permite clicks rápidos seguidos incluso si todavía no hemos cambiado
     // posterViewMode (por ejemplo, mientras el layout se redimensiona).
     const currentMode = posterRequestedModeRef.current || posterViewMode;
     const nextMode = currentMode === "preview" ? "poster" : "preview";
     const targetPath = nextMode === "preview" ? previewPath : posterPath;
 
-    // ✅ Incrementar secuencia ANTES de iniciar la transición
+    // Incrementar secuencia antes de iniciar la transicion
     const seq = (posterToggleSeqRef.current += 1);
     posterRequestedModeRef.current = nextMode;
     setPosterToggleBusy(true);
@@ -3098,18 +3382,18 @@ export default function DetailsClient({
         requestAnimationFrame(() => requestAnimationFrame(resolve));
       });
 
-    // ✅ 1) Si vamos a PREVIEW (backdrop), primero forzamos el layout (ratio/ancho)
+    // 1) Si vamos a preview (backdrop), primero forzar el layout (ratio/ancho)
     // y esperamos a que la tarjeta se redimensione antes de cambiar la imagen.
     if (nextMode === "preview") {
       setPosterLayoutMode("preview");
       await waitFrames();
-      // ✅ Esperar a la MITAD de la transición CSS (250ms de 500ms)
+      // Esperar a la mitad de la transicion CSS (250ms de 500ms)
       // para que el aspect-ratio cambie primero
       await wait(250);
       if (abortIfStale()) return;
     }
 
-    // ✅ Verificar si la imagen ya está en caché (instantáneo)
+    // Verificar si la imagen ya esta en cache (instantaneo)
     const checkCached = () => {
       const testImg = new Image();
       testImg.src = `https://image.tmdb.org/t/p/w780${targetPath}`;
@@ -3119,12 +3403,12 @@ export default function DetailsClient({
     const applyMode = () => {
       if (abortIfStale()) return;
 
-      // ✅ Cambiar la imagen DESPUÉS de que el layout haya empezado a cambiar
+      // Cambiar la imagen despues de que el layout haya empezado a cambiar
       setPosterViewMode(nextMode);
 
-      // ✅ Si volvemos a POSTER, reducimos el layout DESPUÉS del swap
+      // Si volvemos a poster, reducir el layout despues del swap
       if (nextMode === "poster") {
-        // ✅ Esperar a la mitad de la transición antes de cambiar el layout
+        // Esperar a la mitad de la transicion antes de cambiar el layout
         setTimeout(() => {
           if (abortIfStale()) return;
           setPosterLayoutMode("poster");
@@ -3134,18 +3418,18 @@ export default function DetailsClient({
       safeFinish();
     };
 
-    // ✅ Si ya está en caché, cambiar sin precarga adicional
+    // Si ya esta en cache, cambiar sin precarga adicional
     if (checkCached()) {
       applyMode();
       return;
     }
 
-    // ✅ Precargar la imagen con timeout (evita esperas eternas)
+    // Precargar la imagen con timeout (evita esperas eternas)
     await new Promise((resolve) => {
       const img = new Image();
       const timeout = setTimeout(() => {
         resolve(false); // timeout: continuar de todas formas
-      }, 400); // ✅ Timeout más corto ya que esperamos antes
+      }, 400); // Timeout corto ya que esperamos antes
 
       img.onload = () => {
         clearTimeout(timeout);
@@ -3170,12 +3454,12 @@ export default function DetailsClient({
     globalViewModeStorageKey,
   ]);
 
-  // ✅ Persistir el modo de vista globalmente y sincronizar layoutMode
+  // Persistir el modo de vista globalmente y sincronizar layoutMode
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       window.localStorage.setItem(globalViewModeStorageKey, posterViewMode);
-      // ✅ Sincronizar layoutMode cuando posterViewMode cambie (excepto durante transiciones)
+      // Sincronizar layoutMode cuando posterViewMode cambie (excepto durante transiciones)
       // Esto asegura que ambos estados estén alineados después de navegaciones
       if (!posterToggleBusy) {
         setPosterLayoutMode(posterViewMode);
@@ -3183,6 +3467,7 @@ export default function DetailsClient({
     } catch {}
   }, [posterViewMode, globalViewModeStorageKey, posterToggleBusy]);
 
+  // Copia la URL original de una imagen de TMDb al portapapeles
   const handleCopyImageUrl = async (filePath) => {
     const url = buildOriginalImageUrl(filePath);
     try {
@@ -3194,7 +3479,7 @@ export default function DetailsClient({
     }
   };
 
-  // Scroll Nav Logic
+  // -- Navegacion por scroll horizontal de la galeria de imagenes --
   const updateImagesNav = () => {
     const el = imagesScrollRef.current;
     if (!el) return;
@@ -3223,14 +3508,23 @@ export default function DetailsClient({
   const showPrevImages = isHoveredImages && canPrevImages;
   const showNextImages = isHoveredImages && canNextImages;
 
-  const [externalLinksOpen, setExternalLinksOpen] = useState(false);
+  // =====================================================================
+  // ENLACES EXTERNOS
+  // URLs a sitios externos: FilmAffinity, JustWatch, Letterboxd,
+  // SeriesGraph, sitio oficial. Se resuelven via API para obtener
+  // URLs directas (no de busqueda) cuando es posible.
+  // =====================================================================
 
+  const [externalLinksOpen, setExternalLinksOpen] = useState(false); // Modal de enlaces externos abierto
+
+  // URL de busqueda en FilmAffinity
   const filmAffinitySearchUrl = `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent(
     data.title || data.name,
   )}`;
 
   const isMovie = endpointType === "movie";
 
+  // URL de SeriesGraph (solo para series TV)
   const seriesGraphUrl =
     type === "tv" && data?.id && (data.name || data.original_name)
       ? `https://seriesgraph.com/show/${data.id}-${slugifyForSeriesGraph(
@@ -3320,7 +3614,7 @@ export default function DetailsClient({
     } catch {}
   }, [jwCacheKey]);
 
-  // ✅ 1) hidratar desde cache para que el icono salga instantáneo en visitas posteriores
+  // 1) Hidratar desde cache para que el icono salga instantaneo en visitas posteriores
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -3350,7 +3644,7 @@ export default function DetailsClient({
     const ac = new AbortController();
 
     const run = async () => {
-      // ✅ Importante: marcamos loading pero NO ponemos justwatch:null (así no “parpadea”)
+      // Importante: marcamos loading pero NO ponemos justwatch:null (asi no "parpadea")
       setExtLinks((p) => ({ ...p, loadingJW: true, errorJW: "" }));
 
       try {
@@ -3386,7 +3680,7 @@ export default function DetailsClient({
           errorJW: "",
         }));
 
-        // ✅ cache: para que en siguientes visitas salga instantáneo
+        // Cache: para que en siguientes visitas salga instantaneo
         try {
           if (typeof window !== "undefined") {
             if (resolved) window.localStorage.setItem(jwCacheKey, resolved);
@@ -3485,7 +3779,7 @@ export default function DetailsClient({
         href: jwHref,
       });
 
-    // ✅ Letterboxd SOLO movies
+    // Letterboxd SOLO movies
     if (isMovie && letterboxdUrl)
       items.push({
         id: "lb",
@@ -3594,8 +3888,8 @@ export default function DetailsClient({
       ? `$${(data.revenue / 1_000_000).toFixed(1)}M`
       : null;
 
-  // ✅ Director (movie) — fallback si data no trae credits
-  // ✅ Director (movie) — fallback si data no trae credits
+  // Director (movie) - fallback si data no trae credits
+  // Director (movie) - fallback si data no trae credits
   const [movieDirector, setMovieDirector] = useState(null);
   const [movieDirectorsCrew, setMovieDirectorsCrew] = useState([]);
 
@@ -3621,7 +3915,7 @@ export default function DetailsClient({
       );
 
       setMovieDirectorsCrew(dirsCrew);
-      // ✅ FIX: Actualizamos también el string del nombre aquí
+      // FIX: Actualizamos tambien el string del nombre aqui
       setMovieDirector(formatDirectorNames(dirsCrew));
       return;
     }
@@ -3647,7 +3941,7 @@ export default function DetailsClient({
         );
 
         setMovieDirectorsCrew(dirsCrew);
-        // ✅ FIX: Actualizamos también el string del nombre tras el fetch
+        // FIX: Actualizamos tambien el string del nombre tras el fetch
         setMovieDirector(formatDirectorNames(dirsCrew));
       } catch (e) {
         if (e?.name !== "AbortError") {
@@ -3745,11 +4039,11 @@ export default function DetailsClient({
     return () => ac.abort();
   }, [type, id, data?.created_by]);
 
-  // ✅ MENÚ GLOBAL (nuevo)
+  // Menu global (nuevo)
 
   const [activeSection, setActiveSection] = useState(() => null);
 
-  // ✅ cuando cambie type, fija una sección inicial válida
+  // Cuando cambie type, fijar una seccion inicial valida
   useEffect(() => {
     setActiveSection(null);
   }, [type, id]);
@@ -3786,7 +4080,7 @@ export default function DetailsClient({
   }, [tScoreboard.rating]);
 
   // =====================================================
-  // ✅ CAST: mantener orden TMDb + evitar cast incompleto
+  // CAST: mantener orden TMDb + evitar cast incompleto
   // =====================================================
   const [tmdbCast, setTmdbCast] = useState([]);
   const [tmdbCastLoading, setTmdbCastLoading] = useState(false);
@@ -3975,7 +4269,7 @@ export default function DetailsClient({
   const sectionItems = useMemo(() => {
     const items = [];
 
-    // ✅ Media = Imágenes + Vídeos (unificado)
+    // Media = Imagenes + Videos (unificado)
     const postersCount = imagesState?.posters?.length || 0;
     const backdropsCount = imagesState?.backdrops?.length || 0;
     const videosCount = Array.isArray(videos) ? videos.length : 0;
@@ -3988,14 +4282,14 @@ export default function DetailsClient({
       count: mediaCount || undefined,
     });
 
-    // ✅ Sentimientos
+    // Sentimientos
     items.push({
       id: "sentiment",
       label: "Sentimientos",
       icon: Sparkles,
     });
 
-    // ✅ TV: Temporadas
+    // TV: Temporadas
     if (type === "tv") {
       items.push({
         id: "seasons",
@@ -4005,7 +4299,7 @@ export default function DetailsClient({
           ? tSeasons.items.length
           : undefined,
       });
-      // ✅ TV: Episodios
+      // TV: Episodios
       items.push({
         id: "episodes",
         label: "Episodios",
@@ -4015,7 +4309,7 @@ export default function DetailsClient({
       });
     }
 
-    // ✅ Comentarios = Trakt + Críticas (unificado)
+    // Comentarios = Trakt + Criticas (unificado)
     const traktCommentsCount = Number(tComments?.total || 0) || 0;
     const reviewsCount = Array.isArray(reviews) ? reviews.length : 0;
     const commentsCount = traktCommentsCount + reviewsCount;
@@ -4027,7 +4321,7 @@ export default function DetailsClient({
       count: commentsCount || undefined,
     });
 
-    // ✅ Listas
+    // Listas
     items.push({
       id: "lists",
       label: "Listas",
@@ -4035,7 +4329,7 @@ export default function DetailsClient({
       count: Array.isArray(tLists?.items) ? tLists.items.length : undefined,
     });
 
-    // ✅ Colección
+    // Coleccion
     if (collectionId) {
       items.push({
         id: "collection",
@@ -4046,7 +4340,7 @@ export default function DetailsClient({
       });
     }
 
-    // ✅ Reparto
+    // Reparto
     items.push({
       id: "cast",
       label: "Reparto",
@@ -4054,7 +4348,7 @@ export default function DetailsClient({
       count: castDataForUI?.length ? castDataForUI.length : undefined,
     });
 
-    // ✅ Recomendaciones (texto completo)
+    // Recomendaciones (texto completo)
     items.push({
       id: "recs",
       label: "Recomendaciones",
@@ -4082,7 +4376,7 @@ export default function DetailsClient({
     collectionData,
   ]);
 
-  // ✅ MENÚ GLOBAL (scroll + sticky + spy)
+  // Menu global (scroll + sticky + spy)
   const STICKY_TOP = 72; // ajusta si tu navbar mide otra cosa (px)
 
   const sentinelRef = useRef(null);
@@ -4194,7 +4488,7 @@ export default function DetailsClient({
   }, [sectionItems, activeSection]);
 
   // =====================================================
-  // ✅ IMDb para RECOMENDACIONES: SOLO HOVER (no auto)
+  // IMDb para recomendaciones: solo hover (no auto)
   // =====================================================
   const [recImdbRatings, setRecImdbRatings] = useState({});
   const recImdbRatingsRef = useRef({});
@@ -4472,7 +4766,7 @@ export default function DetailsClient({
     return providers.slice(0, 6);
   }, [streamingProviders, plexAvailable, plexUrl]);
 
-  // ✅ Refs para gestión de carga de poster (los estados están definidos al inicio)
+  // Refs para gestion de carga de poster (los estados estan definidos al inicio)
   const prevDisplayPosterRef = useRef(null);
   const posterLoadTokenRef = useRef(0);
   const posterToggleSeqRef = useRef(0);
@@ -4482,16 +4776,16 @@ export default function DetailsClient({
     posterRequestedModeRef.current = posterViewMode;
   }, [posterViewMode]);
 
-  // ✅ Activar posterResolved cuando displayPosterPath esté disponible
+  // Activar posterResolved cuando displayPosterPath este disponible
   useEffect(() => {
-    // ✅ Activar posterResolved INMEDIATAMENTE si tenemos un path válido (igual que el poster)
+    // Activar posterResolved inmediatamente si tenemos un path valido (igual que el poster)
     if (displayPosterPath && !posterResolved) {
       setPosterResolved(true);
     }
     // Incluimos artworkInitialized para evitar error de HMR "deps changed size"
   }, [displayPosterPath, posterResolved, artworkInitialized]);
 
-  // ✅ Fallback automático: si backdrop falla, cambiar a poster
+  // Fallback automatico: si backdrop falla, cambiar a poster
   useEffect(() => {
     if (
       posterImgError &&
@@ -4508,7 +4802,7 @@ export default function DetailsClient({
     }
   }, [posterImgError, posterViewMode, basePosterDisplayPath]);
 
-  // ✅ Fallback si no hay backdrop disponible en modo preview
+  // Fallback si no hay backdrop disponible en modo preview
   useEffect(() => {
     if (
       posterViewMode === "preview" &&
@@ -4527,7 +4821,7 @@ export default function DetailsClient({
     basePosterDisplayPath,
   ]);
 
-  // ✅ Timeout de seguridad: si después de 3s no hay imagen en modo preview, cambiar a poster
+  // Timeout de seguridad: si despues de 3s no hay imagen en modo preview, cambiar a poster
   useEffect(() => {
     if (posterViewMode !== "preview" || posterResolved) return;
 
@@ -4547,14 +4841,14 @@ export default function DetailsClient({
     prevDisplayPosterRef.current = displayPosterPath;
     posterLoadTokenRef.current += 1;
 
-    // ✅ Manejar cambio de imagen (incluyendo de null a valor)
+    // Manejar cambio de imagen (incluyendo de null a valor)
     if (prev !== displayPosterPath) {
       // Si hay imagen anterior, guardarla para crossfade
       if (prev) {
         setPrevPosterPath(prev);
       }
 
-      // ✅ Verificar si la nueva imagen ya está precargada
+      // Verificar si la nueva imagen ya esta precargada
       if (displayPosterPath) {
         const checkIfLoaded = (size) => {
           const testImg = new Image();
@@ -4565,10 +4859,10 @@ export default function DetailsClient({
         const isLowPreloaded = checkIfLoaded("w342");
         const isHighPreloaded = checkIfLoaded("w780");
 
-        // ✅ Si está precargada, marcar como cargada inmediatamente
+        // Si esta precargada, marcar como cargada inmediatamente
         if (isLowPreloaded) {
           setPosterLowLoaded(true);
-          setPosterHighLoaded(isHighPreloaded); // ✅ También verificar HIGH
+          setPosterHighLoaded(isHighPreloaded); // Tambien verificar HIGH
         } else {
           setPosterLowLoaded(false);
           setPosterHighLoaded(false);
@@ -4577,7 +4871,7 @@ export default function DetailsClient({
         setPosterTransitioning(!!prev); // Solo transición si había imagen anterior
         setPosterImgError(false);
 
-        // ✅ Limpiar transición después del tiempo configurado
+        // Limpiar transicion despues del tiempo configurado
         if (prev) {
           const timer = setTimeout(() => {
             setPosterTransitioning(false);
@@ -4598,7 +4892,7 @@ export default function DetailsClient({
     }
   }, [displayPosterPath]);
 
-  // ✅ Resetear estados de carga del backdrop cuando cambia la vista o la imagen
+  // Resetear estados de carga del backdrop cuando cambia la vista o la imagen
   const prevDisplayBackdropRef = useRef(null);
   const backdropLoadTokenRef = useRef(0);
   const backdropLoadToken = backdropLoadTokenRef.current;
@@ -4611,7 +4905,7 @@ export default function DetailsClient({
     // Solo manejar cuando estamos en modo preview
     if (posterViewMode === "preview") {
       if (prev !== previewBackdropPath) {
-        // ✅ Verificar si la nueva imagen ya está precargada
+        // Verificar si la nueva imagen ya esta precargada
         if (previewBackdropPath) {
           const checkIfLoaded = (size) => {
             const testImg = new Image();
@@ -4622,7 +4916,7 @@ export default function DetailsClient({
           const isLowPreloaded = checkIfLoaded("w780");
           const isHighPreloaded = checkIfLoaded("w1280");
 
-          // ✅ Si está precargada, marcar como cargada inmediatamente
+          // Si esta precargada, marcar como cargada inmediatamente
           if (isLowPreloaded) {
             setBackdropLowLoaded(true);
             setBackdropHighLoaded(isHighPreloaded);
@@ -4653,7 +4947,7 @@ export default function DetailsClient({
       ? isBackdropPath(prevPosterPath)
       : isBackdropPoster;
 
-  // ✅ URLs basadas en el modo de vista
+  // URLs basadas en el modo de vista
   const posterLowUrl =
     posterViewMode === "preview" && previewBackdropPath
       ? `https://image.tmdb.org/t/p/w780${previewBackdropPath}`
@@ -4669,7 +4963,7 @@ export default function DetailsClient({
         : null;
   const posterLoadToken = posterLoadTokenRef.current;
 
-  // ✅ Estados unificados: usar backdrop states si estamos en preview, sino poster states
+  // Estados unificados: usar backdrop states si estamos en preview, sino poster states
   const currentLowLoaded =
     posterViewMode === "preview" ? backdropLowLoaded : posterLowLoaded;
   const currentHighLoaded =
@@ -4709,15 +5003,15 @@ export default function DetailsClient({
   const posterIdleRafRef = useRef(0);
   const posterIsInteractingRef = useRef(false);
   const posterIdleStartRef = useRef(0);
-  const posterTiltRef = useRef(null); // ✅ el recuadro completo que se inclina
-  const posterAnimRafRef = useRef(0); // ✅ un solo rAF
+  const posterTiltRef = useRef(null); // El recuadro completo que se inclina
+  const posterAnimRafRef = useRef(0); // Un solo rAF
   const posterTargetRef = useRef({ rx: 0, ry: 0, s: 1 });
   const posterStateRef = useRef({ rx: 0, ry: 0, s: 1 });
   const posterLastInputRef = useRef(0);
 
   const POSTER_MAX = 12; // grados
   const POSTER_SCALE = 1.06; // escala al hover
-  const POSTER_OVERSCAN = 1.02; // ✅ mínimo para NO perder nitidez
+  const POSTER_OVERSCAN = 1.02; // Minimo para no perder nitidez
   const IDLE_DELAY = 220; // ms sin interacción => idle
 
   // Overscan
@@ -4755,7 +5049,7 @@ export default function DetailsClient({
       typeof performance !== "undefined" ? performance.now() : Date.now();
   }, []);
 
-  // ✅ Animación 3D del poster/backdrop
+  // Animacion 3D del poster/backdrop
   useEffect(() => {
     if (!poster3dEnabled) return;
 
@@ -4764,7 +5058,7 @@ export default function DetailsClient({
 
     let mounted = true;
 
-    // ✅ Resetear posterLastInputRef para que idle funcione inmediatamente al cambiar imagen
+    // Resetear posterLastInputRef para que idle funcione inmediatamente al cambiar imagen
     posterLastInputRef.current =
       typeof performance !== "undefined" ? performance.now() : Date.now();
 
@@ -4778,7 +5072,7 @@ export default function DetailsClient({
 
       let target = posterTargetRef.current;
 
-      // ✅ Idle automático cuando no hay interacción (más visual pero estable)
+      // Idle automatico cuando no hay interaccion (mas visual pero estable)
       if (idle) {
         const dt = now / 1000;
         target = {
@@ -4790,7 +5084,7 @@ export default function DetailsClient({
 
       const cur = posterStateRef.current;
 
-      // ✅ LERP suave (fluido y responsivo)
+      // LERP suave (fluido y responsivo)
       const k = 0.14;
       cur.rx += (target.rx - cur.rx) * k;
       cur.ry += (target.ry - cur.ry) * k;
@@ -4844,7 +5138,7 @@ export default function DetailsClient({
               </>
             )}
 
-            {/* ✅ Capa base: SIEMPRE cubre (evita marcos laterales) */}
+            {/* Capa base: siempre cubre (evita marcos laterales) */}
             <div
               className="absolute inset-0 bg-cover bg-center transition-opacity duration-500"
               style={{
@@ -4855,7 +5149,7 @@ export default function DetailsClient({
               }}
             />
 
-            {/* ✅ Capa detalle: zoom OUT (scale < 1) */}
+            {/* Capa detalle: zoom OUT (scale < 1) */}
             <div
               className="absolute inset-0 bg-cover transition-opacity duration-500"
               style={{
@@ -4871,7 +5165,7 @@ export default function DetailsClient({
           <div className="absolute inset-0 bg-[#0a0a0a]" />
         )}
 
-        {/* ✅ Sombreado superior + laterales (sin “marcos”) */}
+        {/* Sombreado superior + laterales (sin "marcos") */}
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-transparent" />
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
@@ -4916,7 +5210,7 @@ export default function DetailsClient({
                   touchAction: "none",
                 }}
               >
-                {/* ✅ Este es el recuadro completo que se inclina */}
+                {/* Este es el recuadro completo que se inclina */}
                 <div
                   ref={posterTiltRef}
                   className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 will-change-transform"
@@ -4926,7 +5220,7 @@ export default function DetailsClient({
                     WebkitBackfaceVisibility: "hidden",
                     outline: "1px solid transparent",
                     isolation: "isolate",
-                    // ✅ NO transition en transform - manejado por requestAnimationFrame
+                    // NO transition en transform - manejado por requestAnimationFrame
                   }}
                 >
                   {/* (Opcional) borde suave sin sombreado encima */}
@@ -4972,7 +5266,7 @@ export default function DetailsClient({
                               currentLoadTokenRef.current !== currentLoadToken
                             )
                               return;
-                            // ✅ Usar el setState correcto según el modo
+                            // Usar el setState correcto segun el modo
                             if (posterViewMode === "preview") {
                               setBackdropLowLoaded(true);
                               setBackdropResolved(true);
@@ -4986,7 +5280,7 @@ export default function DetailsClient({
                               currentLoadTokenRef.current !== currentLoadToken
                             )
                               return;
-                            // ✅ Usar el setState correcto según el modo
+                            // Usar el setState correcto segun el modo
                             if (posterViewMode === "preview") {
                               setBackdropImgError(true);
                               setBackdropResolved(true);
@@ -5015,7 +5309,7 @@ ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-
                                 currentLoadTokenRef.current !== currentLoadToken
                               )
                                 return;
-                              // ✅ Usar el setState correcto según el modo
+                              // Usar el setState correcto segun el modo
                               if (posterViewMode === "preview") {
                                 setBackdropHighLoaded(true);
                               } else {
@@ -5289,9 +5583,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </div>
             </div>
 
-            {/* 2. BARRA DE ACCIONES PRINCIPALES */}
+            {/* =================================================================
+                BARRA DE ACCIONES PRINCIPALES
+               ================================================================= */}
+            {/* Sección de botones de acción rápida: reproducir tráiler, marcar como visto,
+                puntuar, agregar a favoritos, watchlist y listas, cambiar portada */}
             <div className="flex flex-wrap items-center gap-2 mb-6 px-1">
-              {/* Botón Tráiler */}
+              {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
               <LiquidButton
                 onClick={() => openVideo(preferredVideo)}
                 disabled={!preferredVideo}
@@ -5305,8 +5603,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 />
               </LiquidButton>
 
+              {/* Separador vertical entre el botón de tráiler y los controles de Trakt */}
               <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
 
+              {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
               <TraktWatchedControl
                 connected={trakt.connected}
                 watched={trakt.watched}
@@ -5326,6 +5626,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }}
               />
 
+              {/* Componente de puntuación con estrellas - Rating unificado TMDb + Trakt */}
+              {/* Permite al usuario puntuar el contenido, sincronizando entre ambas plataformas */}
+              <StarRating
+                rating={unifiedUserRating}
+                max={10}
+                loading={accountStatesLoading || ratingLoading || !!traktBusy}
+                onRate={handleUnifiedRate}
+                connected={!!session || trakt.connected}
+                onConnect={() => {
+                  window.location.href = "/login";
+                }}
+              />
+
+              {/* Botón de Favoritos - Añade o quita el contenido de la lista de favoritos del usuario */}
               <LiquidButton
                 onClick={toggleFavorite}
                 disabled={favLoading}
@@ -5343,6 +5657,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
               </LiquidButton>
 
+              {/* Botón de Watchlist - Añade o quita el contenido de la lista de pendientes */}
               <LiquidButton
                 onClick={toggleWatchlist}
                 disabled={wlLoading}
@@ -5360,6 +5675,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
               </LiquidButton>
 
+              {/* Botón de añadir a listas personalizadas - Solo visible si el usuario tiene acceso a listas */}
               {canUseLists && (
                 <LiquidButton
                   onClick={openListsModal}
@@ -5377,18 +5693,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </LiquidButton>
               )}
 
-              {/* Botón de Compartir */}
-              <ActionShareButton
-                title={title}
-                text={`Echa un vistazo a ${title} en The Show Verse`}
-                url={
-                  typeof window !== "undefined"
-                    ? `${window.location.origin}/details/${type}/${id}`
-                    : undefined
-                }
-              />
-
-              {/* Botón Cambiar Portada */}
+              {/* Botón para cambiar entre vista de portada y vista previa (backdrop) */}
+              {/* Permite alternar la imagen principal entre el póster y el backdrop */}
               <LiquidButton
                 onClick={(e) => {
                   e.preventDefault();
@@ -5396,7 +5702,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   handleCyclePoster();
                 }}
                 active={posterViewMode === "preview"}
-                activeColor="yellow"
+                activeColor="orange"
                 groupId="details-actions"
                 title={
                   posterViewMode === "preview"
@@ -5412,6 +5718,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </LiquidButton>
             </div>
 
+            {/* =================================================================
+                PANEL DE PUNTUACIONES Y ESTADÍSTICAS
+               ================================================================= */}
+            {/* Tarjeta compacta que muestra los ratings de diferentes plataformas
+                (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
+                de visualización (watchers, plays, lists, favorited) */}
             <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
               <div
                 className="
@@ -5423,12 +5735,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
       overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
     "
               >
-                {/* A. Ratings */}
+                {/* ========== A. RATINGS - Puntuaciones de diferentes plataformas ========== */}
+                {/* Sección de badges compactos que muestran las puntuaciones y votos de cada plataforma */}
                 <div className="flex items-center gap-4 sm:gap-5 shrink-0">
+                  {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
                   {tScoreboard.loading && (
                     <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                   )}
 
+                  {/* Badge de TMDb - Muestra la puntuación promedio y número de votos */}
                   <CompactBadge
                     logo="/logo-TMDb.png"
                     logoClassName="h-2 sm:h-4"
@@ -5437,7 +5752,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     href={tmdbDetailUrl}
                   />
 
-                  {/* Trakt (móvil sin sufijo / desktop con %) */}
+                  {/* Badge de Trakt - Muestra puntuación en formato decimal cuando el usuario está conectado */}
+                  {/* En móvil sin sufijo, en desktop con % */}
                   {traktDecimal && (
                     <CompactBadge
                       logo="/logo-Trakt.png"
@@ -5459,7 +5775,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     />
                   )}
 
-                  {/* Badge de Trakt cuando no está conectado pero hay score público */}
+                  {/* Badge de Trakt alternativo cuando no hay conexión pero existe score público */}
+                  {/* Se muestra solo si el usuario no está conectado a Trakt pero hay datos públicos disponibles */}
                   {!traktDecimal &&
                     !trakt?.connected &&
                     tScoreboard?.rating && (
@@ -5479,6 +5796,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       />
                     )}
 
+                  {/* Badge de IMDb - Muestra rating y votos, enlaza al título en IMDb */}
                   {extras.imdbRating && (
                     <CompactBadge
                       logo="/logo-IMDb.png"
@@ -5493,7 +5811,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     />
                   )}
 
-                  {/* ✅ Rotten Tomatoes: SOLO desktop (>= sm) */}
+                  {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm) */}
+                  {/* Muestra el porcentaje de audiencia de RT, prioriza datos de Trakt sobre OMDb */}
                   {(tScoreboard?.external?.rtAudience != null ||
                     extras.rtScore != null) && (
                     <div className="hidden sm:block">
@@ -5511,7 +5830,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     </div>
                   )}
 
-                  {/* ✅ Metacritic: SOLO desktop (>= sm) */}
+                  {/* Badge de Metacritic - Solo visible en desktop (>= sm) */}
+                  {/* Muestra la puntuación de Metacritic sobre 100 */}
                   {extras.mcScore != null && (
                     <div className="hidden sm:block">
                       <CompactBadge
@@ -5523,16 +5843,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   )}
                 </div>
 
-                {/* ✅ SEPARADOR 1 - SOLO si NO es backdrop */}
+                {/* ========== Separador vertical 1 ========== */}
+                {/* Solo se muestra cuando NO estamos en modo backdrop */}
                 {!isBackdropPoster && (
                   <div className="w-px h-6 bg-white/10 shrink-0" />
                 )}
 
-                {/* ✅ B. Links externos - SOLO si NO es backdrop (se muestran abajo con plataformas en modo backdrop) */}
+                {/* ========== B. ENLACES EXTERNOS ========== */}
+                {/* Botones para acceder a páginas externas (Web oficial, FilmAffinity, JustWatch, etc.) */}
+                {/* Solo se muestran aquí cuando NO estamos en modo backdrop (en ese modo se muestran abajo con las plataformas) */}
                 {!isBackdropPoster && (
                   <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
-                    {/* ✅ DESKTOP: iconos normales */}
+                    {/* Versión Desktop: iconos normales de enlaces externos */}
                     <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
+                      {/* Sitio web oficial */}
                       <div className="hidden sm:block">
                         <ExternalLinkButton
                           icon="/logo-Web.png"
@@ -5540,10 +5864,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         />
                       </div>
 
+                      {/* FilmAffinity - búsqueda del título */}
                       <ExternalLinkButton
                         icon="/logoFilmaffinity.png"
                         href={filmAffinitySearchUrl}
                       />
+
+                      {/* JustWatch - dónde ver el contenido */}
                       <ExternalLinkButton
                         icon="/logo-JustWatch.png"
                         title="JustWatch"
@@ -5551,6 +5878,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         fallbackHref={justWatchUrl}
                       />
 
+                      {/* Letterboxd - solo para películas */}
                       {isMovie && (
                         <ExternalLinkButton
                           icon="/logo-Letterboxd.png"
@@ -5558,6 +5886,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         />
                       )}
 
+                      {/* SeriesGraph - solo para series */}
                       {type === "tv" && (
                         <ExternalLinkButton
                           icon="/logoseriesgraph.png"
@@ -5566,7 +5895,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       )}
                     </div>
 
-                    {/* ✅ MÓVIL: botón "..." */}
+                    {/* Versión Móvil: botón "..." que abre modal de enlaces */}
                     <button
                       type="button"
                       onClick={() => setExternalLinksOpen(true)}
@@ -5580,28 +5909,32 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </div>
                 )}
 
-                {/* ✅ SEPARADOR 2 - SOLO si NO es backdrop */}
+                {/* ========== Separador vertical 2 ========== */}
+                {/* Solo visible en desktop (>= md) y cuando NO estamos en modo backdrop */}
                 {!isBackdropPoster && (
                   <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
                 )}
 
-                {/* C. Puntuación Usuario - con margen automático cuando es backdrop */}
-                <div
-                  className={`flex items-center gap-3 shrink-0 ${isBackdropPoster ? "ml-auto" : ""}`}
-                >
-                  <StarRating
-                    rating={unifiedUserRating}
-                    max={10}
-                    loading={
-                      accountStatesLoading || ratingLoading || !!traktBusy
+                {/* ========== Botón de Compartir ========== */}
+                {/* Permite compartir el contenido usando la API Web Share o copiando el enlace */}
+                {/* Se mantiene pegado al extremo derecho con ml-auto */}
+                <div className="ml-auto shrink-0">
+                  <ActionShareButton
+                    title={title}
+                    text={`Echa un vistazo a ${title} en The Show Verse`}
+                    url={
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/details/${type}/${id}`
+                        : undefined
                     }
-                    onRate={handleUnifiedRate}
-                    connected={!!session || trakt.connected}
-                    onConnect={() => (window.location.href = "/login")}
                   />
                 </div>
               </div>
-              {/* Footer de Estadísticas (VISIBLE EN MÓVIL, SIN RECORTES) */}
+              {/* =================================================================
+                  FOOTER DE ESTADÍSTICAS (Watchers, Plays, Lists, Favorited)
+                 ================================================================= */}
+              {/* Muestra estadísticas de Trakt en formato compacto con scroll horizontal */}
+              {/* Visible en móvil sin recortes gracias al padding con safe-area */}
               {!tScoreboard.loading && (
                 <div className="border-t border-white/5 bg-black/10">
                   {/* Scroller con padding + safe-area para que no se recorte en bordes */}
@@ -5614,8 +5947,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         pr-[calc(1rem+env(safe-area-inset-right))]
       "
                   >
-                    {/* Inner: min-w-max evita que “aplasten”/corten el último item */}
+                    {/* Contenedor interno con min-w-max para evitar que se corten los últimos elementos */}
                     <div className="flex items-center gap-3 min-w-max">
+                      {/* Watchers - Usuarios que siguen este contenido */}
                       <div className="shrink-0">
                         <MiniStat
                           icon={Eye}
@@ -5625,6 +5959,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           tooltip="Watchers"
                         />
                       </div>
+
+                      {/* Plays - Número de reproducciones totales */}
                       <div className="shrink-0">
                         <MiniStat
                           icon={Play}
@@ -5634,6 +5970,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           tooltip="Plays"
                         />
                       </div>
+
+                      {/* Lists - Cantidad de listas que incluyen este contenido */}
                       <div className="shrink-0">
                         <MiniStat
                           icon={List}
@@ -5643,6 +5981,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           tooltip="Lists"
                         />
                       </div>
+
+                      {/* Favorited - Usuarios que lo han marcado como favorito */}
                       <div className="shrink-0">
                         <MiniStat
                           icon={Heart}
@@ -5658,10 +5998,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               )}
             </div>
 
-            {/* 4. CONTENEDOR TABS Y CONTENIDO - Oculto si es backdrop (se muestra abajo) */}
+            {/* =================================================================
+                CONTENEDOR DE TABS Y CONTENIDO - Información detallada
+               ================================================================= */}
+            {/* Sistema de tabs para mostrar información adicional: Detalles, Producción, Sinopsis, Premios */}
+            {/* Solo visible cuando NO estamos en modo backdrop (en ese modo se muestra más abajo) */}
             {!isBackdropPoster && (
               <div>
-                {/* --- MENÚ DE NAVEGACIÓN --- */}
+                {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
+                {/* Pestañas clicables para cambiar entre diferentes vistas de información */}
+                {/* Incluye: Detalles, Producción, Sinopsis, y Premios (si están disponibles) */}
                 <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
                   {[
                     { id: "details", label: "Detalles" },
@@ -5686,10 +6032,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   ))}
                 </div>
 
-                {/* --- ÁREA DE CONTENIDO --- */}
+                {/* ========== ÁREA DE CONTENIDO DE TABS ========== */}
+                {/* Muestra el contenido de la tab activa con animaciones de transición */}
+                {/* Usa AnimatePresence de Framer Motion para animar cambios entre tabs */}
                 <div className="relative min-h-[100px]">
                   <AnimatePresence mode="wait">
-                    {/* 1. SINOPSIS */}
+                    {/* ===== TAB 1: SINOPSIS ===== */}
+                    {/* Muestra el tagline (si existe) y la descripción completa del contenido */}
                     {activeTab === "synopsis" && (
                       <motion.div
                         key="synopsis"
@@ -5711,7 +6060,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       </motion.div>
                     )}
 
-                    {/* 2. DETALLES */}
+                    {/* ===== TAB 2: DETALLES ===== */}
+                    {/* Información técnica: título original, formato, fechas, presupuesto, recaudación */}
                     {activeTab === "details" && (
                       <motion.div
                         key="details"
@@ -5721,6 +6071,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         transition={{ duration: 0.2 }}
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                          {/* Tarjeta: Título Original - Nombre del contenido en su idioma original */}
                           <VisualMetaCard
                             icon={type === "movie" ? FilmIcon : MonitorPlay}
                             label="Título Original"
@@ -5733,7 +6084,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
 
-                          {/* Formato (solo TV) */}
+                          {/* Tarjeta: Formato - Solo para series (número de temporadas y episodios) */}
                           {type !== "movie" ? (
                             <VisualMetaCard
                               icon={Layers}
@@ -5747,6 +6098,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             />
                           ) : null}
 
+                          {/* Tarjeta: Fecha de Estreno/Inicio - Película: fecha de estreno, Serie: fecha de inicio */}
                           <VisualMetaCard
                             icon={CalendarIcon}
                             label={type === "movie" ? "Estreno" : "Inicio"}
@@ -5754,8 +6106,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
 
-                          {/* Finalización / Última emisión (solo TV) */}
-                          {type !== "movie" ? (
+                          {/* Tarjeta: Finalización/Última Emisión - Solo para series */}
+                          {type !== "movie" && lastAirDateValue && (
                             <VisualMetaCard
                               icon={CalendarIcon}
                               label={
@@ -5766,10 +6118,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               value={lastAirDateValue || "En emisión"}
                               className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
-                          ) : null}
+                          )}
 
-                          {/* Presupuesto + Recaudación (solo Cine) */}
-                          {type === "movie" ? (
+                          {/* Tarjetas de Presupuesto y Recaudación - Solo para películas */}
+                          {type === "movie" && (
                             <>
                               <VisualMetaCard
                                 icon={BadgeDollarSignIcon}
@@ -5784,12 +6136,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                               />
                             </>
-                          ) : null}
+                          )}
                         </div>
                       </motion.div>
                     )}
 
-                    {/* 3. PRODUCCIÓN Y EQUIPO */}
+                    {/* ===== TAB 3: PRODUCCIÓN Y EQUIPO ===== */}
+                    {/* Información sobre el equipo creativo: director/creadores, canal, productoras */}
                     {activeTab === "production" && (
                       <motion.div
                         key="production"
@@ -5799,7 +6152,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         transition={{ duration: 0.2 }}
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                          {/* Director (Cine) / Creadores (TV) */}
+                          {/* Tarjeta: Director (Cine) / Creadores (TV) - Equipo principal creativo */}
                           <VisualMetaCard
                             icon={Users}
                             label={type === "movie" ? "Director" : "Creadores"}
@@ -5869,7 +6222,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           </div>
         </div>
 
-        {/* ✅ TABS Y CONTENIDO DEBAJO DE LA TARJETA (solo cuando es backdrop) */}
+        {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
         {isBackdropPoster && (
           <div className="mt-8 w-full">
             {/* --- MENÚ DE NAVEGACIÓN --- */}
@@ -6041,7 +6394,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </motion.div>
                 )}
 
-                {/* 4. PREMIOS */}
+                {/* ===== TAB 4: PREMIOS ===== */}
+                {/* Muestra los reconocimientos y premios obtenidos */}
+                {/* Solo visible si hay datos de premios disponibles desde OMDb */}
                 {activeTab === "awards" && extras.awards && (
                   <motion.div
                     key="awards-backdrop"
@@ -6074,13 +6429,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           </div>
         )}
 
-        {/* ===================================================== */}
-        {/* ✅ MENÚ GLOBAL + CONTENIDO (tipo ActorDetails) */}
+        {/* =================================================================
+            MENÚ DE NAVEGACIÓN STICKY Y SECCIONES DE CONTENIDO
+           ================================================================= */}
+        {/* Sistema de navegación por secciones con detección de scroll */}
+        {/* Incluye: Media, Actores, Recomendaciones, Comentarios, etc. */}
         <div className="sm:mt-10">
-          {/* sentinel para detectar cuándo el menú “pega” */}
+          {/* Elemento centinela para detectar cuándo el menú debe quedar sticky */}
           <div ref={sentinelRef} className="h-px w-full" />
 
-          {/* ✅ Sticky debajo del navbar */}
+          {/* Menú de navegación sticky que se queda fijo debajo del navbar al hacer scroll */}
           <div
             ref={menuStickyRef}
             className="sticky z-30 py-2"
@@ -6097,26 +6455,35 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             />
           </div>
 
-          {/* ✅ TODAS las secciones en orden (sin ocultar) */}
+          {/* =================================================================
+              CONTENEDOR DE TODAS LAS SECCIONES
+             ================================================================= */}
+          {/* Todas las secciones se muestran en orden sin ocultarse */}
+          {/* Cada sección se registra para el sistema de detección de scroll */}
           <div className="mt-6 space-y-14">
+            {/* =================================================================
+                SECCIÓN: MEDIA (Portadas y Fondos)
+               ================================================================= */}
             <section id="section-media" ref={registerSection("media")}>
-              {/* ✅ PORTADAS Y FONDOS */}
+              {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
               {(type === "movie" || type === "tv") && (
                 <section className="mb-16" ref={artworkControlsWrapRef}>
-                  {/* ✅ Header: TODO alineado en UNA SOLA FILA con el título */}
+                  {/* ========== Header de la Sección de Media ========== */}
+                  {/* Incluye título y controles (tabs y filtros) */}
                   <div className="mb-6 flex items-center justify-between gap-3">
-                    {/* ✅ Mantiene tamaño del título como antes, y quitamos el mb interno para no desalinear */}
+                    {/* Título de la sección - Alineado a la izquierda */}
                     <SectionTitle
                       title="Portadas y fondos"
                       icon={ImageIcon}
                       className="mb-0 mt-4"
                     />
 
-                    {/* ✅ Misma altura que el título en desktop (md:text-3xl + py-1 ≈ 44px) */}
+                    {/* ========== Controles de Filtrado ========== */}
+                    {/* Desktop: Tabs + Filtros en línea | Móvil: Botón que abre modal */}
                     <div className="flex items-center gap-2 sm:gap-3 h-10 md:h-11">
-                      {/* ===================== DESKTOP: tabs + filtros en línea ===================== */}
+                      {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                       <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
-                        {/* Tabs */}
+                        {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
                         <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 w-fit h-10 md:h-11">
                           {["posters", "backdrops", "background"].map((tab) => (
                             <button
@@ -6287,7 +6654,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     </div>
                   </div>
 
-                  {/* ✅ Panel móvil desplegable en 2 filas máximo */}
+                  {/* Panel movil desplegable en 2 filas maximo */}
                   <AnimatePresence>
                     {artworkControlsOpen && (
                       <motion.div
@@ -6496,7 +6863,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       );
                     }
 
-                    // ✅ 2 en móvil y 4 en desktop para backdrops (vista previa / fondo)
+                    // 2 en movil y 4 en desktop para backdrops (vista previa / fondo)
                     const isBackdropLike = activeImagesTab !== "posters";
 
                     const breakpoints = isPoster
@@ -6682,7 +7049,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </section>
               )}
 
-              {/* === TRÁILER Y VÍDEOS === */}
+              {/* =================================================================
+                  SECCIÓN: TRÁILER Y VÍDEOS
+                 ================================================================= */}
+              {/* Carrusel de vídeos (tráilers, teasers, clips, etc.) del contenido */}
+              {/* Solo se muestra si hay una API key de TMDb configurada */}
               {TMDB_API_KEY && (
                 <section className="mt-6">
                   <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} />
@@ -6753,14 +7124,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 </div>
 
                                 <div className="flex flex-col flex-1 p-4 items-start">
-                                  {/* ✅ Título arriba (1 línea siempre) */}
+                                  {/* Titulo arriba (1 linea siempre) */}
                                   <div className="w-full min-h-[22px]">
                                     <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
                                       {v.name || "Vídeo"}
                                     </div>
                                   </div>
 
-                                  {/* ✅ Propiedades debajo, alineadas a la izquierda */}
+                                  {/* Propiedades debajo, alineadas a la izquierda */}
                                   <div className="mt-3 flex items-center gap-1.5 w-full overflow-hidden">
                                     <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar">
                                       {/* Label de Oficial - Agregado shrink-0 */}
@@ -6787,7 +7158,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </div>
                                   </div>
 
-                                  {/* ✅ Fuente y fecha abajo, mismo margen izquierdo */}
+                                  {/* Fuente y fecha abajo, mismo margen izquierdo */}
                                   <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
                                     <span className="font-semibold text-zinc-200">
                                       {v.site || "—"}
@@ -6817,7 +7188,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
             <section id="section-sentiment" ref={registerSection("sentiment")}>
               {/* ===================================================== */}
-              {/* ✅ TRAKT: SENTIMIENTOS (AI SUMMARY) - Solo mostrar si no hay error */}
+              {/* Trakt: sentimientos (AI summary) - Solo mostrar si no hay error */}
               {!tSentiment.error && (
                 <section className="mb-12">
                   <SectionTitle
@@ -6920,6 +7291,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               )}
             </section>
 
+            {/* =================================================================
+                SECCIÓN: TEMPORADAS (solo para series)
+               ================================================================= */}
+            {/* Muestra las temporadas disponibles de la serie con información resumida */}
             {type === "tv" && (
               <section id="section-seasons" ref={registerSection("seasons")}>
                 <section className="mb-12">
@@ -7056,9 +7431,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </section>
             )}
 
+            {/* =================================================================
+                SECCIÓN: VALORACIÓN DE EPISODIOS (solo para series)
+               ================================================================= */}
+            {/* Gráfico de valoraciones por episodio mostrando la evolución de ratings */}
             {type === "tv" && (
               <section id="section-episodes" ref={registerSection("episodes")}>
-                {/* --- EPISODIOS --- */}
+                {/* Subsección: Episodios y sus valoraciones */}
                 {type === "tv" ? (
                   <section className="mb-10">
                     <SectionTitle
@@ -7177,17 +7556,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </section>
               )}
               {/* ===================================================== */}
-              {/* ✅ TRAKT: COMENTARIOS */}
+              {/* Trakt: comentarios */}
               <section className="mb-10">
                 <div className="mb-2 flex items-center justify-between gap-4">
-                  {/* ✅ Mantiene SectionTitle (mismo tamaño), pero sin mb interno aquí */}
+                  {/* Mantiene SectionTitle (mismo tamano), pero sin mb interno aqui */}
                   <SectionTitle
                     title="Comentarios"
                     icon={MessageSquareIcon}
                     className="mb-0"
                   />
 
-                  {/* ✅ Bloque derecho centrado al título */}
+                  {/* Bloque derecho centrado al titulo */}
                   <div className="flex items-center gap-2 h-10 md:h-11 transform-gpu -translate-y-[3px] md:-translate-y-[10px]">
                     <a
                       href={
@@ -7364,7 +7743,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
             <section id="section-lists" ref={registerSection("lists")}>
               {/* ===================================================== */}
-              {/* ✅ TRAKT: LISTAS - Solo mostrar si no hay error */}
+              {/* Trakt: listas - Solo mostrar si no hay error */}
               {!tLists.error && (
                 <section className="mb-12">
                   <div className="mb-6 flex items-center justify-between">
@@ -7411,7 +7790,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         const slug = list?.ids?.slug || null;
                         const traktId = list?.ids?.trakt || null;
 
-                        // ✅ Ruta interna (slug si existe; si no, traktId)
+                        // Ruta interna (slug si existe; si no, traktId)
                         const internalUrl =
                           username && (slug || traktId)
                             ? `/lists/trakt/${encodeURIComponent(username)}/${encodeURIComponent(String(slug || traktId))}`
@@ -7792,20 +8171,26 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         </div>
       </div>
 
-      {/* ✅ MODAL: Vídeos / Trailer */}
+      {/* =================================================================
+          MODALES Y DIÁLOGOS
+         ================================================================= */}
+
+      {/* Modal de reproducción de vídeos y tráilers */}
       <VideoModal
         open={videoModalOpen}
         onClose={closeVideo}
         video={activeVideo}
       />
 
-      {/* ✅ MODAL: Enlaces externos */}
+      {/* Modal de enlaces externos - Muestra todos los enlaces a páginas externas */}
+      {/* Solo visible en móvil, en desktop se muestran inline */}
       <ExternalLinksModal
         open={externalLinksOpen}
         onClose={() => setExternalLinksOpen(false)}
         links={externalLinks}
       />
 
+      {/* Modal de control de visto en Trakt - Para marcar películas como vistas */}
       <TraktWatchedModal
         open={traktWatchedOpen}
         onClose={() => {
@@ -7827,6 +8212,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         onRemovePlay={handleTraktRemovePlay}
       />
 
+      {/* Modal de episodios de Trakt - Para marcar episodios de series como vistos */}
+      {/* Incluye gestión de runs de rewatch y visualización por temporadas */}
       <TraktEpisodesWatchedModal
         key={`${id}-episodes-${traktEpisodesOpen ? "open" : "closed"}`}
         open={traktEpisodesOpen}
@@ -7856,7 +8243,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         onToggleEpisodeRewatch={toggleEpisodeRewatch}
       />
 
-      {/* ✅ MODAL: Añadir a lista */}
+      {/* Modal de añadir a lista - Permite agregar el contenido a listas personalizadas del usuario */}
+      {/* Incluye funcionalidad para crear nuevas listas directamente desde el modal */}
       <AddToListModal
         open={listModalOpen}
         onClose={closeListsModal}
@@ -7881,7 +8269,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
   );
 }
 
-// Icon helper para el reparto
+// =============================================================================
+// Componente auxiliar: UsersIconComponent
+// =============================================================================
+/**
+ * Componente de icono SVG personalizado para representar el reparto/usuarios
+ *
+ * Este icono se utiliza en la interfaz para mostrar secciones relacionadas
+ * con el elenco y equipo del contenido.
+ *
+ * @param {Object} props - Propiedades del componente
+ * @param {number} [props.size=24] - Tamaño del icono en píxeles
+ * @param {string} [props.className] - Clases CSS adicionales para estilizar el icono
+ * @returns {JSX.Element} Elemento SVG del icono de usuarios
+ */
 const UsersIconComponent = ({ size = 24, className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
