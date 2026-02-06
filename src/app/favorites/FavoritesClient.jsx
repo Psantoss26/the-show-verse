@@ -1872,7 +1872,7 @@ export default function FavoritesClient() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
-          <div className="flex items-center justify-between gap-4 mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <div className="h-px w-12 bg-red-500" />
@@ -1887,65 +1887,65 @@ export default function FavoritesClient() {
                 Tu colección personal de películas y series favoritas.
               </p>
             </div>
-          </div>
 
-          <motion.div
-            className="grid grid-cols-3 gap-2 md:gap-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <div className="flex-1 min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-1 py-2 md:p-4 flex flex-col items-center justify-center gap-0.5 md:gap-1">
-              <div className="p-1 md:p-2 rounded-full bg-white/5 mb-0.5 md:mb-1 text-red-400">
-                <Heart className="w-3 h-3 md:w-4 md:h-4 fill-red-400" />
+            <motion.div
+              className="flex gap-3 md:gap-4 shrink-0"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <div className="min-w-[100px] lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-red-400">
+                  <Heart className="w-4 h-4 md:w-5 md:h-5 fill-red-400" />
+                </div>
+                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                  {loading ? (
+                    <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
+                  ) : (
+                    stats.total
+                  )}
+                </div>
+                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                  Total
+                </div>
               </div>
-              <div className="text-base md:text-2xl font-black text-white tracking-tight">
-                {loading ? (
-                  <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" />
-                ) : (
-                  stats.total
-                )}
+              <div className="min-w-[100px] lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
+                  <Film className="w-4 h-4 md:w-5 md:h-5" />
+                </div>
+                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                  {loading ? (
+                    <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
+                  ) : (
+                    stats.movies
+                  )}
+                </div>
+                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                  Películas
+                </div>
               </div>
-              <div className="text-[8px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight px-0.5">
-                Total
+              <div className="min-w-[100px] lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400">
+                  <TvGlyph className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+                </div>
+                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                  {loading ? (
+                    <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
+                  ) : (
+                    stats.shows
+                  )}
+                </div>
+                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                  Series
+                </div>
               </div>
-            </div>
-            <div className="flex-1 min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-1 py-2 md:p-4 flex flex-col items-center justify-center gap-0.5 md:gap-1">
-              <div className="p-1 md:p-2 rounded-full bg-white/5 mb-0.5 md:mb-1 text-sky-400">
-                <Film className="w-3 h-3 md:w-4 md:h-4" />
-              </div>
-              <div className="text-base md:text-2xl font-black text-white tracking-tight">
-                {loading ? (
-                  <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" />
-                ) : (
-                  stats.movies
-                )}
-              </div>
-              <div className="text-[8px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight px-0.5">
-                Películas
-              </div>
-            </div>
-            <div className="flex-1 min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-1 py-2 md:p-4 flex flex-col items-center justify-center gap-0.5 md:gap-1">
-              <div className="p-1 md:p-2 rounded-full bg-white/5 mb-0.5 md:mb-1 text-purple-400">
-                <TvGlyph className="w-3 h-3 md:w-4 md:h-4 text-purple-400" />
-              </div>
-              <div className="text-base md:text-2xl font-black text-white tracking-tight">
-                {loading ? (
-                  <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" />
-                ) : (
-                  stats.shows
-                )}
-              </div>
-              <div className="text-[8px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight px-0.5">
-                Series
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </motion.header>
 
         {/* Filters */}
         <motion.div
-          className="sticky top-16 z-40 space-y-3 mb-6 bg-[#050505] py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+          className="sticky top-16 z-[60] space-y-3 mb-6 py-3 px-4 backdrop-blur-xl bg-gradient-to-br from-black/60 via-black/50 to-black/55 rounded-2xl"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
