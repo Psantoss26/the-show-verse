@@ -5583,9 +5583,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </div>
             </div>
 
-            {/* 2. BARRA DE ACCIONES PRINCIPALES */}
+            {/* =================================================================
+                BARRA DE ACCIONES PRINCIPALES
+               ================================================================= */}
+            {/* Sección de botones de acción rápida: reproducir tráiler, marcar como visto,
+                puntuar, agregar a favoritos, watchlist y listas, cambiar portada */}
             <div className="flex flex-wrap items-center gap-2 mb-6 px-1">
-              {/* Botón Tráiler */}
+              {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
               <LiquidButton
                 onClick={() => openVideo(preferredVideo)}
                 disabled={!preferredVideo}
@@ -5599,8 +5603,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 />
               </LiquidButton>
 
+              {/* Separador vertical entre el botón de tráiler y los controles de Trakt */}
               <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
 
+              {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
               <TraktWatchedControl
                 connected={trakt.connected}
                 watched={trakt.watched}
@@ -5620,7 +5626,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }}
               />
 
-              {/* Botón Puntuar */}
+              {/* Componente de puntuación con estrellas - Rating unificado TMDb + Trakt */}
+              {/* Permite al usuario puntuar el contenido, sincronizando entre ambas plataformas */}
               <StarRating
                 rating={unifiedUserRating}
                 max={10}
@@ -5632,6 +5639,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }}
               />
 
+              {/* Botón de Favoritos - Añade o quita el contenido de la lista de favoritos del usuario */}
               <LiquidButton
                 onClick={toggleFavorite}
                 disabled={favLoading}
@@ -5649,6 +5657,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
               </LiquidButton>
 
+              {/* Botón de Watchlist - Añade o quita el contenido de la lista de pendientes */}
               <LiquidButton
                 onClick={toggleWatchlist}
                 disabled={wlLoading}
@@ -5666,6 +5675,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
               </LiquidButton>
 
+              {/* Botón de añadir a listas personalizadas - Solo visible si el usuario tiene acceso a listas */}
               {canUseLists && (
                 <LiquidButton
                   onClick={openListsModal}
@@ -5683,7 +5693,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </LiquidButton>
               )}
 
-              {/* Botón Cambiar Portada */}
+              {/* Botón para cambiar entre vista de portada y vista previa (backdrop) */}
+              {/* Permite alternar la imagen principal entre el póster y el backdrop */}
               <LiquidButton
                 onClick={(e) => {
                   e.preventDefault();
@@ -5707,6 +5718,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </LiquidButton>
             </div>
 
+            {/* =================================================================
+                PANEL DE PUNTUACIONES Y ESTADÍSTICAS
+               ================================================================= */}
+            {/* Tarjeta compacta que muestra los ratings de diferentes plataformas
+                (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
+                de visualización (watchers, plays, lists, favorited) */}
             <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
               <div
                 className="
@@ -5718,12 +5735,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
       overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
     "
               >
-                {/* A. Ratings */}
+                {/* ========== A. RATINGS - Puntuaciones de diferentes plataformas ========== */}
+                {/* Sección de badges compactos que muestran las puntuaciones y votos de cada plataforma */}
                 <div className="flex items-center gap-4 sm:gap-5 shrink-0">
+                  {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
                   {tScoreboard.loading && (
                     <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                   )}
 
+                  {/* Badge de TMDb - Muestra la puntuación promedio y número de votos */}
                   <CompactBadge
                     logo="/logo-TMDb.png"
                     logoClassName="h-2 sm:h-4"
@@ -5732,7 +5752,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     href={tmdbDetailUrl}
                   />
 
-                  {/* Trakt (móvil sin sufijo / desktop con %) */}
+                  {/* Badge de Trakt - Muestra puntuación en formato decimal cuando el usuario está conectado */}
+                  {/* En móvil sin sufijo, en desktop con % */}
                   {traktDecimal && (
                     <CompactBadge
                       logo="/logo-Trakt.png"
@@ -5754,7 +5775,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     />
                   )}
 
-                  {/* Badge de Trakt cuando no está conectado pero hay score público */}
+                  {/* Badge de Trakt alternativo cuando no hay conexión pero existe score público */}
+                  {/* Se muestra solo si el usuario no está conectado a Trakt pero hay datos públicos disponibles */}
                   {!traktDecimal &&
                     !trakt?.connected &&
                     tScoreboard?.rating && (
@@ -5774,6 +5796,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       />
                     )}
 
+                  {/* Badge de IMDb - Muestra rating y votos, enlaza al título en IMDb */}
                   {extras.imdbRating && (
                     <CompactBadge
                       logo="/logo-IMDb.png"
@@ -5788,7 +5811,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     />
                   )}
 
-                  {/* Rotten Tomatoes: solo desktop (>= sm) */}
+                  {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm) */}
+                  {/* Muestra el porcentaje de audiencia de RT, prioriza datos de Trakt sobre OMDb */}
                   {(tScoreboard?.external?.rtAudience != null ||
                     extras.rtScore != null) && (
                     <div className="hidden sm:block">
@@ -5806,7 +5830,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     </div>
                   )}
 
-                  {/* Metacritic: solo desktop (>= sm) */}
+                  {/* Badge de Metacritic - Solo visible en desktop (>= sm) */}
+                  {/* Muestra la puntuación de Metacritic sobre 100 */}
                   {extras.mcScore != null && (
                     <div className="hidden sm:block">
                       <CompactBadge
@@ -5818,16 +5843,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   )}
                 </div>
 
-                {/* Separador 1 - solo si no es backdrop */}
+                {/* ========== Separador vertical 1 ========== */}
+                {/* Solo se muestra cuando NO estamos en modo backdrop */}
                 {!isBackdropPoster && (
                   <div className="w-px h-6 bg-white/10 shrink-0" />
                 )}
 
-                {/* B. Links externos - solo si no es backdrop (se muestran abajo con plataformas en modo backdrop) */}
+                {/* ========== B. ENLACES EXTERNOS ========== */}
+                {/* Botones para acceder a páginas externas (Web oficial, FilmAffinity, JustWatch, etc.) */}
+                {/* Solo se muestran aquí cuando NO estamos en modo backdrop (en ese modo se muestran abajo con las plataformas) */}
                 {!isBackdropPoster && (
                   <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
-                    {/* Desktop: iconos normales */}
+                    {/* Versión Desktop: iconos normales de enlaces externos */}
                     <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
+                      {/* Sitio web oficial */}
                       <div className="hidden sm:block">
                         <ExternalLinkButton
                           icon="/logo-Web.png"
@@ -5835,10 +5864,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         />
                       </div>
 
+                      {/* FilmAffinity - búsqueda del título */}
                       <ExternalLinkButton
                         icon="/logoFilmaffinity.png"
                         href={filmAffinitySearchUrl}
                       />
+
+                      {/* JustWatch - dónde ver el contenido */}
                       <ExternalLinkButton
                         icon="/logo-JustWatch.png"
                         title="JustWatch"
@@ -5846,6 +5878,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         fallbackHref={justWatchUrl}
                       />
 
+                      {/* Letterboxd - solo para películas */}
                       {isMovie && (
                         <ExternalLinkButton
                           icon="/logo-Letterboxd.png"
@@ -5853,6 +5886,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         />
                       )}
 
+                      {/* SeriesGraph - solo para series */}
                       {type === "tv" && (
                         <ExternalLinkButton
                           icon="/logoseriesgraph.png"
@@ -5861,7 +5895,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       )}
                     </div>
 
-                    {/* Movil: boton "..." */}
+                    {/* Versión Móvil: botón "..." que abre modal de enlaces */}
                     <button
                       type="button"
                       onClick={() => setExternalLinksOpen(true)}
@@ -5875,12 +5909,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </div>
                 )}
 
-                {/* Separador 2 - solo si no es backdrop */}
+                {/* ========== Separador vertical 2 ========== */}
+                {/* Solo visible en desktop (>= md) y cuando NO estamos en modo backdrop */}
                 {!isBackdropPoster && (
                   <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
                 )}
 
-                {/* Boton de Compartir - pegado al extremo derecho */}
+                {/* ========== Botón de Compartir ========== */}
+                {/* Permite compartir el contenido usando la API Web Share o copiando el enlace */}
+                {/* Se mantiene pegado al extremo derecho con ml-auto */}
                 <div className="ml-auto shrink-0">
                   <ActionShareButton
                     title={title}
@@ -5893,7 +5930,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   />
                 </div>
               </div>
-              {/* Footer de Estadísticas (VISIBLE EN MÓVIL, SIN RECORTES) */}
+              {/* =================================================================
+                  FOOTER DE ESTADÍSTICAS (Watchers, Plays, Lists, Favorited)
+                 ================================================================= */}
+              {/* Muestra estadísticas de Trakt en formato compacto con scroll horizontal */}
+              {/* Visible en móvil sin recortes gracias al padding con safe-area */}
               {!tScoreboard.loading && (
                 <div className="border-t border-white/5 bg-black/10">
                   {/* Scroller con padding + safe-area para que no se recorte en bordes */}
@@ -5906,8 +5947,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         pr-[calc(1rem+env(safe-area-inset-right))]
       "
                   >
-                    {/* Inner: min-w-max evita que “aplasten”/corten el último item */}
+                    {/* Contenedor interno con min-w-max para evitar que se corten los últimos elementos */}
                     <div className="flex items-center gap-3 min-w-max">
+                      {/* Watchers - Usuarios que siguen este contenido */}
                       <div className="shrink-0">
                         <MiniStat
                           icon={Eye}
@@ -5917,6 +5959,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           tooltip="Watchers"
                         />
                       </div>
+
+                      {/* Plays - Número de reproducciones totales */}
                       <div className="shrink-0">
                         <MiniStat
                           icon={Play}
@@ -5926,6 +5970,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           tooltip="Plays"
                         />
                       </div>
+
+                      {/* Lists - Cantidad de listas que incluyen este contenido */}
                       <div className="shrink-0">
                         <MiniStat
                           icon={List}
@@ -5935,6 +5981,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           tooltip="Lists"
                         />
                       </div>
+
+                      {/* Favorited - Usuarios que lo han marcado como favorito */}
                       <div className="shrink-0">
                         <MiniStat
                           icon={Heart}
@@ -5950,10 +5998,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               )}
             </div>
 
-            {/* 4. CONTENEDOR TABS Y CONTENIDO - Oculto si es backdrop (se muestra abajo) */}
+            {/* =================================================================
+                CONTENEDOR DE TABS Y CONTENIDO - Información detallada
+               ================================================================= */}
+            {/* Sistema de tabs para mostrar información adicional: Detalles, Producción, Sinopsis, Premios */}
+            {/* Solo visible cuando NO estamos en modo backdrop (en ese modo se muestra más abajo) */}
             {!isBackdropPoster && (
               <div>
-                {/* --- MENÚ DE NAVEGACIÓN --- */}
+                {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
+                {/* Pestañas clicables para cambiar entre diferentes vistas de información */}
+                {/* Incluye: Detalles, Producción, Sinopsis, y Premios (si están disponibles) */}
                 <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
                   {[
                     { id: "details", label: "Detalles" },
@@ -5978,10 +6032,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   ))}
                 </div>
 
-                {/* --- ÁREA DE CONTENIDO --- */}
+                {/* ========== ÁREA DE CONTENIDO DE TABS ========== */}
+                {/* Muestra el contenido de la tab activa con animaciones de transición */}
+                {/* Usa AnimatePresence de Framer Motion para animar cambios entre tabs */}
                 <div className="relative min-h-[100px]">
                   <AnimatePresence mode="wait">
-                    {/* 1. SINOPSIS */}
+                    {/* ===== TAB 1: SINOPSIS ===== */}
+                    {/* Muestra el tagline (si existe) y la descripción completa del contenido */}
                     {activeTab === "synopsis" && (
                       <motion.div
                         key="synopsis"
@@ -6003,7 +6060,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       </motion.div>
                     )}
 
-                    {/* 2. DETALLES */}
+                    {/* ===== TAB 2: DETALLES ===== */}
+                    {/* Información técnica: título original, formato, fechas, presupuesto, recaudación */}
                     {activeTab === "details" && (
                       <motion.div
                         key="details"
@@ -6013,6 +6071,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         transition={{ duration: 0.2 }}
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                          {/* Tarjeta: Título Original - Nombre del contenido en su idioma original */}
                           <VisualMetaCard
                             icon={type === "movie" ? FilmIcon : MonitorPlay}
                             label="Título Original"
@@ -6025,7 +6084,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
 
-                          {/* Formato (solo TV) */}
+                          {/* Tarjeta: Formato - Solo para series (número de temporadas y episodios) */}
                           {type !== "movie" ? (
                             <VisualMetaCard
                               icon={Layers}
@@ -6039,6 +6098,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             />
                           ) : null}
 
+                          {/* Tarjeta: Fecha de Estreno/Inicio - Película: fecha de estreno, Serie: fecha de inicio */}
                           <VisualMetaCard
                             icon={CalendarIcon}
                             label={type === "movie" ? "Estreno" : "Inicio"}
@@ -6046,8 +6106,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
 
-                          {/* Finalización / Última emisión (solo TV) */}
-                          {type !== "movie" ? (
+                          {/* Tarjeta: Finalización/Última Emisión - Solo para series */}
+                          {type !== "movie" && lastAirDateValue && (
                             <VisualMetaCard
                               icon={CalendarIcon}
                               label={
@@ -6058,10 +6118,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               value={lastAirDateValue || "En emisión"}
                               className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
-                          ) : null}
+                          )}
 
-                          {/* Presupuesto + Recaudación (solo Cine) */}
-                          {type === "movie" ? (
+                          {/* Tarjetas de Presupuesto y Recaudación - Solo para películas */}
+                          {type === "movie" && (
                             <>
                               <VisualMetaCard
                                 icon={BadgeDollarSignIcon}
@@ -6076,12 +6136,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                               />
                             </>
-                          ) : null}
+                          )}
                         </div>
                       </motion.div>
                     )}
 
-                    {/* 3. PRODUCCIÓN Y EQUIPO */}
+                    {/* ===== TAB 3: PRODUCCIÓN Y EQUIPO ===== */}
+                    {/* Información sobre el equipo creativo: director/creadores, canal, productoras */}
                     {activeTab === "production" && (
                       <motion.div
                         key="production"
@@ -6091,7 +6152,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         transition={{ duration: 0.2 }}
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                          {/* Director (Cine) / Creadores (TV) */}
+                          {/* Tarjeta: Director (Cine) / Creadores (TV) - Equipo principal creativo */}
                           <VisualMetaCard
                             icon={Users}
                             label={type === "movie" ? "Director" : "Creadores"}
@@ -6333,7 +6394,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </motion.div>
                 )}
 
-                {/* 4. PREMIOS */}
+                {/* ===== TAB 4: PREMIOS ===== */}
+                {/* Muestra los reconocimientos y premios obtenidos */}
+                {/* Solo visible si hay datos de premios disponibles desde OMDb */}
                 {activeTab === "awards" && extras.awards && (
                   <motion.div
                     key="awards-backdrop"
@@ -6366,13 +6429,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           </div>
         )}
 
-        {/* ===================================================== */}
-        {/* Menu global + contenido (tipo ActorDetails) */}
+        {/* =================================================================
+            MENÚ DE NAVEGACIÓN STICKY Y SECCIONES DE CONTENIDO
+           ================================================================= */}
+        {/* Sistema de navegación por secciones con detección de scroll */}
+        {/* Incluye: Media, Actores, Recomendaciones, Comentarios, etc. */}
         <div className="sm:mt-10">
-          {/* sentinel para detectar cuándo el menú “pega” */}
+          {/* Elemento centinela para detectar cuándo el menú debe quedar sticky */}
           <div ref={sentinelRef} className="h-px w-full" />
 
-          {/* Sticky debajo del navbar */}
+          {/* Menú de navegación sticky que se queda fijo debajo del navbar al hacer scroll */}
           <div
             ref={menuStickyRef}
             className="sticky z-30 py-2"
@@ -6389,26 +6455,35 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             />
           </div>
 
-          {/* Todas las secciones en orden (sin ocultar) */}
+          {/* =================================================================
+              CONTENEDOR DE TODAS LAS SECCIONES
+             ================================================================= */}
+          {/* Todas las secciones se muestran en orden sin ocultarse */}
+          {/* Cada sección se registra para el sistema de detección de scroll */}
           <div className="mt-6 space-y-14">
+            {/* =================================================================
+                SECCIÓN: MEDIA (Portadas y Fondos)
+               ================================================================= */}
             <section id="section-media" ref={registerSection("media")}>
-              {/* Portadas y fondos */}
+              {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
               {(type === "movie" || type === "tv") && (
                 <section className="mb-16" ref={artworkControlsWrapRef}>
-                  {/* Header: todo alineado en una sola fila con el titulo */}
+                  {/* ========== Header de la Sección de Media ========== */}
+                  {/* Incluye título y controles (tabs y filtros) */}
                   <div className="mb-6 flex items-center justify-between gap-3">
-                    {/* Mantiene tamano del titulo como antes, y quitamos el mb interno para no desalinear */}
+                    {/* Título de la sección - Alineado a la izquierda */}
                     <SectionTitle
                       title="Portadas y fondos"
                       icon={ImageIcon}
                       className="mb-0 mt-4"
                     />
 
-                    {/* Misma altura que el titulo en desktop (md:text-3xl + py-1 = 44px aprox) */}
+                    {/* ========== Controles de Filtrado ========== */}
+                    {/* Desktop: Tabs + Filtros en línea | Móvil: Botón que abre modal */}
                     <div className="flex items-center gap-2 sm:gap-3 h-10 md:h-11">
-                      {/* ===================== DESKTOP: tabs + filtros en línea ===================== */}
+                      {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                       <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
-                        {/* Tabs */}
+                        {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
                         <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 w-fit h-10 md:h-11">
                           {["posters", "backdrops", "background"].map((tab) => (
                             <button
@@ -6974,7 +7049,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </section>
               )}
 
-              {/* === TRÁILER Y VÍDEOS === */}
+              {/* =================================================================
+                  SECCIÓN: TRÁILER Y VÍDEOS
+                 ================================================================= */}
+              {/* Carrusel de vídeos (tráilers, teasers, clips, etc.) del contenido */}
+              {/* Solo se muestra si hay una API key de TMDb configurada */}
               {TMDB_API_KEY && (
                 <section className="mt-6">
                   <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} />
@@ -7212,6 +7291,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               )}
             </section>
 
+            {/* =================================================================
+                SECCIÓN: TEMPORADAS (solo para series)
+               ================================================================= */}
+            {/* Muestra las temporadas disponibles de la serie con información resumida */}
             {type === "tv" && (
               <section id="section-seasons" ref={registerSection("seasons")}>
                 <section className="mb-12">
@@ -7348,9 +7431,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </section>
             )}
 
+            {/* =================================================================
+                SECCIÓN: VALORACIÓN DE EPISODIOS (solo para series)
+               ================================================================= */}
+            {/* Gráfico de valoraciones por episodio mostrando la evolución de ratings */}
             {type === "tv" && (
               <section id="section-episodes" ref={registerSection("episodes")}>
-                {/* --- EPISODIOS --- */}
+                {/* Subsección: Episodios y sus valoraciones */}
                 {type === "tv" ? (
                   <section className="mb-10">
                     <SectionTitle
@@ -8084,20 +8171,26 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         </div>
       </div>
 
-      {/* Modal: Videos / Trailer */}
+      {/* =================================================================
+          MODALES Y DIÁLOGOS
+         ================================================================= */}
+
+      {/* Modal de reproducción de vídeos y tráilers */}
       <VideoModal
         open={videoModalOpen}
         onClose={closeVideo}
         video={activeVideo}
       />
 
-      {/* Modal: Enlaces externos */}
+      {/* Modal de enlaces externos - Muestra todos los enlaces a páginas externas */}
+      {/* Solo visible en móvil, en desktop se muestran inline */}
       <ExternalLinksModal
         open={externalLinksOpen}
         onClose={() => setExternalLinksOpen(false)}
         links={externalLinks}
       />
 
+      {/* Modal de control de visto en Trakt - Para marcar películas como vistas */}
       <TraktWatchedModal
         open={traktWatchedOpen}
         onClose={() => {
@@ -8119,6 +8212,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         onRemovePlay={handleTraktRemovePlay}
       />
 
+      {/* Modal de episodios de Trakt - Para marcar episodios de series como vistos */}
+      {/* Incluye gestión de runs de rewatch y visualización por temporadas */}
       <TraktEpisodesWatchedModal
         key={`${id}-episodes-${traktEpisodesOpen ? "open" : "closed"}`}
         open={traktEpisodesOpen}
@@ -8148,7 +8243,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         onToggleEpisodeRewatch={toggleEpisodeRewatch}
       />
 
-      {/* Modal: Anadir a lista */}
+      {/* Modal de añadir a lista - Permite agregar el contenido a listas personalizadas del usuario */}
+      {/* Incluye funcionalidad para crear nuevas listas directamente desde el modal */}
       <AddToListModal
         open={listModalOpen}
         onClose={closeListsModal}
@@ -8173,7 +8269,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
   );
 }
 
-// Icon helper para el reparto
+// =============================================================================
+// Componente auxiliar: UsersIconComponent
+// =============================================================================
+/**
+ * Componente de icono SVG personalizado para representar el reparto/usuarios
+ *
+ * Este icono se utiliza en la interfaz para mostrar secciones relacionadas
+ * con el elenco y equipo del contenido.
+ *
+ * @param {Object} props - Propiedades del componente
+ * @param {number} [props.size=24] - Tamaño del icono en píxeles
+ * @param {string} [props.className] - Clases CSS adicionales para estilizar el icono
+ * @returns {JSX.Element} Elemento SVG del icono de usuarios
+ */
 const UsersIconComponent = ({ size = 24, className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
