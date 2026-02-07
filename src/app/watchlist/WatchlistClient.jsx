@@ -1620,7 +1620,7 @@ export default function WatchlistClient() {
               <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
                 Pendientes<span className="text-blue-500">.</span>
               </h1>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
                 Títulos guardados para ver más tarde.
               </p>
             </div>
