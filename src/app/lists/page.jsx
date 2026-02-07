@@ -1345,10 +1345,35 @@ export default function ListsPage() {
               Gestiona y organiza tus colecciones personales.
             </p>
           </div>
+        </motion.div>
 
+        {/* Filtros Sticky */}
+        <motion.div
+          ref={(el) => {
+            if (el && !el.dataset.stickySetup) {
+              el.dataset.stickySetup = 'true';
+              const observer = new IntersectionObserver(
+                ([e]) => {
+                  const isStuck = e.intersectionRatio < 1;
+                  if (isStuck) {
+                    el.classList.add('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                  } else {
+                    el.classList.remove('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                  }
+                },
+                { threshold: [1], rootMargin: '-65px 0px 0px 0px' }
+              );
+              observer.observe(el);
+            }
+          }}
+          className="sticky top-16 z-[60] space-y-1 mb-3 p-2 rounded-2xl transition-all duration-300"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
+        >
           {/* Controles (desktop: todo en 1 línea; móvil: 3 filas) */}
-          <div className="w-full xl:w-auto">
-            <div className="space-y-3">
+          <div className="w-full">
+            <div className="space-y-1">
               {/* Móvil: Fila 1 - Búsqueda */}
               <div className="lg:hidden">
                 <div className="relative w-full">
