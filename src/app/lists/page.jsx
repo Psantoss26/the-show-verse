@@ -39,6 +39,7 @@ import {
   X,
   Layers,
   Filter,
+  SlidersHorizontal,
 } from "lucide-react";
 import useTraktLists from "@/lib/hooks/useTraktLists";
 
@@ -326,6 +327,56 @@ function DropdownItem({ active, onClick, children }) {
       <span className="font-medium">{children}</span>
       {active && <CheckCircle2 className="w-3.5 h-3.5 text-purple-500" />}
     </button>
+  );
+}
+
+function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative w-full lg:w-auto lg:shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[140px]"
+      >
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="w-4 h-4 text-purple-500" />}
+          <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider">
+            {label}:
+          </span>
+          <span className="font-semibold text-white truncate">
+            {valueLabel}
+          </span>
+        </div>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="absolute left-0 top-full z-[100] mt-2 w-48 rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden p-1"
+          >
+            {children({ close: () => setOpen(false) })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -944,6 +995,7 @@ export default function ListsPage() {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [sortMode, setSortMode] = useState("items_desc");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState("rows"); // ✅ por defecto como “Dashboard”
 
   // ✅ NUEVO: selector de fuente
@@ -1318,50 +1370,66 @@ export default function ListsPage() {
   const canEdit = !!canUse && source === "tmdb";
 
   return (
-    <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30 overflow-x-hidden">
+    <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-purple-500/30">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-1/4 w-[600px] h-[600px] bg-purple-600/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-1/4 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[100px]" />
+        <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[150px]" />
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        {/* HEADER + CONTROLES */}
-        <motion.div
-          className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mb-10"
+        {/* Header */}
+        <motion.header
+          className="mb-10"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
         >
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-purple-500" />
-              <span className="text-purple-400 font-bold uppercase tracking-widest text-xs">TU COLECCIÓN</span>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-px w-12 bg-purple-500" />
+                <span className="text-purple-400 font-bold uppercase tracking-widest text-xs">
+                  TU COLECCIÓN
+                </span>
+              </div>
+              <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+                Mis Listas
+                <span className="text-purple-500">.</span>
+              </h1>
+              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
+                Gestiona y organiza tus colecciones personales.
+              </p>
             </div>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              Mis Listas
-              <span className="text-purple-500">.</span>
-            </h1>
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-              Gestiona y organiza tus colecciones personales.
-            </p>
           </div>
-        </motion.div>
+        </motion.header>
 
         {/* Filtros Sticky */}
         <motion.div
           ref={(el) => {
             if (el && !el.dataset.stickySetup) {
-              el.dataset.stickySetup = 'true';
+              el.dataset.stickySetup = "true";
               const observer = new IntersectionObserver(
                 ([e]) => {
                   const isStuck = e.intersectionRatio < 1;
                   if (isStuck) {
-                    el.classList.add('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                    el.classList.add(
+                      "backdrop-blur-xl",
+                      "bg-gradient-to-br",
+                      "from-black/60",
+                      "via-black/50",
+                      "to-black/55",
+                    );
                   } else {
-                    el.classList.remove('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                    el.classList.remove(
+                      "backdrop-blur-xl",
+                      "bg-gradient-to-br",
+                      "from-black/60",
+                      "via-black/50",
+                      "to-black/55",
+                    );
                   }
                 },
-                { threshold: [1], rootMargin: '-65px 0px 0px 0px' }
+                { threshold: [1], rootMargin: "-65px 0px 0px 0px" },
               );
               observer.observe(el);
             }
@@ -1371,598 +1439,552 @@ export default function ListsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
-          {/* Controles (desktop: todo en 1 línea; móvil: 3 filas) */}
-          <div className="w-full">
-            <div className="space-y-1">
-              {/* Móvil: Fila 1 - Búsqueda */}
-              <div className="lg:hidden">
-                <div className="relative w-full">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                  <input
-                    value={query}
-                    onChange={(e) =>
-                      startTransition(() => setQuery(e.target.value))
-                    }
-                    placeholder={
-                      source === "collections"
-                        ? "Buscar colecciones..."
-                        : "Buscar listas..."
-                    }
-                    className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-zinc-600"
-                  />
-                  {query && (
-                    <button
-                      onClick={() => startTransition(() => setQuery(""))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5 text-zinc-500" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Móvil: Fila 2 - Fuente y Modo/Ordenar (50% cada uno) */}
-              <div className="flex gap-2 lg:hidden">
-                <div className="flex-1">
-                  <Dropdown
-                    label="Fuente"
-                    valueLabel={
-                      source === "tmdb"
-                        ? "TMDb"
-                        : source === "trakt"
-                          ? "Trakt"
-                          : "Colecciones"
-                    }
-                    icon={Layers}
-                  >
-                    {({ close }) => (
-                      <>
-                        <DropdownItem
-                          active={source === "tmdb"}
-                          onClick={() => {
-                            startTransition(() => setSource("tmdb"));
-                            close();
-                          }}
-                        >
-                          TMDb
-                        </DropdownItem>
-                        <DropdownItem
-                          active={source === "trakt"}
-                          onClick={() => {
-                            startTransition(() => setSource("trakt"));
-                            close();
-                          }}
-                        >
-                          Trakt
-                        </DropdownItem>
-                        <DropdownItem
-                          active={source === "collections"}
-                          onClick={() => {
-                            startTransition(() => setSource("collections"));
-                            close();
-                          }}
-                        >
-                          Colecciones
-                        </DropdownItem>
-                      </>
-                    )}
-                  </Dropdown>
-                </div>
-
-                <div className="flex-1">
-                  {source === "trakt" ? (
-                    <Dropdown
-                      label="Modo"
-                      valueLabel={
-                        traktMode === "trending"
-                          ? "Trending"
-                          : traktMode === "popular"
-                            ? "Popular"
-                            : "Mis listas"
-                      }
-                      icon={Filter}
-                    >
-                      {({ close }) => (
-                        <>
-                          <DropdownItem
-                            active={traktMode === "trending"}
-                            onClick={() => {
-                              setTraktMode("trending");
-                              close();
-                            }}
-                          >
-                            Trending
-                          </DropdownItem>
-                          <DropdownItem
-                            active={traktMode === "popular"}
-                            onClick={() => {
-                              setTraktMode("popular");
-                              close();
-                            }}
-                          >
-                            Popular
-                          </DropdownItem>
-                          <DropdownItem
-                            active={traktMode === "user"}
-                            onClick={() => {
-                              setTraktMode("user");
-                              close();
-                            }}
-                          >
-                            Mis listas
-                          </DropdownItem>
-                        </>
-                      )}
-                    </Dropdown>
-                  ) : (
-                    <Dropdown
-                      label="Ordenar"
-                      valueLabel={
-                        sortMode.includes("items")
-                          ? sortMode === "items_desc"
-                            ? "Más items"
-                            : "Menos items"
-                          : sortMode.includes("likes")
-                            ? sortMode === "likes_desc"
-                              ? "Más likes"
-                              : "Menos likes"
-                            : sortMode === "name_asc"
-                              ? "A-Z"
-                              : "Z-A"
-                      }
-                      icon={ArrowUpDown}
-                    >
-                      {({ close }) => (
-                        <>
-                          <DropdownItem
-                            active={sortMode === "items_desc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("items_desc"));
-                              close();
-                            }}
-                          >
-                            Más items
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortMode === "items_asc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("items_asc"));
-                              close();
-                            }}
-                          >
-                            Menos items
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortMode === "likes_desc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("likes_desc"));
-                              close();
-                            }}
-                          >
-                            Más likes
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortMode === "likes_asc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("likes_asc"));
-                              close();
-                            }}
-                          >
-                            Menos likes
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortMode === "name_asc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("name_asc"));
-                              close();
-                            }}
-                          >
-                            Nombre (A-Z)
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortMode === "name_desc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("name_desc"));
-                              close();
-                            }}
-                          >
-                            Nombre (Z-A)
-                          </DropdownItem>
-                        </>
-                      )}
-                    </Dropdown>
-                  )}
-                </div>
-              </div>
-
-              {/* Móvil: Fila 3 - Ordenar (si Trakt) + Vistas + Acciones */}
-              <div className="flex gap-2 lg:hidden">
-                {source === "trakt" && (
-                  <div className="flex-1">
-                    <Dropdown
-                      label="Ordenar"
-                      valueLabel={
-                        sortMode.includes("items")
-                          ? sortMode === "items_desc"
-                            ? "Más items"
-                            : "Menos items"
-                          : sortMode.includes("likes")
-                            ? sortMode === "likes_desc"
-                              ? "Más likes"
-                              : "Menos likes"
-                            : sortMode === "name_asc"
-                              ? "A-Z"
-                              : "Z-A"
-                      }
-                      icon={ArrowUpDown}
-                    >
-                      {({ close }) => (
-                        <>
-                          <DropdownItem
-                            active={sortMode === "items_desc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("items_desc"));
-                              close();
-                            }}
-                          >
-                            Más items
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortMode === "items_asc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("items_asc"));
-                              close();
-                            }}
-                          >
-                            Menos items
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortMode === "likes_desc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("likes_desc"));
-                              close();
-                            }}
-                          >
-                            Más likes
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortMode === "likes_asc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("likes_asc"));
-                              close();
-                            }}
-                          >
-                            Menos likes
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortMode === "name_asc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("name_asc"));
-                              close();
-                            }}
-                          >
-                            Nombre (A-Z)
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortMode === "name_desc"}
-                            onClick={() => {
-                              startTransition(() => setSortMode("name_desc"));
-                              close();
-                            }}
-                          >
-                            Nombre (Z-A)
-                          </DropdownItem>
-                        </>
-                      )}
-                    </Dropdown>
-                  </div>
-                )}
-
-                <div
-                  className={`flex ${source === "trakt" ? "flex-1" : "flex-[2]"} gap-2`}
-                >
-                  <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
-                    <button
-                      onClick={() => startTransition(() => setViewMode("grid"))}
-                      className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "grid"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
-                      title="Cuadrícula"
-                    >
-                      <LayoutGrid className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => startTransition(() => setViewMode("rows"))}
-                      className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "rows"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
-                      title="Filas"
-                    >
-                      <Rows className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => startTransition(() => setViewMode("list"))}
-                      className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "list"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
-                      title="Lista"
-                    >
-                      <StretchHorizontal className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={handleRefresh}
-                    className="h-11 w-11 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex items-center justify-center shrink-0"
-                    title="Refrescar"
-                  >
-                    <RefreshCcw
-                      className={`w-4 h-4 ${loadingUnified ? "animate-spin text-purple-500" : ""}`}
-                    />
-                  </button>
-
-                  {canEdit && (
-                    <button
-                      onClick={() => setCreateOpen(true)}
-                      className="h-11 px-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Crear</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Desktop: Una sola fila con todo */}
-              <div className="hidden lg:flex gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                  <input
-                    value={query}
-                    onChange={(e) =>
-                      startTransition(() => setQuery(e.target.value))
-                    }
-                    placeholder={
-                      source === "collections"
-                        ? "Buscar colecciones..."
-                        : "Buscar listas..."
-                    }
-                    className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-zinc-600"
-                  />
-                  {query && (
-                    <button
-                      onClick={() => startTransition(() => setQuery(""))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5 text-zinc-500" />
-                    </button>
-                  )}
-                </div>
-
-                <Dropdown
-                  label="Fuente"
-                  valueLabel={
-                    source === "tmdb"
-                      ? "TMDb"
-                      : source === "trakt"
-                        ? "Trakt"
-                        : "Colecciones"
-                  }
-                  icon={Layers}
-                >
-                  {({ close }) => (
-                    <>
-                      <DropdownItem
-                        active={source === "tmdb"}
-                        onClick={() => {
-                          startTransition(() => setSource("tmdb"));
-                          close();
-                        }}
-                      >
-                        TMDb
-                      </DropdownItem>
-                      <DropdownItem
-                        active={source === "trakt"}
-                        onClick={() => {
-                          startTransition(() => setSource("trakt"));
-                          close();
-                        }}
-                      >
-                        Trakt
-                      </DropdownItem>
-                      <DropdownItem
-                        active={source === "collections"}
-                        onClick={() => {
-                          startTransition(() => setSource("collections"));
-                          close();
-                        }}
-                      >
-                        Colecciones
-                      </DropdownItem>
-                    </>
-                  )}
-                </Dropdown>
-
-                {source === "trakt" && (
-                  <Dropdown
-                    label="Modo"
-                    valueLabel={
-                      traktMode === "trending"
-                        ? "Trending"
-                        : traktMode === "popular"
-                          ? "Popular"
-                          : "Mis listas"
-                    }
-                    icon={Filter}
-                  >
-                    {({ close }) => (
-                      <>
-                        <DropdownItem
-                          active={traktMode === "trending"}
-                          onClick={() => {
-                            setTraktMode("trending");
-                            close();
-                          }}
-                        >
-                          Trending
-                        </DropdownItem>
-                        <DropdownItem
-                          active={traktMode === "popular"}
-                          onClick={() => {
-                            setTraktMode("popular");
-                            close();
-                          }}
-                        >
-                          Popular
-                        </DropdownItem>
-                        <DropdownItem
-                          active={traktMode === "user"}
-                          onClick={() => {
-                            setTraktMode("user");
-                            close();
-                          }}
-                        >
-                          Mis listas
-                        </DropdownItem>
-                      </>
-                    )}
-                  </Dropdown>
-                )}
-
-                <Dropdown
-                  label="Ordenar"
-                  valueLabel={
-                    sortMode.includes("items")
-                      ? sortMode === "items_desc"
-                        ? "Más items"
-                        : "Menos items"
-                      : sortMode.includes("likes")
-                        ? sortMode === "likes_desc"
-                          ? "Más likes"
-                          : "Menos likes"
-                        : sortMode === "name_asc"
-                          ? "A-Z"
-                          : "Z-A"
-                  }
-                  icon={ArrowUpDown}
-                >
-                  {({ close }) => (
-                    <>
-                      <DropdownItem
-                        active={sortMode === "items_desc"}
-                        onClick={() => {
-                          startTransition(() => setSortMode("items_desc"));
-                          close();
-                        }}
-                      >
-                        Más items
-                      </DropdownItem>
-                      <DropdownItem
-                        active={sortMode === "items_asc"}
-                        onClick={() => {
-                          startTransition(() => setSortMode("items_asc"));
-                          close();
-                        }}
-                      >
-                        Menos items
-                      </DropdownItem>
-                      <DropdownItem
-                        active={sortMode === "likes_desc"}
-                        onClick={() => {
-                          startTransition(() => setSortMode("likes_desc"));
-                          close();
-                        }}
-                      >
-                        Más likes
-                      </DropdownItem>
-                      <DropdownItem
-                        active={sortMode === "likes_asc"}
-                        onClick={() => {
-                          startTransition(() => setSortMode("likes_asc"));
-                          close();
-                        }}
-                      >
-                        Menos likes
-                      </DropdownItem>
-                      <DropdownItem
-                        active={sortMode === "name_asc"}
-                        onClick={() => {
-                          startTransition(() => setSortMode("name_asc"));
-                          close();
-                        }}
-                      >
-                        Nombre (A-Z)
-                      </DropdownItem>
-                      <DropdownItem
-                        active={sortMode === "name_desc"}
-                        onClick={() => {
-                          startTransition(() => setSortMode("name_desc"));
-                          close();
-                        }}
-                      >
-                        Nombre (Z-A)
-                      </DropdownItem>
-                    </>
-                  )}
-                </Dropdown>
-
-                <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
-                  <button
-                    onClick={() => startTransition(() => setViewMode("grid"))}
-                    className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "grid"
-                      ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
-                    title="Cuadrícula"
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => startTransition(() => setViewMode("rows"))}
-                    className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "rows"
-                      ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
-                    title="Filas"
-                  >
-                    <Rows className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => startTransition(() => setViewMode("list"))}
-                    className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "list"
-                      ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
-                    title="Lista"
-                  >
-                    <StretchHorizontal className="w-4 h-4" />
-                  </button>
-                </div>
-
+          {/* Mobile: search + toggle */}
+          <div className="flex gap-2 lg:hidden">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input
+                value={query}
+                onChange={(e) =>
+                  startTransition(() => setQuery(e.target.value))
+                }
+                placeholder={
+                  source === "collections"
+                    ? "Buscar colecciones..."
+                    : "Buscar listas..."
+                }
+                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-zinc-600"
+              />
+              {query && (
                 <button
-                  onClick={handleRefresh}
-                  className="h-11 w-11 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex items-center justify-center shrink-0"
-                  title="Refrescar"
+                  onClick={() => startTransition(() => setQuery(""))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
                 >
-                  <RefreshCcw
-                    className={`w-4 h-4 ${loadingUnified ? "animate-spin text-purple-500" : ""}`}
-                  />
+                  <X className="w-3.5 h-3.5 text-zinc-500" />
                 </button>
-
-                {canEdit && (
-                  <button
-                    onClick={() => setCreateOpen(true)}
-                    className="h-11 px-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Crear</span>
-                  </button>
-                )}
-              </div>
+              )}
             </div>
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
+                mobileFiltersOpen
+                  ? "bg-purple-500/20 border-purple-500/40 text-purple-400"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Mobile: collapsible filters */}
+          <AnimatePresence>
+            {mobileFiltersOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className="lg:hidden overflow-visible"
+              >
+                <div className="space-y-3 pt-1">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <InlineDropdown
+                        label="Fuente"
+                        valueLabel={
+                          source === "tmdb"
+                            ? "TMDb"
+                            : source === "trakt"
+                              ? "Trakt"
+                              : "Colecciones"
+                        }
+                        icon={Layers}
+                      >
+                        {({ close }) => (
+                          <>
+                            <DropdownItem
+                              active={source === "tmdb"}
+                              onClick={() => {
+                                startTransition(() => setSource("tmdb"));
+                                close();
+                              }}
+                            >
+                              TMDb
+                            </DropdownItem>
+                            <DropdownItem
+                              active={source === "trakt"}
+                              onClick={() => {
+                                startTransition(() => setSource("trakt"));
+                                close();
+                              }}
+                            >
+                              Trakt
+                            </DropdownItem>
+                            <DropdownItem
+                              active={source === "collections"}
+                              onClick={() => {
+                                startTransition(() => setSource("collections"));
+                                close();
+                              }}
+                            >
+                              Colecciones
+                            </DropdownItem>
+                          </>
+                        )}
+                      </InlineDropdown>
+                    </div>
+
+                    {source === "trakt" && (
+                      <div className="flex-1">
+                        <InlineDropdown
+                          label="Modo"
+                          valueLabel={
+                            traktMode === "trending"
+                              ? "Trending"
+                              : traktMode === "popular"
+                                ? "Popular"
+                                : "Mis listas"
+                          }
+                          icon={Filter}
+                        >
+                          {({ close }) => (
+                            <>
+                              <DropdownItem
+                                active={traktMode === "trending"}
+                                onClick={() => {
+                                  setTraktMode("trending");
+                                  close();
+                                }}
+                              >
+                                Trending
+                              </DropdownItem>
+                              <DropdownItem
+                                active={traktMode === "popular"}
+                                onClick={() => {
+                                  setTraktMode("popular");
+                                  close();
+                                }}
+                              >
+                                Popular
+                              </DropdownItem>
+                              <DropdownItem
+                                active={traktMode === "user"}
+                                onClick={() => {
+                                  setTraktMode("user");
+                                  close();
+                                }}
+                              >
+                                Mis listas
+                              </DropdownItem>
+                            </>
+                          )}
+                        </InlineDropdown>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <InlineDropdown
+                        label="Ordenar"
+                        valueLabel={
+                          sortMode.includes("items")
+                            ? sortMode === "items_desc"
+                              ? "Más items"
+                              : "Menos items"
+                            : sortMode.includes("likes")
+                              ? sortMode === "likes_desc"
+                                ? "Más likes"
+                                : "Menos likes"
+                              : sortMode === "name_asc"
+                                ? "A-Z"
+                                : "Z-A"
+                        }
+                        icon={ArrowUpDown}
+                      >
+                        {({ close }) => (
+                          <>
+                            <DropdownItem
+                              active={sortMode === "items_desc"}
+                              onClick={() => {
+                                startTransition(() =>
+                                  setSortMode("items_desc"),
+                                );
+                                close();
+                              }}
+                            >
+                              Más items
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortMode === "items_asc"}
+                              onClick={() => {
+                                startTransition(() => setSortMode("items_asc"));
+                                close();
+                              }}
+                            >
+                              Menos items
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortMode === "likes_desc"}
+                              onClick={() => {
+                                startTransition(() =>
+                                  setSortMode("likes_desc"),
+                                );
+                                close();
+                              }}
+                            >
+                              Más likes
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortMode === "likes_asc"}
+                              onClick={() => {
+                                startTransition(() => setSortMode("likes_asc"));
+                                close();
+                              }}
+                            >
+                              Más likes
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortMode === "name_asc"}
+                              onClick={() => {
+                                startTransition(() => setSortMode("name_asc"));
+                                close();
+                              }}
+                            >
+                              A-Z
+                            </DropdownItem>
+                            <DropdownItem
+                              active={sortMode === "name_desc"}
+                              onClick={() => {
+                                startTransition(() => setSortMode("name_desc"));
+                                close();
+                              }}
+                            >
+                              Z-A
+                            </DropdownItem>
+                          </>
+                        )}
+                      </InlineDropdown>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
+                      <button
+                        onClick={() =>
+                          startTransition(() => setViewMode("grid"))
+                        }
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "grid"
+                            ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
+                        title="Cuadrícula"
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          startTransition(() => setViewMode("rows"))
+                        }
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "rows"
+                            ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
+                        title="Filas"
+                      >
+                        <Rows className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          startTransition(() => setViewMode("list"))
+                        }
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "list"
+                            ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
+                        title="Lista"
+                      >
+                        <StretchHorizontal className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={handleRefresh}
+                      className="h-11 w-11 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex items-center justify-center shrink-0"
+                      title="Refrescar"
+                    >
+                      <RefreshCcw
+                        className={`w-4 h-4 ${loadingUnified ? "animate-spin text-purple-500" : ""}`}
+                      />
+                    </button>
+
+                    {canEdit && (
+                      <button
+                        onClick={() => setCreateOpen(true)}
+                        className="h-11 px-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Crear</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Desktop */}
+          <div className="hidden lg:flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input
+                value={query}
+                onChange={(e) =>
+                  startTransition(() => setQuery(e.target.value))
+                }
+                placeholder={
+                  source === "collections"
+                    ? "Buscar colecciones..."
+                    : "Buscar listas..."
+                }
+                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-zinc-600"
+              />
+              {query && (
+                <button
+                  onClick={() => startTransition(() => setQuery(""))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-zinc-500" />
+                </button>
+              )}
+            </div>
+
+            <InlineDropdown
+              label="Fuente"
+              valueLabel={
+                source === "tmdb"
+                  ? "TMDb"
+                  : source === "trakt"
+                    ? "Trakt"
+                    : "Colecciones"
+              }
+              icon={Layers}
+            >
+              {({ close }) => (
+                <>
+                  <DropdownItem
+                    active={source === "tmdb"}
+                    onClick={() => {
+                      startTransition(() => setSource("tmdb"));
+                      close();
+                    }}
+                  >
+                    TMDb
+                  </DropdownItem>
+                  <DropdownItem
+                    active={source === "trakt"}
+                    onClick={() => {
+                      startTransition(() => setSource("trakt"));
+                      close();
+                    }}
+                  >
+                    Trakt
+                  </DropdownItem>
+                  <DropdownItem
+                    active={source === "collections"}
+                    onClick={() => {
+                      startTransition(() => setSource("collections"));
+                      close();
+                    }}
+                  >
+                    Colecciones
+                  </DropdownItem>
+                </>
+              )}
+            </InlineDropdown>
+
+            {source === "trakt" && (
+              <InlineDropdown
+                label="Modo"
+                valueLabel={
+                  traktMode === "trending"
+                    ? "Trending"
+                    : traktMode === "popular"
+                      ? "Popular"
+                      : "Mis listas"
+                }
+                icon={Filter}
+              >
+                {({ close }) => (
+                  <>
+                    <DropdownItem
+                      active={traktMode === "trending"}
+                      onClick={() => {
+                        setTraktMode("trending");
+                        close();
+                      }}
+                    >
+                      Trending
+                    </DropdownItem>
+                    <DropdownItem
+                      active={traktMode === "popular"}
+                      onClick={() => {
+                        setTraktMode("popular");
+                        close();
+                      }}
+                    >
+                      Popular
+                    </DropdownItem>
+                    <DropdownItem
+                      active={traktMode === "user"}
+                      onClick={() => {
+                        setTraktMode("user");
+                        close();
+                      }}
+                    >
+                      Mis listas
+                    </DropdownItem>
+                  </>
+                )}
+              </InlineDropdown>
+            )}
+
+            <InlineDropdown
+              label="Ordenar"
+              valueLabel={
+                sortMode.includes("items")
+                  ? sortMode === "items_desc"
+                    ? "Más items"
+                    : "Menos items"
+                  : sortMode.includes("likes")
+                    ? sortMode === "likes_desc"
+                      ? "Más likes"
+                      : "Menos likes"
+                    : sortMode === "name_asc"
+                      ? "A-Z"
+                      : "Z-A"
+              }
+              icon={ArrowUpDown}
+            >
+              {({ close }) => (
+                <>
+                  <DropdownItem
+                    active={sortMode === "items_desc"}
+                    onClick={() => {
+                      startTransition(() => setSortMode("items_desc"));
+                      close();
+                    }}
+                  >
+                    Más items
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortMode === "items_asc"}
+                    onClick={() => {
+                      startTransition(() => setSortMode("items_asc"));
+                      close();
+                    }}
+                  >
+                    Menos items
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortMode === "likes_desc"}
+                    onClick={() => {
+                      startTransition(() => setSortMode("likes_desc"));
+                      close();
+                    }}
+                  >
+                    Más likes
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortMode === "likes_asc"}
+                    onClick={() => {
+                      startTransition(() => setSortMode("likes_asc"));
+                      close();
+                    }}
+                  >
+                    Menos likes
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortMode === "name_asc"}
+                    onClick={() => {
+                      startTransition(() => setSortMode("name_asc"));
+                      close();
+                    }}
+                  >
+                    A-Z
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortMode === "name_desc"}
+                    onClick={() => {
+                      startTransition(() => setSortMode("name_desc"));
+                      close();
+                    }}
+                  >
+                    Z-A
+                  </DropdownItem>
+                </>
+              )}
+            </InlineDropdown>
+
+            <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
+              <button
+                onClick={() => startTransition(() => setViewMode("grid"))}
+                className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                  viewMode === "grid"
+                    ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                }`}
+                title="Cuadrícula"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => startTransition(() => setViewMode("rows"))}
+                className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                  viewMode === "rows"
+                    ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                }`}
+                title="Filas"
+              >
+                <Rows className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => startTransition(() => setViewMode("list"))}
+                className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                  viewMode === "list"
+                    ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                }`}
+                title="Lista"
+              >
+                <StretchHorizontal className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              onClick={handleRefresh}
+              className="h-11 w-11 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex items-center justify-center shrink-0"
+              title="Refrescar"
+            >
+              <RefreshCcw
+                className={`w-4 h-4 ${loadingUnified ? "animate-spin text-purple-500" : ""}`}
+              />
+            </button>
+
+            {canEdit && (
+              <button
+                onClick={() => setCreateOpen(true)}
+                className="h-11 px-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Crear</span>
+              </button>
+            )}
           </div>
         </motion.div>
 
