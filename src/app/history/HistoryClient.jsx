@@ -1916,7 +1916,7 @@ export default function HistoryClient() {
                   </div>
                 )}
               </div>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
                 Registro cronológico de todo lo que has visto.
               </p>
             </div>

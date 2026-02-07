@@ -1883,7 +1883,7 @@ export default function FavoritesClient() {
               <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
                 Favoritos<span className="text-red-500">.</span>
               </h1>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
                 Tu colección personal de películas y series favoritas.
               </p>
             </div>

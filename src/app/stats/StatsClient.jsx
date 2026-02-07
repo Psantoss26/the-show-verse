@@ -25,7 +25,7 @@ import {
   Library,
   MessageSquare,
   LogIn,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -78,19 +78,84 @@ const CHART_THEME = {
 };
 
 const COLOR_STYLES = {
-  emerald: { iconBg: "bg-emerald-500/10", iconText: "text-emerald-500", ring: "ring-emerald-500/20", glow: "bg-emerald-500/20", groupGlow: "group-hover:bg-emerald-500/30" },
-  blue: { iconBg: "bg-blue-500/10", iconText: "text-blue-500", ring: "ring-blue-500/20", glow: "bg-blue-500/20", groupGlow: "group-hover:bg-blue-500/30" },
-  purple: { iconBg: "bg-purple-500/10", iconText: "text-purple-500", ring: "ring-purple-500/20", glow: "bg-purple-500/20", groupGlow: "group-hover:bg-purple-500/30" },
-  yellow: { iconBg: "bg-yellow-500/10", iconText: "text-yellow-500", ring: "ring-yellow-500/20", glow: "bg-yellow-500/20", groupGlow: "group-hover:bg-yellow-500/30" },
-  pink: { iconBg: "bg-pink-500/10", iconText: "text-pink-500", ring: "ring-pink-500/20", glow: "bg-pink-500/20", groupGlow: "group-hover:bg-pink-500/30" },
-  orange: { iconBg: "bg-orange-500/10", iconText: "text-orange-500", ring: "ring-orange-500/20", glow: "bg-orange-500/20", groupGlow: "group-hover:bg-orange-500/30" },
-  cyan: { iconBg: "bg-cyan-500/10", iconText: "text-cyan-500", ring: "ring-cyan-500/20", glow: "bg-cyan-500/20", groupGlow: "group-hover:bg-cyan-500/30" },
-  indigo: { iconBg: "bg-indigo-500/10", iconText: "text-indigo-500", ring: "ring-indigo-500/20", glow: "bg-indigo-500/20", groupGlow: "group-hover:bg-indigo-500/30" },
-  rose: { iconBg: "bg-rose-500/10", iconText: "text-rose-500", ring: "ring-rose-500/20", glow: "bg-rose-500/20", groupGlow: "group-hover:bg-rose-500/30" },
-  teal: { iconBg: "bg-teal-500/10", iconText: "text-teal-500", ring: "ring-teal-500/20", glow: "bg-teal-500/20", groupGlow: "group-hover:bg-teal-500/30" },
-  lime: { iconBg: "bg-lime-500/10", iconText: "text-lime-500", ring: "ring-lime-500/20", glow: "bg-lime-500/20", groupGlow: "group-hover:bg-lime-500/30" },
+  emerald: {
+    iconBg: "bg-emerald-500/10",
+    iconText: "text-emerald-500",
+    ring: "ring-emerald-500/20",
+    glow: "bg-emerald-500/20",
+    groupGlow: "group-hover:bg-emerald-500/30",
+  },
+  blue: {
+    iconBg: "bg-blue-500/10",
+    iconText: "text-blue-500",
+    ring: "ring-blue-500/20",
+    glow: "bg-blue-500/20",
+    groupGlow: "group-hover:bg-blue-500/30",
+  },
+  purple: {
+    iconBg: "bg-purple-500/10",
+    iconText: "text-purple-500",
+    ring: "ring-purple-500/20",
+    glow: "bg-purple-500/20",
+    groupGlow: "group-hover:bg-purple-500/30",
+  },
+  yellow: {
+    iconBg: "bg-yellow-500/10",
+    iconText: "text-yellow-500",
+    ring: "ring-yellow-500/20",
+    glow: "bg-yellow-500/20",
+    groupGlow: "group-hover:bg-yellow-500/30",
+  },
+  pink: {
+    iconBg: "bg-pink-500/10",
+    iconText: "text-pink-500",
+    ring: "ring-pink-500/20",
+    glow: "bg-pink-500/20",
+    groupGlow: "group-hover:bg-pink-500/30",
+  },
+  orange: {
+    iconBg: "bg-orange-500/10",
+    iconText: "text-orange-500",
+    ring: "ring-orange-500/20",
+    glow: "bg-orange-500/20",
+    groupGlow: "group-hover:bg-orange-500/30",
+  },
+  cyan: {
+    iconBg: "bg-cyan-500/10",
+    iconText: "text-cyan-500",
+    ring: "ring-cyan-500/20",
+    glow: "bg-cyan-500/20",
+    groupGlow: "group-hover:bg-cyan-500/30",
+  },
+  indigo: {
+    iconBg: "bg-indigo-500/10",
+    iconText: "text-indigo-500",
+    ring: "ring-indigo-500/20",
+    glow: "bg-indigo-500/20",
+    groupGlow: "group-hover:bg-indigo-500/30",
+  },
+  rose: {
+    iconBg: "bg-rose-500/10",
+    iconText: "text-rose-500",
+    ring: "ring-rose-500/20",
+    glow: "bg-rose-500/20",
+    groupGlow: "group-hover:bg-rose-500/30",
+  },
+  teal: {
+    iconBg: "bg-teal-500/10",
+    iconText: "text-teal-500",
+    ring: "ring-teal-500/20",
+    glow: "bg-teal-500/20",
+    groupGlow: "group-hover:bg-teal-500/30",
+  },
+  lime: {
+    iconBg: "bg-lime-500/10",
+    iconText: "text-lime-500",
+    ring: "ring-lime-500/20",
+    glow: "bg-lime-500/20",
+    groupGlow: "group-hover:bg-lime-500/30",
+  },
 };
-
 
 // -----------------------------------------------------------------------------
 // DATA HELPERS
@@ -108,7 +173,7 @@ const processMonthlyActivity = (historyData) => {
       label: d.toLocaleDateString("es-ES", { month: "short" }),
       movies: 0,
       episodes: 0,
-      total: 0
+      total: 0,
     };
   }
 
@@ -147,9 +212,9 @@ const processRatings = (ratingDist) => {
 
 const processDayOfWeek = (historyData) => {
   const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-  const counts = days.map(day => ({ name: day, value: 0 }));
+  const counts = days.map((day) => ({ name: day, value: 0 }));
 
-  historyData.forEach(item => {
+  historyData.forEach((item) => {
     const d = new Date(item.watched_at);
     counts[d.getDay()].value++;
   });
@@ -157,8 +222,11 @@ const processDayOfWeek = (historyData) => {
 };
 
 const processHourOfDay = (historyData) => {
-  const counts = Array.from({ length: 24 }, (_, i) => ({ name: `${i}h`, value: 0 }));
-  historyData.forEach(item => {
+  const counts = Array.from({ length: 24 }, (_, i) => ({
+    name: `${i}h`,
+    value: 0,
+  }));
+  historyData.forEach((item) => {
     const d = new Date(item.watched_at);
     counts[d.getHours()].value++;
   });
@@ -179,16 +247,22 @@ function KPICard({ title, value, subtitle, icon: Icon, color, delay = 0 }) {
       transition={{ delay, duration: 0.5 }}
       className="relative overflow-hidden p-6 rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl group hover:bg-zinc-900/80 transition-all duration-300"
     >
-      <div className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity ${styles.iconText}`}>
+      <div
+        className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity ${styles.iconText}`}
+      >
         <Icon className="w-24 h-24 transform rotate-12 -translate-y-4 translate-x-4" />
       </div>
 
       <div className="relative z-10 flex flex-col h-full justify-between">
         <div className="flex items-center gap-3 mb-4">
-          <div className={`p-2.5 rounded-xl ${styles.iconBg} ${styles.iconText} ring-1 ${styles.ring}`}>
+          <div
+            className={`p-2.5 rounded-xl ${styles.iconBg} ${styles.iconText} ring-1 ${styles.ring}`}
+          >
             <Icon className="w-6 h-6" />
           </div>
-          <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">{title}</h3>
+          <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">
+            {title}
+          </h3>
         </div>
 
         <div>
@@ -196,15 +270,15 @@ function KPICard({ title, value, subtitle, icon: Icon, color, delay = 0 }) {
             {value}
           </div>
           {subtitle && (
-            <div className="text-sm font-medium text-zinc-500">
-              {subtitle}
-            </div>
+            <div className="text-sm font-medium text-zinc-500">{subtitle}</div>
           )}
         </div>
       </div>
 
       {/* Decorative gradient glow */}
-      <div className={`absolute -bottom-10 -left-10 w-32 h-32 rounded-full blur-3xl pointer-events-none transition-all ${styles.glow} ${styles.groupGlow}`} />
+      <div
+        className={`absolute -bottom-10 -left-10 w-32 h-32 rounded-full blur-3xl pointer-events-none transition-all ${styles.glow} ${styles.groupGlow}`}
+      />
     </motion.div>
   );
 }
@@ -214,7 +288,9 @@ function SectionTitle({ icon: Icon, title, subtitle, color = "indigo" }) {
 
   return (
     <div className="flex items-center gap-3 mb-6">
-      <div className={`p-2 rounded-lg border ${styles.iconBg} border-white/10 ${styles.iconText}`}>
+      <div
+        className={`p-2 rounded-lg border ${styles.iconBg} border-white/10 ${styles.iconText}`}
+      >
         <Icon className="w-5 h-5" />
       </div>
       <div>
@@ -233,9 +309,18 @@ function CustomTooltip({ active, payload, label, formatter }) {
         <p className="font-bold text-white mb-2 text-sm">{title}</p>
         <div className="space-y-1">
           {payload.map((p, idx) => (
-            <div key={idx} className="flex items-center justify-between gap-4 text-xs">
-              <span className="flex items-center gap-2" style={{ color: p.color }}>
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+            <div
+              key={idx}
+              className="flex items-center justify-between gap-4 text-xs"
+            >
+              <span
+                className="flex items-center gap-2"
+                style={{ color: p.color }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: p.color }}
+                />
                 {p.name}
               </span>
               <span className="font-mono font-bold text-zinc-300">
@@ -306,8 +391,15 @@ export default function StatsClient() {
       { name: "Series", value: episodes.minutes || 0, color: COLORS.purple },
     ];
 
-    const totalComments = (movies.comments || 0) + (showStats.comments || 0) + (seasons.comments || 0) + (episodes.comments || 0);
-    const totalCollected = (movies.collected || 0) + (showStats.collected || 0) + (episodes.collected || 0);
+    const totalComments =
+      (movies.comments || 0) +
+      (showStats.comments || 0) +
+      (seasons.comments || 0) +
+      (episodes.comments || 0);
+    const totalCollected =
+      (movies.collected || 0) +
+      (showStats.collected || 0) +
+      (episodes.collected || 0);
 
     return {
       raw: tStats,
@@ -329,11 +421,17 @@ export default function StatsClient() {
       dayOfWeekData,
       hourOfDayData,
       timeDistribution,
-      topMovies: (data.watchedMovies || []).sort((a, b) => b.plays - a.plays).slice(0, 5),
-      topShows: (data.watchedShows || []).sort((a, b) => b.plays - a.plays).slice(0, 5),
-      years: [...new Set(history.map(h => new Date(h.watched_at).getFullYear()))].sort((a, b) => b - a),
+      topMovies: (data.watchedMovies || [])
+        .sort((a, b) => b.plays - a.plays)
+        .slice(0, 5),
+      topShows: (data.watchedShows || [])
+        .sort((a, b) => b.plays - a.plays)
+        .slice(0, 5),
+      years: [
+        ...new Set(history.map((h) => new Date(h.watched_at).getFullYear())),
+      ].sort((a, b) => b - a),
       topActors: (data.topActors || []).slice(0, 6),
-      topDirectors: (data.topDirectors || []).slice(0, 6)
+      topDirectors: (data.topDirectors || []).slice(0, 6),
     };
   }, [data]);
 
@@ -369,13 +467,15 @@ export default function StatsClient() {
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="h-px w-12 bg-indigo-500" />
-              <span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">Tu Perfil</span>
+              <span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">
+                Tu Perfil
+              </span>
             </div>
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
               Estadísticas
               <span className="text-indigo-500">.</span>
             </h1>
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
               Tus estadísticas personalizadas de Trakt.
             </p>
           </motion.div>
@@ -393,7 +493,8 @@ export default function StatsClient() {
                 Conecta tu cuenta de Trakt
               </h2>
               <p className="text-zinc-400 max-w-sm mb-8 text-sm">
-                Para ver tus estadísticas personales, historial detallado y patrones de visualización, necesitas iniciar sesión.
+                Para ver tus estadísticas personales, historial detallado y
+                patrones de visualización, necesitas iniciar sesión.
               </p>
               <button
                 onClick={() =>
@@ -419,7 +520,6 @@ export default function StatsClient() {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-
         {/* Header - Always Visible */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -429,13 +529,15 @@ export default function StatsClient() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="h-px w-12 bg-indigo-500" />
-              <span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">Tu Perfil</span>
+              <span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">
+                Tu Perfil
+              </span>
             </div>
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
               Estadísticas
               <span className="text-indigo-500">.</span>
             </h1>
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
               Tus estadísticas personalizadas de Trakt.
             </p>
           </div>
@@ -449,10 +551,11 @@ export default function StatsClient() {
               <button
                 key={tab.id}
                 onClick={() => setViewMode(tab.id)}
-                className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === tab.id
-                  ? "text-black"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-                  }`}
+                className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${
+                  viewMode === tab.id
+                    ? "text-black"
+                    : "text-zinc-400 hover:text-white hover:bg-white/5"
+                }`}
               >
                 {viewMode === tab.id && (
                   <motion.div
@@ -525,38 +628,61 @@ export default function StatsClient() {
                 {/* Secondary KPIs */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
-                    <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500"><Star className="w-5 h-5" /></div>
+                    <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500">
+                      <Star className="w-5 h-5" />
+                    </div>
                     <div>
-                      <div className="text-xl font-bold">{stats.ratings.total}</div>
-                      <div className="text-xs text-zinc-500 uppercase font-bold">Valoraciones</div>
+                      <div className="text-xl font-bold">
+                        {stats.ratings.total}
+                      </div>
+                      <div className="text-xs text-zinc-500 uppercase font-bold">
+                        Valoraciones
+                      </div>
                     </div>
                   </div>
                   <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
-                    <div className="p-2 bg-rose-500/10 rounded-lg text-rose-500"><MessageSquare className="w-5 h-5" /></div>
+                    <div className="p-2 bg-rose-500/10 rounded-lg text-rose-500">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
                     <div>
-                      <div className="text-xl font-bold">{stats.totalComments}</div>
-                      <div className="text-xs text-zinc-500 uppercase font-bold">Comentarios</div>
+                      <div className="text-xl font-bold">
+                        {stats.totalComments}
+                      </div>
+                      <div className="text-xs text-zinc-500 uppercase font-bold">
+                        Comentarios
+                      </div>
                     </div>
                   </div>
                   <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
-                    <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500"><Users className="w-5 h-5" /></div>
+                    <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
+                      <Users className="w-5 h-5" />
+                    </div>
                     <div>
-                      <div className="text-xl font-bold">{stats.network.followers}</div>
-                      <div className="text-xs text-zinc-500 uppercase font-bold">Seguidores</div>
+                      <div className="text-xl font-bold">
+                        {stats.network.followers}
+                      </div>
+                      <div className="text-xs text-zinc-500 uppercase font-bold">
+                        Seguidores
+                      </div>
                     </div>
                   </div>
                   <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
-                    <div className="p-2 bg-teal-500/10 rounded-lg text-teal-500"><Heart className="w-5 h-5" /></div>
+                    <div className="p-2 bg-teal-500/10 rounded-lg text-teal-500">
+                      <Heart className="w-5 h-5" />
+                    </div>
                     <div>
-                      <div className="text-xl font-bold">{stats.network.friends}</div>
-                      <div className="text-xs text-zinc-500 uppercase font-bold">Amigos</div>
+                      <div className="text-xl font-bold">
+                        {stats.network.friends}
+                      </div>
+                      <div className="text-xs text-zinc-500 uppercase font-bold">
+                        Amigos
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Main Charts Row */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
                   {/* Activity Chart - Spans 2 cols */}
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -565,18 +691,44 @@ export default function StatsClient() {
                     className="lg:col-span-2 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden"
                   >
                     <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-                    <SectionTitle icon={Activity} title="Actividad Mensual" subtitle="Visualizaciones en el último año" color="indigo" />
+                    <SectionTitle
+                      icon={Activity}
+                      title="Actividad Mensual"
+                      subtitle="Visualizaciones en el último año"
+                      color="indigo"
+                    />
 
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={stats.monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <AreaChart
+                          data={stats.monthlyData}
+                          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                        >
                           <defs>
-                            <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor={COLORS.indigo} stopOpacity={0.3} />
-                              <stop offset="95%" stopColor={COLORS.indigo} stopOpacity={0} />
+                            <linearGradient
+                              id="colorTotal"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor={COLORS.indigo}
+                                stopOpacity={0.3}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor={COLORS.indigo}
+                                stopOpacity={0}
+                              />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_THEME.grid} />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            vertical={false}
+                            stroke={CHART_THEME.grid}
+                          />
                           <XAxis
                             dataKey="label"
                             stroke={CHART_THEME.text}
@@ -591,7 +743,13 @@ export default function StatsClient() {
                             tickLine={false}
                             axisLine={false}
                           />
-                          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }} />
+                          <Tooltip
+                            content={<CustomTooltip />}
+                            cursor={{
+                              stroke: "rgba(255,255,255,0.1)",
+                              strokeWidth: 2,
+                            }}
+                          />
                           <Area
                             type="monotone"
                             dataKey="total"
@@ -614,7 +772,12 @@ export default function StatsClient() {
                     transition={{ delay: 0.3 }}
                     className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center justify-center relative"
                   >
-                    <SectionTitle icon={Clock} title="Distribución de Tiempo" subtitle="Películas vs Series" color="indigo" />
+                    <SectionTitle
+                      icon={Clock}
+                      title="Distribución de Tiempo"
+                      subtitle="Películas vs Series"
+                      color="indigo"
+                    />
                     <div className="h-[250px] w-full relative">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -626,20 +789,34 @@ export default function StatsClient() {
                             dataKey="value"
                           >
                             {stats.timeDistribution.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(0,0,0,0)" />
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={entry.color}
+                                stroke="rgba(0,0,0,0)"
+                              />
                             ))}
                           </Pie>
                           <Tooltip
-                            content={<CustomTooltip formatter={formatMinutes} />}
+                            content={
+                              <CustomTooltip formatter={formatMinutes} />
+                            }
                             wrapperStyle={{ zIndex: 1000 }}
                           />
-                          <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                          <Legend
+                            verticalAlign="bottom"
+                            height={36}
+                            iconType="circle"
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                       {/* Center Text */}
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
-                        <span className="text-3xl font-black text-white">{stats.formattedTotalTime.split(" ")[0]}</span>
-                        <span className="text-sm font-bold text-zinc-500 uppercase tracking-widest">{stats.formattedTotalTime.split(" ")[1]}</span>
+                        <span className="text-3xl font-black text-white">
+                          {stats.formattedTotalTime.split(" ")[0]}
+                        </span>
+                        <span className="text-sm font-bold text-zinc-500 uppercase tracking-widest">
+                          {stats.formattedTotalTime.split(" ")[1]}
+                        </span>
                       </div>
                     </div>
                   </motion.div>
@@ -654,16 +831,31 @@ export default function StatsClient() {
                     transition={{ delay: 0.7 }}
                     className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6"
                   >
-                    <SectionTitle icon={Film} title="Películas Top" subtitle="Las que más has visto" color="blue" />
+                    <SectionTitle
+                      icon={Film}
+                      title="Películas Top"
+                      subtitle="Las que más has visto"
+                      color="blue"
+                    />
                     <div className="space-y-3">
                       {stats.topMovies.map((item, idx) => (
-                        <Link key={idx} href={`/details/movie/${item.movie.ids.tmdb}`} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${idx === 0 ? 'bg-blue-500 text-black' : 'bg-white/10 text-zinc-400'}`}>
+                        <Link
+                          key={idx}
+                          href={`/details/movie/${item.movie.ids.tmdb}`}
+                          className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group"
+                        >
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${idx === 0 ? "bg-blue-500 text-black" : "bg-white/10 text-zinc-400"}`}
+                          >
                             {idx + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-zinc-200 truncate group-hover:text-blue-400 transition">{item.movie.title}</h4>
-                            <p className="text-xs text-zinc-500">{item.plays} reproducciones</p>
+                            <h4 className="font-bold text-zinc-200 truncate group-hover:text-blue-400 transition">
+                              {item.movie.title}
+                            </h4>
+                            <p className="text-xs text-zinc-500">
+                              {item.plays} reproducciones
+                            </p>
                           </div>
                           <div className="opacity-0 group-hover:opacity-100 transition text-blue-500">
                             <ArrowUp className="w-4 h-4 rotate-45" />
@@ -680,16 +872,31 @@ export default function StatsClient() {
                     transition={{ delay: 0.7 }}
                     className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6"
                   >
-                    <SectionTitle icon={Tv} title="Series Top" subtitle="Tus maratones favoritos" color="purple" />
+                    <SectionTitle
+                      icon={Tv}
+                      title="Series Top"
+                      subtitle="Tus maratones favoritos"
+                      color="purple"
+                    />
                     <div className="space-y-3">
                       {stats.topShows.map((item, idx) => (
-                        <Link key={idx} href={`/details/tv/${item.show.ids.tmdb}`} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${idx === 0 ? 'bg-purple-500 text-black' : 'bg-white/10 text-zinc-400'}`}>
+                        <Link
+                          key={idx}
+                          href={`/details/tv/${item.show.ids.tmdb}`}
+                          className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group"
+                        >
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${idx === 0 ? "bg-purple-500 text-black" : "bg-white/10 text-zinc-400"}`}
+                          >
                             {idx + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-zinc-200 truncate group-hover:text-purple-400 transition">{item.show.title}</h4>
-                            <p className="text-xs text-zinc-500">{item.plays} vistos</p>
+                            <h4 className="font-bold text-zinc-200 truncate group-hover:text-purple-400 transition">
+                              {item.show.title}
+                            </h4>
+                            <p className="text-xs text-zinc-500">
+                              {item.plays} vistos
+                            </p>
                           </div>
                           <div className="opacity-0 group-hover:opacity-100 transition text-purple-500">
                             <ArrowUp className="w-4 h-4 rotate-45" />
@@ -708,10 +915,19 @@ export default function StatsClient() {
                     transition={{ delay: 0.65 }}
                     className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
                   >
-                    <SectionTitle icon={Users} title="Actores Favoritos" subtitle="Las caras que más ves" color="yellow" />
+                    <SectionTitle
+                      icon={Users}
+                      title="Actores Favoritos"
+                      subtitle="Las caras que más ves"
+                      color="yellow"
+                    />
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
                       {stats.topActors.map((person, idx) => (
-                        <Link key={person.id} href={`/details/person/${person.id}`} className="group relative">
+                        <Link
+                          key={person.id}
+                          href={`/details/person/${person.id}`}
+                          className="group relative"
+                        >
                           <div className="aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 mb-2 border border-white/5 group-hover:border-yellow-500/50 transition-all duration-300">
                             {person.profile_path ? (
                               <img
@@ -726,8 +942,12 @@ export default function StatsClient() {
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition" />
                             <div className="absolute bottom-0 left-0 right-0 p-2">
-                              <p className="text-white text-xs font-bold leading-tight truncate">{person.name}</p>
-                              <p className="text-yellow-400 text-[10px] font-medium">{person.count} pelis</p>
+                              <p className="text-white text-xs font-bold leading-tight truncate">
+                                {person.name}
+                              </p>
+                              <p className="text-yellow-400 text-[10px] font-medium">
+                                {person.count} pelis
+                              </p>
                             </div>
                           </div>
                         </Link>
@@ -744,10 +964,19 @@ export default function StatsClient() {
                     transition={{ delay: 0.7 }}
                     className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl mt-6"
                   >
-                    <SectionTitle icon={Film} title="Directores Favoritos" subtitle="Los cineastas que más sigues" color="rose" />
+                    <SectionTitle
+                      icon={Film}
+                      title="Directores Favoritos"
+                      subtitle="Los cineastas que más sigues"
+                      color="rose"
+                    />
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
                       {stats.topDirectors.map((person, idx) => (
-                        <Link key={person.id} href={`/details/person/${person.id}`} className="group relative">
+                        <Link
+                          key={person.id}
+                          href={`/details/person/${person.id}`}
+                          className="group relative"
+                        >
                           <div className="aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 mb-2 border border-white/5 group-hover:border-rose-500/50 transition-all duration-300">
                             {person.profile_path ? (
                               <img
@@ -762,8 +991,12 @@ export default function StatsClient() {
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition" />
                             <div className="absolute bottom-0 left-0 right-0 p-2">
-                              <p className="text-white text-xs font-bold leading-tight truncate">{person.name}</p>
-                              <p className="text-rose-400 text-[10px] font-medium">{person.count} pelis</p>
+                              <p className="text-white text-xs font-bold leading-tight truncate">
+                                {person.name}
+                              </p>
+                              <p className="text-rose-400 text-[10px] font-medium">
+                                {person.count} pelis
+                              </p>
                             </div>
                           </div>
                         </Link>
@@ -771,7 +1004,6 @@ export default function StatsClient() {
                     </div>
                   </motion.div>
                 )}
-
               </motion.div>
             )}
 
@@ -787,14 +1019,36 @@ export default function StatsClient() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Hour of Day */}
                   <div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
-                    <SectionTitle icon={Clock} title="Hora del Día" subtitle="¿Cuándo ves más contenido?" color="pink" />
+                    <SectionTitle
+                      icon={Clock}
+                      title="Hora del Día"
+                      subtitle="¿Cuándo ves más contenido?"
+                      color="pink"
+                    />
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={stats.hourOfDayData}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_THEME.grid} />
-                          <XAxis dataKey="name" stroke={CHART_THEME.text} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                          <Bar dataKey="value" fill={COLORS.pink} radius={[4, 4, 0, 0]} />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            vertical={false}
+                            stroke={CHART_THEME.grid}
+                          />
+                          <XAxis
+                            dataKey="name"
+                            stroke={CHART_THEME.text}
+                            tick={{ fontSize: 10 }}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <Tooltip
+                            content={<CustomTooltip />}
+                            cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                          />
+                          <Bar
+                            dataKey="value"
+                            fill={COLORS.pink}
+                            radius={[4, 4, 0, 0]}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -802,14 +1056,36 @@ export default function StatsClient() {
 
                   {/* Day of Week */}
                   <div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
-                    <SectionTitle icon={CalendarIcon} title="Día de la Semana" subtitle="Tus días más activos" color="cyan" />
+                    <SectionTitle
+                      icon={CalendarIcon}
+                      title="Día de la Semana"
+                      subtitle="Tus días más activos"
+                      color="cyan"
+                    />
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={stats.dayOfWeekData}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_THEME.grid} />
-                          <XAxis dataKey="name" stroke={CHART_THEME.text} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                          <Bar dataKey="value" fill={COLORS.cyan} radius={[4, 4, 0, 0]} />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            vertical={false}
+                            stroke={CHART_THEME.grid}
+                          />
+                          <XAxis
+                            dataKey="name"
+                            stroke={CHART_THEME.text}
+                            tick={{ fontSize: 10 }}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <Tooltip
+                            content={<CustomTooltip />}
+                            cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                          />
+                          <Bar
+                            dataKey="value"
+                            fill={COLORS.cyan}
+                            radius={[4, 4, 0, 0]}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -819,16 +1095,36 @@ export default function StatsClient() {
                 {/* Genres & Ratings row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Genres - Radar */}
-                  <motion.div
-                    className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
-                  >
-                    <SectionTitle icon={Target} title="Gustos por Género" subtitle="Tus categorías más frecuentes" color="lime" />
+                  <motion.div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+                    <SectionTitle
+                      icon={Target}
+                      title="Gustos por Género"
+                      subtitle="Tus categorías más frecuentes"
+                      color="lime"
+                    />
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={stats.genreData}>
+                        <RadarChart
+                          cx="50%"
+                          cy="50%"
+                          outerRadius="80%"
+                          data={stats.genreData}
+                        >
                           <PolarGrid stroke={CHART_THEME.grid} />
-                          <PolarAngleAxis dataKey="name" tick={{ fill: CHART_THEME.text, fontSize: 13, fontWeight: 500 }} />
-                          <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+                          <PolarAngleAxis
+                            dataKey="name"
+                            tick={{
+                              fill: CHART_THEME.text,
+                              fontSize: 13,
+                              fontWeight: 500,
+                            }}
+                          />
+                          <PolarRadiusAxis
+                            angle={30}
+                            domain={[0, "auto"]}
+                            tick={false}
+                            axisLine={false}
+                          />
                           <Radar
                             name="Géneros"
                             dataKey="value"
@@ -843,14 +1139,21 @@ export default function StatsClient() {
                   </motion.div>
 
                   {/* Ratings - Bar */}
-                  <motion.div
-                    className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
-                  >
-                    <SectionTitle icon={Award} title="Tus Puntuaciones" subtitle="Distribución de ratings (1-10)" color="teal" />
+                  <motion.div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+                    <SectionTitle
+                      icon={Award}
+                      title="Tus Puntuaciones"
+                      subtitle="Distribución de ratings (1-10)"
+                      color="teal"
+                    />
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={stats.ratingData} barSize={20}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_THEME.grid} />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            vertical={false}
+                            stroke={CHART_THEME.grid}
+                          />
                           <XAxis
                             dataKey="name"
                             stroke={CHART_THEME.text}
@@ -858,10 +1161,26 @@ export default function StatsClient() {
                             axisLine={false}
                             tickLine={false}
                           />
-                          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                          <Bar dataKey="value" name="Votos" radius={[4, 4, 0, 0]}>
+                          <Tooltip
+                            content={<CustomTooltip />}
+                            cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                          />
+                          <Bar
+                            dataKey="value"
+                            name="Votos"
+                            radius={[4, 4, 0, 0]}
+                          >
                             {stats.ratingData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={index > 6 ? COLORS.teal : index > 4 ? COLORS.yellow : COLORS.rose} />
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={
+                                  index > 6
+                                    ? COLORS.teal
+                                    : index > 4
+                                      ? COLORS.yellow
+                                      : COLORS.rose
+                                }
+                              />
                             ))}
                           </Bar>
                         </BarChart>
@@ -885,22 +1204,30 @@ export default function StatsClient() {
                   <div className="absolute inset-0 bg-indigo-500/20 rounded-full blur-xl animate-pulse" />
                   <CalendarIcon className="w-10 h-10 text-zinc-400" />
                 </div>
-                <h2 className="text-3xl font-bold text-white mb-2">Histórico Detallado</h2>
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  Histórico Detallado
+                </h2>
                 <p className="text-zinc-500 max-w-md mx-auto mb-8">
-                  Estamos preparando una vista cronológica completa para que explores tu historia año por año con un nivel de detalle increíble.
+                  Estamos preparando una vista cronológica completa para que
+                  explores tu historia año por año con un nivel de detalle
+                  increíble.
                 </p>
                 <div className="flex gap-2">
-                  {stats.years.slice(0, 5).map(year => (
-                    <span key={year} className="px-4 py-2 rounded-lg bg-zinc-900 border border-white/10 text-zinc-400 font-mono text-sm">
+                  {stats.years.slice(0, 5).map((year) => (
+                    <span
+                      key={year}
+                      className="px-4 py-2 rounded-lg bg-zinc-900 border border-white/10 text-zinc-400 font-mono text-sm"
+                    >
                       {year}
                     </span>
                   ))}
-                  {stats.years.length > 5 && <span className="px-4 py-2 text-zinc-600">...</span>}
+                  {stats.years.length > 5 && (
+                    <span className="px-4 py-2 text-zinc-600">...</span>
+                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-
         )}
       </div>
     </div>

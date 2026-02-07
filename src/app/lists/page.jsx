@@ -1341,7 +1341,7 @@ export default function ListsPage() {
               Mis Listas
               <span className="text-purple-500">.</span>
             </h1>
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
               Gestiona y organiza tus colecciones personales.
             </p>
           </div>

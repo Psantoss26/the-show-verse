@@ -121,10 +121,11 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between ${active
-        ? "bg-zinc-800 text-white"
-        : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-        }`}
+      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between ${
+        active
+          ? "bg-zinc-800 text-white"
+          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+      }`}
     >
       <span className="font-medium">{children}</span>
       {active && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
@@ -224,19 +225,19 @@ function DateSelector({
               modifiers={
                 viewMode === "week"
                   ? {
-                    selectedWeek: (date) =>
-                      isSameWeek(date, selected, {
-                        locale: es,
-                        weekStartsOn: 1,
-                      }),
-                  }
+                      selectedWeek: (date) =>
+                        isSameWeek(date, selected, {
+                          locale: es,
+                          weekStartsOn: 1,
+                        }),
+                    }
                   : {}
               }
               modifiersClassNames={
                 viewMode === "week"
                   ? {
-                    selectedWeek: "!bg-yellow-500/20 !text-yellow-300",
-                  }
+                      selectedWeek: "!bg-yellow-500/20 !text-yellow-300",
+                    }
                   : {}
               }
               classNames={{
@@ -422,13 +423,15 @@ export default function CalendarPage() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="h-px w-12 bg-yellow-500" />
-              <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">AGENDA</span>
+              <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">
+                AGENDA
+              </span>
             </div>
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
               Calendario
               <span className="text-yellow-500">.</span>
             </h1>
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg">
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
               Consulta las fechas de emisión y próximos estrenos.
             </p>
           </div>
@@ -443,28 +446,31 @@ export default function CalendarPage() {
               <div className="flex items-center gap-1.5 p-1 bg-zinc-900/50 rounded-xl border border-white/5">
                 <button
                   onClick={() => setViewMode("day")}
-                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${viewMode === "day"
-                    ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-                    }`}
+                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                    viewMode === "day"
+                      ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
                 >
                   Día
                 </button>
                 <button
                   onClick={() => setViewMode("week")}
-                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${viewMode === "week"
-                    ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-                    }`}
+                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                    viewMode === "week"
+                      ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
                 >
                   Semana
                 </button>
                 <button
                   onClick={() => setViewMode("month")}
-                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${viewMode === "month"
-                    ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-                    }`}
+                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                    viewMode === "month"
+                      ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
                 >
                   Mes
                 </button>
@@ -575,16 +581,16 @@ export default function CalendarPage() {
                 const sortedMovies =
                   viewMode !== "day"
                     ? [...selectedMovies].sort((a, b) => {
-                      const dateA =
-                        a.media_type === "movie" || a.title
-                          ? a.release_date
-                          : a.first_air_date;
-                      const dateB =
-                        b.media_type === "movie" || b.title
-                          ? b.release_date
-                          : b.first_air_date;
-                      return (dateA || "").localeCompare(dateB || "");
-                    })
+                        const dateA =
+                          a.media_type === "movie" || a.title
+                            ? a.release_date
+                            : a.first_air_date;
+                        const dateB =
+                          b.media_type === "movie" || b.title
+                            ? b.release_date
+                            : b.first_air_date;
+                        return (dateA || "").localeCompare(dateB || "");
+                      })
                     : selectedMovies;
 
                 return sortedMovies.map((item) => {
@@ -632,10 +638,11 @@ export default function CalendarPage() {
                           {/* Badge Tipo en hover - Esquina superior derecha */}
                           <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-end items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                             <span
-                              className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
-                                ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                }`}
+                              className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                                isMovie
+                                  ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                                  : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                              }`}
                             >
                               {isMovie ? "PELÍCULA" : "SERIE"}
                             </span>
@@ -657,10 +664,11 @@ export default function CalendarPage() {
                         {/* Badge Fecha (siempre visible en vistas semana/mes) */}
                         {dateBadgeInfo && (
                           <div
-                            className={`absolute top-1 left-1 sm:top-2 sm:left-2 px-1.5 py-1 rounded-lg backdrop-blur-md border shadow-lg ${dateBadgeInfo.isToday
-                              ? "bg-yellow-500/90 border-yellow-400/50 text-black"
-                              : "bg-black/80 border-white/20 text-white"
-                              }`}
+                            className={`absolute top-1 left-1 sm:top-2 sm:left-2 px-1.5 py-1 rounded-lg backdrop-blur-md border shadow-lg ${
+                              dateBadgeInfo.isToday
+                                ? "bg-yellow-500/90 border-yellow-400/50 text-black"
+                                : "bg-black/80 border-white/20 text-white"
+                            }`}
                           >
                             <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider leading-none">
                               {dateBadgeInfo.dayName}
