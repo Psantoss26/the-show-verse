@@ -1889,12 +1889,12 @@ export default function FavoritesClient() {
             </div>
 
             <motion.div
-              className="flex gap-3 md:gap-4 shrink-0"
+              className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
-              <div className="min-w-[100px] lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                 <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-red-400">
                   <Heart className="w-4 h-4 md:w-5 md:h-5 fill-red-400" />
                 </div>
@@ -1909,7 +1909,7 @@ export default function FavoritesClient() {
                   Total
                 </div>
               </div>
-              <div className="min-w-[100px] lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                 <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
                   <Film className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
@@ -1924,7 +1924,7 @@ export default function FavoritesClient() {
                   Películas
                 </div>
               </div>
-              <div className="min-w-[100px] lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                 <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400">
                   <TvGlyph className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
                 </div>
@@ -1945,7 +1945,24 @@ export default function FavoritesClient() {
 
         {/* Filters */}
         <motion.div
-          className="sticky top-16 z-[60] space-y-3 mb-6 py-3 px-4 backdrop-blur-xl bg-gradient-to-br from-black/60 via-black/50 to-black/55 rounded-2xl"
+          ref={(el) => {
+            if (el && !el.dataset.stickySetup) {
+              el.dataset.stickySetup = 'true';
+              const observer = new IntersectionObserver(
+                ([e]) => {
+                  const isStuck = e.intersectionRatio < 1;
+                  if (isStuck) {
+                    el.classList.add('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                  } else {
+                    el.classList.remove('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                  }
+                },
+                { threshold: [1], rootMargin: '-65px 0px 0px 0px' }
+              );
+              observer.observe(el);
+            }
+          }}
+          className="sticky top-16 z-[60] space-y-1 mb-3 p-2 rounded-2xl transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}

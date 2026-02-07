@@ -32,6 +32,7 @@ import {
   Calendar,
   X,
   LogOut,
+  SlidersHorizontal,
 } from "lucide-react";
 
 import {
@@ -409,20 +410,20 @@ function StatCard({
   loading = false,
 }) {
   return (
-    <div className="flex-1 min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-1 py-2 md:p-4 flex flex-col items-center justify-center gap-0.5 md:gap-1 backdrop-blur-sm transition hover:bg-zinc-900/70">
+    <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1 backdrop-blur-sm transition hover:bg-zinc-900/70">
       <div
-        className={`p-1 md:p-2 rounded-full bg-white/5 mb-0.5 md:mb-1 ${colorClass}`}
+        className={`p-1.5 md:p-2 rounded-full bg-white/5 mb-1 ${colorClass}`}
       >
-        <Icon className="w-3 h-3 md:w-4 md:h-4" />
+        <Icon className="w-4 h-4 md:w-5 md:h-5" />
       </div>
-      <div className="text-base md:text-2xl font-black text-white tracking-tight">
+      <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
         {loading ? (
-          <span className="inline-block h-5 md:h-7 w-8 md:w-12 rounded-lg bg-white/10 animate-pulse" />
+          <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
         ) : (
           value
         )}
       </div>
-      <div className="text-[8px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight px-0.5">
+      <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
         {label}
       </div>
     </div>
@@ -1633,6 +1634,7 @@ export default function HistoryClient() {
   const [selectedDay, setSelectedDay] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [showCalendarView, setShowCalendarView] = useState(false);
 
   // Persistir estados de UI en localStorage
@@ -1869,153 +1871,119 @@ export default function HistoryClient() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
-          <div className="flex items-center justify-between gap-4 mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <div className="h-px w-12 bg-emerald-500" />
                 <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">REGISTRO</span>
               </div>
-              <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                Historial
-                <span className="text-emerald-500">.</span>
-              </h1>
+              <div className="flex items-center gap-6">
+                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+                  Historial
+                  <span className="text-emerald-500">.</span>
+                </h1>
+
+                {/* Botones redondos junto al título */}
+                {auth.connected && (
+                  <div className="flex items-center gap-2">
+                    <motion.button
+                      onClick={() => loadHistory()}
+                      disabled={loading}
+                      className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.4, delay: 0.3 }}
+                      whileHover={{ scale: loading ? 1 : 1.05 }}
+                      whileTap={{ scale: loading ? 1 : 0.95 }}
+                      title="Sincronizar"
+                    >
+                      <RotateCcw className={`w-5 h-5 text-white ${loading ? "animate-spin" : ""}`} />
+                    </motion.button>
+
+                    <motion.button
+                      onClick={() => setShowDisconnectModal(true)}
+                      disabled={loading}
+                      className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.4, delay: 0.4 }}
+                      whileHover={{ scale: loading ? 1 : 1.05 }}
+                      whileTap={{ scale: loading ? 1 : 0.95 }}
+                      title="Desconectar"
+                    >
+                      <LogOut className="w-5 h-5 text-red-400" />
+                    </motion.button>
+                  </div>
+                )}
+              </div>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg">
                 Registro cronológico de todo lo que has visto.
               </p>
             </div>
 
-            {/* Botones solo iconos - SOLO MÓVIL a la derecha */}
+            {/* Solo estadísticas a la derecha */}
             {auth.connected && (
-              <div className="flex md:hidden items-center gap-2">
-                <motion.button
-                  onClick={() => loadHistory()}
-                  disabled={loading}
-                  className="p-2.5 bg-white text-black hover:bg-zinc-200 rounded-full transition disabled:opacity-50 shadow-lg shadow-white/5"
-                  initial={{ opacity: 0, scale: 0.8 }}
+              <motion.div
+                className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.5 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  title="Sincronizar"
                 >
-                  <RotateCcw
-                    className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                  <StatCard
+                    label="Total Vistos"
+                    value={stats.plays}
+                    loading={!historyLoaded}
+                    icon={CheckCircle2}
+                    colorClass="text-emerald-400 bg-emerald-500/10"
                   />
-                </motion.button>
-
-                <motion.button
-                  onClick={() => setShowDisconnectModal(true)}
-                  disabled={loading}
-                  className="p-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-full transition disabled:opacity-50 shadow-lg shadow-red-500/5"
-                  initial={{ opacity: 0, scale: 0.8 }}
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.6 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  title="Desconectar"
                 >
-                  <LogOut className="w-4 h-4" />
-                </motion.button>
-              </div>
-            )}
-
-            {/* Botones con texto - SOLO DESKTOP en su posición original */}
-            {auth.connected && (
-              <div className="hidden md:flex items-center gap-3">
-                <motion.button
-                  onClick={() => loadHistory()}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-white text-black hover:bg-zinc-200 rounded-full text-sm font-bold transition disabled:opacity-50 shadow-lg shadow-white/5"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.5 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <RotateCcw
-                    className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                  <StatCard
+                    label="Títulos Únicos"
+                    value={stats.unique}
+                    loading={!historyLoaded}
+                    icon={LayoutList}
+                    colorClass="text-purple-400 bg-purple-500/10"
                   />
-                  {loading ? "Sincronizando..." : "Sincronizar"}
-                </motion.button>
-
-                <motion.button
-                  onClick={() => setShowDisconnectModal(true)}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-full text-sm font-bold transition disabled:opacity-50 shadow-lg shadow-red-500/5"
-                  initial={{ opacity: 0, scale: 0.8 }}
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.6 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  transition={{ duration: 0.4, delay: 0.7 }}
                 >
-                  <LogOut className="w-4 h-4" />
-                  Desconectar
-                </motion.button>
-              </div>
+                  <StatCard
+                    label="Películas"
+                    value={stats.movies}
+                    loading={!historyLoaded}
+                    icon={Film}
+                    colorClass="text-sky-400 bg-sky-500/10"
+                  />
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.8 }}
+                >
+                  <StatCard
+                    label="Episodios"
+                    value={stats.shows}
+                    loading={!historyLoaded}
+                    icon={Tv}
+                    colorClass="text-pink-400 bg-pink-500/10"
+                  />
+                </motion.div>
+              </motion.div>
             )}
           </div>
-
-          {auth.connected && (
-            <motion.div
-              className="grid grid-cols-4 gap-2 md:gap-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: 0.7 }}
-              >
-                <StatCard
-                  label="Total Vistos"
-                  value={stats.plays}
-                  loading={!historyLoaded}
-                  icon={CheckCircle2}
-                  colorClass="text-emerald-400 bg-emerald-500/10"
-                />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: 0.8 }}
-              >
-                <StatCard
-                  label="Títulos Únicos"
-                  value={stats.unique}
-                  loading={!historyLoaded}
-                  icon={LayoutList}
-                  colorClass="text-purple-400 bg-purple-500/10"
-                />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: 0.9 }}
-              >
-                <StatCard
-                  label="Películas"
-                  value={stats.movies}
-                  loading={!historyLoaded}
-                  icon={Film}
-                  colorClass="text-sky-400 bg-sky-500/10"
-                />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: 1.0 }}
-              >
-                <StatCard
-                  label="Episodios"
-                  value={stats.shows}
-                  loading={!historyLoaded}
-                  icon={Tv}
-                  colorClass="text-pink-400 bg-pink-500/10"
-                />
-              </motion.div>
-            </motion.div>
-          )}
         </motion.header>
 
         {/* Layout Principal */}
@@ -2031,14 +1999,31 @@ export default function HistoryClient() {
           >
             {auth.connected && (
               <motion.div
-                className="space-y-3"
+                ref={(el) => {
+                  if (el && !el.dataset.stickySetup) {
+                    el.dataset.stickySetup = 'true';
+                    const observer = new IntersectionObserver(
+                      ([e]) => {
+                        const isStuck = e.intersectionRatio < 1;
+                        if (isStuck) {
+                          el.classList.add('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                        } else {
+                          el.classList.remove('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                        }
+                      },
+                      { threshold: [1], rootMargin: '-65px 0px 0px 0px' }
+                    );
+                    observer.observe(el);
+                  }
+                }}
+                className="sticky top-16 z-[60] space-y-1 mb-3 p-2 rounded-2xl transition-all duration-300"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.5 }}
               >
-                {/* Móvil: Fila 1 - Búsqueda */}
-                <div className="lg:hidden">
-                  <div className="relative w-full">
+                {/* Mobile: search + toggle */}
+                <div className="flex gap-2 lg:hidden">
+                  <div className="relative flex-1">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                     <input
                       value={q}
@@ -2055,212 +2040,233 @@ export default function HistoryClient() {
                       </button>
                     )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setMobileFiltersOpen((v) => !v)}
+                    className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${mobileFiltersOpen
+                      ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                      : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                      }`}
+                  >
+                    <SlidersHorizontal className="w-4 h-4" />
+                  </button>
                 </div>
 
-                {/* Móvil: Fila 2 - Tipo y Agrupar (50% cada uno) */}
-                <div className="flex gap-2 lg:hidden">
-                  <div className="flex-1">
-                    <InlineDropdown
-                      label="Tipo"
-                      valueLabel={
-                        typeFilter === "all"
-                          ? "Todo"
-                          : typeFilter === "movies"
-                            ? "Películas"
-                            : "Series"
-                      }
-                      icon={Filter}
+                {/* Mobile: collapsible filters */}
+                <AnimatePresence>
+                  {mobileFiltersOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: "easeInOut" }}
+                      className="lg:hidden overflow-visible"
                     >
-                      {({ close }) => (
-                        <>
-                          <DropdownItem
-                            active={typeFilter === "all"}
-                            onClick={() => {
-                              setTypeFilter("all");
-                              close();
-                            }}
-                          >
-                            Todo
-                          </DropdownItem>
-                          <DropdownItem
-                            active={typeFilter === "movies"}
-                            onClick={() => {
-                              setTypeFilter("movies");
-                              close();
-                            }}
-                          >
-                            Películas
-                          </DropdownItem>
-                          <DropdownItem
-                            active={typeFilter === "shows"}
-                            onClick={() => {
-                              setTypeFilter("shows");
-                              close();
-                            }}
-                          >
-                            Series
-                          </DropdownItem>
-                        </>
-                      )}
-                    </InlineDropdown>
-                  </div>
+                      <div className="space-y-3 pt-1">
+                        {/* Fila 1 - Tipo y Agrupar */}
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <InlineDropdown
+                              label="Tipo"
+                              valueLabel={
+                                typeFilter === "all"
+                                  ? "Todo"
+                                  : typeFilter === "movies"
+                                    ? "Películas"
+                                    : "Series"
+                              }
+                              icon={Filter}
+                            >
+                              {({ close }) => (
+                                <>
+                                  <DropdownItem
+                                    active={typeFilter === "all"}
+                                    onClick={() => {
+                                      setTypeFilter("all");
+                                      close();
+                                    }}
+                                  >
+                                    Todo
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    active={typeFilter === "movies"}
+                                    onClick={() => {
+                                      setTypeFilter("movies");
+                                      close();
+                                    }}
+                                  >
+                                    Películas
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    active={typeFilter === "shows"}
+                                    onClick={() => {
+                                      setTypeFilter("shows");
+                                      close();
+                                    }}
+                                  >
+                                    Series
+                                  </DropdownItem>
+                                </>
+                              )}
+                            </InlineDropdown>
+                          </div>
 
-                  <div className="flex-1">
-                    <InlineDropdown
-                      label="Agrupar"
-                      valueLabel={
-                        groupBy === "day"
-                          ? "Día"
-                          : groupBy === "month"
-                            ? "Mes"
-                            : "Año"
-                      }
-                      icon={Layers}
-                    >
-                      {({ close }) => (
-                        <>
-                          <DropdownItem
-                            active={groupBy === "day"}
-                            onClick={() => {
-                              setGroupBy("day");
-                              close();
-                            }}
-                          >
-                            Día
-                          </DropdownItem>
-                          <DropdownItem
-                            active={groupBy === "month"}
-                            onClick={() => {
-                              setGroupBy("month");
-                              close();
-                            }}
-                          >
-                            Mes
-                          </DropdownItem>
-                          <DropdownItem
-                            active={groupBy === "year"}
-                            onClick={() => {
-                              setGroupBy("year");
-                              close();
-                            }}
-                          >
-                            Año
-                          </DropdownItem>
-                        </>
-                      )}
-                    </InlineDropdown>
-                  </div>
-                </div>
+                          <div className="flex-1">
+                            <InlineDropdown
+                              label="Agrupar"
+                              valueLabel={
+                                groupBy === "day"
+                                  ? "Día"
+                                  : groupBy === "month"
+                                    ? "Mes"
+                                    : "Año"
+                              }
+                              icon={Calendar}
+                            >
+                              {({ close }) => (
+                                <>
+                                  <DropdownItem
+                                    active={groupBy === "day"}
+                                    onClick={() => {
+                                      setGroupBy("day");
+                                      close();
+                                    }}
+                                  >
+                                    Día
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    active={groupBy === "month"}
+                                    onClick={() => {
+                                      setGroupBy("month");
+                                      close();
+                                    }}
+                                  >
+                                    Mes
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    active={groupBy === "year"}
+                                    onClick={() => {
+                                      setGroupBy("year");
+                                      close();
+                                    }}
+                                  >
+                                    Año
+                                  </DropdownItem>
+                                </>
+                              )}
+                            </InlineDropdown>
+                          </div>
+                        </div>
 
-                {/* Móvil: Fila 3 - Ordenar + Selector vistas + Botón editar */}
-                <div className="flex gap-2 lg:hidden">
-                  <div className="flex-1">
-                    <InlineDropdown
-                      label="Orden"
-                      valueLabel={
-                        sortBy === "date-desc"
-                          ? "Reciente"
-                          : sortBy === "date-asc"
-                            ? "Antiguo"
-                            : sortBy === "title-asc"
-                              ? "A-Z"
-                              : "Z-A"
-                      }
-                      icon={ArrowUpDown}
-                    >
-                      {({ close }) => (
-                        <>
-                          <DropdownItem
-                            active={sortBy === "date-desc"}
-                            onClick={() => {
-                              setSortBy("date-desc");
-                              close();
-                            }}
-                          >
-                            Más reciente
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortBy === "date-asc"}
-                            onClick={() => {
-                              setSortBy("date-asc");
-                              close();
-                            }}
-                          >
-                            Más antiguo
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortBy === "title-asc"}
-                            onClick={() => {
-                              setSortBy("title-asc");
-                              close();
-                            }}
-                          >
-                            Título A-Z
-                          </DropdownItem>
-                          <DropdownItem
-                            active={sortBy === "title-desc"}
-                            onClick={() => {
-                              setSortBy("title-desc");
-                              close();
-                            }}
-                          >
-                            Título Z-A
-                          </DropdownItem>
-                        </>
-                      )}
-                    </InlineDropdown>
-                  </div>
+                        {/* Fila 2 - Ordenar, Vista y Editar */}
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <InlineDropdown
+                              label="Ordenar"
+                              valueLabel={
+                                sortBy === "date-desc"
+                                  ? "Más reciente"
+                                  : sortBy === "date-asc"
+                                    ? "Más antiguo"
+                                    : sortBy === "title-asc"
+                                      ? "A-Z"
+                                      : "Z-A"
+                              }
+                              icon={ArrowUpDown}
+                            >
+                              {({ close }) => (
+                                <>
+                                  <DropdownItem
+                                    active={sortBy === "date-desc"}
+                                    onClick={() => {
+                                      setSortBy("date-desc");
+                                      close();
+                                    }}
+                                  >
+                                    Más reciente
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    active={sortBy === "date-asc"}
+                                    onClick={() => {
+                                      setSortBy("date-asc");
+                                      close();
+                                    }}
+                                  >
+                                    Más antiguo
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    active={sortBy === "title-asc"}
+                                    onClick={() => {
+                                      setSortBy("title-asc");
+                                      close();
+                                    }}
+                                  >
+                                    Título A-Z
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    active={sortBy === "title-desc"}
+                                    onClick={() => {
+                                      setSortBy("title-desc");
+                                      close();
+                                    }}
+                                  >
+                                    Título Z-A
+                                  </DropdownItem>
+                                </>
+                              )}
+                            </InlineDropdown>
+                          </div>
 
-                  <div className="flex flex-1 gap-2">
-                    <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
-                      <button
-                        onClick={() => setViewMode("list")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "list"
-                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                          }`}
-                        title="Lista"
-                      >
-                        <LayoutList className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setViewMode("compact")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "compact"
-                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                          }`}
-                        title="Compacta"
-                      >
-                        <Grid3x3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setViewMode("grid")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "grid"
-                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                          }`}
-                        title="Grid"
-                      >
-                        <LayoutGrid className="w-4 h-4" />
-                      </button>
-                    </div>
+                          <div className="flex-1 flex gap-2">
+                            <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
+                              <button
+                                onClick={() => setViewMode("list")}
+                                className={`flex-1 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "list"
+                                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                                  }`}
+                                title="Lista"
+                              >
+                                <LayoutList className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setViewMode("compact")}
+                                className={`flex-1 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "compact"
+                                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                                  }`}
+                                title="Compacta"
+                              >
+                                <Grid3x3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setViewMode("grid")}
+                                className={`flex-1 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "grid"
+                                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                                  }`}
+                                title="Grid"
+                              >
+                                <LayoutGrid className="w-4 h-4" />
+                              </button>
+                            </div>
 
-                    <button
-                      onClick={() => setEditMode(!editMode)}
-                      className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 ${editMode
-                        ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                        : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600"
-                        }`}
-                      title={editMode ? "Cancelar" : "Editar"}
-                    >
-                      {editMode ? (
-                        <X className="w-4 h-4" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
+                            <button
+                              onClick={() => setEditMode(!editMode)}
+                              className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 ${editMode
+                                ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                                : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600"
+                                }`}
+                              title={editMode ? "Cancelar" : "Editar"}
+                            >
+                              {editMode ? <X className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Desktop: Una sola fila con todo */}
                 <div className="hidden lg:flex gap-3">
@@ -2591,7 +2597,7 @@ export default function HistoryClient() {
           {/* Derecha: Calendario (Solo visible en desktop y cuando no está en vista calendario) */}
           {auth.connected && !showCalendarView && (
             <motion.div
-              className="hidden xl:block space-y-6 sticky top-6"
+              className="hidden xl:block space-y-6 sticky top-20"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
@@ -2723,6 +2729,6 @@ export default function HistoryClient() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 }
