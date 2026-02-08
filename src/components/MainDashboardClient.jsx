@@ -254,19 +254,21 @@ function pickBestPosterByLangThenResolution(list, opts = {}) {
   return null;
 }
 
-async function getMovieImages(movieId) {
-  if (movieImagesCache.has(movieId)) return movieImagesCache.get(movieId);
+async function getMovieImages(itemId, mediaType = "movie") {
+  const cacheKey = `${mediaType}:${itemId}`;
+  if (movieImagesCache.has(cacheKey)) return movieImagesCache.get(cacheKey);
 
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey) {
     const fallback = { posters: [], backdrops: [] };
-    movieImagesCache.set(movieId, fallback);
+    movieImagesCache.set(cacheKey, fallback);
     return fallback;
   }
 
   try {
+    const type = mediaType === "tv" ? "tv" : "movie";
     const url =
-      `https://api.themoviedb.org/3/movie/${movieId}/images` +
+      `https://api.themoviedb.org/3/${type}/${itemId}/images` +
       `?api_key=${apiKey}` +
       `&include_image_language=en,en-US,es,es-ES,null`;
 
@@ -276,17 +278,17 @@ async function getMovieImages(movieId) {
     const backdrops = Array.isArray(j?.backdrops) ? j.backdrops : [];
 
     const data = { posters, backdrops };
-    movieImagesCache.set(movieId, data);
+    movieImagesCache.set(cacheKey, data);
     return data;
   } catch {
     const fallback = { posters: [], backdrops: [] };
-    movieImagesCache.set(movieId, fallback);
+    movieImagesCache.set(cacheKey, fallback);
     return fallback;
   }
 }
 
-async function fetchBestBackdrop(movieId) {
-  const { backdrops } = await getMovieImages(movieId);
+async function fetchBestBackdrop(itemId, mediaType = "movie") {
+  const { backdrops } = await getMovieImages(itemId, mediaType);
   if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
 
   const best = pickBestBackdropByLangResVotes(backdrops, {
@@ -298,8 +300,8 @@ async function fetchBestBackdrop(movieId) {
   return best?.file_path || null;
 }
 
-async function fetchBestPoster(movieId) {
-  const { posters } = await getMovieImages(movieId);
+async function fetchBestPoster(itemId, mediaType = "movie") {
+  const { posters } = await getMovieImages(itemId, mediaType);
   if (!Array.isArray(posters) || posters.length === 0) return null;
 
   const best = pickBestPosterByLangThenResolution(posters, {
@@ -432,7 +434,13 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
       }
 
       setReady(false);
-      const preferred = await fetchBestPoster(movie.id);
+      const mediaType =
+        movie.media_type === "tv" ||
+        (movie.name && !movie.title) ||
+        movie.first_air_date
+          ? "tv"
+          : "movie";
+      const preferred = await fetchBestPoster(movie.id, mediaType);
       const chosen =
         preferred ||
         movie.poster_path ||
@@ -614,7 +622,13 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
           }
         } else {
           try {
-            const preferred = await fetchBestBackdrop(movie.id);
+            const mediaType =
+              movie.media_type === "tv" ||
+              (movie.name && !movie.title) ||
+              movie.first_air_date
+                ? "tv"
+                : "movie";
+            const preferred = await fetchBestBackdrop(movie.id, mediaType);
             const chosen =
               preferred ||
               movie.backdrop_path ||
@@ -644,6 +658,14 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
         }
       }
 
+      // Detectar tipo de media
+      const mediaType =
+        movie.media_type === "tv" ||
+        (movie.name && !movie.title) ||
+        movie.first_air_date
+          ? "tv"
+          : "movie";
+
       const cachedExtras = movieExtrasCache.get(movie.id);
       if (cachedExtras) {
         if (!abort) setExtras(cachedExtras);
@@ -651,8 +673,25 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
         try {
           let runtime = null;
           try {
-            const details = await getMovieDetails(movie.id);
-            runtime = details?.runtime ?? null;
+            if (mediaType === "movie") {
+              const details = await getMovieDetails(movie.id);
+              runtime = details?.runtime ?? null;
+            } else {
+              // Para series, obtener info de la API de TV
+              const response = await fetch(
+                `https://api.themoviedb.org/3/tv/${movie.id}?append_to_response=external_ids&api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`,
+              );
+              if (response.ok) {
+                const details = await response.json();
+                // Para series mostramos temporadas y episodios
+                if (details.number_of_seasons) {
+                  runtime = `${details.number_of_seasons} Temp.`;
+                  if (details.number_of_episodes) {
+                    runtime += ` / ${details.number_of_episodes} Eps.`;
+                  }
+                }
+              }
+            }
           } catch {}
 
           let awards = null;
@@ -660,7 +699,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
           try {
             let imdb = movie?.imdb_id;
             if (!imdb) {
-              const ext = await getExternalIds("movie", movie.id);
+              const ext = await getExternalIds(mediaType, movie.id);
               imdb = ext?.imdb_id || null;
             }
             if (imdb) {
@@ -696,7 +735,13 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     };
   }, [movie, backdropOverride]);
 
-  const href = `/details/movie/${movie.id}`;
+  const mediaType =
+    movie.media_type === "tv" ||
+    (movie.name && !movie.title) ||
+    movie.first_air_date
+      ? "tv"
+      : "movie";
+  const href = `/details/${mediaType}/${movie.id}`;
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -717,7 +762,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       await markAsFavorite({
         accountId: account.id,
         sessionId: session,
-        type: movie.media_type || "movie",
+        type: mediaType,
         mediaId: movie.id,
         favorite: next,
       });
@@ -740,7 +785,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       await markInWatchlist({
         accountId: account.id,
         sessionId: session,
-        type: movie.media_type || "movie",
+        type: mediaType,
         mediaId: movie.id,
         watchlist: next,
       });
@@ -1063,7 +1108,13 @@ function InlinePreviewCardAnticipated({
       }
       try {
         setLoadingStates(true);
-        const st = await getMediaAccountStates("movie", movie.id, session);
+        const mediaType =
+          movie.media_type === "tv" ||
+          (movie.name && !movie.title) ||
+          movie.first_air_date
+            ? "tv"
+            : "movie";
+        const st = await getMediaAccountStates(mediaType, movie.id, session);
         if (!cancel) {
           setFavorite(!!st.favorite);
           setWatchlist(!!st.watchlist);
@@ -1115,11 +1166,43 @@ function InlinePreviewCardAnticipated({
         }
       }
 
-      // Extras: runtime + país (1 característica extra)
+      // Detectar tipo de media
+      const mediaType =
+        movie.media_type === "tv" ||
+        (movie.name && !movie.title) ||
+        movie.first_air_date
+          ? "tv"
+          : "movie";
+
+      // Extras: runtime/temporadas + país
       try {
-        const details = await getMovieDetails(movie.id).catch(() => null);
-        const runtime = details?.runtime ?? null;
-        const country = details?.production_countries?.[0]?.name || null;
+        let runtime = null;
+        let country = null;
+
+        if (mediaType === "movie") {
+          const details = await getMovieDetails(movie.id).catch(() => null);
+          runtime = details?.runtime ?? null;
+          country = details?.production_countries?.[0]?.name || null;
+        } else {
+          // Para series
+          const response = await fetch(
+            `https://api.themoviedb.org/3/tv/${movie.id}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`,
+          );
+          if (response.ok) {
+            const details = await response.json();
+            if (details.number_of_seasons) {
+              runtime = `${details.number_of_seasons} Temp.`;
+              if (details.number_of_episodes) {
+                runtime += ` / ${details.number_of_episodes} Eps.`;
+              }
+            }
+            country =
+              details?.origin_country?.[0] ||
+              details?.production_countries?.[0]?.name ||
+              null;
+          }
+        }
+
         if (!abort) setExtras({ runtime, country });
       } catch {
         if (!abort) setExtras({ runtime: null, country: null });
@@ -1132,7 +1215,13 @@ function InlinePreviewCardAnticipated({
     };
   }, [movie, backdropOverride]);
 
-  const href = `/details/movie/${movie.id}`;
+  const mediaType =
+    movie.media_type === "tv" ||
+    (movie.name && !movie.title) ||
+    movie.first_air_date
+      ? "tv"
+      : "movie";
+  const href = `/details/${mediaType}/${movie.id}`;
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -1153,7 +1242,7 @@ function InlinePreviewCardAnticipated({
       await markAsFavorite({
         accountId: account.id,
         sessionId: session,
-        type: "movie",
+        type: mediaType,
         mediaId: movie.id,
         favorite: next,
       });
@@ -1176,7 +1265,7 @@ function InlinePreviewCardAnticipated({
       await markInWatchlist({
         accountId: account.id,
         sessionId: session,
-        type: "movie",
+        type: mediaType,
         mediaId: movie.id,
         watchlist: next,
       });
@@ -1388,6 +1477,190 @@ function InlinePreviewCardAnticipated({
   );
 }
 
+/* ---------- Fila con filtro de tiempo (semana/mes/año) ---------- */
+function RowWithTimeFilter({
+  title,
+  weeklyData,
+  monthlyData,
+  yearlyData,
+  isMobile,
+  hydrated,
+  posterCacheRef,
+  posterOverrides,
+  backdropOverrides,
+  overridesReady,
+  eager = false,
+}) {
+  const [selectedPeriod, setSelectedPeriod] = useState("weekly");
+
+  const periodMap = {
+    weekly: { label: "Semana", data: weeklyData },
+    monthly: { label: "Mes", data: monthlyData },
+    yearly: { label: "Año", data: yearlyData },
+  };
+
+  // Filtrar solo los períodos que tienen datos
+  const availablePeriods = Object.entries(periodMap).filter(
+    ([_, { data }]) => data?.length > 0,
+  );
+
+  // Verificar si el período seleccionado está disponible, si no, cambiar al primero disponible
+  useEffect(() => {
+    const isCurrentPeriodAvailable = availablePeriods.some(
+      ([key]) => key === selectedPeriod,
+    );
+    if (!isCurrentPeriodAvailable && availablePeriods.length > 0) {
+      setSelectedPeriod(availablePeriods[0][0]);
+    }
+  }, [availablePeriods, selectedPeriod]);
+
+  const currentData = periodMap[selectedPeriod]?.data || [];
+
+  if (availablePeriods.length === 0) return null;
+
+  return (
+    <div className="relative">
+      {/* Título con selector de período */}
+      <div className="mb-5 px-1 sm:px-0">
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className="h-px w-8 bg-emerald-500" />
+          <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+            TRAKT
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+            {title}
+            <span className="text-emerald-500">.</span>
+          </h3>
+
+          {/* Selector de período */}
+          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+            {availablePeriods.map(([key, { label, data }]) => (
+              <button
+                key={key}
+                onClick={() => setSelectedPeriod(key)}
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  selectedPeriod === key
+                    ? "bg-white text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Componente Row con los datos seleccionados */}
+      <Row
+        title={title}
+        items={currentData}
+        isMobile={isMobile}
+        hydrated={hydrated}
+        posterCacheRef={posterCacheRef}
+        posterOverrides={posterOverrides}
+        backdropOverrides={backdropOverrides}
+        overridesReady={overridesReady}
+        eager={eager}
+        hideTitle={true}
+      />
+    </div>
+  );
+}
+
+/* ---------- Fila con filtro de fuente (Trakt/TMDb) ---------- */
+function RowWithSourceFilter({
+  title,
+  traktData,
+  tmdbData,
+  isMobile,
+  hydrated,
+  posterCacheRef,
+  posterOverrides,
+  backdropOverrides,
+  overridesReady,
+  eager = false,
+}) {
+  const [selectedSource, setSelectedSource] = useState("trakt");
+
+  const sourceMap = {
+    trakt: { label: "Trakt", data: traktData },
+    tmdb: { label: "TMDb", data: tmdbData },
+  };
+
+  // Filtrar solo las fuentes que tienen datos
+  const availableSources = Object.entries(sourceMap).filter(
+    ([_, { data }]) => data?.length > 0,
+  );
+
+  // Verificar si la fuente seleccionada está disponible, si no, cambiar a la primera disponible
+  useEffect(() => {
+    const isCurrentSourceAvailable = availableSources.some(
+      ([key]) => key === selectedSource,
+    );
+    if (!isCurrentSourceAvailable && availableSources.length > 0) {
+      setSelectedSource(availableSources[0][0]);
+    }
+  }, [availableSources, selectedSource]);
+
+  const currentData = sourceMap[selectedSource]?.data || [];
+
+  if (availableSources.length === 0) return null;
+
+  return (
+    <div className="relative">
+      {/* Título con selector de fuente */}
+      <div className="mb-5 px-1 sm:px-0">
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className="h-px w-8 bg-emerald-500" />
+          <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+            {selectedSource === "trakt" ? "TRAKT" : "TMDB"}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+            {title}
+            <span className="text-emerald-500">.</span>
+          </h3>
+
+          {/* Selector de fuente */}
+          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+            {availableSources.map(([key, { label, data }]) => (
+              <button
+                key={key}
+                onClick={() => setSelectedSource(key)}
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  selectedSource === key
+                    ? "bg-white text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Componente Row con los datos seleccionados */}
+      <Row
+        title={title}
+        items={currentData}
+        isMobile={isMobile}
+        hydrated={hydrated}
+        posterCacheRef={posterCacheRef}
+        posterOverrides={posterOverrides}
+        backdropOverrides={backdropOverrides}
+        overridesReady={overridesReady}
+        eager={eager}
+        hideTitle={true}
+      />
+    </div>
+  );
+}
+
 /* ---------- Fila reusable ---------- */
 /* ---------- Fila reusable ---------- */
 function Row({
@@ -1401,6 +1674,7 @@ function Row({
   overridesReady,
   previewKind = "default", // ✅ 4C: selector de preview
   eager = false,
+  hideTitle = false, // Ocultar título cuando se usa con RowWithTimeFilter
 }) {
   if (!items || items.length === 0) return null;
 
@@ -1408,10 +1682,9 @@ function Row({
   const isGenreRow =
     ![
       "Recomendado",
-      "Tendencias (Trakt)",
+      "Tendencias",
       "Más esperadas",
       "Populares",
-      "Tendencias semanales",
       "Taquillazos imprescindibles",
       "Premiadas y nominadas",
       "Historias de venganza",
@@ -1432,7 +1705,7 @@ function Row({
     labelText = "ANTICIPADAS";
   } else if (title === "Populares") {
     labelText = "POPULARES";
-  } else if (title === "Tendencias semanales") {
+  } else if (title === "Tendencias") {
     labelText = "TENDENCIAS";
   } else if (isGenreRow) {
     labelText = "GÉNERO";
@@ -1536,20 +1809,22 @@ function Row({
       variants={fadeInUp}
       className="relative group"
     >
-      <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
-        {labelText && (
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-px w-8 bg-emerald-500" />
-            <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
-              {labelText}
-            </span>
-          </div>
-        )}
-        <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-          {title}
-          <span className="text-emerald-500">.</span>
-        </h3>
-      </motion.div>
+      {!hideTitle && (
+        <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
+          {labelText && (
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="h-px w-8 bg-emerald-500" />
+              <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+                {labelText}
+              </span>
+            </div>
+          )}
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+            {title}
+            <span className="text-emerald-500">.</span>
+          </h3>
+        </motion.div>
+      )}
 
       <div
         className="relative"
@@ -1720,7 +1995,9 @@ function Row({
                           className="w-full h-full"
                           style={{ willChange: "transform, opacity" }}
                         >
-                          <Link href={`/details/movie/${m.id}`}>
+                          <Link
+                            href={`/details/${m.media_type === "tv" || (m.name && !m.title) || m.first_air_date ? "tv" : "movie"}/${m.id}`}
+                          >
                             <PosterImage
                               movie={m}
                               cache={posterCacheRef}
@@ -1798,10 +2075,9 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
   const isGenreRow =
     ![
       "Recomendado",
-      "Tendencias (Trakt)",
+      "Tendencias",
       "Más esperadas",
       "Populares",
-      "Tendencias semanales",
       "Taquillazos imprescindibles",
       "Premiadas y nominadas",
       "Historias de venganza",
@@ -1822,7 +2098,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
     labelText = "ANTICIPADAS";
   } else if (title === "Populares") {
     labelText = "POPULARES";
-  } else if (title === "Tendencias semanales") {
+  } else if (title === "Tendencias") {
     labelText = "TENDENCIAS";
   } else if (isGenreRow) {
     labelText = "GÉNERO";
@@ -1983,7 +2259,13 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
               return [id, chosen];
             }
 
-            chosen = await fetchBestBackdrop(id);
+            const mediaType =
+              movie.media_type === "tv" ||
+              (movie.name && !movie.title) ||
+              movie.first_air_date
+                ? "tv"
+                : "movie";
+            chosen = await fetchBestBackdrop(id, mediaType);
             if (!chosen)
               chosen = movie?.backdrop_path || movie?.poster_path || null;
             if (chosen) await preloadImage(buildImg(chosen, "w780"));
@@ -2145,10 +2427,17 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
                     ? "!w-full select-none"
                     : "select-none";
 
+                  const mediaType =
+                    movie.media_type === "tv" ||
+                    (movie.name && !movie.title) ||
+                    movie.first_air_date
+                      ? "tv"
+                      : "movie";
+
                   if (!heroBackdrop) {
                     return (
                       <SwiperSlide key={movie.id} className={slideClass}>
-                        <Link href={`/details/movie/${movie.id}`}>
+                        <Link href={`/details/${mediaType}/${movie.id}`}>
                           {
                             // CAMBIO: rounded-3xl -> rounded-xl
                           }
@@ -2160,7 +2449,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
 
                   return (
                     <SwiperSlide key={movie.id} className={slideClass}>
-                      <Link href={`/details/movie/${movie.id}`}>
+                      <Link href={`/details/${mediaType}/${movie.id}`}>
                         <motion.div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero">
                           <img
                             src={buildImg(heroBackdrop, "w780")}
@@ -2262,15 +2551,18 @@ export default function MainDashboardClient({ initialData }) {
       "popular",
       "trending",
       "mind",
-      "action",
-      "us",
-      "cult",
-      "underrated",
-      "rising",
       "recommended",
+      // Nuevas secciones Trakt
+      "traktTrending",
+      "traktPopular",
       "traktRecommended",
       "traktAnticipated",
-      "traktTrending",
+      "traktPlayedWeekly",
+      "traktPlayedMonthly",
+      "traktWatchedWeekly",
+      "traktWatchedMonthly",
+      "traktCollectedWeekly",
+      "traktCollectedMonthly",
     ];
     const set = new Set();
     for (const k of keys) {
@@ -2346,35 +2638,11 @@ export default function MainDashboardClient({ initialData }) {
       />
 
       <motion.div
-        className="space-y-14 sm:space-y-16"
+        className="space-y-14 sm:space-y-16 mt-10 sm:mt-14"
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
       >
-        {/* ✅ Trakt: Recomendado (preview normal) */}
-        <Row
-          title="Recomendado"
-          items={dashboardData.traktRecommended || []}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
-
-        {/* ✅ Trakt: Tendencias (preview normal) */}
-        <Row
-          title="Tendencias (Trakt)"
-          items={dashboardData.traktTrending || []}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
-
         {/* ✅ Trakt: Más esperadas (preview nueva) */}
         <Row
           title="Más esperadas"
@@ -2389,10 +2657,36 @@ export default function MainDashboardClient({ initialData }) {
           eager={true}
         />
 
-        {/* ...el resto igual... */}
+        {/* ✅ Trakt: Recomendado (preview normal) */}
         <Row
+          title="Recomendado"
+          items={dashboardData.traktRecommended || []}
+          isMobile={isMobile}
+          hydrated={hydrated}
+          posterCacheRef={posterCacheRef}
+          posterOverrides={posterOverrides}
+          backdropOverrides={backdropOverrides}
+          overridesReady={overridesReady}
+        />
+
+        {/* ✅ Tendencias unificadas (Trakt/TMDb) */}
+        <RowWithSourceFilter
+          title="Tendencias"
+          traktData={dashboardData.traktTrending || []}
+          tmdbData={dashboardData.trending || []}
+          isMobile={isMobile}
+          hydrated={hydrated}
+          posterCacheRef={posterCacheRef}
+          posterOverrides={posterOverrides}
+          backdropOverrides={backdropOverrides}
+          overridesReady={overridesReady}
+        />
+
+        {/* ✅ Populares unificados (Trakt/TMDb) */}
+        <RowWithSourceFilter
           title="Populares"
-          items={dashboardData.popular}
+          traktData={dashboardData.traktPopular || []}
+          tmdbData={dashboardData.popular || []}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
@@ -2400,17 +2694,6 @@ export default function MainDashboardClient({ initialData }) {
           backdropOverrides={backdropOverrides}
           overridesReady={overridesReady}
           eager={true}
-        />
-
-        <Row
-          title="Tendencias semanales"
-          items={dashboardData.trending}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
         />
 
         <Row
@@ -2424,9 +2707,12 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        <Row
-          title="Top acción"
-          items={dashboardData.action}
+        {/* ✅ Trakt: Más jugadas (con selector de período) */}
+        <RowWithTimeFilter
+          title="Más jugadas"
+          weeklyData={dashboardData.traktPlayedWeekly || []}
+          monthlyData={dashboardData.traktPlayedMonthly || []}
+          yearlyData={[]}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
@@ -2435,9 +2721,12 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        <Row
-          title="Populares en EE.UU."
-          items={dashboardData.us}
+        {/* ✅ Trakt: Más vistas (con selector de período) */}
+        <RowWithTimeFilter
+          title="Más vistas"
+          weeklyData={dashboardData.traktWatchedWeekly || []}
+          monthlyData={dashboardData.traktWatchedMonthly || []}
+          yearlyData={[]}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
@@ -2446,31 +2735,12 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        <Row
-          title="Películas de culto"
-          items={dashboardData.cult}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
-
-        <Row
-          title="Infravaloradas"
-          items={dashboardData.underrated}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
-
-        <Row
-          title="En ascenso"
-          items={dashboardData.rising}
+        {/* ✅ Trakt: Más coleccionadas (con selector de período) */}
+        <RowWithTimeFilter
+          title="Más coleccionadas"
+          weeklyData={dashboardData.traktCollectedWeekly || []}
+          monthlyData={dashboardData.traktCollectedMonthly || []}
+          yearlyData={[]}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}

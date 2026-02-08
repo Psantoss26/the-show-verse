@@ -502,11 +502,16 @@ export async function fetchFavoritesForUser(accountId, sessionId) {
   const fetchAllPages = async (path, mediaType) => {
     // First request to get total pages
     const firstRes = await fetch(
-      buildUrl(path, { session_id: sessionId, sort_by: "created_at.desc", page: 1 }),
+      buildUrl(path, {
+        session_id: sessionId,
+        sort_by: "created_at.desc",
+        page: 1,
+      }),
       { cache: "no-store" },
     );
     const firstData = await firstRes.json();
-    if (!firstRes.ok) throw new Error(firstData?.status_message || "TMDb error");
+    if (!firstRes.ok)
+      throw new Error(firstData?.status_message || "TMDb error");
 
     const totalPages = firstData.total_pages || 1;
     const allResults = [...(firstData.results || [])];
@@ -517,12 +522,16 @@ export async function fetchFavoritesForUser(accountId, sessionId) {
       for (let page = 2; page <= totalPages; page++) {
         pagePromises.push(
           fetch(
-            buildUrl(path, { session_id: sessionId, sort_by: "created_at.desc", page }),
+            buildUrl(path, {
+              session_id: sessionId,
+              sort_by: "created_at.desc",
+              page,
+            }),
             { cache: "no-store" },
           )
             .then((res) => res.json())
             .then((data) => data.results || [])
-            .catch(() => [])
+            .catch(() => []),
         );
       }
 
@@ -559,11 +568,16 @@ export async function fetchWatchlistForUser(accountId, sessionId) {
   const fetchAllPages = async (path, mediaType) => {
     // First request to get total pages
     const firstRes = await fetch(
-      buildUrl(path, { session_id: sessionId, sort_by: "created_at.desc", page: 1 }),
+      buildUrl(path, {
+        session_id: sessionId,
+        sort_by: "created_at.desc",
+        page: 1,
+      }),
       { cache: "no-store" },
     );
     const firstData = await firstRes.json();
-    if (!firstRes.ok) throw new Error(firstData?.status_message || "TMDb error");
+    if (!firstRes.ok)
+      throw new Error(firstData?.status_message || "TMDb error");
 
     const totalPages = firstData.total_pages || 1;
     const allResults = [...(firstData.results || [])];
@@ -574,12 +588,16 @@ export async function fetchWatchlistForUser(accountId, sessionId) {
       for (let page = 2; page <= totalPages; page++) {
         pagePromises.push(
           fetch(
-            buildUrl(path, { session_id: sessionId, sort_by: "created_at.desc", page }),
+            buildUrl(path, {
+              session_id: sessionId,
+              sort_by: "created_at.desc",
+              page,
+            }),
             { cache: "no-store" },
           )
             .then((res) => res.json())
             .then((data) => data.results || [])
-            .catch(() => [])
+            .catch(() => []),
         );
       }
 
@@ -616,11 +634,16 @@ export async function fetchRatedForUser(accountId, sessionId) {
   const fetchAllPages = async (path, mediaType) => {
     // First request to get total pages
     const firstRes = await fetch(
-      buildUrl(path, { session_id: sessionId, sort_by: "created_at.desc", page: 1 }),
+      buildUrl(path, {
+        session_id: sessionId,
+        sort_by: "created_at.desc",
+        page: 1,
+      }),
       { cache: "no-store" },
     );
     const firstData = await firstRes.json();
-    if (!firstRes.ok) throw new Error(firstData?.status_message || "TMDb error");
+    if (!firstRes.ok)
+      throw new Error(firstData?.status_message || "TMDb error");
 
     const totalPages = firstData.total_pages || 1;
     const allResults = [...(firstData.results || [])];
@@ -631,12 +654,16 @@ export async function fetchRatedForUser(accountId, sessionId) {
       for (let page = 2; page <= totalPages; page++) {
         pagePromises.push(
           fetch(
-            buildUrl(path, { session_id: sessionId, sort_by: "created_at.desc", page }),
+            buildUrl(path, {
+              session_id: sessionId,
+              sort_by: "created_at.desc",
+              page,
+            }),
             { cache: "no-store" },
           )
             .then((res) => res.json())
             .then((data) => data.results || [])
-            .catch(() => [])
+            .catch(() => []),
         );
       }
 
@@ -763,6 +790,35 @@ export const fetchMediaByKeyword = async ({
     return data?.results || [];
   } catch (error) {
     console.error(`Error fetching media by keyword ${keywordId}:`, error);
+    return [];
+  }
+};
+
+export const fetchRomanceSeriesWithGoodReviews = async ({
+  language = "es-ES",
+  pages = 3,
+}) => {
+  try {
+    const allResults = [];
+
+    for (let page = 1; page <= pages; page++) {
+      const data = await tmdb(`/discover/tv`, {
+        language,
+        sort_by: "vote_average.desc",
+        "vote_count.gte": 200,
+        "vote_average.gte": 7.0,
+        with_genres: 10749,
+        page,
+      });
+
+      if (data?.results) {
+        allResults.push(...data.results);
+      }
+    }
+
+    return allResults;
+  } catch (error) {
+    console.error("Error fetching romance series with good reviews:", error);
     return [];
   }
 };

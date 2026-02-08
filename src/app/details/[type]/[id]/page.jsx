@@ -47,7 +47,7 @@ export default function DetailsPage() {
               // Usar Trakt para recomendaciones
               getTraktRelated({ type, tmdbId: id }),
               getReviews(type, id),
-              getWatchProviders(type, id, "ES"), // <- movie/tv watch providers
+              getWatchProviders(type, id, "ES").catch(() => ({ providers: [], link: null })), // <- movie/tv watch providers
             ]);
 
           const providers = watchProviders?.providers || [];

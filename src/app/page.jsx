@@ -1,9 +1,10 @@
 // /src/app/page.jsx
-import MainDashboardClient from '@/components/MainDashboardClient'
-import { cookies } from 'next/headers'
+import MainDashboardClient from "@/components/MainDashboardClient";
+import { cookies } from "next/headers";
 
 import {
   fetchTopRatedMovies,
+  fetchTopRatedTV,
   fetchCultClassics,
   fetchMindBendingMovies,
   fetchTopActionMovies,
@@ -13,9 +14,20 @@ import {
   fetchTrendingMovies,
   fetchPopularMovies,
   fetchRecommendedMovies,
-} from '@/lib/api/tmdb'
+} from "@/lib/api/tmdb";
 
-export const revalidate = 1800 // 30 minutos
+import {
+  getTraktTrending,
+  getTraktPopular,
+  getTraktRecommended,
+  getTraktAnticipated,
+  getTraktPlayed,
+  getTraktWatched,
+  getTraktCollected,
+  removeDuplicates,
+} from "@/lib/api/traktHelpers";
+
+export const revalidate = 1800; // 30 minutos
 
 /* ====================================================================
  * MISMO CRITERIO QUE EN CLIENTE (MainDashboardClient.jsx):
@@ -25,67 +37,72 @@ export const revalidate = 1800 // 30 minutos
  * ==================================================================== */
 function pickBestBackdropByLangResVotesServer(list, opts = {}) {
   const {
-    preferLangs = ['en', 'en-US'],
+    preferLangs = ["en", "en-US"],
     resolutionWindow = 0.98,
     minWidth = 1200,
-  } = opts
+  } = opts;
 
-  if (!Array.isArray(list) || list.length === 0) return null
+  if (!Array.isArray(list) || list.length === 0) return null;
 
-  const area = (img) => (img?.width || 0) * (img?.height || 0)
-  const lang = (img) => img?.iso_639_1 || null
+  const area = (img) => (img?.width || 0) * (img?.height || 0);
+  const lang = (img) => img?.iso_639_1 || null;
 
-  const sizeFiltered = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
-  const pool0 = sizeFiltered.length ? sizeFiltered : list
+  const sizeFiltered =
+    minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
+  const pool0 = sizeFiltered.length ? sizeFiltered : list;
 
-  const hasPreferred = pool0.some((b) => preferLangs.includes(lang(b)))
-  const pool1 = hasPreferred ? pool0.filter((b) => preferLangs.includes(lang(b))) : pool0
+  const hasPreferred = pool0.some((b) => preferLangs.includes(lang(b)));
+  const pool1 = hasPreferred
+    ? pool0.filter((b) => preferLangs.includes(lang(b)))
+    : pool0;
 
-  const maxArea = Math.max(...pool1.map(area))
-  const threshold = maxArea * (typeof resolutionWindow === 'number' ? resolutionWindow : 1.0)
-  const pool2 = pool1.filter((b) => area(b) >= threshold)
+  const maxArea = Math.max(...pool1.map(area));
+  const threshold =
+    maxArea * (typeof resolutionWindow === "number" ? resolutionWindow : 1.0);
+  const pool2 = pool1.filter((b) => area(b) >= threshold);
 
   const sorted = [...pool2].sort((a, b) => {
-    const aA = area(a)
-    const bA = area(b)
-    if (bA !== aA) return bA - aA
-    const w = (b.width || 0) - (a.width || 0)
-    if (w !== 0) return w
-    const vc = (b.vote_count || 0) - (a.vote_count || 0)
-    if (vc !== 0) return vc
-    const va = (b.vote_average || 0) - (a.vote_average || 0)
-    return va
-  })
+    const aA = area(a);
+    const bA = area(b);
+    if (bA !== aA) return bA - aA;
+    const w = (b.width || 0) - (a.width || 0);
+    if (w !== 0) return w;
+    const vc = (b.vote_count || 0) - (a.vote_count || 0);
+    if (vc !== 0) return vc;
+    const va = (b.vote_average || 0) - (a.vote_average || 0);
+    return va;
+  });
 
-  return sorted[0] || null
+  return sorted[0] || null;
 }
 
 /* ========= Backdrop preferido (SERVER) ========= */
-async function fetchBestBackdropServer(movieId) {
+async function fetchBestBackdropServer(itemId, mediaType = "movie") {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY
-    if (!apiKey || !movieId) return null
+    const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+    if (!apiKey || !itemId) return null;
 
+    const type = mediaType === "tv" ? "tv" : "movie";
     const url =
-      `https://api.themoviedb.org/3/movie/${movieId}/images` +
+      `https://api.themoviedb.org/3/${type}/${itemId}/images` +
       `?api_key=${apiKey}` +
-      `&include_image_language=en,en-US,es,es-ES,null`
+      `&include_image_language=en,en-US,es,es-ES,null`;
 
-    const r = await fetch(url, { cache: 'force-cache' })
-    if (!r.ok) return null
+    const r = await fetch(url, { cache: "force-cache" });
+    if (!r.ok) return null;
 
-    const j = await r.json()
-    const backs = Array.isArray(j?.backdrops) ? j.backdrops : []
+    const j = await r.json();
+    const backs = Array.isArray(j?.backdrops) ? j.backdrops : [];
 
     const best = pickBestBackdropByLangResVotesServer(backs, {
-      preferLangs: ['en', 'en-US'],
+      preferLangs: ["en", "en-US"],
       resolutionWindow: 0.98,
       minWidth: 1200,
-    })
+    });
 
-    return best?.file_path || null
+    return best?.file_path || null;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -95,74 +112,77 @@ async function fetchBestBackdropServer(movieId) {
 const TRAKT_KEY =
   process.env.TRAKT_CLIENT_ID ||
   process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ||
-  process.env.TRAKT_API_KEY
+  process.env.TRAKT_API_KEY;
 
-const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
+const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
 function traktHeaders() {
-  if (!TRAKT_KEY) return null
+  if (!TRAKT_KEY) return null;
   return {
-    'content-type': 'application/json',
-    'trakt-api-version': '2',
-    'trakt-api-key': TRAKT_KEY,
-  }
+    "content-type": "application/json",
+    "trakt-api-version": "2",
+    "trakt-api-key": TRAKT_KEY,
+  };
 }
 
 async function safeJson(res) {
   try {
-    return await res.json()
+    return await res.json();
   } catch {
-    return null
+    return null;
   }
 }
 
 async function fetchTrakt(path) {
-  const headers = traktHeaders()
-  if (!headers) return []
+  const headers = traktHeaders();
+  if (!headers) return [];
   const res = await fetch(`https://api.trakt.tv${path}`, {
     headers,
     // cache y revalidate independientes (puedes alinearlo con 1800 si quieres)
     next: { revalidate: 60 * 60 }, // 1h
-  })
-  const json = await safeJson(res)
-  if (!res.ok) return []
-  return Array.isArray(json) ? json : []
+  });
+  const json = await safeJson(res);
+  if (!res.ok) return [];
+  return Array.isArray(json) ? json : [];
 }
 
 async function fetchTmdbDetails(type, id) {
-  if (!TMDB_KEY || !type || !id) return null
-  const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&language=es-ES`
-  const res = await fetch(url, { next: { revalidate: 60 * 60 } })
-  const json = await safeJson(res)
-  if (!res.ok) return null
-  return json
+  if (!TMDB_KEY || !type || !id) return null;
+  const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&language=es-ES`;
+  const res = await fetch(url, { next: { revalidate: 60 * 60 } });
+  const json = await safeJson(res);
+  if (!res.ok) return null;
+  return json;
 }
 
 function interleave(a, b, limit = 24) {
-  const out = []
-  let i = 0
+  const out = [];
+  let i = 0;
   while (out.length < limit && (i < a.length || i < b.length)) {
-    if (i < a.length) out.push(a[i])
-    if (out.length >= limit) break
-    if (i < b.length) out.push(b[i])
-    i++
+    if (i < a.length) out.push(a[i]);
+    if (out.length >= limit) break;
+    if (i < b.length) out.push(b[i]);
+    i++;
   }
-  return out
+  return out;
 }
 
 async function mapWithConcurrency(items, worker, concurrency = 8) {
-  const out = new Array(items.length)
-  let idx = 0
+  const out = new Array(items.length);
+  let idx = 0;
 
-  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (idx < items.length) {
-      const cur = idx++
-      out[cur] = await worker(items[cur]).catch(() => null)
-    }
-  })
+  const runners = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (idx < items.length) {
+        const cur = idx++;
+        out[cur] = await worker(items[cur]).catch(() => null);
+      }
+    },
+  );
 
-  await Promise.all(runners)
-  return out.filter(Boolean)
+  await Promise.all(runners);
+  return out.filter(Boolean);
 }
 
 async function getTraktDiscoverRecommended(limit = 24) {
@@ -170,24 +190,27 @@ async function getTraktDiscoverRecommended(limit = 24) {
   const [movies, shows] = await Promise.all([
     fetchTrakt(`/movies/recommended?extended=full&limit=30`),
     fetchTrakt(`/shows/recommended?extended=full&limit=30`),
-  ])
+  ]);
 
   const movieSeeds = movies
-    .map((m) => ({ media_type: 'movie', tmdb: m?.ids?.tmdb }))
-    .filter((x) => x.tmdb)
+    .map((m) => ({ media_type: "movie", tmdb: m?.ids?.tmdb }))
+    .filter((x) => x.tmdb);
 
   const showSeeds = shows
-    .map((s) => ({ media_type: 'tv', tmdb: s?.ids?.tmdb }))
-    .filter((x) => x.tmdb)
+    .map((s) => ({ media_type: "tv", tmdb: s?.ids?.tmdb }))
+    .filter((x) => x.tmdb);
 
-  const mixed = interleave(movieSeeds, showSeeds, limit)
+  const mixed = interleave(movieSeeds, showSeeds, limit);
 
   return await mapWithConcurrency(
     mixed,
     async (it) => {
-      const details = await fetchTmdbDetails(it.media_type === 'tv' ? 'tv' : 'movie', it.tmdb)
+      const details = await fetchTmdbDetails(
+        it.media_type === "tv" ? "tv" : "movie",
+        it.tmdb,
+      );
       // si no hay poster, se ve feo en tu grid (y además te rompe consistencia)
-      if (!details?.id || !details?.poster_path) return null
+      if (!details?.id || !details?.poster_path) return null;
 
       return {
         id: details.id,
@@ -201,10 +224,10 @@ async function getTraktDiscoverRecommended(limit = 24) {
         vote_average: details.vote_average ?? null,
         runtime: details.runtime ?? null,
         number_of_episodes: details.number_of_episodes ?? null,
-      }
+      };
     },
-    8
-  )
+    8,
+  );
 }
 
 async function getTraktDiscoverAnticipated(limit = 24) {
@@ -212,27 +235,30 @@ async function getTraktDiscoverAnticipated(limit = 24) {
   const [moviesRaw, showsRaw] = await Promise.all([
     fetchTrakt(`/movies/anticipated?extended=full&limit=30`),
     fetchTrakt(`/shows/anticipated?extended=full&limit=30`),
-  ])
+  ]);
 
   const movieSeeds = moviesRaw
     .map((x) => x?.movie)
     .filter(Boolean)
-    .map((m) => ({ media_type: 'movie', tmdb: m?.ids?.tmdb }))
-    .filter((x) => x.tmdb)
+    .map((m) => ({ media_type: "movie", tmdb: m?.ids?.tmdb }))
+    .filter((x) => x.tmdb);
 
   const showSeeds = showsRaw
     .map((x) => x?.show)
     .filter(Boolean)
-    .map((s) => ({ media_type: 'tv', tmdb: s?.ids?.tmdb }))
-    .filter((x) => x.tmdb)
+    .map((s) => ({ media_type: "tv", tmdb: s?.ids?.tmdb }))
+    .filter((x) => x.tmdb);
 
-  const mixed = interleave(movieSeeds, showSeeds, limit)
+  const mixed = interleave(movieSeeds, showSeeds, limit);
 
   return await mapWithConcurrency(
     mixed,
     async (it) => {
-      const details = await fetchTmdbDetails(it.media_type === 'tv' ? 'tv' : 'movie', it.tmdb)
-      if (!details?.id || !details?.poster_path) return null
+      const details = await fetchTmdbDetails(
+        it.media_type === "tv" ? "tv" : "movie",
+        it.tmdb,
+      );
+      if (!details?.id || !details?.poster_path) return null;
 
       return {
         id: details.id,
@@ -246,83 +272,130 @@ async function getTraktDiscoverAnticipated(limit = 24) {
         vote_average: details.vote_average ?? null,
         runtime: details.runtime ?? null,
         number_of_episodes: details.number_of_episodes ?? null,
-      }
+      };
     },
-    8
-  )
+    8,
+  );
 }
 
 /* ======== Carga de datos en el SERVIDOR ======== */
 async function getDashboardData(sessionId = null) {
   try {
+    // Preparamos todas las llamadas en paralelo para optimizar
     const [
-      topRated,
-      cult,
+      topRatedMovies,
+      topRatedTV,
       mind,
-      action,
-      us,
-      underrated,
-      rising,
       trending,
       popular,
+
+      // ✅ NUEVAS SECCIONES TRAKT - Contenido Mixto (películas + series)
+      traktTrending,
+      traktPopular,
       traktRecommended,
       traktAnticipated,
+      traktPlayedWeekly,
+      traktPlayedMonthly,
+      traktWatchedWeekly,
+      traktWatchedMonthly,
+      traktCollectedWeekly,
+      traktCollectedMonthly,
     ] = await Promise.all([
+      // TMDb secciones originales
       fetchTopRatedMovies(),
-      fetchCultClassics(),
+      fetchTopRatedTV(),
       fetchMindBendingMovies(),
-      fetchTopActionMovies(),
-      fetchPopularInUS(),
-      fetchUnderratedMovies(),
-      fetchRisingMovies(),
       fetchTrendingMovies(),
       fetchPopularMovies(),
 
-      // ✅ NUEVO: filas Trakt (si hay key)
-      (TRAKT_KEY ? getTraktDiscoverRecommended(24) : Promise.resolve([])),
-      (TRAKT_KEY ? getTraktDiscoverAnticipated(24) : Promise.resolve([])),
-    ])
+      // ✅ Trakt - Contenido Mixto (Movies + Shows)
+      TRAKT_KEY ? getTraktTrending(30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktPopular(30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktRecommended(30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktAnticipated(30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktPlayed("weekly", 30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktPlayed("monthly", 30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktWatched("weekly", 30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktWatched("monthly", 30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktCollected("weekly", 30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktCollected("monthly", 30) : Promise.resolve([]),
+    ]);
 
-    const recommended = sessionId ? await fetchRecommendedMovies(sessionId) : []
+    const recommended = sessionId
+      ? await fetchRecommendedMovies(sessionId)
+      : [];
+
+    // ✅ Mezclar películas y series mejor valoradas, ordenadas por puntuación
+    const topRatedMoviesWithType = topRatedMovies.map((m) => ({
+      ...m,
+      media_type: "movie",
+    }));
+    const topRatedTVWithType = topRatedTV.map((s) => ({
+      ...s,
+      media_type: "tv",
+    }));
+
+    const mixedTopRated = [...topRatedMoviesWithType, ...topRatedTVWithType]
+      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
+      .slice(0, 30); // Top 30 mejor valorados
 
     // ✅ Preparamos los backdrops del hero SIN flicker (mismo criterio que cliente)
     const topRatedWithBackdrop = await Promise.all(
-      topRated.map(async (m) => {
-        const preferred = await fetchBestBackdropServer(m.id)
+      mixedTopRated.map(async (m) => {
+        const mediaType = m.media_type === "tv" ? "tv" : "movie";
+        const preferred = await fetchBestBackdropServer(m.id, mediaType);
         return {
           ...m,
           backdrop_path: preferred || m.backdrop_path || m.poster_path || null,
-        }
-      })
-    )
+        };
+      }),
+    );
+
+    // ✅ Eliminamos duplicados en las secciones de Trakt para evitar repeticiones
+    const cleanedTraktTrending = removeDuplicates(traktTrending);
+    const cleanedTraktPopular = removeDuplicates(traktPopular);
+    const cleanedTraktRecommended = removeDuplicates(traktRecommended);
+    const cleanedTraktAnticipated = removeDuplicates(traktAnticipated);
+    const cleanedTraktPlayedWeekly = removeDuplicates(traktPlayedWeekly);
+    const cleanedTraktPlayedMonthly = removeDuplicates(traktPlayedMonthly);
+    const cleanedTraktWatchedWeekly = removeDuplicates(traktWatchedWeekly);
+    const cleanedTraktWatchedMonthly = removeDuplicates(traktWatchedMonthly);
+    const cleanedTraktCollectedWeekly = removeDuplicates(traktCollectedWeekly);
+    const cleanedTraktCollectedMonthly = removeDuplicates(
+      traktCollectedMonthly,
+    );
 
     return {
+      // TMDb originales
       topRated: topRatedWithBackdrop,
-      cult,
       mind,
-      action,
-      us,
-      underrated,
-      rising,
       trending,
       popular,
       recommended,
 
-      // ✅ NUEVO: secciones Trakt
-      traktRecommended,
-      traktAnticipated,
-    }
+      // ✅ NUEVAS SECCIONES TRAKT
+      traktTrending: cleanedTraktTrending,
+      traktPopular: cleanedTraktPopular,
+      traktRecommended: cleanedTraktRecommended,
+      traktAnticipated: cleanedTraktAnticipated,
+      traktPlayedWeekly: cleanedTraktPlayedWeekly,
+      traktPlayedMonthly: cleanedTraktPlayedMonthly,
+      traktWatchedWeekly: cleanedTraktWatchedWeekly,
+      traktWatchedMonthly: cleanedTraktWatchedMonthly,
+      traktCollectedWeekly: cleanedTraktCollectedWeekly,
+      traktCollectedMonthly: cleanedTraktCollectedMonthly,
+    };
   } catch (err) {
-    console.error('Error cargando MainDashboard (SSR):', err)
-    return {}
+    console.error("Error cargando MainDashboard (SSR):", err);
+    return {};
   }
 }
 
 /* =================== Página de Inicio =================== */
 export default async function HomePage() {
-  const cookieStore = await cookies()
-  const sessionId = cookieStore.get('tmdb_session')?.value || null
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get("tmdb_session")?.value || null;
 
-  const dashboardData = await getDashboardData(sessionId)
-  return <MainDashboardClient initialData={dashboardData} />
+  const dashboardData = await getDashboardData(sessionId);
+  return <MainDashboardClient initialData={dashboardData} />;
 }
