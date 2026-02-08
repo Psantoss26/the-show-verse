@@ -6,14 +6,14 @@ import {
   fetchTopRatedMovies,
   fetchTopRatedTV,
   fetchCultClassics,
-  fetchMindBendingMovies,
   fetchTopActionMovies,
   fetchPopularInUS,
-  fetchUnderratedMovies,
   fetchRisingMovies,
   fetchTrendingMovies,
   fetchPopularMovies,
   fetchRecommendedMovies,
+  discoverMovies,
+  fetchMediaByGenre,
 } from "@/lib/api/tmdb";
 
 import {
@@ -188,8 +188,8 @@ async function mapWithConcurrency(items, worker, concurrency = 8) {
 async function getTraktDiscoverRecommended(limit = 24) {
   // Movies + TV, alternado
   const [movies, shows] = await Promise.all([
-    fetchTrakt(`/movies/recommended?extended=full&limit=30`),
-    fetchTrakt(`/shows/recommended?extended=full&limit=30`),
+    fetchTrakt(`/movies/recommended/weekly?extended=full&limit=30`),
+    fetchTrakt(`/shows/recommended/weekly?extended=full&limit=30`),
   ]);
 
   const movieSeeds = movies
@@ -278,6 +278,50 @@ async function getTraktDiscoverAnticipated(limit = 24) {
   );
 }
 
+/* ======== Curado de listas (mismo criterio que Películas/Series) ======== */
+const sortByVotes = (list = []) =>
+  [...list].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
+
+function curateList(
+  list,
+  { minVotes = 0, minRating = 0, minSize = 20, maxSize = 60 } = {},
+) {
+  if (!Array.isArray(list)) return [];
+
+  const sorted = sortByVotes(list);
+
+  const applyFilter = (minV, minR) =>
+    sorted.filter((m) => {
+      const votes = m?.vote_count || 0;
+      const rating = typeof m?.vote_average === "number" ? m.vote_average : 0;
+      return votes >= minV && rating >= minR;
+    });
+
+  let current = applyFilter(minVotes, minRating);
+  if (current.length >= minSize) return current.slice(0, maxSize);
+
+  const steps = [
+    { factorV: 0.7, deltaR: -0.3 },
+    { factorV: 0.5, deltaR: -0.6 },
+    { factorV: 0.3, deltaR: -1.0 },
+    { factorV: 0.1, deltaR: -1.5 },
+  ];
+
+  let mv = minVotes;
+  let mr = minRating;
+
+  for (const step of steps) {
+    mv = Math.max(0, Math.round(mv * step.factorV));
+    mr = Math.max(0, mr + step.deltaR);
+    current = applyFilter(mv, mr);
+    if (current.length >= minSize) return current.slice(0, maxSize);
+  }
+
+  if (sorted.length === 0) return [];
+  const size = Math.min(sorted.length, Math.max(minSize, maxSize));
+  return sorted.slice(0, size);
+}
+
 /* ======== Carga de datos en el SERVIDOR ======== */
 async function getDashboardData(sessionId = null) {
   try {
@@ -285,7 +329,8 @@ async function getDashboardData(sessionId = null) {
     const [
       topRatedMovies,
       topRatedTV,
-      mind,
+      awarded,
+      dramaTV,
       trending,
       popular,
 
@@ -304,7 +349,13 @@ async function getDashboardData(sessionId = null) {
       // TMDb secciones originales
       fetchTopRatedMovies(),
       fetchTopRatedTV(),
-      fetchMindBendingMovies(),
+      discoverMovies({
+        "vote_average.gte": 7.5,
+        "vote_count.gte": 2000,
+        sort_by: "vote_average.desc",
+        page: 1,
+      }),
+      fetchMediaByGenre({ type: "tv", genreId: 18, minVotes: 800, language: "es-ES" }),
       fetchTrendingMovies(),
       fetchPopularMovies(),
 
@@ -368,7 +419,8 @@ async function getDashboardData(sessionId = null) {
     return {
       // TMDb originales
       topRated: topRatedWithBackdrop,
-      mind,
+      awarded: curateList(awarded, { minVotes: 1200, minRating: 6.8, minSize: 20, maxSize: 60 }),
+      dramaTV: curateList(dramaTV, { minVotes: 1000, minRating: 6.5, minSize: 25, maxSize: 70 }),
       trending,
       popular,
       recommended,

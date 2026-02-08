@@ -1486,6 +1486,15 @@ export default function MoviesPageClient({ initialData }) {
           />
         )}
 
+        {dashboardData.mind?.length > 0 && (
+          <Row
+            title="Guiones complejos"
+            items={dashboardData.mind}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        )}
+
         {dashboardData.romance?.length > 0 && (
           <Row
             title="Romance que enamora"
