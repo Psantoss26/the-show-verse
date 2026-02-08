@@ -21,6 +21,8 @@ import {
   getTraktPopular,
   getTraktRecommended,
   getTraktAnticipated,
+  getTraktMoviesAnticipated,
+  getTraktShowsAnticipated,
   getTraktPlayed,
   getTraktWatched,
   getTraktCollected,
@@ -339,6 +341,8 @@ async function getDashboardData(sessionId = null) {
       traktPopular,
       traktRecommended,
       traktAnticipated,
+      traktMoviesAnticipated,
+      traktShowsAnticipated,
       traktPlayedWeekly,
       traktPlayedMonthly,
       traktWatchedWeekly,
@@ -355,7 +359,12 @@ async function getDashboardData(sessionId = null) {
         sort_by: "vote_average.desc",
         page: 1,
       }),
-      fetchMediaByGenre({ type: "tv", genreId: 18, minVotes: 800, language: "es-ES" }),
+      fetchMediaByGenre({
+        type: "tv",
+        genreId: 18,
+        minVotes: 800,
+        language: "es-ES",
+      }),
       fetchTrendingMovies(),
       fetchPopularMovies(),
 
@@ -364,6 +373,8 @@ async function getDashboardData(sessionId = null) {
       TRAKT_KEY ? getTraktPopular(30) : Promise.resolve([]),
       TRAKT_KEY ? getTraktRecommended(30) : Promise.resolve([]),
       TRAKT_KEY ? getTraktAnticipated(30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktMoviesAnticipated(30) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktShowsAnticipated(30) : Promise.resolve([]),
       TRAKT_KEY ? getTraktPlayed("weekly", 30) : Promise.resolve([]),
       TRAKT_KEY ? getTraktPlayed("monthly", 30) : Promise.resolve([]),
       TRAKT_KEY ? getTraktWatched("weekly", 30) : Promise.resolve([]),
@@ -408,6 +419,12 @@ async function getDashboardData(sessionId = null) {
     const cleanedTraktPopular = removeDuplicates(traktPopular);
     const cleanedTraktRecommended = removeDuplicates(traktRecommended);
     const cleanedTraktAnticipated = removeDuplicates(traktAnticipated);
+    const cleanedTraktMoviesAnticipated = removeDuplicates(
+      traktMoviesAnticipated,
+    );
+    const cleanedTraktShowsAnticipated = removeDuplicates(
+      traktShowsAnticipated,
+    );
     const cleanedTraktPlayedWeekly = removeDuplicates(traktPlayedWeekly);
     const cleanedTraktPlayedMonthly = removeDuplicates(traktPlayedMonthly);
     const cleanedTraktWatchedWeekly = removeDuplicates(traktWatchedWeekly);
@@ -421,8 +438,18 @@ async function getDashboardData(sessionId = null) {
       // TMDb originales
       topRatedMovies: topRatedMoviesWithBackdrop,
       topRatedTV: topRatedTVWithBackdrop,
-      awarded: curateList(awarded, { minVotes: 1200, minRating: 6.8, minSize: 20, maxSize: 60 }),
-      dramaTV: curateList(dramaTV, { minVotes: 1000, minRating: 6.5, minSize: 25, maxSize: 70 }),
+      awarded: curateList(awarded, {
+        minVotes: 1200,
+        minRating: 6.8,
+        minSize: 20,
+        maxSize: 60,
+      }),
+      dramaTV: curateList(dramaTV, {
+        minVotes: 1000,
+        minRating: 6.5,
+        minSize: 25,
+        maxSize: 70,
+      }),
       trending,
       popular,
       recommended,
@@ -432,6 +459,8 @@ async function getDashboardData(sessionId = null) {
       traktPopular: cleanedTraktPopular,
       traktRecommended: cleanedTraktRecommended,
       traktAnticipated: cleanedTraktAnticipated,
+      traktMoviesAnticipated: cleanedTraktMoviesAnticipated,
+      traktShowsAnticipated: cleanedTraktShowsAnticipated,
       traktPlayedWeekly: cleanedTraktPlayedWeekly,
       traktPlayedMonthly: cleanedTraktPlayedMonthly,
       traktWatchedWeekly: cleanedTraktWatchedWeekly,
