@@ -1050,7 +1050,6 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     ![
       "Populares",
       "Taquillazos imprescindibles",
-      "Premiadas y nominadas",
       "Superéxito",
       "Historias de venganza",
       "Top 10 hoy en España",
@@ -1073,8 +1072,6 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     labelText = "TOP 10";
   } else if (title === "Taquillazos imprescindibles") {
     labelText = "IMPRESCINDIBLES";
-  } else if (title === "Premiadas y nominadas") {
-    labelText = "GALARDONADAS";
   } else if (title === "Historias de venganza") {
     labelText = "SUPERHEROES";
   } else if (title === "Tendencias ahora mismo") {
@@ -1445,15 +1442,6 @@ export default function MoviesPageClient({ initialData }) {
           <Row
             title="Taquillazos imprescindibles"
             items={dashboardData["Superéxito"]}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        ) : null}
-
-        {dashboardData["Premiadas"]?.length ? (
-          <Row
-            title="Premiadas y nominadas"
-            items={dashboardData["Premiadas"]}
             isMobile={isMobile}
             posterCacheRef={posterCacheRef}
           />

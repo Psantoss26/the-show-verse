@@ -1523,15 +1523,15 @@ function RowWithTimeFilter({
       {/* Título con selector de período */}
       <div className="mb-5 px-1 sm:px-0">
         <div className="flex items-center gap-2 mb-1.5">
-          <div className="h-px w-8 bg-emerald-500" />
-          <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+          <div className="h-px w-8 bg-amber-500" />
+          <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
             TRAKT
           </span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
             {title}
-            <span className="text-emerald-500">.</span>
+            <span className="text-amber-500">.</span>
           </h3>
 
           {/* Selector de período */}
@@ -1614,15 +1614,15 @@ function RowWithSourceFilter({
       {/* Título con selector de fuente */}
       <div className="mb-5 px-1 sm:px-0">
         <div className="flex items-center gap-2 mb-1.5">
-          <div className="h-px w-8 bg-emerald-500" />
-          <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+          <div className="h-px w-8 bg-amber-500" />
+          <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
             {selectedSource === "trakt" ? "TRAKT" : "TMDB"}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
             {title}
-            <span className="text-emerald-500">.</span>
+            <span className="text-amber-500">.</span>
           </h3>
 
           {/* Selector de fuente */}
@@ -1675,6 +1675,7 @@ function Row({
   previewKind = "default", // ✅ 4C: selector de preview
   eager = false,
   hideTitle = false, // Ocultar título cuando se usa con RowWithTimeFilter
+  labelText, // Label superior para la sección
 }) {
   if (!items || items.length === 0) return null;
 
@@ -1699,16 +1700,17 @@ function Row({
     !title.includes("Favoritas") &&
     !title.includes("Hits");
 
-  // ✅ Determinar etiqueta específica según el título
-  let labelText = null;
-  if (title === "Más esperadas") {
-    labelText = "ANTICIPADAS";
-  } else if (title === "Populares") {
-    labelText = "POPULARES";
-  } else if (title === "Tendencias") {
-    labelText = "TENDENCIAS";
-  } else if (isGenreRow) {
-    labelText = "GÉNERO";
+  // ✅ Determinar etiqueta específica según el título (si no viene como prop)
+  if (!labelText) {
+    if (title === "Más esperadas") {
+      labelText = "ANTICIPADAS";
+    } else if (title === "Populares") {
+      labelText = "POPULARES";
+    } else if (title === "Tendencias") {
+      labelText = "TENDENCIAS";
+    } else if (isGenreRow) {
+      labelText = "GÉNERO";
+    }
   }
 
   const swiperRef = useRef(null);
@@ -1813,15 +1815,15 @@ function Row({
         <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
           {labelText && (
             <div className="flex items-center gap-2 mb-1.5">
-              <div className="h-px w-8 bg-emerald-500" />
-              <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+              <div className="h-px w-8 bg-amber-500" />
+              <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
                 {labelText}
               </span>
             </div>
           )}
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
             {title}
-            <span className="text-emerald-500">.</span>
+            <span className="text-amber-500">.</span>
           </h3>
         </motion.div>
       )}
@@ -2212,12 +2214,109 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
   );
 }
 
-/* ---------- Carrusel hero (backdrops) ---------- */
-function TopRatedHero({ movieItems, tvItems, isMobile, hydrated, backdropOverrides }) {
+/* ---------- Sección "Más esperadas" con selector Películas/Series ---------- */
+function AnticipatedSection({
+  movieItems,
+  tvItems,
+  isMobile,
+  hydrated,
+  posterCacheRef,
+  posterOverrides,
+  backdropOverrides,
+  overridesReady,
+}) {
   const [activeTab, setActiveTab] = useState("movies");
   const items = activeTab === "movies" ? movieItems : tvItems;
 
-  if ((!movieItems || movieItems.length === 0) && (!tvItems || tvItems.length === 0)) return null;
+  if (
+    (!movieItems || movieItems.length === 0) &&
+    (!tvItems || tvItems.length === 0)
+  )
+    return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {/* Título con selector */}
+      <div className="flex items-center justify-between mb-5 px-1 sm:px-0">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="h-px w-8 bg-amber-500" />
+            <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
+              PRÓXIMAMENTE
+            </span>
+          </div>
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+            Más esperadas<span className="text-amber-500">.</span>
+          </h3>
+        </div>
+
+        <div className="flex gap-1 bg-white/5 rounded-full p-1">
+          {movieItems?.length > 0 && (
+            <button
+              onClick={() => setActiveTab("movies")}
+              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                activeTab === "movies"
+                  ? "bg-white text-black"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Películas
+            </button>
+          )}
+          {tvItems?.length > 0 && (
+            <button
+              onClick={() => setActiveTab("series")}
+              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                activeTab === "series"
+                  ? "bg-white text-black"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Series
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Contenido con las tarjetas anticipated */}
+      <Row
+        title=""
+        hideTitle={true}
+        items={items}
+        isMobile={isMobile}
+        hydrated={hydrated}
+        posterCacheRef={posterCacheRef}
+        posterOverrides={posterOverrides}
+        backdropOverrides={backdropOverrides}
+        overridesReady={overridesReady}
+        previewKind="anticipated"
+        eager={true}
+      />
+    </motion.div>
+  );
+}
+
+/* ---------- Carrusel hero (backdrops) ---------- */
+function TopRatedHero({
+  movieItems,
+  tvItems,
+  isMobile,
+  hydrated,
+  backdropOverrides,
+}) {
+  const [activeTab, setActiveTab] = useState("movies");
+  const items = activeTab === "movies" ? movieItems : tvItems;
+
+  if (
+    (!movieItems || movieItems.length === 0) &&
+    (!tvItems || tvItems.length === 0)
+  )
+    return null;
 
   const swiperRef = useRef(null);
   const heroRef = useRef(null);
@@ -2370,14 +2469,14 @@ function TopRatedHero({ movieItems, tvItems, isMobile, hydrated, backdropOverrid
         className="mb-5 px-1 sm:px-0"
       >
         <div className="flex items-center gap-2 mb-1.5">
-          <div className="h-px w-8 bg-emerald-500" />
-          <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+          <div className="h-px w-8 bg-amber-500" />
+          <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
             DESTACADAS
           </span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-            Mejores valoradas<span className="text-emerald-500">.</span>
+            Mejores valoradas<span className="text-amber-500">.</span>
           </h3>
 
           <div className="flex gap-1 bg-white/5 rounded-full p-1">
@@ -2602,6 +2701,8 @@ export default function MainDashboardClient({ initialData }) {
       "traktPopular",
       "traktRecommended",
       "traktAnticipated",
+      "traktMoviesAnticipated",
+      "traktShowsAnticipated",
       "traktPlayedWeekly",
       "traktPlayedMonthly",
       "traktWatchedWeekly",
@@ -2689,18 +2790,16 @@ export default function MainDashboardClient({ initialData }) {
         initial="hidden"
         animate="visible"
       >
-        {/* ✅ Trakt: Más esperadas (preview nueva) */}
-        <Row
-          title="Más esperadas"
-          items={dashboardData.traktAnticipated || []}
+        {/* ✅ Trakt: Más esperadas con selector Películas/Series */}
+        <AnticipatedSection
+          movieItems={dashboardData.traktMoviesAnticipated || []}
+          tvItems={dashboardData.traktShowsAnticipated || []}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
           posterOverrides={posterOverrides}
           backdropOverrides={backdropOverrides}
           overridesReady={overridesReady}
-          previewKind="anticipated"
-          eager={true}
         />
 
         {/* ✅ Trakt: Recomendado (preview normal) */}
@@ -2744,6 +2843,7 @@ export default function MainDashboardClient({ initialData }) {
 
         <Row
           title="Premiadas y nominadas"
+          labelText="GALARDONADAS"
           items={dashboardData.awarded}
           isMobile={isMobile}
           hydrated={hydrated}

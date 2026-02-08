@@ -1434,15 +1434,6 @@ export default function SeriesPageClient({ initialData }) {
           />
         ) : null}
 
-        {dashboardData.drama?.length > 0 && (
-          <Row
-            title="Dramas que enganchan"
-            items={dashboardData.drama}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        )}
-
         {dashboardData.scifi_fantasy?.length > 0 && (
           <Row
             title="Ciencia ficción y fantasía"
