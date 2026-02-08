@@ -2550,7 +2550,8 @@ export default function MainDashboardClient({ initialData }) {
       "topRated",
       "popular",
       "trending",
-      "mind",
+      "awarded",
+      "dramaTV",
       "recommended",
       // Nuevas secciones Trakt
       "traktTrending",
@@ -2697,8 +2698,19 @@ export default function MainDashboardClient({ initialData }) {
         />
 
         <Row
-          title="Guiones complejos"
-          items={dashboardData.mind}
+          title="Premiadas y nominadas"
+          items={dashboardData.awarded}
+          isMobile={isMobile}
+          hydrated={hydrated}
+          posterCacheRef={posterCacheRef}
+          posterOverrides={posterOverrides}
+          backdropOverrides={backdropOverrides}
+          overridesReady={overridesReady}
+        />
+
+        <Row
+          title="Dramas que enganchan"
+          items={dashboardData.dramaTV}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}

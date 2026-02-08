@@ -8,6 +8,7 @@ import {
   fetchMediaByGenre,
   fetchMediaByKeyword,
   fetchMovieSections,
+  fetchMindBendingMovies,
 } from "@/lib/api/tmdb";
 
 import {
@@ -119,6 +120,7 @@ async function getDashboardData() {
       thrillers,
       romance,
       vengeance,
+      mind,
       baseSections,
 
       // ✅ NUEVAS SECCIONES TRAKT - Solo Películas
@@ -163,6 +165,7 @@ async function getDashboardData() {
         minVotes: 500,
         language: lang,
       }),
+      fetchMindBendingMovies(),
       fetchMovieSections
         ? fetchMovieSections({ language: lang })
         : Promise.resolve({}),
@@ -303,6 +306,7 @@ async function getDashboardData() {
       // TMDb originales
       popular: curatedPopular,
       top_imdb: curatedTopIMDb,
+      mind,
       action: curatedAction,
       scifi: curatedScifi,
       thrillers: curatedThrillers,
