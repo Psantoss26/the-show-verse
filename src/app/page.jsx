@@ -376,31 +376,32 @@ async function getDashboardData(sessionId = null) {
       ? await fetchRecommendedMovies(sessionId)
       : [];
 
-    // ✅ Mezclar películas y series mejor valoradas, ordenadas por puntuación
-    const topRatedMoviesWithType = topRatedMovies.map((m) => ({
-      ...m,
-      media_type: "movie",
-    }));
-    const topRatedTVWithType = topRatedTV.map((s) => ({
-      ...s,
-      media_type: "tv",
-    }));
-
-    const mixedTopRated = [...topRatedMoviesWithType, ...topRatedTVWithType]
+    // ✅ Top 20 películas y Top 20 series por separado (con backdrops)
+    const topMovies = topRatedMovies
+      .map((m) => ({ ...m, media_type: "movie" }))
       .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
-      .slice(0, 30); // Top 30 mejor valorados
+      .slice(0, 20);
 
-    // ✅ Preparamos los backdrops del hero SIN flicker (mismo criterio que cliente)
-    const topRatedWithBackdrop = await Promise.all(
-      mixedTopRated.map(async (m) => {
-        const mediaType = m.media_type === "tv" ? "tv" : "movie";
-        const preferred = await fetchBestBackdropServer(m.id, mediaType);
-        return {
-          ...m,
-          backdrop_path: preferred || m.backdrop_path || m.poster_path || null,
-        };
-      }),
-    );
+    const topShows = topRatedTV
+      .map((s) => ({ ...s, media_type: "tv" }))
+      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
+      .slice(0, 20);
+
+    const addBackdrops = (list) =>
+      Promise.all(
+        list.map(async (m) => {
+          const mediaType = m.media_type === "tv" ? "tv" : "movie";
+          const preferred = await fetchBestBackdropServer(m.id, mediaType);
+          return {
+            ...m,
+            backdrop_path:
+              preferred || m.backdrop_path || m.poster_path || null,
+          };
+        }),
+      );
+
+    const [topRatedMoviesWithBackdrop, topRatedTVWithBackdrop] =
+      await Promise.all([addBackdrops(topMovies), addBackdrops(topShows)]);
 
     // ✅ Eliminamos duplicados en las secciones de Trakt para evitar repeticiones
     const cleanedTraktTrending = removeDuplicates(traktTrending);
@@ -418,7 +419,8 @@ async function getDashboardData(sessionId = null) {
 
     return {
       // TMDb originales
-      topRated: topRatedWithBackdrop,
+      topRatedMovies: topRatedMoviesWithBackdrop,
+      topRatedTV: topRatedTVWithBackdrop,
       awarded: curateList(awarded, { minVotes: 1200, minRating: 6.8, minSize: 20, maxSize: 60 }),
       dramaTV: curateList(dramaTV, { minVotes: 1000, minRating: 6.5, minSize: 25, maxSize: 70 }),
       trending,

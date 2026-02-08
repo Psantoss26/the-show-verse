@@ -2213,8 +2213,11 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
 }
 
 /* ---------- Carrusel hero (backdrops) ---------- */
-function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
-  if (!items || items.length === 0) return null;
+function TopRatedHero({ movieItems, tvItems, isMobile, hydrated, backdropOverrides }) {
+  const [activeTab, setActiveTab] = useState("movies");
+  const items = activeTab === "movies" ? movieItems : tvItems;
+
+  if ((!movieItems || movieItems.length === 0) && (!tvItems || tvItems.length === 0)) return null;
 
   const swiperRef = useRef(null);
   const heroRef = useRef(null);
@@ -2226,8 +2229,19 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
   const [heroBackdrops, setHeroBackdrops] = useState({});
   const [heroLoaded, setHeroLoaded] = useState(false);
 
+  // Cargar backdrops para AMBAS listas para evitar flash al cambiar de tab
+  const allItems = useMemo(() => {
+    const combined = [...(movieItems || []), ...(tvItems || [])];
+    const seen = new Set();
+    return combined.filter((m) => {
+      if (seen.has(m.id)) return false;
+      seen.add(m.id);
+      return true;
+    });
+  }, [movieItems, tvItems]);
+
   useEffect(() => {
-    if (!items || items.length === 0) {
+    if (!allItems || allItems.length === 0) {
       setHeroLoaded(true);
       return;
     }
@@ -2237,7 +2251,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
     const load = async () => {
       try {
         const entries = await Promise.all(
-          items.map(async (movie) => {
+          allItems.map(async (movie) => {
             const id = movie?.id;
             if (!id) return [null, null];
 
@@ -2288,7 +2302,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
         console.error("Error cargando backdrops del hero", err);
 
         const map = {};
-        for (const movie of items) {
+        for (const movie of allItems) {
           map[movie.id] = movie.backdrop_path || movie.poster_path || null;
         }
         setHeroBackdrops(map);
@@ -2301,7 +2315,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
     return () => {
       canceled = true;
     };
-  }, [items, backdropOverrides]);
+  }, [allItems, backdropOverrides]);
 
   const updateNav = (swiper) => {
     if (!swiper) return;
@@ -2336,7 +2350,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
   const showPrev = isHoveredHero && canPrev;
   const showNext = isHoveredHero && canNext;
 
-  const heroKey = `hero-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
+  const heroKey = `hero-${activeTab}-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
 
   return (
     <motion.div
@@ -2346,7 +2360,7 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
       transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
       className="relative group mb-10 sm:mb-14"
     >
-      {/* Título de la sección */}
+      {/* Título de la sección con selector Películas / Series */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={
@@ -2361,9 +2375,38 @@ function TopRatedHero({ items, isMobile, hydrated, backdropOverrides }) {
             DESTACADAS
           </span>
         </div>
-        <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-          Mejores valoradas<span className="text-emerald-500">.</span>
-        </h3>
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+            Mejores valoradas<span className="text-emerald-500">.</span>
+          </h3>
+
+          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+            {movieItems?.length > 0 && (
+              <button
+                onClick={() => setActiveTab("movies")}
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  activeTab === "movies"
+                    ? "bg-white text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Películas
+              </button>
+            )}
+            {tvItems?.length > 0 && (
+              <button
+                onClick={() => setActiveTab("series")}
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  activeTab === "series"
+                    ? "bg-white text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Series
+              </button>
+            )}
+          </div>
+        </div>
       </motion.div>
 
       <div
@@ -2547,7 +2590,8 @@ export default function MainDashboardClient({ initialData }) {
 
   const allMovieIds = useMemo(() => {
     const keys = [
-      "topRated",
+      "topRatedMovies",
+      "topRatedTV",
       "popular",
       "trending",
       "awarded",
@@ -2632,7 +2676,8 @@ export default function MainDashboardClient({ initialData }) {
   return (
     <div className="min-h-screen px-4 sm:px-6 py-6 sm:py-8 text-white bg-gradient-to-b from-black via-neutral-950 to-black">
       <TopRatedHero
-        items={dashboardData.topRated || []}
+        movieItems={dashboardData.topRatedMovies || []}
+        tvItems={dashboardData.topRatedTV || []}
         isMobile={isMobile}
         hydrated={hydrated}
         backdropOverrides={backdropOverrides}
