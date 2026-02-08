@@ -206,8 +206,8 @@ async function getDashboardData() {
     });
 
     const curatedRomance = curateList(romance, {
-      minVotes: 200,
-      minRating: 7.0,
+      minVotes: 50,
+      minRating: 6.0,
       minSize: 20,
       maxSize: 60,
     });

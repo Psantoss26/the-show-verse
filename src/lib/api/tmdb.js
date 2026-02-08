@@ -799,20 +799,56 @@ export const fetchRomanceSeriesWithGoodReviews = async ({
   pages = 3,
 }) => {
   try {
-    const allResults = [];
+    // Estrategia multi-fuente: muchas series populares de romance no tienen
+    // el género 10749 como primario, así que combinamos varias búsquedas.
+    const queries = [];
 
     for (let page = 1; page <= pages; page++) {
-      const data = await tmdb(`/discover/tv`, {
-        language,
-        sort_by: "vote_average.desc",
-        "vote_count.gte": 200,
-        "vote_average.gte": 7.0,
-        with_genres: 10749,
-        page,
-      });
+      // 1) Género Romance directo
+      queries.push(
+        tmdb(`/discover/tv`, {
+          language,
+          sort_by: "popularity.desc",
+          "vote_count.gte": 50,
+          with_genres: 10749,
+          page,
+        }),
+      );
+      // 2) Dramas con keyword "romance" (9840) — captura Bridgerton, Outlander, etc.
+      queries.push(
+        tmdb(`/discover/tv`, {
+          language,
+          sort_by: "popularity.desc",
+          "vote_count.gte": 100,
+          with_genres: 18,
+          with_keywords: "9840|818",
+          page,
+        }),
+      );
+    }
 
-      if (data?.results) {
-        allResults.push(...data.results);
+    // 3) Keywords "love triangle" (11123) y "romantic drama" (2041)
+    queries.push(
+      tmdb(`/discover/tv`, {
+        language,
+        sort_by: "popularity.desc",
+        "vote_count.gte": 50,
+        with_keywords: "11123|2041|9840",
+        page: 1,
+      }),
+    );
+
+    const results = await Promise.all(queries);
+
+    // Deduplicar por ID y unir
+    const seen = new Set();
+    const allResults = [];
+    for (const data of results) {
+      for (const item of data?.results || []) {
+        if (item?.id && !seen.has(item.id)) {
+          seen.add(item.id);
+          allResults.push(item);
+        }
       }
     }
 
