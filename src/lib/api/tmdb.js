@@ -35,7 +35,7 @@ async function tmdb(path, params = {}, options = {}) {
 
   // En servidor: timeout más corto, caching por defecto
   // En cliente: dejamos más margen al usuario
-  const { timeoutMs = IS_SERVER ? 4000 : 8000, ...fetchOptions } = options;
+  const { timeoutMs = 8000, ...fetchOptions } = options;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -45,12 +45,12 @@ async function tmdb(path, params = {}, options = {}) {
     // En cliente: no-store (el browser ya gestiona su propio cache HTTP).
     const baseInit = IS_SERVER
       ? {
-          cache: "force-cache",
-          next: { revalidate: 60 * 10 }, // 10 minutos
-        }
+        cache: "force-cache",
+        next: { revalidate: 60 * 10 }, // 10 minutos
+      }
       : {
-          cache: "no-store",
-        };
+        cache: "no-store",
+      };
 
     const res = await fetch(buildUrl(path, params), {
       ...baseInit,

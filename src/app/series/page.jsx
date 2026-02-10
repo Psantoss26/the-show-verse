@@ -18,7 +18,6 @@ import {
   removeDuplicates,
 } from "@/lib/api/traktHelpers";
 
-export const dynamic = "force-dynamic";
 export const revalidate = 1800; // 30 min
 
 /* ========= Utilidad para obtener la URL base en servidor ========= */
@@ -145,7 +144,7 @@ async function getDashboardData() {
       }), // Crimen
       fetchRomanceSeriesWithGoodReviews({
         language: lang,
-        pages: 3,
+        pages: 1,
       }), // Romance
       fetchMediaByGenre({
         type: "tv",
@@ -158,14 +157,14 @@ async function getDashboardData() {
         : Promise.resolve({}),
 
       // ✅ Trakt - Solo Series
-      getTraktShowsTrending(50),
-      getTraktShowsPopular(50),
-      getTraktShowsRecommended(50),
-      getTraktShowsAnticipated(50),
-      getTraktShowsPlayed("weekly", 50),
-      getTraktShowsPlayed("monthly", 50),
-      getTraktShowsPlayed("yearly", 50),
-      getTraktShowsPlayed("all", 50),
+      getTraktShowsTrending(24),
+      getTraktShowsPopular(24),
+      getTraktShowsRecommended(24),
+      getTraktShowsAnticipated(24),
+      getTraktShowsPlayed("weekly", 24),
+      getTraktShowsPlayed("monthly", 24),
+      getTraktShowsPlayed("yearly", 24),
+      getTraktShowsPlayed("all", 24),
     ]);
 
     const top_imdb_raw = await topImdbPromise;
