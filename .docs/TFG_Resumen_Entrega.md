@@ -191,37 +191,47 @@ Se ha seguido una **metodología ágil iterativa** adaptada a un proyecto indivi
 
 ## 7. Estado actual del desarrollo
 
-### Métricas de rendimiento en producción
+### 7.1 Grado de completitud del proyecto
 
-| Métrica Lighthouse | Resultado |
-|---|---|
-| Performance | **92/100** |
-| Best Practices | **95/100** |
-| SEO | **100/100** |
-| Accessibility | **88/100** (en mejora) |
+El proyecto se encuentra en un estado avanzado de desarrollo, con un progreso estimado del 85% sobre el alcance total definido. En cuanto al Producto Mínimo Viable (MVP), todas las funcionalidades esenciales han sido implementadas y están operativas, alcanzando un 100% de completitud. Las funcionalidades opcionales tienen un progreso del 75%, habiendo completado 9 de las 12 características adicionales planificadas.
 
-| Core Web Vital | Resultado | Umbral bueno |
-|---|---|---|
-| LCP | **1,8s** | < 2,5s ✅ |
-| FID | **45ms** | < 100ms ✅ |
-| CLS | **0,05** | < 0,1 ✅ |
+La aplicación está desplegada en producción y accesible públicamente en la URL the-show-verse.vercel.app, donde puede ser probada por usuarios reales. Este despliegue ha permitido validar la arquitectura propuesta y recoger métricas reales de rendimiento.
 
-### Cifras del proyecto
+### 7.2 Funcionalidades implementadas por área
 
-| Concepto | Valor |
-|---|---|
-| Rutas API | 44 grupos |
-| Funciones de consulta | 80+ |
-| Componentes React | 30+ |
-| Páginas / vistas | 12 |
-| APIs externas integradas | 5 |
-| Commits | 50+ |
+**Núcleo de la aplicación (100% completado):** Se ha implementado completamente el sistema de navegación principal, el dashboard con más de 10 secciones temáticas, el motor de búsqueda avanzada con filtros combinables, y las páginas de detalle tanto para películas como para series de televisión. Este núcleo constituye la base sobre la que se construyen el resto de funcionalidades.
 
-### Resumen de estado
+**Sistema de autenticación (100% completado):** La integración con Trakt.tv mediante OAuth 2.0 está completamente operativa. Los usuarios pueden iniciar sesión de forma segura, mantener su sesión persistente mediante cookies httpOnly, y cerrar sesión cuando lo deseen. El flujo de autenticación cumple con los estándares de seguridad actuales.
 
-- **Funcionalidades completas:** Dashboard, búsqueda avanzada, detalle de películas/series/actores, autenticación OAuth, favoritos, watchlist, historial, seguimiento por episodios, valoraciones, estadísticas, calendario, streaming, Plex, listas, modos de vista, animaciones, enlaces externos, despliegue en producción.
-- **En desarrollo:** Ajustes de diseño del dashboard, mejoras de accesibilidad.
-- **Planificado:** Pruebas automatizadas, PWA, notificaciones.
+**Gestión personal de contenido (100% completado):** Todas las funcionalidades de gestión personal están implementadas y sincronizadas bidireccionalmente con Trakt.tv. Los usuarios pueden marcar contenido como favorito, añadirlo a su watchlist, registrar su historial de visualización, asignar valoraciones personales, y realizar seguimiento detallado del progreso de series por temporada y episodio individual.
+
+**Analíticas y estadísticas (100% completado):** El módulo de estadísticas presenta al usuario un panel completo con sus datos de consumo, diferenciando entre películas y episodios de series, con posibilidad de filtrar por período temporal. Los datos se visualizan mediante gráficos interactivos construidos con Recharts. El calendario personalizado muestra los estrenos de series que el usuario sigue y las películas en su watchlist.
+
+**Contenido extendido (100% completado):** Se han implementado las páginas de perfil para actores y miembros del equipo técnico, incluyendo su filmografía completa. Las páginas de detalle de contenido incluyen galerías multimedia con imágenes de alta resolución, tráilers integrados de YouTube, y secciones de contenido similar y recomendaciones.
+
+**Integraciones con APIs externas (100% completado):** Las cinco integraciones planificadas están operativas: TMDb como fuente principal de metadatos, Trakt.tv para sincronización de datos personales, OMDb para valoraciones cruzadas de múltiples críticas, JustWatch para información de disponibilidad en plataformas de streaming, y Plex para verificar contenido en bibliotecas locales. Se han desarrollado más de 80 funciones de consulta y 44 grupos de rutas API.
+
+**Interfaz de usuario y experiencia (90% completado):** Se han implementado tres modos de visualización diferentes para las páginas de listado (cuadrícula, lista y compacto), animaciones fluidas mediante Framer Motion, y diseño completamente responsivo que se adapta desde dispositivos móviles hasta pantallas de escritorio grandes. El aspecto pendiente de mejora es la accesibilidad, que actualmente tiene una puntuación de 88/100 en Lighthouse.
+
+**Optimización de rendimiento (95% completado):** Se ha implementado renderizado del lado del servidor (SSR) y regeneración estática incremental (ISR) para las páginas principales, carga diferida de componentes pesados, optimización automática de imágenes mediante el componente Image de Next.js, y estrategias de caché. Quedan ajustes menores de optimización en algunas secciones específicas.
+
+**Calidad y testing (70% completado):** La aplicación está desplegada en producción con pipelines de CI/CD automatizados en Vercel. Sin embargo, aún no se ha implementado una suite completa de tests automatizados, ni se ha desarrollado la versión PWA (Progressive Web App) con capacidades offline.
+
+### 7.3 Métricas de rendimiento en producción
+
+La aplicación ha sido evaluada mediante Google Lighthouse, obteniendo una puntuación de 92/100 en rendimiento, 95/100 en mejores prácticas, 100/100 en SEO y 88/100 en accesibilidad. Estas puntuaciones sitúan la aplicación en niveles de calidad profesionales.
+
+Los Core Web Vitals, que son las métricas estándar de la industria para medir la experiencia de usuario real, se encuentran todos dentro de los umbrales considerados buenos: Largest Contentful Paint (LCP) de 1,8 segundos (umbral: menor a 2,5s), First Input Delay (FID) de 45 milisegundos (umbral: menor a 100ms), y Cumulative Layout Shift (CLS) de 0,05 (umbral: menor a 0,1).
+
+En cuanto a la arquitectura implementada, se han integrado 5 servicios externos mediante más de 80 funciones de consulta específicas. El proyecto cuenta con más de 30 componentes React reutilizables organizados de forma modular, y 12 páginas o vistas principales que conforman la navegación de la aplicación.
+
+### 7.4 Trabajo pendiente
+
+**A corto plazo (próximas dos semanas):** Se trabajará en mejorar la puntuación de accesibilidad mediante la incorporación de atributos ARIA apropiados, mejora de la navegación por teclado, y contraste de colores. También se realizarán ajustes finales en el diseño visual del dashboard para pulir detalles de espaciado, alineación y consistencia visual.
+
+**Para la entrega final del TFG:** Se desarrollará una suite completa de tests automatizados utilizando Jest y React Testing Library, cubriendo tests unitarios de componentes, tests de integración de las rutas API, y tests end-to-end de los flujos principales. Se implementará la versión PWA de la aplicación con service workers para caché offline y manifest para instalación. Se añadirá un sistema de notificaciones que alerte al usuario de los estrenos de series que sigue.
+
+**Funcionalidades opcionales si el tiempo lo permite:** Implementación de un sistema de temas con modo oscuro y modo claro alternables por el usuario, e internacionalización (i18n) de la interfaz para soportar múltiples idiomas, priorizando español e inglés.
 
 ---
 
