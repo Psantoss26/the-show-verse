@@ -20,8 +20,6 @@ import {
   removeDuplicates,
 } from "@/lib/api/traktHelpers";
 
-export const dynamic = "force-dynamic";
-
 // Ajusta el revalidate según lo fresco que quieras el contenido
 export const revalidate = 1800; // 30 minutos
 
@@ -171,14 +169,14 @@ async function getDashboardData() {
         : Promise.resolve({}),
 
       // ✅ Trakt - Solo Películas
-      getTraktMoviesTrending(50),
-      getTraktMoviesPopular(50),
-      getTraktMoviesRecommended(50),
-      getTraktMoviesAnticipated(50),
-      getTraktMoviesPlayed("weekly", 50),
-      getTraktMoviesPlayed("monthly", 50),
-      getTraktMoviesPlayed("yearly", 50),
-      getTraktMoviesPlayed("all", 50),
+      getTraktMoviesTrending(24),
+      getTraktMoviesPopular(24),
+      getTraktMoviesRecommended(24),
+      getTraktMoviesAnticipated(24),
+      getTraktMoviesPlayed("weekly", 24),
+      getTraktMoviesPlayed("monthly", 24),
+      getTraktMoviesPlayed("yearly", 24),
+      getTraktMoviesPlayed("all", 24),
     ]);
 
     const top_imdb_raw = await topImdbPromise;

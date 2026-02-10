@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+export const revalidate = 43200 // 12 horas
 
 // ✅ Mejor: clave server-side
 const API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY

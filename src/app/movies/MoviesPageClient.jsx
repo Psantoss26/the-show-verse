@@ -52,14 +52,9 @@ const scaleIn = {
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
 const useIsMobileLayout = (breakpointPx = 768) => {
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia(`(max-width:${breakpointPx - 1}px)`).matches;
-  });
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
     const mq = window.matchMedia(`(max-width:${breakpointPx - 1}px)`);
     const update = () => setIsMobile(mq.matches);
     update();
@@ -446,7 +441,7 @@ function PosterImage({ movie, cache }) {
 
   if (!ready || !posterPath) {
     return (
-      <div className="w-full h-full rounded-lg bg-neutral-800 animate-pulse" />
+      <div className="w-full h-full aspect-[2/3] rounded-lg bg-neutral-800/60" />
     );
   }
 
@@ -546,9 +541,7 @@ function Top10MobileBackdropCard({ movie, rank }) {
   return (
     <Link href={href} className="block w-full">
       <div className="relative w-full rounded-3xl overflow-hidden bg-neutral-900 aspect-[16/9]">
-        {!ready && (
-          <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
-        )}
+        {!ready && <div className="absolute inset-0 bg-neutral-900" />}
 
         {ready && src && (
           <>
@@ -870,7 +863,7 @@ function InlinePreviewCard({ movie, heightClass }) {
     >
       <div className="relative w-full h-full bg-black">
         {!showTrailer && !backdropReady && (
-          <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
+          <div className="absolute inset-0 bg-neutral-900" />
         )}
 
         {!showTrailer && backdropReady && bgSrc && (
@@ -886,7 +879,7 @@ function InlinePreviewCard({ movie, heightClass }) {
         {showTrailer && (
           <>
             {(trailerLoading || !trailerSrc) && (
-              <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
+              <div className="absolute inset-0 bg-neutral-900" />
             )}
 
             {trailerSrc && (

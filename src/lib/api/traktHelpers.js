@@ -43,13 +43,25 @@ async function fetchTrakt(path, options = {}) {
     return Array.isArray(json) ? json : [];
 }
 
+// Cache de deduplicación: evita pedir el mismo TMDb ID varias veces en un mismo render
+const tmdbDetailsCache = new Map();
+
 async function fetchTmdbDetails(type, id) {
     if (!TMDB_KEY || !type || !id) return null;
-    const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&language=es-ES`;
-    const res = await fetch(url, { next: { revalidate: 60 * 60 } });
-    const json = await safeJson(res);
-    if (!res.ok) return null;
-    return json;
+
+    const cacheKey = `${type}:${id}`;
+    if (tmdbDetailsCache.has(cacheKey)) return tmdbDetailsCache.get(cacheKey);
+
+    const promise = (async () => {
+        const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&language=es-ES`;
+        const res = await fetch(url, { next: { revalidate: 60 * 60 } });
+        const json = await safeJson(res);
+        if (!res.ok) return null;
+        return json;
+    })();
+
+    tmdbDetailsCache.set(cacheKey, promise);
+    return promise;
 }
 
 function interleave(a, b, limit = 24) {
@@ -104,7 +116,7 @@ async function hydrateTraktResults(seeds, limit = 24) {
                 overview: details.overview || null,
             };
         },
-        8
+        15
     );
 }
 
