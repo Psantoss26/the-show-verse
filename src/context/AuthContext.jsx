@@ -1,78 +1,84 @@
 // /src/context/AuthContext.jsx
-'use client'
+"use client";
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from "react";
 
-const AuthContext = createContext(null)
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [session, setSession] = useState(null)
-  const [account, setAccount] = useState(null)
-  const [hydrated, setHydrated] = useState(false) // 👈 NUEVO
+  const [session, setSession] = useState(null);
+  const [account, setAccount] = useState(null);
+  const [hydrated, setHydrated] = useState(false); // 👈 NUEVO
 
   useEffect(() => {
     // Este efecto solo se ejecuta en el cliente
-    if (typeof window === 'undefined') {
-      setHydrated(true)
-      return
+    if (typeof window === "undefined") {
+      setHydrated(true);
+      return;
     }
 
     try {
-      const storedSession = window.localStorage.getItem('tmdb_session')
-      const storedAccount = window.localStorage.getItem('tmdb_account')
+      const storedSession = window.localStorage.getItem("tmdb_session");
+      const storedAccount = window.localStorage.getItem("tmdb_account");
 
       if (storedSession) {
-        setSession(storedSession)
+        setSession(storedSession);
+        // Asegurar que la cookie tiene el nombre correcto (tmdb_session_id)
+        document.cookie = `tmdb_session_id=${encodeURIComponent(
+          storedSession,
+        )}; path=/; max-age=31536000`;
+        // Limpiar cookie vieja si existe
+        document.cookie = "tmdb_session=; path=/; max-age=0";
       }
 
       if (storedAccount) {
         try {
-          setAccount(JSON.parse(storedAccount))
+          setAccount(JSON.parse(storedAccount));
         } catch (e) {
-          console.warn('tmdb_account corrupto, se limpia', e)
-          window.localStorage.removeItem('tmdb_account')
-          setAccount(null)
+          console.warn("tmdb_account corrupto, se limpia", e);
+          window.localStorage.removeItem("tmdb_account");
+          setAccount(null);
         }
       }
     } catch (e) {
-      console.warn('Error leyendo sesión TMDb desde localStorage', e)
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem('tmdb_session')
-        window.localStorage.removeItem('tmdb_account')
+      console.warn("Error leyendo sesión TMDb desde localStorage", e);
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("tmdb_session");
+        window.localStorage.removeItem("tmdb_account");
       }
-      setSession(null)
-      setAccount(null)
+      setSession(null);
+      setAccount(null);
     } finally {
       // 👇 Muy importante: marcar que ya hemos intentado hidratar
-      setHydrated(true)
+      setHydrated(true);
     }
-  }, [])
+  }, []);
 
   const login = ({ session_id, account }) => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('tmdb_session', session_id)
-      window.localStorage.setItem('tmdb_account', JSON.stringify(account))
-      document.cookie = `tmdb_session=${encodeURIComponent(
-        session_id
-      )}; path=/; max-age=31536000`
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("tmdb_session", session_id);
+      window.localStorage.setItem("tmdb_account", JSON.stringify(account));
+      document.cookie = `tmdb_session_id=${encodeURIComponent(
+        session_id,
+      )}; path=/; max-age=31536000`;
     }
 
-    setSession(session_id)
-    setAccount(account)
-    setHydrated(true) // por si acaso
-  }
+    setSession(session_id);
+    setAccount(account);
+    setHydrated(true); // por si acaso
+  };
 
   const logout = () => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('tmdb_session')
-      window.localStorage.removeItem('tmdb_account')
-      document.cookie = 'tmdb_session=; path=/; max-age=0'
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("tmdb_session");
+      window.localStorage.removeItem("tmdb_account");
+      document.cookie = "tmdb_session_id=; path=/; max-age=0";
     }
 
-    setSession(null)
-    setAccount(null)
-    setHydrated(true) // también hemos “terminado de saber” el estado
-  }
+    setSession(null);
+    setAccount(null);
+    setHydrated(true); // también hemos “terminado de saber” el estado
+  };
 
   return (
     <AuthContext.Provider
@@ -80,21 +86,21 @@ export const AuthProvider = ({ children }) => {
     >
       {children}
     </AuthContext.Provider>
-  )
-}
+  );
+};
 
 export const useAuth = () => {
-  const ctx = useContext(AuthContext)
+  const ctx = useContext(AuthContext);
   if (!ctx) {
-    console.warn('useAuth se ha usado fuera de <AuthProvider>')
+    console.warn("useAuth se ha usado fuera de <AuthProvider>");
     // devolvemos hydrated: true para no dejar la UI en loading eterno
     return {
       session: null,
       account: null,
-      login: () => { },
-      logout: () => { },
+      login: () => {},
+      logout: () => {},
       hydrated: true,
-    }
+    };
   }
-  return ctx
-}
+  return ctx;
+};
