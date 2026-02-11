@@ -477,7 +477,7 @@ async function getDashboardData(sessionId = null) {
 /* =================== Página de Inicio =================== */
 export default async function HomePage() {
   const cookieStore = await cookies();
-  const sessionId = cookieStore.get("tmdb_session")?.value || null;
+  const sessionId = cookieStore.get("tmdb_session_id")?.value || null;
 
   const dashboardData = await getDashboardData(sessionId);
   return <MainDashboardClient initialData={dashboardData} />;
