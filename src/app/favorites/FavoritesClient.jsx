@@ -1655,9 +1655,8 @@ export default function FavoritesClient() {
   const grouped = useMemo(() => {
     if (groupBy === "none") return null;
 
-    // Don't show grouped view while loading external scores
-    if (groupBy === "imdb_rating" && loadingImdb) return null;
-    if (groupBy === "trakt_rating" && loadingTrakt) return null;
+    // Show grouped view with available scores (progressive loading)
+    // No need to block rendering while loading external scores
 
     const groups = new Map();
 
@@ -2628,22 +2627,27 @@ export default function FavoritesClient() {
           </div>
         </motion.div>
 
+        {/* Loading indicator for scores (non-blocking) */}
+        {(loadingImdb || loadingTrakt) && !loading && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-4 p-3 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center gap-3"
+          >
+            <Loader2 className="w-4 h-4 text-red-500 animate-spin flex-shrink-0" />
+            <p className="text-zinc-400 text-sm">
+              {loadingImdb && groupBy === "imdb_rating" && "Cargando puntuaciones de IMDb..."}
+              {loadingTrakt && groupBy === "trakt_rating" && "Cargando puntuaciones de Trakt..."}
+            </p>
+          </motion.div>
+        )}
+
         {/* Content */}
-        {loading ||
-          (groupBy === "imdb_rating" && loadingImdb) ||
-          (groupBy === "trakt_rating" && loadingTrakt) ? (
+        {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
-            {loadingImdb && groupBy === "imdb_rating" && (
-              <p className="text-zinc-500 text-sm">
-                Cargando puntuaciones de IMDb...
-              </p>
-            )}
-            {loadingTrakt && groupBy === "trakt_rating" && (
-              <p className="text-zinc-500 text-sm">
-                Cargando puntuaciones de Trakt...
-              </p>
-            )}
+            <p className="text-zinc-500 text-sm">Cargando favoritos...</p>
           </div>
         ) : sorted.length === 0 ? (
           <motion.div
