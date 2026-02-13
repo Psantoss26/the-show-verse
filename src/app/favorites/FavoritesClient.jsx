@@ -1240,6 +1240,11 @@ export default function FavoritesClient() {
 
   // Load favorites
   useEffect(() => {
+    let cancelled = false;
+
+    const getItemType = (item) => item?.media_type || (item?.title ? "movie" : "tv");
+    const getRatingKey = (item) => `${getItemType(item)}:${item?.id}`;
+
     const loadFavorites = async () => {
       if (!session || !account?.id) {
         setLoading(false);
@@ -1249,11 +1254,7 @@ export default function FavoritesClient() {
       try {
         setLoading(true);
 
-        // Fetch favorites and rated items in parallel
-        const [favResponse, rated] = await Promise.all([
-          fetch("/api/tmdb/account/favorite"),
-          fetchRatedForUser(account.id, session),
-        ]);
+        const favResponse = await fetch("/api/tmdb/account/favorite");
 
         if (!favResponse.ok) {
           console.error(
@@ -1275,30 +1276,56 @@ export default function FavoritesClient() {
         const data = JSON.parse(text);
         const favorites = data?.favorites || [];
 
-        // Create a Map for quick rating lookup by item id
-        const ratingMap = new Map();
-        rated.forEach((item) => {
-          ratingMap.set(item.id, item.user_rating);
-        });
-
-        // Merge user ratings into favorites and add index for sorting
-        const favoritesWithRatings = favorites.map((item, index) => ({
+        // Render rápido: mostramos favoritos sin esperar a rated items.
+        const favoritesWithBaseMeta = favorites.map((item, index) => ({
           ...item,
-          user_rating: ratingMap.get(item.id) || null,
+          user_rating: null,
           _addedIndex: index, // Keep original order (most recent first from API)
         }));
 
-        setRatedItems(rated);
-        setItems(favoritesWithRatings);
+        if (!cancelled) {
+          setItems(favoritesWithBaseMeta);
+        }
+
+        // Hidratar ratings en segundo plano para no bloquear la pantalla inicial.
+        fetchRatedForUser(account.id, session)
+          .then((rated) => {
+            if (cancelled) return;
+
+            const ratingMap = new Map();
+            rated.forEach((item) => {
+              ratingMap.set(getRatingKey(item), item.user_rating);
+            });
+
+            startTransition(() => {
+              setRatedItems(rated);
+              setItems((prev) =>
+                prev.map((item) => ({
+                  ...item,
+                  user_rating: ratingMap.get(getRatingKey(item)) ?? item.user_rating ?? null,
+                })),
+              );
+            });
+          })
+          .catch((error) => {
+            console.error("Error loading rated items:", error);
+          });
       } catch (error) {
         console.error("Error loading favorites:", error);
-        setItems([]);
+        if (!cancelled) {
+          setItems([]);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     loadFavorites();
+    return () => {
+      cancelled = true;
+    };
   }, [session, account]);
 
   // Load IMDb scores from cache on mount
@@ -1323,24 +1350,21 @@ export default function FavoritesClient() {
     }
   }, [items]);
 
-  // Load IMDb scores when grouping by IMDb rating
+  // Prefetch IMDb scores in background (non-blocking)
   useEffect(() => {
-    if (groupBy !== "imdb_rating" || items.length === 0 || loadingImdb) return;
+    if (items.length === 0) return;
+
+    let cancelled = false;
 
     const loadImdbScores = async () => {
-      // Load from cache first and show immediately
       const cachedScores = readScoreCache("imdb");
       const scores = new Map(cachedScores);
 
-      // Show cached scores immediately
       if (cachedScores.size > 0) {
-        setImdbScores(new Map(scores));
+        startTransition(() => setImdbScores(new Map(scores)));
       }
 
-      // Identify items that need fetching
-      const itemsToFetch = items.filter(
-        (item) => !cachedScores.has(String(item.id)),
-      );
+      const itemsToFetch = items.filter((item) => !scores.has(String(item.id)));
 
       if (itemsToFetch.length === 0) {
         setLoadingImdb(false);
@@ -1351,80 +1375,81 @@ export default function FavoritesClient() {
 
       try {
         let fetchedCount = 0;
-        const newScores = new Map();
+        const batchSize = 4;
 
-        // Process items with limited concurrency (3 at a time)
         const processItem = async (item) => {
           const type = item.media_type || (item.title ? "movie" : "tv");
 
           try {
             const externalIds = await getExternalIds(type, item.id);
             const imdbId = externalIds?.imdb_id;
+            if (!imdbId) return false;
 
-            if (imdbId) {
-              const omdbData = await fetchOmdbByImdb(imdbId);
-              const rating = omdbData?.imdbRating;
+            const omdbData = await fetchOmdbByImdb(imdbId);
+            const rating = omdbData?.imdbRating;
+            if (!rating || rating === "N/A") return false;
 
-              if (rating && rating !== "N/A") {
-                const numRating = parseFloat(rating);
-                if (!isNaN(numRating)) {
-                  scores.set(String(item.id), numRating);
-                  newScores.set(String(item.id), numRating);
-                  fetchedCount++;
+            const numRating = parseFloat(rating);
+            if (isNaN(numRating)) return false;
 
-                  // Update state immediately for progressive display
-                  setImdbScores(new Map(scores));
-                }
-              }
-            }
+            scores.set(String(item.id), numRating);
+            fetchedCount++;
+            return true;
           } catch (err) {
             console.warn(`Failed to fetch IMDb score for ${item.id}:`, err);
+            return false;
           }
         };
 
-        // Process in batches of 3 concurrent requests
-        const batchSize = 3;
         for (let i = 0; i < itemsToFetch.length; i += batchSize) {
+          if (cancelled) break;
+
           const batch = itemsToFetch.slice(i, i + batchSize);
-          await Promise.all(batch.map(processItem));
+          const results = await Promise.all(batch.map(processItem));
+          const hasBatchUpdates = results.some(Boolean);
+
+          if (hasBatchUpdates && !cancelled) {
+            startTransition(() => setImdbScores(new Map(scores)));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
         }
 
-        // Save all new scores to cache at once
-        if (fetchedCount > 0) {
+        if (!cancelled && fetchedCount > 0) {
           writeScoreCache("imdb", scores);
         }
       } catch (error) {
         console.error("Error loading IMDb scores:", error);
       } finally {
-        setLoadingImdb(false);
+        if (!cancelled) {
+          setLoadingImdb(false);
+        }
       }
     };
 
     loadImdbScores();
-  }, [groupBy, items]);
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
-  // Load Trakt scores when grouping by Trakt rating
+  // Prefetch Trakt scores in background (non-blocking)
   useEffect(() => {
-    if (groupBy !== "trakt_rating" || items.length === 0 || loadingTrakt)
-      return;
+    if (items.length === 0) return;
+
+    let cancelled = false;
 
     const loadTraktScores = async () => {
-      // Load from cache first and show immediately
       const cachedScores = readScoreCache("trakt");
       const scores = new Map(cachedScores);
 
-      // Show cached scores immediately
       if (cachedScores.size > 0) {
-        setTraktScores(new Map(scores));
+        startTransition(() => setTraktScores(new Map(scores)));
       }
 
-      // Identify items that need fetching
-      const itemsToFetch = items.filter(
-        (item) => !cachedScores.has(String(item.id)),
-      );
+      const itemsToFetch = items.filter((item) => !scores.has(String(item.id)));
 
-      // For items without cache, use TMDb ratings as fallback immediately
-      itemsToFetch.forEach((item) => {
+      // Fallback temprano a TMDb para que los grupos por Trakt no esperen
+      for (const item of itemsToFetch) {
         if (
           item.vote_average &&
           typeof item.vote_average === "number" &&
@@ -1432,10 +1457,8 @@ export default function FavoritesClient() {
         ) {
           scores.set(String(item.id), item.vote_average);
         }
-      });
-
-      // Show TMDb fallback scores immediately
-      setTraktScores(new Map(scores));
+      }
+      startTransition(() => setTraktScores(new Map(scores)));
 
       if (itemsToFetch.length === 0) {
         setLoadingTrakt(false);
@@ -1446,9 +1469,8 @@ export default function FavoritesClient() {
 
       try {
         let fetchedCount = 0;
-        const newScores = new Map();
+        const batchSize = 4;
 
-        // Process items with limited concurrency (3 at a time)
         const processItem = async (item) => {
           const type = item.media_type || (item.title ? "movie" : "tv");
 
@@ -1458,44 +1480,52 @@ export default function FavoritesClient() {
               tmdbId: item.id,
             });
             const rating = traktData?.community?.rating;
-
-            if (rating && typeof rating === "number" && !isNaN(rating)) {
-              scores.set(String(item.id), rating);
-              newScores.set(String(item.id), rating);
-              fetchedCount++;
-
-              // Update state immediately for progressive display
-              setTraktScores(new Map(scores));
+            if (!rating || typeof rating !== "number" || isNaN(rating)) {
+              return false;
             }
+
+            scores.set(String(item.id), rating);
+            fetchedCount++;
+            return true;
           } catch (err) {
-            // Fallback to TMDb rating already set, just log warning
             console.warn(
               `[Trakt] Failed to fetch score for ${item.id}, using TMDb fallback:`,
               err,
             );
+            return false;
           }
         };
 
-        // Process in batches of 3 concurrent requests
-        const batchSize = 3;
         for (let i = 0; i < itemsToFetch.length; i += batchSize) {
+          if (cancelled) break;
+
           const batch = itemsToFetch.slice(i, i + batchSize);
-          await Promise.all(batch.map(processItem));
+          const results = await Promise.all(batch.map(processItem));
+          const hasBatchUpdates = results.some(Boolean);
+
+          if (hasBatchUpdates && !cancelled) {
+            startTransition(() => setTraktScores(new Map(scores)));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
         }
 
-        // Save all new scores to cache at once
-        if (fetchedCount > 0) {
+        if (!cancelled && fetchedCount > 0) {
           writeScoreCache("trakt", scores);
         }
       } catch (error) {
         console.error("Error loading Trakt scores:", error);
       } finally {
-        setLoadingTrakt(false);
+        if (!cancelled) {
+          setLoadingTrakt(false);
+        }
       }
     };
 
     loadTraktScores();
-  }, [groupBy, items]);
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   // Load watch history for sorting
   useEffect(() => {
@@ -1825,7 +1855,34 @@ export default function FavoritesClient() {
     }
 
     return groupsArray;
-  }, [sorted, groupBy, imdbScores, traktScores, loadingImdb, loadingTrakt]);
+  }, [sorted, groupBy, imdbScores, traktScores]);
+
+  const scoreLoadingLabel = loadingImdb && loadingTrakt
+    ? "Actualizando puntuaciones de IMDb y Trakt..."
+    : loadingImdb
+      ? "Actualizando puntuaciones de IMDb..."
+      : "Actualizando puntuaciones de Trakt...";
+
+  const resolveItemType = (item) =>
+    item?.media_type || (item?.title ? "movie" : "tv");
+  const getMediaKey = (item) => `${resolveItemType(item)}-${item.id}`;
+  const getItemsGridClass = (withTopMargin = false) => {
+    if (viewMode === "list") {
+      return `grid grid-cols-1 xl:grid-cols-2 gap-4${withTopMargin ? " mt-6" : ""}`;
+    }
+    if (viewMode === "compact") {
+      const compactCols =
+        imageMode === "backdrop"
+          ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
+          : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8";
+      return `grid gap-2 ${compactCols}${withTopMargin ? " mt-6" : ""}`;
+    }
+    const gridCols =
+      imageMode === "backdrop"
+        ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6";
+    return `grid gap-3 ${gridCols}${withTopMargin ? " mt-6" : ""}`;
+  };
 
   if (!hydrated) {
     // Still checking authentication, show nothing or loader
@@ -2637,8 +2694,7 @@ export default function FavoritesClient() {
           >
             <Loader2 className="w-4 h-4 text-red-500 animate-spin flex-shrink-0" />
             <p className="text-zinc-400 text-sm">
-              {loadingImdb && groupBy === "imdb_rating" && "Cargando puntuaciones de IMDb..."}
-              {loadingTrakt && groupBy === "trakt_rating" && "Cargando puntuaciones de Trakt..."}
+              {scoreLoadingLabel}
             </p>
           </motion.div>
         )}
@@ -2681,126 +2737,46 @@ export default function FavoritesClient() {
                   stats={group.stats}
                   groupBy={groupBy}
                 />
-                <AnimatePresence mode="wait">
-                  {viewMode === "list" ? (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
-                      {group.items.map((item, idx) => (
-                        <FavoriteCard
-                          key={item.id}
-                          item={item}
-                          index={idx}
-                          totalItems={group.items.length}
-                          viewMode="list"
-                          imageMode={imageMode}
-                          imdbScore={imdbScores.get(String(item.id))}
-                          traktScore={traktScores.get(String(item.id))}
-                        />
-                      ))}
-                    </div>
-                  ) : viewMode === "compact" ? (
-                    <div
-                      className={`grid gap-2 mt-6 ${imageMode === "backdrop"
-                        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
-                        : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
-                        }`}
-                    >
-                      {group.items.map((item, idx) => (
-                        <FavoriteCard
-                          key={item.id}
-                          item={item}
-                          index={idx}
-                          totalItems={group.items.length}
-                          viewMode="compact"
-                          imageMode={imageMode}
-                          imdbScore={imdbScores.get(String(item.id))}
-                          traktScore={traktScores.get(String(item.id))}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div
-                      className={`grid gap-3 mt-6 ${imageMode === "backdrop"
-                        ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
-                        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
-                        }`}
-                    >
-                      {group.items.map((item, idx) => (
-                        <FavoriteCard
-                          key={item.id}
-                          item={item}
-                          index={idx}
-                          totalItems={group.items.length}
-                          viewMode="grid"
-                          imageMode={imageMode}
-                          imdbScore={imdbScores.get(String(item.id))}
-                          traktScore={traktScores.get(String(item.id))}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </AnimatePresence>
+                <motion.div
+                  layout
+                  transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
+                  className={getItemsGridClass(true)}
+                >
+                  {group.items.map((item, idx) => (
+                    <FavoriteCard
+                      key={getMediaKey(item)}
+                      item={item}
+                      index={idx}
+                      totalItems={group.items.length}
+                      viewMode={viewMode}
+                      imageMode={imageMode}
+                      imdbScore={imdbScores.get(String(item.id))}
+                      traktScore={traktScores.get(String(item.id))}
+                    />
+                  ))}
+                </motion.div>
               </div>
             ))}
           </div>
         ) : (
-          <AnimatePresence mode="wait">
-            {viewMode === "list" ? (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {sorted.map((item, idx) => (
-                  <FavoriteCard
-                    key={item.id}
-                    item={item}
-                    index={idx}
-                    totalItems={sorted.length}
-                    viewMode="list"
-                    imageMode={imageMode}
-                    imdbScore={imdbScores.get(String(item.id))}
-                    traktScore={traktScores.get(String(item.id))}
-                  />
-                ))}
-              </div>
-            ) : viewMode === "compact" ? (
-              <div
-                className={`grid gap-2 ${imageMode === "backdrop"
-                  ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
-                  : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
-                  }`}
-              >
-                {sorted.map((item, idx) => (
-                  <FavoriteCard
-                    key={item.id}
-                    item={item}
-                    index={idx}
-                    totalItems={sorted.length}
-                    viewMode="compact"
-                    imageMode={imageMode}
-                    imdbScore={imdbScores.get(String(item.id))}
-                    traktScore={traktScores.get(String(item.id))}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div
-                className={`grid gap-3 ${imageMode === "backdrop"
-                  ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
-                  : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
-                  }`}
-              >
-                {sorted.map((item, idx) => (
-                  <FavoriteCard
-                    key={item.id}
-                    item={item}
-                    index={idx}
-                    totalItems={sorted.length}
-                    viewMode="grid"
-                    imageMode={imageMode}
-                    imdbScore={imdbScores.get(String(item.id))}
-                    traktScore={traktScores.get(String(item.id))}
-                  />
-                ))}
-              </div>
-            )}
-          </AnimatePresence>
+          <motion.div
+            layout
+            transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
+            className={getItemsGridClass(false)}
+          >
+            {sorted.map((item, idx) => (
+              <FavoriteCard
+                key={getMediaKey(item)}
+                item={item}
+                index={idx}
+                totalItems={sorted.length}
+                viewMode={viewMode}
+                imageMode={imageMode}
+                imdbScore={imdbScores.get(String(item.id))}
+                traktScore={traktScores.get(String(item.id))}
+              />
+            ))}
+          </motion.div>
         )}
       </div>
     </div>

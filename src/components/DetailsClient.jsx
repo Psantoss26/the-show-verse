@@ -5515,7 +5515,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <img
                             src={link.icon}
                             alt={link.label}
-                            className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5 p-1"
+                            className="w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain"
                             onError={(e) => {
                               e.target.style.display = "none";
                             }}

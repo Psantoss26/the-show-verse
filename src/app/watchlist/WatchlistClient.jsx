@@ -1,7 +1,14 @@
 // src/app/watchlist/WatchlistClient.jsx
 "use client";
 
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import {
+  useEffect,
+  useState,
+  useMemo,
+  useRef,
+  useCallback,
+  startTransition,
+} from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
@@ -754,10 +761,10 @@ function WatchlistCard({
       >
         <Link
           href={href}
-          className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-blue-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
+          className="block bg-zinc-900/40 border border-zinc-800/80 rounded-xl hover:border-blue-500/35 hover:bg-zinc-900/65 transition-[background-color,border-color] duration-300 group overflow-hidden"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
-            <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
+            <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-zinc-800/80 bg-zinc-900 shrink-0">
               <SmartPoster
                 item={item}
                 title={title}
@@ -817,7 +824,7 @@ function WatchlistCard({
       >
         <Link href={href} className="block">
           <motion.div
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md`}
+            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md transition-[border-color] duration-300`}
             whileHover={{
               scale: 1.15,
               zIndex: 50,
@@ -921,7 +928,7 @@ function WatchlistCard({
     >
       <Link href={href} className="block">
         <div
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-blue-900/20 transition-all`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-blue-900/20 hover:border-blue-500/30 transition-[border-color,box-shadow] duration-300`}
           onMouseEnter={handleHover}
         >
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
@@ -1173,24 +1180,21 @@ export default function WatchlistClient() {
     }
   }, [items]);
 
-  // Load IMDb scores when grouping by IMDb rating
+  // Prefetch IMDb scores in background (non-blocking)
   useEffect(() => {
-    if (groupBy !== "imdb_rating" || items.length === 0 || loadingImdb) return;
+    if (items.length === 0) return;
+
+    let cancelled = false;
 
     const loadImdbScores = async () => {
-      // Load from cache first and show immediately
       const cachedScores = readScoreCache("imdb");
       const scores = new Map(cachedScores);
 
-      // Show cached scores immediately
       if (cachedScores.size > 0) {
-        setImdbScores(new Map(scores));
+        startTransition(() => setImdbScores(new Map(scores)));
       }
 
-      // Identify items that need fetching
-      const itemsToFetch = items.filter(
-        (item) => !cachedScores.has(String(item.id)),
-      );
+      const itemsToFetch = items.filter((item) => !scores.has(String(item.id)));
 
       if (itemsToFetch.length === 0) {
         setLoadingImdb(false);
@@ -1201,80 +1205,81 @@ export default function WatchlistClient() {
 
       try {
         let fetchedCount = 0;
-        const newScores = new Map();
+        const batchSize = 4;
 
-        // Process items with limited concurrency (3 at a time)
         const processItem = async (item) => {
           const type = item.media_type || (item.title ? "movie" : "tv");
 
           try {
             const externalIds = await getExternalIds(type, item.id);
             const imdbId = externalIds?.imdb_id;
+            if (!imdbId) return false;
 
-            if (imdbId) {
-              const omdbData = await fetchOmdbByImdb(imdbId);
-              const rating = omdbData?.imdbRating;
+            const omdbData = await fetchOmdbByImdb(imdbId);
+            const rating = omdbData?.imdbRating;
+            if (!rating || rating === "N/A") return false;
 
-              if (rating && rating !== "N/A") {
-                const numRating = parseFloat(rating);
-                if (!isNaN(numRating)) {
-                  scores.set(String(item.id), numRating);
-                  newScores.set(String(item.id), numRating);
-                  fetchedCount++;
+            const numRating = parseFloat(rating);
+            if (isNaN(numRating)) return false;
 
-                  // Update state immediately for progressive display
-                  setImdbScores(new Map(scores));
-                }
-              }
-            }
+            scores.set(String(item.id), numRating);
+            fetchedCount++;
+            return true;
           } catch (err) {
             console.warn(`Failed to fetch IMDb score for ${item.id}:`, err);
+            return false;
           }
         };
 
-        // Process in batches of 3 concurrent requests
-        const batchSize = 3;
         for (let i = 0; i < itemsToFetch.length; i += batchSize) {
+          if (cancelled) break;
+
           const batch = itemsToFetch.slice(i, i + batchSize);
-          await Promise.all(batch.map(processItem));
+          const results = await Promise.all(batch.map(processItem));
+          const hasBatchUpdates = results.some(Boolean);
+
+          if (hasBatchUpdates && !cancelled) {
+            startTransition(() => setImdbScores(new Map(scores)));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
         }
 
-        // Save all new scores to cache at once
-        if (fetchedCount > 0) {
+        if (!cancelled && fetchedCount > 0) {
           writeScoreCache("imdb", scores);
         }
       } catch (error) {
         console.error("Error loading IMDb scores:", error);
       } finally {
-        setLoadingImdb(false);
+        if (!cancelled) {
+          setLoadingImdb(false);
+        }
       }
     };
 
     loadImdbScores();
-  }, [groupBy, items]);
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
-  // Load Trakt scores when grouping by Trakt rating
+  // Prefetch Trakt scores in background (non-blocking)
   useEffect(() => {
-    if (groupBy !== "trakt_rating" || items.length === 0 || loadingTrakt)
-      return;
+    if (items.length === 0) return;
+
+    let cancelled = false;
 
     const loadTraktScores = async () => {
-      // Load from cache first and show immediately
       const cachedScores = readScoreCache("trakt");
       const scores = new Map(cachedScores);
 
-      // Show cached scores immediately
       if (cachedScores.size > 0) {
-        setTraktScores(new Map(scores));
+        startTransition(() => setTraktScores(new Map(scores)));
       }
 
-      // Identify items that need fetching
-      const itemsToFetch = items.filter(
-        (item) => !cachedScores.has(String(item.id)),
-      );
+      const itemsToFetch = items.filter((item) => !scores.has(String(item.id)));
 
-      // For items without cache, use TMDb ratings as fallback immediately
-      itemsToFetch.forEach((item) => {
+      // Fallback temprano a TMDb para que los grupos por Trakt no esperen
+      for (const item of itemsToFetch) {
         if (
           item.vote_average &&
           typeof item.vote_average === "number" &&
@@ -1282,10 +1287,8 @@ export default function WatchlistClient() {
         ) {
           scores.set(String(item.id), item.vote_average);
         }
-      });
-
-      // Show TMDb fallback scores immediately
-      setTraktScores(new Map(scores));
+      }
+      startTransition(() => setTraktScores(new Map(scores)));
 
       if (itemsToFetch.length === 0) {
         setLoadingTrakt(false);
@@ -1296,9 +1299,8 @@ export default function WatchlistClient() {
 
       try {
         let fetchedCount = 0;
-        const newScores = new Map();
+        const batchSize = 4;
 
-        // Process items with limited concurrency (3 at a time)
         const processItem = async (item) => {
           const type = item.media_type || (item.title ? "movie" : "tv");
 
@@ -1308,44 +1310,52 @@ export default function WatchlistClient() {
               tmdbId: item.id,
             });
             const rating = traktData?.community?.rating;
-
-            if (rating && typeof rating === "number" && !isNaN(rating)) {
-              scores.set(String(item.id), rating);
-              newScores.set(String(item.id), rating);
-              fetchedCount++;
-
-              // Update state immediately for progressive display
-              setTraktScores(new Map(scores));
+            if (!rating || typeof rating !== "number" || isNaN(rating)) {
+              return false;
             }
+
+            scores.set(String(item.id), rating);
+            fetchedCount++;
+            return true;
           } catch (err) {
-            // Fallback to TMDb rating already set, just log warning
             console.warn(
               `[Trakt] Failed to fetch score for ${item.id}, using TMDb fallback:`,
               err,
             );
+            return false;
           }
         };
 
-        // Process in batches of 3 concurrent requests
-        const batchSize = 3;
         for (let i = 0; i < itemsToFetch.length; i += batchSize) {
+          if (cancelled) break;
+
           const batch = itemsToFetch.slice(i, i + batchSize);
-          await Promise.all(batch.map(processItem));
+          const results = await Promise.all(batch.map(processItem));
+          const hasBatchUpdates = results.some(Boolean);
+
+          if (hasBatchUpdates && !cancelled) {
+            startTransition(() => setTraktScores(new Map(scores)));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
         }
 
-        // Save all new scores to cache at once
-        if (fetchedCount > 0) {
+        if (!cancelled && fetchedCount > 0) {
           writeScoreCache("trakt", scores);
         }
       } catch (error) {
         console.error("Error loading Trakt scores:", error);
       } finally {
-        setLoadingTrakt(false);
+        if (!cancelled) {
+          setLoadingTrakt(false);
+        }
       }
     };
 
     loadTraktScores();
-  }, [groupBy, items]);
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   // Filter and sort
   const filtered = useMemo(() => {
@@ -1562,7 +1572,34 @@ export default function WatchlistClient() {
     }
 
     return groupsArray;
-  }, [sorted, groupBy, imdbScores, traktScores, loadingImdb, loadingTrakt]);
+  }, [sorted, groupBy, imdbScores, traktScores]);
+
+  const scoreLoadingLabel = loadingImdb && loadingTrakt
+    ? "Actualizando puntuaciones de IMDb y Trakt..."
+    : loadingImdb
+      ? "Actualizando puntuaciones de IMDb..."
+      : "Actualizando puntuaciones de Trakt...";
+
+  const resolveItemType = (item) =>
+    item?.media_type || (item?.title ? "movie" : "tv");
+  const getMediaKey = (item) => `${resolveItemType(item)}-${item.id}`;
+  const getItemsGridClass = (withTopMargin = false) => {
+    if (viewMode === "list") {
+      return `grid grid-cols-1 xl:grid-cols-2 gap-4${withTopMargin ? " mt-6" : ""}`;
+    }
+    if (viewMode === "compact") {
+      const compactCols =
+        imageMode === "backdrop"
+          ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
+          : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8";
+      return `grid gap-2 ${compactCols}${withTopMargin ? " mt-6" : ""}`;
+    }
+    const gridCols =
+      imageMode === "backdrop"
+        ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6";
+    return `grid gap-3 ${gridCols}${withTopMargin ? " mt-6" : ""}`;
+  };
 
   if (!hydrated) {
     // Still checking authentication, show nothing or loader
@@ -2308,8 +2345,7 @@ export default function WatchlistClient() {
           >
             <Loader2 className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" />
             <p className="text-zinc-400 text-sm">
-              {loadingImdb && groupBy === "imdb_rating" && "Cargando puntuaciones de IMDb..."}
-              {loadingTrakt && groupBy === "trakt_rating" && "Cargando puntuaciones de Trakt..."}
+              {scoreLoadingLabel}
             </p>
           </motion.div>
         )}
@@ -2352,132 +2388,48 @@ export default function WatchlistClient() {
                   stats={group.stats}
                   groupBy={groupBy}
                 />
-                <AnimatePresence mode="wait">
-                  {viewMode === "list" ? (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
-                      {group.items.map((item, idx) => (
-                        <WatchlistCard
-                          key={item.id}
-                          item={item}
-                          index={idx}
-                          totalItems={group.items.length}
-                          viewMode="list"
-                          imageMode={imageMode}
-                          imdbScore={imdbScores.get(String(item.id))}
-                          traktScore={traktScores.get(String(item.id))}
-                          userRating={item.user_rating}
-                        />
-                      ))}
-                    </div>
-                  ) : viewMode === "compact" ? (
-                    <div
-                      className={`grid gap-2 mt-6 ${imageMode === "backdrop"
-                        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
-                        : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
-                        }`}
-                    >
-                      {group.items.map((item, idx) => (
-                        <WatchlistCard
-                          key={item.id}
-                          item={item}
-                          index={idx}
-                          totalItems={group.items.length}
-                          viewMode="compact"
-                          imageMode={imageMode}
-                          imdbScore={imdbScores.get(String(item.id))}
-                          traktScore={traktScores.get(String(item.id))}
-                          userRating={item.user_rating}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div
-                      className={`grid gap-3 mt-6 ${imageMode === "backdrop"
-                        ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
-                        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
-                        }`}
-                    >
-                      {group.items.map((item, idx) => (
-                        <WatchlistCard
-                          key={item.id}
-                          item={item}
-                          index={idx}
-                          totalItems={group.items.length}
-                          viewMode="grid"
-                          imageMode={imageMode}
-                          imdbScore={imdbScores.get(String(item.id))}
-                          traktScore={traktScores.get(String(item.id))}
-                          userRating={item.user_rating}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </AnimatePresence>
+                <motion.div
+                  layout
+                  transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
+                  className={getItemsGridClass(true)}
+                >
+                  {group.items.map((item, idx) => (
+                    <WatchlistCard
+                      key={getMediaKey(item)}
+                      item={item}
+                      index={idx}
+                      totalItems={group.items.length}
+                      viewMode={viewMode}
+                      imageMode={imageMode}
+                      imdbScore={imdbScores.get(String(item.id))}
+                      traktScore={traktScores.get(String(item.id))}
+                      userRating={item.user_rating}
+                    />
+                  ))}
+                </motion.div>
               </div>
             ))}
           </div>
         ) : (
-          <AnimatePresence mode="wait">
-            {viewMode === "list" ? (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {sorted.map((item, idx) => (
-                  <WatchlistCard
-                    key={item.id}
-                    item={item}
-                    index={idx}
-                    totalItems={sorted.length}
-                    viewMode="list"
-                    imageMode={imageMode}
-                    imdbScore={imdbScores.get(String(item.id))}
-                    traktScore={traktScores.get(String(item.id))}
-                    userRating={item.user_rating}
-                  />
-                ))}
-              </div>
-            ) : viewMode === "compact" ? (
-              <div
-                className={`grid gap-2 ${imageMode === "backdrop"
-                  ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
-                  : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
-                  }`}
-              >
-                {sorted.map((item, idx) => (
-                  <WatchlistCard
-                    key={item.id}
-                    item={item}
-                    index={idx}
-                    totalItems={sorted.length}
-                    viewMode="compact"
-                    imageMode={imageMode}
-                    imdbScore={imdbScores.get(String(item.id))}
-                    traktScore={traktScores.get(String(item.id))}
-                    userRating={item.user_rating}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div
-                className={`grid gap-3 ${imageMode === "backdrop"
-                  ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
-                  : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6"
-                  }`}
-              >
-                {sorted.map((item, idx) => (
-                  <WatchlistCard
-                    key={item.id}
-                    item={item}
-                    index={idx}
-                    totalItems={sorted.length}
-                    viewMode="grid"
-                    imageMode={imageMode}
-                    imdbScore={imdbScores.get(String(item.id))}
-                    traktScore={traktScores.get(String(item.id))}
-                    userRating={item.user_rating}
-                  />
-                ))}
-              </div>
-            )}
-          </AnimatePresence>
+          <motion.div
+            layout
+            transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
+            className={getItemsGridClass(false)}
+          >
+            {sorted.map((item, idx) => (
+              <WatchlistCard
+                key={getMediaKey(item)}
+                item={item}
+                index={idx}
+                totalItems={sorted.length}
+                viewMode={viewMode}
+                imageMode={imageMode}
+                imdbScore={imdbScores.get(String(item.id))}
+                traktScore={traktScores.get(String(item.id))}
+                userRating={item.user_rating}
+              />
+            ))}
+          </motion.div>
         )}
       </div>
     </div>

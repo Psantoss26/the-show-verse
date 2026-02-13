@@ -85,8 +85,8 @@ export function ExternalLinkButton({
   href,
   title = "Enlace externo",
   onClick,
-  size = 40,
-  iconSize = 22,
+  size,
+  iconSize,
   className = "",
   loading = false,
   fallbackHref = null, // ✅ si aún no está resuelto, puedes abrir búsqueda (opcional)
@@ -113,20 +113,18 @@ export function ExternalLinkButton({
       title={title}
       aria-label={title}
       className={[
-        "relative shrink-0 grid place-items-center",
-        "rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm",
-        "transition hover:bg-white/10 hover:border-white/20",
+        "relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10",
         disabled ? "opacity-0 pointer-events-none" : "", // ✅ si no hay link real, NO se muestra
         className,
       ].join(" ")}
-      style={{ width: size, height: size }}
+      style={size ? { width: size, height: size } : undefined}
     >
       {/* Logo */}
       <img
         src={icon}
         alt=""
-        style={{ width: iconSize, height: iconSize }}
-        className="object-contain"
+        style={iconSize ? { width: iconSize, height: iconSize } : undefined}
+        className="w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain"
         draggable="false"
       />
 
