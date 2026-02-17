@@ -649,9 +649,22 @@ function WatchlistCard({
   const [traktScore, setTraktScore] = useState(initialTraktScore);
   const [loadingScores, setLoadingScores] = useState(false);
 
+  // Sync scores from parent when they arrive progressively
+  useEffect(() => {
+    if (initialImdbScore !== undefined && initialImdbScore !== null) {
+      setImdbScore(initialImdbScore);
+    }
+  }, [initialImdbScore]);
+
+  useEffect(() => {
+    if (initialTraktScore !== undefined && initialTraktScore !== null) {
+      setTraktScore(initialTraktScore);
+    }
+  }, [initialTraktScore]);
+
   const animDelay =
-    totalItems > 20 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 60;
+    totalItems > 30 ? Math.min(index * 0.01, 0.15) : Math.min(index * 0.02, 0.3);
+  const shouldAnimate = index < 30;
 
   const href =
     type === "movie" ? `/details/movie/${item.id}` : `/details/tv/${item.id}`;
@@ -757,7 +770,6 @@ function WatchlistCard({
           delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout
       >
         <Link
           href={href}
@@ -820,7 +832,6 @@ function WatchlistCard({
           delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout
       >
         <Link href={href} className="block">
           <motion.div
@@ -1195,6 +1206,20 @@ export default function WatchlistClient() {
       }
 
       const itemsToFetch = items.filter((item) => !scores.has(String(item.id)));
+
+      // Fallback temprano a TMDb para que los grupos por IMDb no esperen
+      for (const item of itemsToFetch) {
+        if (
+          item.vote_average &&
+          typeof item.vote_average === "number" &&
+          !isNaN(item.vote_average)
+        ) {
+          scores.set(String(item.id), item.vote_average);
+        }
+      }
+      if (itemsToFetch.length > 0) {
+        startTransition(() => setImdbScores(new Map(scores)));
+      }
 
       if (itemsToFetch.length === 0) {
         setLoadingImdb(false);
@@ -2335,20 +2360,7 @@ export default function WatchlistClient() {
           </div>
         </motion.div>
 
-        {/* Loading indicator for scores (non-blocking) */}
-        {(loadingImdb || loadingTrakt) && !loading && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="mb-4 p-3 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center gap-3"
-          >
-            <Loader2 className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" />
-            <p className="text-zinc-400 text-sm">
-              {scoreLoadingLabel}
-            </p>
-          </motion.div>
-        )}
+        {/* Scores load silently in background - no loading indicator */}
 
         {/* Content */}
         {loading ? (
@@ -2388,9 +2400,7 @@ export default function WatchlistClient() {
                   stats={group.stats}
                   groupBy={groupBy}
                 />
-                <motion.div
-                  layout
-                  transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
+                <div
                   className={getItemsGridClass(true)}
                 >
                   {group.items.map((item, idx) => (
@@ -2406,14 +2416,12 @@ export default function WatchlistClient() {
                       userRating={item.user_rating}
                     />
                   ))}
-                </motion.div>
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          <motion.div
-            layout
-            transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
+          <div
             className={getItemsGridClass(false)}
           >
             {sorted.map((item, idx) => (
@@ -2429,7 +2437,7 @@ export default function WatchlistClient() {
                 userRating={item.user_rating}
               />
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
     </div>

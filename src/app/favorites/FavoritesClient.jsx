@@ -770,9 +770,22 @@ function FavoriteCard({
   const [traktScore, setTraktScore] = useState(initialTraktScore);
   const [loadingScores, setLoadingScores] = useState(false);
 
+  // Sync scores from parent when they arrive progressively
+  useEffect(() => {
+    if (initialImdbScore !== undefined && initialImdbScore !== null) {
+      setImdbScore(initialImdbScore);
+    }
+  }, [initialImdbScore]);
+
+  useEffect(() => {
+    if (initialTraktScore !== undefined && initialTraktScore !== null) {
+      setTraktScore(initialTraktScore);
+    }
+  }, [initialTraktScore]);
+
   const animDelay =
-    totalItems > 20 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 60;
+    totalItems > 30 ? Math.min(index * 0.01, 0.15) : Math.min(index * 0.02, 0.3);
+  const shouldAnimate = index < 30;
 
   const href =
     type === "movie" ? `/details/movie/${item.id}` : `/details/tv/${item.id}`;
@@ -878,7 +891,6 @@ function FavoriteCard({
           delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout
       >
         <Link
           href={href}
@@ -941,7 +953,6 @@ function FavoriteCard({
           delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout
       >
         <Link href={href} className="block">
           <motion.div
@@ -1254,7 +1265,16 @@ export default function FavoritesClient() {
       try {
         setLoading(true);
 
-        const favResponse = await fetch("/api/tmdb/account/favorite");
+        // Fetch favorites and rated items in parallel so user_rating
+        // is available from the very first render — avoids the flash
+        // of "Sin puntuar" when grouped by user_rating.
+        const [favResponse, rated] = await Promise.all([
+          fetch("/api/tmdb/account/favorite"),
+          fetchRatedForUser(account.id, session).catch((err) => {
+            console.error("Error loading rated items:", err);
+            return [];
+          }),
+        ]);
 
         if (!favResponse.ok) {
           console.error(
@@ -1276,40 +1296,23 @@ export default function FavoritesClient() {
         const data = JSON.parse(text);
         const favorites = data?.favorites || [];
 
-        // Render rápido: mostramos favoritos sin esperar a rated items.
-        const favoritesWithBaseMeta = favorites.map((item, index) => ({
+        // Build rating map from rated items
+        const ratingMap = new Map();
+        rated.forEach((item) => {
+          ratingMap.set(getRatingKey(item), item.user_rating);
+        });
+
+        // Merge user_rating into favorites from the start
+        const favoritesWithMeta = favorites.map((item, index) => ({
           ...item,
-          user_rating: null,
-          _addedIndex: index, // Keep original order (most recent first from API)
+          user_rating: ratingMap.get(getRatingKey({ ...item })) ?? null,
+          _addedIndex: index,
         }));
 
         if (!cancelled) {
-          setItems(favoritesWithBaseMeta);
+          setRatedItems(rated);
+          setItems(favoritesWithMeta);
         }
-
-        // Hidratar ratings en segundo plano para no bloquear la pantalla inicial.
-        fetchRatedForUser(account.id, session)
-          .then((rated) => {
-            if (cancelled) return;
-
-            const ratingMap = new Map();
-            rated.forEach((item) => {
-              ratingMap.set(getRatingKey(item), item.user_rating);
-            });
-
-            startTransition(() => {
-              setRatedItems(rated);
-              setItems((prev) =>
-                prev.map((item) => ({
-                  ...item,
-                  user_rating: ratingMap.get(getRatingKey(item)) ?? item.user_rating ?? null,
-                })),
-              );
-            });
-          })
-          .catch((error) => {
-            console.error("Error loading rated items:", error);
-          });
       } catch (error) {
         console.error("Error loading favorites:", error);
         if (!cancelled) {
@@ -1365,6 +1368,20 @@ export default function FavoritesClient() {
       }
 
       const itemsToFetch = items.filter((item) => !scores.has(String(item.id)));
+
+      // Fallback temprano a TMDb para que los grupos por IMDb no esperen
+      for (const item of itemsToFetch) {
+        if (
+          item.vote_average &&
+          typeof item.vote_average === "number" &&
+          !isNaN(item.vote_average)
+        ) {
+          scores.set(String(item.id), item.vote_average);
+        }
+      }
+      if (itemsToFetch.length > 0) {
+        startTransition(() => setImdbScores(new Map(scores)));
+      }
 
       if (itemsToFetch.length === 0) {
         setLoadingImdb(false);
@@ -2684,20 +2701,7 @@ export default function FavoritesClient() {
           </div>
         </motion.div>
 
-        {/* Loading indicator for scores (non-blocking) */}
-        {(loadingImdb || loadingTrakt) && !loading && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="mb-4 p-3 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center gap-3"
-          >
-            <Loader2 className="w-4 h-4 text-red-500 animate-spin flex-shrink-0" />
-            <p className="text-zinc-400 text-sm">
-              {scoreLoadingLabel}
-            </p>
-          </motion.div>
-        )}
+        {/* Scores load silently in background - no loading indicator */}
 
         {/* Content */}
         {loading ? (
@@ -2737,9 +2741,7 @@ export default function FavoritesClient() {
                   stats={group.stats}
                   groupBy={groupBy}
                 />
-                <motion.div
-                  layout
-                  transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
+                <div
                   className={getItemsGridClass(true)}
                 >
                   {group.items.map((item, idx) => (
@@ -2754,14 +2756,12 @@ export default function FavoritesClient() {
                       traktScore={traktScores.get(String(item.id))}
                     />
                   ))}
-                </motion.div>
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          <motion.div
-            layout
-            transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
+          <div
             className={getItemsGridClass(false)}
           >
             {sorted.map((item, idx) => (
@@ -2776,7 +2776,7 @@ export default function FavoritesClient() {
                 traktScore={traktScores.get(String(item.id))}
               />
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
     </div>
