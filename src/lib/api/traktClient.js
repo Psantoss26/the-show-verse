@@ -394,6 +394,17 @@ export async function traktAddShowPlay({ tmdbId, watchedAt }) {
   return json;
 }
 /**
+ * Obtiene las series en progreso del usuario
+ */
+export async function traktGetInProgress() {
+  const res = await fetch('/api/trakt/show/in-progress', { cache: 'no-store' });
+  const json = await safeJson(res);
+  if (!res.ok)
+    throw new Error(json?.error || `Trakt in-progress HTTP ${res.status}`);
+  return json;
+}
+
+/**
  * Obtiene recomendaciones relacionadas desde Trakt para una película o serie
  * @param {Object} params
  * @param {string} params.type - 'movie' o 'tv'
