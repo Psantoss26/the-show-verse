@@ -691,26 +691,62 @@ export default function InProgressClient() {
     // Not connected state
     if (!auth.connected) {
         return (
-            <div className="min-h-screen bg-[#050505] flex items-center justify-center px-4 pb-20">
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center max-w-md"
-                >
-                    <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                        <Tv className="w-10 h-10 text-emerald-500" />
-                    </div>
-                    <h2 className="text-2xl font-black text-white mb-3">Series en Progreso</h2>
-                    <p className="text-zinc-400 mb-6 leading-relaxed">
-                        Conecta tu cuenta de Trakt para ver las series que estás viendo actualmente con su progreso detallado.
-                    </p>
-                    <Link
-                        href="/login"
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
+            <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20">
+                <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                    <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-sky-500/5 rounded-full blur-[150px]" />
+                </div>
+
+                <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+                    <motion.header
+                        className="mb-8"
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
                     >
-                        Conectar con Trakt
-                    </Link>
-                </motion.div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="h-px w-12 bg-emerald-500" />
+                            <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">SEGUIMIENTO</span>
+                        </div>
+                        <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+                            En Progreso<span className="text-emerald-500">.</span>
+                        </h1>
+                        <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
+                            Series que estás viendo actualmente con su progreso.
+                        </p>
+                    </motion.header>
+
+                    <div className="flex items-center justify-center py-12 lg:py-24">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
+                        >
+                            <div className="mb-6">
+                                <img
+                                    src="/logo-Trakt.png"
+                                    alt="Trakt Logo"
+                                    className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"
+                                />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white mb-2">
+                                Conecta tu cuenta de Trakt
+                            </h2>
+                            <p className="text-zinc-400 max-w-sm mb-8 text-sm">
+                                Conecta tu cuenta de Trakt para ver las series que estás viendo actualmente con su progreso detallado.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    window.location.assign("/api/trakt/auth/start?next=/in-progress")
+                                }
+                                className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
+                            >
+                                Conectar ahora
+                            </button>
+                        </motion.div>
+                    </div>
+                </div>
             </div>
         );
     }
