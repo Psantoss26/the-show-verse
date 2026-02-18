@@ -674,8 +674,8 @@ function CalendarWithPosters({
               key={d.toISOString()}
               onClick={hasItems ? () => setSelectedDayKey(isSelected ? null : key) : undefined}
               className={[
-                "flex flex-col rounded-lg lg:rounded-xl border-2 transition-all relative overflow-hidden",
-                hasItems ? "cursor-pointer" : "",
+                "flex flex-col rounded-lg lg:rounded-xl border-2 transition-all relative overflow-visible",
+                hasItems ? "cursor-pointer hover:z-10" : "",
                 !inMonth
                   ? "bg-zinc-900/10 border-zinc-800/20"
                   : isSelected
@@ -715,42 +715,59 @@ function CalendarWithPosters({
 
               {/* Portadas apiladas */}
               {hasItems && (
-                <div className="flex-1 flex items-center justify-center px-1 pb-1 min-h-0">
-                  <div
-                    className="relative w-full max-w-[80px] lg:max-w-[100px] aspect-[2/3]"
-                    onMouseMove={(e) => {
-                      const container = e.currentTarget;
-                      const children = Array.from(container.children);
-                      if (children.length <= 1) return;
-                      const rect = container.getBoundingClientRect();
-                      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                      const activeIdx = Math.min(Math.floor(ratio * children.length), children.length - 1);
-                      children.forEach((child, i) => {
-                        child.style.zIndex = i === activeIdx ? "20" : String(children.length - i);
-                        child.style.transform = i === activeIdx
-                          ? "translateX(0) translateY(-6px) scale(1.04)"
-                          : `translateX(${i * 1.5}px) translateY(${i * 1.5}px) scale(1)`;
-                        child.style.opacity = i === activeIdx ? "1" : "0.6";
-                        child.style.transition = "all 0.2s ease-out";
-                      });
-                    }}
-                    onMouseLeave={(e) => {
-                      const container = e.currentTarget;
-                      const children = Array.from(container.children);
-                      children.forEach((child, i) => {
-                        child.style.zIndex = String(children.length - i);
-                        child.style.transform = `translateX(${i * 1.5}px) translateY(${i * 1.5}px) scale(1)`;
+                <div
+                  className="flex-1 flex items-center justify-center px-1 pb-1 min-h-0 overflow-visible"
+                  onMouseMove={(e) => {
+                    const wrapper = e.currentTarget.querySelector("[data-poster-stack]");
+                    if (!wrapper) return;
+                    const children = Array.from(wrapper.children);
+                    const total = children.length;
+                    if (total <= 1) return;
+                    const rect = wrapper.getBoundingClientRect();
+                    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    const activeIdx = Math.min(Math.floor(ratio * total), total - 1);
+                    const spread = Math.min(16, rect.width / (total + 1));
+                    const totalWidth = spread * (total - 1);
+                    const startOffset = -totalWidth / 2;
+                    children.forEach((child, i) => {
+                      const xPos = startOffset + i * spread;
+                      if (i === activeIdx) {
+                        child.style.zIndex = "20";
+                        child.style.transform = `translateX(${xPos}px) translateY(-8px) scale(1.08)`;
                         child.style.opacity = "1";
-                        child.style.transition = "all 0.25s ease-out";
-                      });
-                    }}
+                        child.style.filter = "brightness(1.1)";
+                      } else {
+                        child.style.zIndex = String(total - Math.abs(i - activeIdx));
+                        child.style.transform = `translateX(${xPos}px) scale(0.95)`;
+                        child.style.opacity = "0.5";
+                        child.style.filter = "brightness(0.7)";
+                      }
+                      child.style.transition = "all 0.2s ease-out";
+                    });
+                  }}
+                  onMouseLeave={(e) => {
+                    const wrapper = e.currentTarget.querySelector("[data-poster-stack]");
+                    if (!wrapper) return;
+                    const children = Array.from(wrapper.children);
+                    children.forEach((child, i) => {
+                      child.style.zIndex = String(children.length - i);
+                      child.style.transform = `translateX(${i * 1.5}px) translateY(${i * 1.5}px) scale(1)`;
+                      child.style.opacity = "1";
+                      child.style.filter = "brightness(1)";
+                      child.style.transition = "all 0.25s ease-out";
+                    });
+                  }}
+                >
+                  <div
+                    data-poster-stack
+                    className="relative w-full max-w-[80px] lg:max-w-[100px] aspect-[2/3]"
                   >
                     {items.slice(0, MAX_POSTERS).map((item, idx) => {
                       const shown = Math.min(items.length, MAX_POSTERS);
                       return (
                         <div
                           key={`${getTmdbId(item)}-${idx}`}
-                          className="absolute inset-0"
+                          className="absolute inset-0 pointer-events-none"
                           style={{
                             transform: `translateX(${idx * 1.5}px) translateY(${idx * 1.5}px)`,
                             zIndex: shown - idx,
@@ -769,7 +786,7 @@ function CalendarWithPosters({
 
               {/* Badge +X si hay más del máximo */}
               {hasItems && items.length > MAX_POSTERS && (
-                <div className="absolute bottom-1 right-1 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white text-[8px] lg:text-[9px] font-bold px-1 lg:px-1.5 py-0.5 rounded-md shadow-lg z-10">
+                <div className="absolute bottom-1 right-1 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white text-[8px] lg:text-[9px] font-bold px-1 lg:px-1.5 py-0.5 rounded-md shadow-lg z-30 pointer-events-none">
                   +{items.length - MAX_POSTERS}
                 </div>
               )}
