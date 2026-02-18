@@ -608,7 +608,7 @@ export default function EpisodeRatingsGrid({
                           ${SZ.cell}
                           rounded-[6px]
                           flex items-center justify-center
-                          text-[14px] md:text-[15px] lg:text-[22px]
+                          text-[16px] md:text-[15px] lg:text-[22px]
                           font-semibold
                           [font-variant-numeric:tabular-nums]
                           select-none
@@ -776,7 +776,7 @@ export default function EpisodeRatingsGrid({
                           flex items-center justify-center
                           font-semibold
                           [font-variant-numeric:tabular-nums]
-                          text-[15px] md:text-[16px] lg:text-[22px]
+                          text-[16px] md:text-[16px] lg:text-[22px]
                           ${clickable ? 'cursor-pointer hover:brightness-[1.07]' : 'cursor-default'}
                           ${clickable ? 'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30' : ''}
                           transition duration-150
@@ -877,7 +877,7 @@ export default function EpisodeRatingsGrid({
                         flex items-center justify-center
                         font-semibold
                         [font-variant-numeric:tabular-nums]
-                        text-[15px] md:text-[16px] lg:text-[22px]
+                        text-[16px] md:text-[16px] lg:text-[22px]
                         ${clickable ? 'cursor-pointer hover:brightness-[1.07]' : 'cursor-default'}
                         ${clickable ? 'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30' : ''}
                         transition duration-150
