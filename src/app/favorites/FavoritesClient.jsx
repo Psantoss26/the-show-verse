@@ -1787,18 +1787,24 @@ export default function FavoritesClient() {
           }
         } else if (groupBy === "tmdb_rating") {
           const rating = item.vote_average || 0;
-          const bucket = Math.floor(rating);
+          const bucket = Math.floor(rating * 2) / 2;
+          const next = bucket + 0.5;
+          const fmtB = Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
+          const fmtN = Number.isInteger(next) ? `${next}` : next.toFixed(1);
           groupKey = bucket.toString();
-          groupLabel = `${bucket} - ${bucket + 1}`;
+          groupLabel = `${fmtB} - ${fmtN}`;
         } else if (groupBy === "imdb_rating") {
           const rating = imdbScores.get(String(item.id)) || 0;
           if (!rating) {
             groupKey = "no_imdb";
             groupLabel = "Sin puntuación IMDb";
           } else {
-            const bucket = Math.floor(rating);
+            const bucket = Math.floor(rating * 2) / 2;
+            const next = bucket + 0.5;
+            const fmtB = Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
+            const fmtN = Number.isInteger(next) ? `${next}` : next.toFixed(1);
             groupKey = bucket.toString();
-            groupLabel = `${bucket} - ${bucket + 1}`;
+            groupLabel = `${fmtB} - ${fmtN}`;
           }
         } else if (groupBy === "trakt_rating") {
           const rating = traktScores.get(String(item.id)) || 0;
@@ -1806,9 +1812,12 @@ export default function FavoritesClient() {
             groupKey = "no_trakt";
             groupLabel = "Sin puntuación Trakt";
           } else {
-            const bucket = Math.floor(rating);
+            const bucket = Math.floor(rating * 2) / 2;
+            const next = bucket + 0.5;
+            const fmtB = Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
+            const fmtN = Number.isInteger(next) ? `${next}` : next.toFixed(1);
             groupKey = bucket.toString();
-            groupLabel = `${bucket} - ${bucket + 1}`;
+            groupLabel = `${fmtB} - ${fmtN}`;
           }
         } else if (groupBy === "user_rating") {
           const rating = item.user_rating || 0;

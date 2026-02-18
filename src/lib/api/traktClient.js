@@ -403,6 +403,16 @@ export async function traktGetInProgress() {
     throw new Error(json?.error || `Trakt in-progress HTTP ${res.status}`);
   return json;
 }
+/**
+ * Obtiene las series completadas del usuario
+ */
+export async function traktGetCompleted() {
+  const res = await fetch('/api/trakt/show/completed', { cache: 'no-store' });
+  const json = await safeJson(res);
+  if (!res.ok)
+    throw new Error(json?.error || `Trakt completed HTTP ${res.status}`);
+  return json;
+}
 
 /**
  * Obtiene recomendaciones relacionadas desde Trakt para una película o serie
