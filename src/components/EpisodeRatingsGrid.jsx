@@ -120,25 +120,6 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
         </div>
 
         <div className="space-y-2">
-          {activeData.tmdbVal != null && (
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1">
-                <img src="/logo-TMDb.png" alt="TMDb" className="h-3 w-auto rounded-[2px]" />
-                <span className="text-[10px] uppercase tracking-wide text-emerald-300 font-bold">TMDb</span>
-              </div>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-[14px] font-bold">
-                  {activeData.format1(activeData.tmdbVal)}
-                </span>
-                {activeData.tmdbVotesStr && (
-                  <span className="text-[10px] text-zinc-400">
-                    {activeData.tmdbVotesStr} votos
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
           {activeData.imdbVal != null && (
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
@@ -152,6 +133,25 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
                 {activeData.imdbVotesStr && (
                   <span className="text-[10px] text-zinc-400">
                     {activeData.imdbVotesStr} votos
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeData.traktVal != null && (
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1">
+                <img src="/logo-Trakt.png" alt="Trakt" className="h-3 w-auto" />
+                <span className="text-[10px] uppercase tracking-wide text-red-300 font-bold">Trakt</span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-[14px] font-bold">
+                  {activeData.format1(activeData.traktVal)}
+                </span>
+                {activeData.traktVotesStr && (
+                  <span className="text-[10px] text-zinc-400">
+                    {activeData.traktVotesStr} votos
                   </span>
                 )}
               </div>
@@ -178,7 +178,8 @@ export default function EpisodeRatingsGrid({
   showId, // ✅ nuevo: TMDb show id para poder navegar
   initialSource = 'imdb', // compat
   density = 'compact',
-  fillMissingWithTmdb = true
+  fillMissingWithTmdb = false,
+  fallbackSource = 'trakt'
 }) {
   const router = useRouter()
   const isTouchLike = useIsTouchLike()
@@ -296,13 +297,16 @@ export default function EpisodeRatingsGrid({
 
             let tmdbRating = toRatingNumber(ep.tmdbRating ?? ep.tmdb ?? ep.vote_average)
             let imdbRating = toRatingNumber(ep.imdbRating ?? ep.imdb)
+            let traktRating = toRatingNumber(ep.traktRating ?? ep.trakt)
 
             let displayRating = imdbRating
+            if (displayRating == null && fallbackSource === 'trakt') displayRating = traktRating
             if (displayRating == null && fillMissingWithTmdb) displayRating = tmdbRating
 
             if (isUnaired) {
               tmdbRating = null
               imdbRating = null
+              traktRating = null
               displayRating = null
             }
 
@@ -313,17 +317,26 @@ export default function EpisodeRatingsGrid({
               ep.imdbVotesCount ??
               ep.imdb_votes_count
             )
+            const traktVotes = toNumberSafe(
+              ep.traktVotes ??
+              ep.trakt_votes ??
+              ep.traktVotesCount ??
+              ep.trakt_votes_count
+            )
 
             return {
               episodeNumber,
               name: ep.name || '',
               tmdbRating,
               imdbRating,
+              traktRating,
               displayRating,
               tmdbVotes,
               imdbVotes,
+              traktVotes,
               airDate: airDateStr,
-              isUnaired
+              isUnaired,
+              source: ep.source || (imdbRating != null ? 'imdb' : traktRating != null ? 'trakt' : null)
             }
           })
           .filter(Boolean)
@@ -395,7 +408,7 @@ export default function EpisodeRatingsGrid({
     })
 
     return { seasonsSorted: seasons, maxEpisodes: maxEp, seasonAverages: seasonAveragesMap }
-  }, [ratings, shouldFlatten, fillMissingWithTmdb])
+  }, [ratings, shouldFlatten, fillMissingWithTmdb, fallbackSource])
 
   const singleSeasonView =
     shouldFlatten && seasonsSorted.length === 1 && totalSeasonsEstimate > 1
@@ -435,16 +448,16 @@ export default function EpisodeRatingsGrid({
     if (!tooltipEnabled) return null
     if (!ep || ep.isUnaired) return null
 
-    const hasData = ep.tmdbRating != null || ep.imdbRating != null || ep.displayRating != null
+    const hasData = ep.imdbRating != null || ep.traktRating != null || ep.displayRating != null
     if (!hasData) return null
 
     const titleText = ep.name || `Episodio ${episodeNumber}`
-    const tmdbVal = ep.tmdbRating
     const imdbVal = ep.imdbRating
-    const tmdbVotesStr = ep.tmdbVotes ? ep.tmdbVotes.toLocaleString() : null
+    const traktVal = ep.traktRating
     const imdbVotesStr = ep.imdbVotes ? ep.imdbVotes.toLocaleString() : null
+    const traktVotesStr = ep.traktVotes ? ep.traktVotes.toLocaleString() : null
 
-    const nums = [tmdbVal, imdbVal].filter((v) => typeof v === 'number')
+    const nums = [imdbVal, traktVal].filter((v) => typeof v === 'number')
     const avgVal = nums.length
       ? Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1))
       : null
@@ -453,7 +466,7 @@ export default function EpisodeRatingsGrid({
       ? `Episode ${episodeNumber}`
       : `Season ${seasonNumber}, Episode ${episodeNumber}`
 
-    return { titleText, seasonInfo, tmdbVal, imdbVal, tmdbVotesStr, imdbVotesStr, avgVal, format1 }
+    return { titleText, seasonInfo, imdbVal, traktVal, imdbVotesStr, traktVotesStr, avgVal, format1 }
   }
 
   // ✅ navegación a detalles

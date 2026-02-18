@@ -3215,15 +3215,64 @@ export default function DetailsClient({
 
   // Carga los ratings de episodios para series TV (excluyendo especiales)
   useEffect(() => {
+    const RATINGS_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 días
+    const cacheKey = `showverse:tv:${id}:episode-ratings:v2-imdb-trakt`;
+
+    const readCache = () => {
+      if (typeof window === "undefined") return null;
+      try {
+        const raw = window.localStorage.getItem(cacheKey);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed?.ts || !parsed?.data) return null;
+        if (Date.now() - Number(parsed.ts) > RATINGS_CACHE_TTL_MS) return null;
+        return parsed.data;
+      } catch {
+        return null;
+      }
+    };
+
+    const writeCache = (data) => {
+      if (typeof window === "undefined" || !data) return;
+      try {
+        window.localStorage.setItem(
+          cacheKey,
+          JSON.stringify({ ts: Date.now(), data }),
+        );
+      } catch {}
+    };
+
     let ignore = false;
     async function load() {
-      if (type !== "tv") return;
+      if (type !== "tv") {
+        if (!ignore) {
+          setRatings(null);
+          setRatingsError(null);
+          setRatingsLoading(false);
+        }
+        return;
+      }
+
+      if (!ignore) setRatingsError(null);
+
+      const cached = readCache();
+      if (cached) {
+        if (!ignore) {
+          setRatings(cached);
+          setRatingsLoading(false);
+        }
+        return;
+      }
+
       setRatingsLoading(true);
       try {
         const res = await fetch(`/api/tv/${id}/ratings?excludeSpecials=true`);
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error);
-        if (!ignore) setRatings(json);
+        if (!ignore) {
+          setRatings(json);
+          writeCache(json);
+        }
       } catch (e) {
         if (!ignore) setRatingsError(e.message);
       } finally {
@@ -7445,7 +7494,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       title="Valoración de Episodios"
                       icon={TrendingUp}
                     />
-                    <div className="p-2">
+                    <div className="p-0">
                       {ratingsLoading && (
                         <p className="text-sm text-gray-300 mb-2">
                           Cargando ratings…
@@ -7465,12 +7514,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         <EpisodeRatingsGrid
                           ratings={ratings}
                           showId={Number(id)}
-                          initialSource="avg"
                           density="compact"
-                          traktConnected={trakt.connected}
-                          watchedBySeason={watchedBySeason}
-                          episodeBusyKey={episodeBusyKey}
-                          onToggleEpisodeWatched={toggleEpisodeWatched}
+                          fallbackSource="trakt"
                         />
                       )}
                     </div>

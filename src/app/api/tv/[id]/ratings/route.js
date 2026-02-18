@@ -5,10 +5,15 @@ const TMDB_API_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3'
+const RATINGS_REVALIDATE_SECONDS = 60 * 60 * 24 * 30 // 30 días
 
 // OMDb (IMDb)
 const OMDB_API_KEY = process.env.OMDB_API_KEY
 const OMDB_BASE_URL = 'https://www.omdbapi.com/'
+
+// Trakt
+const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID
+const TRAKT_BASE_URL = 'https://api.trakt.tv'
 
 /**
  * Pequeño helper para llamar a TMDb con control de errores.
@@ -32,8 +37,7 @@ async function tmdbFetch(path, searchParams = {}) {
   }
 
   const res = await fetch(url.toString(), {
-    // algo de caché para no reventar la API
-    next: { revalidate: 60 * 60 } // 1 hora
+    next: { revalidate: RATINGS_REVALIDATE_SECONDS }
   })
 
   const status = res.status
@@ -69,7 +73,7 @@ async function omdbFetchSeason(imdbId, seasonNumber) {
 
   try {
     const res = await fetch(url.toString(), {
-      next: { revalidate: 24 * 60 * 60 } // 24h
+      next: { revalidate: RATINGS_REVALIDATE_SECONDS }
     })
     const json = await res.json()
     if (!res.ok || json?.Response === 'False') return null
@@ -77,6 +81,80 @@ async function omdbFetchSeason(imdbId, seasonNumber) {
   } catch {
     return null
   }
+}
+
+function traktHeaders() {
+  if (!TRAKT_CLIENT_ID) return null
+  return {
+    'Content-Type': 'application/json',
+    'trakt-api-version': '2',
+    'trakt-api-key': TRAKT_CLIENT_ID
+  }
+}
+
+async function traktFetch(path) {
+  const headers = traktHeaders()
+  if (!headers) return null
+
+  try {
+    const res = await fetch(`${TRAKT_BASE_URL}${path}`, {
+      headers,
+      next: { revalidate: RATINGS_REVALIDATE_SECONDS }
+    })
+
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+async function resolveTraktShowIdFromTmdb(tmdbId) {
+  if (!tmdbId) return null
+  const search = await traktFetch(
+    `/search/tmdb/${encodeURIComponent(tmdbId)}?type=show&limit=1`
+  )
+  if (!Array.isArray(search) || !search.length) return null
+  return search?.[0]?.show?.ids?.trakt || null
+}
+
+async function traktFetchEpisodesBySeason(tmdbId) {
+  const out = new Map()
+
+  const traktShowId = await resolveTraktShowIdFromTmdb(tmdbId)
+  if (!traktShowId) return out
+
+  const seasons = await traktFetch(
+    `/shows/${encodeURIComponent(traktShowId)}/seasons?extended=full,episodes`
+  )
+  if (!Array.isArray(seasons)) return out
+
+  for (const season of seasons) {
+    const seasonNumber = Number(season?.number)
+    if (!Number.isFinite(seasonNumber)) continue
+
+    const epMap = new Map()
+    const episodes = Array.isArray(season?.episodes) ? season.episodes : []
+
+    for (const ep of episodes) {
+      const episodeNumber = Number(ep?.number)
+      if (!Number.isFinite(episodeNumber)) continue
+
+      const ratingNum = Number(ep?.rating)
+      const votesNum = Number(ep?.votes)
+
+      epMap.set(episodeNumber, {
+        rating: Number.isFinite(ratingNum) && ratingNum > 0 ? ratingNum : null,
+        votes: Number.isFinite(votesNum) && votesNum > 0 ? votesNum : null,
+        title: ep?.title || null,
+        firstAired: ep?.first_aired || null
+      })
+    }
+
+    out.set(seasonNumber, epMap)
+  }
+
+  return out
 }
 
 /**
@@ -118,6 +196,7 @@ export async function GET(request, context) {
 
     const imdbId = show?.external_ids?.imdb_id || null
     const useOmdb = Boolean(imdbId && OMDB_API_KEY)
+    const traktEpisodesBySeason = await traktFetchEpisodesBySeason(id)
 
     // Filtramos temporadas reales (y quitamos specials si toca)
     const seasons = allSeasons
@@ -183,7 +262,28 @@ export async function GET(request, context) {
               }
             }
 
-            const values = [tmdbRating, imdbRating].filter(
+            // Trakt como fallback de IMDb
+            const traktEp =
+              traktEpisodesBySeason
+                .get(seasonMeta.season_number)
+                ?.get(ep.episode_number) || null
+
+            const traktRatingRaw = Number(traktEp?.rating)
+            const traktVotesRaw = Number(traktEp?.votes)
+
+            const traktRating =
+              Number.isFinite(traktRatingRaw) && traktRatingRaw > 0
+                ? traktRatingRaw
+                : null
+            const traktVotes =
+              Number.isFinite(traktVotesRaw) && traktVotesRaw > 0
+                ? traktVotesRaw
+                : null
+
+            const display = imdbRating ?? traktRating ?? null
+            const source = imdbRating != null ? 'imdb' : traktRating != null ? 'trakt' : null
+
+            const values = [imdbRating, traktRating].filter(
               (v) => typeof v === 'number'
             )
             const avg =
@@ -197,19 +297,27 @@ export async function GET(request, context) {
 
             return {
               episodeNumber: ep.episode_number,
-              name: ep.name || om?.Title || `Episodio ${ep.episode_number}`,
+              name:
+                ep.name ||
+                om?.Title ||
+                traktEp?.title ||
+                `Episodio ${ep.episode_number}`,
               airDate: ep.air_date || om?.Released || null,
               tmdb: tmdbRating,
               tmdbVotes,
               imdb: imdbRating,
               imdbVotes,
+              trakt: traktRating,
+              traktVotes,
+              display,
+              source,
               avg
             }
           })
 
         const hasAnyRating = mappedEpisodes.some(
           (ep) =>
-            typeof ep.tmdb === 'number' || typeof ep.imdb === 'number'
+            typeof ep.imdb === 'number' || typeof ep.trakt === 'number'
         )
 
         if (!mappedEpisodes.length || !hasAnyRating) return null
@@ -245,12 +353,18 @@ export async function GET(request, context) {
         name: show.name || show.original_name || '',
         totalSeasons: seasonsWithEpisodes.length,
         totalEpisodes,
-        sources: useOmdb ? ['avg', 'tmdb', 'imdb'] : ['avg', 'tmdb']
+        sources: ['imdb', 'trakt', 'avg', 'tmdb'],
+        cacheTtlDays: 30
       },
       seasons: seasonsWithEpisodes
     }
 
-    return NextResponse.json(payload, { status: 200 })
+    return NextResponse.json(payload, {
+      status: 200,
+      headers: {
+        'Cache-Control': `public, s-maxage=${RATINGS_REVALIDATE_SECONDS}, stale-while-revalidate=${RATINGS_REVALIDATE_SECONDS}`
+      }
+    })
   } catch (err) {
     console.error('Error en /api/tv/[id]/ratings:', err)
 
