@@ -1389,15 +1389,27 @@ export default function ListsPage() {
               <div className="flex items-center gap-3 mb-2">
                 <div className="h-px w-12 bg-purple-500" />
                 <span className="text-purple-400 font-bold uppercase tracking-widest text-xs">
-                  TU COLECCIÓN
+                  {source === "collections"
+                    ? "COLECCIONES"
+                    : source === "trakt"
+                      ? "TRAKT"
+                      : "TUS LISTAS"}
                 </span>
               </div>
               <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                Mis Listas
+                {source === "collections"
+                  ? "Colecciones"
+                  : source === "trakt"
+                    ? "Listas de Trakt"
+                    : "Mis Listas"}
                 <span className="text-purple-500">.</span>
               </h1>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                Gestiona y organiza tus colecciones personales.
+                {source === "collections"
+                  ? "Explora colecciones temáticas de películas."
+                  : source === "trakt"
+                    ? "Descubre y explora listas populares de Trakt."
+                    : "Gestiona y organiza tus listas personales."}
               </p>
             </div>
           </div>
