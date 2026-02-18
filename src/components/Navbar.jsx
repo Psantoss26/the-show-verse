@@ -21,6 +21,7 @@ import {
   Compass,
   Activity,
   BarChart3,
+  Play,
 } from "lucide-react";
 import TraktHistoryNavButton from "@/components/trakt/TraktHistoryNavButton";
 
@@ -400,6 +401,14 @@ export default function Navbar() {
                 <CalendarDaysIcon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
               </Link>
 
+              <Link
+                href="/in-progress"
+                className={iconLinkClass("/in-progress", "green")}
+                title="En Progreso"
+              >
+                <Play className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="currentColor" />
+              </Link>
+
               <TraktHistoryNavButton />
 
               {hydrated && account && (
@@ -624,6 +633,18 @@ export default function Navbar() {
                 >
                   <BarChart3 className="w-5 h-5" />
                   <span>Estadísticas</span>
+                </Link>
+
+                <Link
+                  href="/in-progress"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/in-progress")
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-300 hover:bg-white/5"
+                    }`}
+                >
+                  <Play className="w-5 h-5" fill="currentColor" />
+                  <span>En Progreso</span>
                 </Link>
 
                 <TraktHistoryNavButton
