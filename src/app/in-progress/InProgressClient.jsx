@@ -36,6 +36,7 @@ import {
 import {
     traktAuthStatus,
     traktGetInProgress,
+    traktGetCompleted,
     traktDisconnect,
 } from "@/lib/api/traktClient";
 
@@ -244,7 +245,7 @@ const InProgressCard = memo(function InProgressCard({ item, index = 0, viewMode 
                 transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
             >
                 <Link href={href} className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden">
-                    <div className="relative flex items-center gap-2 sm:gap-5 p-1.5 sm:p-4">
+                    <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
                         {/* Backdrop image - same size as History list view */}
                         <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
                             {backdropSrc ? (
@@ -287,7 +288,7 @@ const InProgressCard = memo(function InProgressCard({ item, index = 0, viewMode 
                             </div>
 
                             {/* Progress bar */}
-                            <div className="h-1.5 w-full max-w-xs rounded-full bg-zinc-800 overflow-hidden relative">
+                            <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden relative">
                                 <motion.div
                                     className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden`}
                                     initial={{ width: 0 }}
@@ -492,6 +493,13 @@ export default function InProgressClient() {
     const [stats, setStats] = useState(null);
     const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
+    // Tab: "inprogress" | "completed"
+    const [activeTab, setActiveTab] = useState("inprogress");
+    const [completedItems, setCompletedItems] = useState([]);
+    const [completedStats, setCompletedStats] = useState(null);
+    const [completedLoading, setCompletedLoading] = useState(false);
+    const [completedLoaded, setCompletedLoaded] = useState(false);
+
     // UI
     const [viewMode, setViewMode] = useState(() => {
         if (typeof window === "undefined") return "cards";
@@ -516,6 +524,13 @@ export default function InProgressClient() {
         if (typeof window === "undefined") return;
         window.localStorage.setItem("showverse:inprogress:sortBy", sortBy);
     }, [sortBy]);
+
+    // Update document title when tab changes
+    useEffect(() => {
+        document.title = activeTab === "completed"
+            ? "Completadas - ShowVerse"
+            : "En Progreso - ShowVerse";
+    }, [activeTab]);
 
     useEffect(() => {
         const mq = window.matchMedia("(max-width: 1024px)");
@@ -548,6 +563,20 @@ export default function InProgressClient() {
         }
     }, []);
 
+    const loadCompleted = useCallback(async () => {
+        setCompletedLoading(true);
+        try {
+            const json = await traktGetCompleted();
+            setCompletedItems(json?.items || []);
+            setCompletedStats(json?.stats || null);
+        } catch (e) {
+            console.error("Error loading completed:", e);
+        } finally {
+            setCompletedLoading(false);
+            setCompletedLoaded(true);
+        }
+    }, []);
+
     useEffect(() => {
         loadAuth();
     }, [loadAuth]);
@@ -556,9 +585,22 @@ export default function InProgressClient() {
         if (auth.connected) loadData();
     }, [auth.connected, loadData]);
 
+    // Lazy load completed data when tab is switched
+    useEffect(() => {
+        if (auth.connected && activeTab === "completed" && !completedLoaded) {
+            loadCompleted();
+        }
+    }, [auth.connected, activeTab, completedLoaded, loadCompleted]);
+
+    // Active data based on tab
+    const currentItems = activeTab === "completed" ? completedItems : items;
+    const currentStats = activeTab === "completed" ? completedStats : stats;
+    const currentLoading = activeTab === "completed" ? completedLoading : loading;
+    const currentDataLoaded = activeTab === "completed" ? completedLoaded : dataLoaded;
+
     // Filter + Sort
     const filtered = useMemo(() => {
-        let list = [...items];
+        let list = [...currentItems];
 
         // Search
         if (q.trim()) {
@@ -594,9 +636,9 @@ export default function InProgressClient() {
         }
 
         return list;
-    }, [items, q, sortBy]);
+    }, [currentItems, q, sortBy]);
 
-    const sortLabels = {
+    const allSortLabels = {
         recent: "Recientes",
         oldest: "Más antiguas",
         "progress-high": "Más avanzadas",
@@ -605,12 +647,27 @@ export default function InProgressClient() {
         "episodes-left": "Menos eps. restantes",
     };
 
+    // For completed tab, filter out sort options that don't make sense
+    const sortLabels = activeTab === "completed"
+        ? { recent: allSortLabels.recent, oldest: allSortLabels.oldest, alpha: allSortLabels.alpha }
+        : allSortLabels;
+
+    // Reset sort if current option is not available in the active tab
+    useEffect(() => {
+        if (activeTab === "completed" && !["recent", "oldest", "alpha"].includes(sortBy)) {
+            setSortBy("recent");
+        }
+    }, [activeTab, sortBy]);
+
     const handleDisconnect = async () => {
         try {
             await traktDisconnect();
             setAuth({ loading: false, connected: false });
             setItems([]);
             setStats(null);
+            setCompletedItems([]);
+            setCompletedStats(null);
+            setCompletedLoaded(false);
             window.location.href = "/";
         } catch (e) {
             console.error(e);
@@ -682,34 +739,34 @@ export default function InProgressClient() {
                             </div>
                             <div className="flex items-center gap-6">
                                 <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                                    En Progreso<span className="text-emerald-500">.</span>
+                                    {activeTab === "completed" ? "Completadas" : "En Progreso"}<span className="text-emerald-500">.</span>
                                 </h1>
 
                                 {/* Action buttons next to title */}
                                 <div className="flex items-center gap-2">
                                     <motion.button
-                                        onClick={() => loadData()}
-                                        disabled={loading}
+                                        onClick={() => activeTab === "completed" ? loadCompleted() : loadData()}
+                                        disabled={currentLoading}
                                         className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50"
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         transition={{ duration: 0.4, delay: 0.3 }}
-                                        whileHover={{ scale: loading ? 1 : 1.05 }}
-                                        whileTap={{ scale: loading ? 1 : 0.95 }}
+                                        whileHover={{ scale: currentLoading ? 1 : 1.05 }}
+                                        whileTap={{ scale: currentLoading ? 1 : 0.95 }}
                                         title="Sincronizar"
                                     >
-                                        <RotateCcw className={`w-5 h-5 text-white ${loading ? "animate-spin" : ""}`} />
+                                        <RotateCcw className={`w-5 h-5 text-white ${currentLoading ? "animate-spin" : ""}`} />
                                     </motion.button>
 
                                     <motion.button
                                         onClick={() => setShowDisconnectModal(true)}
-                                        disabled={loading}
+                                        disabled={currentLoading}
                                         className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50"
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         transition={{ duration: 0.4, delay: 0.4 }}
-                                        whileHover={{ scale: loading ? 1 : 1.05 }}
-                                        whileTap={{ scale: loading ? 1 : 0.95 }}
+                                        whileHover={{ scale: currentLoading ? 1 : 1.05 }}
+                                        whileTap={{ scale: currentLoading ? 1 : 0.95 }}
                                         title="Desconectar"
                                     >
                                         <LogOut className="w-5 h-5 text-red-400" />
@@ -717,7 +774,9 @@ export default function InProgressClient() {
                                 </div>
                             </div>
                             <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                                Series que estás viendo actualmente con su progreso.
+                                {activeTab === "completed"
+                                    ? "Series que ya has terminado de ver."
+                                    : "Series que estás viendo actualmente con su progreso."}
                             </p>
                         </div>
 
@@ -735,8 +794,8 @@ export default function InProgressClient() {
                             >
                                 <StatCard
                                     label="Series"
-                                    value={stats?.total ?? 0}
-                                    loading={!dataLoaded}
+                                    value={currentStats?.total ?? 0}
+                                    loading={!currentDataLoaded}
                                     icon={Tv}
                                     colorClass="text-emerald-400 bg-emerald-500/10"
                                 />
@@ -748,8 +807,8 @@ export default function InProgressClient() {
                             >
                                 <StatCard
                                     label="Progreso Medio"
-                                    value={`${stats?.avgProgress ?? 0}%`}
-                                    loading={!dataLoaded}
+                                    value={`${currentStats?.avgProgress ?? 0}%`}
+                                    loading={!currentDataLoaded}
                                     icon={TrendingUp}
                                     colorClass="text-purple-400 bg-purple-500/10"
                                 />
@@ -761,8 +820,8 @@ export default function InProgressClient() {
                             >
                                 <StatCard
                                     label="Eps. Vistos"
-                                    value={stats?.totalEpisodesWatched ?? 0}
-                                    loading={!dataLoaded}
+                                    value={currentStats?.totalEpisodesWatched ?? 0}
+                                    loading={!currentDataLoaded}
                                     icon={Eye}
                                     colorClass="text-sky-400 bg-sky-500/10"
                                 />
@@ -774,8 +833,8 @@ export default function InProgressClient() {
                             >
                                 <StatCard
                                     label="Eps. Restantes"
-                                    value={stats?.totalEpisodesRemaining ?? 0}
-                                    loading={!dataLoaded}
+                                    value={currentStats?.totalEpisodesRemaining ?? 0}
+                                    loading={!currentDataLoaded}
                                     icon={Layers}
                                     colorClass="text-amber-400 bg-amber-500/10"
                                 />
@@ -850,6 +909,31 @@ export default function InProgressClient() {
                                 className="lg:hidden overflow-visible"
                             >
                                 <div className="space-y-3 pt-1">
+                                    {/* Section tabs */}
+                                    <div className="flex gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800">
+                                        <button
+                                            onClick={() => setActiveTab("inprogress")}
+                                            className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "inprogress"
+                                                ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                                : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                                                }`}
+                                        >
+                                            <Play className="w-3.5 h-3.5" fill={activeTab === "inprogress" ? "currentColor" : "none"} />
+                                            Viendo
+                                            {dataLoaded && <span className="text-[10px] opacity-70">({items.length})</span>}
+                                        </button>
+                                        <button
+                                            onClick={() => setActiveTab("completed")}
+                                            className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "completed"
+                                                ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                                : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                                                }`}
+                                        >
+                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                            Completadas
+                                            {completedLoaded && <span className="text-[10px] opacity-70">({completedItems.length})</span>}
+                                        </button>
+                                    </div>
                                     <div className="flex gap-2">
                                         <div className="flex-1">
                                             <InlineDropdown label="Ordenar" valueLabel={sortLabels[sortBy]} icon={ArrowUpDown}>
@@ -892,6 +976,32 @@ export default function InProgressClient() {
 
                     {/* Desktop: Single row */}
                     <div className="hidden lg:flex gap-3">
+                        {/* Section tabs */}
+                        <div className="flex gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 shrink-0">
+                            <button
+                                onClick={() => setActiveTab("inprogress")}
+                                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === "inprogress"
+                                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                                    }`}
+                            >
+                                <Play className="w-3.5 h-3.5" fill={activeTab === "inprogress" ? "currentColor" : "none"} />
+                                Viendo
+                                {dataLoaded && <span className="text-xs opacity-70">({items.length})</span>}
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("completed")}
+                                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === "completed"
+                                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                                    }`}
+                            >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Completadas
+                                {completedLoaded && <span className="text-xs opacity-70">({completedItems.length})</span>}
+                            </button>
+                        </div>
+
                         <div className="relative flex-1">
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                             <input
@@ -951,10 +1061,10 @@ export default function InProgressClient() {
                 {/* ========== CONTENT ========== */}
 
                 {/* Loading state */}
-                {loading && (
+                {currentLoading && (
                     <div className={viewMode === "cards"
                         ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6"
-                        : "space-y-2"
+                        : "grid grid-cols-1 xl:grid-cols-2 gap-4"
                     }>
                         {Array.from({ length: 6 }).map((_, i) => (
                             <SkeletonCard key={i} viewMode={viewMode} />
@@ -963,29 +1073,31 @@ export default function InProgressClient() {
                 )}
 
                 {/* Empty state */}
-                {!loading && filtered.length === 0 && (
+                {!currentLoading && filtered.length === 0 && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         className="flex flex-col items-center justify-center py-20 text-center"
                     >
                         <div className="w-16 h-16 mb-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                            <Tv className="w-8 h-8 text-zinc-600" />
+                            {activeTab === "completed" ? <CheckCircle2 className="w-8 h-8 text-zinc-600" /> : <Tv className="w-8 h-8 text-zinc-600" />}
                         </div>
                         <h3 className="text-lg font-bold text-zinc-400 mb-2">
-                            {q ? "Sin resultados" : "No tienes series en progreso"}
+                            {q ? "Sin resultados" : activeTab === "completed" ? "No tienes series completadas" : "No tienes series en progreso"}
                         </h3>
                         <p className="text-sm text-zinc-600 max-w-sm">
                             {q
                                 ? `No se encontraron series que coincidan con "${q}"`
-                                : "Empieza a ver una serie y márcala en Trakt para verla aquí."
+                                : activeTab === "completed"
+                                    ? "Completa una serie en Trakt para verla aquí."
+                                    : "Empieza a ver una serie y márcala en Trakt para verla aquí."
                             }
                         </p>
                     </motion.div>
                 )}
 
                 {/* Items */}
-                {!loading && filtered.length > 0 && (
+                {!currentLoading && filtered.length > 0 && (
                     <AnimatePresence mode="popLayout">
                         {viewMode === "cards" ? (
                             <motion.div
@@ -1003,10 +1115,8 @@ export default function InProgressClient() {
                                 ))}
                             </motion.div>
                         ) : (
-                            <motion.div
-                                key="compact-list"
-                                className="space-y-2"
-                                layout
+                            <div
+                                className="grid grid-cols-1 xl:grid-cols-2 gap-4"
                             >
                                 {filtered.map((item, idx) => (
                                     <InProgressCard
@@ -1016,7 +1126,7 @@ export default function InProgressClient() {
                                         viewMode="compact"
                                     />
                                 ))}
-                            </motion.div>
+                            </div>
                         )}
                     </AnimatePresence>
                 )}
