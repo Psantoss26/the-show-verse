@@ -33,6 +33,7 @@ import {
   X,
   LogOut,
   SlidersHorizontal,
+  ChevronsUpDown,
 } from "lucide-react";
 
 import {
@@ -176,6 +177,47 @@ function formatEpisodeBadge(meta) {
 function formatEpisodeInline(meta) {
   if (!meta) return null;
   return `T${meta.season} E${meta.episode}`;
+}
+
+// Agrupa episodios consecutivos de la misma serie (mismo tmdbId + poster_path)
+function collapseConsecutive(items) {
+  if (!items.length) return items;
+  const result = [];
+  let current = { ...items[0], _group: [items[0]] };
+
+  for (let i = 1; i < items.length; i++) {
+    const curr = items[i];
+    const sameShow =
+      getItemType(current) === "show" &&
+      getItemType(curr) === "show" &&
+      getTmdbId(current) &&
+      getTmdbId(current) === getTmdbId(curr) &&
+      current.poster_path &&
+      current.poster_path === curr.poster_path;
+    if (sameShow) {
+      current._group.push(curr);
+    } else {
+      result.push(current);
+      current = { ...curr, _group: [curr] };
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+// Obtiene rango de episodios de un grupo colapsado
+function getEpisodeRange(group) {
+  if (!group || group.length < 2) return null;
+  const metas = group.map((e) => getEpisodeMeta(e)).filter(Boolean);
+  if (metas.length < 2) return null;
+  const seasons = [...new Set(metas.map((m) => m.season))];
+  if (seasons.length === 1) {
+    const eps = metas.map((m) => m.episode).sort((a, b) => a - b);
+    return `T${seasons[0]} E${eps[0]}-E${eps[eps.length - 1]}`;
+  }
+  const first = metas[0];
+  const last = metas[metas.length - 1];
+  return `T${first.season}E${first.episode} – T${last.season}E${last.episode}`;
 }
 
 function getMainTitle(entry) {
@@ -1636,6 +1678,16 @@ export default function HistoryClient() {
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [showCalendarView, setShowCalendarView] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
+
+  const toggleExpandGroup = useCallback((groupKey) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }, []);
 
   // Persistir estados de UI en localStorage
   useEffect(() => {
@@ -1847,6 +1899,19 @@ export default function HistoryClient() {
       items: map.get(k) || [],
     }));
   }, [sorted, groupBy]);
+
+  // Agrupar episodios consecutivos de la misma serie
+  const groupedWithCollapse = useMemo(() => {
+    return grouped.map((g) => ({
+      ...g,
+      collapsedItems: collapseConsecutive(g.items),
+    }));
+  }, [grouped]);
+
+  // Resetear expansiones cuando cambian filtros/ordenación/datos
+  useEffect(() => {
+    setExpandedGroups(new Set());
+  }, [sorted, groupBy, typeFilter, q, selectedDay]);
 
   if (auth.loading) {
     return (
@@ -2516,80 +2581,156 @@ export default function HistoryClient() {
               </motion.div>
             ) : (
               <div className="space-y-8">
-                {grouped.map((g, groupIndex) => (
-                  <motion.div
-                    key={g.key}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
-                  >
-                    <div className="flex items-center gap-4 mb-4">
-                      <h3 className="text-lg font-bold text-white capitalize">
-                        {formatDateHeader(g.date, groupBy)}
-                      </h3>
-                      <div className="h-px bg-zinc-800 flex-1" />
-                      <span className="text-[10px] font-bold text-zinc-500 bg-zinc-900 px-2 py-1 rounded-md border border-zinc-800">
-                        {g.items.length} vistos
-                      </span>
-                    </div>
+                {groupedWithCollapse.map((g, groupIndex) => {
+                  const renderItems = (CardComponent, entry, idx, extraProps = {}) => {
+                    const isCollapsed = entry._group && entry._group.length > 1;
+                    const collapseKey = `${g.key}:${getTmdbId(entry)}:${idx}`;
+                    const isExpanded = expandedGroups.has(collapseKey);
 
-                    {viewMode === "grid" ? (
-                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                        {g.items.map((entry, idx) => (
-                          <HistoryGridCard
-                            key={
-                              getHistoryId(entry) ||
-                              `${getTmdbId(entry)}:${entry?.watched_at}:${Math.random()}`
+                    if (isCollapsed && !isExpanded) {
+                      // Tarjeta colapsada con badge de cantidad
+                      const count = entry._group.length;
+                      return (
+                        <div
+                          key={`collapsed:${collapseKey}`}
+                          className="relative cursor-pointer"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleExpandGroup(collapseKey);
+                          }}
+                        >
+                          {/* Tarjeta principal – bloquear navegación interna */}
+                          <div className="relative z-10 pointer-events-none">
+                            <CardComponent
+                              entry={entry}
+                              busy={false}
+                              onRemoveFromHistory={removeFromHistory}
+                              index={idx}
+                              totalItems={g.collapsedItems.length}
+                              editMode={editMode}
+                              isMobile={isMobile}
+                              {...extraProps}
+                            />
+                          </div>
+
+                          {/* Badge de cantidad */}
+                          <div className="absolute top-2 right-2 z-30 pointer-events-none">
+                            <span className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-600/90 text-white backdrop-blur-md shadow-lg border border-emerald-400/30">
+                              <Layers className="w-3 h-3" />
+                              {count}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (isCollapsed && isExpanded) {
+                      // Grupo expandido: mostrar todos los items individuales
+                      return (
+                        <div
+                          key={`expanded:${collapseKey}`}
+                          className={
+                            viewMode === "list"
+                              ? "col-span-full"
+                              : "contents"
+                          }
+                        >
+                          {/* Botón para colapsar de nuevo */}
+                          <div
+                            className={
+                              viewMode === "list"
+                                ? "mb-2"
+                                : "col-span-full flex justify-start mb-1"
                             }
-                            entry={entry}
-                            busy={mutatingId === `del:${getHistoryId(entry)}`}
-                            onRemoveFromHistory={removeFromHistory}
-                            index={idx}
-                            totalItems={g.items.length}
-                            editMode={editMode}
-                            isMobile={isMobile}
-                          />
-                        ))}
+                          >
+                            <button
+                              onClick={() => toggleExpandGroup(collapseKey)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/25 transition-colors"
+                            >
+                              <Layers className="w-3.5 h-3.5" />
+                              {getMainTitle(entry)} · {entry._group.length} episodios
+                              <span className="text-emerald-500/60 ml-1">– Colapsar</span>
+                            </button>
+                          </div>
+                          {entry._group.map((subEntry, subIdx) => (
+                            <CardComponent
+                              key={
+                                getHistoryId(subEntry) ||
+                                `${getTmdbId(subEntry)}:${subEntry?.watched_at}:${subIdx}`
+                              }
+                              entry={subEntry}
+                              busy={mutatingId === `del:${getHistoryId(subEntry)}`}
+                              onRemoveFromHistory={removeFromHistory}
+                              index={subIdx}
+                              totalItems={entry._group.length}
+                              editMode={editMode}
+                              isMobile={isMobile}
+                              {...extraProps}
+                            />
+                          ))}
+                        </div>
+                      );
+                    }
+
+                    // Item normal (sin grupo o grupo de 1)
+                    return (
+                      <CardComponent
+                        key={
+                          getHistoryId(entry) ||
+                          `${getTmdbId(entry)}:${entry?.watched_at}:${idx}`
+                        }
+                        entry={entry}
+                        busy={mutatingId === `del:${getHistoryId(entry)}`}
+                        onRemoveFromHistory={removeFromHistory}
+                        index={idx}
+                        totalItems={g.collapsedItems.length}
+                        editMode={editMode}
+                        isMobile={isMobile}
+                        {...extraProps}
+                      />
+                    );
+                  };
+
+                  return (
+                    <motion.div
+                      key={g.key}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
+                    >
+                      <div className="flex items-center gap-4 mb-4">
+                        <h3 className="text-lg font-bold text-white capitalize">
+                          {formatDateHeader(g.date, groupBy)}
+                        </h3>
+                        <div className="h-px bg-zinc-800 flex-1" />
+                        <span className="text-[10px] font-bold text-zinc-500 bg-zinc-900 px-2 py-1 rounded-md border border-zinc-800">
+                          {g.items.length} vistos
+                        </span>
                       </div>
-                    ) : viewMode === "compact" ? (
-                      <div className="compact-cards-grid grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2">
-                        {g.items.map((entry, idx) => (
-                          <HistoryCompactCard
-                            key={
-                              getHistoryId(entry) ||
-                              `${getTmdbId(entry)}:${entry?.watched_at}:${Math.random()}`
-                            }
-                            entry={entry}
-                            busy={mutatingId === `del:${getHistoryId(entry)}`}
-                            onRemoveFromHistory={removeFromHistory}
-                            index={idx}
-                            totalItems={g.items.length}
-                            editMode={editMode}
-                            isMobile={isMobile}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        {g.items.map((entry, idx) => (
-                          <HistoryItemCard
-                            key={
-                              getHistoryId(entry) ||
-                              `${getTmdbId(entry)}:${entry?.watched_at}:${Math.random()}`
-                            }
-                            entry={entry}
-                            busy={mutatingId === `del:${getHistoryId(entry)}`}
-                            onRemoveFromHistory={removeFromHistory}
-                            index={idx}
-                            totalItems={g.items.length}
-                            editMode={editMode}
-                            isMobile={isMobile}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
+
+                      {viewMode === "grid" ? (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                          {g.collapsedItems.map((entry, idx) =>
+                            renderItems(HistoryGridCard, entry, idx)
+                          )}
+                        </div>
+                      ) : viewMode === "compact" ? (
+                        <div className="compact-cards-grid grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2">
+                          {g.collapsedItems.map((entry, idx) =>
+                            renderItems(HistoryCompactCard, entry, idx)
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                          {g.collapsedItems.map((entry, idx) =>
+                            renderItems(HistoryItemCard, entry, idx)
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
           </motion.div>

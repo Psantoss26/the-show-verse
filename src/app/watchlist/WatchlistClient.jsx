@@ -31,9 +31,30 @@ import {
   Grid3x3,
   LayoutGrid,
   Layers3,
+  MoreHorizontal,
 } from "lucide-react";
 
 // ================== UTILS & CACHE ==================
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: "easeOut" }
+  },
+};
+
 // TMDb Genre mappings
 const MOVIE_GENRES = {
   28: "Acción",
@@ -762,13 +783,14 @@ function WatchlistCard({
   if (viewMode === "list") {
     return (
       <motion.div
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+        layout
+        initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
         transition={{
-          duration: 0.25,
+          duration: 0.35,
           delay: shouldAnimate ? animDelay : 0,
-          ease: [0.25, 0.1, 0.25, 1],
+          ease: "easeOut",
         }}
       >
         <Link
@@ -776,7 +798,7 @@ function WatchlistCard({
           className="block bg-zinc-900/40 border border-zinc-800/80 rounded-xl hover:border-blue-500/35 hover:bg-zinc-900/65 transition-[background-color,border-color] duration-300 group overflow-hidden"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
-            <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-zinc-800/80 bg-zinc-900 shrink-0">
+            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-zinc-800/80 bg-zinc-900 shrink-0">
               <SmartPoster
                 item={item}
                 title={title}
@@ -824,13 +846,14 @@ function WatchlistCard({
   if (viewMode === "compact") {
     return (
       <motion.div
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+        layout
+        initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
         transition={{
-          duration: 0.25,
+          duration: 0.35,
           delay: shouldAnimate ? animDelay : 0,
-          ease: [0.25, 0.1, 0.25, 1],
+          ease: "easeOut",
         }}
       >
         <Link href={href} className="block">
@@ -932,6 +955,7 @@ function WatchlistCard({
   // Grid mode
   return (
     <motion.div
+      layout
       initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
@@ -1157,6 +1181,13 @@ export default function WatchlistClient() {
           _addedIndex: index,
         }));
 
+        // Load cached scores BEFORE setting items so grouped views
+        // never flash a "Sin puntuación" frame.
+        const cachedImdb = readScoreCache("imdb");
+        if (cachedImdb.size > 0) setImdbScores(cachedImdb);
+        const cachedTrakt = readScoreCache("trakt");
+        if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
+
         setItems(watchlistWithIndex);
       } catch (error) {
         console.error("Error loading watchlist:", error);
@@ -1168,28 +1199,6 @@ export default function WatchlistClient() {
 
     loadWatchlist();
   }, [session, account]);
-
-  // Load IMDb scores from cache on mount
-  useEffect(() => {
-    if (items.length === 0) return;
-
-    // Always load from cache to show stats in all grouping modes
-    const cachedScores = readScoreCache("imdb");
-    if (cachedScores.size > 0) {
-      setImdbScores(cachedScores);
-    }
-  }, [items]);
-
-  // Load Trakt scores from cache on mount
-  useEffect(() => {
-    if (items.length === 0) return;
-
-    // Always load from cache to show stats in all grouping modes
-    const cachedScores = readScoreCache("trakt");
-    if (cachedScores.size > 0) {
-      setTraktScores(cachedScores);
-    }
-  }, [items]);
 
   // Prefetch IMDb scores in background (non-blocking)
   useEffect(() => {
@@ -2409,8 +2418,13 @@ export default function WatchlistClient() {
                   stats={group.stats}
                   groupBy={groupBy}
                 />
-                <div
+                <motion.div
+                  key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
                   className={getItemsGridClass(true)}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
                 >
                   {group.items.map((item, idx) => (
                     <WatchlistCard
@@ -2425,13 +2439,18 @@ export default function WatchlistClient() {
                       userRating={item.user_rating}
                     />
                   ))}
-                </div>
+                </motion.div>
               </div>
             ))}
           </div>
         ) : (
-          <div
+          <motion.div
+            key={`flat-grid-${viewMode}-${imageMode}`}
             className={getItemsGridClass(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
           >
             {sorted.map((item, idx) => (
               <WatchlistCard
@@ -2446,7 +2465,7 @@ export default function WatchlistClient() {
                 userRating={item.user_rating}
               />
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
     </div>

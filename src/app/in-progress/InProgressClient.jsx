@@ -247,7 +247,7 @@ const InProgressCard = memo(function InProgressCard({ item, index = 0, viewMode 
                 <Link href={href} className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden">
                     <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
                         {/* Backdrop image - same size as History list view */}
-                        <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
+                        <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
                             {backdropSrc ? (
                                 <img
                                     src={backdropSrc}
