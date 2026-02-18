@@ -48,7 +48,7 @@ const cardVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.3, ease: "easeOut" }
+    transition: { duration: 0.3, ease: "easeOut" },
   },
 };
 
@@ -414,8 +414,9 @@ function SmartPoster({ item, title, mode = "poster" }) {
   return (
     <div className="relative w-full h-full">
       <div
-        className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 transition-opacity duration-300 ${ready && src ? "opacity-0" : "opacity-100"
-          }`}
+        className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 transition-opacity duration-300 ${
+          ready && src ? "opacity-0" : "opacity-100"
+        }`}
       >
         <Film className="w-8 h-8 text-neutral-700" />
       </div>
@@ -426,8 +427,9 @@ function SmartPoster({ item, title, mode = "poster" }) {
           alt={title}
           loading="lazy"
           decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${ready ? "opacity-100" : "opacity-0"
-            }`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            ready ? "opacity-100" : "opacity-0"
+          }`}
         />
       ) : null}
     </div>
@@ -461,7 +463,7 @@ const writeOmdbCache = (imdbId, patch) => {
       `showverse:omdb:${imdbId}`,
       JSON.stringify(next),
     );
-  } catch { }
+  } catch {}
 };
 
 function runPool(items, limit, worker) {
@@ -476,7 +478,7 @@ function runPool(items, limit, worker) {
         const it = queue.shift();
         active++;
         Promise.resolve(worker(it))
-          .catch(() => { })
+          .catch(() => {})
           .finally(() => {
             active--;
             done++;
@@ -804,7 +806,9 @@ function FavoriteCard({
   }, [initialTraktScore]);
 
   const animDelay =
-    totalItems > 30 ? Math.min(index * 0.01, 0.15) : Math.min(index * 0.02, 0.3);
+    totalItems > 30
+      ? Math.min(index * 0.01, 0.15)
+      : Math.min(index * 0.02, 0.3);
   const shouldAnimate = index < 30;
 
   const href =
@@ -933,10 +937,11 @@ function FavoriteCard({
               </div>
               <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
                 <span
-                  className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${type === "movie"
-                    ? "bg-sky-500/10 text-sky-500"
-                    : "bg-purple-500/10 text-purple-500"
-                    }`}
+                  className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${
+                    type === "movie"
+                      ? "bg-sky-500/10 text-sky-500"
+                      : "bg-purple-500/10 text-purple-500"
+                  }`}
                 >
                   {type === "movie" ? "PELÍCULA" : "SERIE"}
                 </span>
@@ -996,10 +1001,11 @@ function FavoriteCard({
               {/* Top gradient con tipo y ratings */}
               <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                 <span
-                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${type === "movie"
-                    ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                    : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                    }`}
+                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                    type === "movie"
+                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                  }`}
                 >
                   {type === "movie" ? "PELÍCULA" : "SERIE"}
                 </span>
@@ -1079,7 +1085,11 @@ function FavoriteCard({
       initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.35, delay: shouldAnimate ? animDelay : 0, ease: "easeOut" }}
+      transition={{
+        duration: 0.35,
+        delay: shouldAnimate ? animDelay : 0,
+        ease: "easeOut",
+      }}
     >
       <Link href={href} className="block">
         <div
@@ -1091,10 +1101,11 @@ function FavoriteCard({
           <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
             <div className="flex items-center gap-2 mb-1 -ml-0.5">
               <span
-                className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === "movie"
-                  ? "bg-sky-500/20 text-sky-200"
-                  : "bg-purple-500/20 text-purple-200"
-                  }`}
+                className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
+                  type === "movie"
+                    ? "bg-sky-500/20 text-sky-200"
+                    : "bg-purple-500/20 text-purple-200"
+                }`}
               >
                 {type === "movie" ? "Cine" : "TV"}
               </span>
@@ -1119,10 +1130,11 @@ function FavoriteCard({
             {/* Top gradient con tipo y ratings */}
             <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
               <span
-                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${type === "movie"
-                  ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                  : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                  }`}
+                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                  type === "movie"
+                    ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                    : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                }`}
               >
                 {type === "movie" ? "PELÍCULA" : "SERIE"}
               </span>
@@ -1276,7 +1288,8 @@ export default function FavoritesClient() {
   useEffect(() => {
     let cancelled = false;
 
-    const getItemType = (item) => item?.media_type || (item?.title ? "movie" : "tv");
+    const getItemType = (item) =>
+      item?.media_type || (item?.title ? "movie" : "tv");
     const getRatingKey = (item) => `${getItemType(item)}:${item?.id}`;
 
     const loadFavorites = async () => {
@@ -1636,11 +1649,35 @@ export default function FavoritesClient() {
         return titleB.localeCompare(titleA);
       });
     }
-    if (sortBy === "rating-desc") {
-      return arr.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
-    }
-    if (sortBy === "rating-asc") {
-      return arr.sort((a, b) => (a.vote_average || 0) - (b.vote_average || 0));
+    if (sortBy === "rating-desc" || sortBy === "rating-asc") {
+      const getRating = (item) => {
+        if (groupBy === "imdb_rating")
+          return imdbScores.get(String(item.id)) || 0;
+        if (groupBy === "tmdb_rating") return item.vote_average || 0;
+        if (groupBy === "trakt_rating")
+          return traktScores.get(String(item.id)) || 0;
+        // Default (including user_rating): average of available ratings (IMDb, TMDb, Trakt)
+        const tmdb = item.vote_average || 0;
+        const imdb = imdbScores.get(String(item.id)) || 0;
+        const trakt = traktScores.get(String(item.id)) || 0;
+        let sum = 0,
+          count = 0;
+        if (tmdb > 0) {
+          sum += tmdb;
+          count++;
+        }
+        if (imdb > 0) {
+          sum += imdb;
+          count++;
+        }
+        if (trakt > 0) {
+          sum += trakt;
+          count++;
+        }
+        return count > 0 ? sum / count : 0;
+      };
+      const dir = sortBy === "rating-desc" ? -1 : 1;
+      return arr.sort((a, b) => dir * (getRating(a) - getRating(b)));
     }
     if (sortBy === "added-desc") {
       // Most recent added first (lower index = more recent)
@@ -1693,7 +1730,7 @@ export default function FavoritesClient() {
       });
     }
     return arr;
-  }, [filtered, sortBy, watchDates]);
+  }, [filtered, sortBy, watchDates, groupBy, imdbScores, traktScores]);
 
   const stats = useMemo(() => {
     let movies = 0;
@@ -1797,7 +1834,9 @@ export default function FavoritesClient() {
           const rating = item.vote_average || 0;
           const bucket = Math.floor(rating * 2) / 2;
           const next = bucket + 0.5;
-          const fmtB = Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
+          const fmtB = Number.isInteger(bucket)
+            ? `${bucket}`
+            : bucket.toFixed(1);
           const fmtN = Number.isInteger(next) ? `${next}` : next.toFixed(1);
           groupKey = bucket.toString();
           groupLabel = `${fmtB} - ${fmtN}`;
@@ -1809,7 +1848,9 @@ export default function FavoritesClient() {
           } else {
             const bucket = Math.floor(rating * 2) / 2;
             const next = bucket + 0.5;
-            const fmtB = Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
+            const fmtB = Number.isInteger(bucket)
+              ? `${bucket}`
+              : bucket.toFixed(1);
             const fmtN = Number.isInteger(next) ? `${next}` : next.toFixed(1);
             groupKey = bucket.toString();
             groupLabel = `${fmtB} - ${fmtN}`;
@@ -1822,7 +1863,9 @@ export default function FavoritesClient() {
           } else {
             const bucket = Math.floor(rating * 2) / 2;
             const next = bucket + 0.5;
-            const fmtB = Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
+            const fmtB = Number.isInteger(bucket)
+              ? `${bucket}`
+              : bucket.toFixed(1);
             const fmtN = Number.isInteger(next) ? `${next}` : next.toFixed(1);
             groupKey = bucket.toString();
             groupLabel = `${fmtB} - ${fmtN}`;
@@ -1835,7 +1878,9 @@ export default function FavoritesClient() {
           } else {
             const bucket = Math.floor(rating * 2) / 2; // 0.5 steps
             groupKey = bucket.toString();
-            groupLabel = Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
+            groupLabel = Number.isInteger(bucket)
+              ? `${bucket}`
+              : bucket.toFixed(1);
           }
         }
 
@@ -1891,11 +1936,12 @@ export default function FavoritesClient() {
     return groupsArray;
   }, [sorted, groupBy, imdbScores, traktScores]);
 
-  const scoreLoadingLabel = loadingImdb && loadingTrakt
-    ? "Actualizando puntuaciones de IMDb y Trakt..."
-    : loadingImdb
-      ? "Actualizando puntuaciones de IMDb..."
-      : "Actualizando puntuaciones de Trakt...";
+  const scoreLoadingLabel =
+    loadingImdb && loadingTrakt
+      ? "Actualizando puntuaciones de IMDb y Trakt..."
+      : loadingImdb
+        ? "Actualizando puntuaciones de IMDb..."
+        : "Actualizando puntuaciones de Trakt...";
 
   const resolveItemType = (item) =>
     item?.media_type || (item?.title ? "movie" : "tv");
@@ -2037,17 +2083,29 @@ export default function FavoritesClient() {
         <motion.div
           ref={(el) => {
             if (el && !el.dataset.stickySetup) {
-              el.dataset.stickySetup = 'true';
+              el.dataset.stickySetup = "true";
               const observer = new IntersectionObserver(
                 ([e]) => {
                   const isStuck = e.intersectionRatio < 1;
                   if (isStuck) {
-                    el.classList.add('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                    el.classList.add(
+                      "backdrop-blur-xl",
+                      "bg-gradient-to-br",
+                      "from-black/60",
+                      "via-black/50",
+                      "to-black/55",
+                    );
                   } else {
-                    el.classList.remove('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                    el.classList.remove(
+                      "backdrop-blur-xl",
+                      "bg-gradient-to-br",
+                      "from-black/60",
+                      "via-black/50",
+                      "to-black/55",
+                    );
                   }
                 },
-                { threshold: [1], rootMargin: '-65px 0px 0px 0px' }
+                { threshold: [1], rootMargin: "-65px 0px 0px 0px" },
               );
               observer.observe(el);
             }
@@ -2079,10 +2137,11 @@ export default function FavoritesClient() {
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${mobileFiltersOpen
-                ? "bg-red-500/20 border-red-500/40 text-red-400"
-                : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
-                }`}
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
+                mobileFiltersOpen
+                  ? "bg-red-500/20 border-red-500/40 text-red-400"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+              }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
             </button>
@@ -2099,7 +2158,6 @@ export default function FavoritesClient() {
                 className="lg:hidden overflow-visible"
               >
                 <div className="space-y-3 pt-1">
-
                   <div className="flex gap-2">
                     <div className="flex-1">
                       <InlineDropdown
@@ -2355,45 +2413,60 @@ export default function FavoritesClient() {
                       <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center flex-1">
                         <button
                           onClick={() => setViewMode("list")}
-                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "list"
-                            ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                            }`}
+                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                            viewMode === "list"
+                              ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                              : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                          }`}
                         >
                           <Layers className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setViewMode("compact")}
-                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "compact"
-                            ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                            }`}
+                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                            viewMode === "compact"
+                              ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                              : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                          }`}
                         >
                           <AllGlyph className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setViewMode("grid")}
-                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "grid"
-                            ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                            }`}
+                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                            viewMode === "grid"
+                              ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                              : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                          }`}
                         >
                           <PosterGlyph className="w-4 h-4" />
                         </button>
                       </div>
                       <button
-                        onClick={() => setImageMode(imageMode === "poster" ? "backdrop" : "poster")}
-                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${imageMode === "backdrop"
-                          ? "bg-red-500/20 border-red-500/40 text-red-400"
-                          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
-                          }`}
-                        title={imageMode === "poster" ? "Cambiar a Backdrop" : "Cambiar a Poster"}
+                        onClick={() =>
+                          setImageMode(
+                            imageMode === "poster" ? "backdrop" : "poster",
+                          )
+                        }
+                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
+                          imageMode === "backdrop"
+                            ? "bg-red-500/20 border-red-500/40 text-red-400"
+                            : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                        }`}
+                        title={
+                          imageMode === "poster"
+                            ? "Cambiar a Backdrop"
+                            : "Cambiar a Poster"
+                        }
                       >
-                        {imageMode === "poster" ? <PosterGlyph className="w-4 h-4" /> : <BackdropGlyph className="w-4 h-4" />}
+                        {imageMode === "poster" ? (
+                          <PosterGlyph className="w-4 h-4" />
+                        ) : (
+                          <BackdropGlyph className="w-4 h-4" />
+                        )}
                       </button>
                     </div>
                   </div>
-
                 </div>
               </motion.div>
             )}
@@ -2666,28 +2739,31 @@ export default function FavoritesClient() {
             <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
               <button
                 onClick={() => setViewMode("list")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "list"
-                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                  }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                  viewMode === "list"
+                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                }`}
               >
                 <Layers className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("compact")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "compact"
-                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                  }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                  viewMode === "compact"
+                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                }`}
               >
                 <AllGlyph className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("grid")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "grid"
-                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                  }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                  viewMode === "grid"
+                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                }`}
               >
                 <PosterGlyph className="w-4 h-4" />
               </button>
@@ -2696,20 +2772,22 @@ export default function FavoritesClient() {
             <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
               <button
                 onClick={() => setImageMode("poster")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${imageMode === "poster"
-                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                  }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                  imageMode === "poster"
+                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                }`}
                 title="Vista Poster"
               >
                 <PosterGlyph className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setImageMode("backdrop")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${imageMode === "backdrop"
-                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                  }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                  imageMode === "backdrop"
+                    ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                }`}
                 title="Vista Backdrop"
               >
                 <BackdropGlyph className="w-4 h-4" />

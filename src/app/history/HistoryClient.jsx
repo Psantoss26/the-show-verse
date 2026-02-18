@@ -577,6 +577,12 @@ function CalendarWithPosters({
     [monthDate],
   );
   const dow = ["L", "M", "X", "J", "V", "S", "D"];
+  const [selectedDayKey, setSelectedDayKey] = useState(null);
+
+  // Cerrar drawer al cambiar de mes
+  useEffect(() => {
+    setSelectedDayKey(null);
+  }, [monthDate]);
 
   // Agrupar items por día
   const itemsByDay = useMemo(() => {
@@ -589,8 +595,17 @@ function CalendarWithPosters({
     return map;
   }, [historyItems]);
 
+  const selectedDayItems = selectedDayKey ? itemsByDay[selectedDayKey] || [] : [];
+  const selectedDayCollapsed = useMemo(
+    () => collapseConsecutive(selectedDayItems),
+    [selectedDayItems],
+  );
+
+  const MAX_POSTERS = 8;
+
   return (
-    <div className="flex flex-col h-full gap-2 lg:gap-2.5">
+    <div className="flex flex-col h-full gap-2 lg:gap-2.5 relative">
+      {/* Header */}
       <div className="flex items-center justify-between bg-zinc-900/40 border border-zinc-800 rounded-xl lg:rounded-2xl px-3 py-2 lg:px-4 lg:py-3 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2 lg:gap-3">
           <div className="p-1.5 lg:p-2 bg-emerald-500/10 rounded-lg lg:rounded-xl border border-emerald-500/20">
@@ -601,7 +616,7 @@ function CalendarWithPosters({
               {monthLabel}
             </h2>
             <p className="hidden lg:block text-[10px] text-emerald-500/70 mt-0.5">
-              Vista de calendario con portadas
+              Pulsa un día para ver su contenido
             </p>
           </div>
         </div>
@@ -632,6 +647,7 @@ function CalendarWithPosters({
         </div>
       </div>
 
+      {/* Días de la semana */}
       <div className="grid grid-cols-7 gap-1 lg:gap-1.5 shrink-0">
         {dow.map((d) => (
           <div
@@ -643,104 +659,322 @@ function CalendarWithPosters({
         ))}
       </div>
 
+      {/* Grid del calendario */}
       <div className="grid grid-cols-7 gap-1 lg:gap-1.5 flex-1 min-h-0">
         {weeks.flat().map((d) => {
           const inMonth = d.getMonth() === month;
           const key = ymdLocal(d);
           const items = key ? itemsByDay[key] || [] : [];
           const isToday = ymdLocal(new Date()) === key;
+          const isSelected = key === selectedDayKey;
+          const hasItems = inMonth && items.length > 0;
 
           return (
             <div
               key={d.toISOString()}
-              className={`flex flex-col rounded-lg lg:rounded-xl border-2 transition-all relative group ${!inMonth
-                ? "bg-zinc-900/10 border-zinc-800/20"
-                : isToday
-                  ? "bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/40 shadow-lg shadow-emerald-500/10"
-                  : "bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-900/60"
-                }`}
+              onClick={hasItems ? () => setSelectedDayKey(isSelected ? null : key) : undefined}
+              className={[
+                "flex flex-col rounded-lg lg:rounded-xl border-2 transition-all relative overflow-hidden",
+                hasItems ? "cursor-pointer" : "",
+                !inMonth
+                  ? "bg-zinc-900/10 border-zinc-800/20"
+                  : isSelected
+                    ? "bg-gradient-to-br from-emerald-500/15 to-emerald-600/10 border-emerald-500/60 shadow-lg shadow-emerald-500/10"
+                    : isToday
+                      ? "bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/40 shadow-lg shadow-emerald-500/10"
+                      : hasItems
+                        ? "bg-zinc-900/40 border-zinc-800/50 hover:border-emerald-500/30 hover:bg-zinc-900/60"
+                        : "bg-zinc-900/40 border-zinc-800/50",
+              ].join(" ")}
             >
+              {/* Número del día + badge count */}
               <div
-                className={`p-1 lg:p-1.5 text-[10px] lg:text-xs font-bold flex items-center justify-between shrink-0 ${!inMonth
-                  ? "text-zinc-700"
-                  : isToday
-                    ? "text-emerald-400"
-                    : "text-zinc-400 group-hover:text-zinc-300"
-                  }`}
+                className={[
+                  "px-1.5 py-1 lg:px-2 lg:py-1.5 text-xs lg:text-sm font-bold flex items-center justify-between shrink-0",
+                  !inMonth
+                    ? "text-zinc-700"
+                    : isSelected
+                      ? "text-emerald-300"
+                      : isToday
+                        ? "text-emerald-400"
+                        : "text-zinc-300",
+                ].join(" ")}
               >
                 <span>{d.getDate()}</span>
-                {inMonth && items.length > 0 && (
-                  <span className="text-[8px] lg:text-[9px] px-1 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+                {hasItems && (
+                  <span className={[
+                    "text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+                    isSelected
+                      ? "bg-emerald-500/40 text-emerald-200"
+                      : "bg-emerald-500/20 text-emerald-300",
+                  ].join(" ")}>
                     {items.length}
                   </span>
                 )}
               </div>
 
-              {inMonth && items.length > 0 && (
-                <div className="flex-1 flex items-center justify-center px-1 pb-1 lg:px-1.5 lg:pb-1.5 min-h-0">
-                  <div className="relative w-full max-w-[55px] lg:max-w-[70px] aspect-[2/3]">
-                    {items.slice(0, 5).map((item, idx) => {
-                      const href = getDetailsHref(item);
-                      const totalItems = Math.min(items.length, 5);
-
+              {/* Portadas apiladas */}
+              {hasItems && (
+                <div className="flex-1 flex items-center justify-center px-1 pb-1 min-h-0">
+                  <div
+                    className="relative w-full max-w-[80px] lg:max-w-[100px] aspect-[2/3]"
+                    onMouseMove={(e) => {
+                      const container = e.currentTarget;
+                      const children = Array.from(container.children);
+                      if (children.length <= 1) return;
+                      const rect = container.getBoundingClientRect();
+                      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                      const activeIdx = Math.min(Math.floor(ratio * children.length), children.length - 1);
+                      children.forEach((child, i) => {
+                        child.style.zIndex = i === activeIdx ? "20" : String(children.length - i);
+                        child.style.transform = i === activeIdx
+                          ? "translateX(0) translateY(-6px) scale(1.04)"
+                          : `translateX(${i * 1.5}px) translateY(${i * 1.5}px) scale(1)`;
+                        child.style.opacity = i === activeIdx ? "1" : "0.6";
+                        child.style.transition = "all 0.2s ease-out";
+                      });
+                    }}
+                    onMouseLeave={(e) => {
+                      const container = e.currentTarget;
+                      const children = Array.from(container.children);
+                      children.forEach((child, i) => {
+                        child.style.zIndex = String(children.length - i);
+                        child.style.transform = `translateX(${i * 1.5}px) translateY(${i * 1.5}px) scale(1)`;
+                        child.style.opacity = "1";
+                        child.style.transition = "all 0.25s ease-out";
+                      });
+                    }}
+                  >
+                    {items.slice(0, MAX_POSTERS).map((item, idx) => {
+                      const shown = Math.min(items.length, MAX_POSTERS);
                       return (
-                        <Link
+                        <div
                           key={`${getTmdbId(item)}-${idx}`}
-                          href={href || "#"}
-                          className="absolute inset-0 transition-all duration-300 ease-out"
+                          className="absolute inset-0"
                           style={{
-                            transform: `translateX(${idx * 2}px) translateY(${idx * 2}px)`,
-                            zIndex: totalItems - idx,
-                          }}
-                          onMouseEnter={(e) => {
-                            const parent = e.currentTarget.parentElement;
-                            if (!parent) return;
-                            Array.from(parent.children).forEach(
-                              (child, childIdx) => {
-                                if (childIdx < idx) {
-                                  child.style.transform = `translateX(${childIdx * -25}px) translateY(0px) scale(0.95)`;
-                                  child.style.opacity = "0.7";
-                                } else if (childIdx === idx) {
-                                  child.style.transform =
-                                    "translateX(0) translateY(-8px) scale(1.05)";
-                                  child.style.opacity = "1";
-                                } else {
-                                  child.style.transform = `translateX(${(childIdx - idx) * 25}px) translateY(0px) scale(0.95)`;
-                                  child.style.opacity = "0.7";
-                                }
-                              },
-                            );
-                          }}
-                          onMouseLeave={(e) => {
-                            const parent = e.currentTarget.parentElement;
-                            if (!parent) return;
-                            Array.from(parent.children).forEach(
-                              (child, childIdx) => {
-                                child.style.transform = `translateX(${childIdx * 2}px) translateY(${childIdx * 2}px)`;
-                                child.style.opacity = "1";
-                              },
-                            );
+                            transform: `translateX(${idx * 1.5}px) translateY(${idx * 1.5}px)`,
+                            zIndex: shown - idx,
+                            transition: "all 0.25s ease-out",
                           }}
                         >
-                          <div className="w-full h-full rounded-md lg:rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-xl shadow-black/50 group-hover:border-emerald-500/30">
+                          <div className="w-full h-full rounded-md lg:rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-xl shadow-black/50">
                             <Poster entry={item} className="w-full h-full" />
                           </div>
-                        </Link>
+                        </div>
                       );
                     })}
                   </div>
                 </div>
               )}
 
-              {inMonth && items.length > 5 && (
-                <div className="absolute bottom-1 right-1 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white text-[8px] lg:text-[9px] font-bold px-1 lg:px-1.5 py-0.5 rounded-md shadow-lg">
-                  +{items.length - 5}
+              {/* Badge +X si hay más del máximo */}
+              {hasItems && items.length > MAX_POSTERS && (
+                <div className="absolute bottom-1 right-1 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white text-[8px] lg:text-[9px] font-bold px-1 lg:px-1.5 py-0.5 rounded-md shadow-lg z-10">
+                  +{items.length - MAX_POSTERS}
                 </div>
               )}
             </div>
           );
         })}
       </div>
+
+      {/* Drawer lateral: items del día seleccionado */}
+      <AnimatePresence>
+        {selectedDayKey && (
+          <>
+            {/* Fondo semitransparente */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 z-40 bg-black/40 backdrop-blur-[2px] rounded-2xl"
+              onClick={() => setSelectedDayKey(null)}
+            />
+            {/* Panel drawer */}
+            <motion.div
+              initial={{ x: "100%", opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: "100%", opacity: 0 }}
+              transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+              className="absolute top-0 right-0 bottom-0 z-50 w-full sm:w-[440px] lg:w-[520px] bg-[#0c0c0c] border-l border-zinc-800 rounded-r-2xl flex flex-col shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header del drawer */}
+              <div className="shrink-0 p-4 border-b border-zinc-800/80">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-base font-bold text-white capitalize">
+                    {formatDateHeader(new Date(selectedDayKey), "day")}
+                  </h3>
+                  <button
+                    onClick={() => setSelectedDayKey(null)}
+                    className="p-1.5 hover:bg-white/10 rounded-lg transition"
+                    title="Cerrar"
+                  >
+                    <X className="w-4 h-4 text-zinc-400" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                    {selectedDayItems.length} {selectedDayItems.length === 1 ? "visto" : "vistos"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Lista scrollable de items */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-1.5 min-h-0">
+                {selectedDayCollapsed.map((entry, idx) => {
+                  const isGroup = entry._group && entry._group.length > 1;
+                  const title = getMainTitle(entry);
+                  const type = getItemType(entry);
+                  const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null;
+                  const href = getDetailsHref(entry);
+
+                  if (isGroup) {
+                    const range = getEpisodeRange(entry._group);
+                    return (
+                      <CalendarDrawerGroup
+                        key={`grp-${getTmdbId(entry)}-${idx}`}
+                        entry={entry}
+                        title={title}
+                        type={type}
+                        range={range}
+                      />
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={`item-${getHistoryId(entry) || idx}`}
+                      href={href || "#"}
+                      className="flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/5 transition-colors group/row"
+                    >
+                      <div className="w-[56px] h-[84px] shrink-0 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-md">
+                        <Poster entry={entry} className="w-full h-full" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[15px] font-bold text-white truncate group-hover/row:text-emerald-300 transition-colors">
+                          {title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={[
+                            "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded",
+                            type === "movie"
+                              ? "bg-sky-500/20 text-sky-300"
+                              : "bg-purple-500/20 text-purple-300",
+                          ].join(" ")}>
+                            {type === "movie" ? "Película" : "Serie"}
+                          </span>
+                          {type === "show" && epMeta && (
+                            <span className="text-[10px] font-semibold text-emerald-400">
+                              {formatEpisodeBadge(epMeta)}
+                            </span>
+                          )}
+                        </div>
+                        {type === "show" && epMeta?.title && (
+                          <p className="text-[10px] text-zinc-500 truncate mt-0.5">
+                            {epMeta.title}
+                          </p>
+                        )}
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-zinc-600 group-hover/row:text-emerald-500 transition-colors shrink-0" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// Grupo colapsado de episodios dentro del drawer del calendario
+function CalendarDrawerGroup({ entry, title, type, range }) {
+  const [expanded, setExpanded] = useState(false);
+  const count = entry._group.length;
+
+  return (
+    <div className="rounded-xl border border-zinc-800/60 overflow-hidden">
+      {/* Header del grupo */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-3.5 p-2.5 hover:bg-white/5 transition-colors"
+      >
+        <div className="w-[56px] h-[84px] shrink-0 relative">
+          <div className="absolute inset-0 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-md">
+            <Poster entry={entry} className="w-full h-full" />
+          </div>
+          <div className="absolute -top-1.5 -right-1.5 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600 text-white shadow-lg">
+            <Layers className="w-3 h-3" />
+            {count}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <p className="text-[15px] font-bold text-white truncate">{title}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
+              Serie
+            </span>
+            {range && (
+              <span className="text-[10px] font-semibold text-emerald-400">
+                {range}
+              </span>
+            )}
+          </div>
+        </div>
+        <ChevronDown
+          className={[
+            "w-4 h-4 text-zinc-500 transition-transform shrink-0",
+            expanded ? "rotate-180" : "",
+          ].join(" ")}
+        />
+      </button>
+
+      {/* Lista expandida de episodios */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-zinc-800/50 bg-zinc-900/30">
+              {entry._group.map((sub, subIdx) => {
+                const subMeta = isEpisodeEntry(sub) ? getEpisodeMeta(sub) : null;
+                const subHref = getDetailsHref(sub);
+                return (
+                  <Link
+                    key={`sub-${getHistoryId(sub) || subIdx}`}
+                    href={subHref || "#"}
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors group/sub"
+                  >
+                    <div className="w-[44px] h-[66px] shrink-0 rounded-md overflow-hidden bg-zinc-900 border border-white/10 shadow-sm">
+                      <Poster entry={sub} className="w-full h-full" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {subMeta && (
+                        <p className="text-[11px] font-bold text-emerald-400">
+                          {formatEpisodeBadge(subMeta)}
+                        </p>
+                      )}
+                      {subMeta?.title && (
+                        <p className="text-[10px] text-zinc-400 truncate">
+                          {subMeta.title}
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-zinc-600 group-hover/sub:text-emerald-500 transition-colors shrink-0" />
+                  </Link>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -2600,8 +2834,8 @@ export default function HistoryClient() {
                             toggleExpandGroup(collapseKey);
                           }}
                         >
-                          {/* Tarjeta principal – bloquear navegación interna */}
-                          <div className="relative z-10 pointer-events-none">
+                          {/* Tarjeta renderizada debajo */}
+                          <div className="relative z-10">
                             <CardComponent
                               entry={entry}
                               busy={false}
@@ -2613,13 +2847,15 @@ export default function HistoryClient() {
                               {...extraProps}
                             />
                           </div>
-
-                          {/* Badge de cantidad */}
-                          <div className="absolute top-2 right-2 z-30 pointer-events-none">
-                            <span className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-600/90 text-white backdrop-blur-md shadow-lg border border-emerald-400/30">
-                              <Layers className="w-3 h-3" />
-                              {count}
-                            </span>
+                          {/* Overlay encima: bloquea TODO hover/click en la tarjeta, los clics suben al padre */}
+                          <div className="absolute inset-0 z-40 cursor-pointer">
+                            {/* Badge de cantidad dentro del overlay */}
+                            <div className="absolute top-2 right-2">
+                              <span className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-600/90 text-white backdrop-blur-md shadow-lg border border-emerald-400/30">
+                                <Layers className="w-3 h-3" />
+                                {count}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       );
