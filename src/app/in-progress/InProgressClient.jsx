@@ -131,18 +131,18 @@ function CircularProgress({ pct, colors, size = 52 }) {
 // ----------------------------
 function StatCard({ label, value, icon: Icon, colorClass = "text-white", loading = false }) {
     return (
-        <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1 backdrop-blur-sm transition hover:bg-zinc-900/70">
-            <div className={`p-1.5 md:p-2 rounded-full bg-white/5 mb-1 ${colorClass}`}>
-                <Icon className="w-4 h-4 md:w-5 md:h-5" />
+        <div className="w-full h-full min-h-[96px] sm:min-h-[112px] lg:min-h-[120px] lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1 backdrop-blur-sm transition hover:bg-zinc-900/70">
+            <div className={`p-1 sm:p-1.5 md:p-2 rounded-full bg-white/5 mb-1 ${colorClass}`}>
+                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" />
             </div>
-            <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+            <div className="text-sm sm:text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
                 {loading ? (
-                    <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
+                    <span className="inline-block h-4 w-8 sm:h-6 sm:w-10 md:h-8 md:w-14 rounded-lg bg-white/10 animate-pulse" />
                 ) : (
                     value
                 )}
             </div>
-            <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+            <div className="text-[8px] sm:text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wide text-center leading-tight">
                 {label}
             </div>
         </div>
@@ -762,7 +762,7 @@ export default function InProgressClient() {
             <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
                 {/* ========== HEADER (same pattern as History, Favorites, Watchlist, Calendar) ========== */}
                 <motion.header
-                    className="mb-10"
+                    className="mb-6 lg:mb-10"
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, ease: "easeOut" }}
@@ -818,12 +818,13 @@ export default function InProgressClient() {
 
                         {/* Stats cards on the right (same as History) */}
                         <motion.div
-                            className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+                            className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5, delay: 0.3 }}
                         >
                             <motion.div
+                                className="w-full min-w-0"
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ duration: 0.4, delay: 0.5 }}
@@ -837,6 +838,7 @@ export default function InProgressClient() {
                                 />
                             </motion.div>
                             <motion.div
+                                className="w-full min-w-0"
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ duration: 0.4, delay: 0.6 }}
@@ -850,6 +852,7 @@ export default function InProgressClient() {
                                 />
                             </motion.div>
                             <motion.div
+                                className="w-full min-w-0"
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ duration: 0.4, delay: 0.7 }}
@@ -863,6 +866,7 @@ export default function InProgressClient() {
                                 />
                             </motion.div>
                             <motion.div
+                                className="w-full min-w-0"
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ duration: 0.4, delay: 0.8 }}
