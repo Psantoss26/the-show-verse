@@ -83,6 +83,100 @@ function buildTmdbImage(path, size = "w1280") {
   return `https://image.tmdb.org/t/p/${size}${path}`;
 }
 
+// ================== TMDB IMAGE CACHE (nivel módulo, igual que Favoritos/Pendientes) ==================
+// Caché persistente entre re-renders: { poster: "/path"|null, backdrop: "/path"|null }
+const tmdbImageCache = new Map();
+const tmdbImageInFlight = new Map();
+
+// Misma lógica que pickBestPosterEN en Favoritos
+function pickBestPosterPath(posters) {
+  if (!Array.isArray(posters) || !posters.length) return null;
+  const maxVotes = posters.reduce(
+    (max, p) => Math.max(max, p.vote_count || 0),
+    0,
+  );
+  const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes);
+  if (!withMaxVotes.length) return null;
+  const preferredLangs = new Set(["en", "en-US"]);
+  const enGroup = withMaxVotes.filter(
+    (p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1),
+  );
+  const nullLang = withMaxVotes.filter((p) => p.iso_639_1 === null);
+  const candidates = enGroup.length
+    ? enGroup
+    : nullLang.length
+      ? nullLang
+      : withMaxVotes;
+  return (
+    [...candidates].sort((a, b) => {
+      const va = (b.vote_average || 0) - (a.vote_average || 0);
+      if (va !== 0) return va;
+      return (b.width || 0) - (a.width || 0);
+    })[0]?.file_path || null
+  );
+}
+
+// Misma lógica que pickBestBackdropByLangResVotes en Favoritos
+function pickBestBackdropPath(backdrops) {
+  if (!Array.isArray(backdrops) || !backdrops.length) return null;
+  const minWidth = 1200;
+  const pool0 = backdrops.filter((b) => (b?.width || 0) >= minWidth);
+  const pool = pool0.length ? pool0 : backdrops;
+  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
+  const preferSet = new Set(["en"]);
+  const isPreferred = (b) => {
+    if (b?.iso_639_1 == null) return false;
+    return preferSet.has(norm(b.iso_639_1));
+  };
+  const top3 = [];
+  for (const b of pool) {
+    if (isPreferred(b)) top3.push(b);
+    if (top3.length === 3) break;
+  }
+  if (!top3.length) return null;
+  const isRes = (b, w, h) =>
+    (b?.width || 0) === w && (b?.height || 0) === h;
+  return (
+    top3.find((b) => isRes(b, 1920, 1080)) ||
+    top3.find((b) => isRes(b, 2560, 1440)) ||
+    top3.find((b) => isRes(b, 3840, 2160)) ||
+    top3.find((b) => isRes(b, 1280, 720)) ||
+    top3[0]
+  )?.file_path || null;
+}
+
+// Llamada directa a TMDB desde el navegador (mismo patrón que SmartPoster en Favoritos)
+// Obtiene poster y backdrop en una sola petición y los cachea juntos
+async function loadTmdbImages(type, id) {
+  const key = `${type}:${id}`;
+  if (tmdbImageCache.has(key)) return tmdbImageCache.get(key);
+  if (tmdbImageInFlight.has(key)) return tmdbImageInFlight.get(key);
+
+  const p = (async () => {
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+      if (!apiKey) return { poster: null, backdrop: null };
+      const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`;
+      const r = await fetch(url, { cache: "force-cache" });
+      if (!r.ok) return { poster: null, backdrop: null };
+      const j = await r.json();
+      const result = {
+        poster: pickBestPosterPath(j?.posters || []),
+        backdrop: pickBestBackdropPath(j?.backdrops || []),
+      };
+      tmdbImageCache.set(key, result);
+      return result;
+    } catch {
+      return { poster: null, backdrop: null };
+    } finally {
+      tmdbImageInFlight.delete(key);
+    }
+  })();
+
+  tmdbImageInFlight.set(key, p);
+  return p;
+}
+
 // ================== UTILS ==================
 
 function formatEpoch(value) {
@@ -938,59 +1032,47 @@ export default function BibliotecaClient() {
 
   useEffect(() => {
     const { poster, backdrop } = missingArtworkIdsByType;
-    const allEmpty =
-      !poster.movie.length &&
-      !poster.tv.length &&
-      !backdrop.movie.length &&
-      !backdrop.tv.length;
-    if (allEmpty) return;
+    // Unificar IDs por tipo: poster y backdrop se obtienen en una sola llamada a TMDB
+    const movieIds = [...new Set([...poster.movie, ...backdrop.movie])];
+    const tvIds = [...new Set([...poster.tv, ...backdrop.tv])];
+    if (!movieIds.length && !tvIds.length) return;
 
     let aborted = false;
 
-    const loadBatch = async (type, ids, kind) => {
-      if (!ids.length) return null;
-      try {
-        const response = await fetch("/api/tmdb/localized-images", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type, ids, kind }),
-        });
-        if (!response.ok) return null;
-        const json = await response.json().catch(() => null);
-        return json?.ok && json?.map && typeof json.map === "object"
-          ? json.map
-          : null;
-      } catch {
-        return null;
-      }
-    };
-
     (async () => {
-      const [moviePosters, tvPosters, movieBackdrops, tvBackdrops] =
-        await Promise.all([
-          loadBatch("movie", poster.movie, "poster"),
-          loadBatch("tv", poster.tv, "poster"),
-          loadBatch("movie", backdrop.movie, "backdrop"),
-          loadBatch("tv", backdrop.tv, "backdrop"),
-        ]);
+      // Llamadas directas a TMDB desde el navegador (mismo criterio que Favoritos/Pendientes)
+      // Cada petición obtiene poster + backdrop juntos y queda cacheada en el módulo
+      const allFetches = [
+        ...movieIds.map((id) =>
+          loadTmdbImages("movie", id).then((r) => ({
+            type: "movie",
+            id,
+            ...r,
+          })),
+        ),
+        ...tvIds.map((id) =>
+          loadTmdbImages("tv", id).then((r) => ({ type: "tv", id, ...r })),
+        ),
+      ];
 
+      const results = await Promise.all(allFetches);
       if (aborted) return;
 
-      if (moviePosters || tvPosters) {
-        setLocalizedPosterMap((prev) => ({
-          movie: moviePosters ? { ...prev.movie, ...moviePosters } : prev.movie,
-          tv: tvPosters ? { ...prev.tv, ...tvPosters } : prev.tv,
-        }));
+      const posterUpdates = { movie: {}, tv: {} };
+      const backdropUpdates = { movie: {}, tv: {} };
+      for (const r of results) {
+        posterUpdates[r.type][String(r.id)] = r.poster;
+        backdropUpdates[r.type][String(r.id)] = r.backdrop;
       }
 
-      if (movieBackdrops || tvBackdrops) {
-        setLocalizedBackdropMap((prev) => ({
-          movie: movieBackdrops
-            ? { ...prev.movie, ...movieBackdrops }
-            : prev.movie,
-          tv: tvBackdrops ? { ...prev.tv, ...tvBackdrops } : prev.tv,
-        }));
-      }
+      setLocalizedPosterMap((prev) => ({
+        movie: { ...prev.movie, ...posterUpdates.movie },
+        tv: { ...prev.tv, ...posterUpdates.tv },
+      }));
+      setLocalizedBackdropMap((prev) => ({
+        movie: { ...prev.movie, ...backdropUpdates.movie },
+        tv: { ...prev.tv, ...backdropUpdates.tv },
+      }));
     })();
 
     return () => {
