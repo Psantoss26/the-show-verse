@@ -109,17 +109,38 @@ export async function GET(request) {
       }
     }
 
+    function extractMachineIdentifier(raw) {
+      if (!raw) return null;
+      const text = String(raw);
+
+      // JSON: {"MediaContainer":{"machineIdentifier":"..."}}
+      const jsonMatch = text.match(/"machineIdentifier"\s*:\s*"([^"]+)"/i);
+      if (jsonMatch?.[1]) return jsonMatch[1];
+
+      // XML: machineIdentifier="..."
+      const xmlMatch = text.match(/machineIdentifier="([^"]+)"/i);
+      if (xmlMatch?.[1]) return xmlMatch[1];
+
+      return null;
+    }
+
     async function getMachineIdentifier(baseUrl) {
+      const paths = ["/identity", "/"];
       try {
-        const serverInfoUrl = `${baseUrl}/?X-Plex-Token=${plexToken}`;
-        const serverInfoResponse = await fetchWithTimeout(serverInfoUrl, {
-          headers: { Accept: "application/json" },
-        });
+        for (const path of paths) {
+          const serverInfoUrl = `${baseUrl}${path}?X-Plex-Token=${plexToken}`;
+          const serverInfoResponse = await fetchWithTimeout(serverInfoUrl, {
+            headers: { Accept: "application/json,application/xml,*/*" },
+          });
 
-        if (!serverInfoResponse.ok) return null;
+          if (!serverInfoResponse.ok) continue;
 
-        const serverData = await serverInfoResponse.json();
-        return serverData?.MediaContainer?.machineIdentifier ?? null;
+          const bodyText = await serverInfoResponse.text();
+          const machineId = extractMachineIdentifier(bodyText);
+          if (machineId) return machineId;
+        }
+
+        return null;
       } catch {
         return null;
       }
@@ -204,7 +225,10 @@ export async function GET(request) {
 
     try {
       const serverMachineId =
-        machineIdentifier || matchedItem.machineIdentifier;
+        machineIdentifier ||
+        matchedItem.machineIdentifier ||
+        process.env.PLEX_MACHINE_IDENTIFIER?.trim() ||
+        null;
 
       // metadata key base
       let metadataKey =
@@ -218,11 +242,15 @@ export async function GET(request) {
       const encodedKey = encodeURIComponent(metadataKey);
 
       // Web (desktop)
-      const plexWebUrl = `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`;
+      const plexWebUrl = serverMachineId
+        ? `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`
+        : `${activePlexUrl}/web/index.html#!/details?key=${encodedKey}`;
 
       // iOS deep link (preplay). Añadimos metadataType para máxima compatibilidad.
       const metadataType = type === "movie" ? 1 : 2;
-      const plexMobileUrl = `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}&server=${serverMachineId}`;
+      const plexMobileUrl = serverMachineId
+        ? `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}&server=${serverMachineId}`
+        : null;
 
       // Android universal link (watch.plex.tv)
       let plexUniversalUrl = null;

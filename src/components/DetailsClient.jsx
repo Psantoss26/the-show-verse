@@ -4714,7 +4714,7 @@ export default function DetailsClient({
     if (!title || !id) return;
 
     // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
-    const cacheKey = `plex-v7:${endpointType}:${id}`;
+    const cacheKey = `plex-v8:${endpointType}:${id}`;
     const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 días (1 semana)
 
     // Intentar cargar desde caché primero
@@ -5436,37 +5436,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const isAndroid = /Android/i.test(ua);
                           const isIOS = /iPad|iPhone|iPod/i.test(ua);
 
-                          // Debug
-                          console.log("[Plex Click Debug]", {
-                            userAgent: ua,
-                            isTouchDevice,
-                            maxTouchPoints: navigator.maxTouchPoints,
-                            isAndroid,
-                            isIOS,
-                            availableUrls: {
-                              web: p.url.web,
-                              mobile: p.url.mobile,
-                              universal: p.url.universal,
-                            },
-                          });
-
-                          // Elección de URL según dispositivo:
+                          // Eleccion de URL segun dispositivo:
                           let urlToOpen;
 
                           if (isTouchDevice) {
-                            // Dispositivo táctil: priorizar URLs de app
-                            if (isAndroid) {
-                              // Android: universal link funciona mejor
+                            // En movil/tablet SIEMPRE intentar deep link primero
+                            // para abrir el detalle en la app Plex del servidor local.
+                            if (isAndroid || isIOS) {
                               urlToOpen =
-                                p.url.universal || p.url.mobile || p.url.web;
-                            } else if (isIOS) {
-                              // iOS/iPad: deep link funciona mejor
+                                p.url.mobile || p.url.web || p.url.universal;
+                            } else {
                               urlToOpen =
                                 p.url.mobile || p.url.universal || p.url.web;
-                            } else {
-                              // Otro táctil: intentar universal primero
-                              urlToOpen =
-                                p.url.universal || p.url.mobile || p.url.web;
                             }
                           } else {
                             // Ordenador sin táctil: solo URL web
@@ -5477,13 +5458,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             console.warn("[Plex] No URL available");
                             return;
                           }
-
-                          console.log(
-                            "[Plex] Opening URL:",
-                            urlToOpen,
-                            "| Touch device:",
-                            isTouchDevice,
-                          );
 
                           // En dispositivo táctil, usa navegación directa (mejor para app links)
                           if (isTouchDevice) {
