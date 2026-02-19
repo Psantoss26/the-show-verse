@@ -29,19 +29,19 @@ function pickBestByLangThenResolution(list, opts = {}) {
   return best
 }
 
-// Backdrop: ES -> EN -> cualquier idioma, priorizando tamaño útil
+// Backdrop: EN -> cualquier idioma, priorizando tamaño útil (mismo criterio que Favoritos)
 function pickLocalizedBackdrop(backdrops = []) {
   const best = pickBestByLangThenResolution(backdrops, {
-    preferLangs: ['es', 'es-ES', 'en', 'en-US'],
-    minWidth: 1280, // backdrops: pedimos calidad mínima razonable (ajusta si quieres)
+    preferLangs: ['en', 'en-US'],
+    minWidth: 1280,
   })
   return best?.file_path || null
 }
 
-// Poster: ES -> EN -> cualquier idioma, priorizando mayor área disponible
+// Poster: EN -> cualquier idioma, priorizando mayor área disponible (mismo criterio que Favoritos)
 function pickLocalizedPoster(posters = []) {
   const best = pickBestByLangThenResolution(posters, {
-    preferLangs: ['es', 'es-ES', 'en', 'en-US'],
+    preferLangs: ['en', 'en-US'],
     minWidth: 500,
   })
   return best?.file_path || null
@@ -71,7 +71,10 @@ async function poolMap(concurrency, items, fn) {
   })
 }
 
-export const revalidate = 86400 // 24h (ISR)
+// POST route: siempre dinámico (no pre-renderizable en Vercel)
+export const dynamic = 'force-dynamic'
+
+const REVALIDATE_SECS = 86400 // 24h - usado en caché interna de fetch, no a nivel de ruta
 
 export async function POST(req) {
   try {
@@ -86,9 +89,9 @@ export async function POST(req) {
     const unique = [...new Set(ids)].slice(0, 400)
 
     const pairs = await poolMap(8, unique, async (id) => {
-      // IMPORTANTE: incluye "null" para permitir backdrops sin idioma (muy comunes en TMDb)
-      const url = `${TMDB}/${type}/${id}/images?api_key=${API_KEY}&include_image_language=es,en,null`
-      const r = await fetch(url, { cache: 'force-cache', next: { revalidate } })
+      // Mismo criterio que Favoritos/Pendientes: inglés + imágenes sin idioma (backdrops)
+      const url = `${TMDB}/${type}/${id}/images?api_key=${API_KEY}&include_image_language=en,en-US,null`
+      const r = await fetch(url, { cache: 'force-cache', next: { revalidate: REVALIDATE_SECS } })
       if (!r.ok) return [id, null]
       const j = await r.json()
       if (kind === 'poster') {

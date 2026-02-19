@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpDown,
@@ -117,7 +124,15 @@ function getResolutionTextColor(resolution) {
 
 function PosterGlyph({ className = "" }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect x="5" y="3" width="14" height="18" rx="2" />
       <path d="M9 7h6M9 12h6" opacity="0.5" />
     </svg>
@@ -126,7 +141,15 @@ function PosterGlyph({ className = "" }) {
 
 function BackdropGlyph({ className = "" }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect x="3" y="5" width="18" height="14" rx="2" />
       <path d="M3 15l5.5-5.5L12 13l3.5-3.5L21 15" opacity="0.5" />
     </svg>
@@ -282,7 +305,9 @@ function LibraryMediaCard({
       : Math.min(index * 0.02, 0.3);
   const shouldAnimate = animated && index < 30;
   const enableHoverLift =
-    animated && totalItems <= 120 && (viewMode === "compact" || viewMode === "grid");
+    animated &&
+    totalItems <= 120 &&
+    (viewMode === "compact" || viewMode === "grid");
 
   const openItem = () => {
     if (!canOpen) return;
@@ -318,11 +343,15 @@ function LibraryMediaCard({
         initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
         animate={shouldAnimate ? { opacity: 1, y: 0 } : undefined}
         exit={shouldAnimate ? { opacity: 0, y: -10 } : undefined}
-        transition={shouldAnimate ? {
-          duration: 0.35,
-          delay: animDelay,
-          ease: "easeOut",
-        } : { duration: 0 }}
+        transition={
+          shouldAnimate
+            ? {
+                duration: 0.35,
+                delay: animDelay,
+                ease: "easeOut",
+              }
+            : { duration: 0 }
+        }
       >
         <article
           className={`block bg-zinc-900/40 border border-zinc-800/80 rounded-xl transition-[background-color,border-color] duration-300 group overflow-hidden ${canOpen ? "cursor-pointer hover:border-amber-500/35 hover:bg-zinc-900/65" : ""}`}
@@ -363,7 +392,9 @@ function LibraryMediaCard({
                 {primaryRes && (
                   <>
                     <span>•</span>
-                    <span className={`font-bold ${getResolutionTextColor(primaryRes)}`}>
+                    <span
+                      className={`font-bold ${getResolutionTextColor(primaryRes)}`}
+                    >
                       {primaryRes}
                     </span>
                   </>
@@ -383,11 +414,15 @@ function LibraryMediaCard({
         initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
         animate={shouldAnimate ? { opacity: 1, y: 0 } : undefined}
         exit={shouldAnimate ? { opacity: 0, y: -10 } : undefined}
-        transition={shouldAnimate ? {
-          duration: 0.35,
-          delay: animDelay,
-          ease: "easeOut",
-        } : { duration: 0 }}
+        transition={
+          shouldAnimate
+            ? {
+                duration: 0.35,
+                delay: animDelay,
+                ease: "easeOut",
+              }
+            : { duration: 0 }
+        }
       >
         <motion.article
           className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md transition-[border-color] duration-300 ${canOpen ? "cursor-pointer" : ""}`}
@@ -402,7 +437,11 @@ function LibraryMediaCard({
                 }
               : undefined
           }
-          transition={enableHoverLift ? { type: "spring", stiffness: 300, damping: 20 } : { duration: 0 }}
+          transition={
+            enableHoverLift
+              ? { type: "spring", stiffness: 300, damping: 20 }
+              : { duration: 0 }
+          }
           style={{ transformOrigin: "center center" }}
           onClick={openItem}
         >
@@ -458,7 +497,9 @@ function LibraryMediaCard({
       initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
       animate={shouldAnimate ? { opacity: 1, scale: 1 } : undefined}
       exit={shouldAnimate ? { opacity: 0, scale: 0.95 } : undefined}
-      transition={shouldAnimate ? { duration: 0.2, delay: animDelay } : { duration: 0 }}
+      transition={
+        shouldAnimate ? { duration: 0.2, delay: animDelay } : { duration: 0 }
+      }
     >
       <article
         className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-amber-900/20 transition-[border-color,box-shadow] duration-300 ${canOpen ? "cursor-pointer hover:border-amber-500/30" : ""}`}
@@ -483,7 +524,9 @@ function LibraryMediaCard({
               </span>
             )}
             {primaryRes && (
-              <span className={`text-[10px] font-semibold ${getResolutionTextColor(primaryRes)}`}>
+              <span
+                className={`text-[10px] font-semibold ${getResolutionTextColor(primaryRes)}`}
+              >
                 {primaryRes}
               </span>
             )}
@@ -566,11 +609,15 @@ export default function BibliotecaClient() {
   const [groupBy, setGroupBy] = useState("none");
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return "grid";
-    return window.localStorage.getItem("showverse:biblioteca:viewMode") || "grid";
+    return (
+      window.localStorage.getItem("showverse:biblioteca:viewMode") || "grid"
+    );
   });
   const [imageMode, setImageMode] = useState(() => {
     if (typeof window === "undefined") return "poster";
-    return window.localStorage.getItem("showverse:biblioteca:imageMode") || "poster";
+    return (
+      window.localStorage.getItem("showverse:biblioteca:imageMode") || "poster"
+    );
   });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [isExpandingDataset, setIsExpandingDataset] = useState(false);
@@ -599,79 +646,103 @@ export default function BibliotecaClient() {
     window.localStorage.setItem("showverse:biblioteca:imageMode", imageMode);
   }, [imageMode]);
 
-  const fetchLibrary = useCallback(async ({
-    force = false,
-    limit = DEFAULT_FETCH_LIMIT,
-    background = false,
-    markExpanded = false,
-  } = {}) => {
-    const hasWindow = typeof window !== "undefined";
-    const now = Date.now();
-    const safeLimit =
-      Number.isFinite(Number(limit)) && Number(limit) > 0
-        ? Number(limit)
-        : DEFAULT_FETCH_LIMIT;
-    const cacheKey = getCacheKey(safeLimit);
+  const fetchLibrary = useCallback(
+    async ({
+      force = false,
+      limit = DEFAULT_FETCH_LIMIT,
+      background = false,
+      markExpanded = false,
+    } = {}) => {
+      const hasWindow = typeof window !== "undefined";
+      const now = Date.now();
+      const safeLimit =
+        Number.isFinite(Number(limit)) && Number(limit) > 0
+          ? Number(limit)
+          : DEFAULT_FETCH_LIMIT;
+      const cacheKey = getCacheKey(safeLimit);
 
-    if (!background && safeLimit <= DEFAULT_FETCH_LIMIT) {
-      setExpansionAttempted(false);
-    }
+      if (!background && safeLimit <= DEFAULT_FETCH_LIMIT) {
+        setExpansionAttempted(false);
+      }
 
-    if (!force && hasWindow) {
-      try {
-        const raw = window.sessionStorage.getItem(cacheKey);
-        if (raw) {
-          const cached = JSON.parse(raw);
-          if (cached?.timestamp && now - Number(cached.timestamp) < CACHE_TTL_MS && cached?.payload) {
-            setData(cached.payload);
-            setError("");
-            setLoading(false);
-            if (markExpanded || safeLimit > DEFAULT_FETCH_LIMIT || !cached?.payload?.summary?.truncated) {
-              setHasExpandedDataset(true);
+      if (!force && hasWindow) {
+        try {
+          const raw = window.sessionStorage.getItem(cacheKey);
+          if (raw) {
+            const cached = JSON.parse(raw);
+            if (
+              cached?.timestamp &&
+              now - Number(cached.timestamp) < CACHE_TTL_MS &&
+              cached?.payload
+            ) {
+              setData(cached.payload);
+              setError("");
+              setLoading(false);
+              if (
+                markExpanded ||
+                safeLimit > DEFAULT_FETCH_LIMIT ||
+                !cached?.payload?.summary?.truncated
+              ) {
+                setHasExpandedDataset(true);
+              }
+              return;
             }
-            return;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (force || background) setRefreshing(true);
+      else setLoading(true);
+      if (background) setIsExpandingDataset(true);
+
+      try {
+        const response = await fetch(`/api/plex/library?limit=${safeLimit}`, {
+          cache: "no-store",
+        });
+        const json = await response.json().catch(() => null);
+
+        if (!response.ok || !json?.available) {
+          throw new Error(
+            json?.message ||
+              json?.error ||
+              "No se pudo cargar la biblioteca Plex.",
+          );
+        }
+
+        setData(json);
+        setError("");
+        if (
+          markExpanded ||
+          safeLimit > DEFAULT_FETCH_LIMIT ||
+          !json?.summary?.truncated
+        ) {
+          setHasExpandedDataset(true);
+        }
+
+        if (hasWindow) {
+          const payload = JSON.stringify({ timestamp: now, payload: json });
+          window.sessionStorage.setItem(cacheKey, payload);
+          if (safeLimit > DEFAULT_FETCH_LIMIT) {
+            window.sessionStorage.setItem(
+              getCacheKey(DEFAULT_FETCH_LIMIT),
+              payload,
+            );
           }
         }
-      } catch {
-        // ignore
-      }
-    }
-
-    if (force || background) setRefreshing(true);
-    else setLoading(true);
-    if (background) setIsExpandingDataset(true);
-
-    try {
-      const response = await fetch(`/api/plex/library?limit=${safeLimit}`, { cache: "no-store" });
-      const json = await response.json().catch(() => null);
-
-      if (!response.ok || !json?.available) {
-        throw new Error(json?.message || json?.error || "No se pudo cargar la biblioteca Plex.");
-      }
-
-      setData(json);
-      setError("");
-      if (markExpanded || safeLimit > DEFAULT_FETCH_LIMIT || !json?.summary?.truncated) {
-        setHasExpandedDataset(true);
-      }
-
-      if (hasWindow) {
-        const payload = JSON.stringify({ timestamp: now, payload: json });
-        window.sessionStorage.setItem(cacheKey, payload);
-        if (safeLimit > DEFAULT_FETCH_LIMIT) {
-          window.sessionStorage.setItem(getCacheKey(DEFAULT_FETCH_LIMIT), payload);
+      } catch (err) {
+        if (!background) {
+          setError(err instanceof Error ? err.message : "Error desconocido.");
         }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        if (background) setIsExpandingDataset(false);
       }
-    } catch (err) {
-      if (!background) {
-        setError(err instanceof Error ? err.message : "Error desconocido.");
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      if (background) setIsExpandingDataset(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     fetchLibrary({ limit: DEFAULT_FETCH_LIMIT });
@@ -686,7 +757,13 @@ export default function BibliotecaClient() {
       background: true,
       markExpanded: true,
     });
-  }, [data?.summary?.truncated, hasExpandedDataset, isExpandingDataset, expansionAttempted, fetchLibrary]);
+  }, [
+    data?.summary?.truncated,
+    hasExpandedDataset,
+    isExpandingDataset,
+    expansionAttempted,
+    fetchLibrary,
+  ]);
 
   const summary = useMemo(() => data?.summary || {}, [data]);
 
@@ -699,7 +776,9 @@ export default function BibliotecaClient() {
 
     const localCounts = {};
     for (const item of base) {
-      const resolutions = Array.isArray(item?.resolutions) ? item.resolutions : [];
+      const resolutions = Array.isArray(item?.resolutions)
+        ? item.resolutions
+        : [];
       for (const resolution of resolutions) {
         localCounts[resolution] = (localCounts[resolution] || 0) + 1;
       }
@@ -708,9 +787,13 @@ export default function BibliotecaClient() {
   }, [summary, data]);
 
   const availableResolutions = useMemo(() => {
-    const ordered = RESOLUTION_ORDER.filter((r) => Number(resolutionCounts[r] || 0) > 0);
+    const ordered = RESOLUTION_ORDER.filter(
+      (r) => Number(resolutionCounts[r] || 0) > 0,
+    );
     const extras = Object.entries(resolutionCounts)
-      .filter(([r, count]) => Number(count) > 0 && !RESOLUTION_ORDER.includes(r))
+      .filter(
+        ([r, count]) => Number(count) > 0 && !RESOLUTION_ORDER.includes(r),
+      )
       .map(([r]) => r)
       .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
 
@@ -731,25 +814,46 @@ export default function BibliotecaClient() {
     const filtered = base.filter((item) => {
       if (typeFilter !== "all" && item.type !== typeFilter) return false;
       if (resFilter !== "all") {
-        const resolutions = Array.isArray(item.resolutions) ? item.resolutions : [];
+        const resolutions = Array.isArray(item.resolutions)
+          ? item.resolutions
+          : [];
         if (!resolutions.includes(resFilter)) return false;
       }
       if (!normalizedQuery) return true;
-      return `${item.title || ""} ${item.sectionTitle || ""}`.toLowerCase().includes(normalizedQuery);
+      return `${item.title || ""} ${item.sectionTitle || ""}`
+        .toLowerCase()
+        .includes(normalizedQuery);
     });
 
     return filtered.sort((a, b) => {
-      if (sortBy === "title-asc") return String(a.title || "").localeCompare(String(b.title || ""), "es", { sensitivity: "base" });
-      if (sortBy === "year-desc") return Number(b.year || 0) - Number(a.year || 0);
-      if (sortBy === "year-asc") return Number(a.year || 0) - Number(b.year || 0);
-      if (sortBy === "added-asc") return Number(a.addedAt || 0) - Number(b.addedAt || 0);
+      if (sortBy === "title-asc")
+        return String(a.title || "").localeCompare(
+          String(b.title || ""),
+          "es",
+          { sensitivity: "base" },
+        );
+      if (sortBy === "year-desc")
+        return Number(b.year || 0) - Number(a.year || 0);
+      if (sortBy === "year-asc")
+        return Number(a.year || 0) - Number(b.year || 0);
+      if (sortBy === "added-asc")
+        return Number(a.addedAt || 0) - Number(b.addedAt || 0);
       return Number(b.addedAt || 0) - Number(a.addedAt || 0);
     });
   }, [data, deferredQuery, typeFilter, resFilter, sortBy]);
 
   useEffect(() => {
     setVisibleCount(INITIAL_RENDER_COUNT);
-  }, [query, typeFilter, resFilter, sortBy, groupBy, viewMode, imageMode, data?.items?.length]);
+  }, [
+    query,
+    typeFilter,
+    resFilter,
+    sortBy,
+    groupBy,
+    viewMode,
+    imageMode,
+    data?.items?.length,
+  ]);
 
   const maxArtworkScanCount = Math.min(
     filteredItems.length,
@@ -784,104 +888,136 @@ export default function BibliotecaClient() {
     return () => observer.disconnect();
   }, [hasMoreItems, loadMoreItems]);
 
-  const preferredArtworkKind = viewMode === "list" ? "backdrop" : imageMode;
-
   const missingArtworkIdsByType = useMemo(() => {
-    const out = { movie: [], tv: [] };
-    const seen = { movie: new Set(), tv: new Set() };
-    const activeMap =
-      preferredArtworkKind === "poster" ? localizedPosterMap : localizedBackdropMap;
+    const out = {
+      poster: { movie: [], tv: [] },
+      backdrop: { movie: [], tv: [] },
+    };
+    const seen = {
+      poster: { movie: new Set(), tv: new Set() },
+      backdrop: { movie: new Set(), tv: new Set() },
+    };
 
     for (const item of artworkScanItems) {
-      const type = item?.tmdbType === "movie" ? "movie" : item?.tmdbType === "tv" ? "tv" : null;
+      const type =
+        item?.tmdbType === "movie"
+          ? "movie"
+          : item?.tmdbType === "tv"
+            ? "tv"
+            : null;
       if (!type) continue;
 
       const tmdbId = Number(item?.tmdbId || 0);
       if (!Number.isFinite(tmdbId) || tmdbId <= 0) continue;
 
       const key = String(tmdbId);
-      if (activeMap[type]?.[key]) continue;
-      if (seen[type].has(key)) continue;
 
-      seen[type].add(key);
-      out[type].push(tmdbId);
+      // Poster: only add if not already fetched (key in map handles null correctly)
+      if (
+        !(localizedPosterMap[type] && key in localizedPosterMap[type]) &&
+        !seen.poster[type].has(key) &&
+        out.poster[type].length < MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE
+      ) {
+        seen.poster[type].add(key);
+        out.poster[type].push(tmdbId);
+      }
 
-      if (out[type].length >= MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE) {
-        if (out.movie.length >= MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE && out.tv.length >= MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE) {
-          break;
-        }
+      // Backdrop: only add if not already fetched
+      if (
+        !(localizedBackdropMap[type] && key in localizedBackdropMap[type]) &&
+        !seen.backdrop[type].has(key) &&
+        out.backdrop[type].length < MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE
+      ) {
+        seen.backdrop[type].add(key);
+        out.backdrop[type].push(tmdbId);
       }
     }
 
     return out;
-  }, [preferredArtworkKind, artworkScanItems, localizedPosterMap, localizedBackdropMap]);
+  }, [artworkScanItems, localizedPosterMap, localizedBackdropMap]);
 
   useEffect(() => {
-    const movieIds = missingArtworkIdsByType.movie;
-    const tvIds = missingArtworkIdsByType.tv;
-    if (!movieIds.length && !tvIds.length) return;
+    const { poster, backdrop } = missingArtworkIdsByType;
+    const allEmpty =
+      !poster.movie.length &&
+      !poster.tv.length &&
+      !backdrop.movie.length &&
+      !backdrop.tv.length;
+    if (allEmpty) return;
 
     let aborted = false;
 
-    const loadType = async (type, ids) => {
+    const loadBatch = async (type, ids, kind) => {
       if (!ids.length) return null;
       try {
         const response = await fetch("/api/tmdb/localized-images", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type, ids, kind: preferredArtworkKind }),
-          cache: "force-cache",
+          body: JSON.stringify({ type, ids, kind }),
         });
         if (!response.ok) return null;
         const json = await response.json().catch(() => null);
-        return json?.ok && json?.map && typeof json.map === "object" ? json.map : null;
+        return json?.ok && json?.map && typeof json.map === "object"
+          ? json.map
+          : null;
       } catch {
         return null;
       }
     };
 
     (async () => {
-      const [movieMap, tvMap] = await Promise.all([
-        loadType("movie", movieIds),
-        loadType("tv", tvIds),
-      ]);
+      const [moviePosters, tvPosters, movieBackdrops, tvBackdrops] =
+        await Promise.all([
+          loadBatch("movie", poster.movie, "poster"),
+          loadBatch("tv", poster.tv, "poster"),
+          loadBatch("movie", backdrop.movie, "backdrop"),
+          loadBatch("tv", backdrop.tv, "backdrop"),
+        ]);
 
       if (aborted) return;
-      if (!movieMap && !tvMap) return;
 
-      if (preferredArtworkKind === "poster") {
+      if (moviePosters || tvPosters) {
         setLocalizedPosterMap((prev) => ({
-          movie: movieMap ? { ...prev.movie, ...movieMap } : prev.movie,
-          tv: tvMap ? { ...prev.tv, ...tvMap } : prev.tv,
+          movie: moviePosters ? { ...prev.movie, ...moviePosters } : prev.movie,
+          tv: tvPosters ? { ...prev.tv, ...tvPosters } : prev.tv,
         }));
-        return;
       }
 
-      setLocalizedBackdropMap((prev) => ({
-        movie: movieMap ? { ...prev.movie, ...movieMap } : prev.movie,
-        tv: tvMap ? { ...prev.tv, ...tvMap } : prev.tv,
-      }));
+      if (movieBackdrops || tvBackdrops) {
+        setLocalizedBackdropMap((prev) => ({
+          movie: movieBackdrops
+            ? { ...prev.movie, ...movieBackdrops }
+            : prev.movie,
+          tv: tvBackdrops ? { ...prev.tv, ...tvBackdrops } : prev.tv,
+        }));
+      }
     })();
 
     return () => {
       aborted = true;
     };
-  }, [preferredArtworkKind, missingArtworkIdsByType]);
+  }, [missingArtworkIdsByType]);
 
-  const stats = useMemo(() => ({
-    total: summary?.totalItems || 0,
-    movies: summary?.moviesCount || 0,
-    shows: summary?.showsCount || 0,
-  }), [summary]);
+  const stats = useMemo(
+    () => ({
+      total: summary?.totalItems || 0,
+      movies: summary?.moviesCount || 0,
+      shows: summary?.showsCount || 0,
+    }),
+    [summary],
+  );
 
-  const resolutionStats = useMemo(() => ({
-    r4k:
-      Number(resolutionCounts["4K"] || 0) +
-      Number(resolutionCounts["2160p"] || 0),
-    r1440: Number(resolutionCounts["1440p"] || 0),
-    r1080: Number(resolutionCounts["1080p"] || 0),
-    r720: Number(resolutionCounts["720p"] || 0),
-  }), [resolutionCounts]);
+  const resolutionStats = useMemo(
+    () => ({
+      r4k:
+        Number(resolutionCounts["4K"] || 0) +
+        Number(resolutionCounts["2160p"] || 0),
+      r1440: Number(resolutionCounts["1440p"] || 0),
+      r1080: Number(resolutionCounts["1080p"] || 0),
+      r720: Number(resolutionCounts["720p"] || 0),
+    }),
+    [resolutionCounts],
+  );
 
   // Grouping logic
   const grouped = useMemo(() => {
@@ -990,24 +1126,59 @@ export default function BibliotecaClient() {
   }
 
   function resolvePosterSrc(item) {
-    const tmdbType = item?.tmdbType === "movie" ? "movie" : item?.tmdbType === "tv" ? "tv" : null;
+    const tmdbType =
+      item?.tmdbType === "movie"
+        ? "movie"
+        : item?.tmdbType === "tv"
+          ? "tv"
+          : null;
     const tmdbId = Number(item?.tmdbId || 0);
+
     if (tmdbType && Number.isFinite(tmdbId) && tmdbId > 0) {
-      const localizedPath = localizedPosterMap[tmdbType]?.[String(tmdbId)] || null;
-      const localizedSrc = buildTmdbImage(localizedPath, "w500");
-      if (localizedSrc) return localizedSrc;
+      const key = String(tmdbId);
+      const map = localizedPosterMap[tmdbType];
+      const fetched = map != null && key in map;
+
+      if (!fetched) {
+        // TMDB aún no ha cargado: mostrar placeholder (null) en lugar de URL de Plex
+        // que puede no ser accesible desde el navegador en despliegues remotos
+        return null;
+      }
+
+      // TMDB ya respondió: usar imagen si existe, o Plex como último recurso
+      const localizedPath = map[key];
+      if (localizedPath) return buildTmdbImage(localizedPath, "w500");
+      return item?.thumb || item?.art || null;
     }
+
+    // Sin tmdbId: usar directamente URLs de Plex
     return item?.thumb || item?.art || null;
   }
 
   function resolveBackdropSrc(item) {
-    const tmdbType = item?.tmdbType === "movie" ? "movie" : item?.tmdbType === "tv" ? "tv" : null;
+    const tmdbType =
+      item?.tmdbType === "movie"
+        ? "movie"
+        : item?.tmdbType === "tv"
+          ? "tv"
+          : null;
     const tmdbId = Number(item?.tmdbId || 0);
+
     if (tmdbType && Number.isFinite(tmdbId) && tmdbId > 0) {
-      const localizedPath = localizedBackdropMap[tmdbType]?.[String(tmdbId)] || null;
-      const localizedSrc = buildTmdbImage(localizedPath, "w1280");
-      if (localizedSrc) return localizedSrc;
+      const key = String(tmdbId);
+      const map = localizedBackdropMap[tmdbType];
+      const fetched = map != null && key in map;
+
+      if (!fetched) {
+        // TMDB aún no ha cargado: mostrar placeholder en lugar de URL de Plex
+        return null;
+      }
+
+      const localizedPath = map[key];
+      if (localizedPath) return buildTmdbImage(localizedPath, "w1280");
+      return item?.art || item?.thumb || null;
     }
+
     return item?.art || item?.thumb || null;
   }
 
@@ -1030,11 +1201,22 @@ export default function BibliotecaClient() {
   // Filter dropdowns (shared between mobile & desktop)
   function renderTypeDropdown() {
     return (
-      <InlineDropdown label="Tipo" valueLabel={typeLabels[typeFilter]} icon={Filter}>
+      <InlineDropdown
+        label="Tipo"
+        valueLabel={typeLabels[typeFilter]}
+        icon={Filter}
+      >
         {({ close }) => (
           <>
             {Object.entries(typeLabels).map(([key, label]) => (
-              <DropdownItem key={key} active={typeFilter === key} onClick={() => { setTypeFilter(key); close(); }}>
+              <DropdownItem
+                key={key}
+                active={typeFilter === key}
+                onClick={() => {
+                  setTypeFilter(key);
+                  close();
+                }}
+              >
                 {label}
               </DropdownItem>
             ))}
@@ -1046,14 +1228,31 @@ export default function BibliotecaClient() {
 
   function renderResDropdown() {
     return (
-      <InlineDropdown label="Resolución" valueLabel={resLabel} icon={MonitorPlay}>
+      <InlineDropdown
+        label="Resolución"
+        valueLabel={resLabel}
+        icon={MonitorPlay}
+      >
         {({ close }) => (
           <>
-            <DropdownItem active={resFilter === "all"} onClick={() => { setResFilter("all"); close(); }}>
+            <DropdownItem
+              active={resFilter === "all"}
+              onClick={() => {
+                setResFilter("all");
+                close();
+              }}
+            >
               Todas
             </DropdownItem>
             {availableResolutions.map((res) => (
-              <DropdownItem key={res} active={resFilter === res} onClick={() => { setResFilter(res); close(); }}>
+              <DropdownItem
+                key={res}
+                active={resFilter === res}
+                onClick={() => {
+                  setResFilter(res);
+                  close();
+                }}
+              >
                 {res}
               </DropdownItem>
             ))}
@@ -1065,11 +1264,22 @@ export default function BibliotecaClient() {
 
   function renderSortDropdown() {
     return (
-      <InlineDropdown label="Orden" valueLabel={sortLabels[sortBy]} icon={ArrowUpDown}>
+      <InlineDropdown
+        label="Orden"
+        valueLabel={sortLabels[sortBy]}
+        icon={ArrowUpDown}
+      >
         {({ close }) => (
           <>
             {Object.entries(sortLabels).map(([key, label]) => (
-              <DropdownItem key={key} active={sortBy === key} onClick={() => { setSortBy(key); close(); }}>
+              <DropdownItem
+                key={key}
+                active={sortBy === key}
+                onClick={() => {
+                  setSortBy(key);
+                  close();
+                }}
+              >
                 {label}
               </DropdownItem>
             ))}
@@ -1081,11 +1291,22 @@ export default function BibliotecaClient() {
 
   function renderGroupDropdown() {
     return (
-      <InlineDropdown label="Agrupar" valueLabel={groupLabels[groupBy]} icon={Layers3}>
+      <InlineDropdown
+        label="Agrupar"
+        valueLabel={groupLabels[groupBy]}
+        icon={Layers3}
+      >
         {({ close }) => (
           <>
             {Object.entries(groupLabels).map(([key, label]) => (
-              <DropdownItem key={key} active={groupBy === key} onClick={() => { setGroupBy(key); close(); }}>
+              <DropdownItem
+                key={key}
+                active={groupBy === key}
+                onClick={() => {
+                  setGroupBy(key);
+                  close();
+                }}
+              >
                 {label}
               </DropdownItem>
             ))}
@@ -1096,18 +1317,34 @@ export default function BibliotecaClient() {
   }
 
   function renderViewToggle() {
-    const active = "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20";
+    const active =
+      "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20";
     const inactive = "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50";
 
     return (
       <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
-        <button type="button" onClick={() => setViewMode("list")} className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center ${viewMode === "list" ? active : inactive}`} title="Lista">
+        <button
+          type="button"
+          onClick={() => setViewMode("list")}
+          className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center ${viewMode === "list" ? active : inactive}`}
+          title="Lista"
+        >
           <LayoutList className="w-4 h-4" />
         </button>
-        <button type="button" onClick={() => setViewMode("compact")} className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center ${viewMode === "compact" ? active : inactive}`} title="Compacta">
+        <button
+          type="button"
+          onClick={() => setViewMode("compact")}
+          className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center ${viewMode === "compact" ? active : inactive}`}
+          title="Compacta"
+        >
           <Grid3x3 className="w-4 h-4" />
         </button>
-        <button type="button" onClick={() => setViewMode("grid")} className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center ${viewMode === "grid" ? active : inactive}`} title="Grid">
+        <button
+          type="button"
+          onClick={() => setViewMode("grid")}
+          className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center ${viewMode === "grid" ? active : inactive}`}
+          title="Grid"
+        >
           <LayoutGrid className="w-4 h-4" />
         </button>
       </div>
@@ -1115,15 +1352,26 @@ export default function BibliotecaClient() {
   }
 
   function renderImageToggle() {
-    const active = "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20";
+    const active =
+      "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20";
     const inactive = "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50";
 
     return (
       <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
-        <button type="button" onClick={() => setImageMode("poster")} className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center ${imageMode === "poster" ? active : inactive}`} title="Poster">
+        <button
+          type="button"
+          onClick={() => setImageMode("poster")}
+          className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center ${imageMode === "poster" ? active : inactive}`}
+          title="Poster"
+        >
           <PosterGlyph className="w-4 h-4" />
         </button>
-        <button type="button" onClick={() => setImageMode("backdrop")} className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center ${imageMode === "backdrop" ? active : inactive}`} title="Backdrop">
+        <button
+          type="button"
+          onClick={() => setImageMode("backdrop")}
+          className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center ${imageMode === "backdrop" ? active : inactive}`}
+          title="Backdrop"
+        >
           <BackdropGlyph className="w-4 h-4" />
         </button>
       </div>
@@ -1136,12 +1384,27 @@ export default function BibliotecaClient() {
 
     if (filteredItems.length === 0) {
       return (
-        <motion.div className="py-24 text-center" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
+        <motion.div
+          className="py-24 text-center"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+        >
           <FolderKanban className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
           <p className="text-xl font-bold text-white mb-2">Sin resultados</p>
-          <p className="text-zinc-500 mb-6">Ajusta los filtros o prueba otra búsqueda.</p>
+          <p className="text-zinc-500 mb-6">
+            Ajusta los filtros o prueba otra búsqueda.
+          </p>
           {(query || typeFilter !== "all" || resFilter !== "all") && (
-            <button type="button" onClick={() => { setQuery(""); setTypeFilter("all"); setResFilter("all"); }} className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold rounded-xl transition-colors text-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setTypeFilter("all");
+                setResFilter("all");
+              }}
+              className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold rounded-xl transition-colors text-sm"
+            >
               Limpiar filtros
             </button>
           )}
@@ -1165,9 +1428,19 @@ export default function BibliotecaClient() {
           <div key={`grouped-${viewMode}-${imageMode}`}>
             {visibleGrouped.map(([groupTitle, items]) => (
               <div key={groupTitle}>
-                <GroupDivider title={groupTitle} count={items.length} total={filteredItems.length} />
-                <motion.div key={`group-grid-${groupTitle}-${viewMode}-${imageMode}`} className={getItemsGridClass(true)} {...contentMotionProps}>
-                  {items.map((item, idx) => renderCard(item, idx, items.length))}
+                <GroupDivider
+                  title={groupTitle}
+                  count={items.length}
+                  total={filteredItems.length}
+                />
+                <motion.div
+                  key={`group-grid-${groupTitle}-${viewMode}-${imageMode}`}
+                  className={getItemsGridClass(true)}
+                  {...contentMotionProps}
+                >
+                  {items.map((item, idx) =>
+                    renderCard(item, idx, items.length),
+                  )}
                 </motion.div>
               </div>
             ))}
@@ -1192,8 +1465,14 @@ export default function BibliotecaClient() {
     const visibleItems = filteredItems.slice(0, visibleLimit);
     return (
       <>
-        <motion.div key={`flat-grid-${viewMode}-${imageMode}`} className={getItemsGridClass(false)} {...contentMotionProps}>
-          {visibleItems.map((item, idx) => renderCard(item, idx, visibleItems.length))}
+        <motion.div
+          key={`flat-grid-${viewMode}-${imageMode}`}
+          className={getItemsGridClass(false)}
+          {...contentMotionProps}
+        >
+          {visibleItems.map((item, idx) =>
+            renderCard(item, idx, visibleItems.length),
+          )}
         </motion.div>
         {hasMoreItems && (
           <div className="mt-6 text-center">
@@ -1226,14 +1505,18 @@ export default function BibliotecaClient() {
       <div className="min-h-screen bg-[#050505] flex items-center justify-center">
         <div className="text-center">
           <Clapperboard className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">No se pudo cargar Plex</h2>
+          <h2 className="text-2xl font-bold text-white mb-2">
+            No se pudo cargar Plex
+          </h2>
           <p className="text-zinc-500 mb-6 max-w-md">{error}</p>
           <button
             type="button"
             onClick={() =>
               fetchLibrary({
                 force: true,
-                limit: hasExpandedDataset ? EXPANDED_FETCH_LIMIT : DEFAULT_FETCH_LIMIT,
+                limit: hasExpandedDataset
+                  ? EXPANDED_FETCH_LIMIT
+                  : DEFAULT_FETCH_LIMIT,
               })
             }
             className="px-6 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl transition"
@@ -1254,12 +1537,19 @@ export default function BibliotecaClient() {
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* ====== HEADER ====== */}
-        <motion.header className="mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
+        <motion.header
+          className="mb-10"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <div className="h-px w-12 bg-amber-500" />
-                <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">PLEX SERVER</span>
+                <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">
+                  PLEX SERVER
+                </span>
               </div>
               <div className="flex items-center gap-4">
                 <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
@@ -1270,7 +1560,9 @@ export default function BibliotecaClient() {
                   onClick={() =>
                     fetchLibrary({
                       force: true,
-                      limit: hasExpandedDataset ? EXPANDED_FETCH_LIMIT : DEFAULT_FETCH_LIMIT,
+                      limit: hasExpandedDataset
+                        ? EXPANDED_FETCH_LIMIT
+                        : DEFAULT_FETCH_LIMIT,
                     })
                   }
                   disabled={refreshing}
@@ -1282,7 +1574,9 @@ export default function BibliotecaClient() {
                   whileTap={{ scale: refreshing ? 1 : 0.95 }}
                   title="Actualizar"
                 >
-                  <RefreshCw className={`w-5 h-5 text-white ${refreshing ? "animate-spin" : ""}`} />
+                  <RefreshCw
+                    className={`w-5 h-5 text-white ${refreshing ? "animate-spin" : ""}`}
+                  />
                 </motion.button>
               </div>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
@@ -1290,37 +1584,84 @@ export default function BibliotecaClient() {
               </p>
             </div>
 
-            <motion.div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 md:gap-4 w-full lg:w-auto" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
+            <motion.div
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 md:gap-4 w-full lg:w-auto"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
               <div className="min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-amber-400"><HardDrive className="w-4 h-4 md:w-5 md:h-5" /></div>
-                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">{stats.total}</div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">Total</div>
+                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-amber-400">
+                  <HardDrive className="w-4 h-4 md:w-5 md:h-5" />
+                </div>
+                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                  {stats.total}
+                </div>
+                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                  Total
+                </div>
               </div>
               <div className="min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400"><Film className="w-4 h-4 md:w-5 md:h-5" /></div>
-                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">{stats.movies}</div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">Películas</div>
+                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
+                  <Film className="w-4 h-4 md:w-5 md:h-5" />
+                </div>
+                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                  {stats.movies}
+                </div>
+                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                  Películas
+                </div>
               </div>
               <div className="min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400"><Tv className="w-4 h-4 md:w-5 md:h-5" /></div>
-                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">{stats.shows}</div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">Series</div>
+                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400">
+                  <Tv className="w-4 h-4 md:w-5 md:h-5" />
+                </div>
+                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                  {stats.shows}
+                </div>
+                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                  Series
+                </div>
               </div>
-              <div className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("4K")}`}>
-                <div className="text-[10px] uppercase font-black tracking-wider leading-none">4K</div>
-                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">{resolutionStats.r4k}</div>
+              <div
+                className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("4K")}`}
+              >
+                <div className="text-[10px] uppercase font-black tracking-wider leading-none">
+                  4K
+                </div>
+                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">
+                  {resolutionStats.r4k}
+                </div>
               </div>
-              <div className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("1440p")}`}>
-                <div className="text-[10px] uppercase font-black tracking-wider leading-none">1440p</div>
-                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">{resolutionStats.r1440}</div>
+              <div
+                className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("1440p")}`}
+              >
+                <div className="text-[10px] uppercase font-black tracking-wider leading-none">
+                  1440p
+                </div>
+                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">
+                  {resolutionStats.r1440}
+                </div>
               </div>
-              <div className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("1080p")}`}>
-                <div className="text-[10px] uppercase font-black tracking-wider leading-none">1080p</div>
-                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">{resolutionStats.r1080}</div>
+              <div
+                className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("1080p")}`}
+              >
+                <div className="text-[10px] uppercase font-black tracking-wider leading-none">
+                  1080p
+                </div>
+                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">
+                  {resolutionStats.r1080}
+                </div>
               </div>
-              <div className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("720p")}`}>
-                <div className="text-[10px] uppercase font-black tracking-wider leading-none">720p</div>
-                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">{resolutionStats.r720}</div>
+              <div
+                className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("720p")}`}
+              >
+                <div className="text-[10px] uppercase font-black tracking-wider leading-none">
+                  720p
+                </div>
+                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">
+                  {resolutionStats.r720}
+                </div>
               </div>
             </motion.div>
           </div>
@@ -1335,7 +1676,13 @@ export default function BibliotecaClient() {
                 ([e]) => {
                   const isStuck = e.intersectionRatio < 1;
                   const method = isStuck ? "add" : "remove";
-                  el.classList[method]("backdrop-blur-xl", "bg-gradient-to-br", "from-black/60", "via-black/50", "to-black/55");
+                  el.classList[method](
+                    "backdrop-blur-xl",
+                    "bg-gradient-to-br",
+                    "from-black/60",
+                    "via-black/50",
+                    "to-black/55",
+                  );
                 },
                 { threshold: [1], rootMargin: "-65px 0px 0px 0px" },
               );
@@ -1351,9 +1698,18 @@ export default function BibliotecaClient() {
           <div className="flex gap-2 lg:hidden">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar..." className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-zinc-600" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar..."
+                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-zinc-600"
+              />
               {query && (
-                <button type="button" onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                >
                   <X className="w-3.5 h-3.5 text-zinc-500" />
                 </button>
               )}
@@ -1370,7 +1726,13 @@ export default function BibliotecaClient() {
           {/* Mobile: collapsible filters */}
           <AnimatePresence>
             {mobileFiltersOpen && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25, ease: "easeInOut" }} className="lg:hidden overflow-visible">
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className="lg:hidden overflow-visible"
+              >
                 <div className="space-y-3 pt-1">
                   <div className="flex gap-2">
                     <div className="flex-1">{renderTypeDropdown()}</div>
@@ -1382,7 +1744,9 @@ export default function BibliotecaClient() {
                   </div>
                   <div className="flex gap-2">
                     <div className="flex-1">{renderViewToggle()}</div>
-                    {viewMode !== "list" && <div className="shrink-0">{renderImageToggle()}</div>}
+                    {viewMode !== "list" && (
+                      <div className="shrink-0">{renderImageToggle()}</div>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -1393,9 +1757,18 @@ export default function BibliotecaClient() {
           <div className="hidden lg:flex gap-3 w-full items-stretch">
             <div className="relative flex-[1.8] min-w-[280px]">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar en biblioteca..." className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-zinc-600" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar en biblioteca..."
+                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-zinc-600"
+              />
               {query && (
-                <button type="button" onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                >
                   <X className="w-3.5 h-3.5 text-zinc-500" />
                 </button>
               )}
@@ -1406,7 +1779,9 @@ export default function BibliotecaClient() {
             <div className="flex-1 min-w-[150px]">{renderSortDropdown()}</div>
             <div className="flex-1 min-w-[150px]">{renderGroupDropdown()}</div>
             <div className="shrink-0">{renderViewToggle()}</div>
-            {viewMode !== "list" && <div className="shrink-0">{renderImageToggle()}</div>}
+            {viewMode !== "list" && (
+              <div className="shrink-0">{renderImageToggle()}</div>
+            )}
           </div>
         </motion.div>
 
@@ -1419,11 +1794,7 @@ export default function BibliotecaClient() {
           </div>
         )}
 
-        {!summary?.truncated && filteredItems.length > visibleRenderedCount && (
-          <div className="mb-4 text-xs text-zinc-400 bg-zinc-900/60 border border-zinc-800 rounded-xl px-3 py-2">
-            Renderizado progresivo activo: mostrando {visibleRenderedCount} de {filteredItems.length} elementos.
-          </div>
-        )}
+        {/* Mensaje de renderizado progresivo eliminado por solicitud del usuario */}
 
         {/* ====== CONTENT ====== */}
         {renderContent()}
