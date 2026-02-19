@@ -199,12 +199,20 @@ export async function GET(request) {
         }
 
         const data = await response.json();
+        const machineIdFromHeader =
+          response.headers.get("x-plex-machine-identifier") || null;
+        const machineIdFromContainer =
+          data?.MediaContainer?.machineIdentifier || null;
         const candidate = pickBestMatch(data);
         if (!candidate) continue;
 
         matchedItem = candidate;
         activePlexUrl = baseUrl;
-        machineIdentifier = await getMachineIdentifier(baseUrl);
+        machineIdentifier =
+          machineIdFromHeader ||
+          machineIdFromContainer ||
+          candidate?.machineIdentifier ||
+          (await getMachineIdentifier(baseUrl));
         break;
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -231,8 +239,16 @@ export async function GET(request) {
         null;
 
       // metadata key base
-      let metadataKey =
-        matchedItem.key || `/library/metadata/${matchedItem.ratingKey}`;
+      let metadataKey = matchedItem?.ratingKey
+        ? `/library/metadata/${matchedItem.ratingKey}`
+        : matchedItem?.key || null;
+
+      if (!metadataKey) {
+        return NextResponse.json({
+          available: false,
+          plexUrl: null,
+        });
+      }
 
       // Si es serie y viene /children, limpiar para abrir ficha de la serie
       if (type === "tv" && metadataKey.endsWith("/children")) {
