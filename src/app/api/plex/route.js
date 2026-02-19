@@ -1,5 +1,6 @@
 // src/app/api/plex/route.js
 import { NextResponse } from "next/server";
+import { getPlexAccessToken } from "@/lib/plex/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,11 +43,11 @@ export async function GET(request) {
     }
 
     const PLEX_URL = process.env.PLEX_URL || "http://localhost:32400";
-    const PLEX_TOKEN = process.env.PLEX_TOKEN || "";
+    const plexToken = await getPlexAccessToken();
 
-    if (!PLEX_TOKEN) {
+    if (!plexToken) {
       console.warn(
-        "PLEX_TOKEN no configurado. Configura la variable de entorno PLEX_TOKEN.",
+        "Plex no configurado. Define PLEX_TOKEN (fallback) o PLEX_JWT_PRIVATE_KEY para refresh automatico.",
       );
       return NextResponse.json({
         available: false,
@@ -68,7 +69,7 @@ export async function GET(request) {
 
       const url = `https://metadata.provider.plex.tv/library/metadata/matches?guid=${encodeURIComponent(
         guid,
-      )}&type=${metadataType}&X-Plex-Token=${encodeURIComponent(PLEX_TOKEN)}`;
+      )}&type=${metadataType}&X-Plex-Token=${encodeURIComponent(plexToken)}`;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
@@ -90,7 +91,7 @@ export async function GET(request) {
     // machineIdentifier del servidor (para URLs tipo app.plex.tv)
     let machineIdentifier = null;
     try {
-      const serverInfoUrl = `${PLEX_URL}/?X-Plex-Token=${PLEX_TOKEN}`;
+      const serverInfoUrl = `${PLEX_URL}/?X-Plex-Token=${plexToken}`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
 
@@ -106,14 +107,14 @@ export async function GET(request) {
         machineIdentifier =
           serverData?.MediaContainer?.machineIdentifier ?? null;
       }
-    } catch (err) {
+    } catch {
       // Silently fail - Plex not available
     }
 
     // Buscar en Plex
     const searchUrl = `${PLEX_URL}/search?query=${encodeURIComponent(
       title,
-    )}&X-Plex-Token=${PLEX_TOKEN}`;
+    )}&X-Plex-Token=${plexToken}`;
 
     try {
       const controller = new AbortController();
@@ -220,7 +221,7 @@ export async function GET(request) {
           year: matchedItem.year,
           ratingKey: matchedItem.ratingKey,
           thumb: matchedItem.thumb
-            ? `${PLEX_URL}${matchedItem.thumb}?X-Plex-Token=${PLEX_TOKEN}`
+            ? `${PLEX_URL}${matchedItem.thumb}?X-Plex-Token=${plexToken}`
             : null,
         },
         {
@@ -231,7 +232,7 @@ export async function GET(request) {
           },
         },
       );
-    } catch (plexError) {
+    } catch {
       // Silently fail - Plex not available or timeout
       return NextResponse.json({
         available: false,
