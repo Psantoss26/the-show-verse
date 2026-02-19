@@ -42,7 +42,15 @@ export async function GET(request) {
       );
     }
 
-    const PLEX_URL = process.env.PLEX_URL || "http://localhost:32400";
+    const configuredUrls = [
+      process.env.PLEX_URL,
+      ...(process.env.PLEX_URLS || "").split(","),
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    const plexUrls = Array.from(
+      new Set(configuredUrls.length ? configuredUrls : ["http://localhost:32400"]),
+    );
     const plexToken = await getPlexAccessToken();
 
     if (!plexToken) {
@@ -88,89 +96,113 @@ export async function GET(request) {
       return typeof slug === "string" && slug.trim() ? slug.trim() : null;
     }
 
-    // machineIdentifier del servidor (para URLs tipo app.plex.tv)
-    let machineIdentifier = null;
-    try {
-      const serverInfoUrl = `${PLEX_URL}/?X-Plex-Token=${plexToken}`;
+    async function fetchWithTimeout(url, opts = {}, timeoutMs = 3000) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
-
-      const serverInfoResponse = await fetch(serverInfoUrl, {
-        headers: { Accept: "application/json" },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (serverInfoResponse.ok) {
-        const serverData = await serverInfoResponse.json();
-        machineIdentifier =
-          serverData?.MediaContainer?.machineIdentifier ?? null;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, {
+          ...opts,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
       }
-    } catch {
-      // Silently fail - Plex not available
     }
 
-    // Buscar en Plex
-    const searchUrl = `${PLEX_URL}/search?query=${encodeURIComponent(
-      title,
-    )}&X-Plex-Token=${plexToken}`;
+    async function getMachineIdentifier(baseUrl) {
+      try {
+        const serverInfoUrl = `${baseUrl}/?X-Plex-Token=${plexToken}`;
+        const serverInfoResponse = await fetchWithTimeout(serverInfoUrl, {
+          headers: { Accept: "application/json" },
+        });
+
+        if (!serverInfoResponse.ok) return null;
+
+        const serverData = await serverInfoResponse.json();
+        return serverData?.MediaContainer?.machineIdentifier ?? null;
+      } catch {
+        return null;
+      }
+    }
+
+    function pickBestMatch(data) {
+      if (!data?.MediaContainer?.Metadata) return null;
+
+      let bestMatch = null;
+      for (const item of data.MediaContainer.Metadata) {
+        const itemType =
+          item.type === "movie" ? "movie" : item.type === "show" ? "tv" : null;
+        if (itemType !== type) continue;
+
+        const itemTitle = item.title?.toLowerCase();
+        const searchTitle = title.toLowerCase();
+        if (itemTitle !== searchTitle && !itemTitle?.includes(searchTitle)) {
+          continue;
+        }
+
+        if (year && item.year && Math.abs(item.year - year) > 1) continue;
+
+        if (imdbId) {
+          const itemGuid = item.guid || "";
+          if (
+            itemGuid.includes("imdb://") &&
+            itemGuid.includes(imdbId.replace("tt", ""))
+          ) {
+            return item;
+          }
+        }
+
+        if (!bestMatch) bestMatch = item;
+      }
+
+      return bestMatch;
+    }
+
+    let matchedItem = null;
+    let activePlexUrl = null;
+    let machineIdentifier = null;
+
+    for (const baseUrl of plexUrls) {
+      const searchUrl = `${baseUrl}/search?query=${encodeURIComponent(
+        title,
+      )}&X-Plex-Token=${plexToken}`;
+
+      try {
+        const response = await fetchWithTimeout(searchUrl, {
+          headers: { Accept: "application/json" },
+        });
+
+        if (!response.ok) {
+          console.warn(`[Plex] Search failed on ${baseUrl}: ${response.status}`);
+          continue;
+        }
+
+        const data = await response.json();
+        const candidate = pickBestMatch(data);
+        if (!candidate) continue;
+
+        matchedItem = candidate;
+        activePlexUrl = baseUrl;
+        machineIdentifier = await getMachineIdentifier(baseUrl);
+        break;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.warn(`[Plex] Search error on ${baseUrl}: ${msg}`);
+      }
+    }
+
+    if (!matchedItem) {
+      return NextResponse.json({
+        available: false,
+        plexUrl: null,
+      });
+    }
+
+    if (!activePlexUrl) {
+      activePlexUrl = plexUrls[0];
+    }
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
-
-      const response = await fetch(searchUrl, {
-        headers: { Accept: "application/json" },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`Plex API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      let matchedItem = null;
-
-      if (data.MediaContainer?.Metadata) {
-        for (const item of data.MediaContainer.Metadata) {
-          const itemType =
-            item.type === "movie"
-              ? "movie"
-              : item.type === "show"
-                ? "tv"
-                : null;
-          if (itemType !== type) continue;
-
-          const itemTitle = item.title?.toLowerCase();
-          const searchTitle = title.toLowerCase();
-          if (itemTitle !== searchTitle && !itemTitle?.includes(searchTitle))
-            continue;
-
-          if (year && item.year && Math.abs(item.year - year) > 1) continue;
-
-          if (imdbId) {
-            const itemGuid = item.guid || "";
-            if (
-              itemGuid.includes("imdb://") &&
-              itemGuid.includes(imdbId.replace("tt", ""))
-            ) {
-              matchedItem = item;
-              break;
-            }
-          }
-
-          if (!matchedItem) matchedItem = item;
-        }
-      }
-
-      if (!matchedItem) {
-        return NextResponse.json({ available: false, plexUrl: null });
-      }
-
       const serverMachineId =
         machineIdentifier || matchedItem.machineIdentifier;
 
@@ -221,7 +253,7 @@ export async function GET(request) {
           year: matchedItem.year,
           ratingKey: matchedItem.ratingKey,
           thumb: matchedItem.thumb
-            ? `${PLEX_URL}${matchedItem.thumb}?X-Plex-Token=${plexToken}`
+            ? `${activePlexUrl}${matchedItem.thumb}?X-Plex-Token=${plexToken}`
             : null,
         },
         {
