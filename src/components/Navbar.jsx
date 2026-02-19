@@ -19,9 +19,9 @@ import {
   Menu as MenuIcon,
   HomeIcon,
   Compass,
-  Activity,
   BarChart3,
   Play,
+  FolderKanban,
 } from "lucide-react";
 import TraktHistoryNavButton from "@/components/trakt/TraktHistoryNavButton";
 
@@ -371,6 +371,9 @@ export default function Navbar() {
               <Link href="/discover" className={navLinkClass("/discover")}>
                 Descubrir
               </Link>
+              <Link href="/biblioteca" className={navLinkClass("/biblioteca")}>
+                Biblioteca
+              </Link>
             </div>
           </div>
 
@@ -619,6 +622,19 @@ export default function Navbar() {
                 >
                   <Compass className="w-5 h-5" />
                   <span>Descubrir</span>
+                </Link>
+
+                <Link
+                  href="/biblioteca"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/biblioteca")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
+                >
+                  <FolderKanban className="w-5 h-5" />
+                  <span>Biblioteca</span>
                 </Link>
 
                 <div className="my-3 h-px bg-neutral-800" />
