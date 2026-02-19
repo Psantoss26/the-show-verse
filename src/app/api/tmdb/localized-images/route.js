@@ -1,4 +1,4 @@
-// /api/tmdb/localized-images  (POST { type: "movie"|"tv", ids: number[] })
+// /api/tmdb/localized-images  (POST { type: "movie"|"tv", ids: number[], kind?: "backdrop"|"poster" })
 import { NextResponse } from 'next/server'
 
 const TMDB = 'https://api.themoviedb.org/3'
@@ -29,11 +29,20 @@ function pickBestByLangThenResolution(list, opts = {}) {
   return best
 }
 
-// Aplica ES -> EN -> (si no hay, cualquiera) y elige la de mayor área con minWidth
-function pickLocalized(backdrops = []) {
+// Backdrop: ES -> EN -> cualquier idioma, priorizando tamaño útil
+function pickLocalizedBackdrop(backdrops = []) {
   const best = pickBestByLangThenResolution(backdrops, {
     preferLangs: ['es', 'es-ES', 'en', 'en-US'],
     minWidth: 1280, // backdrops: pedimos calidad mínima razonable (ajusta si quieres)
+  })
+  return best?.file_path || null
+}
+
+// Poster: ES -> EN -> cualquier idioma, priorizando mayor área disponible
+function pickLocalizedPoster(posters = []) {
+  const best = pickBestByLangThenResolution(posters, {
+    preferLangs: ['es', 'es-ES', 'en', 'en-US'],
+    minWidth: 500,
   })
   return best?.file_path || null
 }
@@ -66,9 +75,12 @@ export const revalidate = 86400 // 24h (ISR)
 
 export async function POST(req) {
   try {
-    const { type = 'movie', ids = [] } = await req.json()
+    const { type = 'movie', ids = [], kind = 'backdrop' } = await req.json()
     if (!Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: 'ids vacíos' }, { status: 400 })
+    }
+    if (!['backdrop', 'poster'].includes(kind)) {
+      return NextResponse.json({ error: 'kind inválido' }, { status: 400 })
     }
 
     const unique = [...new Set(ids)].slice(0, 400)
@@ -79,11 +91,14 @@ export async function POST(req) {
       const r = await fetch(url, { cache: 'force-cache', next: { revalidate } })
       if (!r.ok) return [id, null]
       const j = await r.json()
-      return [id, pickLocalized(j?.backdrops || [])]
+      if (kind === 'poster') {
+        return [id, pickLocalizedPoster(j?.posters || [])]
+      }
+      return [id, pickLocalizedBackdrop(j?.backdrops || [])]
     })
 
     const map = Object.fromEntries(pairs)
-    const res = NextResponse.json({ ok: true, type, map })
+    const res = NextResponse.json({ ok: true, type, kind, map })
     res.headers.set('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800')
     return res
   } catch {

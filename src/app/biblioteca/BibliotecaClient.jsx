@@ -30,16 +30,19 @@ const CACHE_KEY_PREFIX = "showverse:plex-library:v3";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_FETCH_LIMIT = 2000;
 const EXPANDED_FETCH_LIMIT = 10000;
-const MAX_LOCALIZED_BACKDROP_IDS_PER_TYPE = 250;
+const MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE = 120;
+const INITIAL_RENDER_COUNT = 180;
+const RENDER_CHUNK_SIZE = 120;
+const ARTWORK_PREFETCH_AHEAD = 80;
 
 const RESOLUTION_STYLES = {
   "8K": "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30",
   "4K": "bg-amber-500/20 text-amber-300 border-amber-500/30",
   "2160p": "bg-amber-500/20 text-amber-300 border-amber-500/30",
-  "1440p": "bg-sky-500/20 text-sky-300 border-sky-500/30",
+  "1440p": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
   "1080p": "bg-blue-500/20 text-blue-300 border-blue-500/30",
   "720p": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  "576p": "bg-lime-500/20 text-lime-300 border-lime-500/30",
+  "576p": "bg-orange-500/20 text-orange-300 border-orange-500/30",
   "480p": "bg-zinc-500/20 text-zinc-300 border-zinc-500/30",
   SD: "bg-zinc-600/20 text-zinc-200 border-zinc-600/30",
 };
@@ -61,15 +64,6 @@ const containerVariants = {
   visible: {
     opacity: 1,
     transition: { staggerChildren: 0.04 },
-  },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.3, ease: "easeOut" },
   },
 };
 
@@ -155,11 +149,11 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   }, [open]);
 
   return (
-    <div ref={ref} className="relative w-full lg:w-auto lg:shrink-0">
+    <div ref={ref} className="relative w-full shrink-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[140px]"
+        className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300"
       >
         <div className="flex items-center gap-2 min-w-0">
           {Icon && <Icon className="w-4 h-4 text-amber-500 shrink-0" />}
@@ -254,185 +248,306 @@ function openPlexLink(item) {
   }
 }
 
-// --- Grid / Poster card (aspect-[2/3]) ---
-function PosterCard({ item, animated = true }) {
-  const title = item?.title || "Sin titulo";
-  const year = item?.year ? String(item.year) : "----";
+function LibraryMediaCard({
+  item,
+  index = 0,
+  totalItems = 0,
+  viewMode = "grid",
+  imageMode = "poster",
+  posterSrc = null,
+  backdropSrc = null,
+  animated = true,
+}) {
+  const title = item?.title || "Sin título";
+  const year = item?.year ? String(item.year) : "";
   const isMovie = item?.type === "movie";
-  const primaryRes = item?.primaryResolution;
-  const canOpen = item?.links?.web || item?.links?.mobile;
-
-  return (
-    <motion.article
-      variants={animated ? cardVariants : undefined}
-      className="group relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 cursor-pointer"
-      onClick={canOpen ? () => openPlexLink(item) : undefined}
-    >
-      {item?.thumb ? (
-        <img src={item.thumb} alt={title} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900">
-          {isMovie ? <Film className="w-12 h-12 text-zinc-700" /> : <Tv className="w-12 h-12 text-zinc-700" />}
-        </div>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-        <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 drop-shadow-lg">{title}</h3>
-        <div className="flex items-center gap-1.5 text-[11px] text-zinc-300 mt-1">
-          <span>{year}</span>
-          {primaryRes && (
-            <>
-              <span className="w-0.5 h-0.5 rounded-full bg-zinc-500" />
-              <span className={`font-semibold ${getResolutionTextColor(primaryRes)}`}>{primaryRes}</span>
-            </>
-          )}
-        </div>
-      </div>
-      <div className="absolute inset-0 rounded-xl ring-1 ring-white/5 group-hover:ring-amber-500/30 transition-all duration-300 pointer-events-none" />
-    </motion.article>
-  );
-}
-
-// --- Backdrop card (aspect-[16/9]) ---
-function BackdropCard({ item, animated = true, backdropSrc = null }) {
-  const title = item?.title || "Sin titulo";
-  const year = item?.year ? String(item.year) : "----";
-  const isMovie = item?.type === "movie";
-  const primaryRes = item?.primaryResolution;
-  const canOpen = item?.links?.web || item?.links?.mobile;
-
-  return (
-    <motion.article
-      variants={animated ? cardVariants : undefined}
-      className="group relative aspect-video w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 cursor-pointer"
-      onClick={canOpen ? () => openPlexLink(item) : undefined}
-    >
-      {backdropSrc ? (
-        <img src={backdropSrc} alt={title} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900">
-          {isMovie ? <Film className="w-12 h-12 text-zinc-700" /> : <Tv className="w-12 h-12 text-zinc-700" />}
-        </div>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-        <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 drop-shadow-lg">{title}</h3>
-        <div className="flex items-center gap-1.5 text-[11px] text-zinc-300 mt-1">
-          <span>{year}</span>
-          {primaryRes && (
-            <>
-              <span className="w-0.5 h-0.5 rounded-full bg-zinc-500" />
-              <span className={`font-semibold ${getResolutionTextColor(primaryRes)}`}>{primaryRes}</span>
-            </>
-          )}
-        </div>
-      </div>
-      <div className="absolute inset-0 rounded-xl ring-1 ring-white/5 group-hover:ring-amber-500/30 transition-all duration-300 pointer-events-none" />
-    </motion.article>
-  );
-}
-
-// --- Compact card (small poster + text) ---
-function CompactCard({ item, animated = true }) {
-  const title = item?.title || "Sin titulo";
-  const year = item?.year ? String(item.year) : "----";
-  const isMovie = item?.type === "movie";
-  const primaryRes = item?.primaryResolution;
+  const typeLabel = isMovie ? "PELÍCULA" : "SERIE";
+  const primaryRes = item?.primaryResolution || null;
   const duration = formatDuration(item?.durationMs);
-  const canOpen = item?.links?.web || item?.links?.mobile;
-
-  return (
-    <motion.article
-      variants={animated ? cardVariants : undefined}
-      className="group flex items-center gap-3 p-2 rounded-xl bg-zinc-900/50 border border-white/5 hover:border-amber-500/20 hover:bg-zinc-900 transition-all cursor-pointer"
-      onClick={canOpen ? () => openPlexLink(item) : undefined}
-    >
-      <div className="w-10 h-14 sm:w-12 sm:h-[4.5rem] rounded-lg overflow-hidden bg-neutral-800 shrink-0">
-        {item?.thumb ? (
-          <img src={item.thumb} alt={title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            {isMovie ? <Film className="w-4 h-4 text-zinc-700" /> : <Tv className="w-4 h-4 text-zinc-700" />}
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <h3 className="text-white font-semibold text-sm leading-tight truncate">{title}</h3>
-        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mt-0.5">
-          <span>{year}</span>
-          {duration && (
-            <>
-              <span className="w-0.5 h-0.5 rounded-full bg-zinc-600" />
-              <span>{duration}</span>
-            </>
-          )}
-          {primaryRes && (
-            <>
-              <span className="w-0.5 h-0.5 rounded-full bg-zinc-600" />
-              <span className={`font-semibold ${getResolutionTextColor(primaryRes)}`}>{primaryRes}</span>
-            </>
-          )}
-        </div>
-      </div>
-      <span className="text-[10px] font-bold text-zinc-600 uppercase shrink-0 hidden sm:block">
-        {isMovie ? "PEL" : "SER"}
-      </span>
-    </motion.article>
-  );
-}
-
-// --- List card (horizontal row) ---
-function ListCard({ item, animated = true }) {
-  const title = item?.title || "Sin titulo";
-  const year = item?.year ? String(item.year) : "----";
-  const isMovie = item?.type === "movie";
-  const primaryRes = item?.primaryResolution;
-  const duration = formatDuration(item?.durationMs);
-  const canOpen = item?.links?.web || item?.links?.mobile;
+  const canOpen = Boolean(item?.links?.web || item?.links?.mobile);
   const resolutions = Array.isArray(item?.resolutions) ? item.resolutions : [];
 
-  return (
-    <motion.article
-      variants={animated ? cardVariants : undefined}
-      className="group flex items-center gap-4 p-3 rounded-xl bg-zinc-900/50 border border-white/5 hover:border-amber-500/20 hover:bg-zinc-900 transition-all cursor-pointer"
-      onClick={canOpen ? () => openPlexLink(item) : undefined}
-    >
-      <div className="w-14 h-20 sm:w-16 sm:h-24 rounded-lg overflow-hidden bg-neutral-800 shrink-0">
-        {item?.thumb ? (
-          <img src={item.thumb} alt={title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            {isMovie ? <Film className="w-5 h-5 text-zinc-700" /> : <Tv className="w-5 h-5 text-zinc-700" />}
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <h3 className="text-white font-bold text-sm sm:text-base leading-tight truncate">{title}</h3>
-        <div className="flex items-center gap-2 text-xs text-zinc-500 mt-1">
-          <span>{year}</span>
-          {duration && (
-            <>
-              <span className="w-0.5 h-0.5 rounded-full bg-zinc-600" />
-              <span>{duration}</span>
-            </>
+  const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
+  const aspectRatio =
+    effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
+  const imageSrc =
+    effectiveImageMode === "backdrop"
+      ? backdropSrc || posterSrc
+      : posterSrc || backdropSrc;
+  const addedAtLabel = formatEpoch(item?.addedAt);
+
+  const animDelay =
+    totalItems > 30
+      ? Math.min(index * 0.01, 0.15)
+      : Math.min(index * 0.02, 0.3);
+  const shouldAnimate = animated && index < 30;
+  const enableHoverLift =
+    animated && totalItems <= 120 && (viewMode === "compact" || viewMode === "grid");
+
+  const openItem = () => {
+    if (!canOpen) return;
+    openPlexLink(item);
+  };
+
+  const renderMedia = () => (
+    <div className="relative w-full h-full">
+      {imageSrc ? (
+        <img
+          src={imageSrc}
+          alt={title}
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900">
+          {isMovie ? (
+            <Film className="w-10 h-10 text-zinc-700" />
+          ) : (
+            <Tv className="w-10 h-10 text-zinc-700" />
           )}
-          <span className="w-0.5 h-0.5 rounded-full bg-zinc-600" />
-          <span>{isMovie ? "Película" : "Serie"}</span>
         </div>
-        {resolutions.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {resolutions.slice(0, 5).map((res) => (
-              <span key={`${item.id}-${res}`} className={`px-1.5 py-0.5 rounded border text-[9px] font-bold ${getResolutionStyle(res)}`}>
-                {res}
-              </span>
-            ))}
+      )}
+    </div>
+  );
+
+  if (viewMode === "list") {
+    return (
+      <motion.div
+        layout={shouldAnimate}
+        initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
+        animate={shouldAnimate ? { opacity: 1, y: 0 } : undefined}
+        exit={shouldAnimate ? { opacity: 0, y: -10 } : undefined}
+        transition={shouldAnimate ? {
+          duration: 0.35,
+          delay: animDelay,
+          ease: "easeOut",
+        } : { duration: 0 }}
+      >
+        <article
+          className={`block bg-zinc-900/40 border border-zinc-800/80 rounded-xl transition-[background-color,border-color] duration-300 group overflow-hidden ${canOpen ? "cursor-pointer hover:border-amber-500/35 hover:bg-zinc-900/65" : ""}`}
+          onClick={openItem}
+        >
+          <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
+            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-zinc-800/80 bg-zinc-900 shrink-0">
+              {renderMedia()}
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+              <div className="flex items-center gap-2">
+                <h4 className="text-white font-bold text-base leading-tight truncate">
+                  {title}
+                </h4>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5 flex-wrap">
+                <span
+                  className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${
+                    isMovie
+                      ? "bg-sky-500/10 text-sky-500"
+                      : "bg-purple-500/10 text-purple-500"
+                  }`}
+                >
+                  {typeLabel}
+                </span>
+                {year && (
+                  <>
+                    <span>•</span>
+                    <span>{year}</span>
+                  </>
+                )}
+                {duration && (
+                  <>
+                    <span>•</span>
+                    <span>{duration}</span>
+                  </>
+                )}
+                {primaryRes && (
+                  <>
+                    <span>•</span>
+                    <span className={`font-bold ${getResolutionTextColor(primaryRes)}`}>
+                      {primaryRes}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
-        )}
-      </div>
-      <div className="text-[10px] text-zinc-600 text-right shrink-0 hidden sm:block">
-        {formatEpoch(item?.addedAt)}
-      </div>
-    </motion.article>
+        </article>
+      </motion.div>
+    );
+  }
+
+  if (viewMode === "compact") {
+    return (
+      <motion.div
+        layout={shouldAnimate}
+        initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
+        animate={shouldAnimate ? { opacity: 1, y: 0 } : undefined}
+        exit={shouldAnimate ? { opacity: 0, y: -10 } : undefined}
+        transition={shouldAnimate ? {
+          duration: 0.35,
+          delay: animDelay,
+          ease: "easeOut",
+        } : { duration: 0 }}
+      >
+        <motion.article
+          className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md transition-[border-color] duration-300 ${canOpen ? "cursor-pointer" : ""}`}
+          whileHover={
+            canOpen && enableHoverLift
+              ? {
+                  scale: 1.06,
+                  zIndex: 50,
+                  boxShadow:
+                    "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
+                  borderColor: "rgba(245, 158, 11, 0.4)",
+                }
+              : undefined
+          }
+          transition={enableHoverLift ? { type: "spring", stiffness: 300, damping: 20 } : { duration: 0 }}
+          style={{ transformOrigin: "center center" }}
+          onClick={openItem}
+        >
+          {renderMedia()}
+          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+              <span
+                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                  isMovie
+                    ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                    : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                }`}
+              >
+                {typeLabel}
+              </span>
+
+              <div className="flex flex-col items-end gap-1">
+                {primaryRes && (
+                  <span
+                    className={`text-[10px] font-black font-mono tracking-tight px-1.5 py-0.5 rounded-md border ${getResolutionStyle(primaryRes)}`}
+                  >
+                    {primaryRes}
+                  </span>
+                )}
+                <span className="text-[10px] text-zinc-300 font-semibold">
+                  {addedAtLabel}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0 text-left flex-1">
+                  <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs">
+                    {title}
+                  </h3>
+                  <p className="text-amber-400 text-[10px] font-bold mt-0.5 drop-shadow-md">
+                    {year || "Sin año"}
+                    {item?.sectionTitle ? ` • ${item.sectionTitle}` : ""}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.article>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      layout={shouldAnimate}
+      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
+      animate={shouldAnimate ? { opacity: 1, scale: 1 } : undefined}
+      exit={shouldAnimate ? { opacity: 0, scale: 0.95 } : undefined}
+      transition={shouldAnimate ? { duration: 0.2, delay: animDelay } : { duration: 0 }}
+    >
+      <article
+        className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-amber-900/20 transition-[border-color,box-shadow] duration-300 ${canOpen ? "cursor-pointer hover:border-amber-500/30" : ""}`}
+        onClick={openItem}
+      >
+        {renderMedia()}
+
+        <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
+          <div className="flex items-center gap-2 mb-1 -ml-0.5">
+            <span
+              className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
+                isMovie
+                  ? "bg-sky-500/20 text-sky-200"
+                  : "bg-purple-500/20 text-purple-200"
+              }`}
+            >
+              {isMovie ? "Cine" : "TV"}
+            </span>
+            {year && (
+              <span className="text-[10px] text-zinc-300/80 font-medium">
+                {year}
+              </span>
+            )}
+            {primaryRes && (
+              <span className={`text-[10px] font-semibold ${getResolutionTextColor(primaryRes)}`}>
+                {primaryRes}
+              </span>
+            )}
+          </div>
+          <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
+            {title}
+          </h5>
+        </div>
+
+        <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+            <span
+              className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                isMovie
+                  ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                  : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+              }`}
+            >
+              {typeLabel}
+            </span>
+
+            <div className="flex flex-col items-end gap-1">
+              {primaryRes && (
+                <span
+                  className={`text-[10px] font-black font-mono tracking-tight px-1.5 py-0.5 rounded-md border ${getResolutionStyle(primaryRes)}`}
+                >
+                  {primaryRes}
+                </span>
+              )}
+              <span className="text-[10px] text-zinc-200 font-bold">
+                {addedAtLabel}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+            <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 drop-shadow-md">
+              {title}
+            </h3>
+            <p className="text-amber-400 text-[11px] font-bold mt-0.5 drop-shadow-md flex items-center gap-1.5">
+              <span>{year || "Sin año"}</span>
+              {duration && (
+                <>
+                  <span className="text-zinc-400">•</span>
+                  <span>{duration}</span>
+                </>
+              )}
+            </p>
+            {resolutions.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {resolutions.slice(0, 3).map((res) => (
+                  <span
+                    key={`${item.id}-${res}`}
+                    className={`px-1.5 py-0.5 rounded border text-[9px] font-bold ${getResolutionStyle(res)}`}
+                  >
+                    {res}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </article>
+    </motion.div>
   );
 }
 
@@ -461,10 +576,16 @@ export default function BibliotecaClient() {
   const [isExpandingDataset, setIsExpandingDataset] = useState(false);
   const [hasExpandedDataset, setHasExpandedDataset] = useState(false);
   const [expansionAttempted, setExpansionAttempted] = useState(false);
+  const [localizedPosterMap, setLocalizedPosterMap] = useState({
+    movie: {},
+    tv: {},
+  });
   const [localizedBackdropMap, setLocalizedBackdropMap] = useState({
     movie: {},
     tv: {},
   });
+  const [visibleCount, setVisibleCount] = useState(INITIAL_RENDER_COUNT);
+  const loadMoreRef = useRef(null);
   const deferredQuery = useDeferredValue(query);
 
   // Persist view preferences
@@ -603,11 +724,6 @@ export default function BibliotecaClient() {
     }
   }, [resFilter, availableResolutions]);
 
-  const resolutionTop = useMemo(() => {
-    const entries = Object.entries(resolutionCounts);
-    return entries.sort((a, b) => b[1] - a[1]).slice(0, 8);
-  }, [resolutionCounts]);
-
   const filteredItems = useMemo(() => {
     const base = Array.isArray(data?.items) ? data.items : [];
     const normalizedQuery = deferredQuery.trim().toLowerCase();
@@ -631,13 +747,52 @@ export default function BibliotecaClient() {
     });
   }, [data, deferredQuery, typeFilter, resFilter, sortBy]);
 
-  const missingBackdropIdsByType = useMemo(() => {
-    if (imageMode !== "backdrop") return { movie: [], tv: [] };
+  useEffect(() => {
+    setVisibleCount(INITIAL_RENDER_COUNT);
+  }, [query, typeFilter, resFilter, sortBy, groupBy, viewMode, imageMode, data?.items?.length]);
 
+  const maxArtworkScanCount = Math.min(
+    filteredItems.length,
+    visibleCount + ARTWORK_PREFETCH_AHEAD,
+  );
+  const artworkScanItems = useMemo(
+    () => filteredItems.slice(0, maxArtworkScanCount),
+    [filteredItems, maxArtworkScanCount],
+  );
+
+  const hasMoreItems = filteredItems.length > visibleCount;
+  const loadMoreItems = useCallback(() => {
+    setVisibleCount((prev) =>
+      Math.min(prev + RENDER_CHUNK_SIZE, filteredItems.length),
+    );
+  }, [filteredItems.length]);
+
+  useEffect(() => {
+    if (!hasMoreItems) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          loadMoreItems();
+        }
+      },
+      { rootMargin: "300px 0px 300px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMoreItems, loadMoreItems]);
+
+  const preferredArtworkKind = viewMode === "list" ? "backdrop" : imageMode;
+
+  const missingArtworkIdsByType = useMemo(() => {
     const out = { movie: [], tv: [] };
     const seen = { movie: new Set(), tv: new Set() };
+    const activeMap =
+      preferredArtworkKind === "poster" ? localizedPosterMap : localizedBackdropMap;
 
-    for (const item of filteredItems) {
+    for (const item of artworkScanItems) {
       const type = item?.tmdbType === "movie" ? "movie" : item?.tmdbType === "tv" ? "tv" : null;
       if (!type) continue;
 
@@ -645,26 +800,25 @@ export default function BibliotecaClient() {
       if (!Number.isFinite(tmdbId) || tmdbId <= 0) continue;
 
       const key = String(tmdbId);
-      if (localizedBackdropMap[type]?.[key]) continue;
+      if (activeMap[type]?.[key]) continue;
       if (seen[type].has(key)) continue;
 
       seen[type].add(key);
       out[type].push(tmdbId);
 
-      if (out[type].length >= MAX_LOCALIZED_BACKDROP_IDS_PER_TYPE) {
-        if (out.movie.length >= MAX_LOCALIZED_BACKDROP_IDS_PER_TYPE && out.tv.length >= MAX_LOCALIZED_BACKDROP_IDS_PER_TYPE) {
+      if (out[type].length >= MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE) {
+        if (out.movie.length >= MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE && out.tv.length >= MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE) {
           break;
         }
       }
     }
 
     return out;
-  }, [imageMode, filteredItems, localizedBackdropMap]);
+  }, [preferredArtworkKind, artworkScanItems, localizedPosterMap, localizedBackdropMap]);
 
   useEffect(() => {
-    if (imageMode !== "backdrop") return;
-    const movieIds = missingBackdropIdsByType.movie;
-    const tvIds = missingBackdropIdsByType.tv;
+    const movieIds = missingArtworkIdsByType.movie;
+    const tvIds = missingArtworkIdsByType.tv;
     if (!movieIds.length && !tvIds.length) return;
 
     let aborted = false;
@@ -675,7 +829,7 @@ export default function BibliotecaClient() {
         const response = await fetch("/api/tmdb/localized-images", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type, ids }),
+          body: JSON.stringify({ type, ids, kind: preferredArtworkKind }),
           cache: "force-cache",
         });
         if (!response.ok) return null;
@@ -695,6 +849,14 @@ export default function BibliotecaClient() {
       if (aborted) return;
       if (!movieMap && !tvMap) return;
 
+      if (preferredArtworkKind === "poster") {
+        setLocalizedPosterMap((prev) => ({
+          movie: movieMap ? { ...prev.movie, ...movieMap } : prev.movie,
+          tv: tvMap ? { ...prev.tv, ...tvMap } : prev.tv,
+        }));
+        return;
+      }
+
       setLocalizedBackdropMap((prev) => ({
         movie: movieMap ? { ...prev.movie, ...movieMap } : prev.movie,
         tv: tvMap ? { ...prev.tv, ...tvMap } : prev.tv,
@@ -704,13 +866,22 @@ export default function BibliotecaClient() {
     return () => {
       aborted = true;
     };
-  }, [imageMode, missingBackdropIdsByType]);
+  }, [preferredArtworkKind, missingArtworkIdsByType]);
 
   const stats = useMemo(() => ({
     total: summary?.totalItems || 0,
     movies: summary?.moviesCount || 0,
     shows: summary?.showsCount || 0,
   }), [summary]);
+
+  const resolutionStats = useMemo(() => ({
+    r4k:
+      Number(resolutionCounts["4K"] || 0) +
+      Number(resolutionCounts["2160p"] || 0),
+    r1440: Number(resolutionCounts["1440p"] || 0),
+    r1080: Number(resolutionCounts["1080p"] || 0),
+    r720: Number(resolutionCounts["720p"] || 0),
+  }), [resolutionCounts]);
 
   // Grouping logic
   const grouped = useMemo(() => {
@@ -794,17 +965,39 @@ export default function BibliotecaClient() {
 
   const resLabel = resFilter === "all" ? "Todas" : resFilter;
   const loadedItemsCount = Array.isArray(data?.items) ? data.items.length : 0;
+  const visibleRenderedCount = Math.min(visibleCount, filteredItems.length);
   const shouldAnimateCards = filteredItems.length <= 180;
   const contentMotionProps = shouldAnimateCards
     ? { variants: containerVariants, initial: "hidden", animate: "visible" }
-    : { initial: false, animate: false };
+    : { initial: false };
 
-  // Grid class based on viewMode
-  function getGridClass() {
-    if (viewMode === "list") return "flex flex-col gap-2";
-    if (viewMode === "compact") return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2";
-    if (imageMode === "backdrop") return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4";
-    return "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4";
+  function getItemsGridClass(withTopMargin = false) {
+    if (viewMode === "list") {
+      return `grid grid-cols-1 xl:grid-cols-2 gap-4${withTopMargin ? " mt-6" : ""}`;
+    }
+    if (viewMode === "compact") {
+      const compactCols =
+        imageMode === "backdrop"
+          ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
+          : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8";
+      return `grid gap-2 ${compactCols}${withTopMargin ? " mt-6" : ""}`;
+    }
+    const gridCols =
+      imageMode === "backdrop"
+        ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6";
+    return `grid gap-3 ${gridCols}${withTopMargin ? " mt-6" : ""}`;
+  }
+
+  function resolvePosterSrc(item) {
+    const tmdbType = item?.tmdbType === "movie" ? "movie" : item?.tmdbType === "tv" ? "tv" : null;
+    const tmdbId = Number(item?.tmdbId || 0);
+    if (tmdbType && Number.isFinite(tmdbId) && tmdbId > 0) {
+      const localizedPath = localizedPosterMap[tmdbType]?.[String(tmdbId)] || null;
+      const localizedSrc = buildTmdbImage(localizedPath, "w500");
+      if (localizedSrc) return localizedSrc;
+    }
+    return item?.thumb || item?.art || null;
   }
 
   function resolveBackdropSrc(item) {
@@ -818,11 +1011,20 @@ export default function BibliotecaClient() {
     return item?.art || item?.thumb || null;
   }
 
-  function renderCard(item) {
-    if (viewMode === "list") return <ListCard key={item.id} item={item} animated={shouldAnimateCards} />;
-    if (viewMode === "compact") return <CompactCard key={item.id} item={item} animated={shouldAnimateCards} />;
-    if (imageMode === "backdrop") return <BackdropCard key={item.id} item={item} backdropSrc={resolveBackdropSrc(item)} animated={shouldAnimateCards} />;
-    return <PosterCard key={item.id} item={item} animated={shouldAnimateCards} />;
+  function renderCard(item, index = 0, totalItems = 0) {
+    return (
+      <LibraryMediaCard
+        key={item.id}
+        item={item}
+        index={index}
+        totalItems={totalItems}
+        viewMode={viewMode}
+        imageMode={imageMode}
+        posterSrc={resolvePosterSrc(item)}
+        backdropSrc={resolveBackdropSrc(item)}
+        animated={shouldAnimateCards}
+      />
+    );
   }
 
   // Filter dropdowns (shared between mobile & desktop)
@@ -930,6 +1132,8 @@ export default function BibliotecaClient() {
 
   // Render items (flat or grouped)
   function renderContent() {
+    const visibleLimit = Math.min(visibleCount, filteredItems.length);
+
     if (filteredItems.length === 0) {
       return (
         <motion.div className="py-24 text-center" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
@@ -946,24 +1150,64 @@ export default function BibliotecaClient() {
     }
 
     if (grouped) {
+      let remaining = visibleLimit;
+      const visibleGrouped = [];
+      for (const [groupTitle, items] of grouped) {
+        if (remaining <= 0) break;
+        const visibleItems = items.slice(0, remaining);
+        if (!visibleItems.length) continue;
+        visibleGrouped.push([groupTitle, visibleItems]);
+        remaining -= visibleItems.length;
+      }
+
       return (
-        <div key={`grouped-${viewMode}-${imageMode}`}>
-          {grouped.map(([groupTitle, items]) => (
-            <div key={groupTitle}>
-              <GroupDivider title={groupTitle} count={items.length} total={filteredItems.length} />
-              <motion.div key={`group-grid-${groupTitle}-${viewMode}-${imageMode}`} className={getGridClass()} {...contentMotionProps}>
-                {items.map((item) => renderCard(item))}
-              </motion.div>
+        <>
+          <div key={`grouped-${viewMode}-${imageMode}`}>
+            {visibleGrouped.map(([groupTitle, items]) => (
+              <div key={groupTitle}>
+                <GroupDivider title={groupTitle} count={items.length} total={filteredItems.length} />
+                <motion.div key={`group-grid-${groupTitle}-${viewMode}-${imageMode}`} className={getItemsGridClass(true)} {...contentMotionProps}>
+                  {items.map((item, idx) => renderCard(item, idx, items.length))}
+                </motion.div>
+              </div>
+            ))}
+          </div>
+
+          {hasMoreItems && (
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={loadMoreItems}
+                className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold rounded-xl transition-colors text-sm"
+              >
+                Cargar más ({visibleLimit}/{filteredItems.length})
+              </button>
+              <div ref={loadMoreRef} className="h-2 w-full" />
             </div>
-          ))}
-        </div>
+          )}
+        </>
       );
     }
 
+    const visibleItems = filteredItems.slice(0, visibleLimit);
     return (
-      <motion.div key={`flat-grid-${viewMode}-${imageMode}`} className={getGridClass()} {...contentMotionProps}>
-        {filteredItems.map((item) => renderCard(item))}
-      </motion.div>
+      <>
+        <motion.div key={`flat-grid-${viewMode}-${imageMode}`} className={getItemsGridClass(false)} {...contentMotionProps}>
+          {visibleItems.map((item, idx) => renderCard(item, idx, visibleItems.length))}
+        </motion.div>
+        {hasMoreItems && (
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={loadMoreItems}
+              className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold rounded-xl transition-colors text-sm"
+            >
+              Cargar más ({visibleLimit}/{filteredItems.length})
+            </button>
+            <div ref={loadMoreRef} className="h-2 w-full" />
+          </div>
+        )}
+      </>
     );
   }
 
@@ -1046,47 +1290,41 @@ export default function BibliotecaClient() {
               </p>
             </div>
 
-            <motion.div className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
-              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+            <motion.div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 md:gap-4 w-full lg:w-auto" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
+              <div className="min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                 <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-amber-400"><HardDrive className="w-4 h-4 md:w-5 md:h-5" /></div>
                 <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">{stats.total}</div>
                 <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">Total</div>
               </div>
-              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+              <div className="min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                 <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400"><Film className="w-4 h-4 md:w-5 md:h-5" /></div>
                 <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">{stats.movies}</div>
                 <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">Películas</div>
               </div>
-              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+              <div className="min-w-0 bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                 <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400"><Tv className="w-4 h-4 md:w-5 md:h-5" /></div>
                 <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">{stats.shows}</div>
                 <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">Series</div>
               </div>
+              <div className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("4K")}`}>
+                <div className="text-[10px] uppercase font-black tracking-wider leading-none">4K</div>
+                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">{resolutionStats.r4k}</div>
+              </div>
+              <div className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("1440p")}`}>
+                <div className="text-[10px] uppercase font-black tracking-wider leading-none">1440p</div>
+                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">{resolutionStats.r1440}</div>
+              </div>
+              <div className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("1080p")}`}>
+                <div className="text-[10px] uppercase font-black tracking-wider leading-none">1080p</div>
+                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">{resolutionStats.r1080}</div>
+              </div>
+              <div className={`w-full lg:w-[98px] justify-self-center border rounded-lg px-2.5 py-2 flex flex-col items-center justify-center gap-0.5 ${getResolutionStyle("720p")}`}>
+                <div className="text-[10px] uppercase font-black tracking-wider leading-none">720p</div>
+                <div className="text-lg md:text-xl font-black tracking-tight tabular-nums leading-none">{resolutionStats.r720}</div>
+              </div>
             </motion.div>
           </div>
         </motion.header>
-
-        {/* ====== RESOLUTION OVERVIEW ====== */}
-        {resolutionTop.length > 0 && (
-          <motion.div className="mb-6" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.4 }}>
-            <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-[#0a0a0a] border border-white/[0.08]">
-              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/[0.03] via-transparent to-transparent opacity-50" />
-              <div className="relative px-3 sm:px-6 py-3 sm:py-5">
-                <div className="flex items-center gap-2 sm:gap-4 mb-3">
-                  <div className="w-1 sm:w-1.5 h-6 sm:h-8 bg-gradient-to-b from-amber-500 to-orange-600 rounded-full shadow-[0_0_15px_rgba(245,158,11,0.3)] shrink-0" />
-                  <p className="text-xs sm:text-sm uppercase tracking-wider text-zinc-400 font-bold">Resoluciones Detectadas</p>
-                </div>
-                <div className="flex flex-wrap gap-2 pl-3 sm:pl-6">
-                  {resolutionTop.map(([resolution, count]) => (
-                    <span key={resolution} className={`px-2.5 py-1 rounded-full border text-xs font-bold ${getResolutionStyle(resolution)}`}>
-                      {resolution} <span className="opacity-60">• {count}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
 
         {/* ====== FILTERS ====== */}
         <motion.div
@@ -1144,7 +1382,7 @@ export default function BibliotecaClient() {
                   </div>
                   <div className="flex gap-2">
                     <div className="flex-1">{renderViewToggle()}</div>
-                    {viewMode === "grid" && <div className="shrink-0">{renderImageToggle()}</div>}
+                    {viewMode !== "list" && <div className="shrink-0">{renderImageToggle()}</div>}
                   </div>
                 </div>
               </motion.div>
@@ -1152,8 +1390,8 @@ export default function BibliotecaClient() {
           </AnimatePresence>
 
           {/* Desktop filters */}
-          <div className="hidden lg:flex gap-3">
-            <div className="relative flex-1 max-w-xs">
+          <div className="hidden lg:flex gap-3 w-full items-stretch">
+            <div className="relative flex-[1.8] min-w-[280px]">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar en biblioteca..." className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-zinc-600" />
               {query && (
@@ -1163,12 +1401,12 @@ export default function BibliotecaClient() {
               )}
             </div>
 
-            {renderTypeDropdown()}
-            {renderResDropdown()}
-            {renderSortDropdown()}
-            {renderGroupDropdown()}
-            {renderViewToggle()}
-            {viewMode === "grid" && renderImageToggle()}
+            <div className="flex-1 min-w-[150px]">{renderTypeDropdown()}</div>
+            <div className="flex-1 min-w-[150px]">{renderResDropdown()}</div>
+            <div className="flex-1 min-w-[150px]">{renderSortDropdown()}</div>
+            <div className="flex-1 min-w-[150px]">{renderGroupDropdown()}</div>
+            <div className="shrink-0">{renderViewToggle()}</div>
+            {viewMode !== "list" && <div className="shrink-0">{renderImageToggle()}</div>}
           </div>
         </motion.div>
 
@@ -1178,6 +1416,12 @@ export default function BibliotecaClient() {
             {isExpandingDataset
               ? "Cargando más elementos para mejorar filtros y agrupación..."
               : `Mostrando ${loadedItemsCount} de ${summary.totalItems || loadedItemsCount} elementos por límite de respuesta.`}
+          </div>
+        )}
+
+        {!summary?.truncated && filteredItems.length > visibleRenderedCount && (
+          <div className="mb-4 text-xs text-zinc-400 bg-zinc-900/60 border border-zinc-800 rounded-xl px-3 py-2">
+            Renderizado progresivo activo: mostrando {visibleRenderedCount} de {filteredItems.length} elementos.
           </div>
         )}
 
