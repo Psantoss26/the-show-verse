@@ -48,9 +48,59 @@ export async function GET(request) {
     ]
       .map((value) => String(value || "").trim())
       .filter(Boolean);
-    const plexUrls = Array.from(
-      new Set(configuredUrls.length ? configuredUrls : ["http://localhost:32400"]),
-    );
+
+    function isPrivateOrLocalHost(hostname) {
+      if (!hostname) return false;
+      const host = String(hostname).toLowerCase();
+      if (host === "localhost") return true;
+      if (host.endsWith(".local")) return true;
+      if (/^127\./.test(host)) return true;
+      if (/^10\./.test(host)) return true;
+      if (/^192\.168\./.test(host)) return true;
+      if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)) return true;
+      return false;
+    }
+
+    function normalizeBaseUrl(rawUrl) {
+      const value = String(rawUrl || "").trim();
+      if (!value) return null;
+      try {
+        const parsed = new URL(value);
+        const cleanPath =
+          parsed.pathname && parsed.pathname !== "/"
+            ? parsed.pathname.replace(/\/+$/, "")
+            : "";
+        return `${parsed.protocol}//${parsed.host}${cleanPath}`;
+      } catch {
+        return null;
+      }
+    }
+
+    const rawCandidates = configuredUrls.length
+      ? configuredUrls
+      : ["http://localhost:32400"];
+    const expandedCandidates = [];
+
+    for (const raw of rawCandidates) {
+      const normalized = normalizeBaseUrl(raw);
+      if (!normalized) continue;
+
+      expandedCandidates.push(normalized);
+
+      try {
+        const parsed = new URL(normalized);
+        if (
+          parsed.protocol === "https:" &&
+          isPrivateOrLocalHost(parsed.hostname)
+        ) {
+          expandedCandidates.push(`http://${parsed.host}`);
+        }
+      } catch {
+        // ignore invalid candidate
+      }
+    }
+
+    const plexUrls = Array.from(new Set(expandedCandidates));
     const plexToken = await getPlexAccessToken();
 
     if (!plexToken) {
