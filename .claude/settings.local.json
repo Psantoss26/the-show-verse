@@ -4,7 +4,10 @@
       "Bash(find:*)",
       "Bash(git show:*)",
       "Bash(npx next lint:*)",
-      "Bash(npx next build:*)"
+      "Bash(npx next build:*)",
+      "Bash(dir:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(node -e:*)"
     ]
   }
 }
