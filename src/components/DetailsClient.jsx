@@ -5428,18 +5428,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         p.url &&
                         typeof p.url === "object"
                       ) {
-                        providerLink = "#";
+                        // Use the web URL as href — enables Universal Links (iOS) / App Links (Android)
+                        // to open the Plex app directly to the content details page
+                        providerLink =
+                          p.url.web || p.url.universal || "#";
                         hasValidLink = !!(
-                          p.url.web ||
-                          p.url.mobile ||
-                          p.url.mobileAlt ||
-                          p.url.mobileRaw ||
-                          p.url.play ||
-                          p.url.playLegacy ||
-                          p.url.playRaw ||
-                          p.url.androidIntent ||
-                          p.url.androidIntentPlay ||
-                          p.url.universal
+                          p.url.web || p.url.universal
                         );
                       } else {
                         providerLink = p.url || justwatchUrl || "#";
@@ -5452,14 +5446,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           p.url &&
                           typeof p.url === "object"
                         ) {
-                          e.preventDefault();
-
+                          // On mobile/tablet: let the browser handle the <a> naturally.
+                          // The href points to app.plex.tv which triggers Universal Links (iOS)
+                          // or App Links (Android) to open the Plex app to the details page.
+                          // If the app isn't installed, it opens Plex Web in the browser.
+                          // Do NOT call e.preventDefault() on mobile — it breaks deep linking.
                           const ua = navigator.userAgent || "";
-                          const isTouchDevice =
-                            "ontouchstart" in window ||
-                            navigator.maxTouchPoints > 0 ||
-                            navigator.msMaxTouchPoints > 0;
-                          const isAndroid = /Android/i.test(ua);
                           const isIOS =
                             /iPad|iPhone|iPod/i.test(ua) ||
                             (/Macintosh/i.test(ua) &&
@@ -5468,135 +5460,24 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Tablet/i.test(
                               ua,
                             ) || isIOS;
-
-                          const uniqueCandidates = (urls) =>
-                            Array.from(
-                              new Set(
-                                urls.filter(
-                                  (url) =>
-                                    typeof url === "string" && url.length > 0,
-                                ),
-                              ),
-                            );
-
-                          const openWithFallback = (urls) => {
-                            const candidates = uniqueCandidates(urls);
-                            if (!candidates.length) {
-                              console.warn("[Plex] No URL available");
-                              return;
-                            }
-
-                            let index = 0;
-                            let timeoutId = null;
-
-                            const cleanup = () => {
-                              if (timeoutId) {
-                                clearTimeout(timeoutId);
-                                timeoutId = null;
-                              }
-                              document.removeEventListener(
-                                "visibilitychange",
-                                onVisibilityChange,
-                              );
-                            };
-
-                            const onVisibilityChange = () => {
-                              if (document.hidden) cleanup();
-                            };
-
-                            const tryNext = () => {
-                              if (index >= candidates.length) {
-                                cleanup();
-                                return;
-                              }
-
-                              const nextUrl = candidates[index];
-                              index += 1;
-
-                              if (/^(https?:)/i.test(nextUrl)) {
-                                cleanup();
-                                window.location.href = nextUrl;
-                                return;
-                              }
-
-                              window.location.href = nextUrl;
-
-                              if (index < candidates.length) {
-                                timeoutId = window.setTimeout(() => {
-                                  if (!document.hidden) tryNext();
-                                }, 900);
-                              }
-                            };
-
-                            document.addEventListener(
-                              "visibilitychange",
-                              onVisibilityChange,
-                            );
-                            tryNext();
-                          };
-
-                          const webUrl = p.url.web || null;
-                          const mobileUrl = p.url.mobile || null;
-                          const mobileAltUrl = p.url.mobileAlt || null;
-                          const mobileRawUrl = p.url.mobileRaw || null;
-                          const playUrl = p.url.play || null;
-                          const playLegacyUrl = p.url.playLegacy || null;
-                          const playRawUrl = p.url.playRaw || null;
-                          const universalUrl = p.url.universal || null;
-                          const androidIntentUrl = p.url.androidIntent || null;
-                          const androidIntentPlayUrl =
-                            p.url.androidIntentPlay || null;
+                          const isTouchDevice =
+                            "ontouchstart" in window ||
+                            navigator.maxTouchPoints > 0 ||
+                            navigator.msMaxTouchPoints > 0;
 
                           if (isTouchDevice || isMobileOrTablet) {
-                            if (isAndroid) {
-                              openWithFallback([
-                                androidIntentPlayUrl,
-                                androidIntentUrl,
-                                playLegacyUrl,
-                                playUrl,
-                                playRawUrl,
-                                mobileUrl,
-                                mobileAltUrl,
-                                mobileRawUrl,
-                                universalUrl,
-                                webUrl,
-                              ]);
-                              return;
-                            }
-
-                            if (isIOS) {
-                              openWithFallback([
-                                mobileUrl,
-                                mobileAltUrl,
-                                mobileRawUrl,
-                                playLegacyUrl,
-                                playUrl,
-                                playRawUrl,
-                                universalUrl,
-                                webUrl,
-                              ]);
-                              return;
-                            }
-
-                            openWithFallback([
-                              mobileUrl,
-                              mobileAltUrl,
-                              mobileRawUrl,
-                              playLegacyUrl,
-                              playUrl,
-                              playRawUrl,
-                              universalUrl,
-                              webUrl,
-                            ]);
+                            // Let the natural <a href="..."> behavior handle it
                             return;
                           }
 
+                          // Desktop: open in new window
+                          e.preventDefault();
                           const desktopUrl =
-                            webUrl ||
-                            universalUrl ||
-                            playUrl ||
-                            mobileUrl ||
-                            mobileAltUrl;
+                            p.url.web ||
+                            p.url.universal ||
+                            p.url.play ||
+                            p.url.mobile ||
+                            p.url.mobileAlt;
 
                           if (!desktopUrl) {
                             console.warn("[Plex] No URL available");
@@ -5616,14 +5497,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           key={p.provider_id}
                           href={providerLink}
                           target={
-                            hasValidLink && !isPlexProvider
-                              ? "_blank"
-                              : undefined
+                            hasValidLink ? "_blank" : undefined
                           }
                           rel={
-                            hasValidLink && !isPlexProvider
-                              ? "noreferrer"
-                              : undefined
+                            hasValidLink ? "noreferrer" : undefined
                           }
                           onClick={isPlexProvider ? handleClick : undefined}
                           title={p.provider_name}
