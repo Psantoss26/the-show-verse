@@ -400,132 +400,94 @@ function openPlexLink(item) {
   const uniqueCandidates = (urls) =>
     Array.from(new Set(urls.filter((url) => typeof url === "string" && url)));
 
-  const tryOpenLocalLinks = (urls) =>
-    new Promise((resolve) => {
-      const candidates = uniqueCandidates(urls);
-      if (!candidates.length) {
-        resolve(false);
+  const openWithFallback = (urls) => {
+    const candidates = uniqueCandidates(urls);
+    if (!candidates.length) return;
+
+    let index = 0;
+    let timeoutId = null;
+
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) cleanup();
+    };
+
+    const tryNext = () => {
+      if (index >= candidates.length) {
+        cleanup();
         return;
       }
 
-      let index = 0;
-      let timeoutId = null;
-      let finished = false;
+      const nextUrl = candidates[index];
+      index += 1;
 
-      const cleanup = () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-        document.removeEventListener("visibilitychange", onVisibilityChange);
-      };
-
-      const done = (openedApp) => {
-        if (finished) return;
-        finished = true;
+      if (/^(https?:)/i.test(nextUrl)) {
         cleanup();
-        resolve(openedApp);
-      };
-
-      const onVisibilityChange = () => {
-        if (document.hidden) done(true);
-      };
-
-      const tryNext = () => {
-        if (index >= candidates.length) {
-          done(false);
-          return;
-        }
-
-        const nextUrl = candidates[index];
-        index += 1;
         window.location.href = nextUrl;
+        return;
+      }
 
+      window.location.href = nextUrl;
+
+      if (index < candidates.length) {
         timeoutId = window.setTimeout(() => {
           if (!document.hidden) tryNext();
-        }, 850);
-      };
+        }, 900);
+      }
+    };
 
-      document.addEventListener("visibilitychange", onVisibilityChange);
-      tryNext();
-    });
-
-  const resolveGeneralPlexUrl = async () => {
-    const apiType = item?.type === "movie" ? "movie" : "tv";
-    const title = item?.title ? String(item.title) : "";
-    const tmdbId = Number(item?.tmdbId || 0);
-    const year = Number(item?.year || 0);
-
-    const generalFromCurrentItem = uniqueCandidates([
-      universalUrl,
-      webUrl,
-      title ? `https://watch.plex.tv/search?q=${encodeURIComponent(title)}` : null,
-    ]);
-
-    try {
-      if (!title) return generalFromCurrentItem[0] || null;
-
-      const params = new URLSearchParams({
-        title,
-        type: apiType,
-      });
-      if (tmdbId > 0) params.set("tmdbId", String(tmdbId));
-      if (year > 0) params.set("year", String(year));
-
-      const response = await fetch(`/api/plex?${params.toString()}`);
-      if (!response.ok) return generalFromCurrentItem[0] || null;
-
-      const data = await response.json();
-      const resolved = uniqueCandidates([
-        data?.plexUniversalUrl || null,
-        data?.plexUrl || null,
-        ...generalFromCurrentItem,
-      ]);
-
-      return resolved[0] || null;
-    } catch {
-      return generalFromCurrentItem[0] || null;
-    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    tryNext();
   };
 
   if (isTouchDevice || isMobileOrTablet) {
-    const localCandidates = isAndroid
-      ? [
-          androidIntentPlayUrl,
-          androidIntentUrl,
-          playLegacyUrl,
-          playUrl,
-          playRawUrl,
-          mobileUrl,
-          mobileAltUrl,
-          mobileRawUrl,
-        ]
-      : isIOS
-        ? [
-            mobileUrl,
-            mobileAltUrl,
-            mobileRawUrl,
-            playLegacyUrl,
-            playUrl,
-            playRawUrl,
-          ]
-        : [
-            mobileUrl,
-            mobileAltUrl,
-            mobileRawUrl,
-            playLegacyUrl,
-            playUrl,
-            playRawUrl,
-          ];
+    if (isAndroid) {
+      openWithFallback([
+        androidIntentPlayUrl,
+        androidIntentUrl,
+        playLegacyUrl,
+        playUrl,
+        playRawUrl,
+        mobileUrl,
+        mobileAltUrl,
+        mobileRawUrl,
+        universalUrl,
+        webUrl,
+      ]);
+      return;
+    }
 
-    void (async () => {
-      const openedLocal = await tryOpenLocalLinks(localCandidates);
-      if (openedLocal) return;
+    if (isIOS) {
+      openWithFallback([
+        mobileUrl,
+        mobileAltUrl,
+        mobileRawUrl,
+        playLegacyUrl,
+        playUrl,
+        playRawUrl,
+        universalUrl,
+        webUrl,
+      ]);
+      return;
+    }
 
-      const generalUrl = await resolveGeneralPlexUrl();
-      if (generalUrl) window.location.href = generalUrl;
-    })();
-
+    openWithFallback([
+      mobileUrl,
+      mobileAltUrl,
+      mobileRawUrl,
+      playLegacyUrl,
+      playUrl,
+      playRawUrl,
+      universalUrl,
+      webUrl,
+    ]);
     return;
   }
 
