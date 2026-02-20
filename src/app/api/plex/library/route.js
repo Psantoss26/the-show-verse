@@ -343,20 +343,45 @@ function buildPlexItemLinks({
   itemType,
 }) {
   const metadataKey = getMetadataKey(item);
-  if (!metadataKey) return { web: null, mobile: null };
+  if (!metadataKey) {
+    return {
+      web: null,
+      mobile: null,
+      mobileLegacy: null,
+      universal: null,
+      androidIntent: null,
+    };
+  }
 
   const encodedKey = encodeURIComponent(metadataKey);
-  const metadataType = itemType === "movie" ? 1 : 2;
+  const encodedMachineIdentifier = machineIdentifier
+    ? encodeURIComponent(machineIdentifier)
+    : null;
 
   const web = machineIdentifier
     ? `https://app.plex.tv/desktop/#!/server/${machineIdentifier}/details?key=${encodedKey}`
     : `${baseUrl}/web/index.html#!/details?key=${encodedKey}`;
 
   const mobile = machineIdentifier
-    ? `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}&server=${machineIdentifier}`
+    ? `plex://preplay?metadataKey=${encodedKey}&server=${encodedMachineIdentifier}`
     : null;
 
-  return { web, mobile };
+  const metadataType = itemType === "movie" ? 1 : 2;
+  const mobileLegacy = machineIdentifier
+    ? `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}&server=${encodedMachineIdentifier}`
+    : null;
+
+  const androidIntent = machineIdentifier
+    ? `intent://preplay?metadataKey=${encodedKey}&server=${encodedMachineIdentifier}#Intent;scheme=plex;package=com.plexapp.android;end`
+    : null;
+
+  return {
+    web,
+    mobile,
+    mobileLegacy,
+    universal: web,
+    androidIntent,
+  };
 }
 
 function toPlainCountObject(countMap) {

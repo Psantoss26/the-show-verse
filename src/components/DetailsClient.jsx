@@ -4714,7 +4714,7 @@ export default function DetailsClient({
     if (!title || !id) return;
 
     // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
-    const cacheKey = `plex-v9:${endpointType}:${id}`;
+    const cacheKey = `plex-v10:${endpointType}:${id}`;
     const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 días (1 semana)
 
     // Intentar cargar desde caché primero
@@ -4761,14 +4761,18 @@ export default function DetailsClient({
           const available = result.available || false;
 
           const plexWebUrl = result.plexUrl || null;
-          const plexMobileUrl = result.plexMobileUrl || null; // iOS deep link
-          const plexUniversalUrl = result.plexUniversalUrl || null; // Android
+          const plexMobileUrl = result.plexMobileUrl || null; // deep link principal
+          const plexMobileLegacyUrl = result.plexMobileLegacyUrl || null; // fallback legacy
+          const plexAndroidIntentUrl = result.plexAndroidIntentUrl || null; // fallback Android
+          const plexUniversalUrl = result.plexUniversalUrl || null; // Android / web
 
           setPlexAvailable(available);
 
           setPlexUrl({
             web: plexWebUrl,
             mobile: plexMobileUrl,
+            mobileLegacy: plexMobileLegacyUrl,
+            androidIntent: plexAndroidIntentUrl,
             universal: plexUniversalUrl,
           });
 
@@ -4779,6 +4783,8 @@ export default function DetailsClient({
               plexUrl: {
                 web: plexWebUrl,
                 mobile: plexMobileUrl,
+                mobileLegacy: plexMobileLegacyUrl,
+                androidIntent: plexAndroidIntentUrl,
                 universal: plexUniversalUrl,
               },
               timestamp: Date.now(),
@@ -5410,6 +5416,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         hasValidLink = !!(
                           p.url.web ||
                           p.url.mobile ||
+                          p.url.mobileLegacy ||
+                          p.url.androidIntent ||
                           p.url.universal
                         );
                       } else {
@@ -5426,49 +5434,139 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           e.preventDefault();
 
                           const ua = navigator.userAgent || "";
-
-                          // Detectar si es dispositivo táctil (móvil/tablet)
                           const isTouchDevice =
                             "ontouchstart" in window ||
                             navigator.maxTouchPoints > 0 ||
                             navigator.msMaxTouchPoints > 0;
-
                           const isAndroid = /Android/i.test(ua);
-                          const isIOS = /iPad|iPhone|iPod/i.test(ua);
+                          const isIOS =
+                            /iPad|iPhone|iPod/i.test(ua) ||
+                            (/Macintosh/i.test(ua) &&
+                              navigator.maxTouchPoints > 1);
+                          const isMobileOrTablet =
+                            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Tablet/i.test(
+                              ua,
+                            ) || isIOS;
 
-                          // Eleccion de URL segun dispositivo:
-                          let urlToOpen;
+                          const uniqueCandidates = (urls) =>
+                            Array.from(
+                              new Set(
+                                urls.filter(
+                                  (url) =>
+                                    typeof url === "string" && url.length > 0,
+                                ),
+                              ),
+                            );
 
-                          if (isTouchDevice) {
-                            // En movil/tablet SIEMPRE intentar deep link primero
-                            // para abrir el detalle en la app Plex del servidor local.
-                            if (isAndroid || isIOS) {
-                              urlToOpen =
-                                p.url.mobile || p.url.web || p.url.universal;
-                            } else {
-                              urlToOpen =
-                                p.url.mobile || p.url.universal || p.url.web;
+                          const openWithFallback = (urls) => {
+                            const candidates = uniqueCandidates(urls);
+                            if (!candidates.length) {
+                              console.warn("[Plex] No URL available");
+                              return;
                             }
-                          } else {
-                            // Ordenador sin táctil: solo URL web
-                            urlToOpen = p.url.web || p.url.universal;
+
+                            let index = 0;
+                            let timeoutId = null;
+
+                            const cleanup = () => {
+                              if (timeoutId) {
+                                clearTimeout(timeoutId);
+                                timeoutId = null;
+                              }
+                              document.removeEventListener(
+                                "visibilitychange",
+                                onVisibilityChange,
+                              );
+                            };
+
+                            const onVisibilityChange = () => {
+                              if (document.hidden) cleanup();
+                            };
+
+                            const tryNext = () => {
+                              if (index >= candidates.length) {
+                                cleanup();
+                                return;
+                              }
+
+                              const nextUrl = candidates[index];
+                              index += 1;
+
+                              if (/^(https?:)/i.test(nextUrl)) {
+                                cleanup();
+                                window.location.href = nextUrl;
+                                return;
+                              }
+
+                              window.location.href = nextUrl;
+
+                              if (index < candidates.length) {
+                                timeoutId = window.setTimeout(() => {
+                                  if (!document.hidden) tryNext();
+                                }, 900);
+                              }
+                            };
+
+                            document.addEventListener(
+                              "visibilitychange",
+                              onVisibilityChange,
+                            );
+                            tryNext();
+                          };
+
+                          const webUrl = p.url.web || null;
+                          const mobileUrl = p.url.mobile || null;
+                          const mobileLegacyUrl = p.url.mobileLegacy || null;
+                          const universalUrl = p.url.universal || null;
+                          const androidIntentUrl = p.url.androidIntent || null;
+
+                          if (isTouchDevice || isMobileOrTablet) {
+                            if (isAndroid) {
+                              openWithFallback([
+                                androidIntentUrl,
+                                mobileUrl,
+                                mobileLegacyUrl,
+                                universalUrl,
+                                webUrl,
+                              ]);
+                              return;
+                            }
+
+                            if (isIOS) {
+                              openWithFallback([
+                                mobileUrl,
+                                mobileLegacyUrl,
+                                universalUrl,
+                                webUrl,
+                              ]);
+                              return;
+                            }
+
+                            openWithFallback([
+                              mobileUrl,
+                              mobileLegacyUrl,
+                              universalUrl,
+                              webUrl,
+                            ]);
+                            return;
                           }
 
-                          if (!urlToOpen) {
+                          const desktopUrl =
+                            webUrl ||
+                            universalUrl ||
+                            mobileUrl ||
+                            mobileLegacyUrl;
+
+                          if (!desktopUrl) {
                             console.warn("[Plex] No URL available");
                             return;
                           }
 
-                          // En dispositivo táctil, usa navegación directa (mejor para app links)
-                          if (isTouchDevice) {
-                            window.location.href = urlToOpen;
-                          } else {
-                            window.open(
-                              urlToOpen,
-                              "_blank",
-                              "noopener,noreferrer",
-                            );
-                          }
+                          window.open(
+                            desktopUrl,
+                            "_blank",
+                            "noopener,noreferrer",
+                          );
                         }
                       };
 

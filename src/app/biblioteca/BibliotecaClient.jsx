@@ -372,16 +372,100 @@ function GroupDivider({ title, count, total }) {
 function openPlexLink(item) {
   const webUrl = item?.links?.web || null;
   const mobileUrl = item?.links?.mobile || null;
-  const isTouch =
-    typeof window !== "undefined" &&
-    ("ontouchstart" in window || navigator.maxTouchPoints > 0);
+  const mobileLegacyUrl = item?.links?.mobileLegacy || null;
+  const universalUrl = item?.links?.universal || null;
+  const androidIntentUrl = item?.links?.androidIntent || null;
 
-  if (isTouch && mobileUrl) {
-    window.location.href = mobileUrl;
+  if (typeof window === "undefined") return;
+
+  const ua = navigator.userAgent || "";
+  const isTouchDevice =
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0 ||
+    navigator.msMaxTouchPoints > 0;
+  const isAndroid = /Android/i.test(ua);
+  const isIOS =
+    /iPad|iPhone|iPod/i.test(ua) ||
+    (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  const isMobileOrTablet =
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Tablet/i.test(
+      ua,
+    ) || isIOS;
+
+  const uniqueCandidates = (urls) =>
+    Array.from(new Set(urls.filter((url) => typeof url === "string" && url)));
+
+  const openWithFallback = (urls) => {
+    const candidates = uniqueCandidates(urls);
+    if (!candidates.length) return;
+
+    let index = 0;
+    let timeoutId = null;
+
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) cleanup();
+    };
+
+    const tryNext = () => {
+      if (index >= candidates.length) {
+        cleanup();
+        return;
+      }
+
+      const nextUrl = candidates[index];
+      index += 1;
+
+      if (/^(https?:)/i.test(nextUrl)) {
+        cleanup();
+        window.location.href = nextUrl;
+        return;
+      }
+
+      window.location.href = nextUrl;
+
+      if (index < candidates.length) {
+        timeoutId = window.setTimeout(() => {
+          if (!document.hidden) tryNext();
+        }, 900);
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    tryNext();
+  };
+
+  if (isTouchDevice || isMobileOrTablet) {
+    if (isAndroid) {
+      openWithFallback([
+        androidIntentUrl,
+        mobileUrl,
+        mobileLegacyUrl,
+        universalUrl,
+        webUrl,
+      ]);
+      return;
+    }
+
+    if (isIOS) {
+      openWithFallback([mobileUrl, mobileLegacyUrl, universalUrl, webUrl]);
+      return;
+    }
+
+    openWithFallback([mobileUrl, mobileLegacyUrl, universalUrl, webUrl]);
     return;
   }
-  if (webUrl) {
-    window.open(webUrl, "_blank", "noopener,noreferrer");
+
+  const desktopUrl = webUrl || universalUrl || mobileUrl || mobileLegacyUrl;
+  if (desktopUrl) {
+    window.open(desktopUrl, "_blank", "noopener,noreferrer");
   }
 }
 
@@ -401,7 +485,13 @@ function LibraryMediaCard({
   const typeLabel = isMovie ? "PELÍCULA" : "SERIE";
   const primaryRes = item?.primaryResolution || null;
   const duration = formatDuration(item?.durationMs);
-  const canOpen = Boolean(item?.links?.web || item?.links?.mobile);
+  const canOpen = Boolean(
+    item?.links?.web ||
+      item?.links?.mobile ||
+      item?.links?.mobileLegacy ||
+      item?.links?.universal ||
+      item?.links?.androidIntent,
+  );
   const resolutions = Array.isArray(item?.resolutions) ? item.resolutions : [];
 
   const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
