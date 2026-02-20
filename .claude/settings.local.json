@@ -7,7 +7,10 @@
       "Bash(npx next build:*)",
       "Bash(dir:*)",
       "Bash(powershell -Command:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "WebFetch(domain:community.home-assistant.io)",
+      "WebFetch(domain:forums.plex.tv)",
+      "WebFetch(domain:community.firecore.com)"
     ]
   }
 }
