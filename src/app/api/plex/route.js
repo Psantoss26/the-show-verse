@@ -319,22 +319,31 @@ export async function GET(request) {
         : `${activePlexUrl}/web/index.html#!/details?key=${encodedKey}`;
 
       const metadataType = type === "movie" ? 1 : 2;
-      const plexMobileUrl = `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}`;
+      // Raw (unencoded) server param — custom schemes don't always decode %2F
+      const serverParamRaw = serverMachineId
+        ? `&server=${serverMachineId}`
+        : "";
 
-      const plexMobileAltUrl = `plex://preplay?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}`;
+      // Mobile deep links — use RAW metadataKey (with real slashes, not %2F).
+      // The Plex app's custom URL-scheme handler may not percent-decode
+      // query values, so /library/metadata/... must appear literally.
+      const plexMobileUrl = `plex://preplay/?metadataKey=${metadataKey}&metadataType=${metadataType}${serverParamRaw}`;
 
-      const plexMobileRawUrl = `plex://preplay/?metadataKey=${metadataKey}&metadataType=${metadataType}${serverParam}`;
+      const plexMobileAltUrl = `plex://preplay?metadataKey=${metadataKey}&metadataType=${metadataType}${serverParamRaw}`;
 
-      const plexPlayUrl = `plex://play/?metadataKey=${encodedKey}${serverParam}`;
+      const plexMobileRawUrl = `plex://preplay/?metadataKey=${metadataKey}${serverParamRaw}`;
 
-      const plexPlayLegacyUrl = `plex://play/?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}`;
+      const plexPlayUrl = `plex://play/?metadataKey=${metadataKey}${serverParamRaw}`;
 
-      const plexPlayRawUrl = `plex://play/?metadataKey=${metadataKey}&metadataType=${metadataType}${serverParam}`;
+      const plexPlayLegacyUrl = `plex://play/?metadataKey=${metadataKey}&metadataType=${metadataType}${serverParamRaw}`;
+
+      const plexPlayRawUrl = `plex://play/?metadataKey=${metadataKey}${serverParamRaw}`;
 
       // Intent explícito para Android (mejor compatibilidad en algunos navegadores).
-      const plexAndroidIntentUrl = `intent://preplay?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}#Intent;scheme=plex;package=com.plexapp.android;end`;
+      // También usa raw key — el Intent system pasa la URI tal cual a la app.
+      const plexAndroidIntentUrl = `intent://preplay?metadataKey=${metadataKey}&metadataType=${metadataType}${serverParamRaw}#Intent;scheme=plex;package=com.plexapp.android;end`;
 
-      const plexAndroidIntentPlayUrl = `intent://play?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}#Intent;scheme=plex;package=com.plexapp.android;end`;
+      const plexAndroidIntentPlayUrl = `intent://play?metadataKey=${metadataKey}&metadataType=${metadataType}${serverParamRaw}#Intent;scheme=plex;package=com.plexapp.android;end`;
 
       // Android universal link (watch.plex.tv)
       let plexUniversalUrl = null;

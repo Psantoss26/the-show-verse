@@ -5428,7 +5428,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         p.url &&
                         typeof p.url === "object"
                       ) {
-                        providerLink = "#";
+                        // href apunta a la URL web como fallback y para Universal Links
+                        providerLink = p.url.web || p.url.universal || "#";
                         hasValidLink = !!(
                           p.url.web ||
                           p.url.mobile ||
