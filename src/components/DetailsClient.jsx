@@ -5428,12 +5428,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         p.url &&
                         typeof p.url === "object"
                       ) {
-                        // Use the web URL as href — enables Universal Links (iOS) / App Links (Android)
-                        // to open the Plex app directly to the content details page
-                        providerLink =
-                          p.url.web || p.url.universal || "#";
+                        providerLink = "#";
                         hasValidLink = !!(
-                          p.url.web || p.url.universal
+                          p.url.web ||
+                          p.url.mobile ||
+                          p.url.androidIntent
                         );
                       } else {
                         providerLink = p.url || justwatchUrl || "#";
@@ -5446,12 +5445,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           p.url &&
                           typeof p.url === "object"
                         ) {
-                          // On mobile/tablet: let the browser handle the <a> naturally.
-                          // The href points to app.plex.tv which triggers Universal Links (iOS)
-                          // or App Links (Android) to open the Plex app to the details page.
-                          // If the app isn't installed, it opens Plex Web in the browser.
-                          // Do NOT call e.preventDefault() on mobile — it breaks deep linking.
+                          e.preventDefault();
+
                           const ua = navigator.userAgent || "";
+                          const isAndroid = /Android/i.test(ua);
                           const isIOS =
                             /iPad|iPhone|iPod/i.test(ua) ||
                             (/Macintosh/i.test(ua) &&
@@ -5466,16 +5463,57 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             navigator.msMaxTouchPoints > 0;
 
                           if (isTouchDevice || isMobileOrTablet) {
-                            // Let the natural <a href="..."> behavior handle it
+                            // Mobile: open the native Plex app via deep link.
+                            // Use preplay (details page), NOT play (playback).
+                            // Android: intent:// URI (best Chrome compat) → plex:// fallback
+                            // iOS: plex:// URI directly
+                            const deepLink = isAndroid
+                              ? p.url.androidIntent ||
+                                p.url.mobile ||
+                                p.url.mobileRaw
+                              : p.url.mobile ||
+                                p.url.mobileAlt ||
+                                p.url.mobileRaw;
+
+                            const webFallback = p.url.web || null;
+
+                            if (!deepLink) {
+                              if (webFallback)
+                                window.location.href = webFallback;
+                              return;
+                            }
+
+                            // Try to open the Plex app
+                            window.location.href = deepLink;
+
+                            // Fallback: if after 2s the page is still visible
+                            // (app not installed), redirect to Plex web
+                            if (webFallback) {
+                              const fallbackTimer = setTimeout(() => {
+                                if (!document.hidden) {
+                                  window.location.href = webFallback;
+                                }
+                              }, 2000);
+
+                              const onHide = () => {
+                                clearTimeout(fallbackTimer);
+                                document.removeEventListener(
+                                  "visibilitychange",
+                                  onHide,
+                                );
+                              };
+                              document.addEventListener(
+                                "visibilitychange",
+                                onHide,
+                              );
+                            }
                             return;
                           }
 
                           // Desktop: open in new window
-                          e.preventDefault();
                           const desktopUrl =
                             p.url.web ||
                             p.url.universal ||
-                            p.url.play ||
                             p.url.mobile ||
                             p.url.mobileAlt;
 
@@ -5497,10 +5535,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           key={p.provider_id}
                           href={providerLink}
                           target={
-                            hasValidLink ? "_blank" : undefined
+                            hasValidLink && !isPlexProvider
+                              ? "_blank"
+                              : undefined
                           }
                           rel={
-                            hasValidLink ? "noreferrer" : undefined
+                            hasValidLink && !isPlexProvider
+                              ? "noreferrer"
+                              : undefined
                           }
                           onClick={isPlexProvider ? handleClick : undefined}
                           title={p.provider_name}

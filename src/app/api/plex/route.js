@@ -321,20 +321,20 @@ export async function GET(request) {
       const metadataType = type === "movie" ? 1 : 2;
       const plexMobileUrl = `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}`;
 
-      const plexMobileAltUrl = `plex://preplay?metadataKey=${encodedKey}${serverParam}`;
+      const plexMobileAltUrl = `plex://preplay?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}`;
 
-      const plexMobileRawUrl = `plex://preplay/?metadataKey=${metadataKey}${serverParam}`;
+      const plexMobileRawUrl = `plex://preplay/?metadataKey=${metadataKey}&metadataType=${metadataType}${serverParam}`;
 
       const plexPlayUrl = `plex://play/?metadataKey=${encodedKey}${serverParam}`;
 
       const plexPlayLegacyUrl = `plex://play/?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}`;
 
-      const plexPlayRawUrl = `plex://play/?metadataKey=${metadataKey}${serverParam}`;
+      const plexPlayRawUrl = `plex://play/?metadataKey=${metadataKey}&metadataType=${metadataType}${serverParam}`;
 
       // Intent explícito para Android (mejor compatibilidad en algunos navegadores).
-      const plexAndroidIntentUrl = `intent://preplay?metadataKey=${encodedKey}${serverParam}#Intent;scheme=plex;package=com.plexapp.android;end`;
+      const plexAndroidIntentUrl = `intent://preplay?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}#Intent;scheme=plex;package=com.plexapp.android;end`;
 
-      const plexAndroidIntentPlayUrl = `intent://play?metadataKey=${encodedKey}${serverParam}#Intent;scheme=plex;package=com.plexapp.android;end`;
+      const plexAndroidIntentPlayUrl = `intent://play?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}#Intent;scheme=plex;package=com.plexapp.android;end`;
 
       // Android universal link (watch.plex.tv)
       let plexUniversalUrl = null;
