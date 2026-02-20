@@ -133,7 +133,8 @@ async function fetchAllPlexMetadata({
     const separator = path.includes("?") ? "&" : "?";
     const paginatedPath =
       `${path}${separator}X-Plex-Container-Start=${start}` +
-      `&X-Plex-Container-Size=${pageSize}`;
+      `&X-Plex-Container-Size=${pageSize}` +
+      `&includeGuids=1`;
 
     const json = await fetchPlexJson({
       baseUrl,
