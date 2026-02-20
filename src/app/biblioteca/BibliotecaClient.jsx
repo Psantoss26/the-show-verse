@@ -74,6 +74,25 @@ const containerVariants = {
   },
 };
 
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: "easeOut" },
+  },
+};
+
+function preloadImage(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(false);
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = src;
+  });
+}
+
 function getCacheKey(limit) {
   return `${CACHE_KEY_PREFIX}:limit:${Number(limit) || DEFAULT_FETCH_LIMIT}`;
 }
@@ -403,6 +422,18 @@ function LibraryMediaCard({
     totalItems <= 120 &&
     (viewMode === "compact" || viewMode === "grid");
 
+  const [imgReady, setImgReady] = useState(false);
+
+  useEffect(() => {
+    setImgReady(false);
+    if (!imageSrc) return;
+    let abort = false;
+    preloadImage(imageSrc).then((ok) => {
+      if (!abort && ok) setImgReady(true);
+    });
+    return () => { abort = true; };
+  }, [imageSrc]);
+
   const openItem = () => {
     if (!canOpen) return;
     openPlexLink(item);
@@ -410,22 +441,28 @@ function LibraryMediaCard({
 
   const renderMedia = () => (
     <div className="relative w-full h-full">
-      {imageSrc ? (
+      <div
+        className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900 transition-opacity duration-300 ${
+          imgReady && imageSrc ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        {isMovie ? (
+          <Film className="w-10 h-10 text-zinc-700" />
+        ) : (
+          <Tv className="w-10 h-10 text-zinc-700" />
+        )}
+      </div>
+
+      {imageSrc && (
         <img
           src={imageSrc}
           alt={title}
           loading="lazy"
           decoding="async"
-          className="absolute inset-0 w-full h-full object-cover"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            imgReady ? "opacity-100" : "opacity-0"
+          }`}
         />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900">
-          {isMovie ? (
-            <Film className="w-10 h-10 text-zinc-700" />
-          ) : (
-            <Tv className="w-10 h-10 text-zinc-700" />
-          )}
-        </div>
       )}
     </div>
   );
@@ -433,19 +470,8 @@ function LibraryMediaCard({
   if (viewMode === "list") {
     return (
       <motion.div
-        layout={shouldAnimate}
-        initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
-        animate={shouldAnimate ? { opacity: 1, y: 0 } : undefined}
-        exit={shouldAnimate ? { opacity: 0, y: -10 } : undefined}
-        transition={
-          shouldAnimate
-            ? {
-                duration: 0.35,
-                delay: animDelay,
-                ease: "easeOut",
-              }
-            : { duration: 0 }
-        }
+        variants={shouldAnimate ? cardVariants : undefined}
+        initial={shouldAnimate ? undefined : false}
       >
         <article
           className={`block bg-zinc-900/40 border border-zinc-800/80 rounded-xl transition-[background-color,border-color] duration-300 group overflow-hidden ${canOpen ? "cursor-pointer hover:border-amber-500/35 hover:bg-zinc-900/65" : ""}`}
@@ -504,19 +530,8 @@ function LibraryMediaCard({
   if (viewMode === "compact") {
     return (
       <motion.div
-        layout={shouldAnimate}
-        initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
-        animate={shouldAnimate ? { opacity: 1, y: 0 } : undefined}
-        exit={shouldAnimate ? { opacity: 0, y: -10 } : undefined}
-        transition={
-          shouldAnimate
-            ? {
-                duration: 0.35,
-                delay: animDelay,
-                ease: "easeOut",
-              }
-            : { duration: 0 }
-        }
+        variants={shouldAnimate ? cardVariants : undefined}
+        initial={shouldAnimate ? undefined : false}
       >
         <motion.article
           className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md transition-[border-color] duration-300 ${canOpen ? "cursor-pointer" : ""}`}
@@ -587,13 +602,8 @@ function LibraryMediaCard({
 
   return (
     <motion.div
-      layout={shouldAnimate}
-      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
-      animate={shouldAnimate ? { opacity: 1, scale: 1 } : undefined}
-      exit={shouldAnimate ? { opacity: 0, scale: 0.95 } : undefined}
-      transition={
-        shouldAnimate ? { duration: 0.2, delay: animDelay } : { duration: 0 }
-      }
+      variants={shouldAnimate ? cardVariants : undefined}
+      initial={shouldAnimate ? undefined : false}
     >
       <article
         className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-amber-900/20 transition-[border-color,box-shadow] duration-300 ${canOpen ? "cursor-pointer hover:border-amber-500/30" : ""}`}
@@ -1227,13 +1237,13 @@ export default function BibliotecaClient() {
         return null;
       }
 
-      // TMDB ya respondió: usar imagen si existe, o Plex como último recurso
+      // TMDB ya respondió: usar imagen si existe, Plex como último recurso
       const localizedPath = map[key];
       if (localizedPath) return buildTmdbImage(localizedPath, "w500");
       return item?.thumb || item?.art || null;
     }
 
-    // Sin tmdbId: usar directamente URLs de Plex
+    // Sin tmdbId: usar URLs de Plex como fallback
     return item?.thumb || item?.art || null;
   }
 
@@ -1256,11 +1266,13 @@ export default function BibliotecaClient() {
         return null;
       }
 
+      // TMDB ya respondió: usar imagen si existe, Plex como último recurso
       const localizedPath = map[key];
       if (localizedPath) return buildTmdbImage(localizedPath, "w1280");
       return item?.art || item?.thumb || null;
     }
 
+    // Sin tmdbId: usar URLs de Plex como fallback
     return item?.art || item?.thumb || null;
   }
 
@@ -1467,9 +1479,11 @@ export default function BibliotecaClient() {
     if (filteredItems.length === 0) {
       return (
         <motion.div
+          key="empty-state"
           className="py-24 text-center"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
           <FolderKanban className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
@@ -1506,27 +1520,31 @@ export default function BibliotecaClient() {
       }
 
       return (
-        <>
-          <div key={`grouped-${viewMode}-${imageMode}`}>
-            {visibleGrouped.map(([groupTitle, items]) => (
-              <div key={groupTitle}>
-                <GroupDivider
-                  title={groupTitle}
-                  count={items.length}
-                  total={filteredItems.length}
-                />
-                <motion.div
-                  key={`group-grid-${groupTitle}-${viewMode}-${imageMode}`}
-                  className={getItemsGridClass(true)}
-                  {...contentMotionProps}
-                >
-                  {items.map((item, idx) =>
-                    renderCard(item, idx, items.length),
-                  )}
-                </motion.div>
-              </div>
-            ))}
-          </div>
+        <motion.div
+          key={`grouped-${viewMode}-${imageMode}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+        >
+          {visibleGrouped.map(([groupTitle, items]) => (
+            <div key={groupTitle}>
+              <GroupDivider
+                title={groupTitle}
+                count={items.length}
+                total={filteredItems.length}
+              />
+              <motion.div
+                key={`group-grid-${groupTitle}-${viewMode}-${imageMode}`}
+                className={getItemsGridClass(true)}
+                {...contentMotionProps}
+              >
+                {items.map((item, idx) =>
+                  renderCard(item, idx, items.length),
+                )}
+              </motion.div>
+            </div>
+          ))}
 
           {hasMoreItems && (
             <div className="mt-6 text-center">
@@ -1540,15 +1558,20 @@ export default function BibliotecaClient() {
               <div ref={loadMoreRef} className="h-2 w-full" />
             </div>
           )}
-        </>
+        </motion.div>
       );
     }
 
     const visibleItems = filteredItems.slice(0, visibleLimit);
     return (
-      <>
+      <motion.div
+        key={`flat-grid-${viewMode}-${imageMode}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+      >
         <motion.div
-          key={`flat-grid-${viewMode}-${imageMode}`}
           className={getItemsGridClass(false)}
           {...contentMotionProps}
         >
@@ -1568,15 +1591,38 @@ export default function BibliotecaClient() {
             <div ref={loadMoreRef} className="h-2 w-full" />
           </div>
         )}
-      </>
+      </motion.div>
     );
   }
 
   // ===== LOADING STATE =====
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+      <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans">
+        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+          <div className="mb-10">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-px w-12 bg-amber-500/50" />
+              <div className="h-3 w-24 bg-zinc-800 rounded-full animate-pulse" />
+            </div>
+            <div className="h-12 w-64 bg-zinc-800 rounded-xl animate-pulse mb-2" />
+            <div className="h-4 w-80 bg-zinc-800/50 rounded-full animate-pulse hidden md:block" />
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6 gap-3">
+            {Array.from({ length: 24 }).map((_, i) => (
+              <div
+                key={i}
+                className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-neutral-800/50 via-neutral-900/50 to-neutral-800/50 animate-pulse" />
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"
+                  style={{ backgroundSize: "200% 100%" }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -1879,7 +1925,9 @@ export default function BibliotecaClient() {
         {/* Mensaje de renderizado progresivo eliminado por solicitud del usuario */}
 
         {/* ====== CONTENT ====== */}
-        {renderContent()}
+        <AnimatePresence mode="wait">
+          {renderContent()}
+        </AnimatePresence>
       </div>
     </div>
   );
