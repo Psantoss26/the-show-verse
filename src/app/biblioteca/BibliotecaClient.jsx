@@ -33,7 +33,7 @@ import {
 
 // ================== CONSTANTS ==================
 
-const CACHE_KEY_PREFIX = "showverse:plex-library:v3";
+const CACHE_KEY_PREFIX = "showverse:plex-library:v4";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_FETCH_LIMIT = 2000;
 const EXPANDED_FETCH_LIMIT = 10000;
@@ -372,9 +372,14 @@ function GroupDivider({ title, count, total }) {
 function openPlexLink(item) {
   const webUrl = item?.links?.web || null;
   const mobileUrl = item?.links?.mobile || null;
-  const mobileLegacyUrl = item?.links?.mobileLegacy || null;
+  const mobileAltUrl = item?.links?.mobileAlt || null;
+  const mobileRawUrl = item?.links?.mobileRaw || null;
+  const playUrl = item?.links?.play || null;
+  const playLegacyUrl = item?.links?.playLegacy || null;
+  const playRawUrl = item?.links?.playRaw || null;
   const universalUrl = item?.links?.universal || null;
   const androidIntentUrl = item?.links?.androidIntent || null;
+  const androidIntentPlayUrl = item?.links?.androidIntentPlay || null;
 
   if (typeof window === "undefined") return;
 
@@ -445,9 +450,14 @@ function openPlexLink(item) {
   if (isTouchDevice || isMobileOrTablet) {
     if (isAndroid) {
       openWithFallback([
+        androidIntentPlayUrl,
         androidIntentUrl,
+        playLegacyUrl,
+        playUrl,
+        playRawUrl,
         mobileUrl,
-        mobileLegacyUrl,
+        mobileAltUrl,
+        mobileRawUrl,
         universalUrl,
         webUrl,
       ]);
@@ -455,15 +465,33 @@ function openPlexLink(item) {
     }
 
     if (isIOS) {
-      openWithFallback([mobileUrl, mobileLegacyUrl, universalUrl, webUrl]);
+      openWithFallback([
+        mobileUrl,
+        mobileAltUrl,
+        mobileRawUrl,
+        playLegacyUrl,
+        playUrl,
+        playRawUrl,
+        universalUrl,
+        webUrl,
+      ]);
       return;
     }
 
-    openWithFallback([mobileUrl, mobileLegacyUrl, universalUrl, webUrl]);
+    openWithFallback([
+      mobileUrl,
+      mobileAltUrl,
+      mobileRawUrl,
+      playLegacyUrl,
+      playUrl,
+      playRawUrl,
+      universalUrl,
+      webUrl,
+    ]);
     return;
   }
 
-  const desktopUrl = webUrl || universalUrl || mobileUrl || mobileLegacyUrl;
+  const desktopUrl = webUrl || universalUrl || playUrl || mobileUrl || mobileAltUrl;
   if (desktopUrl) {
     window.open(desktopUrl, "_blank", "noopener,noreferrer");
   }
@@ -488,9 +516,14 @@ function LibraryMediaCard({
   const canOpen = Boolean(
     item?.links?.web ||
       item?.links?.mobile ||
-      item?.links?.mobileLegacy ||
+      item?.links?.mobileAlt ||
+      item?.links?.mobileRaw ||
+      item?.links?.play ||
+      item?.links?.playLegacy ||
+      item?.links?.playRaw ||
       item?.links?.universal ||
-      item?.links?.androidIntent,
+      item?.links?.androidIntent ||
+      item?.links?.androidIntentPlay,
   );
   const resolutions = Array.isArray(item?.resolutions) ? item.resolutions : [];
 
