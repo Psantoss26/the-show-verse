@@ -1237,14 +1237,14 @@ export default function BibliotecaClient() {
         return null;
       }
 
-      // TMDB ya respondió: usar imagen si existe, Plex como último recurso
+      // TMDB ya respondió: usar solo imagen TMDB si existe
       const localizedPath = map[key];
       if (localizedPath) return buildTmdbImage(localizedPath, "w500");
-      return item?.thumb || item?.art || null;
+      return null;
     }
 
-    // Sin tmdbId: usar URLs de Plex como fallback
-    return item?.thumb || item?.art || null;
+    // Sin tmdbId no se muestra imagen (solo TMDB)
+    return null;
   }
 
   function resolveBackdropSrc(item) {
@@ -1266,14 +1266,14 @@ export default function BibliotecaClient() {
         return null;
       }
 
-      // TMDB ya respondió: usar imagen si existe, Plex como último recurso
+      // TMDB ya respondió: usar solo imagen TMDB si existe
       const localizedPath = map[key];
       if (localizedPath) return buildTmdbImage(localizedPath, "w1280");
-      return item?.art || item?.thumb || null;
+      return null;
     }
 
-    // Sin tmdbId: usar URLs de Plex como fallback
-    return item?.art || item?.thumb || null;
+    // Sin tmdbId no se muestra imagen (solo TMDB)
+    return null;
   }
 
   function renderCard(item, index = 0, totalItems = 0) {
