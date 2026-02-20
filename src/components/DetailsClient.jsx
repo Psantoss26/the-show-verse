@@ -4714,7 +4714,7 @@ export default function DetailsClient({
     if (!title || !id) return;
 
     // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
-    const cacheKey = `plex-v10:${endpointType}:${id}`;
+    const cacheKey = `plex-v11:${endpointType}:${id}`;
     const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 días (1 semana)
 
     // Intentar cargar desde caché primero
@@ -4761,9 +4761,15 @@ export default function DetailsClient({
           const available = result.available || false;
 
           const plexWebUrl = result.plexUrl || null;
-          const plexMobileUrl = result.plexMobileUrl || null; // deep link principal
-          const plexMobileLegacyUrl = result.plexMobileLegacyUrl || null; // fallback legacy
-          const plexAndroidIntentUrl = result.plexAndroidIntentUrl || null; // fallback Android
+          const plexMobileUrl = result.plexMobileUrl || null; // preplay legacy
+          const plexMobileAltUrl = result.plexMobileAltUrl || null; // preplay alt
+          const plexMobileRawUrl = result.plexMobileRawUrl || null; // preplay raw key
+          const plexPlayUrl = result.plexPlayUrl || null; // play
+          const plexPlayLegacyUrl = result.plexPlayLegacyUrl || null; // play + metadataType
+          const plexPlayRawUrl = result.plexPlayRawUrl || null; // play raw key
+          const plexAndroidIntentUrl = result.plexAndroidIntentUrl || null; // intent preplay
+          const plexAndroidIntentPlayUrl =
+            result.plexAndroidIntentPlayUrl || null; // intent play
           const plexUniversalUrl = result.plexUniversalUrl || null; // Android / web
 
           setPlexAvailable(available);
@@ -4771,8 +4777,13 @@ export default function DetailsClient({
           setPlexUrl({
             web: plexWebUrl,
             mobile: plexMobileUrl,
-            mobileLegacy: plexMobileLegacyUrl,
+            mobileAlt: plexMobileAltUrl,
+            mobileRaw: plexMobileRawUrl,
+            play: plexPlayUrl,
+            playLegacy: plexPlayLegacyUrl,
+            playRaw: plexPlayRawUrl,
             androidIntent: plexAndroidIntentUrl,
+            androidIntentPlay: plexAndroidIntentPlayUrl,
             universal: plexUniversalUrl,
           });
 
@@ -4783,8 +4794,13 @@ export default function DetailsClient({
               plexUrl: {
                 web: plexWebUrl,
                 mobile: plexMobileUrl,
-                mobileLegacy: plexMobileLegacyUrl,
+                mobileAlt: plexMobileAltUrl,
+                mobileRaw: plexMobileRawUrl,
+                play: plexPlayUrl,
+                playLegacy: plexPlayLegacyUrl,
+                playRaw: plexPlayRawUrl,
                 androidIntent: plexAndroidIntentUrl,
+                androidIntentPlay: plexAndroidIntentPlayUrl,
                 universal: plexUniversalUrl,
               },
               timestamp: Date.now(),
@@ -5416,8 +5432,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         hasValidLink = !!(
                           p.url.web ||
                           p.url.mobile ||
-                          p.url.mobileLegacy ||
+                          p.url.mobileAlt ||
+                          p.url.mobileRaw ||
+                          p.url.play ||
+                          p.url.playLegacy ||
+                          p.url.playRaw ||
                           p.url.androidIntent ||
+                          p.url.androidIntentPlay ||
                           p.url.universal
                         );
                       } else {
@@ -5516,16 +5537,27 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                           const webUrl = p.url.web || null;
                           const mobileUrl = p.url.mobile || null;
-                          const mobileLegacyUrl = p.url.mobileLegacy || null;
+                          const mobileAltUrl = p.url.mobileAlt || null;
+                          const mobileRawUrl = p.url.mobileRaw || null;
+                          const playUrl = p.url.play || null;
+                          const playLegacyUrl = p.url.playLegacy || null;
+                          const playRawUrl = p.url.playRaw || null;
                           const universalUrl = p.url.universal || null;
                           const androidIntentUrl = p.url.androidIntent || null;
+                          const androidIntentPlayUrl =
+                            p.url.androidIntentPlay || null;
 
                           if (isTouchDevice || isMobileOrTablet) {
                             if (isAndroid) {
                               openWithFallback([
+                                androidIntentPlayUrl,
                                 androidIntentUrl,
+                                playLegacyUrl,
+                                playUrl,
+                                playRawUrl,
                                 mobileUrl,
-                                mobileLegacyUrl,
+                                mobileAltUrl,
+                                mobileRawUrl,
                                 universalUrl,
                                 webUrl,
                               ]);
@@ -5535,7 +5567,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             if (isIOS) {
                               openWithFallback([
                                 mobileUrl,
-                                mobileLegacyUrl,
+                                mobileAltUrl,
+                                mobileRawUrl,
+                                playLegacyUrl,
+                                playUrl,
+                                playRawUrl,
                                 universalUrl,
                                 webUrl,
                               ]);
@@ -5544,7 +5580,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                             openWithFallback([
                               mobileUrl,
-                              mobileLegacyUrl,
+                              mobileAltUrl,
+                              mobileRawUrl,
+                              playLegacyUrl,
+                              playUrl,
+                              playRawUrl,
                               universalUrl,
                               webUrl,
                             ]);
@@ -5554,8 +5594,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const desktopUrl =
                             webUrl ||
                             universalUrl ||
+                            playUrl ||
                             mobileUrl ||
-                            mobileLegacyUrl;
+                            mobileAltUrl;
 
                           if (!desktopUrl) {
                             console.warn("[Plex] No URL available");

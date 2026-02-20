@@ -347,9 +347,14 @@ function buildPlexItemLinks({
     return {
       web: null,
       mobile: null,
-      mobileLegacy: null,
+      mobileAlt: null,
+      mobileRaw: null,
+      play: null,
+      playLegacy: null,
+      playRaw: null,
       universal: null,
       androidIntent: null,
+      androidIntentPlay: null,
     };
   }
 
@@ -357,30 +362,42 @@ function buildPlexItemLinks({
   const encodedMachineIdentifier = machineIdentifier
     ? encodeURIComponent(machineIdentifier)
     : null;
+  const serverParam = encodedMachineIdentifier
+    ? `&server=${encodedMachineIdentifier}`
+    : "";
 
   const web = machineIdentifier
     ? `https://app.plex.tv/desktop/#!/server/${machineIdentifier}/details?key=${encodedKey}`
     : `${baseUrl}/web/index.html#!/details?key=${encodedKey}`;
 
-  const mobile = machineIdentifier
-    ? `plex://preplay?metadataKey=${encodedKey}&server=${encodedMachineIdentifier}`
-    : null;
-
   const metadataType = itemType === "movie" ? 1 : 2;
-  const mobileLegacy = machineIdentifier
-    ? `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}&server=${encodedMachineIdentifier}`
-    : null;
+  const mobile = `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}`;
 
-  const androidIntent = machineIdentifier
-    ? `intent://preplay?metadataKey=${encodedKey}&server=${encodedMachineIdentifier}#Intent;scheme=plex;package=com.plexapp.android;end`
-    : null;
+  const mobileAlt = `plex://preplay?metadataKey=${encodedKey}${serverParam}`;
+
+  const mobileRaw = `plex://preplay/?metadataKey=${metadataKey}${serverParam}`;
+
+  const play = `plex://play/?metadataKey=${encodedKey}${serverParam}`;
+
+  const playLegacy = `plex://play/?metadataKey=${encodedKey}&metadataType=${metadataType}${serverParam}`;
+
+  const playRaw = `plex://play/?metadataKey=${metadataKey}${serverParam}`;
+
+  const androidIntent = `intent://preplay?metadataKey=${encodedKey}${serverParam}#Intent;scheme=plex;package=com.plexapp.android;end`;
+
+  const androidIntentPlay = `intent://play?metadataKey=${encodedKey}${serverParam}#Intent;scheme=plex;package=com.plexapp.android;end`;
 
   return {
     web,
     mobile,
-    mobileLegacy,
+    mobileAlt,
+    mobileRaw,
+    play,
+    playLegacy,
+    playRaw,
     universal: web,
     androidIntent,
+    androidIntentPlay,
   };
 }
 
@@ -459,10 +476,14 @@ export async function GET(request) {
       );
     }
 
-    const machineIdentifier = await getMachineIdentifier({
-      baseUrl: activePlexUrl,
-      token: plexToken,
-    });
+    const machineIdentifier =
+      (await getMachineIdentifier({
+        baseUrl: activePlexUrl,
+        token: plexToken,
+      })) ||
+      sectionsData?.MediaContainer?.machineIdentifier ||
+      process.env.PLEX_MACHINE_IDENTIFIER?.trim() ||
+      null;
 
     const sectionsRaw = Array.isArray(sectionsData?.MediaContainer?.Directory)
       ? sectionsData.MediaContainer.Directory
