@@ -306,16 +306,29 @@ export async function GET(request) {
       }
 
       const encodedKey = encodeURIComponent(metadataKey);
+      const encodedServerMachineId = serverMachineId
+        ? encodeURIComponent(serverMachineId)
+        : null;
 
       // Web (desktop)
       const plexWebUrl = serverMachineId
         ? `https://app.plex.tv/desktop/#!/server/${serverMachineId}/details?key=${encodedKey}`
         : `${activePlexUrl}/web/index.html#!/details?key=${encodedKey}`;
 
-      // iOS deep link (preplay). Añadimos metadataType para máxima compatibilidad.
-      const metadataType = type === "movie" ? 1 : 2;
+      // Deep link principal para app móvil (iOS/Android).
       const plexMobileUrl = serverMachineId
-        ? `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}&server=${serverMachineId}`
+        ? `plex://preplay?metadataKey=${encodedKey}&server=${encodedServerMachineId}`
+        : null;
+
+      // Fallback legacy para clientes antiguos.
+      const metadataType = type === "movie" ? 1 : 2;
+      const plexMobileLegacyUrl = serverMachineId
+        ? `plex://preplay/?metadataKey=${encodedKey}&metadataType=${metadataType}&server=${encodedServerMachineId}`
+        : null;
+
+      // Intent explícito para Android (mejor compatibilidad en algunos navegadores).
+      const plexAndroidIntentUrl = serverMachineId
+        ? `intent://preplay?metadataKey=${encodedKey}&server=${encodedServerMachineId}#Intent;scheme=plex;package=com.plexapp.android;end`
         : null;
 
       // Android universal link (watch.plex.tv)
@@ -342,6 +355,8 @@ export async function GET(request) {
           available: true,
           plexUrl: plexWebUrl,
           plexMobileUrl,
+          plexMobileLegacyUrl,
+          plexAndroidIntentUrl,
           plexUniversalUrl, // <- NUEVO (Android)
           title: matchedItem.title,
           year: matchedItem.year,
