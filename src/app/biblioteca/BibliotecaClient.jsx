@@ -153,16 +153,15 @@ function pickBestBackdropPath(backdrops) {
     if (top3.length === 3) break;
   }
   if (!top3.length) return null;
-  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
+  const isRes = (b, w, h) =>
+    (b?.width || 0) === w && (b?.height || 0) === h;
   return (
-    (
-      top3.find((b) => isRes(b, 1920, 1080)) ||
-      top3.find((b) => isRes(b, 2560, 1440)) ||
-      top3.find((b) => isRes(b, 3840, 2160)) ||
-      top3.find((b) => isRes(b, 1280, 720)) ||
-      top3[0]
-    )?.file_path || null
-  );
+    top3.find((b) => isRes(b, 1920, 1080)) ||
+    top3.find((b) => isRes(b, 2560, 1440)) ||
+    top3.find((b) => isRes(b, 3840, 2160)) ||
+    top3.find((b) => isRes(b, 1280, 720)) ||
+    top3[0]
+  )?.file_path || null;
 }
 
 // Llamada directa a TMDB desde el navegador (mismo patrón que SmartPoster en Favoritos)
@@ -555,9 +554,7 @@ function LibraryMediaCard({
     preloadImage(imageSrc).then((ok) => {
       if (!abort && ok) setImgReady(true);
     });
-    return () => {
-      abort = true;
-    };
+    return () => { abort = true; };
   }, [imageSrc]);
 
   const openItem = () => {
@@ -1665,7 +1662,9 @@ export default function BibliotecaClient() {
                 className={getItemsGridClass(true)}
                 {...contentMotionProps}
               >
-                {items.map((item, idx) => renderCard(item, idx, items.length))}
+                {items.map((item, idx) =>
+                  renderCard(item, idx, items.length),
+                )}
               </motion.div>
             </div>
           ))}
@@ -1832,7 +1831,7 @@ export default function BibliotecaClient() {
                 </motion.button>
               </div>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                Contenido del servidor Plex.
+                Contenido y resoluciones de tu servidor Plex.
               </p>
             </div>
 
@@ -2049,7 +2048,9 @@ export default function BibliotecaClient() {
         {/* Mensaje de renderizado progresivo eliminado por solicitud del usuario */}
 
         {/* ====== CONTENT ====== */}
-        <AnimatePresence mode="wait">{renderContent()}</AnimatePresence>
+        <AnimatePresence mode="wait">
+          {renderContent()}
+        </AnimatePresence>
       </div>
     </div>
   );
