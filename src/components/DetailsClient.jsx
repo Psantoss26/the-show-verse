@@ -716,9 +716,9 @@ export default function DetailsClient({
           const id = getListId(l);
           return id === lid
             ? {
-                ...l,
-                item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
-              }
+              ...l,
+              item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
+            }
             : l;
         }),
       );
@@ -1219,7 +1219,7 @@ export default function DetailsClient({
       img.decoding = "async";
       try {
         img.fetchPriority = "high";
-      } catch {}
+      } catch { }
       img.onload = finishOne;
       img.onerror = finishOne; // Si una falla, no bloqueamos toda la fila
       img.src = url;
@@ -2169,7 +2169,7 @@ export default function DetailsClient({
     try {
       const v = window.localStorage.getItem("showverse:trakt:sync") === "1";
       setSyncTrakt(v);
-    } catch {}
+    } catch { }
   }, []);
 
   // Guardar preferencia de sincronizacion en localStorage
@@ -2180,7 +2180,7 @@ export default function DetailsClient({
         "showverse:trakt:sync",
         syncTrakt ? "1" : "0",
       );
-    } catch {}
+    } catch { }
   }, [syncTrakt]);
 
   // Recarga el estado de Trakt (visto, rating, historial, watchlist) para el contenido actual
@@ -2764,7 +2764,7 @@ export default function DetailsClient({
     // Persistir fecha de inicio del rewatch en localStorage
     try {
       window.localStorage.setItem(rewatchStorageKey, startIso);
-    } catch {}
+    } catch { }
 
     await loadTraktShowPlays(startIso);
   };
@@ -2879,7 +2879,7 @@ export default function DetailsClient({
               rewatchRunsStorageKey,
               JSON.stringify(runs),
             );
-          } catch {}
+          } catch { }
         }
       }
 
@@ -3112,7 +3112,7 @@ export default function DetailsClient({
           rewatchRunsStorageKey,
           JSON.stringify(nextRuns || []),
         );
-      } catch {}
+      } catch { }
     },
     [rewatchRunsStorageKey],
   );
@@ -3124,7 +3124,7 @@ export default function DetailsClient({
       setActiveEpisodesView(v);
       try {
         window.localStorage.setItem(episodesViewStorageKey, v);
-      } catch {}
+      } catch { }
 
       if (v === "global") {
         setRewatchStartAt(null);
@@ -3161,7 +3161,7 @@ export default function DetailsClient({
       setActiveEpisodesView(run.id);
       try {
         window.localStorage.setItem(episodesViewStorageKey, run.id);
-      } catch {}
+      } catch { }
       setRewatchStartAt(run.startedAt);
 
       await loadTraktShowPlays(run.startedAt); // Cargar datos del run
@@ -3187,7 +3187,7 @@ export default function DetailsClient({
         const nextView = prev === runId ? "global" : prev;
         try {
           window.localStorage.setItem(episodesViewStorageKey, nextView);
-        } catch {}
+        } catch { }
         return nextView;
       });
 
@@ -3239,7 +3239,7 @@ export default function DetailsClient({
           cacheKey,
           JSON.stringify({ ts: Date.now(), data }),
         );
-      } catch {}
+      } catch { }
     };
 
     let ignore = false;
@@ -3513,7 +3513,7 @@ export default function DetailsClient({
       if (!posterToggleBusy) {
         setPosterLayoutMode(posterViewMode);
       }
-    } catch {}
+    } catch { }
   }, [posterViewMode, globalViewModeStorageKey, posterToggleBusy]);
 
   // Copia la URL original de una imagen de TMDb al portapapeles
@@ -3577,8 +3577,8 @@ export default function DetailsClient({
   const seriesGraphUrl =
     type === "tv" && data?.id && (data.name || data.original_name)
       ? `https://seriesgraph.com/show/${data.id}-${slugifyForSeriesGraph(
-          data.original_name || data.name,
-        )}`
+        data.original_name || data.name,
+      )}`
       : null;
 
   const [traktHomepage, setTraktHomepage] = useState(null);
@@ -3660,7 +3660,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch {}
+    } catch { }
   }, [jwCacheKey]);
 
   // 1) Hidratar desde cache para que el icono salga instantaneo en visitas posteriores
@@ -3671,7 +3671,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch {}
+    } catch { }
   }, [jwCacheKey]);
 
   useEffect(() => {
@@ -3686,7 +3686,7 @@ export default function DetailsClient({
       try {
         if (typeof window !== "undefined")
           window.localStorage.removeItem(jwCacheKey);
-      } catch {}
+      } catch { }
       return;
     }
 
@@ -3701,8 +3701,8 @@ export default function DetailsClient({
 
         const watchnow =
           watchLink &&
-          typeof watchLink === "string" &&
-          !watchLink.includes("themoviedb.org")
+            typeof watchLink === "string" &&
+            !watchLink.includes("themoviedb.org")
             ? watchLink
             : null;
 
@@ -3735,7 +3735,7 @@ export default function DetailsClient({
             if (resolved) window.localStorage.setItem(jwCacheKey, resolved);
             else window.localStorage.removeItem(jwCacheKey);
           }
-        } catch {}
+        } catch { }
       } catch (e) {
         if (ac.signal.aborted) return;
         setExtLinks((p) => ({
@@ -4264,21 +4264,21 @@ export default function DetailsClient({
     const extras =
       type === "movie"
         ? (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
-            .filter((d) => d?.id && d?.name)
-            .map((d, idx) => ({
-              ...d,
-              character: "Director",
-              // orden negativo para que vaya arriba si luego hay sort por order
-              order: -1000 + idx,
-            }))
+          .filter((d) => d?.id && d?.name)
+          .map((d, idx) => ({
+            ...d,
+            character: "Director",
+            // orden negativo para que vaya arriba si luego hay sort por order
+            order: -1000 + idx,
+          }))
         : type === "tv"
           ? (Array.isArray(tvCreators) ? tvCreators : [])
-              .filter((c) => c?.id && c?.name)
-              .map((c, idx) => ({
-                ...c,
-                character: "Creador",
-                order: -1000 + idx,
-              }))
+            .filter((c) => c?.id && c?.name)
+            .map((c, idx) => ({
+              ...c,
+              character: "Creador",
+              order: -1000 + idx,
+            }))
           : [];
 
     // 3) ¿Hay order real en el base? (si viene de TMDb normalmente sí)
@@ -4714,7 +4714,7 @@ export default function DetailsClient({
     if (!title || !id) return;
 
     // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
-    const cacheKey = `plex-v11:${endpointType}:${id}`;
+    const cacheKey = `plex-v12:${endpointType}:${id}`;
     const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 días (1 semana)
 
     // Intentar cargar desde caché primero
@@ -5255,11 +5255,10 @@ export default function DetailsClient({
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 animate-in fade-in duration-700 slide-in-from-bottom-4 items-start">
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
-            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-all duration-500 ${
-              isBackdropPoster
-                ? "max-w-full lg:max-w-[600px]"
-                : "max-w-[280px] lg:max-w-[320px]"
-            }`}
+            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-all duration-500 ${isBackdropPoster
+              ? "max-w-full lg:max-w-[600px]"
+              : "max-w-[280px] lg:max-w-[320px]"
+              }`}
           >
             {/* Poster Card */}
             <div className="relative">
@@ -5299,9 +5298,8 @@ export default function DetailsClient({
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10" />
 
                   <div
-                    className={`relative bg-neutral-950 will-change-auto ${
-                      isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
-                    }`}
+                    className={`relative bg-neutral-950 will-change-auto ${isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
+                      }`}
                     style={{
                       transition:
                         "aspect-ratio 500ms cubic-bezier(0.4, 0, 0.2, 1)",
@@ -5388,7 +5386,7 @@ ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-
                                 setPosterHighLoaded(true);
                               }
                             }}
-                            onError={() => {}}
+                            onError={() => { }}
                             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out
 ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
@@ -5411,7 +5409,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
             {/* Providers Grid + Enlaces Externos (cuando es backdrop) */}
             {(limitedProviders && limitedProviders.length > 0) ||
-            (isBackdropPoster && externalLinks.length > 0) ? (
+              (isBackdropPoster && externalLinks.length > 0) ? (
               <div className="flex flex-row flex-nowrap justify-center items-center gap-3 w-full px-1 py-2 overflow-x-auto [scrollbar-width:none]">
                 {/* Providers - Solo si hay plataformas */}
                 {limitedProviders && limitedProviders.length > 0 && (
@@ -5464,38 +5462,101 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             navigator.msMaxTouchPoints > 0;
 
                           if (isTouchDevice || isMobileOrTablet) {
-                            // Mobile: open the native Plex app via deep link.
-                            // Use preplay (details page), NOT play (playback).
-                            // Android: intent:// URI (best Chrome compat) → plex:// fallback
-                            // iOS: plex:// URI directly
-                            const deepLink = isAndroid
-                              ? p.url.androidIntent ||
+                            // Mobile/Tablet: abrir la app nativa de Plex en la
+                            // página de DETALLES del contenido (preplay), no en reproducción.
+                            //
+                            // Estrategia por plataforma:
+                            //
+                            // iOS:
+                            //   1. watch.plex.tv Universal Link → iOS intercepta y abre la app
+                            //      directamente en la ficha de detalles (sin paso intermedio).
+                            //   2. Fallback: plex://preplay/ custom scheme.
+                            //
+                            // Android (Chrome):
+                            //   1. intent:// URI → el más compatible con Chrome para abrir apps.
+                            //   2. Fallback navegador: watch.plex.tv Universal Link
+                            //      (Android también lo intercepta si la app está instalada).
+                            //
+                            // El Universal Link (watch.plex.tv) lleva siempre a la ficha
+                            // de detalles y es el método más robusto y actualizado de Plex.
+
+                            // URL watch.plex.tv — la más fiable para página de detalles
+                            const universalLink = p.url.universal || null;
+
+                            if (isIOS) {
+                              // iOS: Universal Link primero (app intercepta si está instalada),
+                              // si no, plex:// custom scheme, si no, web.
+                              const iosDeepLink =
                                 p.url.mobile ||
-                                p.url.mobileRaw
-                              : p.url.mobile ||
                                 p.url.mobileAlt ||
                                 p.url.mobileRaw;
 
-                            const webFallback = p.url.web || null;
+                              if (universalLink) {
+                                // watch.plex.tv actúa como Universal Link:
+                                // si la app está instalada, iOS la abre directamente.
+                                // Si no, carga la web (que también muestra los detalles).
+                                window.location.href = universalLink;
+                              } else if (iosDeepLink) {
+                                // Fallback a plex://preplay/ custom scheme
+                                window.location.href = iosDeepLink;
 
-                            if (!deepLink) {
-                              if (webFallback)
-                                window.location.href = webFallback;
+                                // Fallback web si la app no está instalada
+                                const webFallback = p.url.web || null;
+                                if (webFallback) {
+                                  const fallbackTimer = setTimeout(() => {
+                                    if (!document.hidden) {
+                                      window.location.href = webFallback;
+                                    }
+                                  }, 2000);
+                                  const onHide = () => {
+                                    clearTimeout(fallbackTimer);
+                                    document.removeEventListener(
+                                      "visibilitychange",
+                                      onHide,
+                                    );
+                                  };
+                                  document.addEventListener(
+                                    "visibilitychange",
+                                    onHide,
+                                  );
+                                }
+                              } else {
+                                // Sin deep link: ir a la web
+                                const webUrl = p.url.web || null;
+                                if (webUrl) window.location.href = webUrl;
+                              }
                               return;
                             }
 
-                            // Try to open the Plex app
-                            window.location.href = deepLink;
+                            // Android: intent:// URI (mejor compat en Chrome)
+                            const androidDeepLink =
+                              p.url.androidIntent ||
+                              p.url.mobile ||
+                              p.url.mobileRaw;
 
-                            // Fallback: if after 2s the page is still visible
-                            // (app not installed), redirect to Plex web
-                            if (webFallback) {
+                            // Fallback: watch.plex.tv (Universal Link en Android,
+                            // también interceptada por la app si está instalada)
+                            // o app.plex.tv como último recurso.
+                            const androidFallback =
+                              universalLink || p.url.web || null;
+
+                            if (!androidDeepLink) {
+                              if (androidFallback)
+                                window.location.href = androidFallback;
+                              return;
+                            }
+
+                            // Intentar abrir la app vía intent://
+                            window.location.href = androidDeepLink;
+
+                            // Si después de 2s la página sigue visible
+                            // (app no instalada), ir al fallback.
+                            if (androidFallback) {
                               const fallbackTimer = setTimeout(() => {
                                 if (!document.hidden) {
-                                  window.location.href = webFallback;
+                                  window.location.href = androidFallback;
                                 }
                               }, 2000);
-
                               const onHide = () => {
                                 clearTimeout(fallbackTimer);
                                 document.removeEventListener(
@@ -5511,7 +5572,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             return;
                           }
 
-                          // Desktop: open in new window
+                          // Desktop: abrir en nueva pestaña
+                          // Preferir app.plex.tv/desktop (interfaz completa) o watch.plex.tv
                           const desktopUrl =
                             p.url.web ||
                             p.url.universal ||
@@ -5613,9 +5675,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
           {/* --- COLUMNA DERECHA: INFO (sin tabs cuando es backdrop) --- */}
           <div
-            className={`flex-1 flex flex-col min-w-0 w-full ${
-              isBackdropPoster ? "" : ""
-            }`}
+            className={`flex-1 flex flex-col min-w-0 w-full ${isBackdropPoster ? "" : ""
+              }`}
           >
             {/* 1. TÍTULO Y CABECERA */}
             <div className="mb-5 px-1">
@@ -5641,11 +5702,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <>
                     <span className="text-white text-[10px]">●</span>
                     <span
-                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
-                        data.status === "Ended" || data.status === "Canceled"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      }`}
+                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${data.status === "Ended" || data.status === "Canceled"
+                        ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                        : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        }`}
                     >
                       {data.status}
                     </span>
@@ -5850,9 +5910,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       onClick={
                         !trakt?.connected
                           ? () =>
-                              window.location.assign(
-                                `/api/trakt/auth/start?next=/details/${type}/${id}`,
-                              )
+                            window.location.assign(
+                              `/api/trakt/auth/start?next=/details/${type}/${id}`,
+                            )
                           : undefined
                       }
                     />
@@ -5898,20 +5958,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* Muestra el porcentaje de audiencia de RT, prioriza datos de Trakt sobre OMDb */}
                   {(tScoreboard?.external?.rtAudience != null ||
                     extras.rtScore != null) && (
-                    <div className="hidden sm:block">
-                      <CompactBadge
-                        logo="/logo-RottenTomatoes.png"
-                        value={
-                          tScoreboard?.external?.rtAudience != null
-                            ? Math.round(tScoreboard.external.rtAudience)
-                            : extras.rtScore != null
-                              ? Math.round(extras.rtScore)
-                              : null
-                        }
-                        suffix="%"
-                      />
-                    </div>
-                  )}
+                      <div className="hidden sm:block">
+                        <CompactBadge
+                          logo="/logo-RottenTomatoes.png"
+                          value={
+                            tScoreboard?.external?.rtAudience != null
+                              ? Math.round(tScoreboard.external.rtAudience)
+                              : extras.rtScore != null
+                                ? Math.round(extras.rtScore)
+                                : null
+                          }
+                          suffix="%"
+                        />
+                      </div>
+                    )}
 
                   {/* Badge de Metacritic - Solo visible en desktop (>= sm) */}
                   {/* Muestra la puntuación de Metacritic sobre 100 */}
@@ -6104,11 +6164,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-          ${
-            activeTab === tab.id
-              ? "text-white border-yellow-500"
-              : "text-zinc-500 border-transparent hover:text-zinc-300"
-          }`}
+          ${activeTab === tab.id
+                          ? "text-white border-yellow-500"
+                          : "text-zinc-500 border-transparent hover:text-zinc-300"
+                        }`}
                     >
                       {tab.label}
                     </button>
@@ -6320,11 +6379,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-        ${
-          activeTab === tab.id
-            ? "text-white border-yellow-500"
-            : "text-zinc-500 border-transparent hover:text-zinc-300"
-        }`}
+        ${activeTab === tab.id
+                      ? "text-white border-yellow-500"
+                      : "text-zinc-500 border-transparent hover:text-zinc-300"
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -6574,11 +6632,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               type="button"
                               onClick={() => setActiveImagesTab(tab)}
                               className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
-              ${
-                activeImagesTab === tab
-                  ? "bg-white/10 text-white shadow"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
+              ${activeImagesTab === tab
+                                  ? "bg-white/10 text-white shadow"
+                                  : "text-zinc-400 hover:text-zinc-200"
+                                }`}
                               style={{ WebkitTapHighlightColor: "transparent" }}
                             >
                               {tab === "posters"
@@ -6755,11 +6812,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 type="button"
                                 onClick={() => setActiveImagesTab("posters")}
-                                className={`p-2 rounded-lg transition-all ${
-                                  activeImagesTab === "posters"
-                                    ? "bg-white/10 text-white shadow"
-                                    : "text-zinc-400 hover:text-zinc-200"
-                                }`}
+                                className={`p-2 rounded-lg transition-all ${activeImagesTab === "posters"
+                                  ? "bg-white/10 text-white shadow"
+                                  : "text-zinc-400 hover:text-zinc-200"
+                                  }`}
                                 style={{
                                   WebkitTapHighlightColor: "transparent",
                                 }}
@@ -6770,11 +6826,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 type="button"
                                 onClick={() => setActiveImagesTab("backdrops")}
-                                className={`p-2 rounded-lg transition-all ${
-                                  activeImagesTab === "backdrops"
-                                    ? "bg-white/10 text-white shadow"
-                                    : "text-zinc-400 hover:text-zinc-200"
-                                }`}
+                                className={`p-2 rounded-lg transition-all ${activeImagesTab === "backdrops"
+                                  ? "bg-white/10 text-white shadow"
+                                  : "text-zinc-400 hover:text-zinc-200"
+                                  }`}
                                 style={{
                                   WebkitTapHighlightColor: "transparent",
                                 }}
@@ -6785,11 +6840,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 type="button"
                                 onClick={() => setActiveImagesTab("background")}
-                                className={`p-2 rounded-lg transition-all ${
-                                  activeImagesTab === "background"
-                                    ? "bg-white/10 text-white shadow"
-                                    : "text-zinc-400 hover:text-zinc-200"
-                                }`}
+                                className={`p-2 rounded-lg transition-all ${activeImagesTab === "background"
+                                  ? "bg-white/10 text-white shadow"
+                                  : "text-zinc-400 hover:text-zinc-200"
+                                  }`}
                                 style={{
                                   WebkitTapHighlightColor: "transparent",
                                 }}
@@ -6889,11 +6943,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => setLangES((v) => !v)}
-                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${
-                                    langES
-                                      ? "bg-zinc-800 text-white"
-                                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                                  }`}
+                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${langES
+                                    ? "bg-zinc-800 text-white"
+                                    : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                    }`}
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
@@ -6903,11 +6956,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => setLangEN((v) => !v)}
-                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${
-                                    langEN
-                                      ? "bg-zinc-800 text-white"
-                                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                                  }`}
+                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${langEN
+                                    ? "bg-zinc-800 text-white"
+                                    : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                    }`}
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
@@ -6951,19 +7003,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                     const breakpoints = isPoster
                       ? {
-                          500: { slidesPerView: 3, spaceBetween: 14 },
-                          640: { slidesPerView: 4, spaceBetween: 14 },
-                          768: { slidesPerView: 5, spaceBetween: 16 },
-                          1024: { slidesPerView: 6, spaceBetween: 18 },
-                          1280: { slidesPerView: 7, spaceBetween: 18 },
-                        }
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        640: { slidesPerView: 4, spaceBetween: 14 },
+                        768: { slidesPerView: 5, spaceBetween: 16 },
+                        1024: { slidesPerView: 6, spaceBetween: 18 },
+                        1280: { slidesPerView: 7, spaceBetween: 18 },
+                      }
                       : {
-                          0: { slidesPerView: 2, spaceBetween: 12 },
-                          640: { slidesPerView: 3, spaceBetween: 14 },
-                          768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 4, spaceBetween: 18 },
-                          1280: { slidesPerView: 4, spaceBetween: 20 },
-                        };
+                        0: { slidesPerView: 2, spaceBetween: 12 },
+                        640: { slidesPerView: 3, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 4, spaceBetween: 18 },
+                        1280: { slidesPerView: 4, spaceBetween: 20 },
+                      };
 
                     return (
                       <div className="relative overflow-x-hidden overflow-y-visible">
@@ -7054,11 +7106,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     }}
                                     className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
-                        ${
-                          isActive
-                            ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
-                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
-                        }`}
+                        ${isActive
+                                        ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
+                                        : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
+                                      }`}
                                     title="Seleccionar"
                                     style={{
                                       WebkitTapHighlightColor: "transparent",
@@ -7700,11 +7751,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           key={t.id}
                           type="button"
                           onClick={() => setTCommentsTab(t.id)}
-                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
-                            tCommentsTab === t.id
-                              ? "bg-zinc-700 text-white shadow-md"
-                              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-                          }`}
+                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${tCommentsTab === t.id
+                            ? "bg-zinc-700 text-white shadow-md"
+                            : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                            }`}
                         >
                           {t.label}
                         </button>
@@ -7834,11 +7884,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         <button
                           key={tab}
                           onClick={() => setTListsTab(tab)}
-                          className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${
-                            tListsTab === tab
-                              ? "bg-white text-black shadow-lg scale-105"
-                              : "text-zinc-400 hover:text-white hover:bg-white/5"
-                          }`}
+                          className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${tListsTab === tab
+                            ? "bg-white text-black shadow-lg scale-105"
+                            : "text-zinc-400 hover:text-white hover:bg-white/5"
+                            }`}
                         >
                           {tab}
                         </button>
@@ -8151,7 +8200,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                       const tmdbScore =
                         typeof rec.vote_average === "number" &&
-                        rec.vote_average > 0
+                          rec.vote_average > 0
                           ? rec.vote_average
                           : null;
 
@@ -8184,11 +8233,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 {/* Top gradient con tipo y ratings */}
                                 <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
                                   <span
-                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                                      isMovie
-                                        ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                        : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                    }`}
+                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
+                                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                      }`}
                                   >
                                     {isMovie ? "PELÍCULA" : "SERIE"}
                                   </span>
