@@ -4770,7 +4770,9 @@ export default function DetailsClient({
           const plexAndroidIntentUrl = result.plexAndroidIntentUrl || null; // intent preplay
           const plexAndroidIntentPlayUrl =
             result.plexAndroidIntentPlayUrl || null; // intent play
-          const plexUniversalUrl = result.plexUniversalUrl || null; // Android / web
+          const plexUniversalUrl = result.plexUniversalUrl || null; // watch.plex.tv Universal Link
+          const plexSlugUrl = result.plexSlugUrl || null; // plex://movie|show/{slug} — ficha detalles
+          const plexAndroidSlugIntentUrl = result.plexAndroidSlugIntentUrl || null; // intent slug Android
 
           setPlexAvailable(available);
 
@@ -4785,6 +4787,8 @@ export default function DetailsClient({
             androidIntent: plexAndroidIntentUrl,
             androidIntentPlay: plexAndroidIntentPlayUrl,
             universal: plexUniversalUrl,
+            slug: plexSlugUrl,
+            androidSlugIntent: plexAndroidSlugIntentUrl,
           });
 
           sessionStorage.setItem(
@@ -4802,6 +4806,8 @@ export default function DetailsClient({
                 androidIntent: plexAndroidIntentUrl,
                 androidIntentPlay: plexAndroidIntentPlayUrl,
                 universal: plexUniversalUrl,
+                slug: plexSlugUrl,
+                androidSlugIntent: plexAndroidSlugIntentUrl,
               },
               timestamp: Date.now(),
             }),
