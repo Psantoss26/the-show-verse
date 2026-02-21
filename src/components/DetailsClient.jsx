@@ -5434,14 +5434,25 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         p.url &&
                         typeof p.url === "object"
                       ) {
-                        // Construir URL de la página de redirección
-                        const slug = p.url.slug ? p.url.slug.replace("plex://movie/", "").replace("plex://show/", "") : "";
+                        // Extraer el slug limpio de la URL plex://movie/{slug} o plex://show/{slug}
+                        // p.url.slug viene de la API como "plex://movie/fight-club" o "plex://show/the-wire"
+                        let rawSlug = "";
+                        if (p.url.slug) {
+                          // Extraer todo lo que hay después del último "/" en plex://type/slug
+                          const slugMatch = p.url.slug.match(/plex:\/\/(?:movie|show)\/(.+)$/i);
+                          rawSlug = slugMatch ? slugMatch[1] : p.url.slug;
+                        } else if (p.url.universal) {
+                          // Fallback: extraer slug de la URL watch.plex.tv
+                          const uMatch = p.url.universal.match(/watch\.plex\.tv\/(?:movie|show)\/(.+)$/i);
+                          rawSlug = uMatch ? uMatch[1] : "";
+                        }
+
                         const contentType = endpointType === "movie" ? "movie" : "show";
                         const webUrl = p.url.web || "";
 
-                        if (slug) {
+                        if (rawSlug) {
                           const params = new URLSearchParams({
-                            slug,
+                            slug: rawSlug,
                             type: contentType,
                             webUrl,
                             title: title || "",
@@ -5449,7 +5460,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           providerLink = `/api/plex/open?${params.toString()}`;
                           hasValidLink = true;
                         } else {
-                          // Sin slug (raro): fallback directo a web de Plex
+                          // Sin slug (muy raro): fallback directo a web de Plex
                           providerLink = webUrl || p.url.universal || "#";
                           hasValidLink = !!providerLink && providerLink !== "#";
                         }
