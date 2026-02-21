@@ -345,20 +345,36 @@ export async function GET(request) {
 
       const plexAndroidIntentPlayUrl = `intent://play?metadataKey=${metadataKey}&metadataType=${metadataType}${serverParamRaw}#Intent;scheme=plex;package=com.plexapp.android;end`;
 
-      // Android universal link (watch.plex.tv)
-      let plexUniversalUrl = null;
+      // -------------------------------------------------------------------------
+      // Slug-based URLs — EL FORMATO MÁS FIABLE para la ficha de detalles en móvil
+      //
+      // plex://movie/{slug}  →  Abre la app Plex en la ficha de detalles (igual
+      //                          que watch.plex.tv pero en la app nativa).
+      // plex://show/{slug}   →  Ídem para series.
+      //
+      // watch.plex.tv/{type}/{slug} es también un Universal Link:
+      //   - En iOS: el SO lo intercepta y abre la app en la ficha correcta.
+      //   - En Android: ídem si la app está instalada.
+      //   - Si no hay app: carga la web de Plex con los detalles del contenido.
+      // -------------------------------------------------------------------------
+      let plexUniversalUrl = null;          // https://watch.plex.tv/movie|show/{slug}
+      let plexSlugUrl = null;               // plex://movie|show/{slug}  ← deep link nativo
+      let plexAndroidSlugIntentUrl = null;  // intent:// para Chrome en Android
+
       try {
-        const slug = await getPlexSlug({
-          imdbId,
-          tmdbId,
-          type,
-        });
+        const slug = await getPlexSlug({ imdbId, tmdbId, type });
 
         if (slug) {
-          plexUniversalUrl =
-            type === "movie"
-              ? `https://watch.plex.tv/movie/${slug}`
-              : `https://watch.plex.tv/show/${slug}`;
+          const contentType = type === "movie" ? "movie" : "show";
+
+          // Universal Link — web + interceptable por la app en iOS y Android
+          plexUniversalUrl = `https://watch.plex.tv/${contentType}/${slug}`;
+
+          // Deep link nativo de la app (formato más moderno y fiable)
+          plexSlugUrl = `plex://${contentType}/${slug}`;
+
+          // Android Chrome: intent:// con scheme plex://
+          plexAndroidSlugIntentUrl = `intent://${contentType}/${slug}#Intent;scheme=plex;package=com.plexapp.android;end`;
         }
       } catch (e) {
         console.warn("[Plex] Could not resolve watch.plex.tv slug:", e);
@@ -376,7 +392,9 @@ export async function GET(request) {
           plexPlayRawUrl,
           plexAndroidIntentUrl,
           plexAndroidIntentPlayUrl,
-          plexUniversalUrl, // <- NUEVO (Android)
+          plexUniversalUrl,
+          plexSlugUrl,
+          plexAndroidSlugIntentUrl,
           title: matchedItem.title,
           year: matchedItem.year,
           ratingKey: matchedItem.ratingKey,
