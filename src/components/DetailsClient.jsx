@@ -5423,7 +5423,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {limitedProviders.map((p) => {
                       const isPlexProvider = p.isPlex === true;
 
-                      // Para Plex, manejar las URLs de forma especial
+                      // Para Plex: enlazar a /api/plex/open (página de redirección
+                      // intermedia que detecta el dispositivo y lanza el deep link
+                      // correcto — mucho más fiable que window.location en onClick).
                       let providerLink;
                       let hasValidLink;
 
@@ -5432,145 +5434,45 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         p.url &&
                         typeof p.url === "object"
                       ) {
-                        // href apunta a la URL web como fallback y para Universal Links
-                        providerLink = p.url.web || p.url.universal || "#";
-                        hasValidLink = !!(
-                          p.url.web ||
-                          p.url.mobile ||
-                          p.url.androidIntent
-                        );
+                        // Construir URL de la página de redirección
+                        const slug = p.url.slug ? p.url.slug.replace("plex://movie/", "").replace("plex://show/", "") : "";
+                        const contentType = endpointType === "movie" ? "movie" : "show";
+                        const webUrl = p.url.web || "";
+
+                        if (slug) {
+                          const params = new URLSearchParams({
+                            slug,
+                            type: contentType,
+                            webUrl,
+                            title: title || "",
+                          });
+                          providerLink = `/api/plex/open?${params.toString()}`;
+                          hasValidLink = true;
+                        } else {
+                          // Sin slug (raro): fallback directo a web de Plex
+                          providerLink = webUrl || p.url.universal || "#";
+                          hasValidLink = !!providerLink && providerLink !== "#";
+                        }
                       } else {
                         providerLink = p.url || justwatchUrl || "#";
                         hasValidLink = p.url || justwatchUrl;
                       }
-
-                      const handleClick = (e) => {
-                        if (
-                          isPlexProvider &&
-                          p.url &&
-                          typeof p.url === "object"
-                        ) {
-                          e.preventDefault();
-
-                          const ua = navigator.userAgent || "";
-                          const isAndroid = /Android/i.test(ua);
-                          const isIOS =
-                            /iPad|iPhone|iPod/i.test(ua) ||
-                            (/Macintosh/i.test(ua) &&
-                              navigator.maxTouchPoints > 1);
-                          const isMobileOrTablet =
-                            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Tablet/i.test(
-                              ua,
-                            ) || isIOS;
-                          const isTouchDevice =
-                            "ontouchstart" in window ||
-                            navigator.maxTouchPoints > 0 ||
-                            navigator.msMaxTouchPoints > 0;
-
-                          if (isTouchDevice || isMobileOrTablet) {
-                            // ---------------------------------------------------------
-                            // MOVIL/TABLET: Abrir la ficha de detalles en la app Plex
-                            //
-                            // Cadena de prioridad (de mas a menos fiable):
-                            //
-                            // 1. plex://movie/{slug} o plex://show/{slug}
-                            //    Deep link NATIVO de la app. Es el formato mas moderno
-                            //    y fiable: abre directamente la ficha de detalles, igual
-                            //    que watch.plex.tv pero en la app (iOS y Android).
-                            //
-                            // 2. watch.plex.tv (Universal Link)
-                            //    iOS y Android lo interceptan si la app esta instalada.
-                            //    Si no, carga la web con los detalles del contenido.
-                            //
-                            // 3. plex://preplay/ (legacy, puede abrir home en algunos casos)
-                            //
-                            // 4. app.plex.tv/desktop (ultima opcion, solo web escritorio).
-                            // ---------------------------------------------------------
-
-                            const slugUrl = p.url.slug || null;               // plex://movie|show/{slug}
-                            const universalLink = p.url.universal || null;    // watch.plex.tv
-                            const androidSlugIntent = p.url.androidSlugIntent || null; // intent:// slug
-
-                            const legacyDeepLink =
-                              p.url.mobile || p.url.mobileAlt || p.url.mobileRaw;
-
-                            const webFallback = universalLink || p.url.web || null;
-
-                            // Intenta un deep link; si en 2s la pagina sigue visible
-                            // (app no instalada o no responde), redirige al fallback.
-                            const tryDeepLink = (deepLink, fallback) => {
-                              window.location.href = deepLink;
-                              if (!fallback) return;
-                              const timer = setTimeout(() => {
-                                if (!document.hidden) window.location.href = fallback;
-                              }, 2000);
-                              const onHide = () => {
-                                clearTimeout(timer);
-                                document.removeEventListener("visibilitychange", onHide);
-                              };
-                              document.addEventListener("visibilitychange", onHide);
-                            };
-
-                            if (isAndroid) {
-                              // Android: intent:// slug → mejor compat en Chrome
-                              if (androidSlugIntent) {
-                                tryDeepLink(androidSlugIntent, webFallback);
-                              } else if (slugUrl) {
-                                tryDeepLink(slugUrl, webFallback);
-                              } else if (legacyDeepLink) {
-                                tryDeepLink(legacyDeepLink, webFallback);
-                              } else if (webFallback) {
-                                window.location.href = webFallback;
-                              }
-                              return;
-                            }
-
-                            // iOS y otros: plex://movie|show/{slug} primero.
-                            if (slugUrl) {
-                              tryDeepLink(slugUrl, webFallback);
-                            } else if (universalLink) {
-                              // Universal Link: iOS lo intercepta y abre la app.
-                              // Si no esta instalada, carga la web de Plex.
-                              window.location.href = universalLink;
-                            } else if (legacyDeepLink) {
-                              tryDeepLink(legacyDeepLink, p.url.web || null);
-                            } else if (p.url.web) {
-                              window.location.href = p.url.web;
-                            }
-                            return;
-                          }
-
-                          // Desktop: abrir en nueva pestana (app.plex.tv/desktop)
-                          const desktopUrl =
-                            p.url.web ||
-                            p.url.universal ||
-                            p.url.slug ||
-                            p.url.mobile;
-
-                          if (!desktopUrl) {
-                            console.warn("[Plex] No URL available");
-                            return;
-                          }
-
-                          window.open(desktopUrl, "_blank", "noopener,noreferrer");
-                        }
-                      };
 
                       return (
                         <a
                           key={p.provider_id}
                           href={providerLink}
                           target={
-                            hasValidLink && !isPlexProvider
-                              ? "_blank"
-                              : undefined
+                            // Para Plex: la página /api/plex/open se carga en la
+                            // misma pestaña (navegación completa = más fiable para
+                            // deep links). Para otros providers: nueva pestaña.
+                            isPlexProvider ? "_self" : (hasValidLink ? "_blank" : undefined)
                           }
                           rel={
                             hasValidLink && !isPlexProvider
                               ? "noreferrer"
                               : undefined
                           }
-                          onClick={isPlexProvider ? handleClick : undefined}
                           title={p.provider_name}
                           className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10 cursor-pointer"
                         >
