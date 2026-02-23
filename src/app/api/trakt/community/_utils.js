@@ -7,14 +7,22 @@ export function traktClientId() {
     return process.env.TRAKT_CLIENT_ID || process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID || ''
 }
 
-export async function traktHeaders() {
+function traktUserAgent() {
+    return process.env.TRAKT_USER_AGENT || 'TheShowVerse/1.0 (Next.js; Trakt Community)'
+}
+
+export async function traktHeaders({ includeAuth = false } = {}) {
     const clientId = traktClientId()
 
     const h = {
         'content-type': 'application/json',
+        accept: 'application/json',
         'trakt-api-version': '2',
         'trakt-api-key': clientId,
+        'user-agent': traktUserAgent(),
     }
+
+    if (!includeAuth) return h
 
     // ✅ Next (dynamic APIs): cookies() puede ser Promise -> hay que await
     const c = await cookies()
@@ -29,6 +37,25 @@ export async function traktHeaders() {
     return h
 }
 
+export async function safeTraktBody(res) {
+    const raw = await res.text().catch(() => '')
+    if (!raw) return { json: null, text: '' }
+    try {
+        return { json: JSON.parse(raw), text: raw }
+    } catch {
+        return { json: null, text: raw }
+    }
+}
+
+export function buildTraktErrorMessage({ res, json, text, fallback }) {
+    const isCloudflare =
+        Number(res?.status) === 403 && /cloudflare|attention required/i.test(String(text || ''))
+    if (isCloudflare) {
+        return 'Trakt/Cloudflare bloqueó temporalmente la petición de comunidad'
+    }
+    return json?.error || json?.message || fallback
+}
+
 export async function resolveTraktIdFromTmdb({ type, tmdbId }) {
     const headers = await traktHeaders()
 
@@ -37,10 +64,15 @@ export async function resolveTraktIdFromTmdb({ type, tmdbId }) {
     )}?type=${encodeURIComponent(type)}`
 
     const res = await fetch(url, { headers, cache: 'no-store' })
-    const json = await res.json().catch(() => null)
+    const { json, text } = await safeTraktBody(res)
 
     if (!res.ok) {
-        const msg = json?.error || json?.message || 'Error resolviendo ID en Trakt'
+        const msg = buildTraktErrorMessage({
+            res,
+            json,
+            text,
+            fallback: 'Error resolviendo ID en Trakt'
+        })
         throw new Error(msg)
     }
 

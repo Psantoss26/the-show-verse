@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
-import { resolveTraktIdFromTmdb, traktHeaders, readPaginationHeaders } from '../_utils'
+import {
+    resolveTraktIdFromTmdb,
+    traktHeaders,
+    readPaginationHeaders,
+    safeTraktBody,
+    buildTraktErrorMessage,
+} from '../_utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,15 +78,20 @@ export async function GET(req) {
             return NextResponse.json({ error: 'type debe ser movie o show' }, { status: 400 })
 
         const { traktId } = await resolveTraktIdFromTmdb({ type, tmdbId })
-        const headers = await traktHeaders()
+        const headers = await traktHeaders({ includeAuth: false })
 
         const base = type === 'movie' ? 'movies' : 'shows'
         const url = `https://api.trakt.tv/${base}/${traktId}/lists/${tab}?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`
         const res = await fetch(url, { headers, cache: 'no-store' })
-        const json = await res.json().catch(() => null)
+        const { json, text } = await safeTraktBody(res)
 
         if (!res.ok) {
-            const msg = json?.error || json?.message || 'Error cargando listas'
+            const msg = buildTraktErrorMessage({
+                res,
+                json,
+                text,
+                fallback: 'Error cargando listas'
+            })
             return NextResponse.json({ error: msg }, { status: res.status })
         }
 
