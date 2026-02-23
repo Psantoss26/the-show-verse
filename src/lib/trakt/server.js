@@ -4,6 +4,10 @@ const TRAKT_API = 'https://api.trakt.tv'
 const TRAKT_AUTHORIZE = 'https://trakt.tv/oauth/authorize'
 const TRAKT_TOKEN = 'https://api.trakt.tv/oauth/token'
 
+function traktUserAgent() {
+    return process.env.TRAKT_USER_AGENT || 'TheShowVerse/1.0 (Next.js; Trakt OAuth)'
+}
+
 function requireEnv() {
     const clientId = process.env.TRAKT_CLIENT_ID
     const clientSecret = process.env.TRAKT_CLIENT_SECRET
@@ -109,11 +113,24 @@ function traktHeaders({ token } = {}) {
     const { clientId } = requireEnv()
     const h = {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
         'trakt-api-version': '2',
         'trakt-api-key': clientId,
+        'User-Agent': traktUserAgent(),
     }
     if (token) h.Authorization = `Bearer ${token}`
     return h
+}
+
+function traktOAuthHeaders() {
+    const { clientId } = requireEnv()
+    return {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'trakt-api-version': '2',
+        'trakt-api-key': clientId,
+        'User-Agent': traktUserAgent(),
+    }
 }
 
 export async function exchangeCodeForTokens({ code, redirectUri }) {
@@ -121,7 +138,7 @@ export async function exchangeCodeForTokens({ code, redirectUri }) {
 
     const res = await fetch(TRAKT_TOKEN, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: traktOAuthHeaders(),
         cache: 'no-store',
         body: JSON.stringify({
             code,
@@ -153,7 +170,7 @@ export async function refreshAccessToken(refreshToken) {
 
     const res = await fetch(TRAKT_TOKEN, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: traktOAuthHeaders(),
         cache: 'no-store',
         body: JSON.stringify({
             refresh_token: refreshToken,

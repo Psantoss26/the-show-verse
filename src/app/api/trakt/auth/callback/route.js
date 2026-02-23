@@ -9,6 +9,14 @@ function cleanOrigin(s) {
     return String(s || "").replace(/\/+$/, "")
 }
 
+function cleanUrl(s) {
+    return String(s || "").trim().replace(/\/+$/, "")
+}
+
+function traktUserAgent() {
+    return process.env.TRAKT_USER_AGENT || "TheShowVerse/1.0 (Next.js; Trakt OAuth Callback)"
+}
+
 async function originFromRequest(req) {
     const forced =
         process.env.TRAKT_APP_ORIGIN ||
@@ -28,6 +36,16 @@ async function originFromRequest(req) {
     if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
 
     return "http://localhost:3000"
+}
+
+function resolveWebRedirectUri(origin, req) {
+    const fromCookie = cleanUrl(req.cookies.get("trakt_oauth_redirect_uri")?.value || "")
+    if (/^https?:\/\//i.test(fromCookie)) return fromCookie
+
+    const configured = cleanUrl(process.env.TRAKT_REDIRECT_URI || "")
+    if (/^https?:\/\//i.test(configured)) return configured
+
+    return `${origin}/api/trakt/auth/callback`
 }
 
 function sanitizeNextPath(nextPath) {
@@ -56,11 +74,17 @@ export async function GET(req) {
     }
 
     const origin = await originFromRequest(req)
-    const redirectUri = `${origin}/api/trakt/auth/callback`
+    const redirectUri = resolveWebRedirectUri(origin, req)
 
     const tokenRes = await fetch("https://api.trakt.tv/oauth/token", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "trakt-api-version": "2",
+            "trakt-api-key": clientId,
+            "User-Agent": traktUserAgent(),
+        },
         cache: "no-store",
         body: JSON.stringify({
             code,
@@ -71,12 +95,26 @@ export async function GET(req) {
         }),
     })
 
-    const tokenJson = await tokenRes.json().catch(() => null)
+    const rawBody = await tokenRes.text().catch(() => "")
+    let tokenJson = null
+    if (rawBody) {
+        try {
+            tokenJson = JSON.parse(rawBody)
+        } catch {
+            tokenJson = null
+        }
+    }
     if (!tokenRes.ok) {
+        const isCloudflareChallenge =
+            tokenRes.status === 403 &&
+            /cloudflare|attention required/i.test(String(rawBody || ""))
+
         console.error("❌ Trakt token exchange failed:", {
             status: tokenRes.status,
             statusText: tokenRes.statusText,
             response: tokenJson,
+            responseText: tokenJson ? null : rawBody?.slice(0, 400) || null,
+            isCloudflareChallenge,
             redirectUri,
             hasCode: !!code,
             hasClientId: !!clientId,
@@ -95,8 +133,23 @@ export async function GET(req) {
         }
         
         return NextResponse.json(
-            { error: "Token exchange failed", details: tokenJson, status: tokenRes.status },
-            { status: 500 }
+            {
+                error: "Token exchange failed",
+                details: tokenJson,
+                detailsText: tokenJson ? null : rawBody?.slice(0, 400) || null,
+                status: tokenRes.status,
+                redirectUri,
+                hint:
+                    tokenRes.status === 403
+                        ? (
+                            isCloudflareChallenge
+                                ? "Cloudflare está bloqueando la petición del servidor a Trakt. Prueba sin VPN/proxy/antibot y reinicia el flujo."
+                                : "Verifica que el redirect_uri de la app de Trakt coincida exactamente con el usado en /auth/start y /auth/callback."
+                        )
+                        : null,
+                cloudflareChallenge: isCloudflareChallenge || null,
+            },
+            { status: tokenRes.status }
         )
     }
 
@@ -133,6 +186,7 @@ export async function GET(req) {
     // Limpieza
     res.cookies.set("trakt_oauth_state", "", { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: 0 })
     res.cookies.set("trakt_oauth_next", "", { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: 0 })
+    res.cookies.set("trakt_oauth_redirect_uri", "", { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: 0 })
 
     return res
 }

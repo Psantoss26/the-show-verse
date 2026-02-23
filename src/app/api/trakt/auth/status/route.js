@@ -23,8 +23,23 @@ export async function GET(request) {
 
         const auth = await traktApi('/users/settings', { token })
         if (!auth.ok) {
-            const res = NextResponse.json({ connected: false })
-            clearTraktCookies(res)
+            // 401 = token inválido/revocado. 403/5xx puede ser bloqueo upstream (Cloudflare) u error temporal.
+            if (auth.status === 401) {
+                const res = NextResponse.json({ connected: false })
+                clearTraktCookies(res)
+                return res
+            }
+
+            const res = NextResponse.json(
+                {
+                    connected: true,
+                    degraded: true,
+                    upstreamStatus: auth.status,
+                    error: 'Trakt upstream check failed',
+                },
+                { status: 200 }
+            )
+            if (refreshedTokens) setTraktCookies(res, refreshedTokens)
             return res
         }
 

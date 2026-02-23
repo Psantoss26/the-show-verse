@@ -3,6 +3,10 @@ import crypto from 'crypto'
 export const TRAKT_API_BASE = 'https://api.trakt.tv'
 export const TRAKT_OAUTH_TOKEN_URL = `${TRAKT_API_BASE}/oauth/token`
 
+function traktUserAgent() {
+    return process.env.TRAKT_USER_AGENT || 'TheShowVerse/1.0 (Next.js; Trakt OAuth)'
+}
+
 export function assertTraktEnv() {
     if (!process.env.TRAKT_CLIENT_ID) throw new Error('Missing TRAKT_CLIENT_ID')
     if (!process.env.TRAKT_CLIENT_SECRET) throw new Error('Missing TRAKT_CLIENT_SECRET')
@@ -13,11 +17,24 @@ export function traktHeaders({ accessToken } = {}) {
     assertTraktEnv()
     const h = {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
         'trakt-api-version': '2',
-        'trakt-api-key': process.env.TRAKT_CLIENT_ID
+        'trakt-api-key': process.env.TRAKT_CLIENT_ID,
+        'User-Agent': traktUserAgent()
     }
     if (accessToken) h.Authorization = `Bearer ${accessToken}`
     return h
+}
+
+function traktOAuthHeaders() {
+    assertTraktEnv()
+    return {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'trakt-api-version': '2',
+        'trakt-api-key': process.env.TRAKT_CLIENT_ID,
+        'User-Agent': traktUserAgent()
+    }
 }
 
 export function getCookie(req, name) {
@@ -78,7 +95,7 @@ export async function exchangeCodeForTokens(code) {
     assertTraktEnv()
     const r = await fetch(TRAKT_OAUTH_TOKEN_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: traktOAuthHeaders(),
         body: JSON.stringify({
             code,
             client_id: process.env.TRAKT_CLIENT_ID,
@@ -99,7 +116,7 @@ export async function refreshAccessToken(refreshToken) {
     assertTraktEnv()
     const r = await fetch(TRAKT_OAUTH_TOKEN_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: traktOAuthHeaders(),
         body: JSON.stringify({
             refresh_token: refreshToken,
             client_id: process.env.TRAKT_CLIENT_ID,

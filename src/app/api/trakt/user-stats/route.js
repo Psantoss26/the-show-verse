@@ -15,8 +15,11 @@ function traktHeaders(accessToken = null) {
 
   const headers = {
     "Content-Type": "application/json",
+    Accept: "application/json",
     "trakt-api-version": "2",
     "trakt-api-key": key,
+    "User-Agent":
+      process.env.TRAKT_USER_AGENT || "TheShowVerse/1.0 (Next.js; Trakt user-stats)",
   };
 
   if (accessToken) {
