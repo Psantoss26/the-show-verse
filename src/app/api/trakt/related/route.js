@@ -9,22 +9,28 @@ const TRAKT_KEY =
   process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ||
   process.env.TRAKT_API_KEY;
 
-const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const TMDB_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const TRAKT_USER_AGENT =
+  process.env.TRAKT_USER_AGENT || "TheShowVerse/1.0 (Next.js; Trakt related)";
 
 function traktHeaders() {
   if (!TRAKT_KEY) throw new Error("Missing TRAKT_CLIENT_ID env");
   return {
     "content-type": "application/json",
+    accept: "application/json",
     "trakt-api-version": "2",
     "trakt-api-key": TRAKT_KEY,
+    "user-agent": TRAKT_USER_AGENT,
   };
 }
 
-async function safeJson(res) {
+async function safeBody(res) {
+  const text = await res.text().catch(() => "");
+  if (!text) return { json: null, text: "" };
   try {
-    return await res.json();
+    return { json: JSON.parse(text), text };
   } catch {
-    return null;
+    return { json: null, text };
   }
 }
 
@@ -33,8 +39,20 @@ async function fetchTrakt(path) {
     headers: traktHeaders(),
     next: { revalidate },
   });
-  const json = await safeJson(res);
-  if (!res.ok) return [];
+  const { json, text } = await safeBody(res);
+  if (!res.ok) {
+    const isCloudflare =
+      res.status === 403 &&
+      /cloudflare|attention required/i.test(String(text || ""));
+    console.error("Trakt related upstream failed", {
+      path,
+      status: res.status,
+      isCloudflare,
+      response: json,
+      responseText: json ? null : String(text || "").slice(0, 400),
+    });
+    return [];
+  }
   return Array.isArray(json) ? json : [];
 }
 
@@ -42,7 +60,7 @@ async function fetchTmdb(type, id) {
   if (!TMDB_KEY) return null;
   const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&language=es-ES`;
   const res = await fetch(url, { next: { revalidate } });
-  const json = await safeJson(res);
+  const { json } = await safeBody(res);
   if (!res.ok) return null;
   return json;
 }
