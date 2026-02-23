@@ -14,13 +14,33 @@ const TRAKT_CLIENT_ID =
 
 const TMDB_BASE = 'https://api.themoviedb.org/3'
 const TMDB_KEY = String(process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY || '').trim()
+const TRAKT_USER_AGENT =
+    process.env.TRAKT_USER_AGENT || 'TheShowVerse/1.0 (Next.js; Trakt lists)'
+
+async function safeBody(res) {
+    const text = await res.text().catch(() => '')
+    if (!text) return { json: null, text: '' }
+    try {
+        return { json: JSON.parse(text), text }
+    } catch {
+        return { json: null, text }
+    }
+}
+
+function traktErrorMessage({ status, json, text, fallback }) {
+    const isCloudflare = Number(status) === 403 && /cloudflare|attention required/i.test(String(text || ''))
+    if (isCloudflare) return 'Trakt/Cloudflare bloqueó temporalmente la petición de listas'
+    return json?.error || json?.message || fallback
+}
 
 function headersTrakt() {
     if (!TRAKT_CLIENT_ID) return null
     return {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
         'trakt-api-version': TRAKT_API_VERSION,
         'trakt-api-key': TRAKT_CLIENT_ID,
+        'User-Agent': TRAKT_USER_AGENT,
     }
 }
 
@@ -34,8 +54,21 @@ async function traktGet(path, params = {}) {
     })
 
     const res = await fetch(url.toString(), { headers: h, cache: 'no-store' })
-    const json = await res.json().catch(() => null)
-    return { ok: res.ok, status: res.status, json }
+    const { json, text } = await safeBody(res)
+    return {
+        ok: res.ok,
+        status: res.status,
+        json,
+        text,
+        error: res.ok
+            ? null
+            : traktErrorMessage({
+                status: res.status,
+                json,
+                text,
+                fallback: 'Trakt lists request failed',
+            }),
+    }
 }
 
 async function tmdbFetch(path, params = {}) {
@@ -233,11 +266,11 @@ export async function GET(req) {
         // 1) Fuente principal según modo
         if (mode === 'trending') {
             const r = await traktGet('/lists/trending', { page, limit, extended: 'full' })
-            if (!r.ok) return NextResponse.json({ error: 'Trakt lists failed', details: r.json }, { status: r.status })
+            if (!r.ok) return NextResponse.json({ error: r.error || 'Trakt lists failed', details: r.json }, { status: r.status })
             pushMany(Array.isArray(r.json) ? r.json : [])
         } else if (mode === 'popular') {
             const r = await traktGet('/lists/popular', { page, limit, extended: 'full' })
-            if (!r.ok) return NextResponse.json({ error: 'Trakt lists failed', details: r.json }, { status: r.status })
+            if (!r.ok) return NextResponse.json({ error: r.error || 'Trakt lists failed', details: r.json }, { status: r.status })
             pushMany(Array.isArray(r.json) ? r.json : [])
         } else {
             // ✅ OFFICIAL real (si Trakt lo soporta)
@@ -247,7 +280,7 @@ export async function GET(req) {
             } else {
                 // fallback (tu estrategia antigua) por si /official no devuelve nada en tu región
                 const t = await traktGet('/lists/trending', { page: 1, limit: 50, extended: 'full' })
-                if (!t.ok) return NextResponse.json({ error: 'Trakt lists failed', details: t.json }, { status: t.status })
+                if (!t.ok) return NextResponse.json({ error: t.error || 'Trakt lists failed', details: t.json }, { status: t.status })
 
                 const trending = (Array.isArray(t.json) ? t.json : [])
                     .map(normalizeList)
