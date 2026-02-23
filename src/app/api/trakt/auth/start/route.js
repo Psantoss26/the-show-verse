@@ -9,6 +9,10 @@ function cleanOrigin(s) {
     return String(s || "").replace(/\/+$/, "")
 }
 
+function cleanUrl(s) {
+    return String(s || "").trim().replace(/\/+$/, "")
+}
+
 async function originFromRequest(req) {
     // ✅ Forzar dominio estable (RECOMENDADO)
     // En Vercel pon: TRAKT_APP_ORIGIN=https://the-show-verse.vercel.app
@@ -34,6 +38,14 @@ async function originFromRequest(req) {
     return "http://localhost:3000"
 }
 
+function resolveWebRedirectUri(origin) {
+    const configured = cleanUrl(process.env.TRAKT_REDIRECT_URI || "")
+    if (/^https?:\/\//i.test(configured)) {
+        return configured
+    }
+    return `${origin}/api/trakt/auth/callback`
+}
+
 function randomState() {
     return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
 }
@@ -52,7 +64,7 @@ export async function GET(req) {
     }
 
     const origin = await originFromRequest(req)
-    const redirectUri = `${origin}/api/trakt/auth/callback`
+    const redirectUri = resolveWebRedirectUri(origin)
 
     const state = randomState()
     const nextPath = sanitizeNextPath(req?.nextUrl?.searchParams?.get("next") || "/history")
@@ -66,7 +78,13 @@ export async function GET(req) {
 
     // ✅ Debug opcional: /api/trakt/auth/start?debug=1
     if (req?.nextUrl?.searchParams?.get("debug") === "1") {
-        return NextResponse.json({ origin, redirectUri, nextPath, authorizeUrl: url })
+        return NextResponse.json({
+            origin,
+            redirectUri,
+            nextPath,
+            authorizeUrl: url,
+            configuredRedirectUri: process.env.TRAKT_REDIRECT_URI || null,
+        })
     }
 
     const res = NextResponse.redirect(url)
@@ -83,6 +101,15 @@ export async function GET(req) {
 
     // ✅ guardamos a dónde volver tras callback
     res.cookies.set("trakt_oauth_next", nextPath, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure,
+        path: "/",
+        maxAge: 10 * 60,
+    })
+
+    // Guarda el redirect_uri exacto usado en /authorize para reutilizarlo en /callback.
+    res.cookies.set("trakt_oauth_redirect_uri", redirectUri, {
         httpOnly: true,
         sameSite: "lax",
         secure,
