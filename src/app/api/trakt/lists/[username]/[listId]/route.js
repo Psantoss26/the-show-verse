@@ -14,6 +14,8 @@ const TRAKT_CLIENT_ID =
     ''
 
 const TMDB_KEY = String(process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY || '').trim()
+const TRAKT_USER_AGENT =
+    process.env.TRAKT_USER_AGENT || 'TheShowVerse/1.0 (Next.js; Trakt list details)'
 
 function json(res, status = 200) {
     return new NextResponse(JSON.stringify(res), {
@@ -30,6 +32,22 @@ function clampInt(n, { min, max, fallback }) {
     const x = Number.parseInt(String(n), 10)
     if (!Number.isFinite(x)) return fallback
     return Math.max(min, Math.min(max, x))
+}
+
+async function safeBody(res) {
+    const text = await res.text().catch(() => '')
+    if (!text) return { json: null, text: '' }
+    try {
+        return { json: JSON.parse(text), text }
+    } catch {
+        return { json: null, text }
+    }
+}
+
+function traktErrorMessage({ status, json, text, fallback }) {
+    const isCloudflare = Number(status) === 403 && /cloudflare|attention required/i.test(String(text || ''))
+    if (isCloudflare) return 'Trakt/Cloudflare bloqueó temporalmente la petición de listas'
+    return json?.error || json?.message || fallback
 }
 
 async function traktFetchRaw(path, { params } = {}) {
@@ -49,19 +67,28 @@ async function traktFetchRaw(path, { params } = {}) {
     const res = await fetch(url.toString(), {
         headers: {
             'Content-Type': 'application/json',
+            Accept: 'application/json',
             'trakt-api-version': '2',
             'trakt-api-key': TRAKT_CLIENT_ID,
+            'User-Agent': TRAKT_USER_AGENT,
         },
         cache: 'no-store',
     })
 
-    const data = await res.json().catch(() => ({}))
+    const { json: data, text } = await safeBody(res)
     if (!res.ok) {
-        const e = new Error(data?.error || data?.message || 'Trakt request failed')
+        const e = new Error(
+            traktErrorMessage({
+                status: res.status,
+                json: data,
+                text,
+                fallback: 'Trakt request failed',
+            })
+        )
         e.status = res.status
         throw e
     }
-    return { data, headers: res.headers }
+    return { data: data ?? {}, headers: res.headers }
 }
 
 async function tmdbFetch(path, params = {}) {
