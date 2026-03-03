@@ -347,13 +347,14 @@ function pickBestTrailer(videos) {
   return [...candidates].sort((a, b) => score(b) - score(a))[0] || null;
 }
 
-async function fetchBestTrailer(movieId) {
+async function fetchBestTrailer(itemId, mediaType = "movie") {
   try {
     const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-    if (!apiKey || !movieId) return null;
+    if (!apiKey || !itemId) return null;
 
+    const type = mediaType === "tv" ? "tv" : "movie";
     const url =
-      `https://api.themoviedb.org/3/movie/${movieId}/videos` +
+      `https://api.themoviedb.org/3/${type}/${itemId}/videos` +
       `?api_key=${apiKey}&language=en-US`;
 
     const r = await fetch(url, { cache: "force-cache" });
@@ -370,19 +371,20 @@ async function fetchBestTrailer(movieId) {
   }
 }
 
-async function getBestTrailerCached(movieId) {
-  if (movieTrailerCache.has(movieId)) return movieTrailerCache.get(movieId);
-  if (movieTrailerInFlight.has(movieId))
-    return movieTrailerInFlight.get(movieId);
+async function getBestTrailerCached(itemId, mediaType = "movie") {
+  const cacheKey = `${mediaType}:${itemId}`;
+  if (movieTrailerCache.has(cacheKey)) return movieTrailerCache.get(cacheKey);
+  if (movieTrailerInFlight.has(cacheKey))
+    return movieTrailerInFlight.get(cacheKey);
 
   const p = (async () => {
-    const t = await fetchBestTrailer(movieId);
-    movieTrailerCache.set(movieId, t || null);
-    movieTrailerInFlight.delete(movieId);
+    const t = await fetchBestTrailer(itemId, mediaType);
+    movieTrailerCache.set(cacheKey, t || null);
+    movieTrailerInFlight.delete(cacheKey);
     return t || null;
   })();
 
-  movieTrailerInFlight.set(movieId, p);
+  movieTrailerInFlight.set(cacheKey, p);
   return p;
 }
 
@@ -809,7 +811,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       setTrailerLoading(true);
       setError("");
 
-      const t = await getBestTrailerCached(movie.id);
+      const t = await getBestTrailerCached(movie.id, mediaType);
 
       if (!t?.key) {
         setTrailer(null);
@@ -1287,7 +1289,7 @@ function InlinePreviewCardAnticipated({
     try {
       setTrailerLoading(true);
       setError("");
-      const t = await getBestTrailerCached(movie.id);
+      const t = await getBestTrailerCached(movie.id, mediaType);
       if (!t?.key) {
         setTrailer(null);
         setShowTrailer(false);
