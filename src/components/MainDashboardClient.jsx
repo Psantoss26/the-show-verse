@@ -2478,7 +2478,7 @@ function TopRatedHero({
         </div>
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-            Mejores valoradas<span className="text-amber-500">.</span>
+            Mejor valoradas<span className="text-amber-500">.</span>
           </h3>
 
           <div className="flex gap-1 bg-white/5 rounded-full p-1">

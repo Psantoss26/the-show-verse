@@ -1,0 +1,795 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same} % disable monospaced font for URLs
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+\hypertarget{metodologuxeda}{%
+\subsection{3. METODOLOGÍA}\label{metodologuxeda}}
+
+\hypertarget{enfoque-metodoluxf3gico-y-criterios-de-decisiuxf3n}{%
+\subsubsection{3.1 Enfoque metodológico y criterios de
+decisión}\label{enfoque-metodoluxf3gico-y-criterios-de-decisiuxf3n}}
+
+El desarrollo de \emph{The Show Verse} se ha abordado mediante una
+\textbf{metodología iterativa basada en el ciclo de vida ágil}, adaptada
+a un proyecto individual. La elección de este enfoque frente a las
+metodologías en cascada se justifica por la naturaleza exploratoria del
+proyecto: la integración con APIs de terceros implica incertidumbres
+técnicas que no siempre se pueden anticipar en una fase de análisis, y
+la prioridad entre funcionalidades puede variar a medida que se
+comprende mejor el problema.
+
+El proceso de desarrollo se articula en iteraciones de aproximadamente
+una semana de duración. Al inicio de cada iteración se seleccionan del
+backlog las funcionalidades a abordar, priorizadas según tres
+criterios:\\
+- \textbf{Dependencia técnica:} las funcionalidades que sirven de base a
+otras (autenticación, cliente de API) se abordan primeras.\\
+- \textbf{Valor aportado al usuario:} se priorizan las funcionalidades
+más visibles y relevantes para la experiencia de uso.\\
+- \textbf{Riesgo técnico:} las integraciones más inciertas se adelantan
+para conocer cuanto antes sus restricciones.
+
+\hypertarget{criterios-de-integraciuxf3n-de-apis}{%
+\paragraph{Criterios de integración de
+APIs}\label{criterios-de-integraciuxf3n-de-apis}}
+
+La selección de las APIs externas ha seguido los siguientes criterios:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Datos completos:} TMDb fue seleccionada frente a otras
+  alternativas (The Open Movie Database, Wikidata) por ofrecer la mayor
+  cobertura de contenido, soporte en diferentes idiomas, galería de
+  imágenes y datos de streaming. Dispone de la documentación más
+  completa y una comunidad de desarrolladores activa.\\
+\item
+  \textbf{Capacidad de tracking:} Trakt.tv fue seleccionada como
+  plataforma de sincronización por su API pública v2 bien documentada,
+  su soporte completo de series a nivel de episodio, la disponibilidad
+  de sus endpoints principales para desarrolladores, y por ser la
+  plataforma de \emph{tracking} más referenciada por la comunidad de
+  desarrolladores independientes.\\
+\item
+  \textbf{Complementariedad:} OMDb fue seleccionada únicamente para los
+  datos de rating de IMDb y Rotten Tomatoes, que TMDb no proporciona
+  directamente.
+\end{itemize}
+
+\hypertarget{criterios-de-decisiuxf3n-para-la-autenticaciuxf3n}{%
+\paragraph{Criterios de decisión para la
+autenticación}\label{criterios-de-decisiuxf3n-para-la-autenticaciuxf3n}}
+
+El problema de la autenticación OAuth 2.0 admitía varias opciones de
+implementación en Next.js. Se descartó el uso de librerías de
+autenticación genéricas como NextAuth.js / Auth.js por las siguientes
+razones: - Trakt.tv no es un proveedor OAuth soportado de forma nativa
+por estas librerías. - La personalización necesaria (refresco de tokens
+específico de Trakt, intercambio de códigos con headers personalizados)
+habría requerido más configuración que implementar el flujo
+directamente. - La implementación propia ofrece mayor control sobre el
+manejo de errores y el almacenamiento de tokens.
+
+Se optó por implementar el flujo Authorization Code de forma manual
+mediante \textbf{API Routes de Next.js}, almacenando los tokens en
+cookies \texttt{httpOnly} con atributos \texttt{Secure} y
+\texttt{SameSite=Lax}. Esta decisión garantiza que los tokens no sean
+accesibles desde JavaScript del navegador (protección frente a XSS) y
+que no se envíen en peticiones \emph{cross-site} no intencionadas
+(protección parcial frente a CSRF).
+
+\hypertarget{criterios-de-diseuxf1o-de-interfaz}{%
+\paragraph{Criterios de diseño de
+interfaz}\label{criterios-de-diseuxf1o-de-interfaz}}
+
+Las decisiones de diseño visual han seguido los siguientes principios: -
+\textbf{Coherencia con el dominio:} una plataforma de contenido
+audiovisual compite visualmente con las propias plataformas de
+\emph{streaming}, desde el punto de vista del usuario, lo que justifica
+una estética similar. - \textbf{Modo oscuro por defecto:} adecuado para
+el consumo de contenido multimedia y preferido por la mayoría de
+usuarios. - \textbf{Mobile-first:} el consumo de contenido audiovisual
+en dispositivos móviles supera al escritorio en grupos demográficos
+menores de 35 años según datos de Nielsen (2023).
+
+\hypertarget{criterios-de-estrategia-de-cachuxe9}{%
+\paragraph{Criterios de estrategia de
+caché}\label{criterios-de-estrategia-de-cachuxe9}}
+
+Para cada tipo de dato gestionado en la aplicación se ha definido una
+estrategia de caché en función de la frecuencia de actualización del
+dato en origen:
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule()
+\begin{minipage}[b]{\linewidth}\raggedright
+Tipo de dato
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Almacenamiento
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Revalidación
+\end{minipage} \\
+\midrule()
+\endhead
+Catálogo general (top rated, populares) & ISR servidor (force-cache) &
+10 minutos \\
+Detalles de película/serie & ISR servidor (force-cache) & 1 hora \\
+Imágenes TMDb & CDN Vercel & 1 hora \\
+Estado personal del usuario (favoritos, historial) & No-cache & En cada
+petición \\
+Datos de autenticación (token) & Cookie httpOnly & Por expiración \\
+\textbf{Puntuaciones IMDb y Trakt en listas} & \textbf{localStorage
+(cliente)} & \textbf{30 días} \\
+\textbf{Datos OMDb en página de detalle} (IMDb rating, RT, Metacritic) &
+\textbf{sessionStorage (cliente)} & \textbf{24 horas} \\
+\textbf{Rating personal del usuario en página de detalle} &
+\textbf{Memoria (Map en módulo)} & \textbf{10 min (nulo: 45 s)} \\
+\bottomrule()
+\end{longtable}
+
+Esta diferenciación permite reducir el número de llamadas a APIs
+externas en un estimado del 70--80\% para los datos de catálogo,
+mientras se garantiza la actualización de los datos de usuario. El nivel
+de caché en cliente dedicado a las puntuaciones de fuentes externas
+(IMDb, Trakt, OMDb) reduce adicionalmente la carga sobre estas APIs en
+las vistas de listas y detalles, donde se consultan simultáneamente
+puntuaciones de múltiples títulos.
+
+\hypertarget{tecnologuxedas-empleadas}{%
+\subsubsection{3.2 Tecnologías
+empleadas}\label{tecnologuxedas-empleadas}}
+
+\textbf{Next.js 16 (Framework principal)}\\
+Seleccionado frente a otras alternativas (Remix, SvelteKit, Nuxt 3) por
+ser el framework React con mayor adopción industrial (\textgreater40\%
+de cuota entre frameworks React según npm trends 2024), la mejor
+integración con Vercel (plataforma de despliegue objetivo) y la
+documentación y comunidad más extensa. El App Router de Next.js 13+ es
+la única opción que implementa React Server Components de forma estable
+y con soporte oficial.
+
+\textbf{React 19}\\
+La elección de React como biblioteca de UI es consecuencia directa de la
+elección de Next.js. React 19 introduce mejoras en el manejo de acciones
+de servidor y la promesa nativa en componentes de cliente, aunque en
+este proyecto se utiliza primariamente en su versión estable de
+componentes de cliente e hidratación.
+
+\textbf{Tailwind CSS 4}\\
+Seleccionado frente a CSS Modules, Styled Components o Emotion por el
+paradigma \emph{utility-first} que acelera el desarrollo sin sacrificar
+la personalización. La versión 4, basada en PostCSS con motor Rust
+nativo, elimina el \emph{PurgeCSS} separado e incorpora mejoras
+sustanciales de rendimiento en el tiempo de compilación.
+
+\textbf{Framer Motion 12}\\
+La elección de Framer Motion frente a otras librerías de animación
+(React Spring, CSS Animations puras) se basa en su modelo declarativo
+basado en variantes, que permite expresar animaciones complejas de forma
+legible, su soporte nativo para animaciones de \emph{layout} (el
+\emph{Flip Animation Technique}), y su integración con el ciclo de vida
+de los componentes React mediante \texttt{AnimatePresence}.
+
+\textbf{TypeScript 5}\\
+Configurado en modo de verificación estricta para la configuración del
+proyecto y los tipos de datos de las respuestas de API. En los
+componentes React se utiliza JavaScript con JSX, manteniendo la
+flexibilidad de tipado dinámico en la lógica de componentes.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{desarrollo}{%
+\subsection{4. DESARROLLO}\label{desarrollo}}
+
+\hypertarget{arquitectura-del-sistema}{%
+\subsubsection{4.1 Arquitectura del
+sistema}\label{arquitectura-del-sistema}}
+
+El sistema se estructura en tres capas diferenciadas, implementadas en
+una única base de código Next.js:
+
+\textbf{Capa de presentación (Client Components)}\\
+Componentes React que se ejecutan y se hidratan en el navegador.
+Gestionan el estado local de la interfaz, las interacciones del usuario
+y las peticiones a la capa intermedia. Los componentes de mayor
+complejidad son \texttt{MainDashboardClient.jsx} (gestión del dashboard
+completo), \texttt{DetailsClient.jsx} (página de detalle de película y
+serie) y \texttt{DiscoverClient.jsx} (módulo de búsqueda).
+
+\textbf{Capa de servidor (Server Components + API Routes)}\\
+Los Server Components de Next.js realizan la búsqueda inicial de datos
+directamente en el servidor, sin coste de JavaScript para el cliente y
+las API Routes actúan como proxy hacia las APIs externas, añadiendo los
+tokens de autenticación en el servidor y transformando los datos al
+formato que consume el frontend.
+
+\textbf{Capa de datos (APIs externas)}\\
+TMDb, Trakt.tv y OMDb como fuentes para los datos de catálogo y del
+usuario respectivamente.
+
+La separación entre estas capas se hace explícita en la convención de
+nombres del proyecto: los archivos terminados en \texttt{Client.jsx} son
+siempre Client Components (marcados con \texttt{"use\ client"}),
+mientras que los archivos \texttt{page.jsx} y los de la carpeta
+\texttt{api/} son siempre Server Components o API Routes.
+
+\hypertarget{implementaciuxf3n-del-sistema-de-autenticaciuxf3n-oauth-2.0}{%
+\subsubsection{4.2 Implementación del sistema de autenticación OAuth
+2.0}\label{implementaciuxf3n-del-sistema-de-autenticaciuxf3n-oauth-2.0}}
+
+La implementación del flujo OAuth 2.0 con Trakt.tv es el núcleo técnico
+más delicado del proyecto. El flujo se articula en cuatro API Routes de
+Next.js:
+
+\textbf{Inicio del flujo (\texttt{/api/trakt/oauth}):} construye la URL
+de autorización de Trakt con los parámetros \texttt{client\_id},
+\texttt{redirect\_uri} y \texttt{response\_type=code}, y redirige al
+usuario. Este endpoint se invoca al pulsar el botón ``Conectar con
+Trakt'' de la Navbar.
+
+\textbf{Callback (\texttt{/api/trakt/auth/callback}):} recibe el
+\texttt{authorization\_code} de Trakt, lo intercambia por
+\texttt{access\_token} y \texttt{refresh\_token} mediante una petición
+POST servidor-a-servidor a \texttt{https://api.trakt.tv/oauth/token}, y
+almacena ambos tokens en cookies \texttt{httpOnly}. A continuación
+redirige al usuario a la página de inicio.
+
+\textbf{Estado (\texttt{/api/trakt/auth/status}):} lee las cookies de
+sesión y, si existe \texttt{access\_token} válido, hace una petición a
+\texttt{/users/me} de Trakt para obtener el perfil del usuario. Si el
+token está expirado, intenta refrescarlo usando el
+\texttt{refresh\_token} antes de declarar al usuario como no
+autenticado.
+
+\textbf{Desconexión (\texttt{/api/trakt/auth/disconnect}):} revoca el
+token en Trakt mediante la API \texttt{/oauth/revoke} y elimina las
+cookies de sesión.
+
+Este diseño garantiza que ni el \texttt{client\_secret} de Trakt ni los
+\texttt{access\_token} del usuario sean accesibles desde el JavaScript
+del navegador en ningún momento del flujo.
+
+\hypertarget{integraciuxf3n-con-las-apis-externas}{%
+\subsubsection{4.3 Integración con las APIs
+externas}\label{integraciuxf3n-con-las-apis-externas}}
+
+\hypertarget{cliente-tmdb}{%
+\paragraph{Cliente TMDb}\label{cliente-tmdb}}
+
+El cliente de TMDb (\texttt{tmdb.js}) encapsula toda la lógica de acceso
+a la API v3. La función central \texttt{tmdb(path,\ params,\ options)}
+implementa:
+
+\begin{itemize}
+\tightlist
+\item
+  Un \textbf{constructor de URL unificado} que añade automáticamente la
+  API Key y el idioma por defecto (\texttt{es-ES}).
+\item
+  Un \textbf{mecanismo de timeout} mediante \texttt{AbortController} (8
+  segundos por defecto en cliente, ajustable por opción) para evitar que
+  peticiones lentas bloqueen la interfaz.
+\item
+  \textbf{Comportamiento de caché diferenciado} según el entorno:
+  \texttt{force-cache} con revalidación ISR en servidor,
+  \texttt{no-store} en cliente (el navegador gestiona su propia caché
+  HTTP).
+\item
+  \textbf{Gestión granular de errores:} los errores 404 retornan
+  \texttt{null} silenciosamente (contenido no encontrado es un caso
+  esperado); otros errores se loguean y también retornan \texttt{null}
+  para que el componente gestione el estado de error.
+\end{itemize}
+
+Sobre esta función base se construyen más de 40 funciones nombradas por
+dominio (\texttt{fetchTopRatedMovies}, \texttt{getDetails},
+\texttt{getCredits}, \texttt{getWatchProviders},
+\texttt{getActorDetails}, etc.) que constituyen la API pública del
+módulo.
+
+Un aspecto técnico importante es la resolución de imágenes: la función
+\texttt{getLogos} obtiene el logo oficial de un título (endpoint
+\texttt{/images} de TMDb) aplicando un criterio de selección: prioriza
+logos en español, luego en inglés, luego sin idioma; dentro de cada
+grupo selecciona el de mayor número de votos. Este logo se usa como
+título visual en la página de detalle cuando está disponible, en lugar
+del texto plano del título.
+
+\hypertarget{proxy-de-trakt-y-transformaciuxf3n-de-datos}{%
+\paragraph{Proxy de Trakt y transformación de
+datos}\label{proxy-de-trakt-y-transformaciuxf3n-de-datos}}
+
+Las API Routes de Trakt actúan como un intermediario que resuelve dos
+problemas estructurales:
+
+\textbf{Problema de identificadores:} el frontend trabaja exclusivamente
+con \texttt{tmdbId} (identificadores de TMDb), mientras que muchos
+endpoints de Trakt requieren sus propios identificadores
+(\texttt{traktId}, \texttt{slug}). Las API Routes realizan internamente
+la traducción mediante el endpoint de búsqueda por ID externo de Trakt
+(\texttt{/search/tmdb/\{id\}?type=movie\textbar{}show}).
+
+\textbf{Problema de enriquecimiento de datos:} las respuestas de Trakt
+incluyen datos de \emph{tracking} pero no imágenes. Las API Routes que
+devuelven listas de contenido (historial, favoritos, pendientes)
+realizan peticiones paralelas a TMDb para obtener las URLs de poster y
+backdrop, enriqueciendo la respuesta antes de enviarla al cliente.
+
+El cliente del frontend (\texttt{traktClient.js}) expone una API
+orientada a operaciones de usuario: \texttt{traktSetWatched},
+\texttt{traktSetEpisodeWatched}, \texttt{traktHistoryOp},
+\texttt{traktSetRating}, etc. Internamente, todas estas funciones
+realizan peticiones fetch a las API Routes internas, que son las que
+contienen el token de autenticación y la lógica de llamada a Trakt.
+
+Una particularidad técnica de este módulo es el manejo de fechas: Trakt
+acepta formatos distintos según el endpoint (ISO 8601 completo para el
+historial de \emph{plays}; \texttt{YYYY-MM-DD} para favoritos y
+\emph{watchlist}). El cliente incluye las funciones
+\texttt{normalizeWatchedAtForHistoryApi} y
+\texttt{normalizeWatchedAtForApi} que normalizan cualquier entrada
+(objeto \texttt{Date}, string en varios formatos) al formato correcto
+para cada caso.
+
+\hypertarget{cachuxe9-de-puntuaciones-en-listas-de-favoritos-y-pendientes}{%
+\paragraph{Caché de puntuaciones en listas de favoritos y
+pendientes}\label{cachuxe9-de-puntuaciones-en-listas-de-favoritos-y-pendientes}}
+
+Las páginas de Favoritos (\texttt{FavoritesClient.jsx}) y
+Pendientes(\texttt{WatchlistClient.jsx}) muestran, por cada ítem de la
+lista, las puntuaciones IMDb y Trakt de la comunidad junto con la
+valoración personal del usuario en IMDb y Trakt. Estas puntuaciones se
+obtienen de las APIs externas (OMDb, Trakt \emph{scoreboard} endpoint) y
+deben cargarse de forma asíncrona y paginada para no exceder los límites
+de peticiones.
+
+Para evitar peticiones redundantes entre sesiones y navegaciones, se
+implementa un \textbf{sistema de caché de puntuaciones en tres niveles}:
+
+\textbf{Nivel 1 --- \texttt{localStorage} con TTL de 30 días
+(puntuaciones IMDb y Trakt).} Las funciones
+\texttt{readScoreCache(source)}, \texttt{writeScoreCache(source,\ map)}
+y \texttt{updateScoreCache(source,\ id,\ score)} gestionan un
+diccionario persistente en \texttt{localStorage} bajo las claves
+\texttt{showverse:scores:imdb} y \texttt{showverse:scores:trakt}. Cada
+entrada almacena el valor numérico y el \emph{timestamp} de escritura
+(\texttt{\{\ score,\ t\ \}}). En la lectura, las entradas con antigüedad
+superior a 30 días se descartan automáticamente. Este TTL largo está
+justificado porque las puntuaciones de comunidad de IMDb y Trakt cambian
+con muy baja frecuencia.
+
+\textbf{Nivel 2 --- \texttt{sessionStorage} con TTL de 24 horas (datos
+OMDb).} El módulo \texttt{omdbCache.js} gestiona una caché en
+\texttt{sessionStorage} bajo la clave
+\texttt{showverse:omdb:\{imdbId\}}, que almacena el rating de IMDb, los
+votos, los premios y las puntuaciones de Rotten Tomatoes y Metacritic
+obtenidos de la API de OMDb. Este mismo módulo se reutiliza en la página
+de detalle y en la lista de favoritos para evitar llamadas duplicadas a
+OMDb durante una misma sesión de navegación.
+
+\textbf{Nivel 3 --- Caché en memoria (\texttt{Map}) con TTL corto
+(rating personal del usuario).} Los mapas \texttt{userRatingCache} y
+\texttt{traktScoreCache} (instancias de \texttt{Map} a nivel de módulo)
+almacenan en memoria las valoraciones personales del usuario autenticado
+y las puntuaciones de comunidad de Trakt, con TTL de 10 minutos para
+entradas con valor y 45 segundos para entradas nulas (para reintentar si
+la API no respondió). Estos TTL cortos garantizan que los datos de
+usuario se actualizan con frecuencia razonable, mientras se evitan
+peticiones en cada \emph{re-render}.
+
+\textbf{Carga diferida y patrón \emph{on-hover}.} Para minimizar el
+número de peticiones en el montaje inicial del componente, las
+puntuaciones IMDb y Trakt se cargan de forma diferida al primer
+\emph{hover} sobre una tarjeta de la lista (\texttt{handleHover}). Si el
+valor ya está en caché de nivel 1, se recupera instantáneamente sin
+llamada de red. La función \texttt{runPool(items,\ limit,\ worker)}
+controla la concurrencia máxima de peticiones simultáneas para respetar
+los \emph{rate limits} de las APIs externas.
+
+\hypertarget{barra-de-puntuaciones-en-puxe1gina-de-detalle-scoreboardbar}{%
+\paragraph{\texorpdfstring{Barra de puntuaciones en página de detalle
+(\texttt{ScoreboardBar})}{Barra de puntuaciones en página de detalle (ScoreboardBar)}}\label{barra-de-puntuaciones-en-puxe1gina-de-detalle-scoreboardbar}}
+
+El componente \texttt{ScoreboardBar.jsx} centraliza la visualización de
+puntuaciones en la página de detalle de película o serie: puntuación
+TMDb (procedente de los datos ya cargados por el Server Component, sin
+petición adicional), puntuación de comunidad de Trakt (obtenida del
+endpoint \texttt{/api/trakt/scoreboard}) y rating de IMDb (procedente de
+OMDb a través de \texttt{omdbCache}). El componente también gestiona la
+valoración personal del usuario en Trakt (estrellas 1--10), con
+actualización optimista del estado local.
+
+\hypertarget{implementaciuxf3n-de-los-muxf3dulos-funcionales-principales}{%
+\subsubsection{4.4 Implementación de los módulos funcionales
+principales}\label{implementaciuxf3n-de-los-muxf3dulos-funcionales-principales}}
+
+\hypertarget{dashboard-principal}{%
+\paragraph{Dashboard principal}\label{dashboard-principal}}
+
+La página de inicio (\texttt{/}) es un Server Component que obtiene en
+paralelo los datos de todas las secciones mediante \texttt{Promise.all},
+reduciendo el tiempo total de carga a la latencia de la llamada más
+lenta en lugar de la suma de todas ellas. Para el hero, se aplica una
+selección inteligente del backdrop: se descartan imágenes sin texto en
+inglés (inadecuadas para el hero), se priorizan las de mayor resolución
+(1280px) y, dentro de estas, las de mayor número de votos.
+
+El componente cliente \texttt{MainDashboardClient.jsx} recibe todos los
+datos del servidor ya preparados y se encarga exclusivamente de la
+composición visual y las interacciones: el carrusel automático del hero
+(con pausa al hover), el sticky scroll de la Navbar y la aparición
+progresiva de las secciones mediante \texttt{staggerChildren} de Framer
+Motion.
+
+\hypertarget{seguimiento-por-episodio}{%
+\paragraph{Seguimiento por episodio}\label{seguimiento-por-episodio}}
+
+El módulo de episodios es el funcionalmente más complejo. El estado de
+visionado por episodio se representa mediante el objeto
+\texttt{watchedBySeason}.
+
+Este objeto se obtiene del endpoint \texttt{/api/trakt/show/watched},
+que hace una llamada a \texttt{/sync/watched/shows} de Trakt y
+transforma la respuesta para indexarla por temporada y número de
+episodio. Cada toggle de episodio actualiza este objeto optimistamente
+en el estado local del componente, mientras la petición al servidor se
+procesa en segundo plano.
+
+El botón ``Marcar temporada completa'' construye la lista de episodios
+no vistos de la temporada y realiza una única llamada a Trakt,
+reduciendo el número de peticiones de N a 1.
+
+\hypertarget{actualizaciuxf3n-de-la-interfaz}{%
+\paragraph{Actualización de la
+interfaz}\label{actualizaciuxf3n-de-la-interfaz}}
+
+Para las operaciones de favoritos, pendientes e historial de visionado,
+se implementa el siguiente patrón de actualización de la interfaz:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Cuando el usuario realiza una acción, el estado local se actualiza
+  inmediatamente (el botón cambia de estado, el contador de la Navbar se
+  actualiza).
+\item
+  En paralelo, se envía la petición al servidor.
+\item
+  Si la petición falla, el estado local se revierte al valor anterior y
+  se muestra una notificación de error.
+\end{enumerate}
+
+Este patrón elimina el retraso perceptible entre la acción del usuario y
+la respuesta de la interfaz, mejorando significativamente la experiencia
+de usuario.
+
+\hypertarget{diseuxf1o-de-la-interfaz-y-sistema-de-vistas}{%
+\subsubsection{4.5 Diseño de la interfaz y sistema de
+vistas}\label{diseuxf1o-de-la-interfaz-y-sistema-de-vistas}}
+
+La interfaz implementa el sistema de diseño descrito en la metodología.
+El fondo negro (\texttt{\#000000}) como color base crea el lienzo sobre
+el que los fondos (\emph{backdrops}) de las películas y series actúan
+como elemento visual protagonista. Las superficies de las tarjetas y los
+paneles laterales utilizan valores de opacidad muy bajos
+(\texttt{rgba(255,255,255,0.05)}) para el efecto visual, con bordes de
+\texttt{1px\ solid\ rgba(255,255,255,0.1)}.
+
+El sistema de tres vistas (Grid, List, Compact) es un componente
+transversal que se aplica en varios módulos de la aplicación (Favoritos,
+Pendientes, Historial, En Progreso). La selección de vista se persiste
+en \texttt{localStorage} por módulo, de forma que el usuario puede tener
+configuraciones distintas en cada sección. La transición entre vistas
+utiliza \texttt{AnimatePresence} de Framer Motion con un efecto de
+\emph{cross-fade} suave, evitando saltos bruscos en el \emph{layout}.
+
+\hypertarget{rendimiento-en-producciuxf3n}{%
+\subsubsection{4.6 Rendimiento en
+producción}\label{rendimiento-en-producciuxf3n}}
+
+Las métricas obtenidas en producción (Vercel) mediante Lighthouse
+validan las decisiones de arquitectura tomadas:
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule()
+Métrica & Valor & Objetivo \\
+\midrule()
+\endhead
+Performance (Lighthouse) & 92/100 & \textgreater{} 90 \\
+SEO (Lighthouse) & 100/100 & 100 \\
+Best Practices & 95/100 & \textgreater{} 90 \\
+LCP & 1.8s & \textless{} 2.5s \\
+CLS & 0.05 & \textless{} 0.1 \\
+FID & 45ms & \textless{} 100ms \\
+\bottomrule()
+\end{longtable}
+
+El LCP de 1.8s se consigue principalmente gracias al SSR: el HTML con el
+hero ya renderizado llega al navegador antes de que se descargue todo el
+JavaScript, permitiendo que el motor de renderizado del navegador
+comience a mostrar contenido de inmediato. El CLS de 0.05 se logra
+mediante el uso sistemático de \texttt{width} y \texttt{height}
+explícitos en el componente \texttt{\textless{}Image\textgreater{}} de
+Next.js, que reserva el espacio de la imagen antes de que esta se
+descargue.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{conclusiones}{%
+\subsection{5. CONCLUSIONES}\label{conclusiones}}
+
+El trabajo ha demostrado que los objetivos planteados son alcanzables
+con las tecnologías actuales de desarrollo web y sin necesidad de
+infraestructura de servidor propia. Los resultados obtenidos permiten
+extraer las siguientes conclusiones:
+
+En primer lugar, la arquitectura Next.js App Router con React Server
+Components ha demostrado ser particularmente adecuada para aplicaciones
+de este tipo, que combinan una gran cantidad de datos externos con la
+necesidad de interactividad en cliente. La separación entre la obtención
+de datos (servidor) y la presentación interactiva (cliente) simplifica
+el flujo de datos y reduce las fuentes de error. Los Server Components
+permiten realizar fetching paralelo de múltiples APIs en el servidor sin
+coste para el cliente, lo que resulta en tiempos de carga
+significativamente inferiores a los de una SPA equivalente.
+
+En segundo lugar, la integración de OAuth 2.0 mediante API Routes de
+Next.js ha probado ser una estrategia robusta y segura sin necesidad de
+librerías de autenticación genéricas. El patrón de almacenar tokens en
+cookies \texttt{httpOnly} y delegar toda la lógica de autenticación al
+servidor cumple con las recomendaciones de seguridad del RFC 6749 y las
+guías de OWASP para aplicaciones OAuth.
+
+En tercer lugar, la estrategia de caché diferenciada por tipo de dato ha
+demostrado ser eficaz en todas sus capas: ISR en servidor para el
+catálogo (servido desde caché en prácticamente el 100\% de las
+peticiones), \texttt{no-store} para los datos de usuario protegidos por
+autenticación, y una caché en cliente de tres niveles para las
+puntuaciones externas de IMDb, Trakt y OMDb en las vistas de listas.
+Esta última capa ---\texttt{localStorage} con TTL de 30 días para
+puntuaciones de comunidad, \texttt{sessionStorage} con TTL de 24 horas
+para datos de OMDb y caché en memoria para el rating personal del
+usuario--- reduce drásticamente el número de llamadas a APIs externas en
+las páginas de Favoritos y \emph{Watchlist}, donde se consultan
+simultáneamente puntuaciones de decenas de títulos.
+
+Finalmente, desde el punto de vista del diseño, el uso de Framer Motion
+para las animaciones y el sistema de superficies semi-transparentes con
+desenfoque de fondo ha producido una interfaz visualmente diferenciada
+respecto a las plataformas de \emph{tracking} existentes, más próxima en
+estética a las propias plataformas de \emph{streaming}. Las métricas de
+rendimiento obtenidas son completamente compatibles con un diseño
+visualmente rico, siempre que las animaciones se implementen sobre la
+GPU (propiedades \texttt{transform} y \texttt{opacity}) y no fuercen la
+recarga del DOM.
+
+\hypertarget{discusiuxf3n}{%
+\subsubsection{5.1 Discusión}\label{discusiuxf3n}}
+
+El trabajo presenta algunas limitaciones que deben reconocerse:
+
+\textbf{Ausencia de tests automatizados.} El proyecto no incluyó una
+suite de tests unitarios ni de integración durante el desarrollo. La
+validación se realizó exclusivamente mediante pruebas manuales y esta
+decisión, justificada por las restricciones temporales del TFG, supone
+el principal déficit de calidad del proyecto desde el punto de vista del
+proceso de ingeniería del software. Los componentes con lógica de
+negocio compleja (cálculo de progreso de episodios, normalización de
+fechas para Trakt, estrategia de selección de backdrops) serían
+candidatos prioritarios para la cobertura de tests unitarios.
+
+\textbf{Dependencia de APIs de terceros.} La plataforma depende de la
+continuidad y estabilidad de tres APIs externas (TMDb, Trakt.tv, OMDb),
+ninguna de las cuales está bajo el control del proyecto. Cambios en sus
+modelos de precios, modificaciones de sus límites de peticiones o
+interrupciones de servicio afectarían directamente a la aplicación. Esta
+es una limitación estructural de la arquitectura elegida, aceptada
+conscientemente por las ventajas que ofrece frente a la alternativa de
+construir una base de datos propia.
+
+\textbf{Accesibilidad parcial.} La puntuación de accesibilidad en
+Lighthouse (88/100) indica que, aunque se han aplicado prácticas básicas
+(textos alternativos en imágenes, contraste de colores suficiente), no
+se ha alcanzado el nivel WCAG 2.1 AA completo. En particular, la
+navegación exclusiva por teclado en los modales de episodios y el manejo
+del foco en las transiciones de página requieren trabajo adicional.
+
+\textbf{Ausencia de gestión de usuarios propia.} La plataforma delega
+toda la gestión de identidad en IMDb y Trakt.tv, lo que significa que
+los usuarios deben tener una cuenta en Trakt para acceder a las
+funciones personalizadas. Aunque esto reduce la complejidad de
+implementación, limita la autonomía de la plataforma.
+
+\hypertarget{luxedneas-de-investigaciuxf3n-futuras}{%
+\subsubsection{5.2 Líneas de investigación
+futuras}\label{luxedneas-de-investigaciuxf3n-futuras}}
+
+A partir del trabajo realizado, se identifican las siguientes líneas de
+desarrollo futuro:
+
+\textbf{Implementación de Progressive Web App (PWA).} La conversión de
+la aplicación en una PWA, mediante la adición de un \emph{Service
+Worker} y un \emph{manifest} web, permitiría la instalación en
+dispositivos móviles y escritorio, y habilitaría un modo de
+funcionamiento \emph{offline} básico (visualización del historial en
+caché). Esta línea es de especial interés dado que el consumo de
+contenido audiovisual está fuertemente correlacionado con el dispositivo
+móvil.
+
+\textbf{Sistema de recomendaciones personalizado.} El historial de
+visionado acumulado por el usuario constituye un conjunto de datos con
+potencial para la implementación de algoritmos de recomendación
+colaborativa o basada en contenido. La integración de un modelo de
+\emph{machine learning} ligero (posiblemente mediante TensorFlow.js en
+el cliente o una función \emph{serverless}) para enriquecer las
+secciones del dashboard con recomendaciones verdaderamente
+personalizadas es una extensión natural del trabajo actual.
+
+\textbf{Expansión de las funcionalidades sociales.} La comparación del
+historial entre usuarios, las recomendaciones de amigos y la
+visualización del perfil público de otros usuarios de Trakt son
+funcionalidades que la API de Trakt soporta pero que no han sido
+implementadas en la versión actual.
+
+\textbf{Backend propio y base de datos local.} A largo plazo, la
+eliminación de la dependencia total de Trakt.tv como fuente de verdad
+para los datos del usuario requeriría la implementación de un backend
+propio con base de datos (PostgreSQL o MySQL) que almacenara el
+historial y las preferencias localmente. Esto permitiría funcionalidades
+no disponibles en Trakt (estadísticas avanzadas, exportación de datos en
+formatos personalizados) y eliminaría la dependencia de servicio
+externo.
+
+\textbf{Integración con plataformas de streaming.} Las APIs de Netflix,
+Disney+ y Amazon Prime no son públicas, pero servicios como JustWatch
+disponen de datos actualizados sobre disponibilidad de contenido en cada
+plataforma y país. La integración de esta información en la página de
+detalle permitiría completar el ciclo de usuario: ``¿Dónde puedo ver
+este contenido ahora mismo?''.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{referencias}{%
+\subsection{6. REFERENCIAS}\label{referencias}}
+
+\hypertarget{bibliografuxeda}{%
+\subsubsection{6.1 Bibliografía}\label{bibliografuxeda}}
+
+Babich, N. (2021). \emph{Glassmorphism in User Interfaces}. UX Planet.
+https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
+
+Berners-Lee, T., Fielding, R., y Masinter, L. (1999). \emph{RFC 2396:
+Uniform Resource Identifiers (URI): Generic Syntax}. IETF.
+https://www.rfc-editor.org/rfc/rfc2396
+
+Bloch, J. (2008). \emph{Effective Java} (2.ª ed.). Addison-Wesley.
+
+CNMC. (2024). \emph{Informe sobre el consumo de vídeo en España}.
+Comisión Nacional de Mercados y la Competencia. https://www.cnmc.es/
+
+Fielding, R. T. (2000). \emph{Architectural Styles and the Design of
+Network-based Software Architectures} {[}Tesis doctoral, University of
+California, Irvine{]}.
+https://www.ics.uci.edu/\textasciitilde fielding/pubs/dissertation/top.htm
+
+Framer. (2024). \emph{Framer Motion Documentation}.
+https://www.framer.com/motion/
+
+Google Developers. (2024). \emph{Web Vitals --- Essential metrics for a
+healthy site}. https://web.dev/vitals/
+
+Google Developers. (2024). \emph{Core Web Vitals report}.
+https://support.google.com/webmasters/answer/9205520
+
+Hardt, D. (Ed.). (2012). \emph{RFC 6749: The OAuth 2.0 Authorization
+Framework}. IETF. https://www.rfc-editor.org/rfc/rfc6749
+
+Letterboxd. (2024). \emph{About Letterboxd}.
+https://letterboxd.com/about/
+
+Lotz, A. D. (2022). \emph{Netflix and Streaming Video: The Business of
+Subscriber-Funded Video on Demand}. Polity Press.
+
+Meta Open Source. (2024). \emph{React Documentation --- React Server
+Components}. https://react.dev/reference/rsc/server-components
+
+Nielsen. (2023). \emph{The Nielsen Streaming Unwrapped: 2023 Mid-Year
+Report}. Nielsen.
+https://www.nielsen.com/insights/2023/streaming-unwrapped/
+
+OASIs. (2019). \emph{OpenAPI Specification 3.0}.
+https://spec.openapis.org/oas/v3.0.0
+
+OWASP. (2024). \emph{OWASP Top 10: Broken Authentication}. Open Web
+Application Security Project. https://owasp.org/www-project-top-ten/
+
+Schwartz, B. (2004). \emph{The Paradox of Choice: Why More Is Less}.
+Ecco/HarperCollins.
+
+Statista. (2024). \emph{Number of Netflix subscribers worldwide from 1st
+quarter 2013 to 4th quarter 2023}.
+https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
+
+The Movie Database. (2024). \emph{TMDb API Documentation v3}.
+https://developer.themoviedb.org/docs/getting-started
+
+Trakt. (2024). \emph{Trakt API Documentation v2}.
+https://trakt.docs.apiary.io/
+
+Vercel. (2024). \emph{Next.js Documentation --- App Router}.
+https://nextjs.org/docs/app
+
+Vercel. (2024). \emph{Vercel Documentation --- Edge Functions and
+Middleware}. https://vercel.com/docs/functions
+
+W3C. (2023). \emph{Web Content Accessibility Guidelines (WCAG) 2.1}.
+World Wide Web Consortium. https://www.w3.org/TR/WCAG21/
+
+Wieruch, R. (2023). \emph{The Road to Next.js}. Robin Wieruch.
+https://www.roadtonextjs.com/
+
+\end{document}

@@ -1,0 +1,80 @@
+El desarrollo de \textit{The Show Verse} se ha abordado mediante una \textbf{metodología iterativa basada en el ciclo de vida ágil}, adaptada a un proyecto individual. La elección de este enfoque frente a las metodologías en cascada se justifica por la naturaleza exploratoria del proyecto: la integración con APIs de terceros implica incertidumbres técnicas que no siempre se pueden anticipar en una fase de análisis, y la prioridad entre funcionalidades puede variar a medida que se comprende mejor el problema.
+
+El proceso de desarrollo se articula en iteraciones de aproximadamente una semana de duración. Al inicio de cada iteración se seleccionan del \textit{backlog} las funcionalidades a abordar, priorizadas según tres criterios:
+
+\begin{itemize}
+\item \textbf{Dependencia técnica:} las funcionalidades que sirven de base a otras (autenticación, cliente de API) se abordan primero.
+\item \textbf{Valor aportado al usuario:} se priorizan las funcionalidades más visibles y relevantes para la experiencia de uso.
+\item \textbf{Riesgo técnico:} las integraciones más inciertas se adelantan para conocer cuanto antes sus restricciones.
+\end{itemize}
+
+\section{Metodología}
+
+\subsection{Criterios de integración de APIs}
+
+La selección de las APIs externas ha seguido los siguientes criterios:
+
+\begin{itemize}
+\item \textbf{Datos completos:} TMDb fue seleccionada frente a otras alternativas (The Open Movie Database, Wikidata) por ofrecer la mayor cobertura de contenido, soporte en diferentes idiomas, galería de imágenes y datos de \textit{streaming}, además de disponer de la documentación más completa y una comunidad de desarrolladores activa.
+\item \textbf{Capacidad de tracking:} Trakt.tv fue seleccionada como plataforma de sincronización por su API pública v2 bien documentada, su soporte completo de series a nivel de episodio y por ser la plataforma de \textit{tracking} más referenciada por la comunidad de desarrolladores independientes.
+\item \textbf{Complementariedad:} OMDb fue seleccionada únicamente para los datos de \textit{rating} de IMDb y Rotten Tomatoes, que TMDb no proporciona directamente.
+\end{itemize}
+
+\subsection{Criterios de decisión para la autenticación}
+
+El problema de la autenticación OAuth 2.0 admitía varias opciones de implementación en Next.js. Se descartó el uso de librerías de autenticación genéricas como NextAuth.js / Auth.js por las siguientes razones:
+
+\begin{itemize}
+\item Trakt.tv no es un proveedor OAuth soportado de forma nativa por estas librerías.
+\item La personalización necesaria (refresco de tokens específico de Trakt, intercambio de códigos con \textit{headers} personalizados) habría requerido más configuración que implementar el flujo directamente.
+\item La implementación propia ofrece mayor control sobre el manejo de errores y el almacenamiento de tokens.
+\end{itemize}
+
+Se optó por implementar el flujo Authorization Code de forma manual mediante \textbf{API Routes de Next.js}, almacenando los tokens en cookies \texttt{httpOnly} con atributos \texttt{Secure} y \texttt{SameSite=Lax}. Esta decisión garantiza que los tokens no sean accesibles desde JavaScript del navegador (protección frente a XSS) y que no se envíen en peticiones \textit{cross-site} no intencionadas (protección parcial frente a CSRF).
+
+\subsection{Estrategia de caché}
+
+Para cada tipo de dato gestionado en la aplicación se ha definido una estrategia de caché en función de la frecuencia de actualización del dato en origen:
+
+\begin{table}[!htbp]
+\begin{center}
+\begin{tabular}{| l | l | l |}
+\hline
+\textbf{Tipo de dato} & \textbf{Almacenamiento} & \textbf{TTL} \\ 
+\hline
+\hline
+Catálogo general (top rated, populares) & ISR servidor & 10 minutos \\
+\hline
+Detalles de película/serie & ISR servidor & 1 hora \\
+\hline
+Imágenes TMDb & CDN Vercel & 1 hora \\
+\hline
+Datos OMDb (proxy servidor) & Map en proceso & 24 h / 60 s \\
+\hline
+Datos OMDb en cliente & sessionStorage & 24 horas \\
+\hline
+Puntuaciones IMDb y Trakt en listas & localStorage & 30 días \\
+\hline
+Rating personal del usuario & Map en módulo & 10 min / 45 s \\
+\hline
+Estado personal del usuario & No-cache & En cada petición \\
+\hline
+\end{tabular}
+\caption{Estrategia de caché por tipo de dato}
+\label{tab:cache}
+\end{center}
+\end{table}
+
+Esta diferenciación permite reducir el número de llamadas a APIs externas en un estimado del 70--80\% para los datos de catálogo, mientras se garantiza la actualización de los datos de usuario.
+
+\section{Tecnologías empleadas}
+
+\textbf{Next.js 16 (Framework principal).} Seleccionado frente a otras alternativas (Remix, SvelteKit, Nuxt 3) por ser el framework React con mayor adopción industrial (>40\% de cuota entre frameworks React según npm trends 2024), la mejor integración con Vercel y la documentación más extensa. El App Router de Next.js 13+ es la única opción que implementa React Server Components de forma estable y con soporte oficial \parencite{Vercel:2024a}.
+
+\textbf{React 19.} La elección de React como biblioteca de UI es consecuencia directa de la elección de Next.js. React 19 introduce mejoras en el manejo de acciones de servidor y la promesa nativa en componentes de cliente \parencite{Meta:2024}.
+
+\textbf{Tailwind CSS 4.} Seleccionado frente a CSS Modules, Styled Components o Emotion por el paradigma \textit{utility-first} que acelera el desarrollo sin sacrificar la personalización. La versión 4, basada en PostCSS con motor Rust nativo, elimina el PurgeCSS separado e incorpora mejoras sustanciales de rendimiento en el tiempo de compilación.
+
+\textbf{Framer Motion 12.} La elección de Framer Motion frente a otras librerías de animación (React Spring, CSS Animations puras) se basa en su modelo declarativo basado en variantes, su soporte nativo para animaciones de \textit{layout} y su integración con el ciclo de vida de los componentes React mediante \texttt{AnimatePresence} \parencite{Framer:2024}.
+
+\textbf{TypeScript 5.} Configurado en modo de verificación estricta para la configuración del proyecto y los tipos de datos de las respuestas de API.

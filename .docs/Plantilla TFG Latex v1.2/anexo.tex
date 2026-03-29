@@ -1,0 +1,69 @@
+\section*{Variables de entorno del proyecto}
+
+La siguiente tabla recoge todas las variables de entorno necesarias para el despliegue de \textit{The Show Verse}.
+
+\begin{table}[!htbp]
+\begin{center}
+\begin{tabular}{| l | l | c |}
+\hline
+\textbf{Variable} & \textbf{Descripción} & \textbf{Requerida} \\
+\hline
+\hline
+\texttt{NEXT\_PUBLIC\_TMDB\_API\_KEY} & API Key de TMDb v3 & Sí \\
+\hline
+\texttt{TMDB\_SESSION\_ID} & Session ID para operaciones de cuenta TMDb & Cuentas \\
+\hline
+\texttt{NEXT\_PUBLIC\_TRAKT\_CLIENT\_ID} & Client ID de la aplicación Trakt & Sí \\
+\hline
+\texttt{TRAKT\_CLIENT\_SECRET} & Client Secret de Trakt (solo servidor) & Sí \\
+\hline
+\texttt{TRAKT\_REDIRECT\_URI} & URI de callback OAuth registrado en Trakt & Sí \\
+\hline
+\texttt{OMDB\_API\_KEY} & API Key de OMDb & Para IMDb/RT \\
+\hline
+\texttt{PLEX\_URL} & URL del servidor Plex & Para Plex \\
+\hline
+\texttt{PLEX\_URLS} & URLs adicionales Plex (separadas por coma) & Opcional \\
+\hline
+\texttt{PLEX\_TOKEN} & Token de autenticación Plex (modo simple) & Modo simple \\
+\hline
+\texttt{PLEX\_JWT\_PRIVATE\_KEY} & Clave privada RSA/Ed25519 (modo JWT) & Modo JWT \\
+\hline
+\texttt{PLEX\_JWT\_KID} & Key ID del JWK (modo JWT) & Modo JWT \\
+\hline
+\texttt{PLEX\_CLIENT\_IDENTIFIER} & Identificador único de la app en Plex & Modo JWT \\
+\hline
+\texttt{PLEX\_MACHINE\_IDENTIFIER} & Machine ID del servidor Plex (fallback) & Opcional \\
+\hline
+\end{tabular}
+\caption{Variables de entorno del proyecto}
+\label{tab:envvars}
+\end{center}
+\end{table}
+
+\section*{Resumen del sistema de caché multicapa}
+
+\begin{table}[!htbp]
+\begin{center}
+\begin{tabular}{| l | l | l |}
+\hline
+\textbf{Nivel} & \textbf{Almacenamiento} & \textbf{TTL} \\
+\hline
+\hline
+1 -- ISR servidor & Data Cache de Next.js & 10 min / 1 h \\
+\hline
+2 -- CDN Vercel & Edge Network & 1 -- 24 h \\
+\hline
+3 -- Memoria proceso & \texttt{Map} en \texttt{globalThis} & 24 h (éxito) / 60 s (fallo) \\
+\hline
+4 -- \texttt{sessionStorage} & Navegador (sesión) & 24 h \\
+\hline
+5 -- \texttt{localStorage} & Navegador (persistente) & 30 días \\
+\hline
+6 -- \texttt{Map} en módulo & Memoria del cliente (tab) & 10 min / 45 s \\
+\hline
+\end{tabular}
+\caption{Sistema de caché multicapa}
+\label{tab:cache-multicapa}
+\end{center}
+\end{table}
