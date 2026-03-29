@@ -1,0 +1,14 @@
+\babel@toc {spanish}{}\relax 
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Estrategia de caché por tipo de dato}}{14}{table.caption.5}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Rutas principales de la aplicación}}{16}{table.caption.6}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Principales funciones del cliente TMDb y sus \textit {endpoints}}}{18}{table.caption.7}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Principales \textit {endpoints} de Trakt utilizados}}{19}{table.caption.8}%
+\contentsline {table}{\numberline {4.4}{\ignorespaces Secciones del dashboard y sus fuentes de datos}}{21}{table.caption.9}%
+\contentsline {table}{\numberline {4.5}{\ignorespaces Métricas Lighthouse en producción}}{38}{table.caption.10}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Variables de entorno del proyecto}}{42}{table.caption.13}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Sistema de caché multicapa}}{43}{table.caption.14}%
