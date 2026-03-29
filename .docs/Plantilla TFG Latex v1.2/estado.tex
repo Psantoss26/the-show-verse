@@ -1,0 +1,57 @@
+El presente estado de la cuestión aborda el contexto tecnológico y de mercado en el que se enmarca el proyecto. Se comienza con una visión del sector de las plataformas de \textit{streaming} y sus implicaciones para el usuario; a continuación se analizan las tecnologías de desarrollo web actuales que hacen posible la solución propuesta; y se finaliza examinando las plataformas existentes más relevantes.
+
+\section{Marco teórico del trabajo}
+
+\subsection{Las plataformas de streaming y sus consecuencias para el usuario}
+
+La transición del modelo tradicional al \textit{streaming} bajo demanda se inició con el lanzamiento del servicio de Netflix en 2007, aunque su consolidación definitiva se produjo a partir de 2019, con la irrupción simultánea de Disney+, Apple TV+ y HBO Max. En 2024, el usuario medio en mercados como España o Estados Unidos tiene acceso simultáneo a entre 3 y 5 servicios de \textit{streaming} distintos, según datos de CNMC y Statista \parencite{CNMC:2024,Statista:2024}.
+
+Esta fragmentación genera una sobrecarga de elección en cada usuario, lo que provoca que inviertan una gran cantidad de tiempo en decidir qué ver, olviden mantener un registro de lo visto y pierdan el seguimiento de las series que consumen de forma no continua \parencite{Schwartz:2004}.
+
+La necesidad de una capa de abstracción sobre las plataformas de \textit{streaming} ha generado el desarrollo de aplicaciones conocidas como \textbf{media trackers}.
+
+\subsection{Protocolos de autenticación: OAuth 2.0}
+
+OAuth 2.0 es el estándar que permite a una aplicación actuar en nombre de un usuario en un servicio externo sin que ese servicio tenga que proporcionarle su contraseña \parencite{Hardt:2012}. En \textit{The Show Verse} se utiliza para conectar la cuenta de Trakt.tv del usuario con la aplicación.
+
+El flujo implementado (Authorization Code) funciona de la siguiente manera:
+
+\begin{enumerate}
+\item Cuando el usuario pulsa «Conectar con Trakt», la ruta \texttt{/api/trakt/auth/start} genera un código aleatorio de seguridad (\texttt{state}) para evitar ataques CSRF, construye la URL de autorización de Trakt y redirige al usuario.
+\item El usuario introduce sus credenciales en Trakt y concede permisos. Trakt redirige de vuelta a \texttt{/api/trakt/auth/callback} incluyendo un \texttt{code} de un solo uso y el mismo \texttt{state}.
+\item La ruta de \textit{callback} verifica el \texttt{state} e intercambia el \texttt{code} por un \texttt{access\_token} y un \texttt{refresh\_token} directamente desde el servidor.
+\item Ambos tokens se guardan en cookies \texttt{httpOnly} con los atributos \texttt{Secure} y \texttt{SameSite=Lax}, de forma que el JavaScript del navegador no puede leerlos en ningún momento.
+\item Cuando el \texttt{access\_token} expira, la aplicación lo renueva automáticamente usando el \texttt{refresh\_token}.
+\end{enumerate}
+
+\subsection{APIs REST}
+
+Las APIs utilizadas en este proyecto siguen el estilo REST \parencite{Fielding:2000} con las siguientes especificidades:
+
+\textbf{TMDb API v3} es una API REST pública con autenticación por API Key. Proporciona acceso a su base de datos de más de 800.000 películas y 150.000 series de televisión, con soporte para más de 40 idiomas. Su límite de peticiones es de 40 peticiones por 10 segundos para cuentas gratuitas \parencite{TMDb:2024}.
+
+\textbf{Trakt.tv API v2} combina autenticación por API Key para \textit{endpoints} públicos con OAuth 2.0 Bearer Token para \textit{endpoints} autenticados. Un aspecto técnico relevante es el sistema de identificadores: Trakt mantiene sus propios slugs e IDs, pero acepta identificadores de IMDb y TMDb mediante el \textit{endpoint} de búsqueda por ID externo \parencite{Trakt:2024}.
+
+\subsection{Rendimiento web}
+
+Las estrategias de optimización más relevantes para este proyecto incluyen: Server-Side Rendering para reducir el LCP, el componente \texttt{<Image>} de Next.js para optimización automática de imágenes (conversión a WebP, \textit{lazy loading}, reserva de espacio para prevenir CLS), y el \textit{code splitting} automático por ruta para reducir el tiempo de carga inicial \parencite{Google:2024a,Google:2024b}.
+
+\subsection{Diseño de interfaz}
+
+El diseño de \textit{The Show Verse} se basa en el uso de los \textit{backdrops} y \textit{posters} obtenidos de TMDb como elemento principal de la interfaz.
+
+\textbf{Modo oscuro y backdrops de fondo.} El color de base de la aplicación es el negro (\texttt{\#000000}). Las imágenes de fondo se despliegan a pantalla completa con un gradiente en los bordes. Los elementos superpuestos utilizan un fondo semi-transparente con desenfoque del contenido detrás (\texttt{backdrop-filter: blur}), siguiendo el patrón de \textit{glassmorphism} \parencite{Babich:2021}.
+
+\textbf{Animaciones de entrada y transiciones.} Las animaciones se gestionan mediante Framer Motion \parencite{Framer:2024}, usando \texttt{AnimatePresence} para la entrada y salida de componentes. Para listas largas (más de 30 elementos), el retraso entre tarjetas se reduce automáticamente para que la animación no resulte lenta.
+
+\section{Trabajos relacionados}
+
+\textbf{Letterboxd} \parencite{Letterboxd:2024} (fundado en 2011, Auckland, Nueva Zelanda) es la plataforma de referencia para el registro y la crítica cinematográfica personal. Con más de 20 millones de usuarios registrados en 2024, su principal fortaleza es la componente social y el sistema de reseñas. Su limitación más significativa para los propósitos de este trabajo es la ausencia de soporte para el seguimiento de series de televisión por episodio.
+
+\textbf{Trakt.tv} (fundado en 2010) es la plataforma más completa en cuanto a funcionalidades de \textit{tracking}, con soporte completo para películas y series a nivel de episodio. Su característica diferencial es la API pública v2, documentada y con límites de uso generosos para desarrolladores registrados. Sin embargo, su interfaz de usuario presenta un diseño anticuado que no ha evolucionado significativamente en la última década.
+
+\textbf{Simkl} (fundado en 2012) ofrece funcionalidades similares a Trakt con una interfaz algo más moderna, pero con un ecosistema de API menos estable y una comunidad de usuarios significativamente menor.
+
+\textbf{JustWatch} (fundado en 2014) se especializa en la localización de contenido entre plataformas de \textit{streaming}, pero carece de funcionalidades de \textit{tracking} personal.
+
+La comparación entre estas plataformas pone de manifiesto una oportunidad en el mercado: ninguna combina la funcionalidad de Trakt (seguimiento por episodio, sincronización, valoraciones) con una interfaz de usuario moderna y responsiva comparable a las propias plataformas de \textit{streaming}. \textit{The Show Verse} se posiciona precisamente en este punto.

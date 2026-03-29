@@ -1,0 +1,43 @@
+\section{Justificación y contexto}
+
+En los últimos años, el consumo de películas y series ha cambiado radicalmente. Hoy en día la mayoría del contenido se distribuye a través de plataformas de \textit{streaming} como Netflix, HBO Max, Disney+, Amazon Prime Video o Movistar+, cada una con su propio catálogo independiente, lo que genera un problema habitual para cualquier usuario: el contenido está disperso en múltiples servicios y no existe ninguna herramienta que permita gestionarlo todo desde un único lugar.
+
+Esto provoca situaciones como perder el seguimiento de una serie que se dejó a medias, no recordar qué episodios se han visto, tener que buscar en varios sitios a la vez si una película está disponible en \textit{streaming}, o simplemente no tener un registro de lo que ya se ha visto. Las plataformas de \textit{tracking} que existen actualmente, como Trakt.tv o Letterboxd, resuelven parte del problema pero presentan sus propias limitaciones con falta de funcionalidades.
+
+\textit{The Show Verse} nace como respuesta a esa necesidad: una plataforma web que centraliza toda la gestión del contenido audiovisual, integrando los datos de múltiples fuentes mediante APIs externas y ofreciendo al usuario una experiencia completa y funcional.
+
+Desde el punto de vista técnico, el proyecto aborda varios retos propios del desarrollo web actual: la integración de APIs REST de terceros con distintos esquemas de autenticación y formatos de datos, como la implementación del protocolo OAuth 2.0 para el acceso con Trakt.tv, el diseño de una estrategia de caché en múltiples niveles para optimizar el rendimiento, y la construcción de una interfaz responsiva con animaciones fluidas.
+
+\subsection{Motivación}
+
+El punto de partida de este trabajo es la experiencia personal como consumidor habitual de películas y series en múltiples plataformas de \textit{streaming}. La dispersión del catálogo disponible entre los diferentes servicios provocaba con frecuencia situaciones de dificultad para recordar el historial de películas y series y la puntuación que se le había dado a cada una, además de tener que buscar las puntuaciones y críticas en distintas webs independientes.
+
+Las aplicaciones existentes en el mercado (Letterboxd, Trakt.tv, Simkl) ofrecen soluciones parciales, pero ninguna combina todos los datos y funcionalidades realmente necesarios a la hora de gestionar este tipo de contenido. Trakt.tv, la más completa en cuanto a API y funcionalidades de \textit{tracking}, presenta una interfaz datada que resulta poco motivadora para el uso diario. Letterboxd, más elegante visualmente, carece de soporte completo para series de televisión y para otras funcionalidades importantes.
+
+\section{Planteamiento del problema}
+
+El problema abordado en este trabajo puede descomponerse en varias categorías técnicas.
+
+\textbf{1. Integración de fuentes de datos.} Los datos necesarios para una plataforma de gestión de contenido audiovisual completa no están disponibles en una única API. TMDb proporciona los metadatos de películas y series (sinopsis, reparto, imágenes, trailers), además de las puntuaciones y listas de usuario. Trakt.tv gestiona el \textit{tracking} personal del usuario (historial de visionado, sección en progreso y estadísticas). OMDb complementa con las puntuaciones de IMDb y Rotten Tomatoes. Cada API tiene su propio esquema de autenticación, formato de respuesta, límites de uso e identificadores.
+
+\textbf{2. Autenticación y gestión de sesiones.} La funcionalidad de sincronización con Trakt requiere que el usuario delegue permisos en la aplicación mediante OAuth 2.0, lo que implica implementar el flujo completo de autorización (redirección, intercambio de código por token, almacenamiento seguro, refresco automático), sin exponer en ningún momento las credenciales del usuario ni las claves privadas de la aplicación.
+
+\textbf{3. Rendimiento y experiencia de usuario.} Este tipo de aplicación maneja grandes volúmenes de imágenes de alta resolución y realiza múltiples llamadas a APIs externas con límites de peticiones en algunos casos reducidos. Es importante que haya un equilibrio entre datos almacenados en caché y aquellos que se muestran en tiempo real.
+
+\textbf{4. Sincronización de estado entre servidor y cliente.} Las acciones del usuario (marcar como visto, añadir a favoritos, puntuar) deben reflejarse de forma inmediata en la interfaz sin esperar la confirmación del servidor, pero manteniendo la coherencia en caso de error.
+
+\section{Objetivos del trabajo}
+
+\textbf{Objetivo general:} diseñar e implementar una aplicación web completa y funcional para la gestión personalizada y el descubrimiento de nuevas películas y series, que integre múltiples APIs externas y ofrezca una experiencia de usuario centralizada.
+
+\textbf{Objetivos específicos:}
+
+\begin{enumerate}
+\item Implementar la integración con la API de TMDb para obtener los metadatos completos de películas y series (sinopsis, características, imágenes, vídeos, temporadas y episodios).
+\item Desarrollar un sistema de autenticación OAuth 2.0 completo con Trakt.tv, incluyendo almacenamiento seguro de tokens en cookies, actualización automática y revocación.
+\item Construir un módulo de gestión personal (favoritos, pendientes, historial de visionado y en progreso y puntuaciones de usuario) con sincronización bidireccional con Trakt y TMDb.
+\item Implementar un sistema de seguimiento por episodios y temporadas para las series.
+\item Diseñar una interfaz de usuario responsiva y accesible que ofrezca múltiples modos de visualización (Grid, List, Compact) con transiciones fluidas y compatibilidad con dispositivos móviles.
+\item Optimizar el rendimiento de la aplicación, incluyendo un sistema de caché en cliente para las puntuaciones de IMDb, Trakt y OMDb en las listas de favoritos y pendientes.
+\item Desplegar la aplicación en un entorno de producción como Vercel.
+\end{enumerate}
