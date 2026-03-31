@@ -248,8 +248,14 @@ INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\00miktex\epstopdf-s
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\00miktex\epstopdf-sys.cfg
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\caption\ltcaption.sty
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\caption\ltcaption.sty
-OUTPUT Plantilla TFG v1.2.out
+INPUT .\Plantilla TFG v1.2.out
+INPUT .\Plantilla TFG v1.2.out
+INPUT Plantilla TFG v1.2.out
+INPUT Plantilla TFG v1.2.out
 OUTPUT Plantilla TFG v1.2.pdf
+INPUT .\Plantilla TFG v1.2.out
+INPUT .\Plantilla TFG v1.2.out
+OUTPUT Plantilla TFG v1.2.out
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\biblatex-apa\spanish-apa.lbx
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\biblatex-apa\spanish-apa.lbx
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\biblatex-apa\spanish-apa.lbx
@@ -335,8 +341,19 @@ INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmr8r.
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmri8t.tfm
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmri8t.vf
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmri8r.tfm
+INPUT .\Plantilla TFG v1.2.toc
+INPUT .\Plantilla TFG v1.2.toc
+INPUT Plantilla TFG v1.2.toc
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmb8t.vf
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmb8r.tfm
 OUTPUT Plantilla TFG v1.2.toc
+INPUT .\Plantilla TFG v1.2.lof
+INPUT .\Plantilla TFG v1.2.lof
+INPUT Plantilla TFG v1.2.lof
 OUTPUT Plantilla TFG v1.2.lof
+INPUT .\Plantilla TFG v1.2.lot
+INPUT .\Plantilla TFG v1.2.lot
+INPUT Plantilla TFG v1.2.lot
 OUTPUT Plantilla TFG v1.2.lot
 INPUT .\abstract.tex
 INPUT .\abstract.tex
@@ -348,8 +365,6 @@ INPUT .\glosario.tex
 INPUT .\glosario.tex
 INPUT .\glosario.tex
 INPUT glosario.tex
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmb8t.vf
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmb8r.tfm
 INPUT .\introduccion.tex
 INPUT .\introduccion.tex
 INPUT .\introduccion.tex
@@ -359,17 +374,17 @@ INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmr8t.
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmb8t.tfm
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmb8t.vf
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmb8r.tfm
-INPUT .\estado.tex
-INPUT .\estado.tex
-INPUT .\estado.tex
-INPUT .\estado.tex
-INPUT estado.tex
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\t1pcr.fd
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\t1pcr.fd
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\t1pcr.fd
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8t.tfm
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\courier\pcrr8t.vf
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8r.tfm
+INPUT .\estado.tex
+INPUT .\estado.tex
+INPUT .\estado.tex
+INPUT .\estado.tex
+INPUT estado.tex
 INPUT .\aspectos.tex
 INPUT .\aspectos.tex
 INPUT .\aspectos.tex
@@ -412,15 +427,15 @@ INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\ts1ptm.fd
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\ts1ptm.fd
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmr8c.tfm
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmr8c.vf
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmr8t.tfm
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8t.tfm
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8t.tfm
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmbi8t.tfm
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmbi8t.vf
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmbi8r.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\jknappen\ec\ectt1200.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\jknappen\ec\tctt1200.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\jknappen\ec\tcrm1200.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8t.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\courier\pcrr8t.vf
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8r.tfm
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmbi8t.tfm
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmbi8t.vf
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmbi8r.tfm
 INPUT .\conclusiones.tex
 INPUT .\conclusiones.tex
 INPUT .\conclusiones.tex
@@ -434,11 +449,8 @@ INPUT anexo.tex
 INPUT Plantilla TFG v1.2.aux
 INPUT .\Plantilla TFG v1.2.out
 INPUT .\Plantilla TFG v1.2.out
+INPUT Plantilla TFG v1.2.run.xml
 OUTPUT Plantilla TFG v1.2.run.xml
-INPUT C:\Users\pablo\AppData\Local\MiKTeX\fonts\pk\ljfour\jknappen\ec\dpi600\tcrm1200.pk
-INPUT C:\Users\pablo\AppData\Local\MiKTeX\fonts\pk\ljfour\jknappen\ec\dpi600\tcrm1200.pk
-INPUT C:\Users\pablo\AppData\Local\MiKTeX\fonts\pk\ljfour\jknappen\ec\dpi600\tctt1200.pk
-INPUT C:\Users\pablo\AppData\Local\MiKTeX\fonts\pk\ljfour\jknappen\ec\dpi600\tctt1200.pk
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\public\amsfonts\cm\cmmi12.pfb
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\public\amsfonts\cm\cmmi12.pfb
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\public\amsfonts\cm\cmr12.pfb
@@ -447,6 +459,8 @@ INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\public\amsfonts\c
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\public\amsfonts\cm\cmsy10.pfb
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\public\amsfonts\cm\cmsy6.pfb
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\public\amsfonts\cm\cmsy6.pfb
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\public\amsfonts\symbols\msam10.pfb
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\public\amsfonts\symbols\msam10.pfb
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\urw\courier\ucrb8a.pfb
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\urw\courier\ucrb8a.pfb
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\type1\urw\courier\ucrr8a.pfb

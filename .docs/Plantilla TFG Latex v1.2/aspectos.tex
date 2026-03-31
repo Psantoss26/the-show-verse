@@ -34,7 +34,7 @@ Se optó por implementar el flujo Authorization Code de forma manual mediante \t
 
 \subsection{Estrategia de caché}
 
-Para cada tipo de dato gestionado en la aplicación se ha definido una estrategia de caché en función de la frecuencia de actualización del dato en origen:
+Para cada tipo de dato gestionado en la aplicación se ha definido una estrategia de caché en función de la frecuencia de actualización del dato en origen y su importancia para la experiencia de usuario.
 
 \begin{table}[!htbp]
 \begin{center}
@@ -65,7 +65,22 @@ Estado personal del usuario & No-cache & En cada petición \\
 \end{center}
 \end{table}
 
-Esta diferenciación permite reducir el número de llamadas a APIs externas en un estimado del 70--80\% para los datos de catálogo, mientras se garantiza la actualización de los datos de usuario.
+Esta diferenciación permite reducir el número de llamadas a APIs externas en un estimado del 70--80\% para los datos de catálogo, mientras se garantiza la actualización inmediata de los datos de usuario que requieren frescura absoluta.
+
+\textbf{Caché en múltiples niveles:} el sistema implementa cuatro niveles de caché complementarios:
+
+\begin{enumerate}
+\item \textbf{ISR (Incremental Static Regeneration):} páginas estáticas regeneradas periódicamente en servidor, con servicio desde caché entre regeneraciones.
+\item \textbf{Memory cache en proceso Node.js:} \texttt{Map} global que persiste durante la vida del proceso serverless (típicamente 5--15 min en Vercel), evitando peticiones redundantes a OMDb.
+\item \textbf{sessionStorage en cliente:} caché de puntuaciones que persiste durante la sesión del navegador (hasta cerrar pestaña), común entre páginas.
+\item \textbf{localStorage en cliente:} caché persistente de puntuaciones con TTL de 30 días, sobrevive entre sesiones del navegador.
+\end{enumerate}
+
+\textbf{Deduplicación en vuelo:} implementada en \texttt{lib/api/omdb.js}, si múltiples componentes solicitan el mismo dato simultáneamente, solo se realiza una petición HTTP y todas las solicitudes esperan el resultado compartido. Esto es crítico en listas de 100+ ítems donde varias tarjetas pueden necesitar el mismo \texttt{imdbId}.
+
+\textbf{Pool de concurrencia:} para respetar los \textit{rate limits} de las APIs (OMDb: 1000 peticiones/día en plan gratuito), las peticiones paralelas se limitan a 4--5 simultáneas mediante un patrón de \textit{worker pool}. Cuando hay 100 peticiones pendientes, se ejecutan en lotes de 4, esperando a que una termine antes de lanzar la siguiente.
+
+\textbf{Algoritmo LRU para localStorage:} al superar 500 entradas cacheadas, se aplica \textit{Least Recently Used} para eliminar entradas antiguas y mantener el tamaño del almacenamiento controlado (típicamente <2\,MB).
 
 \section{Tecnologías empleadas}
 
