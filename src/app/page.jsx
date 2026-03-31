@@ -30,6 +30,8 @@ import {
 } from "@/lib/api/traktHelpers";
 
 export const revalidate = 1800; // 30 minutos
+export const maxDuration = 60; // Vercel Pro = 60s; Hobby = 10s (máximo posible)
+
 
 /* ====================================================================
  * MISMO CRITERIO QUE EN CLIENTE (MainDashboardClient.jsx):
@@ -145,14 +147,30 @@ async function safeJson(res) {
 async function fetchTrakt(path) {
   const headers = traktHeaders();
   if (!headers) return [];
-  const res = await fetch(`https://api.trakt.tv${path}`, {
-    headers,
-    // cache y revalidate independientes (puedes alinearlo con 1800 si quieres)
-    next: { revalidate: 60 * 60 }, // 1h
-  });
-  const json = await safeJson(res);
-  if (!res.ok) return [];
-  return Array.isArray(json) ? json : [];
+
+  // ✅ Timeout de 8s: evita que una petición lenta de Trakt bloquee
+  // el SSR completo del dashboard y haga que lleguen datos vacíos
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const res = await fetch(`https://api.trakt.tv${path}`, {
+      headers,
+      next: { revalidate: 60 * 60 }, // 1h
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    const json = await safeJson(res);
+    if (!res.ok) return [];
+    return Array.isArray(json) ? json : [];
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      console.warn('[page.jsx] Trakt fetchTrakt timeout:', path);
+    }
+    return [];
+  }
 }
 
 async function fetchTmdbDetails(type, id) {
@@ -380,18 +398,19 @@ async function getDashboardData(sessionId = null) {
       fetchPopularMovies(),
 
       // ✅ Trakt - Contenido Mixto (Movies + Shows)
-      TRAKT_KEY ? getTraktTrending(30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktPopular(30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktRecommended(30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktAnticipated(30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktMoviesAnticipated(30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktShowsAnticipated(30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktPlayed("weekly", 30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktPlayed("monthly", 30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktWatched("weekly", 30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktWatched("monthly", 30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktCollected("weekly", 30) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktCollected("monthly", 30) : Promise.resolve([]),
+      // Cada llamada tiene .catch(() => []) independiente: si una falla, las demás siguen
+      TRAKT_KEY ? getTraktTrending(30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktPopular(30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktRecommended(30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktAnticipated(30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktMoviesAnticipated(30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktShowsAnticipated(30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktPlayed("weekly", 30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktPlayed("monthly", 30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktWatched("weekly", 30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktWatched("monthly", 30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktCollected("weekly", 30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY ? getTraktCollected("monthly", 30).catch(() => []) : Promise.resolve([]),
     ]);
 
     const recommended = sessionId

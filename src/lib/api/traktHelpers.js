@@ -39,15 +39,31 @@ async function fetchTrakt(path, options = {}) {
   const headers = traktHeaders();
   if (!headers) return [];
 
-  const res = await fetch(`https://api.trakt.tv${path}`, {
-    headers,
-    next: { revalidate: 60 * 60 }, // 1h cache
-    ...options,
-  });
+  // ✅ Timeout de 8s para cada llamada individual a Trakt.
+  // Sin esto, en Vercel (límite 10s) una sola petición lenta hace que
+  // el Promise.all completo del dashboard devuelva datos vacíos.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-  const json = await safeJson(res);
-  if (!res.ok) return [];
-  return Array.isArray(json) ? json : [];
+  try {
+    const res = await fetch(`https://api.trakt.tv${path}`, {
+      headers,
+      next: { revalidate: 60 * 60 }, // 1h cache
+      signal: controller.signal,
+      ...options,
+    });
+    clearTimeout(timeoutId);
+
+    const json = await safeJson(res);
+    if (!res.ok) return [];
+    return Array.isArray(json) ? json : [];
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      console.warn('[traktHelpers] fetchTrakt timeout:', path);
+    }
+    return [];
+  }
 }
 
 // Cache de deduplicación: evita pedir el mismo TMDb ID varias veces en un mismo render
