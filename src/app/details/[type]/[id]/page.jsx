@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import {
   getDetails,
   getCredits,
-  getWatchProviders, // <- nuevo helper
+  getWatchProviders,
   getReviews,
   getActorMovies,
 } from "@/lib/api/tmdb";
@@ -20,15 +20,19 @@ export default function DetailsPage() {
   const [propsToRender, setPropsToRender] = useState({});
 
   useEffect(() => {
-    const fetchAll = async () => {
-      if (!type || !id) return;
+    if (!type || !id) return;
 
+    let cancelled = false;
+
+    const fetchAll = async () => {
       try {
         const details = await getDetails(type, id);
+        if (cancelled) return;
 
         if (type === "person") {
           // Vista de persona: filmografía en vez de providers/reviews
-          const actorMovies = await getActorMovies(id);
+          const actorMovies = await getActorMovies(id).catch(() => ({ cast: [] }));
+          if (cancelled) return;
           setPropsToRender({
             type,
             id,
@@ -39,42 +43,66 @@ export default function DetailsPage() {
             watchLink: null,
             reviews: [],
           });
-        } else {
-          // Resto de tipos (movie / tv): llamadas en paralelo
-          const [cast, recommendations, reviews, watchProviders] =
-            await Promise.all([
-              getCredits(type, id),
-              // Usar Trakt para recomendaciones
-              getTraktRelated({ type, tmdbId: id }),
-              getReviews(type, id),
-              getWatchProviders(type, id, "ES").catch(() => ({ providers: [], link: null })), // <- movie/tv watch providers
-            ]);
-
-          const providers = watchProviders?.providers || [];
-          const watchLink = watchProviders?.link || null;
-
-          setPropsToRender({
-            type,
-            id,
-            data: details,
-            castData: cast?.cast || [],
-            recommendations: recommendations?.results || [],
-            reviews: reviews?.results || [],
-            providers,
-            watchLink,
-          });
+          setRenderReady(true);
+          return;
         }
 
+        // Resto de tipos (movie / tv): llamadas en paralelo — SIN getTraktRelated
+        // getTraktRelated se carga a continuación de forma NO bloqueante
+        const [cast, reviews, watchProviders] = await Promise.all([
+          getCredits(type, id).catch(() => ({ cast: [] })),
+          getReviews(type, id).catch(() => ({ results: [] })),
+          getWatchProviders(type, id, "ES").catch(() => ({
+            providers: [],
+            link: null,
+          })),
+        ]);
+        if (cancelled) return;
+
+        const providers = watchProviders?.providers || [];
+        const watchLink = watchProviders?.link || null;
+
+        // ✅ Renderizar de inmediato con recomendaciones vacías (sin esperar Trakt)
+        setPropsToRender({
+          type,
+          id,
+          data: details,
+          castData: cast?.cast || [],
+          recommendations: [],
+          reviews: reviews?.results || [],
+          providers,
+          watchLink,
+        });
         setRenderReady(true);
+
+        // ✅ Cargar recomendaciones de Trakt en segundo plano, sin bloquear
+        getTraktRelated({ type, tmdbId: id })
+          .then((related) => {
+            if (cancelled) return;
+            const results = related?.results || [];
+            if (results.length > 0) {
+              setPropsToRender((prev) => ({
+                ...prev,
+                recommendations: results,
+              }));
+            }
+          })
+          .catch(() => {
+            // Silencioso: si Trakt falla para este título, no hay recomendaciones
+          });
       } catch (err) {
         console.error("Error cargando detalles:", err);
+        // No dejar la página en blanco aunque falle algo inesperado
+        if (!cancelled) setRenderReady(true);
       }
     };
 
     fetchAll();
+    return () => {
+      cancelled = true;
+    };
   }, [type, id]);
 
-  // Hasta tener todo, no renderiza nada
   if (!renderReady) return null;
 
   return <DetailsClient {...propsToRender} />;
