@@ -27,41 +27,61 @@ export async function GET(req) {
       );
     }
 
-    // 1) Mapear TMDb -> Trakt
-    const mapUrl = `${TRAKT_API}/search/tmdb/${encodeURIComponent(tmdbId)}?type=${encodeURIComponent(type)}`;
-    const mapRes = await fetch(mapUrl, {
-      headers: traktHeaders(),
-      next: { revalidate: 86400 },
-    });
+    // ✅ Añadir timeout de 5 segundos para evitar bloqueos
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    const mapJson = await mapRes.json();
-    const item = mapJson?.[0]?.[type];
-    const traktId = item?.ids?.trakt;
+    try {
+      // 1) Mapear TMDb -> Trakt
+      const mapUrl = `${TRAKT_API}/search/tmdb/${encodeURIComponent(tmdbId)}?type=${encodeURIComponent(type)}`;
+      const mapRes = await fetch(mapUrl, {
+        headers: traktHeaders(),
+        next: { revalidate: 86400 },
+        signal: controller.signal,
+      });
 
-    if (!mapRes.ok || !traktId) {
-      return NextResponse.json(
-        { error: "Trakt item not found" },
-        { status: 404 },
-      );
+      const mapJson = await mapRes.json();
+      const item = mapJson?.[0]?.[type];
+      const traktId = item?.ids?.trakt;
+
+      if (!mapRes.ok || !traktId) {
+        clearTimeout(timeoutId);
+        return NextResponse.json(
+          { error: "Trakt item not found" },
+          { status: 404 },
+        );
+      }
+
+      // 2) Stats
+      const path = type === "movie" ? "movies" : "shows";
+      const statsUrl = `${TRAKT_API}/${path}/${traktId}/stats`;
+      const statsRes = await fetch(statsUrl, {
+        headers: traktHeaders(),
+        next: { revalidate: 3600 },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const stats = await statsRes.json();
+      if (!statsRes.ok) {
+        return NextResponse.json(
+          { error: "Error fetching stats from Trakt" },
+          { status: 502 },
+        );
+      }
+
+      return NextResponse.json({ traktId, stats });
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        return NextResponse.json(
+          { error: "Trakt request timeout" },
+          { status: 504 },
+        );
+      }
+      throw err;
     }
-
-    // 2) Stats
-    const path = type === "movie" ? "movies" : "shows";
-    const statsUrl = `${TRAKT_API}/${path}/${traktId}/stats`;
-    const statsRes = await fetch(statsUrl, {
-      headers: traktHeaders(),
-      next: { revalidate: 3600 },
-    });
-
-    const stats = await statsRes.json();
-    if (!statsRes.ok) {
-      return NextResponse.json(
-        { error: "Error fetching stats from Trakt" },
-        { status: 502 },
-      );
-    }
-
-    return NextResponse.json({ traktId, stats });
   } catch (e) {
     return NextResponse.json(
       { error: e?.message || "Unexpected error" },
