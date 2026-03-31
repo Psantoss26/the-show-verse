@@ -1,43 +1,53 @@
-'use client'
+"use client";
 
-import { useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ExternalLink, ShieldCheck, Sparkles, AlertCircle, Loader2 } from 'lucide-react'
+import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ExternalLink,
+  ShieldCheck,
+  Sparkles,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 
 export default function LoginForm() {
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState('')
-  const searchParams = useSearchParams()
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const searchParams = useSearchParams();
 
   const next = useMemo(() => {
-    const n = searchParams?.get('next') || '/'
-    return n.startsWith('/') ? n : '/'
-  }, [searchParams])
+    const n = searchParams?.get("next") || "/";
+    return n.startsWith("/") ? n : "/";
+  }, [searchParams]);
 
   const startTmdbLogin = async () => {
-    setLoading(true)
-    setErr('')
+    setLoading(true);
+    setErr("");
 
     try {
-      const res = await fetch('/api/tmdb/auth/request-token', { cache: 'no-store' })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json?.error || 'No se pudo iniciar el login')
+      const res = await fetch("/api/tmdb/auth/request-token", {
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok)
+        throw new Error(json?.error || "No se pudo iniciar el login");
 
-      const token = json?.request_token
-      if (!token) throw new Error('Token inválido')
+      const token = json?.request_token;
+      if (!token) throw new Error("Token inválido");
 
-      const origin = window.location.origin
-      const redirectUrl = `${origin}/auth/callback?next=${encodeURIComponent(next)}`
+      // Usar URL fija para evitar problemas con puertos dinámicos
+      const baseUrl = "http://localhost:3000";
+      const redirectUrl = `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`;
 
       window.location.href =
         `https://www.themoviedb.org/authenticate/${token}` +
-        `?redirect_to=${encodeURIComponent(redirectUrl)}`
+        `?redirect_to=${encodeURIComponent(redirectUrl)}`;
     } catch (e) {
-      setErr(e?.message || 'Error iniciando login TMDb')
-      setLoading(false)
+      setErr(e?.message || "Error iniciando login TMDb");
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="w-full max-w-md lg:max-w-5xl grid gap-4 lg:grid-cols-2 lg:gap-6 items-stretch">
@@ -59,15 +69,26 @@ export default function LoginForm() {
             Conecta tu cuenta de TMDb
           </div>
 
-          <h1 className="mt-4 text-4xl font-black tracking-tight">Inicia sesión de forma segura</h1>
+          <h1 className="mt-4 text-4xl font-black tracking-tight">
+            Inicia sesión de forma segura
+          </h1>
           <p className="mt-3 text-zinc-300 leading-relaxed max-w-prose">
-            Te redirigimos a TMDb para autorizar. Nosotros solo guardamos tu{' '}
-            <span className="text-emerald-300 font-semibold">session_id</span> y tu perfil.
+            Te redirigimos a TMDb para autorizar. Nosotros solo guardamos tu{" "}
+            <span className="text-emerald-300 font-semibold">session_id</span> y
+            tu perfil.
           </p>
 
           <div className="mt-6 grid grid-cols-2 gap-3">
-            <Feature icon={ShieldCheck} title="Sin contraseña" desc="Autorización oficial de TMDb" />
-            <Feature icon={ExternalLink} title="Vuelves solo" desc="Sesión + perfil al volver" />
+            <Feature
+              icon={ShieldCheck}
+              title="Sin contraseña"
+              desc="Autorización oficial de TMDb"
+            />
+            <Feature
+              icon={ExternalLink}
+              title="Vuelves solo"
+              desc="Sesión + perfil al volver"
+            />
           </div>
 
           <div className="mt-8 text-xs text-zinc-400 border-t border-white/10 pt-4">
@@ -106,8 +127,12 @@ export default function LoginForm() {
 
         <div className="mt-5 lg:mt-0 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl sm:text-2xl font-extrabold">Accede a tu cuenta</h2>
-            <p className="text-xs sm:text-sm text-zinc-400 mt-1">Autenticación oficial de TMDb</p>
+            <h2 className="text-xl sm:text-2xl font-extrabold">
+              Accede a tu cuenta
+            </h2>
+            <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+              Autenticación oficial de TMDb
+            </p>
           </div>
           <div className="px-2.5 py-1 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-200 text-[11px] sm:text-xs font-extrabold">
             Recomendado
@@ -128,8 +153,12 @@ export default function LoginForm() {
               flex items-center justify-center gap-2
             "
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-            {loading ? 'Abriendo TMDb…' : 'Continuar con TMDb'}
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ExternalLink className="w-4 h-4" />
+            )}
+            {loading ? "Abriendo TMDb…" : "Continuar con TMDb"}
           </button>
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4">
@@ -160,11 +189,12 @@ export default function LoginForm() {
 
         {/* Aviso legal SOLO móvil (porque no tenemos columna izquierda) */}
         <div className="lg:hidden text-[11px] text-zinc-500 border-t border-white/10 pt-3 mt-3">
-          Al continuar, TMDb gestiona la autenticación en su web. Solo guardamos tu sesión y perfil.
+          Al continuar, TMDb gestiona la autenticación en su web. Solo guardamos
+          tu sesión y perfil.
         </div>
       </motion.div>
     </div>
-  )
+  );
 }
 
 function Feature({ icon: Icon, title, desc }) {
@@ -178,7 +208,7 @@ function Feature({ icon: Icon, title, desc }) {
       </div>
       <div className="mt-2 text-xs text-zinc-400 leading-relaxed">{desc}</div>
     </div>
-  )
+  );
 }
 
 function MiniPill({ icon: Icon, text }) {
@@ -187,7 +217,7 @@ function MiniPill({ icon: Icon, text }) {
       <Icon className="w-3.5 h-3.5 text-emerald-300" />
       {text}
     </div>
-  )
+  );
 }
 
 function Step({ n, text }) {
@@ -196,5 +226,5 @@ function Step({ n, text }) {
       <span className="text-zinc-500 font-extrabold">{n}.</span>
       <span>{text}</span>
     </div>
-  )
+  );
 }

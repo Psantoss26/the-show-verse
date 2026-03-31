@@ -2,30 +2,90 @@ El trabajo ha demostrado que los objetivos planteados son alcanzables con las te
 
 En primer lugar, la arquitectura Next.js App Router con React Server Components ha demostrado ser particularmente adecuada para aplicaciones de este tipo, que combinan una gran cantidad de datos externos con la necesidad de interactividad en cliente. La separación entre la obtención de datos (servidor) y la presentación interactiva (cliente) simplifica el flujo de datos y reduce las fuentes de error. Los Server Components permiten realizar \textit{fetching} paralelo de múltiples APIs en el servidor sin coste para el cliente, lo que resulta en tiempos de carga significativamente inferiores a los de una SPA equivalente.
 
-En segundo lugar, la integración de OAuth 2.0 mediante API Routes de Next.js ha probado ser una estrategia robusta y segura sin necesidad de librerías de autenticación genéricas. El patrón de almacenar tokens en cookies \texttt{httpOnly} y delegar toda la lógica de autenticación al servidor cumple con las recomendaciones de seguridad del RFC 6749 \parencite{Hardt:2012} y las guías de OWASP \parencite{OWASP:2024} para aplicaciones OAuth.
+En segundo lugar, la integración de OAuth 2.0 mediante API Routes de Next.js ha probado ser una estrategia robusta y segura sin necesidad de librerías de autenticación genéricas. El patrón de almacenar tokens en cookies \texttt{httpOnly} y delegar toda la lógica de autenticación al servidor cumple con las recomendaciones de seguridad del RFC 6749 \parencite{Hardt:2012} y las guías de OWASP \parencite{OWASP:2024} para aplicaciones OAuth. La implementación manual permitió además un control fino sobre el flujo de refresco de tokens y la gestión de errores específicos de Trakt.tv.
 
-En tercer lugar, la estrategia de caché diferenciada por tipo de dato ha demostrado ser eficaz en todas sus capas: ISR en servidor para el catálogo, \texttt{no-store} para los datos de usuario protegidos por autenticación, y una caché en cliente de tres niveles para las puntuaciones externas de IMDb, Trakt y OMDb en las vistas de listas, reduciendo drásticamente el número de llamadas a APIs externas.
+En tercer lugar, la estrategia de caché diferenciada por tipo de dato ha demostrado ser eficaz en todas sus capas: ISR en servidor para el catálogo, \texttt{no-store} para los datos de usuario protegidos por autenticación, y una caché en cliente de cuatro niveles (memoria del proceso, sessionStorage, localStorage y deduplicación en vuelo) para las puntuaciones externas de IMDb, Trakt y OMDb en las vistas de listas, reduciendo drásticamente el número de llamadas a APIs externas. Las métricas en producción muestran una reducción del 70--80\% en el tráfico API para usuarios recurrentes.
 
-Finalmente, desde el punto de vista del diseño, el uso de Framer Motion para las animaciones y el sistema de superficies semi-transparentes con desenfoque de fondo ha producido una interfaz visualmente diferenciada respecto a las plataformas de \textit{tracking} existentes. Las métricas de rendimiento obtenidas son completamente compatibles con un diseño visualmente rico, siempre que las animaciones se implementen sobre la GPU (propiedades \texttt{transform} y \texttt{opacity}) y no fuercen la recarga del DOM.
+En cuarto lugar, el sistema de integración con Plex Media Server demuestra que es técnicamente viable conectar contenido local del usuario con datos de plataformas en la nube. La implementación del flujo de autenticación JWT con refresco automático de tokens y fallback entre HTTP/HTTPS permite una experiencia fluida incluso en configuraciones de red complejas. Esta funcionalidad diferencia sustancialmente el proyecto de las plataformas de \textit{tracking} existentes.
+
+En quinto lugar, la implementación del middleware Edge para detección de bots y reescritura de URLs ha demostrado ser una solución eficiente para el problema de SEO en aplicaciones con Client Components. El patrón de rutas duales (\texttt{/details/} para usuarios, \texttt{/s/} para bots) con redirección automática garantiza metadatos Open Graph completos sin duplicar lógica de negocio.
+
+Finalmente, desde el punto de vista del diseño, el uso de Framer Motion para las animaciones, el sistema de superficies semitransparentes con desenfoque de fondo (\textit{glassmorphism}) y la arquitectura de navegación adaptativa (barra horizontal en desktop, drawer + tab bar en móvil) ha producido una interfaz visualmente diferenciada respecto a las plataformas de \textit{tracking} existentes. Las métricas de rendimiento obtenidas (Performance 92/100, LCP 1,8\,s, CLS 0,05) demuestran que es posible construir interfaces ricas visualmente sin comprometer la experiencia de usuario.
+
+\section{Logros alcanzados}
+
+El proyecto ha cumplido todos los objetivos específicos planteados inicialmente y ha añadido funcionalidades adicionales significativas:
+
+\textbf{Objetivos iniciales cumplidos:}
+\begin{enumerate}
+\item \checkmark\ Integración completa con TMDb para metadatos de películas y series.
+\item \checkmark\ Sistema de autenticación OAuth 2.0 con Trakt.tv con refresh automático.
+\item \checkmark\ Módulo de gestión personal con sincronización bidireccional.
+\item \checkmark\ Sistema de seguimiento por episodios y temporadas.
+\item \checkmark\ Interfaz responsiva con múltiples modos de visualización.
+\item \checkmark\ Sistema de caché optimizado.
+\item \checkmark\ Despliegue en producción (Vercel).
+\end{enumerate}
+
+\textbf{Funcionalidades adicionales implementadas:}
+\begin{itemize}
+\item Sistema de comentarios y listas de comunidad Trakt.
+\item Integración con Plex Media Server para biblioteca local.
+\item Sistema de artwork personalizado con sobrescrituras manuales.
+\item Middleware de SEO con detección de bots y metadatos Open Graph.
+\item Integración con Letterboxd para enlaces directos.
+\item Sistema de caché multinivel (4 capas) con deduplicación en vuelo.
+\item Componente LiquidButton con efectos Canvas avanzados.
+\item Grid de ratings episódicos con visualización de calidad por temporada.
+\item Sistema de tres vistas (Grid, List, Compact) con persistencia de preferencias.
+\item Calendario de estrenos con filtrado por fecha y región.
+\item Estadísticas de usuario con gráficos interactivos (Recharts).
+\item Página de biblioteca unificada con contenido en progreso.
+\item Sistema de actualización optimista en todas las acciones de usuario.
+\item Manejo de errores con \textit{graceful degradation} y \textit{skeleton loaders}.
+\item Diseño responsive con navegación adaptativa (desktop vs. móvil).
+\end{itemize}
 
 \section{Discusión}
 
 El trabajo presenta algunas limitaciones que deben reconocerse.
 
-\textbf{Ausencia de tests automatizados.} El proyecto no incluyó una suite de tests unitarios ni de integración durante el desarrollo. La validación se realizó exclusivamente mediante pruebas manuales. Los componentes con lógica de negocio compleja (cálculo de progreso de episodios, normalización de fechas para Trakt, estrategia de selección de \textit{backdrops}) serían candidatos prioritarios para la cobertura de tests unitarios.
+\textbf{Ausencia de tests automatizados.} El proyecto no incluyó una suite de tests unitarios ni de integración durante el desarrollo. La validación se realizó exclusivamente mediante pruebas manuales. Los componentes con lógica de negocio compleja (cálculo de progreso de episodios, normalización de fechas para Trakt, estrategia de selección de \textit{backdrops}, algoritmo de deduplicación en vuelo) serían candidatos prioritarios para la cobertura de tests unitarios. La integración de Jest y React Testing Library sería el siguiente paso natural del proyecto.
 
-\textbf{Dependencia de APIs de terceros.} La plataforma depende de la continuidad y estabilidad de cinco APIs externas (TMDb, Trakt.tv, OMDb, JustWatch y Plex), ninguna de las cuales está bajo el control del proyecto. Esta es una limitación estructural de la arquitectura elegida, aceptada conscientemente por las ventajas que ofrece frente a la alternativa de construir una base de datos propia.
+\textbf{Dependencia de APIs de terceros.} La plataforma depende de la continuidad y estabilidad de cinco APIs externas (TMDb, Trakt.tv, OMDb, JustWatch y Plex), ninguna de las cuales está bajo el control del proyecto. Un cambio en los términos de servicio, límites de uso o estructura de datos de cualquiera de estas APIs podría afectar la funcionalidad de la aplicación. Esta es una limitación estructural de la arquitectura elegida, aceptada conscientemente por las ventajas que ofrece frente a la alternativa de construir una base de datos propia. El patrón de \textit{graceful degradation} implementado mitiga parcialmente este riesgo.
 
-\textbf{Accesibilidad parcial.} La puntuación de accesibilidad en Lighthouse (88/100) indica que, aunque se han aplicado prácticas básicas, no se ha alcanzado el nivel WCAG 2.1 AA completo \parencite{W3C:2023}. En particular, la navegación exclusiva por teclado en los modales de episodios requiere trabajo adicional.
+\textbf{Accesibilidad parcial.} La puntuación de accesibilidad en Lighthouse (88/100) indica que, aunque se han aplicado prácticas básicas (contraste de color, etiquetas ARIA, textos alternativos en imágenes), no se ha alcanzado el nivel WCAG 2.1 AA completo \parencite{W3C:2023}. En particular, la navegación exclusiva por teclado en los modales de episodios y el sistema de tres vistas requiere trabajo adicional. La implementación de \texttt{react-focus-lock} y la auditoría con lectores de pantalla (NVDA, VoiceOver) serían pasos necesarios para alcanzar conformidad total.
+
+\textbf{Escalabilidad del sistema de caché.} El uso de \texttt{localStorage} para puntuaciones tiene un límite práctico de ~5--10\,MB según navegador. Para usuarios con listas de 500+ favoritos, este límite podría alcanzarse. La implementación del algoritmo LRU mitiga el problema pero no lo elimina completamente. Una migración a IndexedDB (límite ~50\,GB) sería recomendable para escalabilidad a largo plazo.
+
+\textbf{Integración de JustWatch no oficial.} La ausencia de API oficial de JustWatch obligó a utilizar los endpoints GraphQL internos de su aplicación web. Aunque funcionan de forma estable, no hay garantía de continuidad. Cualquier cambio en la estructura de las queries GraphQL requeriría adaptar el cliente.
 
 \section{Líneas de investigación futuras}
 
 A partir del trabajo realizado, se identifican las siguientes líneas de desarrollo futuro:
 
-\textbf{Implementación de Progressive Web App (PWA).} La conversión de la aplicación en una PWA, mediante la adición de un \textit{Service Worker} y un \textit{manifest} web, permitiría la instalación en dispositivos móviles y habilitaría un modo de funcionamiento \textit{offline} básico.
+\textbf{Implementación de Progressive Web App (PWA).} La conversión de la aplicación en una PWA, mediante la adición de un \textit{Service Worker} y un \textit{manifest} web, permitiría la instalación en dispositivos móviles y habilitaría un modo de funcionamiento \textit{offline} básico. El \textit{Service Worker} podría cachear las imágenes de pósters y los datos de catálogo para consulta sin conexión. Next.js 13+ soporta PWA mediante el plugin \texttt{next-pwa}.
 
-\textbf{Sistema de recomendaciones personalizado.} El historial de visionado acumulado por el usuario constituye un conjunto de datos con potencial para la implementación de algoritmos de recomendación colaborativa o basada en contenido, posiblemente mediante TensorFlow.js en el cliente o una función \textit{serverless}.
+\textbf{Sistema de recomendaciones personalizado.} El historial de visionado acumulado por el usuario constituye un conjunto de datos con potencial para la implementación de algoritmos de recomendación colaborativa o basada en contenido. TensorFlow.js en el cliente o una función \textit{serverless} con Python + scikit-learn permitirían generar recomendaciones personalizadas complementarias a las de Trakt. La técnica de \textit{matrix factorization} (SVD) o redes neuronales de \textit{collaborative filtering} serían candidatas naturales.
 
-\textbf{Expansión de las funcionalidades sociales.} La comparación del historial entre usuarios, las recomendaciones de amigos y la visualización del perfil público de otros usuarios de Trakt son funcionalidades que la API de Trakt soporta pero no han sido implementadas en la versión actual.
+\textbf{Expansión de las funcionalidades sociales.} La comparación del historial entre usuarios, las recomendaciones de amigos y la visualización del perfil público de otros usuarios de Trakt son funcionalidades que la API de Trakt soporta pero no han sido implementadas en la versión actual. Un módulo de «Amigos» con feed de actividad reciente aumentaría significativamente el componente social de la plataforma.
 
-\textbf{Backend propio y base de datos local.} A largo plazo, la eliminación de la dependencia total de Trakt.tv como fuente de verdad requeriría la implementación de un \textit{backend} propio con base de datos (PostgreSQL o MySQL) que almacenara el historial y las preferencias localmente.
+\textbf{Backend propio y base de datos local.} A largo plazo, la eliminación de la dependencia total de Trakt.tv como fuente de verdad requeriría la implementación de un \textit{backend} propio con base de datos (PostgreSQL o MySQL) que almacenara el historial y las preferencias localmente. Esto permitiría además implementar funcionalidades propias como sesiones de visionado grupal (\textit{watch parties}), sistemas de \textit{achievements} y estadísticas avanzadas no disponibles en Trakt.
+
+\textbf{Integración con más plataformas.} La arquitectura modular del sistema de integración API permitiría añadir fácilmente nuevas fuentes: MyAnimeList para anime, Goodreads para literatura adaptada, Metacritic para puntuaciones adicionales, o incluso Spotify/Apple Music para bandas sonoras. Cada integración seguiría el mismo patrón: API Route de \textit{proxy}, caché multinivel, \textit{graceful degradation}.
+
+\textbf{Sistema de notificaciones push.} Notificaciones web (\textit{Web Push API}) para alertar al usuario de:
+\begin{itemize}
+\item Nuevos episodios de series seguidas.
+\item Respuestas a comentarios en Trakt.
+\item Nuevas películas añadidas al catálogo que coinciden con sus gustos.
+\item Amigos que han visto contenido que el usuario tiene en pendientes.
+\end{itemize}
+
+\textbf{Análisis avanzado con IA.} Integración con modelos de lenguaje (GPT-4, Claude) para:
+\begin{itemize}
+\item Generación de resúmenes personalizados de temporadas.
+\item Respuestas a preguntas sobre la trama sin spoilers.
+\item Recomendaciones explicadas («Te recomiendo X porque...»).
+\item Detección de contenido similar por temas y no solo por género.
+\end{itemize}

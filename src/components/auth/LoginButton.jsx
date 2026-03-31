@@ -1,21 +1,23 @@
-'use client'
+"use client";
 
-import { createRequestToken } from '@/lib/api/auth'
+import { createRequestToken } from "@/lib/api/auth";
 
 export default function LoginButton() {
   const handleLogin = async () => {
     try {
-      const token = await createRequestToken()
-      const redirectUrl = `${window.location.origin}/auth/callback`
+      const token = await createRequestToken();
+      // Usar URL fija para evitar problemas con puertos dinámicos
+      const baseUrl = "http://localhost:3000";
+      const redirectUrl = `${baseUrl}/auth/callback`;
 
       window.location.href =
         `https://www.themoviedb.org/authenticate/${token}` +
-        `?redirect_to=${encodeURIComponent(redirectUrl)}`
+        `?redirect_to=${encodeURIComponent(redirectUrl)}`;
     } catch (e) {
-      console.error('Error iniciando login TMDb', e)
-      alert('No se pudo iniciar el inicio de sesión con TMDb')
+      console.error("Error iniciando login TMDb", e);
+      alert("No se pudo iniciar el inicio de sesión con TMDb");
     }
-  }
+  };
 
   return (
     <button
@@ -24,5 +26,5 @@ export default function LoginButton() {
     >
       Iniciar sesión
     </button>
-  )
+  );
 }

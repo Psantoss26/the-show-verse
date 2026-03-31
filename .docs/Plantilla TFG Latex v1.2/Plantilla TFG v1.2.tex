@@ -65,6 +65,7 @@
 \geometry{a4paper, left=2.25cm, right=2.0cm, top=2.5cm, bottom=2.5cm}
 
 \usepackage{fancyhdr}
+\setlength{\headheight}{16pt}
 
 \fancypagestyle{plain}{}
 
@@ -140,11 +141,15 @@
 \chapter*{Resumen}
 \addcontentsline{toc}{chapter}{\numberline{}Resumen}
 
-El presente Trabajo de Fin de Grado aborda el diseño y la implementación de \textit{The Show Verse}, una aplicación web de gestión y descubrimiento de películas y series que permite a los usuarios unificar todo el contenido audiovisual en un solo lugar. La plataforma cuenta con secciones personalizadas para cada usuario, gestionadas a través de APIs externas.
+El presente Trabajo de Fin de Grado aborda el diseño y la implementación de \textit{The Show Verse}, una aplicación web avanzada de gestión y descubrimiento de películas y series que permite a los usuarios unificar todo el contenido audiovisual en un solo lugar. La plataforma cuenta con secciones personalizadas para cada usuario, gestionadas a través de APIs externas, e integra funcionalidades de biblioteca local mediante Plex Media Server.
 
-La dispersión del contenido entre las distintas plataformas de \textit{streaming} genera una experiencia de usuario fragmentada y dificulta el seguimiento del contenido consumido. \textit{The Show Verse} soluciona este problema ofreciendo una plataforma que unifica el contenido de las principales páginas de puntuaciones y plataformas de \textit{streaming} haciendo uso de APIs.
+La dispersión del contenido entre las distintas plataformas de \textit{streaming} genera una experiencia de usuario fragmentada y dificulta el seguimiento del contenido consumido. \textit{The Show Verse} soluciona este problema ofreciendo una plataforma que unifica el contenido de las principales páginas de puntuaciones y plataformas de \textit{streaming} haciendo uso de APIs, además de integrar el contenido local del usuario.
 
-El trabajo consiste en el desarrollo completo de una aplicación web en Next.js que integra las APIs de The Movie Database (TMDb), Trakt.tv y OMDb, además de JustWatch para la disponibilidad en plataformas de \textit{streaming} y Plex para el acceso a contenido en un servidor local. Se ha implementado un flujo de autenticación OAuth 2.0 completo con Trakt.tv y TMDb para permitir la sincronización del historial, los favoritos, la lista de pendientes, el calendario de estrenos y las valoraciones del usuario. Además, se ha diseñado un sistema de caché en múltiples niveles que reduce en un 70--80\% el número de peticiones a APIs externas en las vistas de listas.
+El trabajo consiste en el desarrollo completo de una aplicación web en Next.js que integra las APIs de The Movie Database (TMDb), Trakt.tv, OMDb, JustWatch y Plex Media Server. Se ha implementado un flujo de autenticación OAuth 2.0 completo con Trakt.tv y TMDb para permitir la sincronización del historial, los favoritos, la lista de pendientes, el calendario de estrenos y las valoraciones del usuario. Además, se ha diseñado un sistema de caché en múltiples niveles (ISR, memoria de proceso, sessionStorage, localStorage) con deduplicación en vuelo que reduce en un 70--80\% el número de peticiones a APIs externas en las vistas de listas.
+
+La arquitectura implementada combina Server Components de React para la obtención inicial de datos con Client Components para la interactividad, logrando tiempos de carga (LCP) de 1,8\,s y una puntuación de Performance en Lighthouse de 92/100. Se ha desarrollado un \textit{middleware} Edge para optimización SEO con detección de bots y generación de metadatos Open Graph, un sistema de navegación responsive adaptativo (barra horizontal en desktop, drawer lateral + tab bar en móvil), y componentes con efectos visuales avanzados mediante Canvas 2D y Framer Motion.
+
+Entre las funcionalidades destacables se incluyen: seguimiento episódico con visualización de progreso por temporada, grid de ratings que permite detectar patrones de calidad, integración con comentarios y listas de comunidad Trakt, sistema de artwork personalizado con sobrescrituras manuales, tres vistas alternativas (Grid, List, Compact) con persistencia de preferencias, actualización optimista de estado en todas las acciones de usuario, y gestión de errores con \textit{graceful degradation}.
 
 
 % ÍNDICE DE CONTENIDOS

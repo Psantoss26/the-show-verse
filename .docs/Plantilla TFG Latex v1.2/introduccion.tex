@@ -28,16 +28,20 @@ El problema abordado en este trabajo puede descomponerse en varias categorías t
 
 \section{Objetivos del trabajo}
 
-\textbf{Objetivo general:} diseñar e implementar una aplicación web completa y funcional para la gestión personalizada y el descubrimiento de nuevas películas y series, que integre múltiples APIs externas y ofrezca una experiencia de usuario centralizada.
+\textbf{Objetivo general:} diseñar e implementar una aplicación web completa y funcional para la gestión personalizada y el descubrimiento de nuevas películas y series, que integre múltiples APIs externas y ofrezca una experiencia de usuario centralizada, moderna y eficiente.
 
 \textbf{Objetivos específicos:}
 
 \begin{enumerate}
 \item Implementar la integración con la API de TMDb para obtener los metadatos completos de películas y series (sinopsis, características, imágenes, vídeos, temporadas y episodios).
-\item Desarrollar un sistema de autenticación OAuth 2.0 completo con Trakt.tv, incluyendo almacenamiento seguro de tokens en cookies, actualización automática y revocación.
-\item Construir un módulo de gestión personal (favoritos, pendientes, historial de visionado y en progreso y puntuaciones de usuario) con sincronización bidireccional con Trakt y TMDb.
-\item Implementar un sistema de seguimiento por episodios y temporadas para las series.
-\item Diseñar una interfaz de usuario responsiva y accesible que ofrezca múltiples modos de visualización (Grid, List, Compact) con transiciones fluidas y compatibilidad con dispositivos móviles.
-\item Optimizar el rendimiento de la aplicación, incluyendo un sistema de caché en cliente para las puntuaciones de IMDb, Trakt y OMDb en las listas de favoritos y pendientes.
-\item Desplegar la aplicación en un entorno de producción como Vercel.
+\item Desarrollar un sistema de autenticación OAuth 2.0 completo con Trakt.tv, incluyendo almacenamiento seguro de tokens en cookies \texttt{httpOnly}, actualización automática mediante \textit{refresh tokens} y revocación.
+\item Construir un módulo de gestión personal (favoritos, pendientes, historial de visionado, series en progreso y puntuaciones de usuario) con sincronización bidireccional con Trakt y TMDb.
+\item Implementar un sistema de seguimiento episódico completo para series, incluyendo marcado individual por episodio, marcado masivo por temporada, visualización de progreso y grid de ratings para detección de patrones de calidad.
+\item Diseñar una interfaz de usuario responsiva y accesible que ofrezca múltiples modos de visualización (Grid, List, Compact) con transiciones fluidas mediante Framer Motion y compatibilidad con dispositivos móviles mediante navegación adaptativa.
+\item Optimizar el rendimiento de la aplicación mediante un sistema de caché multinivel (ISR en servidor, memoria de proceso Node.js, sessionStorage, localStorage) con deduplicación en vuelo para reducir el tráfico API.
+\item Implementar un \textit{middleware} Edge para optimización SEO con detección de bots, generación de metadatos Open Graph y reescritura de URLs para garantizar indexación correcta.
+\item Integrar Plex Media Server para acceso a biblioteca local del usuario, incluyendo autenticación JWT, enlaces directos multiplataforma y búsqueda unificada.
+\item Desarrollar componentes interactivos avanzados con efectos visuales mediante Canvas 2D (LiquidButton) y sistema de actualización optimista para todas las acciones de usuario.
+\item Implementar gestión de errores con \textit{graceful degradation} y \textit{skeleton loaders} para garantizar funcionalidad parcial aunque fallen APIs externas.
+\item Desplegar la aplicación en un entorno de producción (Vercel) con métricas de rendimiento óptimas (LCP <2\,s, CLS <0,1, Performance >90/100).
 \end{enumerate}
