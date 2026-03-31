@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 10; // Límite máximo Vercel Hobby (s)
 export const revalidate = 3600; // 1h
 
 const TRAKT_KEY =
@@ -35,25 +36,40 @@ async function safeBody(res) {
 }
 
 async function fetchTrakt(path) {
-  const res = await fetch(`https://api.trakt.tv${path}`, {
-    headers: traktHeaders(),
-    next: { revalidate },
-  });
-  const { json, text } = await safeBody(res);
-  if (!res.ok) {
-    const isCloudflare =
-      res.status === 403 &&
-      /cloudflare|attention required/i.test(String(text || ""));
-    console.error("Trakt related upstream failed", {
-      path,
-      status: res.status,
-      isCloudflare,
-      response: json,
-      responseText: json ? null : String(text || "").slice(0, 400),
+  // ✅ Timeout de 5s para evitar que Vercel cancele la función completa
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const res = await fetch(`https://api.trakt.tv${path}`, {
+      headers: traktHeaders(),
+      next: { revalidate },
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
+
+    const { json, text } = await safeBody(res);
+    if (!res.ok) {
+      const isCloudflare =
+        res.status === 403 &&
+        /cloudflare|attention required/i.test(String(text || ""));
+      console.error("Trakt related upstream failed", {
+        path,
+        status: res.status,
+        isCloudflare,
+        response: json,
+        responseText: json ? null : String(text || "").slice(0, 400),
+      });
+      return [];
+    }
+    return Array.isArray(json) ? json : [];
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      console.warn("Trakt related timeout for path:", path);
+    }
     return [];
   }
-  return Array.isArray(json) ? json : [];
 }
 
 async function fetchTmdb(type, id) {
@@ -129,6 +145,7 @@ export async function GET(request) {
     }
 
     // 3. Hidratar con datos de TMDb para obtener posters y datos completos
+    // Concurrencia reducida a 5 para no saturar la función serverless
     const hydrated = await mapWithConcurrency(
       related,
       async (item) => {
@@ -153,7 +170,7 @@ export async function GET(request) {
           overview: details.overview || null,
         };
       },
-      8,
+      5, // Reducido de 8 a 5 para evitar saturar el límite serverless
     );
 
     return NextResponse.json({ results: hydrated });

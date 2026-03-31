@@ -13,6 +13,7 @@ import {
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 10 // Límite máximo Vercel Hobby (s)
 
 export async function GET(request) {
     const type = request.nextUrl.searchParams.get('type') // movie | show
@@ -71,7 +72,7 @@ export async function GET(request) {
 
         let history = []
         if (traktId) {
-            history = await traktGetHistoryForItem(token, { type, traktId, limit: 30 })
+            history = await traktGetHistoryForItem(token, { type, traktId, limit: 10 })
         }
 
         const summary = computeHistorySummary({ searchHit: hit, history, type })
