@@ -1,12 +1,12 @@
 # Fdb version 4
-["biber Plantilla TFG v1.2"] 0 "Plantilla TFG v1.2.bcf" "Plantilla TFG v1.2.bbl" "Plantilla TFG v1.2" 1774958625.05625 -1
-  "Plantilla TFG v1.2.bcf" 1774958624 135269 5bac7d75c99a5533d6f19d7d2c9f8c0b "pdflatex"
+["biber Plantilla TFG v1.2"] 0 "Plantilla TFG v1.2.bcf" "Plantilla TFG v1.2.bbl" "Plantilla TFG v1.2" 1774964640.3442 -1
+  "Plantilla TFG v1.2.bcf" 1774964640 135269 5bac7d75c99a5533d6f19d7d2c9f8c0b "pdflatex"
   "biblio.bib" 1774779974 4205 450d5386d6eb204b7cc4635ac8c425a4 ""
   (generated)
   "Plantilla TFG v1.2.bbl"
   "Plantilla TFG v1.2.blg"
   (rewritten before read)
-["pdflatex"] 1774958622.64798 "e:/ASNPORTS/PELICULAS/the-show-verse/.docs/Plantilla TFG Latex v1.2/Plantilla TFG v1.2.tex" "Plantilla TFG v1.2.pdf" "Plantilla TFG v1.2" 1774958625.05705 0
+["pdflatex"] 1774964637.8298 "e:/ASNPORTS/PELICULAS/the-show-verse/.docs/Plantilla TFG Latex v1.2/Plantilla TFG v1.2.tex" "Plantilla TFG v1.2.pdf" "Plantilla TFG v1.2" 1774964640.34495 0
   "C:/Users/pablo/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map" 1774954176 82705 9cc9f144eacd499bc23a611703921467 ""
   "C:/Users/pablo/AppData/Local/MiKTeX/miktex/data/le/pdftex/pdflatex.fmt" 1774779514 13333849 c2e3b623089f6c7913a15f1e264c0f40 ""
   "C:/Users/pablo/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/base/8r.enc" 1458473887 4993 80dc9bab7f31fb78a000ccfed0e27cab ""
@@ -180,21 +180,21 @@
   "C:/Users/pablo/AppData/Local/Programs/MiKTeX/tex/latex/wasysym/wasysym.sty" 1579693002 11252 7fbfbe7bbcbe1f73acbe32ae2f10c666 ""
   "C:/Users/pablo/AppData/Local/Programs/MiKTeX/tex/latex/xstring/xstring.sty" 1693735632 123 a302f2c651a95033260db60e51527ae8 ""
   "LogoUCJC.png" 1774779974 40164 b272e52b7ad6d11519399042b799e411 ""
-  "Plantilla TFG v1.2.aux" 1774958624 23091 4069c402ed440b67ad86cece0f7f25be "pdflatex"
+  "Plantilla TFG v1.2.aux" 1774964639 23091 4069c402ed440b67ad86cece0f7f25be "pdflatex"
   "Plantilla TFG v1.2.bbl" 1774956393 43037 37433fbfe9e39c3b043396e37dcfc749 "biber Plantilla TFG v1.2"
-  "Plantilla TFG v1.2.lof" 1774958624 130 6065a55bb8926a8d1f250ea1e44d6185 "pdflatex"
-  "Plantilla TFG v1.2.lot" 1774958624 1195 467228ec178efad1127d9d3aca7df352 "pdflatex"
-  "Plantilla TFG v1.2.out" 1774958624 5990 23a0b8af670eb9821938c33da0917307 "pdflatex"
-  "Plantilla TFG v1.2.run.xml" 1774958624 2467 f2452d2e94df24f61cdcdf3707e00b79 "pdflatex"
+  "Plantilla TFG v1.2.lof" 1774964640 130 6065a55bb8926a8d1f250ea1e44d6185 "pdflatex"
+  "Plantilla TFG v1.2.lot" 1774964640 1195 467228ec178efad1127d9d3aca7df352 "pdflatex"
+  "Plantilla TFG v1.2.out" 1774964639 5990 23a0b8af670eb9821938c33da0917307 "pdflatex"
+  "Plantilla TFG v1.2.run.xml" 1774964640 2467 f2452d2e94df24f61cdcdf3707e00b79 "pdflatex"
   "Plantilla TFG v1.2.tex" 1774956403 7348 03ba22013074c6d90d7ede2053002ffa ""
-  "Plantilla TFG v1.2.toc" 1774958624 10796 825186384f2772da5cfa47d1bc6fe76d "pdflatex"
+  "Plantilla TFG v1.2.toc" 1774964640 10796 825186384f2772da5cfa47d1bc6fe76d "pdflatex"
   "U-tad-logo-azul.pdf" 1774779974 78222 713fd0be62da9454a6ffe104592e6a47 ""
   "abstract.tex" 1774779974 788 19964e75dcb5bbf76c5672e5b332983a ""
   "agradecimientos.tex" 1774946261 408 82323c59dabd2db9126118caafce3ff4 ""
   "anexo.tex" 1774779974 2344 cc7cc480df995678db476617a52f132f ""
   "aspectos.tex" 1774956403 8025 6840ef482206108993c6d083bd7826ba ""
   "conclusiones.tex" 1774956403 11452 18d29596183c77d37328877a5857fd82 ""
-  "desarrollo.tex" 1774958619 116192 f932dbcb9cca4dd5c721c6bd2e5524ff ""
+  "desarrollo.tex" 1774964633 116192 f932dbcb9cca4dd5c721c6bd2e5524ff ""
   "e:/ASNPORTS/PELICULAS/the-show-verse/.docs/Plantilla TFG Latex v1.2/Plantilla TFG v1.2.tex" 1774956403 7348 03ba22013074c6d90d7ede2053002ffa ""
   "estado.tex" 1774779974 6909 f6b3140f234a5f35e8731b0568eb73ab ""
   "glosario.tex" 1774779974 2065 7c723e3b91d3e6a99e7ab5438d3cfc40 ""
