@@ -17,26 +17,53 @@ function traktHeaders() {
 }
 
 async function fetchTrakt(path) {
-  const res = await fetch(`${TRAKT_BASE}${path}`, {
-    headers: traktHeaders(),
-    cache: "no-store",
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) {
-    const msg = json?.error || json?.message || `Trakt error (${res.status})`;
-    throw new Error(msg);
+  // ✅ Añadir timeout de 5 segundos para evitar bloqueos
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const res = await fetch(`${TRAKT_BASE}${path}`, {
+      headers: traktHeaders(),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      const msg = json?.error || json?.message || `Trakt error (${res.status})`;
+      throw new Error(msg);
+    }
+    return json;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new Error("Trakt request timeout");
+    }
+    throw err;
   }
-  return json;
 }
 
 async function fetchTraktMaybe(path) {
-  const res = await fetch(`${TRAKT_BASE}${path}`, {
-    headers: traktHeaders(),
-    cache: "no-store",
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) return null;
-  return json;
+  // ✅ Añadir timeout de 5 segundos para evitar bloqueos
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const res = await fetch(`${TRAKT_BASE}${path}`, {
+      headers: traktHeaders(),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok) return null;
+    return json;
+  } catch {
+    clearTimeout(timeoutId);
+    return null;
+  }
 }
 
 function normalizeType(input) {
