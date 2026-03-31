@@ -111,14 +111,21 @@ async function fetchBestBackdropServer(itemId, mediaType = "movie") {
 /* ====================================================================
  * TRAKT: Discover (Recommended / Anticipated) + hidratado con TMDb
  * ==================================================================== */
-const TRAKT_KEY =
-  process.env.TRAKT_CLIENT_ID ||
-  process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ||
-  process.env.TRAKT_API_KEY;
+// ✅ Funciones para obtener las claves en runtime (no en tiempo de build)
+function getTraktKey() {
+  return (
+    process.env.TRAKT_CLIENT_ID ||
+    process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ||
+    process.env.TRAKT_API_KEY
+  );
+}
 
-const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+function getTmdbKey() {
+  return process.env.NEXT_PUBLIC_TMDB_API_KEY;
+}
 
 function traktHeaders() {
+  const TRAKT_KEY = getTraktKey();
   if (!TRAKT_KEY) return null;
   return {
     "content-type": "application/json",
@@ -149,6 +156,7 @@ async function fetchTrakt(path) {
 }
 
 async function fetchTmdbDetails(type, id) {
+  const TMDB_KEY = getTmdbKey();
   if (!TMDB_KEY || !type || !id) return null;
   const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&language=es-ES`;
   const res = await fetch(url, { next: { revalidate: 60 * 60 } });
@@ -327,6 +335,9 @@ function curateList(
 /* ======== Carga de datos en el SERVIDOR ======== */
 async function getDashboardData(sessionId = null) {
   try {
+    // Obtenemos la clave de Trakt en runtime
+    const TRAKT_KEY = getTraktKey();
+
     // Preparamos todas las llamadas en paralelo para optimizar
     const [
       topRatedMovies,

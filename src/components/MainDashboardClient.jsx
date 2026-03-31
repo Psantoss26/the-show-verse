@@ -2866,9 +2866,9 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        {/* ✅ Trakt: Más jugadas (con selector de período) */}
+        {/* ✅ Trakt: Más reproducidas (con selector de período) */}
         <RowWithTimeFilter
-          title="Más jugadas"
+          title="Más reproducidas"
           weeklyData={dashboardData.traktPlayedWeekly || []}
           monthlyData={dashboardData.traktPlayedMonthly || []}
           yearlyData={[]}
