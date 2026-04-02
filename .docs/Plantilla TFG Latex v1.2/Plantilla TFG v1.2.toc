@@ -42,71 +42,70 @@
 \contentsline {subsubsection}{Sistema de puntuaciones}{26}{subsubsection*.12}%
 \contentsline {subsubsection}{Botones de acción}{26}{subsubsection*.13}%
 \contentsline {subsubsection}{Gestión avanzada de episodios para series}{28}{subsubsection*.14}%
-\contentsline {subsubsection}{Modal de enlaces externos y navegación cruzada}{30}{subsubsection*.15}%
-\contentsline {subsubsection}{Gestión avanzada de imágenes y posters}{30}{subsubsection*.16}%
-\contentsline {subsubsection}{Sección de reparto y ficha de personas}{31}{subsubsection*.17}%
-\contentsline {subsubsection}{Comentarios, análisis de sentimiento y listas de Trakt}{32}{subsubsection*.18}%
-\contentsline {subsubsection}{Recomendaciones y contenido similar}{33}{subsubsection*.19}%
-\contentsline {subsection}{\numberline {4.4.3}3. Seguimiento episódico (series)}{34}{subsection.4.4.3}%
-\contentsline {subsection}{\numberline {4.4.4}4. Favoritos (\texttt {/favorites})}{34}{subsection.4.4.4}%
-\contentsline {subsection}{\numberline {4.4.5}5. Pendientes/Watchlist (\texttt {/watchlist})}{35}{subsection.4.4.5}%
-\contentsline {subsection}{\numberline {4.4.6}6. Historial de visionado (\texttt {/history})}{36}{subsection.4.4.6}%
-\contentsline {subsection}{\numberline {4.4.7}7. En Progreso (\texttt {/in-progress})}{36}{subsection.4.4.7}%
-\contentsline {subsection}{\numberline {4.4.8}8. Estadísticas del usuario (\texttt {/stats})}{37}{subsection.4.4.8}%
-\contentsline {subsection}{\numberline {4.4.9}9. Calendario de estrenos (\texttt {/calendar})}{38}{subsection.4.4.9}%
-\contentsline {subsection}{\numberline {4.4.10}10. Biblioteca Personal (\texttt {/biblioteca})}{38}{subsection.4.4.10}%
-\contentsline {subsection}{\numberline {4.4.11}11. Descubrir contenido (\texttt {/discover})}{39}{subsection.4.4.11}%
-\contentsline {subsection}{\numberline {4.4.12}12. Gestión de listas (\texttt {/lists})}{40}{subsection.4.4.12}%
-\contentsline {subsection}{\numberline {4.4.13}13. Películas y Series (\texttt {/movies}, \texttt {/series})}{40}{subsection.4.4.13}%
-\contentsline {subsection}{\numberline {4.4.14}14. Ficha de personas (\texttt {/details/person/[id]})}{41}{subsection.4.4.14}%
-\contentsline {subsection}{\numberline {4.4.15}15. Barra de navegación (Navbar)}{42}{subsection.4.4.15}%
-\contentsline {subsection}{\numberline {4.4.16}Patrones de optimización transversales}{43}{subsection.4.4.16}%
-\contentsline {section}{\numberline {4.5}Diseño de la interfaz}{44}{section.4.5}%
-\contentsline {subsection}{\numberline {4.5.1}Sistema de diseño global}{44}{subsection.4.5.1}%
-\contentsline {subsection}{\numberline {4.5.2}Componentes de Next.js utilizados}{45}{subsection.4.5.2}%
-\contentsline {subsection}{\numberline {4.5.3}Componentes propios: Navbar}{45}{subsection.4.5.3}%
-\contentsline {subsection}{\numberline {4.5.4}Componente propio: LiquidButton}{46}{subsection.4.5.4}%
-\contentsline {subsection}{\numberline {4.5.5}Componente propio: StarRating}{48}{subsection.4.5.5}%
-\contentsline {subsection}{\numberline {4.5.6}Componente propio: FavoriteWatchlistButtons}{48}{subsection.4.5.6}%
-\contentsline {subsection}{\numberline {4.5.7}Sistema de animaciones con Framer Motion}{48}{subsection.4.5.7}%
-\contentsline {subsection}{\numberline {4.5.8}Sistema de estilos global (\texttt {globals.css})}{50}{subsection.4.5.8}%
-\contentsline {subsection}{\numberline {4.5.9}Sistema de tres vistas (Grid, List, Compact)}{50}{subsection.4.5.9}%
-\contentsline {section}{\numberline {4.6}Rendimiento en producción}{51}{section.4.6}%
-\contentsline {section}{\numberline {4.7}Sistema de caché multinivel}{51}{section.4.7}%
-\contentsline {subsection}{\numberline {4.7.1}Nivel 1: Incremental Static Regeneration (ISR)}{51}{subsection.4.7.1}%
-\contentsline {subsection}{\numberline {4.7.2}Nivel 2: Caché en memoria del proceso Node.js}{52}{subsection.4.7.2}%
-\contentsline {subsection}{\numberline {4.7.3}Nivel 3: sessionStorage (cliente)}{53}{subsection.4.7.3}%
-\contentsline {subsection}{\numberline {4.7.4}Nivel 4: localStorage (cliente)}{53}{subsection.4.7.4}%
-\contentsline {subsection}{\numberline {4.7.5}Deduplicación en vuelo}{54}{subsection.4.7.5}%
-\contentsline {subsection}{\numberline {4.7.6}Métricas de efectividad}{55}{subsection.4.7.6}%
-\contentsline {section}{\numberline {4.8}Middleware y optimización SEO}{55}{section.4.8}%
-\contentsline {subsection}{\numberline {4.8.1}Detección de bots y crawlers}{55}{subsection.4.8.1}%
-\contentsline {subsection}{\numberline {4.8.2}Metadatos dinámicos Open Graph}{56}{subsection.4.8.2}%
-\contentsline {subsection}{\numberline {4.8.3}Redirección canónica}{57}{subsection.4.8.3}%
-\contentsline {section}{\numberline {4.9}Sistema de artwork personalizado}{57}{section.4.9}%
-\contentsline {subsection}{\numberline {4.9.1}Motivación}{57}{subsection.4.9.1}%
-\contentsline {subsection}{\numberline {4.9.2}Formato del archivo}{58}{subsection.4.9.2}%
-\contentsline {subsection}{\numberline {4.9.3}Implementación}{58}{subsection.4.9.3}%
-\contentsline {subsection}{\numberline {4.9.4}API Route de gestión}{59}{subsection.4.9.4}%
-\contentsline {section}{\numberline {4.10}Integración con comunidad Trakt}{59}{section.4.10}%
-\contentsline {subsection}{\numberline {4.10.1}Sistema de comentarios}{59}{subsection.4.10.1}%
-\contentsline {subsection}{\numberline {4.10.2}Listas curadas de comunidad}{60}{subsection.4.10.2}%
-\contentsline {subsection}{\numberline {4.10.3}Estadísticas de temporada}{61}{subsection.4.10.3}%
-\contentsline {section}{\numberline {4.11}Integración con Letterboxd}{61}{section.4.11}%
-\contentsline {subsection}{\numberline {4.11.1}Búsqueda de películas en Letterboxd}{61}{subsection.4.11.1}%
-\contentsline {subsection}{\numberline {4.11.2}Botón de acceso rápido}{62}{subsection.4.11.2}%
-\contentsline {section}{\numberline {4.12}Manejo de errores y estados de carga}{62}{section.4.12}%
-\contentsline {subsection}{\numberline {4.12.1}Estrategia de \textit {graceful degradation}}{62}{subsection.4.12.1}%
-\contentsline {subsection}{\numberline {4.12.2}Skeleton loaders}{62}{subsection.4.12.2}%
-\contentsline {subsection}{\numberline {4.12.3}Mensajes de error contextua les}{63}{subsection.4.12.3}%
-\contentsline {subsection}{\numberline {4.12.4}Estados vacíos}{63}{subsection.4.12.4}%
-\contentsline {section}{\numberline {4.13}Diseño responsive y adaptación móvil}{64}{section.4.13}%
-\contentsline {subsection}{\numberline {4.13.1}Breakpoints y estrategia mobile-first}{64}{subsection.4.13.1}%
-\contentsline {subsection}{\numberline {4.13.2}Navegación adaptativa}{64}{subsection.4.13.2}%
-\contentsline {subsection}{\numberline {4.13.3}Imágenes responsive}{65}{subsection.4.13.3}%
-\contentsline {chapter}{\numberline {5}Conclusiones}{66}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Logros alcanzados}{67}{section.5.1}%
-\contentsline {section}{\numberline {5.2}Discusión}{68}{section.5.2}%
-\contentsline {section}{\numberline {5.3}Líneas de investigación futuras}{69}{section.5.3}%
-\contentsline {chapter}{\hbox to\@tempdima {\hfil }Referencias}{71}{section.5.3}%
-\contentsline {chapter}{\hbox to\@tempdima {\hfil }Anexo}{72}{chapter*.23}%
+\contentsline {subsubsection}{Enlaces externos y plataformas de streaming}{28}{subsubsection*.15}%
+\contentsline {subsubsection}{Imágenes y posters}{30}{subsubsection*.16}%
+\contentsline {subsubsection}{Sección de reparto y ficha de personas}{30}{subsubsection*.17}%
+\contentsline {subsubsection}{Comentarios, análisis de sentimientos y listas de Trakt}{31}{subsubsection*.18}%
+\contentsline {subsubsection}{Recomendaciones y contenido similar}{31}{subsubsection*.19}%
+\contentsline {subsection}{\numberline {4.4.3}Favoritos (\texttt {/favorites})}{32}{subsection.4.4.3}%
+\contentsline {subsection}{\numberline {4.4.4}Pendientes (\texttt {/watchlist})}{35}{subsection.4.4.4}%
+\contentsline {subsection}{\numberline {4.4.5}Historial de visionado (\texttt {/history})}{35}{subsection.4.4.5}%
+\contentsline {subsection}{\numberline {4.4.6}En Progreso (\texttt {/in-progress})}{36}{subsection.4.4.6}%
+\contentsline {subsection}{\numberline {4.4.7}Estadísticas del usuario (\texttt {/stats})}{37}{subsection.4.4.7}%
+\contentsline {subsection}{\numberline {4.4.8}Calendario de estrenos (\texttt {/calendar})}{39}{subsection.4.4.8}%
+\contentsline {subsection}{\numberline {4.4.9}Biblioteca Personal (\texttt {/biblioteca})}{39}{subsection.4.4.9}%
+\contentsline {subsection}{\numberline {4.4.10}Descubrir contenido (\texttt {/discover})}{41}{subsection.4.4.10}%
+\contentsline {subsection}{\numberline {4.4.11}Gestión de listas (\texttt {/lists})}{41}{subsection.4.4.11}%
+\contentsline {subsection}{\numberline {4.4.12}Películas y Series (\texttt {/movies}, \texttt {/series})}{42}{subsection.4.4.12}%
+\contentsline {subsection}{\numberline {4.4.13}Ficha de personas (\texttt {/details/person/[id]})}{42}{subsection.4.4.13}%
+\contentsline {subsection}{\numberline {4.4.14}Barra de navegación (Navbar)}{43}{subsection.4.4.14}%
+\contentsline {subsection}{\numberline {4.4.15}Patrones de optimización transversales}{44}{subsection.4.4.15}%
+\contentsline {section}{\numberline {4.5}Diseño de la interfaz}{45}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Sistema de diseño global}{45}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}Componentes de Next.js utilizados}{46}{subsection.4.5.2}%
+\contentsline {subsection}{\numberline {4.5.3}Componentes propios: Navbar}{46}{subsection.4.5.3}%
+\contentsline {subsection}{\numberline {4.5.4}Componente propio: LiquidButton}{47}{subsection.4.5.4}%
+\contentsline {subsection}{\numberline {4.5.5}Componente propio: StarRating}{49}{subsection.4.5.5}%
+\contentsline {subsection}{\numberline {4.5.6}Componente propio: FavoriteWatchlistButtons}{49}{subsection.4.5.6}%
+\contentsline {subsection}{\numberline {4.5.7}Sistema de animaciones con Framer Motion}{49}{subsection.4.5.7}%
+\contentsline {subsection}{\numberline {4.5.8}Sistema de estilos global (\texttt {globals.css})}{51}{subsection.4.5.8}%
+\contentsline {subsection}{\numberline {4.5.9}Sistema de tres vistas (Grid, List, Compact)}{51}{subsection.4.5.9}%
+\contentsline {section}{\numberline {4.6}Rendimiento en producción}{52}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Sistema de caché multinivel}{52}{section.4.7}%
+\contentsline {subsection}{\numberline {4.7.1}Nivel 1: Incremental Static Regeneration (ISR)}{52}{subsection.4.7.1}%
+\contentsline {subsection}{\numberline {4.7.2}Nivel 2: Caché en memoria del proceso Node.js}{53}{subsection.4.7.2}%
+\contentsline {subsection}{\numberline {4.7.3}Nivel 3: sessionStorage (cliente)}{54}{subsection.4.7.3}%
+\contentsline {subsection}{\numberline {4.7.4}Nivel 4: localStorage (cliente)}{54}{subsection.4.7.4}%
+\contentsline {subsection}{\numberline {4.7.5}Deduplicación en vuelo}{55}{subsection.4.7.5}%
+\contentsline {subsection}{\numberline {4.7.6}Métricas de efectividad}{56}{subsection.4.7.6}%
+\contentsline {section}{\numberline {4.8}Middleware y optimización SEO}{56}{section.4.8}%
+\contentsline {subsection}{\numberline {4.8.1}Detección de bots y crawlers}{56}{subsection.4.8.1}%
+\contentsline {subsection}{\numberline {4.8.2}Metadatos dinámicos Open Graph}{57}{subsection.4.8.2}%
+\contentsline {subsection}{\numberline {4.8.3}Redirección canónica}{58}{subsection.4.8.3}%
+\contentsline {section}{\numberline {4.9}Sistema de artwork personalizado}{58}{section.4.9}%
+\contentsline {subsection}{\numberline {4.9.1}Motivación}{58}{subsection.4.9.1}%
+\contentsline {subsection}{\numberline {4.9.2}Formato del archivo}{59}{subsection.4.9.2}%
+\contentsline {subsection}{\numberline {4.9.3}Implementación}{59}{subsection.4.9.3}%
+\contentsline {subsection}{\numberline {4.9.4}API Route de gestión}{60}{subsection.4.9.4}%
+\contentsline {section}{\numberline {4.10}Integración con comunidad Trakt}{60}{section.4.10}%
+\contentsline {subsection}{\numberline {4.10.1}Sistema de comentarios}{60}{subsection.4.10.1}%
+\contentsline {subsection}{\numberline {4.10.2}Listas curadas de comunidad}{61}{subsection.4.10.2}%
+\contentsline {subsection}{\numberline {4.10.3}Estadísticas de temporada}{62}{subsection.4.10.3}%
+\contentsline {section}{\numberline {4.11}Integración con Letterboxd}{62}{section.4.11}%
+\contentsline {subsection}{\numberline {4.11.1}Búsqueda de películas en Letterboxd}{62}{subsection.4.11.1}%
+\contentsline {subsection}{\numberline {4.11.2}Botón de acceso rápido}{63}{subsection.4.11.2}%
+\contentsline {section}{\numberline {4.12}Manejo de errores y estados de carga}{63}{section.4.12}%
+\contentsline {subsection}{\numberline {4.12.1}Estrategia de \textit {graceful degradation}}{63}{subsection.4.12.1}%
+\contentsline {subsection}{\numberline {4.12.2}Skeleton loaders}{63}{subsection.4.12.2}%
+\contentsline {subsection}{\numberline {4.12.3}Mensajes de error contextua les}{64}{subsection.4.12.3}%
+\contentsline {subsection}{\numberline {4.12.4}Estados vacíos}{64}{subsection.4.12.4}%
+\contentsline {section}{\numberline {4.13}Diseño responsive y adaptación móvil}{65}{section.4.13}%
+\contentsline {subsection}{\numberline {4.13.1}Breakpoints y estrategia mobile-first}{65}{subsection.4.13.1}%
+\contentsline {subsection}{\numberline {4.13.2}Navegación adaptativa}{65}{subsection.4.13.2}%
+\contentsline {subsection}{\numberline {4.13.3}Imágenes responsive}{66}{subsection.4.13.3}%
+\contentsline {chapter}{\numberline {5}Conclusiones}{67}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Logros alcanzados}{68}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Discusión}{69}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Líneas de investigación futuras}{70}{section.5.3}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Referencias}{72}{section.5.3}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Anexo}{73}{chapter*.31}%
