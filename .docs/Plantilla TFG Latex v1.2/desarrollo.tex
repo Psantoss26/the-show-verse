@@ -10,7 +10,7 @@ El sistema se estructura en tres capas diferenciadas, implementadas en una únic
 
 \textbf{Capa de presentación (Client Components).} Componentes React que se ejecutan y se hidratan en el navegador. Gestionan el estado local de la interfaz, las interacciones del usuario y las peticiones a la capa intermedia. Los componentes de mayor complejidad son \texttt{MainDashboardClient.jsx} (gestión del dashboard completo), \texttt{DetailsClient.jsx} (página de detalle de película y serie) y \texttt{DiscoverClient.jsx} (módulo de búsqueda).
 
-\textbf{Capa de servidor (Server Components + API Routes).} Los Server Components de Next.js realizan la búsqueda inicial de datos directamente en el servidor, sin coste de JavaScript para el cliente. Las API Routes actúan como \textit{proxy} hacia las APIs externas, añadiendo los tokens de autenticación en el servidor y transformando los datos al formato que consume el \textit{frontend}.
+\textbf{Capa de servidor (Server Components + API Routes).} Los Server Components de Next.js realizan la búsqueda inicial de datos directamente en el servidor, sin coste de JavaScript para el cliente. Las API Routes actúan como \textit{proxy} hacia las APIs externas, añadiendo los tokens de autenticación en el servidor y transformando los datos al formato que utiliza el \textit{frontend}.
 
 \textbf{Capa de datos (APIs externas).} TMDb, Trakt.tv, OMDb, JustWatch y Plex como fuentes para los datos de catálogo y del usuario respectivamente.
 
@@ -22,8 +22,8 @@ El proyecto sigue la convención del App Router de Next.js 13+. La estructura pr
 
 \begin{itemize}
 \item \texttt{src/app/} --- Rutas, páginas y API Routes. Cada subdirectorio corresponde a una ruta de la aplicación.
-\item \texttt{src/components/} --- Componentes React reutilizables. Los de mayor peso son \texttt{DetailsClient.jsx} ($\sim$331\,KB) y \texttt{MainDashboardClient.jsx} ($\sim$102\,KB).
-\item \texttt{src/lib/} --- Lógica de negocio, clientes de API y utilidades. Incluye los módulos \texttt{tmdb.js}, \texttt{traktClient.js}, \texttt{justwatch.js} y \texttt{plex/auth.js}.
+\item \texttt{src/components/} --- Componentes React reutilizables. Los de mayor complejidad son \texttt{DetailsClient.jsx} y \texttt{MainDashboardClient.jsx}.
+\item \texttt{src/lib/} --- Código reutilizable para conectar con APIs externas y funciones auxiliares comunes. Incluye los módulos \texttt{tmdb.js}, \texttt{traktClient.js}, \texttt{justwatch.js} y \texttt{plex/auth.js}.
 \item \texttt{src/context/} --- Contextos globales de React para el estado compartido entre componentes.
 \end{itemize}
 
@@ -62,7 +62,7 @@ Las rutas principales de la aplicación son:
 \hline
 \texttt{/series} & Exploración de catálogo de series \\
 \hline
-\texttt{/details/person/[id]} & Ficha de actor o directora \\
+\texttt{/details/person/[id]} & Ficha de actor o director \\
 \hline
 \end{tabular}
 \caption{Rutas principales de la aplicación}
@@ -118,7 +118,7 @@ La Tabla~\ref{tab:tmdb-endpoints} recoge los \textit{endpoints} principales util
 \hline
 \texttt{fetchTrendingMovies()} & \texttt{GET /trending/movie/week} \\
 \hline
-\texttt{getDetails(type, id)} & \texttt{GET /\{type\}/\{id\}?append\_to\_response=external\_ids} \\
+\texttt{getDetails(type, id)} & \parbox[t]{0.62\linewidth}{\raggedright\strut\texttt{GET /\{type\}/\{id\}?}\\[2pt]\texttt{append\_to\_response=external\_ids}\strut} \\
 \hline
 \texttt{getLogos(type, id)} & \texttt{GET /\{type\}/\{id\}/images} \\
 \hline
@@ -128,13 +128,13 @@ La Tabla~\ref{tab:tmdb-endpoints} recoge los \textit{endpoints} principales util
 \hline
 \texttt{getRecommendations(type, id)} & \texttt{GET /\{type\}/\{id\}/recommendations} \\
 \hline
-\texttt{markAsFavorite(\{...\})} & \texttt{POST /account/\{id\}/favorite} \\
+\texttt{markAsFavorite(\{\ldots\})} & \texttt{POST /account/\{id\}/favorite} \\
 \hline
-\texttt{markInWatchlist(\{...\})} & \texttt{POST /account/\{id\}/watchlist} \\
+\texttt{markInWatchlist(\{\ldots\})} & \texttt{POST /account/\{id\}/watchlist} \\
 \hline
-\texttt{fetchFavoritesForUser(...)} & \texttt{GET /account/\{id\}/favorite/movies|tv} \\
+\texttt{fetchFavoritesForUser(\ldots)} & \texttt{GET /account/\{id\}/favorite/movies|tv} \\
 \hline
-\texttt{fetchWatchlistForUser(...)} & \texttt{GET /account/\{id\}/watchlist/movies|tv} \\
+\texttt{fetchWatchlistForUser(\ldots)} & \texttt{GET /account/\{id\}/watchlist/movies|tv} \\
 \hline
 \end{tabular}
 \caption{Principales funciones del cliente TMDb y sus \textit{endpoints}}
@@ -146,7 +146,7 @@ La Tabla~\ref{tab:tmdb-endpoints} recoge los \textit{endpoints} principales util
 
 OMDb es la única fuente pública que permite obtener el \textit{rating} de IMDb, el número de votos y las puntuaciones de Rotten Tomatoes y Metacritic por \texttt{imdbId}. Para proteger la API Key, todas las peticiones a OMDb pasan por la API Route interna \texttt{/api/omdb}.
 
-El \textit{proxy} implementa un \textbf{sistema de deduplicación} (\texttt{inflight Map} global): si múltiples tarjetas solicitan simultáneamente el mismo \texttt{imdbId}, solo se realiza una petición real a OMDb. Las respuestas exitosas se cachean 24 horas en el proceso de Node.js; las fallidas, 60 segundos para reintentar pronto. La cabecera \texttt{Cache-Control: public, s-maxage=86400} permite adicionalmente que la CDN de Vercel cachee las respuestas.
+El \textit{proxy} implementa un \textbf{sistema de deduplicación} (\texttt{inflight Map} global): si múltiples tarjetas solicitan simultáneamente el mismo \texttt{imdbId}, solo se realiza una petición real a OMDb. Las respuestas exitosas se cachean 24 horas en el proceso de Node.js; las fallidas, 60 segundos para reintentar pronto.
 
 \subsection{Proxy de Trakt y transformación de datos}
 
@@ -222,6 +222,226 @@ La integración con Plex permite a los usuarios que tienen una biblioteca local 
 \end{itemize}
 
 El slug para las URLs universales se resuelve consultando \texttt{https://metadata.provider.plex.tv/library/metadata/matches?guid=imdb://\{imdbId\}}.
+
+% -----------------------------------------------------------------------
+\section{Arquitectura de API Routes propias}
+% -----------------------------------------------------------------------
+
+Next.js permite definir API Routes como funciones serverless que se ejecutan en el servidor, proporcionando endpoints HTTP personalizados. El proyecto implementa 74 API Routes organizadas en el directorio \texttt{src/app/api/}, que actúan como capa intermedia entre el cliente y las APIs externas, implementando lógica de negocio, transformación de datos, caché y seguridad.
+
+\subsection{Funciones principales de las API Routes}
+
+Las API Routes del proyecto cumplen seis funciones fundamentales:
+
+\textbf{1. Proxy seguro.} Protegen las claves API (API keys) de exposición al navegador. Todas las peticiones a TMDb, Trakt, OMDb, Plex y JustWatch pasan por endpoints intermedios que almacenan las credenciales en variables de entorno del servidor, garantizando que nunca se envíen al cliente.
+
+\textbf{2. Transformación y enriquecimiento de datos.} Las respuestas de las APIs externas se procesan antes de enviarlas al cliente: se traducen identificadores entre sistemas (TMDb ID, Trakt ID, IMDb ID), se combinan datos de múltiples fuentes en una única respuesta, y se añaden metadatos adicionales como títulos, posters y años de estreno desde TMDb.
+
+\textbf{3. Caché y optimización.} Implementan caché en memoria para reducir llamadas redundantes a APIs externas con límites de tasa. Las respuestas exitosas se almacenan temporalmente (de 60 segundos a 24 horas según el tipo de dato) y se comparten entre peticiones concurrentes mediante deduplicación.
+
+\textbf{4. Gestión de autenticación.} Manejan flujos OAuth 2.0 completos para Trakt y TMDb, almacenando tokens de sesión en cookies HTTP-only inaccesibles desde JavaScript. Implementan renovación automática de tokens caducados y validación de estado de conexión.
+
+\textbf{5. Agregación de datos.} Consultan múltiples APIs en paralelo y combinan los resultados. Por ejemplo, \texttt{/api/tv/[id]/ratings} obtiene puntuaciones de TMDb, Trakt e IMDb simultáneamente y las devuelve en un objeto unificado.
+
+\textbf{6. Validación y normalización.} Validan parámetros de entrada, normalizan formatos (ej: ratings de 1--10 de Trakt se redondean hacia arriba cuando provienen de TMDb que acepta decimales) y gestionan timeouts configurables para evitar bloqueos.
+
+\subsection{Categorías funcionales de endpoints}
+
+\subsubsection{Autenticación y gestión de sesiones}
+
+\textbf{Flujo OAuth 2.0 con Trakt.} Se implementa mediante cuatro endpoints complementarios:
+
+\begin{itemize}
+\item \texttt{GET /api/trakt/auth/start}: Inicia el flujo OAuth generando la URL de autorización de Trakt con los parámetros \texttt{client\_id}, \texttt{redirect\_uri} y \texttt{state} (token CSRF para prevenir ataques). Maneja dinámicamente la URL de redirección según el entorno (Vercel en producción o localhost en desarrollo).
+
+\item \texttt{GET /api/trakt/auth/callback}: Recibe el código de autorización tras la aprobación del usuario, valida el token CSRF, intercambia el código por \texttt{access\_token} y \texttt{refresh\_token} mediante petición servidor-a-servidor a Trakt, y almacena ambos tokens en cookies \texttt{httpOnly} con configuración \texttt{secure} y \texttt{sameSite}.
+
+\item \texttt{GET /api/trakt/auth/status}: Verifica el estado de conexión consultando el endpoint \texttt{/users/settings} de Trakt. Si el token ha caducado, intenta renovarlo automáticamente usando el \texttt{refresh\_token} antes de declarar al usuario como desconectado.
+
+\item \texttt{POST /api/trakt/auth/disconnect}: Revoca el token en Trakt haciendo uso de \texttt{/oauth/revoke} y elimina las cookies de sesión, completando el cierre de sesión.
+\end{itemize}
+
+\textbf{Autenticación TMDb.} El flujo es similar pero utiliza un sistema de request token:
+
+\begin{itemize}
+\item \texttt{GET /api/tmdb/auth/request-token}: Obtiene un token temporal que el usuario debe aprobar en la web de TMDb.
+
+\item \texttt{POST /api/tmdb/auth/session}: Tras la aprobación, crea un \texttt{session\_id} persistente y lo almacena en cookie. Implementa reintentos (hasta 4 intentos con backoff) para compensar la latencia de propagación de la aprobación en los servidores de TMDb.
+
+\item \texttt{GET /api/tmdb/auth/account}: Retorna los datos de la cuenta autenticada (username, avatar, configuración regional).
+\end{itemize}
+
+\subsubsection{Datos de usuario y actividad}
+
+\textbf{Historial de visualización.} \texttt{GET /api/trakt/history} es el endpoint principal que obtiene el historial completo de películas y episodios vistos por el usuario. Acepta parámetros de filtrado por tipo (\texttt{movies}, \texttt{shows}, \texttt{all}), rango de fechas (\texttt{from} y \texttt{to} en formato YYYY-MM-DD), y paginación (\texttt{page}, \texttt{limit}). 
+
+El proceso para obtener los datos se realiza primero consultando \texttt{/sync/history} de Trakt obteniendo identificadores y timestamps, luego se extraen todos los TMDb IDs únicos, y finalmente se ejecutan peticiones paralelas a TMDb (máximo 8 concurrentes) para obtener títulos, posters, años de estreno y sinopsis. Los resultados se agregan con estadísticas calculadas (total de visualizaciones por título, fecha de primer y último visionado).
+
+Los endpoints complementarios permiten una gestión detallada del historial:
+\begin{itemize}
+\item \texttt{POST /api/trakt/history/add}: añade visualizaciones manuales con timestamp personalizado.
+\item \texttt{POST /api/trakt/history/update}: modifica la fecha de una entrada existente.
+\item \texttt{DELETE /api/trakt/history/remove}: elimina registros específicos mediante \texttt{historyId}.
+\end{itemize}
+
+\textbf{Progreso y estado de series.} \texttt{GET /api/trakt/show/watched} retorna un objeto estructurado que representa el estado de visionado completo de una serie: \texttt{\{watchedBySeason: \{``1'': [1,2,3,5], ``2'': [1,2]\}\}} indica que en la temporada 1 se han visto los episodios 1, 2, 3 y 5, mientras que en la temporada 2 solo los episodios 1 y 2.
+
+\texttt{POST /api/trakt/show/plays} implementa marcado masivo de episodios, aceptando arrays con cientos de entradas en el formato \texttt{\{season, number, watchedAt\}}. Para respetar los límites de la API de Trakt, divide automáticamente las peticiones en chunks de 350 episodios máximo por llamada, y valida los números de episodio contra los datos canónicos de TMDb para prevenir marcado de episodios inexistentes.
+
+\texttt{GET /api/trakt/item/status} proporciona un resumen completo del estado de cualquier título: si ha sido visto, cuántas veces se ha reproducido (\texttt{plays}), cuándo fue la última visualización, y el historial completo de fechas. Además, resuelve y devuelve la URL canónica del título en Trakt para acceso directo.
+
+\textbf{Estadísticas de usuario.} \texttt{GET /api/trakt/user-stats} agrega datos de múltiples endpoints de Trakt (\texttt{/users/me/stats}, \texttt{/sync/history}, \texttt{/sync/watched}) y los enriquece con información de TMDb y créditos:
+
+\begin{itemize}
+\item Calcula el top de películas y series más vistas (por número de reproducciones).
+\item Identifica actores y directores más frecuentes en el historial analizando los créditos de cada título.
+\item Agrupa por géneros consumidos con distribución porcentual.
+\item Suma el tiempo total de visionado en minutos a partir de la duración de cada episodio y película.
+\item Genera gráficas de actividad mensual, distribución por día de la semana y hora del día.
+\end{itemize}
+
+\subsubsection{Valoraciones y ratings}
+
+\textbf{Gestión de ratings personales.} \texttt{GET/POST /api/trakt/ratings} implementa CRUD completo de valoraciones del usuario con las siguientes características:
+
+\begin{itemize}
+\item \textbf{GET con \texttt{?type=all}}: Retorna todas las valoraciones (películas y series) del usuario autenticado.
+\item \textbf{POST con \texttt{\{type, tmdbId, rating\}}}: Crea o actualiza una valoración. El rating se normaliza a escala 1--10 y se redondea hacia arriba si proviene de TMDb (que acepta decimales) para cumplir con las restricciones de Trakt (enteros únicamente).
+\item \textbf{POST con \texttt{rating: null}}: Elimina la valoración existente del título, equivalente a DELETE.
+\item Implementa auto-refresh de tokens: si detecta un token caducado, ejecuta el flujo de renovación automáticamente y reintenta la petición original.
+\end{itemize}
+
+El endpoint paralelo \texttt{POST /api/tmdb/movies/[id]/rating} gestiona valoraciones en TMDb con escala de 0.5 a 10 en incrementos de 0.5, permitiendo mayor granularidad que Trakt.
+
+\textbf{Ratings agregados de múltiples fuentes.} \texttt{GET /api/tv/[id]/ratings} es un endpoint de agregación especializado para series que combina datos de tres fuentes:
+
+\begin{enumerate}
+\item Obtiene el rating promedio de TMDb directamente desde \texttt{/tv/\{id\}}.
+\item Consulta el scoreboard de Trakt mediante \texttt{/search/tmdb/\{id\}} para obtener la valoración comunitaria.
+\item Extrae el IMDb ID de los identificadores externos de TMDb, y consulta OMDb para obtener el rating oficial de IMDb, el número de votos, y puntuaciones de Rotten Tomatoes y Metacritic.
+\end{enumerate}
+
+Las tres fuentes se consultan en paralelo mediante \texttt{Promise.allSettled()}, garantizando que un fallo en cualquiera de ellas no bloquee las demás. El resultado se estructura como \texttt{\{tmdb: \{rating, votes\}, trakt: \{rating, votes\}, imdb: \{rating, votes, rtScore, mcScore\}\}}.
+
+\subsubsection{Proxy y caché de datos externos}
+
+\textbf{Proxy OMDb con caché optimizada.} \texttt{GET /api/omdb} implementa un sistema de caché completo con las siguientes capas:
+
+\begin{itemize}
+\item \textbf{Caché en memoria}: \texttt{Map} global que almacena respuestas exitosas durante 24 horas y respuestas fallidas (404, timeouts) durante 60 segundos. El TTL corto para fallos permite reintentos rápidos sin saturar la API.
+
+\item \textbf{Deduplicación de peticiones concurrentes}: Mantiene un \texttt{Map} de promesas en vuelo (\texttt{inflightRequests}). Si 10 tarjetas solicitan simultáneamente el mismo IMDb ID, solo se ejecuta una petición HTTP real y todas comparten el resultado, reduciendo el tráfico en un factor de 10x durante cargas iniciales de listas.
+
+\item \textbf{Timeout configurable}: Acepta parámetro \texttt{timeoutMs} (800--20000ms) para ajustar el tiempo máximo de espera según el contexto (búsquedas rápidas vs. cargas completas).
+
+\item \textbf{Validación de respuesta}: Verifica que la respuesta sea JSON válido antes de cachearla, descartando errores HTML de OMDb.
+\end{itemize}
+
+\textbf{Imágenes localizadas en batch.} \texttt{POST /api/tmdb/localized-images} optimiza la obtención de posters y backdrops para decenas de títulos simultáneamente:
+
+\begin{itemize}
+\item Acepta arrays de IDs en el body: \texttt{\{type: ``movie'', ids: [1,2,3,...], kind: ``poster''\}}.
+\item Ejecuta peticiones con pool de concurrencia limitado a 8 workers para respetar rate limits.
+\item Implementa selección inteligente de imágenes: prioriza backdrops $\geq$1280px de ancho y posters $\geq$500px, prefiere contenido en inglés o sin texto superpuesto (\texttt{iso\_639\_1 === null}), y ordena por número de votos.
+\item Retorna objeto indexado por ID: \texttt{\{``123'': \{poster\_path, backdrop\_path\}, ``456'': \{...\}\}}.
+\end{itemize}
+
+\subsubsection{Integración con Plex Media Server}
+
+\textbf{Búsqueda multi-servidor.} \texttt{GET /api/plex} implementa búsqueda resiliente en múltiples servidores Plex configurados:
+
+\begin{itemize}
+\item Acepta parámetros de búsqueda: \texttt{title}, \texttt{type} (movie|tv), \texttt{year}, \texttt{imdbId}, \texttt{tmdbId}.
+\item Itera sobre todas las URLs de servidor configuradas en \texttt{PLEX\_URL} (separadas por coma), probando primero HTTPS y haciendo fallback a HTTP para localhost.
+\item Implementa timeout de 8 segundos por servidor para evitar bloqueos.
+\item Realiza matching multinivel: primero por IMDb ID o TMDb ID si están disponibles en los \texttt{Guid} de Plex, luego por coincidencia de título normalizado (case-insensitive, sin acentos) y año con tolerancia de ±1 año.
+\item Retorna el primer resultado encontrado con metadatos completos: \texttt{\{found: true, items: [...], server: ``url''\}}.
+\end{itemize}
+
+\textbf{Biblioteca completa.} \texttt{GET /api/plex/library} lista todo el contenido disponible:
+
+\begin{itemize}
+\item Implementa paginación interna (200 ítems por página) para manejar bibliotecas con miles de títulos.
+\item Extrae metadatos técnicos: resolución (4K, 1080p, 720p, SD), códec de vídeo (H.264, HEVC, AV1), contenedor (mkv, mp4), tamaño en disco, número de pistas de audio y subtítulos.
+\item Ordena por resolución descendente (8K $\rightarrow$ 4K $\rightarrow$ 1080p $\rightarrow$ SD) y elimina duplicados por título.
+\item Limita resultados a 10000 ítems máximo para prevenir sobrecarga de memoria.
+\end{itemize}
+
+\subsubsection{Enlaces externos y descubrimiento}
+
+\textbf{Generación inteligente de enlaces.} Los endpoints de enlace implementan estrategias de búsqueda y caché:
+
+\texttt{GET /api/links/letterboxd} genera URLs a Letterboxd mediante dos métodos:
+\begin{enumerate}
+\item Si el título tiene IMDb ID disponible, redirige a \texttt{/imdb/tt1234567} (URL estable que Letterboxd resuelve automáticamente).
+\item Si solo tiene título y año, construye un slug normalizado (\texttt{inception-2010}), hace scraping de la página HTML de Letterboxd para extraer la URL final desde los metadatos Open Graph, y cachea el resultado 24 horas.
+\end{enumerate}
+
+\texttt{GET /api/links/justwatch} realiza búsqueda real en JustWatch.com:
+\begin{enumerate}
+\item Consulta la página de búsqueda de JustWatch con el título.
+\item Extrae el JSON embebido en \texttt{\_\_NEXT\_DATA\_\_} que contiene los resultados indexados.
+\item Hace matching por año (si está disponible) para desambiguar títulos homónimos.
+\item Fallback a extracción desde metadatos \texttt{og:url} o \texttt{<link rel=``canonical''>} si la estructura del JSON cambia.
+\item Retorna \texttt{\{url: ``https://www.justwatch.com/es/pelicula/inception''\}}.
+\end{enumerate}
+
+\textbf{Descubrimiento y recomendaciones.} \texttt{GET /api/trakt/discover/recommend} implementa recomendaciones públicas:
+
+\begin{itemize}
+\item Consulta \texttt{/movies/recommended} y \texttt{/shows/recommended} de Trakt en paralelo.
+\item Intercala resultados (película, serie, película, serie, ...) para variedad.
+\item Enriquece cada item con datos de TMDb (título localizado, poster, fecha de estreno, sinopsis).
+\item Limita a 24 items totales para mantener tiempos de respuesta bajo 2 segundos.
+\end{itemize}
+
+\texttt{GET /api/trakt/related} obtiene contenido similar a un título específico:
+\begin{enumerate}
+\item Traduce el TMDb ID al slug de Trakt mediante \texttt{/search/tmdb/\{id\}}.
+\item Consulta \texttt{/\{type\}/\{slug\}/related?extended=full\&limit=15}.
+\item Enriquece los resultados con posters y backdrops de TMDb usando \texttt{mapWithConcurrency} para limitar concurrencia.
+\item Retorna hasta 15 títulos relacionados ordenados por similitud según el algoritmo de Trakt.
+\end{enumerate}
+
+\subsubsection{Listas y colecciones}
+
+\textbf{Listas personales de Trakt.} \texttt{GET /api/trakt/lists} obtiene todas las listas del usuario autenticado:
+
+\begin{itemize}
+\item Consulta \texttt{/users/me/lists} obteniendo metadatos (nombre, descripción, privacidad, número de ítems, fecha de creación).
+\item Para cada lista, consulta \texttt{/users/me/lists/\{id\}/items} obteniendo los primeros 48 ítems.
+\item Enriquece cada ítem con título, poster y año de TMDb mediante peticiones paralelas.
+\item Implementa manejo de rate limits: si detecta código 429, espera el tiempo indicado en \texttt{Retry-After} y reintenta.
+\item Elimina duplicados que puedan existir en las listas de Trakt.
+\end{itemize}
+
+\texttt{GET /api/trakt/community/lists} obtiene listas públicas que contienen un título específico:
+
+\begin{itemize}
+\item Acepta parámetros: \texttt{type}, \texttt{tmdbId}, \texttt{tab} (popular|trending|recent), \texttt{page}, \texttt{limit}.
+\item Traduce el TMDb ID al slug de Trakt y consulta \texttt{/\{type\}/\{slug\}/lists/\{tab\}}.
+\item Retorna listas con metadatos del creador, número de likes, número de comentarios, y muestra los primeros 4 posters de cada lista para preview.
+\end{itemize}
+
+\textbf{Colecciones de TMDb.} \texttt{GET /api/tmdb/collections/search} y \texttt{/api/tmdb/collections/featured} proporcionan acceso a sagas y franquicias:
+
+\begin{itemize}
+\item \texttt{search} acepta parámetro \texttt{query} y retorna colecciones con \texttt{item\_count} (número de películas en la saga).
+\item \texttt{featured} retorna colecciones curadas por popularidad (MCU, Star Wars, Harry Potter, etc.).
+\item \texttt{GET /api/tmdb/collection} con ID retorna detalles completos incluyendo todas las películas en orden cronológico.
+\end{itemize}
+
+\subsection{Patrones técnicos transversales}
+
+Todos los endpoints implementan patrones comunes de robustez:
+
+\textbf{Manejo de errores estructurado.} Las respuestas de error siguen un formato consistente: \texttt{\{error: ``descripción'', code?: ``ERR\_CODE'', details?: \{...\}\}}. Los códigos HTTP se asignan semánticamente: 400 para parámetros inválidos, 401 para autenticación requerida, 404 para recursos no encontrados, 429 para rate limit, 500 para errores internos, 503 para APIs externas no disponibles.
+
+\textbf{Validación de entrada.} Los parámetros se validan antes de ejecutar lógica costosa: TMDb IDs deben ser numéricos positivos, fechas deben cumplir formato ISO 8601, ratings se restringen a rangos válidos (1--10), y se rechazan requests con tamaños excesivos (límite de 10000 IDs en batch queries).
+
+\textbf{Timeouts y circuit breakers.} Todas las peticiones a APIs externas incluyen timeouts configurables (valores típicos: 5s para datos críticos, 10s para búsquedas, 15s para operaciones batch). Si un servicio externo falla repetidamente, se activa degradación graceful retornando datos parciales o cacheados.
+
+\textbf{Logging y observabilidad.} Los errores se loguean con contexto completo (endpoint, parámetros, usuario si está autenticado, timestamp, stack trace) permitiendo debugging en producción. Las peticiones lentas ($>$3 segundos) se marcan como warnings para identificar cuellos de botella.
 
 % -----------------------------------------------------------------------
 \section{Implementación de los módulos funcionales}
@@ -351,6 +571,13 @@ La selección automática de la mejor imagen se realiza mediante funciones. Para
 
 Los administradores (específicamente el usuario \texttt{psantos26} hardcoded en el componente) tienen acceso a una galería administrable con tres pestañas: Posters, Backdrops (para modo preview) y Backgrounds (para fondo móvil). Cada pestaña incluye filtros de resolución (Todos, 720p, 1080p, 2K, 4K calculados a partir del \texttt{width} de cada imagen) y checkboxes de idioma (ES, EN). Las imágenes se muestran en un carrusel horizontal y al hacer clic en cualquier imagen se establece como activa, guardando la selección en \texttt{localStorage} con claves específicas por tipo e ID (por ejemplo, \texttt{showverse:movie:550:poster}, \texttt{showverse:tv:1399:backdrop}).
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1\textwidth]{../notes/.images/portadas.jpg}
+  \caption{Interfaz de gestión de portadas y fondos.}
+  \label{fig:portadas}
+\end{figure}
+
 \subsubsection{Sección de reparto y ficha de personas}
 
 La sección de reparto unifica datos de múltiples fuentes. Los directores y creadores se extraen del array \texttt{credits.crew} filtrando por \texttt{job === ``Director''} o \texttt{department === ``Writing''} y se agregan al inicio del array de cast para darles prioridad. El array completo se ordena por el campo \texttt{order} que TMDb proporciona para indicar el orden de importancia de cada actor en la producción, de forma que los protagonistas aparecen primero. Cada tarjeta de actor muestra la foto del perfil en tamaño \texttt{w185}, el nombre real del actor, el nombre del personaje que interpreta, y un efecto de hover. Hacer clic en cualquier actor navega a la página de ficha de persona (\texttt{/details/person/\{id\}}) que carga mediante el componente \texttt{ActorDetails.jsx}.
@@ -359,9 +586,9 @@ La ficha de persona muestra la biografía completa del actor (campo \texttt{biog
 
 \subsubsection{Comentarios, análisis de sentimientos y listas de Trakt}
 
-La sección de comentarios fusiona reviews de TMDb con comentarios de Trakt en la misma sección. Los comentarios de Trakt se organizan en tres categorías: <<Top 30 días>> que muestra los comentarios con más likes recibidos en los últimos 30 días, <<Top histórico>> que muestra los comentarios con más likes de todos los tiempos ordenados descendentemente por \texttt{likes}, y <<Más recientes>> que muestra todos los comentarios ordenados por fecha de creación en orden descendente. Cada comentario incluye el avatar del usuario, su nombre de usuario, la puntuación que dio al título si es que votó, una advertencia de spoiler si el comentario está marcado como tal, el número de likes que ha recibido, el número de respuestas, la fecha de publicación relativa y el texto completo del comentario.
+La sección de comentarios fusiona reviews de TMDb con comentarios de Trakt en la misma sección. Los comentarios de Trakt se organizan en tres categorías: <<Top 30 días>> que muestra los comentarios con más likes recibidos en los últimos 30 días, <<Top histórico>> que muestra los comentarios con más likes de todos los tiempos ordenados descendentemente por \texttt{likes} y <<Más recientes>> que muestra todos los comentarios ordenados por fecha de creación en orden descendente. Cada comentario incluye el avatar del usuario, su nombre de usuario, la puntuación que dio al título si es que votó, una advertencia de spoiler si el comentario está marcado como tal, el número de likes que ha recibido, el número de respuestas, la fecha de publicación relativa y el texto completo del comentario.
 
-El análisis de sentimiento se construye mediante la función \texttt{buildSentimentFromComments(items)} que procesa todos los comentarios cargados, extrae frases que contienen palabras clave positivas (como <<excelente>>, <<increíble>>, <<obra maestra>>, <<recomendable>>) o negativas (como <<decepcionante>>, <<aburrido>>, <<predecible>>, <<desperdicio>>), y genera dos listas: una de pros (aspectos positivos mencionados frecuentemente) y otra de contras (aspectos negativos recurrentes).
+La funcionalidad del análisis de sentimiento de Trakt se construye mediante la función \texttt{buildSentimentFromComments(items)} que procesa todos los comentarios cargados, extrae frases que contienen palabras clave positivas (como <<excelente>>, <<increíble>>, <<obra maestra>>, <<recomendable>>) o negativas (como <<decepcionante>>, <<aburrido>>, <<predecible>>, <<desperdicio>>), y genera dos listas: una de pros (aspectos positivos mencionados frecuentemente) y otra de contras (aspectos negativos recurrentes).
 
 La sección de listas muestra las listas públicas de Trakt que incluyen este título, organizadas en dos pestañas: Popular (ordenadas por número de likes) y Trending (ordenadas por actividad reciente). Cada lista se renderiza como una tarjeta que muestra el nombre de la lista, una descripción, el nombre del usuario que la creó, el número de items que contiene, el número de likes que ha recibido y el número de comentarios. Hacer clic en cualquier lista navega a la página completa de esa lista en Trakt.
 
@@ -478,11 +705,32 @@ El componente implementa renderizado incremental para evitar bloquear el hilo pr
 
 La sección de descubrimiento emplea \texttt{/discover/movie} y \texttt{/discover/tv} de TMDb, que aceptan parámetros de filtrado completos, a diferencia de la búsqueda libre por texto que utiliza \texttt{/search/multi}. \texttt{DiscoverClient.jsx} gestiona el estado completo de los filtros activos: género, plataforma de \textit{streaming} disponible, certificación de edad, rango de valoración media y mínimo de votos, rango de fechas de estreno y palabras clave con autocompletado contra \texttt{/search/keyword} de TMDb. Todos estos filtros se combinan en una única petición estructurada a TMDb cuyos parámetros se calculan dinámicamente mediante \texttt{buildDiscoverParams()} a partir del estado activo.
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/descubrir.jpg}
+  \caption{Interfaz de la sección Descubrir contenido.}
+  \label{fig:descubrir}
+\end{figure}
+
 \subsection{Gestión de listas (\texttt{/lists})}
 
 El módulo de listas unifica cuatro tipologías de contenido curatorado. Las listas propias del usuario en TMDb se obtienen mediante \texttt{GET /account/\{id\}/lists} y permiten operaciones completas de CRUD: creación de nuevas listas mediante formulario modal con nombre y descripción (petición \texttt{POST /list}), adición o eliminación de títulos desde la página de detalle, y edición de metadatos. Las colecciones de saga de TMDb (franquicias como el MCU, la saga de Bourne o el universo de Star Wars) se tratan como un tipo especial de lista que \texttt{CollectionDetailsClient.jsx} renderiza con un hero propio y un grid ordenado cronológicamente. Las listas públicas de Trakt se gestionan mediante \texttt{TraktListDetailsClient.jsx}, que implementa paginación con carga bajo demanda en páginas de 48 ítems mediante un botón «Cargar más» que consulta \texttt{/api/trakt/lists/\{username\}/\{listId\}?page=\{n\}\&limit=48}.
 
 La página principal (\texttt{/lists}) precarga automáticamente los detalles de las primeras 3 listas del usuario (\texttt{PRELOAD\_FIRST\_N\_LISTS = 3}) para navegación instantánea al hacer clic. Las listas se muestran como tarjetas con un collage compuesto de hasta cuatro backdrops de los primeros títulos organizado en variantes de cuadrícula (1$\times$1 para listas con un título, 2$\times$1 para dos, 2$\times$2 para tres o más), generado por \texttt{ListCoverBackdropCollage()}. El diseño visual de cada lista incluye metadatos como el número de ítems, el nombre del creador y la descripción truncada, y permite ordenar las listas del usuario por fecha de creación, número de ítems o valoración media del contenido. \texttt{UnifiedListDetailsLayout.jsx} actúa como envoltorio de maquetación reutilizable para todas las páginas de detalle de lista, proporcionando el hero con título y metadatos, el sistema de pestañas con estado activo, y los controles superiores de filtrado y ordenación de forma consistente independientemente del tipo de lista (TMDb, colección o Trakt).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/listastrakt.jpg}
+  \caption{Interfaz de las listas públicas de Trakt.}
+  \label{fig:listas-trakt}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/colecciones.jpg}
+  \caption{Interfaz de la sección de colecciones.}
+  \label{fig:colecciones}
+\end{figure}
 
 \subsection{Películas y Series (\texttt{/movies}, \texttt{/series})}
 
@@ -490,11 +738,32 @@ Las páginas de películas y series especializan el dashboard principal en un ú
 
 La sección de trailers reproduce el tráiler oficial de cualquier título directamente en la página sin navegar al detalle. Cuando se hace hover sobre una tarjeta, \texttt{prefetchTrailer(id)} comprueba el caché de trailers en memoria y, si no hay datos cacheados, solicita los vídeos del título a TMDb mediante \texttt{GET /\{type\}/\{id\}/videos} y almacena el resultado. Al hacer clic en el botón de reproducción, el componente abre \texttt{VideoModal} con el \texttt{videoKey} de YouTube del tráiler. Ambos módulos incluyen integración directa con los botones de favorito y watchlist de TMDb desde las tarjetas del grid, usando el patrón de actualización optimista descrito en el módulo de detalles, sin necesidad de navegar a la página de detalle para gestionar las listas personales.
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/peliculas.jpg}
+  \caption{Interfaz de la sección de películas.}
+  \label{fig:peliculas}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/series.jpg}
+  \caption{Interfaz de la sección de series.}
+  \label{fig:series}
+\end{figure}
+
 \subsection{Ficha de personas (\texttt{/details/person/[id]})}
 
 La ficha de persona implementada en \texttt{ActorDetails.jsx} carga en paralelo mediante \texttt{Promise.allSettled()} cinco recursos independientes: identificadores externos (\texttt{/person/\{id\}/external\_ids}), créditos combinados de películas y series (\texttt{/person/\{id\}/combined\_credits?language=es-ES}), galería de fotos de perfil (\texttt{/person/\{id\}/images}), imágenes promocionales etiquetadas (\texttt{/person/\{id\}/tagged\_images}) y traducciones disponibles (\texttt{/person/\{id\}/translations}), escogiendo la versión en español de la biografía si está disponible. El uso de \texttt{Promise.allSettled()} en lugar de \texttt{Promise.all()} garantiza que un fallo en uno de los recursos (por ejemplo, ausencia de imágenes etiquetadas) no cancele la carga de los demás.
 
 La filmografía completa se computa como un valor derivado mediante \texttt{useMemo()} a partir del array \texttt{combined\_credits}, normalizando el formato heterogéneo de los campos según si el ítem es una película (\texttt{release\_date}) o una serie (\texttt{first\_air\_date}), y si el crédito es como actor (\texttt{character}) o como miembro del equipo técnico (\texttt{job}, \texttt{department}). Los filtros disponibles son: tipo de medio (todas, películas, series), tipo de crédito (actuación, equipo técnico), departamento (para filtrar directores, guionistas, productores dentro del equipo técnico), rango de años desde/hasta, y búsqueda libre por título o nombre de personaje. Todos los filtros se aplican de forma combinada en un único paso de procesamiento sobre el array completo, sin peticiones adicionales al servidor. La ordenación por popularidad, fecha, valoración o alfabético se aplica como etapa posterior al filtrado. El sistema calcula estadísticas sobre la filmografía filtrada (total de créditos, películas, series, actuaciones, roles técnicos) que se muestran como tarjetas informativas en la cabecera, actualizándose en tiempo real al cambiar los filtros. La función \texttt{calcAge()} calcula la edad actual o la edad en el momento del fallecimiento a partir de las fechas de nacimiento y muerte, y \texttt{formatHumanDate()} formatea las fechas en español con localización \texttt{es-ES}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/persona.jpg}
+  \caption{Interfaz de la ficha de persona.}
+  \label{fig:persona}
+\end{figure}
 
 \subsection{Barra de navegación (Navbar)}
 
@@ -502,16 +771,34 @@ La barra de navegación implementada en \texttt{Navbar.jsx} se encuentra present
 
 La barra de búsqueda \texttt{SearchBar} se reutiliza tanto en la versión de escritorio como en la modal de búsqueda de móvil. Implementa un debounce de 300\,ms antes de lanzar cada consulta a \texttt{/search/multi?query=...\&language=es-ES}, y cancela las peticiones anteriores con \texttt{AbortController} para evitar que resultados de búsquedas superadas sobrescriban los de la búsqueda actual. El \textit{dropdown} de resultados muestra hasta diez sugerencias con el tipo de contenido codificado por color (badge azul para películas, badge verde para series, badge naranja para personas), la foto de perfil o poster en miniatura, el año de estreno y el rating de TMDb. Una variante del componente Navbar incluye el botón \texttt{TraktHistoryNavButton} que muestra en tiempo real cuántos ítems hay en la lista de pendientes, obtenido del contexto de autenticación \texttt{AuthContext} sin petición adicional. El efecto de transición de transparente a \textit{glassmorphism} al hacer \textit{scroll} se implementa con un listener \texttt{scroll} que aplica o elimina la clase \texttt{bg-black/70 backdrop-blur-12px} al superar un umbral de 100\,px.
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/navbar-ordenador.jpg}
+  \caption{Barra de navegación en escritorio.}
+  \label{fig:navbar-ordenador}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.25\textwidth]{../notes/.images/navbar-movil.jpg}
+  \caption{Barra de navegación en móvil.}
+  \label{fig:navbar-movil}
+\end{figure}
+
 % -----------------------------------------------------------------------
 \subsection{Patrones de optimización transversales}
 
-Los módulos funcionales de \textit{The Show Verse} comparten un conjunto de patrones de optimización que se aplican de forma sistemática y que explican los tiempos de respuesta percibidos como inmediatos incluso siendo una aplicación que integra datos de seis APIs externas distintas.
+La aplicación implementa un conjunto de patrones de optimización aplicados de forma sistemática que explican los tiempos de respuesta percibidos como inmediatos a pesar de integrar datos de seis APIs externas distintas.
 
-El patrón de actualización optimista se aplica en todas las acciones de escritura del usuario: al hacer clic en el corazón de favoritos, en el marcador de watchlist o en la estrella de valoración, el estado visual de la interfaz se actualiza instantáneamente sin esperar la confirmación del servidor. La petición real se envía en paralelo en segundo plano, y solo si esta falla por cualquier motivo (error de red, sesión expirada, error del servidor) el estado visual se revierte automáticamente a su valor anterior mostrando un mensaje de error. Este patrón elimina la latencia perceptible de 300 a 600\,ms que tendría una actualización sincrónica, creando la sensación de respuesta inmediata que los usuarios esperan de aplicaciones nativas.
+\textbf{Actualización optimista.} Todas las acciones de escritura del usuario (marcar como favorito, añadir a pendientes, valorar) actualizan la interfaz instantáneamente sin esperar la confirmación del servidor. La petición real se envía en paralelo en segundo plano, y solo si falla se revierte el cambio visual mostrando un mensaje de error. Este patrón elimina la latencia perceptible de 300 a 600 milisegundos que tendría una actualización sincrónica, creando la sensación de respuesta inmediata característica de las aplicaciones nativas.
 
-El sistema de caché multinivel para puntuaciones externas cubre todos los casos de reutilización. Las puntuaciones de OMDb e IMDb se cachean en \texttt{sessionStorage} con TTL de 24 horas y una clave por \texttt{imdbId}, de modo que persisten durante toda la sesión del navegador pero se renuevan en la siguiente. Las puntuaciones de Trakt se cachean en \texttt{localStorage} con TTL de 24 a 48 horas y marcas de tiempo epoch, con lo que sobreviven al cierre y reapertura del navegador. A nivel de peticiones en vuelo, cada módulo mantiene un \texttt{Map} de promesas pendientes (\texttt{inFlight}) por identificador de recurso que garantiza que si diez tarjetas solicitan el mismo \texttt{imdbId} simultáneamente, solo se ejecute una petición real y todas compartan su resultado cuando llegue. Las imágenes de poster y backdrop se precargan mediante promesas con un adelanto configurable respecto al viewport (\texttt{ARTWORK\_PREFETCH\_AHEAD}), de forma que cuando el usuario hace \textit{scroll} las imágenes ya están en la caché del navegador.
+\textbf{Precarga de imágenes.} Las imágenes de posters y backdrops se precargan con un margen adelantado respecto al viewport, de forma que cuando el usuario hace scroll las imágenes ya están disponibles en la caché del navegador, evitando tiempos de carga visibles.
 
-La función utilitaria \texttt{runPool(items, limit, worker)} implementa el patrón de pool de concurrencia que aparece en casi todos los módulos: ejecuta la función \texttt{worker} para cada elemento del array \texttt{items} manteniendo en todo momento exactamente \texttt{limit} operaciones concurrentes (típicamente 4 o 5), lo que respeta los \textit{rate limits} de las APIs externas sin renunciar al paralelismo. Este patrón reduce el tiempo de carga de colecciones paginadas de N peticiones secuenciales a $\lceil N / \texttt{limit} \rceil$ rondas paralelas, un factor de mejora de 4--5$\times$ respecto a la alternativa secuencial. Cuando el usuario navega a una nueva página mientras hay peticiones en vuelo, todos los módulos cancelas sus \texttt{fetch} activos mediante \texttt{AbortController} en la función de limpieza del \texttt{useEffect}, previniendo tanto condiciones de carrera como actualizaciones de estado en componentes ya desmontados que generarían errores en React. Finalmente, los datos considerados semi-estables (catálogo de tendencias, listas top rated) se sirven desde el servidor con ISR y \texttt{revalidate} entre 600 y 1800 segundos, haciendo que la mayoría de visitas sirvan páginas preconstruidas desde la CDN de Vercel sin tocar ninguna API externa.
+\textbf{Control de concurrencia.} Para respetar los límites de las APIs externas sin renunciar al paralelismo, se mantiene un máximo de 4 o 5 peticiones concurrentes. Esto reduce el tiempo de carga de colecciones paginadas de N peticiones secuenciales a aproximadamente N/4 rondas paralelas, mejorando el rendimiento entre 4 y 5 veces respecto a la ejecución secuencial.
+
+\textbf{Cancelación de peticiones obsoletas.} Cuando el usuario navega a otra página mientras hay peticiones en curso, estas se cancelan automáticamente para prevenir condiciones de carrera y actualizaciones de estado en componentes ya desmontados.
+
+\textbf{Regeneración estática incremental (ISR).} Los datos semi-estables como catálogos de tendencias y listas de mejor valoradas se sirven con regeneración cada 10 a 30 minutos, permitiendo que la mayoría de visitas utilicen páginas preconstruidas desde la CDN sin ejecutar peticiones a APIs externas.
 
 % -----------------------------------------------------------------------
 \section{Diseño de la interfaz}
@@ -519,26 +806,15 @@ La función utilitaria \texttt{runPool(items, limit, worker)} implementa el patr
 
 \subsection{Sistema de diseño global}
 
-El sistema de diseño de \textit{The Show Verse} parte de un principio rector: el contenido visual proveniente de TMDb (los \textit{backdrops} y los \textit{posters} de cada título) es el protagonista de la interfaz. La paleta de colores, los efectos de superficie y las estrategias de iluminación se han diseñado para potenciar, no competir con, esas imágenes.
+El sistema de diseño parte de un principio rector: el contenido visual proveniente de TMDb (backdrops y posters de cada título) es el protagonista de la interfaz. La paleta de colores, los efectos de superficie y las estrategias de iluminación se han diseñado para potenciar, no competir con, estas imágenes.
 
-\textbf{Paleta y color de base.} El color de fondo global es el negro puro (\texttt{\#000000}), definido en el \texttt{layout.jsx} raíz. Sobre este fondo se despliegan los \textit{backdrops} a pantalla completa con un gradiente perimetral que los integra suavemente en el negro sin corte brusco. Este enfoque traslada la estética de las propias plataformas de \textit{streaming} (modo teatro) a la interfaz de seguimiento.
+\textbf{Paleta de colores.} El color de fondo global es negro puro, sobre el cual se despliegan los backdrops a pantalla completa con gradientes perimetrales que los integran suavemente. Este enfoque traslada la estética de las plataformas de streaming (modo teatro) a la interfaz de seguimiento.
 
-\textbf{Superficies de cristal (\textit{glassmorphism}).} Las tarjetas, paneles laterales, la Navbar con \textit{scroll} y los \textit{dropdowns} de búsqueda utilizan el patrón definido en la clase utilitaria \texttt{.glass} del fichero \texttt{globals.css}:
+\textbf{Superficies de cristal (glassmorphism).} Las tarjetas, paneles laterales, la barra de navegación y los menús desplegables utilizan un efecto de cristal semitransparente: fondo blanco con 5\% de opacidad, desenfoque de 10 píxeles del contenido subyacente y borde sutil de 1 píxel. La opacidad baja mantiene la legibilidad del texto mientras proyecta el color del backdrop en la superficie del elemento. El desenfoque se procesa mediante GPU y no genera sobrecarga en el renderizado.
 
-\begin{verbatim}
-.glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-\end{verbatim}
+\textbf{Tipografía.} El proyecto utiliza la familia Geist Sans y Geist Mono, tipografías de Vercel distribuidas como fuentes variables. Se cargan como fuentes del sistema sin peticiones externas, evitando el problema de \textit{Flash of Unstyled Text} (FOUT) durante la carga inicial.
 
-La opacidad del fondo (\texttt{0.05}) es deliberadamente baja para mantener la legibilidad del texto proyectando el color del \textit{backdrop} subyacente en la superficie del elemento. El desenfoque de contexto (\texttt{backdrop-filter: blur}) es processing GPU-acelerado y no genera coste de repintado del DOM.
-
-\textbf{Tipografía.} El proyecto usa la familia Geist Sans y Geist Mono, tipografías de Vercel distribuidas como variable CSS mediante el módulo \texttt{next/font}. Se cargan como fuentes de sistema sin peticiones externas, evitando el FOUT (\textit{Flash of Unstyled Text}).
-
-\textbf{Accesibilidad y movimiento reducido.} El fichero \texttt{globals.css} incluye una media query \texttt{prefers-reduced-motion} que desactiva todas las transiciones y animaciones de CSS para usuarios que han solicitado minimizar el movimiento en su sistema operativo, sin modificar ningún componente individual.
+\textbf{Accesibilidad y movimiento reducido.} El sistema respeta las preferencias de accesibilidad del sistema operativo, desactivando automáticamente todas las transiciones y animaciones CSS para usuarios que han configurado la opción de movimiento reducido en su dispositivo.
 
 \subsection{Componentes de Next.js utilizados}
 
@@ -612,6 +888,13 @@ El componente soporta un sistema de \textbf{propagación entre botones del mismo
 
 El color activo del botón es configurable mediante la prop \texttt{activeColor} (blue, red, yellow, purple, green, teal, orange), lo que permite usar el mismo componente para acciones semánticamente distintas manteniendo coherencia visual.
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{../notes/.images/botonesaccion.jpg}
+  \caption{Botones de acción implementados con el componente LiquidButton.}
+  \label{fig:botones-accion}
+\end{figure}
+
 \subsection{Componente propio: StarRating}
 
 \texttt{StarRating.jsx} gestiona la valoración personal del usuario en Trakt (escala 1--10). Utiliza \texttt{LiquidButton} como \textit{trigger} con \texttt{activeColor=''yellow''}: si el usuario ya tiene una valoración, el botón muestra el valor numérico con el efecto de partículas activo; si no, muestra el icono de estrella.
@@ -624,15 +907,91 @@ Al hacer clic, el componente abre un modal renderizado mediante \texttt{createPo
 \item Botón de confirmación y, si ya existe una valoración, botón de borrado con icono de papelera.
 \end{itemize}
 
-\subsection{Componente propio: FavoriteWatchlistButtons}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth]{../notes/.images/puntuacion.jpg}
+  \caption{Interfaz del componente de valoración personal StarRating.}
+  \label{fig:puntuacion}
+\end{figure}
 
-\texttt{FavoriteWatchlistButtons.jsx} encapsula los botones de Favorito y Pendiente de la página de detalle. Gestiona el estado de forma optimista: al pulsar el botón, el estado visual cambia inmediatamente (sin esperar la respuesta del servidor), y si la petición a TMDb falla, el estado se revierte y se muestra un mensaje de error. Este patrón elimina la latencia perceptible (normalmente de 300--600\,ms) entre la acción del usuario y la respuesta de la interfaz.
+\subsection{Componente propio: DetailsSectionMenu}
 
-Los iconos de los botones cambian según el estado (Heart / HeartOff, BookmarkPlus / BookmarkMinus), siguiendo el principio de retroalimentación directa. Cuando hay una operación en curso, los iconos se sustituyen por un spinner (\texttt{Loader2 animate-spin}) de Lucide React.
+\texttt{DetailsSectionMenu.jsx} gestiona la navegación interna de la página de detalle mediante pestañas contextuales. Su función principal es organizar el contenido por bloques funcionales (Media, Comentarios, Listas, Reparto, Recomendaciones, Temporadas y Episodios) y adaptar automáticamente qué pestañas se muestran según el tipo de contenido (película o serie) y según la disponibilidad real de datos.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/detailssectionmenu.jpg}
+  \caption{Interfaz del componente DetailsSectionMenu.}
+  \label{fig:detailssectionmenu}
+\end{figure}
+
+\subsection{Componente propio: EpisodeRatingsGrid}
+
+\texttt{EpisodeRatingsGrid.jsx} presenta una vista matricial de episodios para series, donde cada celda representa un episodio y su color refleja la puntuación. Este componente permite detectar de forma rápida patrones de calidad por temporada y ofrece navegación directa al detalle de episodio cuando el usuario hace clic en una celda.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth]{../notes/.images/gridratings.jpg}
+  \caption{Interfaz del componente EpisodeRatingsGrid.}
+  \label{fig:gridratings}
+\end{figure}
+
+\subsection{Componente propio: ScoreboardBar}
+
+\texttt{ScoreboardBar.jsx} centraliza en una sola franja la información de valoración y contexto del título, para evitar que el usuario tenga que consultar varias secciones distintas de la ficha. En este componente se agrupan:
+
+\begin{itemize}
+\item Puntuaciones de TMDb, Trakt e IMDb.
+\item Número de votos asociado a las fuentes disponibles.
+\item Estadísticas de Trakt vinculadas al seguimiento del título.
+\item Botón de compartir para difundir directamente el contenido.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{../notes/.images/scoreboard.jpg}
+  \caption{Interfaz del componente ScoreboardBar.}
+  \label{fig:scoreboard}
+\end{figure}
+
+\subsection{Componentes propios: control de visionado en Trakt}
+
+El bloque de control de visionado se apoya en tres componentes coordinados:
+\begin{itemize}
+\item \texttt{TraktEpisodesWatchedModal}: modal para gestionar el marcado de episodios en series de forma más detallada.
+\item \texttt{TraktWatchedModal}: modal de historial de visionados del título en Trakt.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{../notes/.images/episodiosvistos.jpg}
+  \caption{Interfaz del modal TraktEpisodesWatchedModal para gestionar episodios vistos.}
+  \label{fig:episodiosvistos}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth]{../notes/.images/historialvisionado.jpg}
+  \caption{Interfaz del modal TraktWatchedModal con el historial de visionado.}
+  \label{fig:historialvisionado}
+\end{figure}
+
+En conjunto, estos componentes centralizan las acciones de seguimiento y sincronización de visionado sin sacar al usuario de la ficha.
+
+\subsection{Componentes propios: modales de apoyo en DetailsClient}
+
+\texttt{DetailsClient.jsx} utiliza varios modales especializados para acciones concretas:
+\begin{itemize}
+\item \texttt{AddToListModal}: añadir o quitar el título de listas personalizadas de TMDb.
+\item \texttt{VideoModal}: reproducir trailers y vídeos oficiales dentro de la propia página.
+\item \texttt{ExternalLinksModal}: agrupar enlaces externos en móvil cuando no hay espacio para mostrar todos los iconos.
+\end{itemize}
+
+Como apoyo adicional en la misma pantalla también es relevante \texttt{SeasonDetailsClient} (detalle expandible de temporadas y episodios).
 
 \subsection{Sistema de animaciones con Framer Motion}
 
-Framer Motion \parencite{Framer:2024} gestiona las animaciones de mayor complejidad del proyecto a través de cuatro patrones principales:
+Framer Motion gestiona las animaciones de mayor complejidad del proyecto a través de cuatro patrones principales:
 
 \textbf{1. Animaciones de entrada escalonada (\texttt{staggerChildren}).} En el dashboard y en las páginas de listas, las tarjetas no aparecen todas simultáneamente. La variante del contenedor define un \texttt{staggerChildren} de 0,05\,s (reducido a 0,02\,s para listas largas de más de 30 ítems), de forma que cada tarjeta entra con un ligero retraso respecto a la anterior:
 \begin{verbatim}
@@ -725,213 +1084,101 @@ El LCP de 1,8\,s se consigue principalmente gracias al SSR: el HTML con el \text
 \section{Sistema de caché multinivel}
 % -----------------------------------------------------------------------
 
-El rendimiento de \textit{The Show Verse} depende críticamente de la estrategia de caché implementada, que opera en cuatro niveles diferenciados según el tipo de dato y sutasa de cambio.
+El rendimiento de \textit{The Show Verse} depende críticamente de la estrategia de caché implementada, que opera en cuatro niveles diferenciados según el tipo de dato y su tasa de cambio.
 
 \subsection{Nivel 1: Incremental Static Regeneration (ISR)}
 
-Las páginas del catálogo (trending, top rated, populares) utilizan ISR con \texttt{revalidate} variable según la volatilidad del dato:
-\begin{itemize}
-\item \textbf{Catálogo general} (10 minutos): páginas de trending y populares se regeneran cada 600\,s. Balance entre frescura y carga del servidor.
-\item \textbf{Detalles de título} (1 hora): los metadatos de películas y series son datos estables que raramente cambian. Revalidación cada 3600\,s.
-\item \textbf{Temporal crítico}  (no-store): datos personales (favoritos, watchlist, historial) nunca se cachean en servidor, requieren autenticación fresca.
-\end{itemize}
+Las páginas que consumen datos de TMDb en el servidor utilizan ISR mediante la opción \texttt{next: \{revalidate: TTL\}} del sistema de caché de Next.js. Por defecto, el módulo \texttt{lib/api/tmdb.js} aplica una revalidación de 10 minutos para todas las peticiones realizadas en Server Components, equilibrando frescura de datos con carga del servidor.
 
-El módulo \texttt{lib/api/tmdb.js} aplica \texttt{next: \{revalidate: TTL\}} condicionalmente según el \textit{endpoint} invocado.
+Este valor puede sobrescribirse pasando opciones personalizadas en casos específicos. Para datos personales que requieren autenticación (favoritos, historial, watchlist), las peticiones se configuran con \texttt{cache: no-store} para evitar que se sirvan datos obsoletos de otros usuarios.
 
 \subsection{Nivel 2: Caché en memoria del proceso Node.js}
 
-La API Route \texttt{/api/omdb} implementa un \underline{Map} global persistente durante toda la vida del proceso de Node.js:
+La API Route \texttt{/api/omdb} implementa un sistema de caché persistente durante toda la vida del proceso serverless de Node.js mediante estructuras \texttt{Map} almacenadas en \texttt{globalThis}. Esta caché distingue entre respuestas exitosas y fallidas con estrategias de TTL diferenciadas.
 
-\begin{verbatim}
-const omdbCache = new Map();  // { imdbId: { data, expiresAt } }
+Las respuestas exitosas se almacenan durante 24 horas, permitiendo que múltiples peticiones HTTP reutilicen el mismo dato sin consultar la API externa de OMDb. Las respuestas fallidas (errores 404, timeouts de red) se cachean solamente durante 60 segundos, lo que permite reintentos rápidos sin sobrecargar la API externa si el problema es temporal.
 
-function getCached(imdbId) {
-  const cached = omdbCache.get(imdbId);
-  if (cached && Date.now() < cached.expiresAt) {
-    return cached.data;
-  }
-  return null;
-}
+Al ejecutarse en Vercel, esta caché persiste mientras la instancia serverless se mantenga activa. Las instancias frías pierden la caché y deben reconstruirla, pero el sistema garantiza que esto no afecte a la experiencia del usuario gracias al nivel siguiente de deduplicación.
 
-function setCached(imdbId, data, ttlMs) {
-  omdbCache.set(imdbId, {
-    data,
-    expiresAt: Date.now() + ttlMs
-  });
-}
-\end{verbatim}
+\subsection{Nivel 3: Deduplicación de peticiones concurrentes}
 
-Las respuestas exitosas se cachean 24 horas; las fallidas (404, timeout), 60\,s para reintento rápido. Esta caché persiste entre peticiones HTTP mientras el proceso no se reinicie. En Vercel, esto implica que la caché sobrevive entre invocaciones de la función \textit{serverless} dentro de la misma \textit{warm instance}.
+El sistema implementa un mecanismo de deduplicación mediante un segundo \texttt{Map} global que registra las promesas de peticiones HTTP en curso. Cuando múltiples componentes solicitan simultáneamente el mismo \texttt{imdbId} (por ejemplo, 10 tarjetas cargándose en paralelo), solo se ejecuta una petición real a OMDb.
 
-\subsection{Nivel 3: sessionStorage (cliente)}
+El resultado de esta petición única se comparte con todos los solicitantes concurrentes. Una vez completada la petición, la promesa se elimina del mapa de deduplicación y el resultado se almacena en la caché persistente del Nivel 2. Esta estrategia reduce el tráfico hasta 10 veces durante la carga inicial de listas extensas.
 
-El componente \texttt{FavoritesClient.jsx} y similares implementan caché de puntuaciones OMDb en \texttt{sessionStorage} del navegador:
+\subsection{Nivel 4: Caché en el navegador (sessionStorage)}
 
-\begin{verbatim}
-const CACHE_KEY = 'omdb_scores';
-const TTL = 24 * 60 * 60 * 1000;  // 24 horas
+Los componentes del cliente que muestran listas de contenido implementan caché de puntuaciones en el almacenamiento de sesión del navegador. Los datos de OMDb (ratings de IMDb, Rotten Tomatoes y Metacritic) se almacenan bajo la clave \texttt{showverse:omdb:\{imdbId\}} con un tiempo de vida de 24 horas.
 
-function getCachedScore(imdbId) {
-  const raw = sessionStorage.getItem(CACHE_KEY);
-  if (!raw) return null;
-  
-  const cache = JSON.parse(raw);
-  const entry = cache[imdbId];
-  
-  if (entry && Date.now() < entry.expiresAt) {
-    return entry.data;
-  }
-  return null;
-}
-\end{verbatim}
-
-La caché de \texttt{sessionStorage} persiste durante toda la navegación del usuario (incluyendo recargas de página F5), pero se elimina al cerrar la pestaña. Esto equilibra entre persistencia útil y almacenamiento controlado.
-
-\subsection{Nivel 4: localStorage (cliente)}
-
-Las puntuaciones de IMDb (\texttt{imdbRating}), Trakt (\texttt{traktRating}) y OMDb (\texttt{rtScore}, \texttt{mcScore}) para las listas personales (Favoritos, Pendientes) se cachean en \texttt{localStorage} con TTL de 30 días:
-
-\begin{verbatim}
-const RATINGS_KEY = 'sv_ratings_cache';
-
-function persistRatings(tmdbId, ratings) {
-  const cache = JSON.parse(
-    localStorage.getItem(RATINGS_KEY) || '{}'
-  );
-  
-  cache[tmdbId] = {
-    ...ratings,
-    cachedAt: Date.now()
-  };
-  
-  localStorage.setItem(RATINGS_KEY, JSON.stringify(cache));
-}
-\end{verbatim}
-
-Ventaja sobre \texttt{sessionStorage}: la caché persiste entre sesiones del navegador, reduciendo drásticamente el número de peticiones a OMDb y Trakt en visitas recurrentes.
-
-\textbf{Gestión de tamaño:} al superar 500 entradas cacheadas, se aplica un algoritmo LRU (\textit{Least Recently Used}) que elimina automáticamente las entradas más antiguas, garantizando que el almacenamiento no crece indefinidamente.
-
-\subsection{Deduplicación en vuelo}
-
-El módulo \texttt{lib/api/omdb.js} implementa deduplicación de peticiones concurrentes:
-
-\begin{verbatim}
-const inflightRequests = new Map();  // { imdbId: Promise }
-
-async function fetchOMDB(imdbId) {
-  // Si ya hay fetch en curso, esperar su resultado
-  if (inflightRequests.has(imdbId)) {
-    return await inflightRequests.get(imdbId);
-  }
-  
-  // Iniciar nuevo fetch
-  const promise = realFetch(imdbId);
-  inflightRequests.set(imdbId, promise);
-  
-  // Limpiar al completar
-  promise.finally(() => {
-    inflightRequests.delete(imdbId);
-  });
-  
-  return await promise;
-}
-\end{verbatim}
-
-Si 10 tarjetas de la lista de favoritos solicitan simultáneamente el rating de una misma película, solo se realiza 1 petición HTTP a OMDb. Las otras 9 peticiones esperan el resultado de la primera. Resultado: reducción de 10x en peticiones a OMDb durante la carga inicial de listas.
-
-\subsection{Métricas de efectividad}
-
-Las pruebas en producción con listas de 100+ favoritos muestran:
-
-\begin{itemize}
-\item \textbf{Primera visita} (caché vacía): 100 peticiones a OMDb, tiempo total 8--12\,s con pool de concurrencia limitado a 4 peticiones simultáneas.
-\item \textbf{Segunda visita} (caché caliente): 0 peticiones a OMDb, tiempo total <300\,ms (lectura de \texttt{localStorage}).
-\item \textbf{Reducción estimada}: 70--80\% del tráfico API en usuarios recurrentes.
-\end{itemize}
+Esta caché persiste durante toda la navegación del usuario, incluyendo recargas de página, pero se elimina automáticamente al cerrar la pestaña del navegador. El sistema valida la frescura de los datos comparando la marca de tiempo almacenada con el tiempo actual antes de utilizarlos, descartando automáticamente los datos expirados.
 
 % -----------------------------------------------------------------------
 \section{Middleware y optimización SEO}
 % -----------------------------------------------------------------------
 
-El archivo \texttt{middleware.js} en la raíz del proyecto implementa un \textit{middleware} Edge de Next.js que intercepta todas las peticiones entrantes antes de que lleguen a cualquier Server Component o API Route. Su función principal es la reescritura de URLs para optimización SEO y detección de bots.
+El sistema implementa una estrategia de optimización para asegurar que los bots de redes sociales y motores de búsqueda puedan indexar correctamente el contenido de la aplicación. Esto es fundamental porque, al ser una aplicación React basada en componentes del lado del cliente, los bots no ejecutarían el JavaScript y recibirían un HTML vacío sin metadatos útiles.
 
-\subsection{Detección de bots y crawlers}
+\subsection{Detección de bots y reescritura de rutas}
 
-\textbf{Problema:} Los bots de redes sociales (FacebookBot, Twitter Bot, WhatsApp) y motores de búsqueda (Googlebot, Bingbot) solicitan las páginas de detalle para generar previsualizaciones (\textit{Open Graph}, \textit{Twitter Cards}). Estas páginas son Client Components con carga asíncrona de datos, por lo que los bots verían un HTML vacío sin metadatos.
+El middleware intercepta las peticiones entrantes e identifica si provienen de bots (WhatsApp, Facebook, Twitter, Telegram, Discord, LinkedIn, Googlebot, Bingbot, etc.) mediante el análisis del encabezado \texttt{User-Agent}. Cuando se detecta un bot accediendo a una página de detalle (como \texttt{/details/movie/550}), el sistema reescribe transparentemente la URL a una ruta alternativa (\texttt{/s/movie/550}) que sirve contenido HTML estático con todos los metadatos necesarios.
 
-\textbf{Solución:} El \textit{middleware} detecta bots mediante inspección del \textit{header} \texttt{User-Agent}:
+Esta reescritura es completamente transparente: la URL visible no cambia, pero internamente el bot recibe una respuesta HTML completa con toda la información de Open Graph y Twitter Cards. El patrón limita su ejecución exclusivamente a las rutas de detalle, evitando cualquier sobrecarga en el resto de la aplicación.
 
-\begin{verbatim}
-const userAgent = req.headers.get('user-agent') || '';
-const isBot = /bot|crawler|spider|facebookexternalhit|
-               twitterbot|whatsapp/i.test(userAgent);
+\subsection{Generación de HTML optimizado para compartir}
 
-if (isBot && req.nextUrl.pathname.match(/^\/details\//)) {
-  // Reescribir a ruta SEO optimizada
-  const seoPath = req.nextUrl.pathname
-    .replace('/details/', '/s/');
-  return NextResponse.rewrite(new URL(seoPath, req.url));
-}
-\end{verbatim}
+Las rutas alternativas (\texttt{/s/*}) construyen páginas HTML estáticas que incluyen:
 
-Las rutas \texttt{/s/movie/[id]}, \texttt{/s/tv/[id]} y \texttt{/s/person/[id]} son Server Components puros que renderizan HTML completo con todos los metadatos Open Graph en el servidor. Los bots reciben contenido listo para indexar sin ejecutar JavaScript.
-
-\subsection{Metadatos dinámicos Open Graph}
-
-Los Server Components de las rutas SEO exportan una función \texttt{generateMetadata()}:
-
-\begin{verbatim}
-export async function generateMetadata({ params }) {
-  const details = await getDetails('movie', params.id);
-  const posterUrl = `https://image.tmdb.org/t/p/w500
-                      ${details.poster_path}`;
-  
-  return {
-    title: `${details.title} (${details.release_date.slice(0,4)}) 
-            - The Show Verse`,
-    description: details.overview,
-    openGraph: {
-      title: details.title,
-      description: details.overview,
-      images: [{ url: posterUrl }],
-      type: 'video.movie'
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: details.title,
-      description: details.overview,
-      images: [posterUrl]
-    }
-  };
-}
-\end{verbatim}
-
-Next.js inyecta estas etiquetas meta en el \texttt{<head>} del HTML antes de enviarlo al bot. Resultado: previsualizaciones ricas en redes sociales sin configuración manual.
-
-\subsection{Redirección canónica}
-
-Los usuarios humanos que acceden directamente a \texttt{/s/movie/123} (por ejemplo, desde un enlace compartido) son redirigidos automáticamente a \texttt{/details/movie/123} (la ruta con interfaz completa):
-
-\begin{verbatim}
-// En /s/movie/[id]/page.jsx
-export default function SEOMoviePage() {
-  redirect(`/details/movie/${params.id}`);
-}
-\end{verbatim}
-
-Esta estrategia garantiza que:
 \begin{itemize}
-\item Los bots indexan las rutas SEO con metadatos completos.
-\item Los usuarios navegan las rutas interactivas con Client Components.
-\item No hay contenido duplicado (problema SEO): las rutas SEO no se indexan para usuarios humanos.
+\item \textbf{Metadatos Open Graph}: título, descripción, tipo de contenido (película, serie o persona), URL canónica e imagen representativa.
+\item \textbf{Twitter Cards}: información adaptada para previsualizaciones en Twitter/X.
+\item \textbf{Selección inteligente de imágenes}: se prioriza el uso de backdrops horizontales (1280$\times$720 píxeles) sobre posters verticales, ya que las redes sociales muestran previsualizaciones en formato apaisado que aprovechan mejor este tipo de imágenes.
+\item \textbf{Redirección automática para usuarios reales}: si un humano accede directamente a estas rutas, se le redirige inmediatamente a la página interactiva completa mediante una metaetiqueta \texttt{refresh}.
+\end{itemize}
+
+El sistema aplica una estrategia de caché de dos niveles: la CDN almacena estas respuestas durante 24 horas y puede servir versiones ligeramente obsoletas hasta 7 días más mientras regenera el contenido en segundo plano. Esto permite que el 99\% de las peticiones de bots se resuelvan desde la CDN sin ejecutar código en el servidor, reduciendo drásticamente la carga y mejorando los tiempos de respuesta.
+
+\subsection{Metadatos globales y por página}
+
+El archivo \texttt{layout.jsx} raíz define los metadatos por defecto de la aplicación mediante el objeto estático \texttt{metadata}:
+
+\begin{verbatim}
+export const metadata = {
+  title: 'The Show Verse',
+  description: 'Tu plataforma de películas y series',
+  manifest: '/site.webmanifest',
+  icons: {
+    icon: [
+      { url: '/icon.png', sizes: '256x256', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512' },
+    ]
+  }
+}
+\end{verbatim}
+
+\subsection{Resumen de la arquitectura dual de rutas}
+
+El flujo completo de una petición a \texttt{/details/movie/550} funciona de la siguiente manera:
+
+\begin{enumerate}
+\item La petición llega al \textit{middleware} Edge de Next.js.
+\item El middleware evalúa el \texttt{User-Agent} contra la expresión regular \texttt{BOT\_UA}.
+\item \textbf{Si es un bot:} reescritura transparente a \texttt{/s/movie/550}. El Route Handler devuelve HTML con Open Graph completo, cacheado 24h en CDN.
+\item \textbf{Si es un usuario:} la petición pasa sin modificar a \texttt{/details/movie/550}. Se ejecuta el Server Component que hidrata el Client Component interactivo.
+\end{enumerate}
+
+Esta arquitectura garantiza:
+\begin{itemize}
+\item Los bots indexan las rutas \texttt{/s/*} con metadatos completos (OGP, Twitter Cards, canonical).
+\item Los usuarios navegan las rutas \texttt{/details/*} con el Client Component completo e interactivo.
+\item No hay contenido duplicado: un usuario que acceda directamente a \texttt{/s/movie/550} es redirigido por el \texttt{<meta refresh>} a la ruta interactiva.
+\item El 99\% del tráfico de bots se resuelve desde la CDN sin invocar funciones serverless.
 \end{itemize}
 
 % -----------------------------------------------------------------------
 \section{Sistema de artwork personalizado}
 % -----------------------------------------------------------------------
 
-El archivo \texttt{artwork-overrides.json} en la raíz del proyecto permite sobrescribir manualmente el \textit{poster} o \textit{backdrop} de cualquier título con una imagen externa o una imagen alternativa de la galería de TMDb.
+El sistema de \textit{artwork} personalizado permite sustituir manualmente el \textit{poster}, \textit{backdrop} o imagen de fondo asociados a una película o serie. Para ello se utiliza un archivo de configuración en la raíz del proyecto, desde el que se definen sobrescrituras vinculadas al identificador de TMDb de cada obra.
 
 \subsection{Motivación}
 
@@ -942,72 +1189,20 @@ TMDb selecciona automáticamente el \textit{poster} con mayor número de votos p
 \item Algunos títulos tienen pósters promocionales con mejor reconocimiento visual que el póster oficial.
 \end{itemize}
 
-\subsection{Formato del archivo}
+Las sobrescrituras pueden apuntar tanto a imágenes alojadas en la carpeta pública del proyecto como a recursos externos o a rutas de la propia galería de TMDb, lo que ofrece flexibilidad suficiente para adaptar la identidad visual de cada ficha.
 
-\begin{verbatim}
-{
-  "1399": {
-    "poster": "/custom/poster-breaking-bad.jpg",
-    "backdrop": "https://external.site/backdrop.jpg"
-  },
-  "550": {
-    "poster": "/rCzpDGLbOoPwLjy3OAm5NUPOTrC.jpg"
-  }
-}
-\end{verbatim}
+\subsection{Funcionamiento general}
 
-Las claves son TMDb IDs. Los valores pueden ser:
+Cuando la aplicación necesita mostrar una imagen principal, comprueba primero si existe una sobrescritura definida para ese título. Si la encuentra, utiliza esa referencia; en caso contrario, mantiene el comportamiento por defecto y recurre al material obtenido automáticamente desde TMDb. Este mecanismo introduce una capa de personalización no intrusiva, ya que permite corregir casos puntuales sin alterar el resto del flujo de obtención de datos.
+
+El sistema también dispone de una API interna para consultar y actualizar estas preferencias de forma dinámica. De este modo, la gestión del \textit{artwork} puede realizarse sin modificar manualmente el código fuente, lo que simplifica el mantenimiento y facilita futuras tareas de administración del catálogo.
+
+Los tipos de recurso admitidos incluyen:
 \begin{itemize}
 \item Ruta relativa al \textit{public folder} (\texttt{/custom/...}).
-\item URL de TMDb (\texttt{/rCzpDGLbOoPwLjy3OAm5NUPOTrC.jpg}) que se resuelve automáticamente como \texttt{https://image.tmdb.org/t/p/original/...}.
+\item Ruta de imagen de TMDb, resuelta automáticamente contra su CDN.
 \item URL externa completa (\texttt{https://...}).
 \end{itemize}
-
-\subsection{Implementación}
-
-La función \texttt{getArtwork(type, id, kind)} en \texttt{lib/artworkApi.js} consulta el JSON de sobrescrituras antes de devolver la imagen:
-
-\begin{verbatim}
-import overrides from '@/artwork-overrides.json';
-
-export function getArtwork(type, tmdbId, kind) {
-  const override = overrides[String(tmdbId)]?.[kind];
-  
-  if (override) {
-    // URL externa completa
-    if (override.startsWith('http')) {
-      return override;
-    }
-    // Ruta TMDb
-    if (override.startsWith('/') && 
-        !override.startsWith('/custom')) {
-      return `https://image.tmdb.org/t/p/original${override}`;
-    }
-    // Ruta pública local
-    return override;
-  }
-  
-  // Fallback: imagen automática de TMDb
-  return fetchDefaultArtwork(type, tmdbId, kind);
-}
-\end{verbatim}
-
-Este patrón permite control manual fino sobre la presentación visual de cada título sin modificar código.
-
-\subsection{API Route de gestión}
-
-La ruta \texttt{/api/artwork} permite añadir sobrescrituras dinámicamente mediante POST (requiere autenticación):
-
-\begin{verbatim}
-POST /api/artwork
-{
-  "tmdbId": "1399",
-  "kind": "poster",
-  "url": "/custom/new-poster.jpg"
-}
-\end{verbatim}
-
-El endpoint lee el JSON actual, añade la entrada y sobrescribe el archivo. Útil para administración sin editar manualmente el JSON.
 
 % -----------------------------------------------------------------------
 \section{Integración con comunidad Trakt}
@@ -1036,7 +1231,7 @@ La página de detalle incluye una pestaña «Comunidad» que muestra los comenta
 \item Fecha de publicación relativa («hace 3 días»).
 \end{itemize}
 
-\subsection{Listas curadas de comunidad}
+\subsection{Listas de la comunidad}
 
 La ruta \texttt{/api/trakt/community/lists} obtiene listas públicas populares de Trakt para un título:
 
@@ -1057,13 +1252,6 @@ Cada lista muestra: nombre, descripción, autor, número de ítems, número de \
 \subsection{Estadísticas de temporada}
 
 Para series, la pestaña «Comunidad» incluye ratings promedio de Trakt por temporada y episodio, obtenidos de \texttt{/api/trakt/community/seasons}.
-
-\textbf{Visualización:} gráfico de líneas (\texttt{recharts}) mostrando evolución del rating episodio a episodio. Permite detectar patrones como:
-\begin{itemize}
-\item Caída de calidad en temporadas intermedias.
-\item Episodios destacados (picos de rating).
-\item Consistencia de calidad a lo largo de la serie.
-\end{itemize}
 
 % -----------------------------------------------------------------------
 \section{Integración con Letterboxd}
@@ -1101,7 +1289,7 @@ La página de detalle incluye un botón «Ver en Letterboxd» en la sección de 
 \begin{itemize}
 \item Leer reseñas detalladas de la comunidad cinéfila.
 \item Añadir la película a sus listas personales de Letterboxd.
-\item Ver las listas curadas que incluyen esta película.
+\item Ver las listas de la comunidad que incluyen esta película.
 \end{itemize}
 
 % -----------------------------------------------------------------------
@@ -1110,72 +1298,29 @@ La página de detalle incluye un botón «Ver en Letterboxd» en la sección de 
 
 \subsection{Estrategia de \textit{graceful degradation}}
 
-Todas las integraciones con APIs externas implementan un patrón de degradación elegante: si una API falla, la aplicación continúa funcionando con funcionalidad reducida en lugar de mostrar un error total.
+Todas las integraciones con APIs externas implementan un patrón de degradación elegante mediante gestión de excepciones que permite continuar con funcionalidad reducida en lugar de bloquear la interfaz completa. Cuando una API externa no responde o devuelve un error, la aplicación captura la excepción, registra el problema en consola para diagnóstico, y asigna valores nulos o por defecto a los datos que no pudieron obtenerse. 
 
-\textbf{Ejemplo: fallos de OMDb.}
-\begin{verbatim}
-try {
-  const omdbData = await fetchOMDB(imdbId);
-  setImdbRating(omdbData.imdbRating);
-} catch (err) {
-  console.warn('OMDb unavailable:', err.message);
-  setImdbRating(null);  // Mostrar "N/A" en lugar de error
-}
-\end{verbatim}
-
-La tarjeta de la película muestra «IMDb: N/A» en lugar de romper todo el render.
+Por ejemplo, si la API de OMDb no está disponible al cargar los detalles de una película, el rating de IMDb simplemente se muestra como «N/A» en lugar de impedir que se renderice toda la tarjeta. De esta forma, el usuario puede seguir accediendo al resto de información proveniente de TMDb y Trakt sin interrupciones. Este patrón se aplica consistentemente en todas las peticiones a servicios externos, garantizando que ningún fallo aislado comprometa la experiencia general.
 
 \subsection{Skeleton loaders}
 
-Durante la carga de datos, los componentes renderizan \textit{skeletons} animados con el patrón \texttt{animate-pulse} de Tailwind:
+Durante la carga de datos, los componentes renderizan \textit{skeletons} animados que simulan la estructura visual del contenido final. Estos componentes de carga utilizan animaciones de pulso implementadas con Tailwind CSS que crean un efecto de brillo sutil sobre fondos grises, proporcionando feedback visual inmediato al usuario mientras se completan las peticiones asíncronas.
 
-\begin{itemize}
-\item \textbf{PosterSkeleton}: rectángulo con proporción 2:3, fondo gris animado.
-\item \textbf{CardSkeleton}: tarjeta completa con bloques de texto simulados.
-\item \textbf{GridSkeleton}: grid de \textit{skeletons} para listas.
-\item \textbf{ScoreboardSkeleton}: barra con círculos animados para ratings.
-\end{itemize}
+El sistema incluye diferentes tipos de \textit{skeletons} especializados según el contenido que representan. El \textit{PosterSkeleton} reproduce la proporción 2:3 de los pósters de películas y series. El \textit{CardSkeleton} simula tarjetas completas con bloques rectangulares que representan título, descripción y metadatos. El \textit{GridSkeleton} genera una cuadrícula de \textit{skeletons} para listas de resultados. El \textit{ScoreboardSkeleton} muestra una barra con círculos animados que anticipan la posición de los indicadores de puntuación.
 
-Los \textit{skeletons} se definen en \texttt{components/details/LoadingSkeleton.jsx} y se reutilizan en todos los módulos.
+Todos estos componentes se definen de forma centralizada en un módulo dedicado y se reutilizan a lo largo de la aplicación, garantizando consistencia visual en los estados de carga.
 
-\subsection{Mensajes de error contextua les}
+\subsection{Mensajes de error contextuales}
 
-Los errores críticos (autenticación fallida, timeout de red) muestran notificaciones no intrusivas en la esquina superior derecha mediante el patrón \textit{toast}:
+Los errores críticos que requieren atención del usuario, como fallos de autenticación o timeouts de red, se comunican mediante notificaciones no intrusivas que aparecen temporalmente en la esquina superior derecha de la pantalla siguiendo el patrón \textit{toast}. Estas notificaciones se generan dinámicamente como elementos del DOM con estilos diferenciados según el tipo de mensaje (error, advertencia, éxito o información).
 
-\begin{verbatim}
-function showToast(message, type = 'error') {
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => toast.remove(), 5000);
-}
-\end{verbatim}
-
-Los \textit{toasts} desaparecen automáticamente tras 5\,s, evitando que el usuario tenga que cerrarlos manualmente.
+El sistema crea el elemento visual, lo inserta en el documento, y programa su eliminación automática tras cinco segundos. Este comportamiento temporal evita que el usuario tenga que cerrar manualmente cada notificación y previene la acumulación de mensajes en pantalla, manteniendo la interfaz limpia mientras se proporciona feedback claro sobre operaciones críticas.
 
 \subsection{Estados vacíos}
 
-Las listas vacías (cero favoritos, cero historial) muestran estados vacíos ilustrados con mensajes motivacionales:
+Las listas vacías se gestionan con componentes específicos que muestran ilustraciones y mensajes motivacionales en lugar de dejar el espacio en blanco. Cuando el usuario no tiene favoritos, historial de visionado o elementos en su lista de pendientes, se renderiza un estado vacío ilustrado que explica la situación e invita a la acción.
 
-\begin{verbatim}
-{favoritos.length === 0 && (
-  <div className="empty-state">
-    <HeartIcon className="w-16 h-16 text-gray-600" />
-    <p className="text-xl">Aún no tienes favoritos</p>
-    <p className="text-sm text-gray-400">
-      Explora el catálogo y marca tus películas 
-      y series favoritas
-    </p>
-    <Link href="/discover">
-      <button>Explorar contenido</button>
-    </Link>
-  </div>
-)}
-\end{verbatim}
-
-Incluyen un call-to-action (CTA) que guía al usuario hacia la acción relevante (en este caso, descubrir contenido).
+Estos estados incluyen un icono representativo de gran tamaño, un título que describe el estado vacío, un mensaje secundario que explica cómo poblarlo, y un botón de llamada a la acción que redirige al usuario hacia la funcionalidad relevante. Por ejemplo, el estado vacío de favoritos guía al usuario hacia la página de descubrimiento de contenido, facilitando que comience a explorar y agregar títulos a su colección personal. Este enfoque mejora la primera experiencia del usuario y reduce la fricción en la adopción de funcionalidades.
 
 % -----------------------------------------------------------------------
 \section{Diseño responsive y adaptación móvil}
@@ -1211,15 +1356,13 @@ El diseño utiliza los breakpoints estándar de Tailwind CSS:
 La estrategia \textit{mobile-first} implica que todos los estilos base se definen para móvil (320\,px), y se sobrescriben progresivamente para pantallas más grandes:
 
 \begin{verbatim}
-<div className="grid grid-cols-2 md:grid-cols-4 
-                lg:grid-cols-6 gap-4">
+<div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+
 \end{verbatim}
 
-Resultado: 2 columnas en móvil, 4 en tablet, 6 en desktop.
+\subsection{Barra de navegación adaptativa}
 
-\subsection{Navegación adaptativa}
-
-La Navbar implementa dos arquitecturas completamente diferentes según el dispositivo:
+El componente Navbar implementa dos arquitecturas completamente diferentes según el dispositivo:
 
 \textbf{Desktop (lg+):}
 \begin{itemize}
@@ -1256,3 +1399,13 @@ El componente \texttt{<Image>} de Next.js genera automáticamente \texttt{srcset
 \end{verbatim}
 
 El navegador selecciona la resolución óptima según el tamaño de renderizado real. Resultado: ahorro de ancho de banda en móviles (imagen 300\,px en lugar de 1000\,px).
+
+% -----------------------------------------------------------------------
+\section{Plan de calidad: estrategia de testing}
+% -----------------------------------------------------------------------
+
+El proyecto no incluyó una suite de tests automatizados durante su desarrollo. La validación se realizó mediante pruebas manuales sistemáticas en navegador, una decisión pragmática dada la velocidad de iteración durante el prototipado. Esta limitación técnica debe abordarse antes de escalar el proyecto a producción.
+
+La estrategia propuesta para futuras iteraciones incluye \textbf{Vitest} para pruebas unitarias e integración, \textbf{React Testing Library} para validar componentes desde el comportamiento del usuario, \textbf{MSW} para simular respuestas de APIs externas, y \textbf{Playwright} para pruebas \textit{end-to-end} de flujos completos.
+
+Los módulos que requieren mayor cobertura de tests son: algoritmo de caché y deduplicación en vuelo, middleware de detección de bots, flujo OAuth y gestión de tokens, transformaciones de datos entre Trakt y TMDb, y algoritmos de selección de imágenes. Los componentes de presentación pura tienen menor necesidad de cobertura al aportar menos valor en la validación automatizada.

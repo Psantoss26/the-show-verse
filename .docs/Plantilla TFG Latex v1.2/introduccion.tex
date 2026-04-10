@@ -1,26 +1,28 @@
 \section{Justificación y contexto}
 
-En los últimos años, el consumo de películas y series ha cambiado radicalmente. Hoy en día la mayoría del contenido se distribuye a través de plataformas de \textit{streaming} como Netflix, HBO Max, Disney+, Amazon Prime Video o Movistar+, cada una con su propio catálogo independiente, lo que genera un problema habitual para cualquier usuario: el contenido está disperso en múltiples servicios y no existe ninguna herramienta que permita gestionarlo todo desde un único lugar.
+En los últimos años, el consumo de películas y series ha cambiado radicalmente debido a que la mayoría del contenido se distribuye a través de plataformas de \textit{streaming} como Netflix, HBO Max, Disney+, Amazon Prime Video o Movistar+, cada una con su propio catálogo independiente, lo que genera un problema habitual para cualquier usuario porque el contenido está disperso en múltiples servicios y no existe ninguna herramienta que permita gestionarlo todo desde un único lugar.
 
-Esto provoca situaciones como perder el seguimiento de una serie que se dejó a medias, no recordar qué episodios se han visto, tener que buscar en varios sitios a la vez si una película está disponible en \textit{streaming}, o simplemente no tener un registro de lo que ya se ha visto. Las plataformas de \textit{tracking} que existen actualmente, como Trakt.tv o Letterboxd, resuelven parte del problema pero presentan sus propias limitaciones con falta de funcionalidades.
+Esto provoca situaciones como perder el seguimiento de una serie que se dejó a medias, no recordar qué episodios se han visto, tener que buscar en varios sitios a la vez si una película está disponible en \textit{streaming}, consultar las puntuaciones y críticas de otros usuarios, o simplemente no tener un registro de lo que ya se ha visto. Las plataformas de \textit{tracking} que existen actualmente, como Trakt.tv o Letterboxd, resuelven parte del problema pero presentan sus propias limitaciones con falta de funcionalidades.
 
-\textit{The Show Verse} nace como respuesta a esa necesidad: una plataforma web que centraliza toda la gestión del contenido audiovisual, integrando los datos de múltiples fuentes mediante APIs externas y ofreciendo al usuario una experiencia completa y funcional.
+\textit{The Show Verse} nace como respuesta a esa necesidad ofreciendo una plataforma web que centraliza gran parte de la gestión del contenido audiovisual, integrando los datos de múltiples fuentes mediante APIs externas y ofreciendo al usuario una experiencia completa y funcional.
 
-Desde el punto de vista técnico, el proyecto aborda varios retos propios del desarrollo web actual: la integración de APIs REST de terceros con distintos esquemas de autenticación y formatos de datos, como la implementación del protocolo OAuth 2.0 para el acceso con Trakt.tv, el diseño de una estrategia de caché en múltiples niveles para optimizar el rendimiento, y la construcción de una interfaz responsiva con animaciones fluidas.
+Desde el punto de vista técnico, el proyecto aborda varios retos propios del desarrollo web actual como la integración de APIs REST de terceros con distintos esquemas de autenticación y formatos de datos, la implementación de la autenticación para el acceso con TMDb y Trakt.tv, el diseño de una estrategia de caché en varios niveles para optimizar el rendimiento, y la construcción de una interfaz responsiva con un diseño propio y cómodo para el usuario.
 
 \subsection{Motivación}
 
-El punto de partida de este trabajo es la experiencia personal como consumidor habitual de películas y series en múltiples plataformas de \textit{streaming}. La dispersión del catálogo disponible entre los diferentes servicios provocaba con frecuencia situaciones de dificultad para recordar el historial de películas y series y la puntuación que se le había dado a cada una, además de tener que buscar las puntuaciones y críticas en distintas webs independientes.
+El interés por el desarrollo de este proyecto surge de la experiencia personal como consumidor habitual de películas y series a través de diversas plataformas de \textit{streaming}. La dispersión del contenido disponible entre los diferentes servicios dificulta tanto el acceso a la información como la gestión del propio consumo.
 
-Las aplicaciones existentes en el mercado (Letterboxd, Trakt.tv, Simkl) ofrecen soluciones parciales, pero ninguna combina todos los datos y funcionalidades realmente necesarios a la hora de gestionar este tipo de contenido. Trakt.tv, la más completa en cuanto a API y funcionalidades de \textit{tracking}, presenta una interfaz datada que resulta poco motivadora para el uso diario. Letterboxd, más elegante visualmente, carece de soporte completo para series de televisión y para otras funcionalidades importantes.
+Es por ello que resulta complicado recordar qué contenido se ha visualizado, cuáles han sido las valoraciones asignadas o qué títulos quedan pendientes por ver y cuales están en progreso. A esta problemática se suma la necesidad de consultar información adicional (como críticas, puntuaciones o detalles técnicos) en diferentes páginas o \textit{webs} independientes, lo que genera una experiencia fragmentada y poco eficiente si habitualmente tienes que estar consultando diferentes sitios para un mismo propósito.
+
+Las aplicaciones existentes en el mercado (Letterboxd, Trakt.tv, Simkl) ofrecen soluciones parciales, pero ninguna combina todos los datos y funcionalidades realmente necesarios a la hora de gestionar este tipo de contenido. Algunas destacan por su capacidad de seguimiento del contenido, mientras que otras priorizan el diseño visual o la experiencia de usuario, pero no logran combinar de manera equilibrada todas las funcionalidades necesarias para una gestión completa del consumo audiovisual.
 
 \section{Planteamiento del problema}
 
 El problema abordado en este trabajo puede descomponerse en varias categorías técnicas.
 
-\textbf{1. Integración de fuentes de datos.} Los datos necesarios para una plataforma de gestión de contenido audiovisual completa no están disponibles en una única API. TMDb proporciona los metadatos de películas y series (sinopsis, reparto, imágenes, trailers), además de las puntuaciones y listas de usuario. Trakt.tv gestiona el \textit{tracking} personal del usuario (historial de visionado, sección en progreso y estadísticas). OMDb complementa con las puntuaciones de IMDb y Rotten Tomatoes. Cada API tiene su propio esquema de autenticación, formato de respuesta, límites de uso e identificadores.
+\textbf{1. Integración de fuentes de datos.} Los datos necesarios para una plataforma de gestión de contenido audiovisual completa no están disponibles en una única API. TMDb proporciona los metadatos de películas y series (sinopsis, reparto, imágenes, trailers), además de las puntuaciones y listas de usuario. Trakt.tv gestiona el \textit{tracking} personal del usuario (historial de visionado, sección en progreso y estadísticas). OMDb complementa con las puntuaciones de IMDb y Rotten Tomatoes además de los premios y nominaciones de cada título. Cada API tiene su propio esquema de autenticación, formato de respuesta, límites de uso e identificadores.
 
-\textbf{2. Autenticación y gestión de sesiones.} La funcionalidad de sincronización con Trakt requiere que el usuario delegue permisos en la aplicación mediante OAuth 2.0, lo que implica implementar el flujo completo de autorización (redirección, intercambio de código por token, almacenamiento seguro, refresco automático), sin exponer en ningún momento las credenciales del usuario ni las claves privadas de la aplicación.
+\textbf{2. Autenticación y gestión de sesiones.} La funcionalidad de sincronización con Trakt requiere que el usuario delegue permisos en la aplicación mediante OAuth 2.0, lo que implica implementar el flujo completo de autorización (redirección, intercambio de código por token, almacenamiento seguro, actualización automática), sin exponer en ningún momento las credenciales del usuario ni las claves privadas de la aplicación.
 
 \textbf{3. Rendimiento y experiencia de usuario.} Este tipo de aplicación maneja grandes volúmenes de imágenes de alta resolución y realiza múltiples llamadas a APIs externas con límites de peticiones en algunos casos reducidos. Es importante que haya un equilibrio entre datos almacenados en caché y aquellos que se muestran en tiempo real.
 
@@ -28,7 +30,7 @@ El problema abordado en este trabajo puede descomponerse en varias categorías t
 
 \section{Objetivos del trabajo}
 
-\textbf{Objetivo general:} diseñar e implementar una aplicación web completa y funcional para la gestión personalizada y el descubrimiento de nuevas películas y series, que integre múltiples APIs externas y ofrezca una experiencia de usuario centralizada, moderna y eficiente.
+El objetivo principal es diseñar e implementar una aplicación web completa y funcional para la gestión personalizada y el descubrimiento de nuevas películas y series, que integre múltiples APIs externas y ofrezca una experiencia de usuario centralizada, moderna y eficiente.
 
 \textbf{Objetivos específicos:}
 
@@ -36,12 +38,52 @@ El problema abordado en este trabajo puede descomponerse en varias categorías t
 \item Implementar la integración con la API de TMDb para obtener los metadatos completos de películas y series (sinopsis, características, imágenes, vídeos, temporadas y episodios).
 \item Desarrollar un sistema de autenticación OAuth 2.0 completo con Trakt.tv, incluyendo almacenamiento seguro de tokens en cookies \texttt{httpOnly}, actualización automática mediante \textit{refresh tokens} y revocación.
 \item Construir un módulo de gestión personal (favoritos, pendientes, historial de visionado, series en progreso y puntuaciones de usuario) con sincronización bidireccional con Trakt y TMDb.
-\item Implementar un sistema de seguimiento episódico completo para series, incluyendo marcado individual por episodio, marcado masivo por temporada, visualización de progreso y grid de ratings para detección de patrones de calidad.
+\item Implementar un sistema de seguimiento de episodios completo para series, incluyendo marcado individual por episodio, marcado completo por temporada, visualización de progreso y tabla de puntuaciones por episodio y temporada.
 \item Diseñar una interfaz de usuario responsiva y accesible que ofrezca múltiples modos de visualización (Grid, List, Compact) con transiciones fluidas mediante Framer Motion y compatibilidad con dispositivos móviles mediante navegación adaptativa.
 \item Optimizar el rendimiento de la aplicación mediante un sistema de caché multinivel (ISR en servidor, memoria de proceso Node.js, sessionStorage, localStorage) con deduplicación en vuelo para reducir el tráfico API.
 \item Implementar un \textit{middleware} Edge para optimización SEO con detección de bots, generación de metadatos Open Graph y reescritura de URLs para garantizar indexación correcta.
 \item Integrar Plex Media Server para acceso a biblioteca local del usuario, incluyendo autenticación JWT, enlaces directos multiplataforma y búsqueda unificada.
-\item Desarrollar componentes interactivos avanzados con efectos visuales mediante Canvas 2D (LiquidButton) y sistema de actualización optimista para todas las acciones de usuario.
+\item Desarrollar componentes interactivos avanzados con efectos visuales y sistema de actualización optimista para todas las acciones de usuario.
 \item Implementar gestión de errores con \textit{graceful degradation} y \textit{skeleton loaders} para garantizar funcionalidad parcial aunque fallen APIs externas.
-\item Desplegar la aplicación en un entorno de producción (Vercel) con métricas de rendimiento óptimas (LCP <2\,s, CLS <0,1, Performance >90/100).
+\item Desplegar la aplicación en un entorno de producción (Vercel).
 \end{enumerate}
+
+\section{Modelo de negocio}
+
+\textit{The Show Verse} se ha desarrollado como proyecto académico, pero su arquitectura permite analizar su viabilidad en un escenario real. No obstante, al tratarse de una aplicación fuertemente dependiente de APIs de terceros, la sostenibilidad económica no puede evaluarse solo por costes de infraestructura, sino que también está condicionada por licencias de uso, límites de petición y cambios de política de proveedores externos.
+
+\subsection{Viabilidad real y dependencia de APIs}
+
+Desde una perspectiva técnica y de producto, el proyecto es viable como servicio de nicho orientado a usuarios avanzados que desean centralizar seguimiento, valoraciones y descubrimiento en una única interfaz. Sin embargo, su potencial de monetización está limitado por la naturaleza de los datos consumidos: una parte relevante del valor funcional procede de metadatos y catálogos de plataformas externas cuya explotación comercial no depende exclusivamente del desarrollador.
+
+En consecuencia, un despliegue público a pequeña escala es factible, pero una monetización agresiva (suscripción, publicidad intensiva o reventa de datos agregados) requeriría revisar de forma previa la conformidad legal y contractual con cada proveedor.
+
+\subsection{Limitaciones por proveedor (coste y condiciones)}
+
+Para analizar la viabilidad con mayor precisión, conviene considerar cada proveedor de forma individual.
+
+\textbf{TMDb.} Aunque su uso básico no se articula en una tarifa pública estándar para proyectos pequeños, cualquier explotación comercial exige revisar de manera específica las condiciones del proveedor. En la práctica, esto implica que no puede asumirse una monetización directa y estable sin un marco contractual explícito.
+
+\textbf{Trakt.tv.} La API pública permite construir funcionalidades avanzadas, pero su disponibilidad está sujeta a límites de uso y a la propia evolución del ecosistema de Trakt. Además, la existencia de planes VIP para usuarios finales (en torno a 4--6\,USD/mes) condiciona indirectamente el alcance de ciertas experiencias premium dentro de la plataforma.
+
+\textbf{OMDb.} Su modelo de acceso mediante planes públicos en Patreon (aprox. 1\,EUR/mes, 4,5\,EUR/mes y 9\,EUR/mes) introduce un coste recurrente asumible para fases iniciales. No obstante, también añade una dependencia económica y operativa que debe contemplarse en la planificación a medio plazo.
+
+\textbf{JustWatch.} La integración se apoya en un ecosistema orientado a acuerdos B2B, con condiciones económicas no publicadas de forma abierta. Por ello, cualquier uso comercial robusto de esta capa requiere negociación previa con el proveedor.
+
+En conjunto, la principal restricción no es tanto el coste unitario de hosting, sino la incertidumbre contractual de dos piezas críticas del producto: si existe explotación comercial y si se desea cobertura robusta de disponibilidad en plataformas.
+
+\subsection{Modelos de ingreso viables}
+
+Con el marco técnico actual, los modelos más razonables serían los siguientes:
+
+\begin{itemize}
+\item \textbf{Freemium conservador}: capa gratuita funcional y un plan de pago centrado en productividad personal (exportaciones, automatizaciones, informes), evitando vender el acceso a datos de terceros como propuesta principal.
+\item \textbf{Servicios para power users}: configuración avanzada de sincronizaciones (Plex/Trakt), backups, reglas personalizadas y soporte prioritario.
+\item \textbf{Afiliación limitada}: enlaces salientes a plataformas bajo acuerdos explícitos, siempre como canal complementario y no como base financiera única.
+\end{itemize}
+
+\subsection{Conclusión de viabilidad}
+
+La viabilidad del proyecto es media para un producto independiente y alta como plataforma técnica demostrable, siempre que se mantenga un crecimiento controlado y una estrategia de costes prudente. La principal barrera para monetizar no es la complejidad de implementación, sino la gobernanza de dependencias externas: condiciones de uso, posibles acuerdos comerciales y cambios de política de APIs.
+
+Por tanto, antes de cualquier lanzamiento comercial, el paso crítico no sería añadir más funcionalidades, sino formalizar un marco de cumplimiento con proveedores y revisar periódicamente costes y límites vigentes, ya que estos parámetros pueden variar en el tiempo.

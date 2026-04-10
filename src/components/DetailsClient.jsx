@@ -3273,7 +3273,7 @@ export default function DetailsClient({
   // Carga los ratings de episodios para series TV (excluyendo especiales)
   useEffect(() => {
     const RATINGS_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 días
-    const cacheKey = `showverse:tv:${id}:episode-ratings:v2-imdb-trakt`;
+    const cacheKey = `showverse:tv:${id}:episode-ratings:v3-imdb-tmdb`;
 
     const readCache = () => {
       if (typeof window === "undefined") return null;
@@ -7555,7 +7555,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           ratings={ratings}
                           showId={Number(id)}
                           density="compact"
-                          fallbackSource="trakt"
+                          fallbackSource="tmdb"
                         />
                       )}
                     </div>

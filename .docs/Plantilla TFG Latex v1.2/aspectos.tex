@@ -1,6 +1,6 @@
-El desarrollo de \textit{The Show Verse} se ha abordado mediante una \textbf{metodología iterativa basada en el ciclo de vida ágil}, adaptada a un proyecto individual. La elección de este enfoque frente a las metodologías en cascada se justifica por la naturaleza exploratoria del proyecto: la integración con APIs de terceros implica incertidumbres técnicas que no siempre se pueden anticipar en una fase de análisis, y la prioridad entre funcionalidades puede variar a medida que se comprende mejor el problema.
+El desarrollo de \textit{The Show Verse} se ha abordado mediante una metodología iterativa basada en el ciclo de vida ágil, adaptada a un proyecto individual. La elección de este enfoque frente a las metodologías en cascada se justifica por la naturaleza exploratoria del proyecto ya que la integración con APIs de terceros implica incertidumbres técnicas que no siempre se pueden anticipar en una fase de análisis, y la prioridad entre funcionalidades puede variar a medida que se comprende mejor el problema.
 
-El proceso de desarrollo se articula en iteraciones de aproximadamente una semana de duración. Al inicio de cada iteración se seleccionan del \textit{backlog} las funcionalidades a abordar, priorizadas según tres criterios:
+El proceso de desarrollo se realiza en iteraciones de aproximadamente una semana de duración. Al inicio de cada iteración se seleccionan del \textit{backlog} las funcionalidades a abordar, priorizadas según tres criterios:
 
 \begin{itemize}
 \item \textbf{Dependencia técnica:} las funcionalidades que sirven de base a otras (autenticación, cliente de API) se abordan primero.
@@ -92,4 +92,62 @@ Esta diferenciación permite reducir el número de llamadas a APIs externas en u
 
 \textbf{Framer Motion 12.} La elección de Framer Motion frente a otras librerías de animación (React Spring, CSS Animations puras) se basa en su modelo declarativo basado en variantes, su soporte nativo para animaciones de \textit{layout} y su integración con el ciclo de vida de los componentes React mediante \texttt{AnimatePresence} \parencite{Framer:2024}.
 
-\textbf{TypeScript 5.} Configurado en modo de verificación estricta para la configuración del proyecto y los tipos de datos de las respuestas de API.
+\section{Gestión del desarrollo y control de versiones}
+
+\subsection{Flujo de trabajo con GitHub}
+
+El proyecto está alojado en un repositorio de GitHub con la siguiente estructura de ramas:
+
+\begin{itemize}
+\item \textbf{main:} rama de producción. Solo contiene código testeado y listo para desplegar. Se configura con protección de rama (require pull requests, require status checks).
+\item \textbf{develop:} rama de integración. Recibe todos los pulls requests de desarrollo. Se despliega automáticamente a un entorno de staging.
+\item \textbf{feature/*:} ramas de funcionalidades. Una rama por característica importante (feature/oauth-trakt, feature/plex-integration, etc.), ramificando desde \texttt{develop}.
+\end{itemize}
+
+\section{Proceso de despliegue en producción}
+
+\subsection{Plataforma de hosting (Vercel)}
+
+El proyecto se despliega en Vercel, la plataforma de hosting optimizada para Next.js como autor del framework. Las razones de esta selección son:
+
+\begin{itemize}
+\item \textbf{Integración native con Next.js:} Las características de Next.js como Image Optimization, ISR y Edge Functions se soportan de forma nativa sin configuración adicional.
+\item \textbf{API serverless:} Las API Routes se auto-escalan sin gestionar servidores o contenedores.
+\item \textbf{Edge computing:} Los Edge Functions ejecutan código más cerca del usuario, reduciendo latencia para SPA middleware.
+\item \textbf{Previe deployments automáticos:} Cada pull request genera un URL único de vista previa con el código del branch.
+\item \textbf{Git-based deploys:} El despliegue se dispara automáticamente al hacer push o merge a una rama configurada.
+\item \textbf{CDN global:} Las assets estáticas se distribuyen mediante una CDN global de Vercel (Vercelnets), con 250+ puntos de presencia.
+\item \textbf{Monitoreo integrado:} Web Analytics, Performance Monitoring y Error Tracking nativos.
+\end{itemize}
+
+\subsection{Variables de entorno y secretos}
+
+Se utiliza el sistema de secretos de GitHub y Vercel para gestionar variables sensibles:
+
+\begin{itemize}
+\item \texttt{NEXT\_PUBLIC\_TMDB\_API\_KEY:} API Key de TMDb (pública, pero limitada a origin permitido).
+\item \texttt{TRAKT\_CLIENT\_ID:} ID de cliente de Trakt (público).
+\item \texttt{TRAKT\_CLIENT\_SECRET:} Secreto de cliente de Trakt (privado, solo servidor).
+\item \texttt{OMDB\_API\_KEY:} API Key de OMDb (privado, solo servidor).
+\item \texttt{JUSTWATCH\_GRAPHQL\_URL:} URL de GraphQL de JustWatch (pública pero sujeta a cambios).
+\item \texttt{PLEX\_JWT\_PRIVATE\_KEY:} Clave privada RSA para autenticación JWT con Plex (privado).
+\item \texttt{DATABASE\_URL:} (no actualmente en uso, pero reservado para evolución futura).
+\end{itemize}
+
+En Vercel, estas variables se configuran en el Dashboard → Settings → Environment Variables, con opciones de aplicación selectiva (preview, production, development).
+
+\subsection{Proceso de deployment}
+
+Un despliegue típico a producción sigue estos pasos:
+
+\begin{enumerate}
+\item Se realiza merge de PR a \texttt{main} desde GitHub.
+\item GitHub webhook notifica a Vercel del cambio.
+\item Vercel inicia el proceso de build: instala dependencias, ejecuta \texttt{next build}, genera artefactos de producción.
+\item Build check de Vercel valida que no hay errores de compilación.
+\item Si el build es exitoso, Vercel despliega a infraestructura de producción.
+\item Vercel ejecuta health checks (petición HTTP a raíz de dominio) para verificar que la aplicación responde.
+\item Dominio \texttt{the-show-verse.vercel.app} apunta automáticamente a la versión nueva.
+\item Si hay error, Vercel realiza rollback automático a la versión anterior.
+\item URL de deployment anterior permanece disponible como \texttt{previousUrl.vercel.app} para rollback manual.
+\end{enumerate}

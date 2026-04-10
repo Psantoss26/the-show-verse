@@ -1,5 +1,6 @@
 // src/app/api/trakt/community/_utils.js
 import { cookies } from "next/headers";
+import { fetchTrakt as fetchTraktWithCache } from "@/lib/trakt/fetchWithCache";
 
 const TRAKT_BASE = "https://api.trakt.tv";
 
@@ -63,35 +64,12 @@ export function buildTraktErrorMessage({ res, json, text, fallback }) {
 }
 
 export async function resolveTraktIdFromTmdb({ type, tmdbId }) {
-  const headers = await traktHeaders();
-
-  const url = `${TRAKT_BASE}/search/tmdb/${encodeURIComponent(
-    String(tmdbId),
-  )}?type=${encodeURIComponent(type)}`;
-
-  // ✅ Añadir timeout de 5 segundos para evitar bloqueos
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-
   try {
-    const res = await fetch(url, {
-      headers,
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    const { json, text } = await safeTraktBody(res);
-
-    if (!res.ok) {
-      const msg = buildTraktErrorMessage({
-        res,
-        json,
-        text,
-        fallback: "Error resolviendo ID en Trakt",
-      });
-      throw new Error(msg);
-    }
+    // ✅ Usar fetchTrakt con cache para evitar rate limiting
+    const json = await fetchTraktWithCache(
+      `/search/tmdb/${tmdbId}?type=${type}`,
+      { cacheTTL: 10 * 60 * 1000 }, // 10 minutos de cache para búsquedas
+    );
 
     const first = Array.isArray(json) ? json[0] : null;
     const item = first?.[type] || null;
