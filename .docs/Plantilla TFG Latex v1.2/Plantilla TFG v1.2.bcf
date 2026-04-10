@@ -3074,23 +3074,18 @@
     <bcf:citekey order="1" intorder="1">CNMC:2024</bcf:citekey>
     <bcf:citekey order="1" intorder="2">Statista:2024</bcf:citekey>
     <bcf:citekey order="2" intorder="1">Schwartz:2004</bcf:citekey>
-    <bcf:citekey order="3" intorder="1">Hardt:2012</bcf:citekey>
-    <bcf:citekey order="4" intorder="1">Fielding:2000</bcf:citekey>
-    <bcf:citekey order="5" intorder="1">TMDb:2024</bcf:citekey>
-    <bcf:citekey order="6" intorder="1">Trakt:2024</bcf:citekey>
-    <bcf:citekey order="7" intorder="1">Google:2024a</bcf:citekey>
-    <bcf:citekey order="7" intorder="2">Google:2024b</bcf:citekey>
-    <bcf:citekey order="8" intorder="1">Babich:2021</bcf:citekey>
-    <bcf:citekey order="9" intorder="1">Framer:2024</bcf:citekey>
-    <bcf:citekey order="10" intorder="1">Letterboxd:2024</bcf:citekey>
-    <bcf:citekey order="11" intorder="1">Vercel:2024a</bcf:citekey>
-    <bcf:citekey order="12" intorder="1">Meta:2024</bcf:citekey>
-    <bcf:citekey order="13" intorder="1">Framer:2024</bcf:citekey>
-    <bcf:citekey order="14" intorder="1">Framer:2024</bcf:citekey>
-    <bcf:citekey order="15" intorder="1">Google:2024a</bcf:citekey>
-    <bcf:citekey order="16" intorder="1">Hardt:2012</bcf:citekey>
-    <bcf:citekey order="17" intorder="1">OWASP:2024</bcf:citekey>
-    <bcf:citekey order="18" intorder="1">W3C:2023</bcf:citekey>
+    <bcf:citekey order="3" intorder="1">TMDb:2024</bcf:citekey>
+    <bcf:citekey order="4" intorder="1">Trakt:2024</bcf:citekey>
+    <bcf:citekey order="5" intorder="1">Google:2024a</bcf:citekey>
+    <bcf:citekey order="5" intorder="2">Google:2024b</bcf:citekey>
+    <bcf:citekey order="6" intorder="1">Framer:2024</bcf:citekey>
+    <bcf:citekey order="7" intorder="1">Letterboxd:2024</bcf:citekey>
+    <bcf:citekey order="8" intorder="1">Vercel:2024a</bcf:citekey>
+    <bcf:citekey order="9" intorder="1">Meta:2024</bcf:citekey>
+    <bcf:citekey order="10" intorder="1">Framer:2024</bcf:citekey>
+    <bcf:citekey order="11" intorder="1">Google:2024a</bcf:citekey>
+    <bcf:citekey order="12" intorder="1">Hardt:2012</bcf:citekey>
+    <bcf:citekey order="13" intorder="1">OWASP:2024</bcf:citekey>
   </bcf:section>
   <!-- SORTING TEMPLATES -->
   <bcf:sortingtemplate name="apa">

@@ -1,104 +1,104 @@
-'use client'
+"use client";
 
-import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
-import { useRouter } from 'next/navigation'
-import { LayoutGrid, WrapText, ArrowUpDown, BarChart3 } from 'lucide-react'
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import { LayoutGrid, WrapText, ArrowUpDown, BarChart3 } from "lucide-react";
 
 /* =======================
    Hooks (perf / mobile)
 ======================= */
 function useIsTouchLike() {
-  const [isTouch, setIsTouch] = useState(false)
+  const [isTouch, setIsTouch] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === "undefined") return;
 
-    const mqHoverNone = window.matchMedia?.('(hover: none)')
-    const mqCoarse = window.matchMedia?.('(pointer: coarse)')
+    const mqHoverNone = window.matchMedia?.("(hover: none)");
+    const mqCoarse = window.matchMedia?.("(pointer: coarse)");
 
     const compute = () => {
       const touch =
-        ('ontouchstart' in window) ||
+        "ontouchstart" in window ||
         (navigator?.maxTouchPoints || 0) > 0 ||
         !!mqHoverNone?.matches ||
-        !!mqCoarse?.matches
-      setIsTouch(touch)
-    }
+        !!mqCoarse?.matches;
+      setIsTouch(touch);
+    };
 
-    compute()
+    compute();
 
-    const onChange = () => compute()
-    mqHoverNone?.addEventListener?.('change', onChange)
-    mqCoarse?.addEventListener?.('change', onChange)
+    const onChange = () => compute();
+    mqHoverNone?.addEventListener?.("change", onChange);
+    mqCoarse?.addEventListener?.("change", onChange);
 
     return () => {
-      mqHoverNone?.removeEventListener?.('change', onChange)
-      mqCoarse?.removeEventListener?.('change', onChange)
-    }
-  }, [])
+      mqHoverNone?.removeEventListener?.("change", onChange);
+      mqCoarse?.removeEventListener?.("change", onChange);
+    };
+  }, []);
 
-  return isTouch
+  return isTouch;
 }
 
-function useInViewOnce(rootMargin = '300px') {
-  const ref = useRef(null)
-  const [inView, setInView] = useState(false)
+function useInViewOnce(rootMargin = "300px") {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
 
   useEffect(() => {
-    const el = ref.current
-    if (!el || inView) return
+    const el = ref.current;
+    if (!el || inView) return;
 
     const io = new IntersectionObserver(
       (entries) => {
         if (entries?.[0]?.isIntersecting) {
-          setInView(true)
-          io.disconnect()
+          setInView(true);
+          io.disconnect();
         }
       },
-      { root: null, rootMargin, threshold: 0.01 }
-    )
+      { root: null, rootMargin, threshold: 0.01 },
+    );
 
-    io.observe(el)
-    return () => io.disconnect()
-  }, [inView, rootMargin])
+    io.observe(el);
+    return () => io.disconnect();
+  }, [inView, rootMargin]);
 
-  return { ref, inView }
+  return { ref, inView };
 }
 
 // --- Tooltip flotante en portal ---
 function TooltipPortal({ activeData, anchorRect, enabled }) {
-  const tooltipRef = useRef(null)
-  const [coords, setCoords] = useState({ top: 0, left: 0, placement: 'top' })
+  const tooltipRef = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, placement: "top" });
 
   useEffect(() => {
-    if (!enabled) return
-    if (!anchorRect || !tooltipRef.current) return
+    if (!enabled) return;
+    if (!anchorRect || !tooltipRef.current) return;
 
-    const tooltip = tooltipRef.current
-    const { width: tW, height: tH } = tooltip.getBoundingClientRect()
-    const { top: rTop, left: rLeft, width: rW, height: rH } = anchorRect
+    const tooltip = tooltipRef.current;
+    const { width: tW, height: tH } = tooltip.getBoundingClientRect();
+    const { top: rTop, left: rLeft, width: rW, height: rH } = anchorRect;
 
-    const GAP = 8
-    const VIEWPORT_PADDING = 10
+    const GAP = 8;
+    const VIEWPORT_PADDING = 10;
 
-    let left = rLeft + rW / 2 - tW / 2
-    let top = rTop - tH - GAP
+    let left = rLeft + rW / 2 - tW / 2;
+    let top = rTop - tH - GAP;
 
-    if (left < VIEWPORT_PADDING) left = VIEWPORT_PADDING
+    if (left < VIEWPORT_PADDING) left = VIEWPORT_PADDING;
     else if (left + tW > window.innerWidth - VIEWPORT_PADDING) {
-      left = window.innerWidth - tW - VIEWPORT_PADDING
+      left = window.innerWidth - tW - VIEWPORT_PADDING;
     }
 
     if (top < VIEWPORT_PADDING) {
-      top = rTop + rH + GAP
+      top = rTop + rH + GAP;
     }
 
-    setCoords({ top, left })
-  }, [anchorRect, enabled])
+    setCoords({ top, left });
+  }, [anchorRect, enabled]);
 
-  if (!enabled) return null
-  if (!activeData) return null
+  if (!enabled) return null;
+  if (!activeData) return null;
 
   return createPortal(
     <div
@@ -107,7 +107,7 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
       style={{
         top: coords.top,
         left: coords.left,
-        opacity: anchorRect ? 1 : 0
+        opacity: anchorRect ? 1 : 0,
       }}
     >
       <div className="bg-black text-white px-3 py-2 rounded-md shadow-2xl border border-white/10 max-w-[280px] sm:max-w-[320px]">
@@ -124,7 +124,9 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
                 <img src="/logo-IMDb.png" alt="IMDb" className="h-3 w-auto" />
-                <span className="text-[10px] uppercase tracking-wide text-yellow-300 font-bold">IMDb</span>
+                <span className="text-[10px] uppercase tracking-wide text-yellow-300 font-bold">
+                  IMDb
+                </span>
               </div>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-[14px] font-bold">
@@ -139,19 +141,21 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
             </div>
           )}
 
-          {activeData.traktVal != null && (
+          {activeData.tmdbVal != null && (
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
-                <img src="/logo-Trakt.png" alt="Trakt" className="h-3 w-auto" />
-                <span className="text-[10px] uppercase tracking-wide text-red-300 font-bold">Trakt</span>
+                <img src="/logo-TMDb.png" alt="TMDb" className="h-3 w-auto" />
+                <span className="text-[10px] uppercase tracking-wide text-blue-300 font-bold">
+                  TMDb
+                </span>
               </div>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-[14px] font-bold">
-                  {activeData.format1(activeData.traktVal)}
+                  {activeData.format1(activeData.tmdbVal)}
                 </span>
-                {activeData.traktVotesStr && (
+                {activeData.tmdbVotesStr && (
                   <span className="text-[10px] text-zinc-400">
-                    {activeData.traktVotesStr} votos
+                    {activeData.tmdbVotesStr} votos
                   </span>
                 )}
               </div>
@@ -169,94 +173,97 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
         )}
       </div>
     </div>,
-    document.body
-  )
+    document.body,
+  );
 }
 
 export default function EpisodeRatingsGrid({
   ratings,
   showId, // ✅ nuevo: TMDb show id para poder navegar
-  initialSource = 'imdb', // compat
-  density = 'compact',
+  initialSource = "imdb", // compat
+  density = "compact",
   fillMissingWithTmdb = false,
-  fallbackSource = 'trakt'
+  fallbackSource = "tmdb",
 }) {
-  const router = useRouter()
-  const isTouchLike = useIsTouchLike()
-  const { ref: inViewRef, inView } = useInViewOnce('450px')
+  const router = useRouter();
+  const isTouchLike = useIsTouchLike();
+  const { ref: inViewRef, inView } = useInViewOnce("450px");
 
   // Controles estilo SeriesGraph
-  const [layoutMode, setLayoutMode] = useState('grid') // 'grid' | 'wrapped'
-  const userPickedLayoutRef = useRef(false)
+  const [layoutMode, setLayoutMode] = useState("grid"); // 'grid' | 'wrapped'
+  const userPickedLayoutRef = useRef(false);
 
-  const [inverted, setInverted] = useState(false)
-  const [showSeasonAvg, setShowSeasonAvg] = useState(false)
+  const [inverted, setInverted] = useState(false);
+  const [showSeasonAvg, setShowSeasonAvg] = useState(false);
 
   // Tooltip (DESACTIVADO EN MÓVIL/TOUCH)
-  const tooltipEnabled = !isTouchLike
-  const [hoveredEp, setHoveredEp] = useState(null)
-  const [anchorRect, setAnchorRect] = useState(null)
+  const tooltipEnabled = !isTouchLike;
+  const [hoveredEp, setHoveredEp] = useState(null);
+  const [anchorRect, setAnchorRect] = useState(null);
 
-  const handleMouseEnter = useCallback((e, epData) => {
-    if (!tooltipEnabled || !epData) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    setAnchorRect(rect)
-    setHoveredEp(epData)
-  }, [tooltipEnabled])
+  const handleMouseEnter = useCallback(
+    (e, epData) => {
+      if (!tooltipEnabled || !epData) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      setAnchorRect(rect);
+      setHoveredEp(epData);
+    },
+    [tooltipEnabled],
+  );
 
   const handleMouseLeave = useCallback(() => {
-    if (!tooltipEnabled) return
-    setHoveredEp(null)
-    setAnchorRect(null)
-  }, [tooltipEnabled])
+    if (!tooltipEnabled) return;
+    setHoveredEp(null);
+    setAnchorRect(null);
+  }, [tooltipEnabled]);
 
   // tamaños
   const SIZES = {
     compact: {
-      cell: 'w-[46px] h-[30px] md:w-[54px] md:h-[34px] lg:w-[60px] lg:h-[38px]',
-      headerPad: 'px-2 py-1.5',
-      stickyCol: 'w-12 md:w-14 lg:w-16'
+      cell: "w-[46px] h-[30px] md:w-[54px] md:h-[34px] lg:w-[60px] lg:h-[38px]",
+      headerPad: "px-2 py-1.5",
+      stickyCol: "w-12 md:w-14 lg:w-16",
     },
     comfy: {
-      cell: 'w-[64px] h-[38px] md:w-[74px] md:h-[44px] lg:w-[84px] lg:h-[48px]',
-      headerPad: 'px-3 py-2',
-      stickyCol: 'w-16 md:w-20 lg:w-24'
-    }
-  }
-  const SZ = SIZES[density] ?? SIZES.compact
+      cell: "w-[64px] h-[38px] md:w-[74px] md:h-[44px] lg:w-[84px] lg:h-[48px]",
+      headerPad: "px-3 py-2",
+      stickyCol: "w-16 md:w-20 lg:w-24",
+    },
+  };
+  const SZ = SIZES[density] ?? SIZES.compact;
 
-  const meta = ratings?.meta || {}
+  const meta = ratings?.meta || {};
   const totalSeasonsEstimate =
     meta.totalSeasons ??
-    (Array.isArray(ratings?.seasons) ? ratings.seasons.length : 0)
+    (Array.isArray(ratings?.seasons) ? ratings.seasons.length : 0);
 
   // helpers numéricos
   const toRatingNumber = (value) => {
-    if (value == null) return null
-    if (typeof value === 'number') {
-      const n = Number(value)
-      return Number.isFinite(n) && n > 0 ? n : null
+    if (value == null) return null;
+    if (typeof value === "number") {
+      const n = Number(value);
+      return Number.isFinite(n) && n > 0 ? n : null;
     }
-    if (typeof value === 'string') {
-      const cleaned = value.replace(',', '.').trim()
-      const num = Number(cleaned)
-      return Number.isFinite(num) && num > 0 ? num : null
+    if (typeof value === "string") {
+      const cleaned = value.replace(",", ".").trim();
+      const num = Number(cleaned);
+      return Number.isFinite(num) && num > 0 ? num : null;
     }
-    return null
-  }
+    return null;
+  };
 
   const toNumberSafe = (value) => {
-    if (value == null) return null
-    if (typeof value === 'number') return Number.isFinite(value) ? value : null
-    if (typeof value === 'string') {
-      const cleaned = value.replace(/,/g, '').trim()
-      const n = Number(cleaned)
-      return Number.isFinite(n) ? n : null
+    if (value == null) return null;
+    if (typeof value === "number") return Number.isFinite(value) ? value : null;
+    if (typeof value === "string") {
+      const cleaned = value.replace(/,/g, "").trim();
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : null;
     }
-    return null
-  }
+    return null;
+  };
 
-  const shouldFlatten = meta.forceSingleSeason === true
+  const shouldFlatten = meta.forceSingleSeason === true;
 
   // === Normalizar datos ===
   const { seasonsSorted, maxEpisodes, seasonAverages } = useMemo(() => {
@@ -264,262 +271,301 @@ export default function EpisodeRatingsGrid({
       ? ratings.seasons
       : Array.isArray(ratings)
         ? ratings
-        : []
+        : [];
 
     const normalized = rawSeasons
       .map((s) => {
         const seasonNumber =
-          typeof s.season_number === 'number'
+          typeof s.season_number === "number"
             ? s.season_number
-            : typeof s.seasonNumber === 'number'
+            : typeof s.seasonNumber === "number"
               ? s.seasonNumber
-              : null
-        if (seasonNumber == null) return null
+              : null;
+        if (seasonNumber == null) return null;
 
-        const episodesArr = Array.isArray(s.episodes) ? s.episodes : []
+        const episodesArr = Array.isArray(s.episodes) ? s.episodes : [];
 
         const episodes = episodesArr
           .map((ep) => {
             const episodeNumber =
-              typeof ep.episode_number === 'number'
+              typeof ep.episode_number === "number"
                 ? ep.episode_number
-                : typeof ep.episodeNumber === 'number'
+                : typeof ep.episodeNumber === "number"
                   ? ep.episodeNumber
-                  : null
-            if (episodeNumber == null) return null
+                  : null;
+            if (episodeNumber == null) return null;
 
-            const airDateStr = ep.air_date || ep.airDate || null
-            let isUnaired = false
+            const airDateStr = ep.air_date || ep.airDate || null;
+            let isUnaired = false;
             if (airDateStr) {
-              const d = new Date(airDateStr)
-              if (!Number.isNaN(d.getTime()) && d > new Date()) isUnaired = true
+              const d = new Date(airDateStr);
+              if (!Number.isNaN(d.getTime()) && d > new Date())
+                isUnaired = true;
             }
 
-            let tmdbRating = toRatingNumber(ep.tmdbRating ?? ep.tmdb ?? ep.vote_average)
-            let imdbRating = toRatingNumber(ep.imdbRating ?? ep.imdb)
-            let traktRating = toRatingNumber(ep.traktRating ?? ep.trakt)
+            let tmdbRating = toRatingNumber(
+              ep.tmdbRating ?? ep.tmdb ?? ep.vote_average,
+            );
+            let imdbRating = toRatingNumber(ep.imdbRating ?? ep.imdb);
 
-            let displayRating = imdbRating
-            if (displayRating == null && fallbackSource === 'trakt') displayRating = traktRating
-            if (displayRating == null && fillMissingWithTmdb) displayRating = tmdbRating
+            let displayRating = imdbRating;
+            if (displayRating == null && fallbackSource === "tmdb")
+              displayRating = tmdbRating;
+            if (displayRating == null && fillMissingWithTmdb)
+              displayRating = tmdbRating;
 
             if (isUnaired) {
-              tmdbRating = null
-              imdbRating = null
-              traktRating = null
-              displayRating = null
+              tmdbRating = null;
+              imdbRating = null;
+              displayRating = null;
             }
 
-            const tmdbVotes = toNumberSafe(ep.tmdbVotes ?? ep.tmdb_votes ?? ep.vote_count)
+            const tmdbVotes = toNumberSafe(
+              ep.tmdbVotes ?? ep.tmdb_votes ?? ep.vote_count,
+            );
             const imdbVotes = toNumberSafe(
               ep.imdbVotes ??
-              ep.imdb_votes ??
-              ep.imdbVotesCount ??
-              ep.imdb_votes_count
-            )
-            const traktVotes = toNumberSafe(
-              ep.traktVotes ??
-              ep.trakt_votes ??
-              ep.traktVotesCount ??
-              ep.trakt_votes_count
-            )
+                ep.imdb_votes ??
+                ep.imdbVotesCount ??
+                ep.imdb_votes_count,
+            );
 
             return {
               episodeNumber,
-              name: ep.name || '',
+              name: ep.name || "",
               tmdbRating,
               imdbRating,
-              traktRating,
               displayRating,
               tmdbVotes,
               imdbVotes,
-              traktVotes,
               airDate: airDateStr,
               isUnaired,
-              source: ep.source || (imdbRating != null ? 'imdb' : traktRating != null ? 'trakt' : null)
-            }
+              source:
+                ep.source ||
+                (imdbRating != null
+                  ? "imdb"
+                  : tmdbRating != null
+                    ? "tmdb"
+                    : null),
+            };
           })
           .filter(Boolean)
-          .sort((a, b) => a.episodeNumber - b.episodeNumber)
+          .sort((a, b) => a.episodeNumber - b.episodeNumber);
 
-        return { season_number: seasonNumber, episodes }
+        return { season_number: seasonNumber, episodes };
       })
-      .filter(Boolean)
+      .filter(Boolean);
 
-    let seasons = normalized.filter((s) => s.episodes.length > 0)
+    let seasons = normalized.filter((s) => s.episodes.length > 0);
 
     if (shouldFlatten && seasons.length > 1) {
-      const allEpisodes = []
-      let counter = 1
+      const allEpisodes = [];
+      let counter = 1;
 
       seasons
         .slice()
         .sort((a, b) => a.season_number - b.season_number)
         .forEach((s) => {
           s.episodes.forEach((ep) => {
-            if (ep.displayRating == null) return
+            if (ep.displayRating == null) return;
             // ✅ Guardamos el season/episode real para la navegación
             allEpisodes.push({
               ...ep,
               episodeNumber: counter++, // número “aplanado” (solo visual)
               _origSeasonNumber: s.season_number,
-              _origEpisodeNumber: ep.episodeNumber
-            })
-          })
-        })
+              _origEpisodeNumber: ep.episodeNumber,
+            });
+          });
+        });
 
       const combined = {
         season_number: 1,
         episodes: allEpisodes,
-        hasAnyRating: allEpisodes.length > 0
-      }
+        hasAnyRating: allEpisodes.length > 0,
+      };
 
-      seasons = combined.hasAnyRating ? [combined] : []
+      seasons = combined.hasAnyRating ? [combined] : [];
     } else {
       seasons = seasons
         .map((s) => {
-          const hasAnyRating = s.episodes.some((ep) => typeof ep.displayRating === 'number')
-          return { ...s, hasAnyRating }
+          const hasAnyRating = s.episodes.some(
+            (ep) => typeof ep.displayRating === "number",
+          );
+          return { ...s, hasAnyRating };
         })
         .filter((s) => s.episodes.length > 0 && s.hasAnyRating)
-        .sort((a, b) => a.season_number - b.season_number)
+        .sort((a, b) => a.season_number - b.season_number);
     }
 
     const maxEp = seasons.reduce((m, s) => {
       const localMax = s.episodes.reduce(
         (mm, e) =>
-          typeof e.episodeNumber === 'number' && e.episodeNumber > mm
+          typeof e.episodeNumber === "number" && e.episodeNumber > mm
             ? e.episodeNumber
             : mm,
-        0
-      )
-      return Math.max(m, localMax)
-    }, 0)
+        0,
+      );
+      return Math.max(m, localMax);
+    }, 0);
 
-    const seasonAveragesMap = new Map()
+    const seasonAveragesMap = new Map();
     seasons.forEach((s) => {
-      const vals = s.episodes.map((e) => e.displayRating).filter((v) => typeof v === 'number')
+      const vals = s.episodes
+        .map((e) => e.displayRating)
+        .filter((v) => typeof v === "number");
       if (!vals.length) {
-        seasonAveragesMap.set(s.season_number, null)
-        return
+        seasonAveragesMap.set(s.season_number, null);
+        return;
       }
-      const avg = vals.reduce((a, b) => a + b, 0) / vals.length
-      seasonAveragesMap.set(s.season_number, avg)
-    })
+      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      seasonAveragesMap.set(s.season_number, avg);
+    });
 
-    return { seasonsSorted: seasons, maxEpisodes: maxEp, seasonAverages: seasonAveragesMap }
-  }, [ratings, shouldFlatten, fillMissingWithTmdb, fallbackSource])
+    return {
+      seasonsSorted: seasons,
+      maxEpisodes: maxEp,
+      seasonAverages: seasonAveragesMap,
+    };
+  }, [ratings, shouldFlatten, fillMissingWithTmdb, fallbackSource]);
 
   const singleSeasonView =
-    shouldFlatten && seasonsSorted.length === 1 && totalSeasonsEstimate > 1
+    shouldFlatten && seasonsSorted.length === 1 && totalSeasonsEstimate > 1;
 
   const epIndexBySeason = useMemo(() => {
-    const map = new Map()
+    const map = new Map();
     seasonsSorted.forEach((s) => {
-      const inner = new Map()
-      s.episodes.forEach((e) => inner.set(e.episodeNumber, e))
-      map.set(s.season_number, inner)
-    })
-    return map
-  }, [seasonsSorted])
+      const inner = new Map();
+      s.episodes.forEach((e) => inner.set(e.episodeNumber, e));
+      map.set(s.season_number, inner);
+    });
+    return map;
+  }, [seasonsSorted]);
 
   const episodeNumbers = useMemo(() => {
-    return Array.from({ length: maxEpisodes }, (_, i) => i + 1)
-  }, [maxEpisodes])
+    return Array.from({ length: maxEpisodes }, (_, i) => i + 1);
+  }, [maxEpisodes]);
 
   const format1 = (v) => {
-    if (v == null) return null
-    const num = Math.round(Number(v) * 10) / 10
-    return Number.isInteger(num) ? num.toString() : num.toFixed(1)
-  }
+    if (v == null) return null;
+    const num = Math.round(Number(v) * 10) / 10;
+    return Number.isInteger(num) ? num.toString() : num.toFixed(1);
+  };
 
   const toneFor = (v) => {
-    if (v == null) return { bg: 'bg-zinc-800', text: 'text-zinc-400', ring: 'ring-white/5' }
-    if (v >= 9.5) return { bg: 'bg-teal-400', text: 'text-black', ring: 'ring-black/10' }
-    if (v >= 9.0) return { bg: 'bg-emerald-700', text: 'text-white/90', ring: 'ring-black/10' }
-    if (v >= 8.0) return { bg: 'bg-green-500', text: 'text-black', ring: 'ring-black/10' }
-    if (v >= 7.0) return { bg: 'bg-yellow-300', text: 'text-black', ring: 'ring-black/10' }
-    if (v >= 6.0) return { bg: 'bg-yellow-500', text: 'text-black', ring: 'ring-black/10' }
-    if (v >= 5.0) return { bg: 'bg-red-500', text: 'text-white', ring: 'ring-black/10' }
-    return { bg: 'bg-purple-700', text: 'text-white', ring: 'ring-white/10' }
-  }
+    if (v == null)
+      return { bg: "bg-zinc-800", text: "text-zinc-400", ring: "ring-white/5" };
+    if (v >= 9.5)
+      return { bg: "bg-teal-400", text: "text-black", ring: "ring-black/10" };
+    if (v >= 9.0)
+      return {
+        bg: "bg-emerald-700",
+        text: "text-white/90",
+        ring: "ring-black/10",
+      };
+    if (v >= 8.0)
+      return { bg: "bg-green-500", text: "text-black", ring: "ring-black/10" };
+    if (v >= 7.0)
+      return { bg: "bg-yellow-300", text: "text-black", ring: "ring-black/10" };
+    if (v >= 6.0)
+      return { bg: "bg-yellow-500", text: "text-black", ring: "ring-black/10" };
+    if (v >= 5.0)
+      return { bg: "bg-red-500", text: "text-white", ring: "ring-black/10" };
+    return { bg: "bg-purple-700", text: "text-white", ring: "ring-white/10" };
+  };
 
   const buildTooltipData = (ep, seasonNumber, episodeNumber) => {
-    if (!tooltipEnabled) return null
-    if (!ep || ep.isUnaired) return null
+    if (!tooltipEnabled) return null;
+    if (!ep || ep.isUnaired) return null;
 
-    const hasData = ep.imdbRating != null || ep.traktRating != null || ep.displayRating != null
-    if (!hasData) return null
+    const hasData =
+      ep.imdbRating != null ||
+      ep.tmdbRating != null ||
+      ep.displayRating != null;
+    if (!hasData) return null;
 
-    const titleText = ep.name || `Episodio ${episodeNumber}`
-    const imdbVal = ep.imdbRating
-    const traktVal = ep.traktRating
-    const imdbVotesStr = ep.imdbVotes ? ep.imdbVotes.toLocaleString() : null
-    const traktVotesStr = ep.traktVotes ? ep.traktVotes.toLocaleString() : null
+    const titleText = ep.name || `Episodio ${episodeNumber}`;
+    const imdbVal = ep.imdbRating;
+    const tmdbVal = ep.tmdbRating;
+    const imdbVotesStr = ep.imdbVotes ? ep.imdbVotes.toLocaleString() : null;
+    const tmdbVotesStr = ep.tmdbVotes ? ep.tmdbVotes.toLocaleString() : null;
 
-    const nums = [imdbVal, traktVal].filter((v) => typeof v === 'number')
+    const nums = [imdbVal, tmdbVal].filter((v) => typeof v === "number");
     const avgVal = nums.length
       ? Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1))
-      : null
+      : null;
 
     const seasonInfo = singleSeasonView
       ? `Episode ${episodeNumber}`
-      : `Season ${seasonNumber}, Episode ${episodeNumber}`
+      : `Season ${seasonNumber}, Episode ${episodeNumber}`;
 
-    return { titleText, seasonInfo, imdbVal, traktVal, imdbVotesStr, traktVotesStr, avgVal, format1 }
-  }
+    return {
+      titleText,
+      seasonInfo,
+      imdbVal,
+      tmdbVal,
+      imdbVotesStr,
+      tmdbVotesStr,
+      avgVal,
+      format1,
+    };
+  };
 
   // ✅ navegación a detalles
-  const goToEpisode = useCallback((ep, seasonNumber, episodeNumber) => {
-    if (!showId) return
-    if (!ep || ep.isUnaired) return
+  const goToEpisode = useCallback(
+    (ep, seasonNumber, episodeNumber) => {
+      if (!showId) return;
+      if (!ep || ep.isUnaired) return;
 
-    const s = ep?._origSeasonNumber ?? seasonNumber
-    const e = ep?._origEpisodeNumber ?? episodeNumber
-    if (s == null || e == null) return
+      const s = ep?._origSeasonNumber ?? seasonNumber;
+      const e = ep?._origEpisodeNumber ?? episodeNumber;
+      if (s == null || e == null) return;
 
-    router.push(`/details/tv/${showId}/season/${s}/episode/${e}`)
-  }, [router, showId])
+      router.push(`/details/tv/${showId}/season/${s}/episode/${e}`);
+    },
+    [router, showId],
+  );
 
-  const gridSize = seasonsSorted.length * maxEpisodes
-  const isHeavyGrid = gridSize >= 420
+  const gridSize = seasonsSorted.length * maxEpisodes;
+  const isHeavyGrid = gridSize >= 420;
 
   useEffect(() => {
-    if (!isTouchLike) return
-    if (userPickedLayoutRef.current) return
-    if (layoutMode !== 'grid') return
-    if (isHeavyGrid) setLayoutMode('wrapped')
-  }, [isTouchLike, layoutMode, isHeavyGrid])
+    if (!isTouchLike) return;
+    if (userPickedLayoutRef.current) return;
+    if (layoutMode !== "grid") return;
+    if (isHeavyGrid) setLayoutMode("wrapped");
+  }, [isTouchLike, layoutMode, isHeavyGrid]);
 
   const setLayoutModeSafe = (mode) => {
-    userPickedLayoutRef.current = true
-    setLayoutMode(mode)
-    if (mode === 'wrapped') {
-      setHoveredEp(null)
-      setAnchorRect(null)
+    userPickedLayoutRef.current = true;
+    setLayoutMode(mode);
+    if (mode === "wrapped") {
+      setHoveredEp(null);
+      setAnchorRect(null);
     }
-  }
+  };
 
-  if (!seasonsSorted.length || maxEpisodes === 0) return null
+  if (!seasonsSorted.length || maxEpisodes === 0) return null;
 
   const cellProps = (ep, seasonNumber, episodeNumber) => {
-    const clickable = !!(ep && !ep.isUnaired && showId)
+    const clickable = !!(ep && !ep.isUnaired && showId);
     return {
-      role: clickable ? 'link' : undefined,
+      role: clickable ? "link" : undefined,
       tabIndex: clickable ? 0 : -1,
-      onClick: clickable ? () => goToEpisode(ep, seasonNumber, episodeNumber) : undefined,
+      onClick: clickable
+        ? () => goToEpisode(ep, seasonNumber, episodeNumber)
+        : undefined,
       onKeyDown: clickable
         ? (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            goToEpisode(ep, seasonNumber, episodeNumber)
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              goToEpisode(ep, seasonNumber, episodeNumber);
+            }
           }
-        }
         : undefined,
-      title: clickable ? 'Ver detalles del episodio' : undefined,
-      clickable
-    }
-  }
+      title: clickable ? "Ver detalles del episodio" : undefined,
+      clickable,
+    };
+  };
 
   // =======================
   // Render GRID normal
@@ -527,7 +573,7 @@ export default function EpisodeRatingsGrid({
   const renderGrid = () => (
     <div
       className="overflow-x-auto overflow-y-visible mt-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain"
-      style={{ contentVisibility: 'auto', containIntrinsicSize: '900px 520px' }}
+      style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
       <table className="border-separate border-spacing-0 [table-layout:fixed]">
         <thead>
@@ -577,25 +623,33 @@ export default function EpisodeRatingsGrid({
               </td>
 
               {seasonsSorted.map((s) => {
-                const ep = epIndexBySeason.get(s.season_number)?.get(epNum)
-                const isUpcoming = ep?.isUnaired
-                const raw = isUpcoming ? null : ep?.displayRating ?? null
-                const val = isUpcoming ? '?' : format1(raw)
-                const spec = toneFor(raw)
+                const ep = epIndexBySeason.get(s.season_number)?.get(epNum);
+                const isUpcoming = ep?.isUnaired;
+                const raw = isUpcoming ? null : (ep?.displayRating ?? null);
+                const val = isUpcoming ? "?" : format1(raw);
+                const spec = toneFor(raw);
 
-                const bgClass = isUpcoming ? 'bg-zinc-400' : spec.bg
-                const textClass = isUpcoming ? 'text-black' : spec.text
+                const bgClass = isUpcoming ? "bg-zinc-400" : spec.bg;
+                const textClass = isUpcoming ? "text-black" : spec.text;
 
-                const tooltipData = isUpcoming ? null : buildTooltipData(ep, s.season_number, epNum)
-                const { role, tabIndex, onClick, onKeyDown, title, clickable } = cellProps(ep, s.season_number, epNum)
+                const tooltipData = isUpcoming
+                  ? null
+                  : buildTooltipData(ep, s.season_number, epNum);
+                const { role, tabIndex, onClick, onKeyDown, title, clickable } =
+                  cellProps(ep, s.season_number, epNum);
 
                 return (
                   <td key={`s${s.season_number}-e${epNum}`} className="p-1">
                     <div
                       onMouseEnter={
-                        tooltipEnabled ? (e) => tooltipData && handleMouseEnter(e, tooltipData) : undefined
+                        tooltipEnabled
+                          ? (e) =>
+                              tooltipData && handleMouseEnter(e, tooltipData)
+                          : undefined
                       }
-                      onMouseLeave={tooltipEnabled ? handleMouseLeave : undefined}
+                      onMouseLeave={
+                        tooltipEnabled ? handleMouseLeave : undefined
+                      }
                     >
                       <div
                         role={role}
@@ -612,17 +666,17 @@ export default function EpisodeRatingsGrid({
                           font-semibold
                           [font-variant-numeric:tabular-nums]
                           select-none
-                          ${clickable ? 'cursor-pointer hover:brightness-[1.06]' : 'cursor-default'}
-                          ${clickable ? 'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30' : ''}
-                          ${tooltipEnabled ? 'md:shadow-[0_0_0_2px_rgba(0,0,0,0.9)]' : 'shadow-none'}
+                          ${clickable ? "cursor-pointer hover:brightness-[1.06]" : "cursor-default"}
+                          ${clickable ? "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30" : ""}
+                          ${tooltipEnabled ? "md:shadow-[0_0_0_2px_rgba(0,0,0,0.9)]" : "shadow-none"}
                           transition
                         `}
                       >
-                        {val ?? '—'}
+                        {val ?? "—"}
                       </div>
                     </div>
                   </td>
-                )
+                );
               })}
             </tr>
           ))}
@@ -644,9 +698,9 @@ export default function EpisodeRatingsGrid({
               </td>
 
               {seasonsSorted.map((s) => {
-                const avg = seasonAverages.get(s.season_number) ?? null
-                const spec = toneFor(avg)
-                const val = format1(avg)
+                const avg = seasonAverages.get(s.season_number) ?? null;
+                const spec = toneFor(avg);
+                const val = format1(avg);
 
                 return (
                   <td
@@ -655,24 +709,24 @@ export default function EpisodeRatingsGrid({
                   >
                     <div className="flex flex-col items-center gap-[2px] min-w-[40px]">
                       <span className="text-sm md:text-base lg:text-lg font-semibold text-white [font-variant-numeric:tabular-nums]">
-                        {val ?? '—'}
+                        {val ?? "—"}
                       </span>
                       <span
                         className={`
                           mt-[2px] h-[3px] md:h-[4px] w-8 md:w-10 lg:w-12 rounded-full
-                          ${avg == null ? 'bg-zinc-700' : spec.bg}
+                          ${avg == null ? "bg-zinc-700" : spec.bg}
                         `}
                       />
                     </div>
                   </td>
-                )
+                );
               })}
             </tr>
           )}
         </tbody>
       </table>
     </div>
-  )
+  );
 
   // =======================
   // Render GRID invertido
@@ -680,7 +734,7 @@ export default function EpisodeRatingsGrid({
   const renderGridInverted = () => (
     <div
       className="overflow-x-auto overflow-y-visible mt-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain"
-      style={{ contentVisibility: 'auto', containIntrinsicSize: '900px 520px' }}
+      style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
       <table className="border-separate border-spacing-0 [table-layout:fixed]">
         <thead>
@@ -743,25 +797,33 @@ export default function EpisodeRatingsGrid({
               </td>
 
               {episodeNumbers.map((epNum) => {
-                const ep = epIndexBySeason.get(s.season_number)?.get(epNum)
+                const ep = epIndexBySeason.get(s.season_number)?.get(epNum);
 
-                const isUpcoming = ep?.isUnaired
-                const raw = isUpcoming ? null : ep?.displayRating ?? null
-                const val = isUpcoming ? '?' : format1(raw)
-                const spec = toneFor(raw)
-                const bgClass = isUpcoming ? 'bg-zinc-400' : spec.bg
-                const textClass = isUpcoming ? 'text-black' : spec.text
+                const isUpcoming = ep?.isUnaired;
+                const raw = isUpcoming ? null : (ep?.displayRating ?? null);
+                const val = isUpcoming ? "?" : format1(raw);
+                const spec = toneFor(raw);
+                const bgClass = isUpcoming ? "bg-zinc-400" : spec.bg;
+                const textClass = isUpcoming ? "text-black" : spec.text;
 
-                const tooltipData = isUpcoming ? null : buildTooltipData(ep, s.season_number, epNum)
-                const { role, tabIndex, onClick, onKeyDown, title, clickable } = cellProps(ep, s.season_number, epNum)
+                const tooltipData = isUpcoming
+                  ? null
+                  : buildTooltipData(ep, s.season_number, epNum);
+                const { role, tabIndex, onClick, onKeyDown, title, clickable } =
+                  cellProps(ep, s.season_number, epNum);
 
                 return (
                   <td key={`s${s.season_number}-e${epNum}`} className="p-1">
                     <div
                       onMouseEnter={
-                        tooltipEnabled ? (e) => tooltipData && handleMouseEnter(e, tooltipData) : undefined
+                        tooltipEnabled
+                          ? (e) =>
+                              tooltipData && handleMouseEnter(e, tooltipData)
+                          : undefined
                       }
-                      onMouseLeave={tooltipEnabled ? handleMouseLeave : undefined}
+                      onMouseLeave={
+                        tooltipEnabled ? handleMouseLeave : undefined
+                      }
                     >
                       <div
                         role={role}
@@ -777,39 +839,39 @@ export default function EpisodeRatingsGrid({
                           font-semibold
                           [font-variant-numeric:tabular-nums]
                           text-[16px] md:text-[16px] lg:text-[22px]
-                          ${clickable ? 'cursor-pointer hover:brightness-[1.07]' : 'cursor-default'}
-                          ${clickable ? 'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30' : ''}
+                          ${clickable ? "cursor-pointer hover:brightness-[1.07]" : "cursor-default"}
+                          ${clickable ? "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30" : ""}
                           transition duration-150
                           select-none
                         `}
                       >
-                        {val ?? '—'}
+                        {val ?? "—"}
                       </div>
                     </div>
                   </td>
-                )
+                );
               })}
 
               {showSeasonAvg && (
                 <td className="px-2 pt-3 pb-2 text-center align-bottom border-l border-white/10">
                   {(() => {
-                    const avg = seasonAverages.get(s.season_number) ?? null
-                    const spec = toneFor(avg)
-                    const val = format1(avg)
+                    const avg = seasonAverages.get(s.season_number) ?? null;
+                    const spec = toneFor(avg);
+                    const val = format1(avg);
 
                     return (
                       <div className="flex flex-col items-center gap-[2px] min-w-[40px]">
                         <span className="text-sm md:text-base lg:text-lg font-semibold text-white [font-variant-numeric:tabular-nums]">
-                          {val ?? '—'}
+                          {val ?? "—"}
                         </span>
                         <span
                           className={`
                             mt-[2px] h-[3px] md:h-[4px] w-8 md:w-10 lg:w-12 rounded-full
-                            ${avg == null ? 'bg-zinc-700' : spec.bg}
+                            ${avg == null ? "bg-zinc-700" : spec.bg}
                           `}
                         />
                       </div>
-                    )
+                    );
                   })()}
                 </td>
               )}
@@ -818,15 +880,18 @@ export default function EpisodeRatingsGrid({
         </tbody>
       </table>
     </div>
-  )
+  );
 
   // =======================
   // Render Wrapped
   // =======================
   const renderWrapped = () => (
-    <div className="space-y-6 mt-2" style={{ contentVisibility: 'auto', containIntrinsicSize: '800px 520px' }}>
+    <div
+      className="space-y-6 mt-2"
+      style={{ contentVisibility: "auto", containIntrinsicSize: "800px 520px" }}
+    >
       {seasonsSorted.map((s) => {
-        const avg = seasonAverages.get(s.season_number) ?? null
+        const avg = seasonAverages.get(s.season_number) ?? null;
         return (
           <div key={`wrap-s${s.season_number}`}>
             <div className="flex items-center gap-3 mb-2">
@@ -835,32 +900,38 @@ export default function EpisodeRatingsGrid({
               </span>
               {showSeasonAvg && avg != null && (
                 <span className="text-xs text-zinc-400">
-                  Avg <span className="font-semibold text-white">{format1(avg)}</span>
+                  Avg{" "}
+                  <span className="font-semibold text-white">
+                    {format1(avg)}
+                  </span>
                 </span>
               )}
             </div>
 
             <div className="flex flex-wrap gap-2">
               {s.episodes.map((ep) => {
-                const isUpcoming = ep.isUnaired
-                const raw = isUpcoming ? null : ep.displayRating ?? null
-                const spec = toneFor(raw)
-                const bgClass = isUpcoming ? 'bg-zinc-400' : spec.bg
-                const textClass = isUpcoming ? 'text-black' : spec.text
-                const val = isUpcoming ? '?' : format1(raw)
+                const isUpcoming = ep.isUnaired;
+                const raw = isUpcoming ? null : (ep.displayRating ?? null);
+                const spec = toneFor(raw);
+                const bgClass = isUpcoming ? "bg-zinc-400" : spec.bg;
+                const textClass = isUpcoming ? "text-black" : spec.text;
+                const val = isUpcoming ? "?" : format1(raw);
 
                 const tooltipData = isUpcoming
                   ? null
-                  : buildTooltipData(ep, s.season_number, ep.episodeNumber)
+                  : buildTooltipData(ep, s.season_number, ep.episodeNumber);
 
-                const { role, tabIndex, onClick, onKeyDown, title, clickable } = cellProps(ep, s.season_number, ep.episodeNumber)
+                const { role, tabIndex, onClick, onKeyDown, title, clickable } =
+                  cellProps(ep, s.season_number, ep.episodeNumber);
 
                 return (
                   <div
                     key={`wrap-s${s.season_number}-e${ep.episodeNumber}`}
                     className="flex flex-col items-center gap-1"
                     onMouseEnter={
-                      tooltipEnabled ? (e) => tooltipData && handleMouseEnter(e, tooltipData) : undefined
+                      tooltipEnabled
+                        ? (e) => tooltipData && handleMouseEnter(e, tooltipData)
+                        : undefined
                     }
                     onMouseLeave={tooltipEnabled ? handleMouseLeave : undefined}
                   >
@@ -878,30 +949,32 @@ export default function EpisodeRatingsGrid({
                         font-semibold
                         [font-variant-numeric:tabular-nums]
                         text-[16px] md:text-[16px] lg:text-[22px]
-                        ${clickable ? 'cursor-pointer hover:brightness-[1.07]' : 'cursor-default'}
-                        ${clickable ? 'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30' : ''}
+                        ${clickable ? "cursor-pointer hover:brightness-[1.07]" : "cursor-default"}
+                        ${clickable ? "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30" : ""}
                         transition duration-150
                         select-none
                       `}
                     >
-                      {val ?? '—'}
+                      {val ?? "—"}
                     </div>
-                    <span className="text-[10px] text-zinc-400">E{ep.episodeNumber}</span>
+                    <span className="text-[10px] text-zinc-400">
+                      E{ep.episodeNumber}
+                    </span>
                   </div>
-                )
+                );
               })}
             </div>
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 
   // ✅ En móvil, si el grid es pesado, no lo montamos hasta que el usuario lo elija (y esté cerca en viewport)
   const shouldRenderHeavyGrid =
-    layoutMode === 'grid' && (!isTouchLike || !isHeavyGrid)
+    layoutMode === "grid" && (!isTouchLike || !isHeavyGrid)
       ? true
-      : (layoutMode === 'grid' && inView)
+      : layoutMode === "grid" && inView;
 
   return (
     <>
@@ -910,8 +983,8 @@ export default function EpisodeRatingsGrid({
         <div className="flex flex-wrap items-center gap-3">
           <SegmentedToggle
             options={[
-              { id: 'grid', label: 'Grid' },
-              { id: 'wrapped', label: 'Wrapped' }
+              { id: "grid", label: "Grid" },
+              { id: "wrapped", label: "Wrapped" },
             ]}
             value={layoutMode}
             onChange={setLayoutModeSafe}
@@ -924,9 +997,9 @@ export default function EpisodeRatingsGrid({
             </div>
             <Switch
               checked={inverted}
-              disabled={layoutMode === 'wrapped'}
+              disabled={layoutMode === "wrapped"}
               onChange={(v) => {
-                if (layoutMode === 'grid') setInverted(v)
+                if (layoutMode === "grid") setInverted(v);
               }}
             />
 
@@ -941,9 +1014,13 @@ export default function EpisodeRatingsGrid({
         <LegendSeriesGraph />
 
         {/* Layout */}
-        {layoutMode === 'grid' ? (
+        {layoutMode === "grid" ? (
           shouldRenderHeavyGrid ? (
-            inverted ? renderGridInverted() : renderGrid()
+            inverted ? (
+              renderGridInverted()
+            ) : (
+              renderGrid()
+            )
           ) : (
             <div className="mt-2 rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-zinc-300">
               Cargando vista Grid…
@@ -954,9 +1031,13 @@ export default function EpisodeRatingsGrid({
         )}
       </div>
 
-      <TooltipPortal activeData={hoveredEp} anchorRect={anchorRect} enabled={tooltipEnabled} />
+      <TooltipPortal
+        activeData={hoveredEp}
+        anchorRect={anchorRect}
+        enabled={tooltipEnabled}
+      />
     </>
-  )
+  );
 }
 
 /* =======================
@@ -967,10 +1048,10 @@ function SegmentedToggle({ options, value, onChange }) {
   return (
     <div className="inline-flex items-center rounded-full bg-black/30 border border-white/10 p-0.5 backdrop-blur-sm shadow-[0_8px_20px_rgba(0,0,0,0.45)]">
       {options.map((opt) => {
-        const active = opt.id === value
-        let Icon = null
-        if (opt.id === 'grid') Icon = LayoutGrid
-        if (opt.id === 'wrapped') Icon = WrapText
+        const active = opt.id === value;
+        let Icon = null;
+        if (opt.id === "grid") Icon = LayoutGrid;
+        if (opt.id === "wrapped") Icon = WrapText;
 
         return (
           <button
@@ -980,16 +1061,16 @@ function SegmentedToggle({ options, value, onChange }) {
             className={`
               px-3 py-1.5 text-[11px] font-medium rounded-full
               inline-flex items-center gap-1.5 transition-colors
-              ${active ? 'bg-white text-black shadow-sm' : 'text-zinc-200 hover:bg-white/5'}
+              ${active ? "bg-white text-black shadow-sm" : "text-zinc-200 hover:bg-white/5"}
             `}
           >
             {Icon && <Icon className="w-3.5 h-3.5" />}
             <span>{opt.label}</span>
           </button>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
 function Switch({ checked, onChange, disabled }) {
@@ -1001,11 +1082,13 @@ function Switch({ checked, onChange, disabled }) {
       className={`
         w-10 h-5 rounded-full flex items-center px-[3px]
         transition-colors border
-        ${disabled
-          ? 'opacity-40 cursor-not-allowed bg-black/40 border-white/10'
-          : checked
-            ? 'bg-emerald-500 border-emerald-400'
-            : 'bg-black/40 border-white/15'}
+        ${
+          disabled
+            ? "opacity-40 cursor-not-allowed bg-black/40 border-white/10"
+            : checked
+              ? "bg-emerald-500 border-emerald-400"
+              : "bg-black/40 border-white/15"
+        }
       `}
       aria-pressed={checked}
     >
@@ -1013,24 +1096,24 @@ function Switch({ checked, onChange, disabled }) {
         className={`
           w-4 h-4 rounded-full bg-white shadow
           transform transition-transform
-          ${checked ? 'translate-x-4' : 'translate-x-0'}
+          ${checked ? "translate-x-4" : "translate-x-0"}
         `}
       />
     </button>
-  )
+  );
 }
 
 function LegendSeriesGraph() {
   const items = [
-    ['bg-teal-400', 'Absolute Cinema'],
-    ['bg-emerald-700', 'Awesome'],
-    ['bg-green-500', 'Great'],
-    ['bg-yellow-300', 'Good'],
-    ['bg-yellow-500', 'Average'],
-    ['bg-red-500', 'Bad'],
-    ['bg-purple-700', 'Garbage'],
-    ['bg-zinc-800', 'Sin nota']
-  ]
+    ["bg-teal-400", "Absolute Cinema"],
+    ["bg-emerald-700", "Awesome"],
+    ["bg-green-500", "Great"],
+    ["bg-yellow-300", "Good"],
+    ["bg-yellow-500", "Average"],
+    ["bg-red-500", "Bad"],
+    ["bg-purple-700", "Garbage"],
+    ["bg-zinc-800", "Sin nota"],
+  ];
 
   return (
     <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-300">
@@ -1041,5 +1124,5 @@ function LegendSeriesGraph() {
         </span>
       ))}
     </div>
-  )
+  );
 }

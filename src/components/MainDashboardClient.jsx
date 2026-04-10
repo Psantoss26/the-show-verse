@@ -1,7 +1,7 @@
 // /src/components/MainDashboardClient.jsx
 "use client";
 
-import { useRef, useEffect, useState, useMemo, useCallback } from "react";
+import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay, FreeMode } from "swiper";
 import { AnimatePresence, motion, useInView } from "framer-motion";
@@ -31,6 +31,17 @@ import {
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchArtworkOverrides } from "@/lib/artworkApi";
+
+// Constantes para evitar recreación de referencias
+const EMPTY_ARRAY = [];
+const EMPTY_OBJECT = {};
+
+function toItemsArray(value) {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.results)) return value.results;
+  if (Array.isArray(value?.items)) return value.items;
+  return EMPTY_ARRAY;
+}
 
 const anton = Anton({ weight: "400", subsets: ["latin"] });
 
@@ -1480,7 +1491,7 @@ function InlinePreviewCardAnticipated({
 }
 
 /* ---------- Fila con filtro de tiempo (semana/mes/año) ---------- */
-function RowWithTimeFilter({
+const RowWithTimeFilter = memo(function RowWithTimeFilter({
   title,
   weeklyData,
   monthlyData,
@@ -1495,15 +1506,18 @@ function RowWithTimeFilter({
 }) {
   const [selectedPeriod, setSelectedPeriod] = useState("weekly");
 
-  const periodMap = {
-    weekly: { label: "Semana", data: weeklyData },
-    monthly: { label: "Mes", data: monthlyData },
-    yearly: { label: "Año", data: yearlyData },
-  };
+  const periodMap = useMemo(() => ({
+    weekly: { label: "Semana", data: toItemsArray(weeklyData) },
+    monthly: { label: "Mes", data: toItemsArray(monthlyData) },
+    yearly: { label: "Año", data: toItemsArray(yearlyData) },
+  }), [weeklyData, monthlyData, yearlyData]);
 
   // Filtrar solo los períodos que tienen datos
-  const availablePeriods = Object.entries(periodMap).filter(
-    ([_, { data }]) => data?.length > 0,
+  const availablePeriods = useMemo(() => 
+    Object.entries(periodMap).filter(
+      ([_, { data }]) => data?.length > 0,
+    ),
+    [periodMap]
   );
 
   // Verificar si el período seleccionado está disponible, si no, cambiar al primero disponible
@@ -1516,7 +1530,10 @@ function RowWithTimeFilter({
     }
   }, [availablePeriods, selectedPeriod]);
 
-  const currentData = periodMap[selectedPeriod]?.data || [];
+  const currentData = useMemo(() => 
+    periodMap[selectedPeriod]?.data || EMPTY_ARRAY,
+    [periodMap, selectedPeriod]
+  );
 
   if (availablePeriods.length === 0) return null;
 
@@ -1570,10 +1587,10 @@ function RowWithTimeFilter({
       />
     </div>
   );
-}
+});
 
 /* ---------- Fila con filtro de fuente (Trakt/TMDb) ---------- */
-function RowWithSourceFilter({
+const RowWithSourceFilter = memo(function RowWithSourceFilter({
   title,
   traktData,
   tmdbData,
@@ -1585,29 +1602,31 @@ function RowWithSourceFilter({
   overridesReady,
   eager = false,
 }) {
+  // selectedSource es la preferencia del usuario; puede que la fuente esté vacía
   const [selectedSource, setSelectedSource] = useState("trakt");
 
-  const sourceMap = {
-    trakt: { label: "Trakt", data: traktData },
-    tmdb: { label: "TMDb", data: tmdbData },
-  };
+  const sourceMap = useMemo(() => ({
+    trakt: { label: "Trakt", data: toItemsArray(traktData) },
+    tmdb: { label: "TMDb", data: toItemsArray(tmdbData) },
+  }), [traktData, tmdbData]);
 
   // Filtrar solo las fuentes que tienen datos
-  const availableSources = Object.entries(sourceMap).filter(
-    ([_, { data }]) => data?.length > 0,
+  const availableSources = useMemo(() =>
+    Object.entries(sourceMap).filter(([_, { data }]) => data?.length > 0),
+    [sourceMap]
   );
 
-  // Verificar si la fuente seleccionada está disponible, si no, cambiar a la primera disponible
-  useEffect(() => {
-    const isCurrentSourceAvailable = availableSources.some(
-      ([key]) => key === selectedSource,
-    );
-    if (!isCurrentSourceAvailable && availableSources.length > 0) {
-      setSelectedSource(availableSources[0][0]);
-    }
-  }, [availableSources, selectedSource]);
+  // Fuente efectiva: preferencia del usuario si tiene datos, si no la primera disponible
+  // Se calcula de forma derivada para que Row reciba datos desde el primer render
+  const effectiveSource = useMemo(() => {
+    if (sourceMap[selectedSource]?.data?.length > 0) return selectedSource;
+    return availableSources[0]?.[0] || selectedSource;
+  }, [sourceMap, selectedSource, availableSources]);
 
-  const currentData = sourceMap[selectedSource]?.data || [];
+  const currentData = useMemo(() =>
+    sourceMap[effectiveSource]?.data || EMPTY_ARRAY,
+    [sourceMap, effectiveSource]
+  );
 
   if (availableSources.length === 0) return null;
 
@@ -1634,7 +1653,7 @@ function RowWithSourceFilter({
                 key={key}
                 onClick={() => setSelectedSource(key)}
                 className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  selectedSource === key
+                  effectiveSource === key
                     ? "bg-white text-black"
                     : "text-neutral-400 hover:text-white"
                 }`}
@@ -1661,7 +1680,7 @@ function RowWithSourceFilter({
       />
     </div>
   );
-}
+});
 
 /* ---------- Fila reusable ---------- */
 /* ---------- Fila reusable ---------- */
@@ -1679,7 +1698,8 @@ function Row({
   hideTitle = false, // Ocultar título cuando se usa con RowWithTimeFilter
   labelText, // Label superior para la sección
 }) {
-  if (!items || items.length === 0) return null;
+  const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
+  const hasItems = normalizedItems.length > 0;
 
   // ✅ Detectar si es una fila de género específico
   const isGenreRow =
@@ -1729,10 +1749,10 @@ function Row({
 
   // Precargar backdrops cuando el usuario está sobre la fila
   useEffect(() => {
-    if (!isHoveredRow || !items || isMobile) return;
+    if (!isHoveredRow || !hasItems || isMobile) return;
 
     const preloadBackdrops = async () => {
-      const toPreload = items
+      const toPreload = normalizedItems
         .slice(0, 5)
         .filter((m) => !preloadedBackdrops.has(m.id));
 
@@ -1750,11 +1770,20 @@ function Row({
 
     const timer = setTimeout(preloadBackdrops, 300);
     return () => clearTimeout(timer);
-  }, [isHoveredRow, items, isMobile, backdropOverrides, preloadedBackdrops]);
+  }, [
+    isHoveredRow,
+    hasItems,
+    normalizedItems,
+    isMobile,
+    backdropOverrides,
+    preloadedBackdrops,
+  ]);
 
   const hasActivePreview = !!hoveredId;
   const heightClassDesktop = "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
+
+  if (!hasItems) return null;
 
   const updateNav = (swiper) => {
     if (!swiper) return;
@@ -2217,7 +2246,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
 }
 
 /* ---------- Sección "Más esperadas" con selector Películas/Series ---------- */
-function AnticipatedSection({
+const AnticipatedSection = memo(function AnticipatedSection({
   movieItems,
   tvItems,
   isMobile,
@@ -2301,7 +2330,7 @@ function AnticipatedSection({
       />
     </motion.div>
   );
-}
+});
 
 /* ---------- Carrusel hero (backdrops) ---------- */
 function TopRatedHero({
@@ -2779,8 +2808,8 @@ export default function MainDashboardClient({ initialData }) {
   return (
     <div className="min-h-screen px-4 sm:px-6 py-6 sm:py-8 text-white bg-gradient-to-b from-black via-neutral-950 to-black">
       <TopRatedHero
-        movieItems={dashboardData.topRatedMovies || []}
-        tvItems={dashboardData.topRatedTV || []}
+        movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
+        tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}
         isMobile={isMobile}
         hydrated={hydrated}
         backdropOverrides={backdropOverrides}
@@ -2794,8 +2823,8 @@ export default function MainDashboardClient({ initialData }) {
       >
         {/* ✅ Trakt: Más esperadas con selector Películas/Series */}
         <AnticipatedSection
-          movieItems={dashboardData.traktMoviesAnticipated || []}
-          tvItems={dashboardData.traktShowsAnticipated || []}
+          movieItems={dashboardData.traktMoviesAnticipated || EMPTY_ARRAY}
+          tvItems={dashboardData.traktShowsAnticipated || EMPTY_ARRAY}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
@@ -2807,7 +2836,7 @@ export default function MainDashboardClient({ initialData }) {
         {/* ✅ Trakt: Recomendado (preview normal) */}
         <Row
           title="Recomendado"
-          items={dashboardData.traktRecommended || []}
+          items={dashboardData.traktRecommended || EMPTY_ARRAY}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
@@ -2819,8 +2848,8 @@ export default function MainDashboardClient({ initialData }) {
         {/* ✅ Tendencias unificadas (Trakt/TMDb) */}
         <RowWithSourceFilter
           title="Tendencias"
-          traktData={dashboardData.traktTrending || []}
-          tmdbData={dashboardData.trending || []}
+          traktData={dashboardData.traktTrending || EMPTY_ARRAY}
+          tmdbData={dashboardData.trending || EMPTY_ARRAY}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
@@ -2832,8 +2861,8 @@ export default function MainDashboardClient({ initialData }) {
         {/* ✅ Populares unificados (Trakt/TMDb) */}
         <RowWithSourceFilter
           title="Populares"
-          traktData={dashboardData.traktPopular || []}
-          tmdbData={dashboardData.popular || []}
+          traktData={dashboardData.traktPopular || EMPTY_ARRAY}
+          tmdbData={dashboardData.popular || EMPTY_ARRAY}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
@@ -2869,9 +2898,9 @@ export default function MainDashboardClient({ initialData }) {
         {/* ✅ Trakt: Más reproducidas (con selector de período) */}
         <RowWithTimeFilter
           title="Más reproducidas"
-          weeklyData={dashboardData.traktPlayedWeekly || []}
-          monthlyData={dashboardData.traktPlayedMonthly || []}
-          yearlyData={[]}
+          weeklyData={dashboardData.traktPlayedWeekly || EMPTY_ARRAY}
+          monthlyData={dashboardData.traktPlayedMonthly || EMPTY_ARRAY}
+          yearlyData={EMPTY_ARRAY}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
@@ -2883,9 +2912,9 @@ export default function MainDashboardClient({ initialData }) {
         {/* ✅ Trakt: Más vistas (con selector de período) */}
         <RowWithTimeFilter
           title="Más vistas"
-          weeklyData={dashboardData.traktWatchedWeekly || []}
-          monthlyData={dashboardData.traktWatchedMonthly || []}
-          yearlyData={[]}
+          weeklyData={dashboardData.traktWatchedWeekly || EMPTY_ARRAY}
+          monthlyData={dashboardData.traktWatchedMonthly || EMPTY_ARRAY}
+          yearlyData={EMPTY_ARRAY}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
@@ -2897,9 +2926,9 @@ export default function MainDashboardClient({ initialData }) {
         {/* ✅ Trakt: Más coleccionadas (con selector de período) */}
         <RowWithTimeFilter
           title="Más coleccionadas"
-          weeklyData={dashboardData.traktCollectedWeekly || []}
-          monthlyData={dashboardData.traktCollectedMonthly || []}
-          yearlyData={[]}
+          weeklyData={dashboardData.traktCollectedWeekly || EMPTY_ARRAY}
+          monthlyData={dashboardData.traktCollectedMonthly || EMPTY_ARRAY}
+          yearlyData={EMPTY_ARRAY}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}

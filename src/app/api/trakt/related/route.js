@@ -10,7 +10,8 @@ const TRAKT_KEY =
   process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ||
   process.env.TRAKT_API_KEY;
 
-const TMDB_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const TMDB_KEY =
+  process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TRAKT_USER_AGENT =
   process.env.TRAKT_USER_AGENT || "TheShowVerse/1.0 (Next.js; Trakt related)";
 

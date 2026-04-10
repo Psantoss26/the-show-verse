@@ -12,7 +12,7 @@ La necesidad de una capa de abstracción sobre las plataformas de \textit{stream
 
 \subsection{Protocolos de autenticación: OAuth 2.0}
 
-OAuth 2.0 es el estándar que permite a una aplicación actuar en nombre de un usuario en un servicio externo sin que ese servicio tenga que proporcionarle su contraseña \parencite{Hardt:2012}. En \textit{The Show Verse} se utiliza para conectar la cuenta de Trakt.tv del usuario con la aplicación.
+OAuth 2.0 es el estándar que permite a una aplicación actuar en nombre de un usuario en un servicio externo sin que ese servicio tenga que proporcionarle su contraseña. En \textit{The Show Verse} se utiliza para conectar la cuenta de Trakt.tv del usuario con la aplicación.
 
 El flujo implementado (Authorization Code) funciona de la siguiente manera:
 
@@ -26,11 +26,17 @@ El flujo implementado (Authorization Code) funciona de la siguiente manera:
 
 \subsection{APIs REST}
 
-Las APIs utilizadas en este proyecto siguen el estilo REST \parencite{Fielding:2000} con las siguientes especificidades:
+Las APIs utilizadas en este proyecto siguen el estilo REST con las siguientes especificidades:
 
 \textbf{TMDb API v3} es una API REST pública con autenticación por API Key. Proporciona acceso a su base de datos de más de 800.000 películas y 150.000 series de televisión, con soporte para más de 40 idiomas. Su límite de peticiones es de 40 peticiones por 10 segundos para cuentas gratuitas \parencite{TMDb:2024}.
 
 \textbf{Trakt.tv API v2} combina autenticación por API Key para \textit{endpoints} públicos con OAuth 2.0 Bearer Token para \textit{endpoints} autenticados. Un aspecto técnico relevante es el sistema de identificadores: Trakt mantiene sus propios slugs e IDs, pero acepta identificadores de IMDb y TMDb mediante el \textit{endpoint} de búsqueda por ID externo \parencite{Trakt:2024}.
+
+\textbf{OMDb API} se utiliza como fuente complementaria para enriquecer fichas con metadatos y puntuaciones externas vinculadas al identificador de IMDb. Su integración se realiza mediante peticiones de lectura a través de la API interna del proyecto para unificar formato de respuesta y control de errores.
+
+\textbf{JustWatch} se integra para obtener enlaces de disponibilidad en plataformas de \textit{streaming}. En este caso no se consume una API REST pública oficial, sino que se encapsula la consulta en rutas internas del proyecto que normalizan parámetros, validan resultados y aplican caché antes de exponer el enlace en la interfaz.
+
+\textbf{Plex Media Server} se incorpora como fuente del catálogo de contenido multimedia local del usuario. La comunicación se realiza por HTTP/HTTPS contra el servidor Plex configurado por el usuario y se protege mediante autenticación basada en token, lo que permite combinar en una misma vista contenido personal y datos procedentes de servicios en la nube.
 
 \subsection{Rendimiento web}
 
@@ -40,7 +46,7 @@ Las estrategias de optimización más relevantes para este proyecto incluyen: Se
 
 El diseño de \textit{The Show Verse} se basa en el uso de los \textit{backdrops} y \textit{posters} obtenidos de TMDb como elemento principal de la interfaz.
 
-\textbf{Modo oscuro y backdrops de fondo.} El color de base de la aplicación es el negro (\texttt{\#000000}). Las imágenes de fondo se despliegan a pantalla completa con un gradiente en los bordes. Los elementos superpuestos utilizan un fondo semi-transparente con desenfoque del contenido detrás (\texttt{backdrop-filter: blur}), siguiendo el patrón de \textit{glassmorphism} \parencite{Babich:2021}.
+\textbf{Modo oscuro y backdrops de fondo.} El color de base de la aplicación es el negro (\texttt{\#000000}) y las páginas de detalle cuentan con as imágenes de fondo que se despliegan a pantalla completa con un gradiente en los bordes y los elementos superpuestos utilizan un fondo semi-transparente con desenfoque.
 
 \textbf{Animaciones de entrada y transiciones.} Las animaciones se gestionan mediante Framer Motion \parencite{Framer:2024}, usando \texttt{AnimatePresence} para la entrada y salida de componentes. Para listas largas (más de 30 elementos), el retraso entre tarjetas se reduce automáticamente para que la animación no resulte lenta.
 

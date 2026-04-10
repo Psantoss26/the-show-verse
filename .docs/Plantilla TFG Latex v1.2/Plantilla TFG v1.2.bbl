@@ -19,42 +19,6 @@
 
 \refsection{0}
   \datalist[entry]{apa/apasortcite//global/global/global}
-    \entry{Babich:2021}{book}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=9cac386feba4a607877226b8f91b3338}{%
-           family={Babich},
-           familyi={B\bibinitperiod},
-           given={Nick},
-           giveni={N\bibinitperiod},
-           givenun=0}}%
-      }
-      \list{publisher}{1}{%
-        {UX Planet}%
-      }
-      \strng{namehash}{9cac386feba4a607877226b8f91b3338}
-      \strng{fullhash}{9cac386feba4a607877226b8f91b3338}
-      \strng{fullhashraw}{9cac386feba4a607877226b8f91b3338}
-      \strng{bibnamehash}{9cac386feba4a607877226b8f91b3338}
-      \strng{authorbibnamehash}{9cac386feba4a607877226b8f91b3338}
-      \strng{authornamehash}{9cac386feba4a607877226b8f91b3338}
-      \strng{authorfullhash}{9cac386feba4a607877226b8f91b3338}
-      \strng{authorfullhashraw}{9cac386feba4a607877226b8f91b3338}
-      \field{sortinit}{B}
-      \field{sortinithash}{d7095fff47cda75ca2589920aae98399}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{Glassmorphism in User Interfaces}
-      \field{year}{2021}
-      \verb{urlraw}
-      \verb https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
-      \endverb
-      \verb{url}
-      \verb https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
-      \endverb
-    \endentry
     \entry{CNMC:2024}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=6d07a471d225b63c9b871719a3607a00}{%
@@ -83,40 +47,6 @@
       \endverb
       \verb{url}
       \verb https://www.cnmc.es/
-      \endverb
-    \endentry
-    \entry{Fielding:2000}{article}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=87dbbd44b3977c28b71d826a931add3e}{%
-           family={Fielding},
-           familyi={F\bibinitperiod},
-           given={Roy\bibnamedelima Thomas},
-           giveni={R\bibinitperiod\bibinitdelim T\bibinitperiod},
-           givenun=0}}%
-      }
-      \strng{namehash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{fullhash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{fullhashraw}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{bibnamehash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{authorbibnamehash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{authornamehash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{authorfullhash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{authorfullhashraw}{87dbbd44b3977c28b71d826a931add3e}
-      \field{sortinit}{F}
-      \field{sortinithash}{2638baaa20439f1b5a8f80c6c08a13b4}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{journaltitle}{Doctoral Dissertation, University of California}
-      \field{title}{Architectural Styles and the Design of Network-based Software Architectures}
-      \field{year}{2000}
-      \verb{urlraw}
-      \verb https://www.ics.uci.edu/~fielding/pubs/dissertation/top.htm
-      \endverb
-      \verb{url}
-      \verb https://www.ics.uci.edu/~fielding/pubs/dissertation/top.htm
       \endverb
     \endentry
     \entry{Framer:2024}{online}{}{}
@@ -487,76 +417,10 @@
       \endverb
       \verb{url}
       \verb https://nextjs.org/docs/app
-      \endverb
-    \endentry
-    \entry{W3C:2023}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=446a1ae6601a5c59360c7d591c3992da}{%
-           family={{W3C}},
-           familyi={W\bibinitperiod}}}%
-      }
-      \strng{namehash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{fullhash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{fullhashraw}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{bibnamehash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{authorbibnamehash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{authornamehash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{authorfullhash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{authorfullhashraw}{446a1ae6601a5c59360c7d591c3992da}
-      \field{sortinit}{W}
-      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{Web Content Accessibility Guidelines (WCAG) 2.1}}
-      \field{year}{2023}
-      \verb{urlraw}
-      \verb https://www.w3.org/TR/WCAG21/
-      \endverb
-      \verb{url}
-      \verb https://www.w3.org/TR/WCAG21/
       \endverb
     \endentry
   \enddatalist
   \datalist[entry]{apa/global//global/global/global}
-    \entry{Babich:2021}{book}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=9cac386feba4a607877226b8f91b3338}{%
-           family={Babich},
-           familyi={B\bibinitperiod},
-           given={Nick},
-           giveni={N\bibinitperiod},
-           givenun=0}}%
-      }
-      \list{publisher}{1}{%
-        {UX Planet}%
-      }
-      \strng{namehash}{9cac386feba4a607877226b8f91b3338}
-      \strng{fullhash}{9cac386feba4a607877226b8f91b3338}
-      \strng{fullhashraw}{9cac386feba4a607877226b8f91b3338}
-      \strng{bibnamehash}{9cac386feba4a607877226b8f91b3338}
-      \strng{authorbibnamehash}{9cac386feba4a607877226b8f91b3338}
-      \strng{authornamehash}{9cac386feba4a607877226b8f91b3338}
-      \strng{authorfullhash}{9cac386feba4a607877226b8f91b3338}
-      \strng{authorfullhashraw}{9cac386feba4a607877226b8f91b3338}
-      \field{sortinit}{B}
-      \field{sortinithash}{d7095fff47cda75ca2589920aae98399}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{Glassmorphism in User Interfaces}
-      \field{year}{2021}
-      \verb{urlraw}
-      \verb https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
-      \endverb
-      \verb{url}
-      \verb https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
-      \endverb
-    \endentry
     \entry{CNMC:2024}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=6d07a471d225b63c9b871719a3607a00}{%
@@ -585,40 +449,6 @@
       \endverb
       \verb{url}
       \verb https://www.cnmc.es/
-      \endverb
-    \endentry
-    \entry{Fielding:2000}{article}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=87dbbd44b3977c28b71d826a931add3e}{%
-           family={Fielding},
-           familyi={F\bibinitperiod},
-           given={Roy\bibnamedelima Thomas},
-           giveni={R\bibinitperiod\bibinitdelim T\bibinitperiod},
-           givenun=0}}%
-      }
-      \strng{namehash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{fullhash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{fullhashraw}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{bibnamehash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{authorbibnamehash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{authornamehash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{authorfullhash}{87dbbd44b3977c28b71d826a931add3e}
-      \strng{authorfullhashraw}{87dbbd44b3977c28b71d826a931add3e}
-      \field{sortinit}{F}
-      \field{sortinithash}{2638baaa20439f1b5a8f80c6c08a13b4}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{journaltitle}{Doctoral Dissertation, University of California}
-      \field{title}{Architectural Styles and the Design of Network-based Software Architectures}
-      \field{year}{2000}
-      \verb{urlraw}
-      \verb https://www.ics.uci.edu/~fielding/pubs/dissertation/top.htm
-      \endverb
-      \verb{url}
-      \verb https://www.ics.uci.edu/~fielding/pubs/dissertation/top.htm
       \endverb
     \endentry
     \entry{Framer:2024}{online}{}{}
@@ -989,36 +819,6 @@
       \endverb
       \verb{url}
       \verb https://nextjs.org/docs/app
-      \endverb
-    \endentry
-    \entry{W3C:2023}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=446a1ae6601a5c59360c7d591c3992da}{%
-           family={{W3C}},
-           familyi={W\bibinitperiod}}}%
-      }
-      \strng{namehash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{fullhash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{fullhashraw}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{bibnamehash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{authorbibnamehash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{authornamehash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{authorfullhash}{446a1ae6601a5c59360c7d591c3992da}
-      \strng{authorfullhashraw}{446a1ae6601a5c59360c7d591c3992da}
-      \field{sortinit}{W}
-      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{Web Content Accessibility Guidelines (WCAG) 2.1}}
-      \field{year}{2023}
-      \verb{urlraw}
-      \verb https://www.w3.org/TR/WCAG21/
-      \endverb
-      \verb{url}
-      \verb https://www.w3.org/TR/WCAG21/
       \endverb
     \endentry
   \enddatalist

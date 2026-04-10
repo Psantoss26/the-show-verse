@@ -1,81 +1,13 @@
 import { NextResponse } from "next/server";
+import {
+  fetchTrakt,
+  fetchTraktMaybe,
+  normalizeType,
+} from "@/lib/trakt/fetchWithCache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const TRAKT_BASE = "https://api.trakt.tv";
-
-function traktHeaders() {
-  const key = process.env.TRAKT_CLIENT_ID;
-  if (!key) throw new Error("Missing TRAKT_CLIENT_ID");
-  return {
-    "Content-Type": "application/json",
-    "trakt-api-version": "2",
-    "trakt-api-key": key,
-    "User-Agent": "TheShowVerse/1.0 (Next.js; Trakt OAuth)",
-  };
-}
-
-async function fetchTrakt(path) {
-  // ✅ Añadir timeout de 5 segundos para evitar bloqueos
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-  try {
-    const res = await fetch(`${TRAKT_BASE}${path}`, {
-      headers: traktHeaders(),
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    const json = await res.json().catch(() => null);
-    if (!res.ok) {
-      const msg = json?.error || json?.message || `Trakt error (${res.status})`;
-      throw new Error(msg);
-    }
-    return json;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === "AbortError") {
-      throw new Error("Trakt request timeout");
-    }
-    throw err;
-  }
-}
-
-async function fetchTraktMaybe(path) {
-  // ✅ Añadir timeout de 5 segundos para evitar bloqueos
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-  try {
-    const res = await fetch(`${TRAKT_BASE}${path}`, {
-      headers: traktHeaders(),
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    const json = await res.json().catch(() => null);
-    if (!res.ok) return null;
-    return json;
-  } catch {
-    clearTimeout(timeoutId);
-    return null;
-  }
-}
-
-function normalizeType(input) {
-  const t = String(input || "")
-    .toLowerCase()
-    .trim();
-  if (t === "tv" || t === "show") return "show";
-  if (t === "movie") return "movie";
-  if (t === "season") return "season";
-  if (t === "episode") return "episode";
-  return null;
-}
+export const maxDuration = 15; // Vercel: máximo tiempo de la función serverless
 
 export async function GET(req) {
   try {
@@ -165,8 +97,11 @@ export async function GET(req) {
       );
     }
 
-    // 1) resolver SHOW en Trakt por TMDb showId
-    const searchShow = await fetchTrakt(`/search/tmdb/${tmdbId}?type=show`);
+    // 1) resolver SHOW en Trakt por TMDb showId (con timeout más largo)
+    const searchShow = await fetchTrakt(
+      `/search/tmdb/${tmdbId}?type=show`,
+      8000,
+    );
     const showHit = Array.isArray(searchShow) ? searchShow[0] : null;
     const showItem = showHit?.show;
     const showIds = showItem?.ids;
@@ -174,15 +109,13 @@ export async function GET(req) {
     if (!showIds?.trakt) return NextResponse.json({ found: false });
 
     const traktShowId = showIds.trakt;
-
-    // 2) cargar summary del show para slug (URL)
-    const showSummary = await fetchTrakt(`/shows/${traktShowId}?extended=full`);
-    const showSlug = showSummary?.ids?.slug || showIds?.slug || traktShowId;
+    const showSlug = showIds?.slug || traktShowId;
 
     if (type === "season") {
-      // 3) temporadas del show para conseguir ids/rating/votes de temporada
+      // 2) temporadas del show para conseguir ids/rating/votes de temporada
       const seasons = await fetchTrakt(
         `/shows/${traktShowId}/seasons?extended=full`,
+        8000,
       );
       const seasonObj = Array.isArray(seasons)
         ? seasons.find((s) => Number(s?.number) === Number(seasonNumber))
@@ -193,13 +126,15 @@ export async function GET(req) {
       const seasonIds = seasonObj.ids;
       const traktUrl = `https://trakt.tv/shows/${showSlug}/seasons/${seasonNumber}`;
 
-      // 4) stats (si existe endpoint; si no, null)
-      const stats =
-        (await fetchTraktMaybe(`/seasons/${seasonIds.trakt}/stats`)) ||
-        (await fetchTraktMaybe(
+      // 3) stats (intentar dos endpoints en paralelo con timeout más largo)
+      const [stats1, stats2] = await Promise.all([
+        fetchTraktMaybe(`/seasons/${seasonIds.trakt}/stats`, 6000),
+        fetchTraktMaybe(
           `/shows/${traktShowId}/seasons/${seasonNumber}/stats`,
-        )) ||
-        null;
+          6000,
+        ),
+      ]);
+      const stats = stats1 || stats2 || null;
 
       return NextResponse.json({
         found: true,
@@ -240,21 +175,25 @@ export async function GET(req) {
       });
     }
 
-    // EPISODE
+    // EPISODE - optimizar con Promise.all para cargar datos en paralelo
     const ep = await fetchTrakt(
       `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
+      8000,
     );
     const epIds = ep?.ids;
     if (!epIds?.trakt) return NextResponse.json({ found: false });
 
     const traktUrl = `https://trakt.tv/shows/${showSlug}/seasons/${seasonNumber}/episodes/${episodeNumber}`;
 
-    const stats =
-      (await fetchTraktMaybe(`/episodes/${epIds.trakt}/stats`)) ||
-      (await fetchTraktMaybe(
+    // Intentar obtener stats de dos endpoints en paralelo con timeout más largo
+    const [stats1, stats2] = await Promise.all([
+      fetchTraktMaybe(`/episodes/${epIds.trakt}/stats`, 6000),
+      fetchTraktMaybe(
         `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
-      )) ||
-      null;
+        6000,
+      ),
+    ]);
+    const stats = stats1 || stats2 || null;
 
     return NextResponse.json({
       found: true,
@@ -293,6 +232,25 @@ export async function GET(req) {
       },
     });
   } catch (e) {
-    return NextResponse.json({ error: e?.message || "Error" }, { status: 500 });
+    console.error("Trakt scoreboard error:", e);
+
+    // Diferenciar entre timeout y otros errores
+    if (e?.message === "Trakt request timeout" || e?.name === "AbortError") {
+      return NextResponse.json(
+        {
+          error: "Trakt request timeout",
+          found: false,
+        },
+        { status: 504 },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: e?.message || "Error",
+        found: false,
+      },
+      { status: 500 },
+    );
   }
 }
