@@ -184,8 +184,13 @@ export async function GET(req) {
     const pg = readPaginationHeaders(res);
     return NextResponse.json({ items: listsWithPreviews, pagination: pg });
   } catch (e) {
-    const isExpected = e?.status === 429 || /rate limit|timeout|no se encontr/i.test(e?.message || "");
+    const isExpected =
+      e?.status === 429 ||
+      /rate limit|timeout|no se encontr/i.test(e?.message || "");
     if (!isExpected) console.warn("Trakt lists error:", e?.message);
-    return NextResponse.json({ items: [], pagination: { itemCount: 0, pageCount: 0, page: 1, limit: 10 } });
+    return NextResponse.json({
+      items: [],
+      pagination: { itemCount: 0, pageCount: 0, page: 1, limit: 10 },
+    });
   }
 }

@@ -379,8 +379,8 @@ async function getDashboardData(sessionId = null) {
       traktCollectedMonthly,
     ] = await Promise.all([
       // TMDb secciones originales
-      fetchTopRatedMovies(),
-      fetchTopRatedTV(),
+      fetchTopRatedMovies(2000), // Mínimo 2000 votos para películas top rated
+      fetchTopRatedTV(1000), // Mínimo 1000 votos para series top rated
       discoverMovies({
         "vote_average.gte": 7.5,
         "vote_count.gte": 2000,

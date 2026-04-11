@@ -2251,7 +2251,11 @@ export default function DetailsClient({
       setTrakt((p) => ({
         ...p,
         loading: false,
-        error: isTimeout ? "" : isRateLimit ? "Trakt: límite de peticiones alcanzado" : e?.message || "Error recargando Trakt",
+        error: isTimeout
+          ? ""
+          : isRateLimit
+            ? "Trakt: límite de peticiones alcanzado"
+            : e?.message || "Error recargando Trakt",
       }));
     }
   };
@@ -2415,7 +2419,11 @@ export default function DetailsClient({
         setTrakt((p) => ({
           ...p,
           loading: false,
-          error: isTimeout ? "" : isRateLimit ? "Trakt: límite de peticiones alcanzado, inténtalo en unos segundos" : e?.message || "Error cargando Trakt",
+          error: isTimeout
+            ? ""
+            : isRateLimit
+              ? "Trakt: límite de peticiones alcanzado, inténtalo en unos segundos"
+              : e?.message || "Error cargando Trakt",
         }));
       }
     };
