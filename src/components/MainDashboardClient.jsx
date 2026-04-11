@@ -205,7 +205,7 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
     minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
   const pool = pool0.length ? pool0 : list;
 
-  // ✅ 3 primeras imágenes EN disponibles (en orden)
+  // 3 primeras imágenes EN disponibles (en orden)
   const top3en = [];
   for (const b of pool) {
     if (isPreferredLang(b)) top3en.push(b);
@@ -1397,7 +1397,7 @@ function InlinePreviewCardAnticipated({
       <div className="w-full h-full bg-gradient-to-br from-neutral-950/98 to-black/98 border-t border-white/5 backdrop-blur-sm">
         <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
-            {/* ✅ META NUEVA SOLO PARA MÁS ESPERADAS */}
+            {/* META NUEVA SOLO PARA MÁS ESPERADAS */}
             <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-neutral-200">
               <span className="font-medium">{releaseText}</span>
               {extras?.runtime ? (
@@ -1506,18 +1506,19 @@ const RowWithTimeFilter = memo(function RowWithTimeFilter({
 }) {
   const [selectedPeriod, setSelectedPeriod] = useState("weekly");
 
-  const periodMap = useMemo(() => ({
-    weekly: { label: "Semana", data: toItemsArray(weeklyData) },
-    monthly: { label: "Mes", data: toItemsArray(monthlyData) },
-    yearly: { label: "Año", data: toItemsArray(yearlyData) },
-  }), [weeklyData, monthlyData, yearlyData]);
+  const periodMap = useMemo(
+    () => ({
+      weekly: { label: "Semana", data: toItemsArray(weeklyData) },
+      monthly: { label: "Mes", data: toItemsArray(monthlyData) },
+      yearly: { label: "Año", data: toItemsArray(yearlyData) },
+    }),
+    [weeklyData, monthlyData, yearlyData],
+  );
 
   // Filtrar solo los períodos que tienen datos
-  const availablePeriods = useMemo(() => 
-    Object.entries(periodMap).filter(
-      ([_, { data }]) => data?.length > 0,
-    ),
-    [periodMap]
+  const availablePeriods = useMemo(
+    () => Object.entries(periodMap).filter(([_, { data }]) => data?.length > 0),
+    [periodMap],
   );
 
   // Verificar si el período seleccionado está disponible, si no, cambiar al primero disponible
@@ -1530,9 +1531,9 @@ const RowWithTimeFilter = memo(function RowWithTimeFilter({
     }
   }, [availablePeriods, selectedPeriod]);
 
-  const currentData = useMemo(() => 
-    periodMap[selectedPeriod]?.data || EMPTY_ARRAY,
-    [periodMap, selectedPeriod]
+  const currentData = useMemo(
+    () => periodMap[selectedPeriod]?.data || EMPTY_ARRAY,
+    [periodMap, selectedPeriod],
   );
 
   if (availablePeriods.length === 0) return null;
@@ -1605,15 +1606,18 @@ const RowWithSourceFilter = memo(function RowWithSourceFilter({
   // selectedSource es la preferencia del usuario; puede que la fuente esté vacía
   const [selectedSource, setSelectedSource] = useState("trakt");
 
-  const sourceMap = useMemo(() => ({
-    trakt: { label: "Trakt", data: toItemsArray(traktData) },
-    tmdb: { label: "TMDb", data: toItemsArray(tmdbData) },
-  }), [traktData, tmdbData]);
+  const sourceMap = useMemo(
+    () => ({
+      trakt: { label: "Trakt", data: toItemsArray(traktData) },
+      tmdb: { label: "TMDb", data: toItemsArray(tmdbData) },
+    }),
+    [traktData, tmdbData],
+  );
 
   // Filtrar solo las fuentes que tienen datos
-  const availableSources = useMemo(() =>
-    Object.entries(sourceMap).filter(([_, { data }]) => data?.length > 0),
-    [sourceMap]
+  const availableSources = useMemo(
+    () => Object.entries(sourceMap).filter(([_, { data }]) => data?.length > 0),
+    [sourceMap],
   );
 
   // Fuente efectiva: preferencia del usuario si tiene datos, si no la primera disponible
@@ -1623,9 +1627,9 @@ const RowWithSourceFilter = memo(function RowWithSourceFilter({
     return availableSources[0]?.[0] || selectedSource;
   }, [sourceMap, selectedSource, availableSources]);
 
-  const currentData = useMemo(() =>
-    sourceMap[effectiveSource]?.data || EMPTY_ARRAY,
-    [sourceMap, effectiveSource]
+  const currentData = useMemo(
+    () => sourceMap[effectiveSource]?.data || EMPTY_ARRAY,
+    [sourceMap, effectiveSource],
   );
 
   if (availableSources.length === 0) return null;
@@ -1693,7 +1697,7 @@ function Row({
   posterOverrides,
   backdropOverrides,
   overridesReady,
-  previewKind = "default", // ✅ 4C: selector de preview
+  previewKind = "default", // 4C: selector de preview
   eager = false,
   hideTitle = false, // Ocultar título cuando se usa con RowWithTimeFilter
   labelText, // Label superior para la sección
@@ -1701,7 +1705,7 @@ function Row({
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = normalizedItems.length > 0;
 
-  // ✅ Detectar si es una fila de género específico
+  // Detectar si es una fila de género específico
   const isGenreRow =
     ![
       "Recomendado",
@@ -1722,7 +1726,7 @@ function Row({
     !title.includes("Favoritas") &&
     !title.includes("Hits");
 
-  // ✅ Determinar etiqueta específica según el título (si no viene como prop)
+  // Determinar etiqueta específica según el título (si no viene como prop)
   if (!labelText) {
     if (title === "Más esperadas") {
       labelText = "ANTICIPADAS";
@@ -1944,7 +1948,7 @@ function Row({
                 m.id,
               );
 
-              // ✅ 4B: NO bloquees PosterImage si ya sabemos que NO hay override.
+              // 4B: NO bloquees PosterImage si ya sabemos que NO hay override.
               // - undefined => aún no listo (loader)
               // - null => listo pero sin override
               // - string => override real
@@ -1996,7 +2000,7 @@ function Row({
                           className="w-full h-full hidden sm:block"
                           style={{ willChange: "transform, opacity" }}
                         >
-                          {/* ✅ 4C: preview por tipo */}
+                          {/* 4C: preview por tipo */}
                           {previewKind === "anticipated" ? (
                             <InlinePreviewCardAnticipated
                               movie={m}
@@ -2104,7 +2108,7 @@ function Row({
 function TraktMixedRow({ title, items, isMobile, hydrated }) {
   if (!items || items.length === 0) return null;
 
-  // ✅ Detectar si es una fila de género específico
+  // Detectar si es una fila de género específico
   const isGenreRow =
     ![
       "Recomendado",
@@ -2125,7 +2129,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
     !title.includes("Favoritas") &&
     !title.includes("Hits");
 
-  // ✅ Determinar etiqueta específica según el título
+  // Determinar etiqueta específica según el título
   let labelText = null;
   if (title === "Más esperadas") {
     labelText = "ANTICIPADAS";
@@ -2821,7 +2825,7 @@ export default function MainDashboardClient({ initialData }) {
         initial="hidden"
         animate="visible"
       >
-        {/* ✅ Trakt: Más esperadas con selector Películas/Series */}
+        {/* Trakt: Más esperadas con selector Películas/Series */}
         <AnticipatedSection
           movieItems={dashboardData.traktMoviesAnticipated || EMPTY_ARRAY}
           tvItems={dashboardData.traktShowsAnticipated || EMPTY_ARRAY}
@@ -2833,7 +2837,7 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        {/* ✅ Trakt: Recomendado (preview normal) */}
+        {/* Trakt: Recomendado (preview normal) */}
         <Row
           title="Recomendado"
           items={dashboardData.traktRecommended || EMPTY_ARRAY}
@@ -2845,7 +2849,7 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        {/* ✅ Tendencias unificadas (Trakt/TMDb) */}
+        {/* Tendencias unificadas (Trakt/TMDb) */}
         <RowWithSourceFilter
           title="Tendencias"
           traktData={dashboardData.traktTrending || EMPTY_ARRAY}
@@ -2858,7 +2862,7 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        {/* ✅ Populares unificados (Trakt/TMDb) */}
+        {/* Populares unificados (Trakt/TMDb) */}
         <RowWithSourceFilter
           title="Populares"
           traktData={dashboardData.traktPopular || EMPTY_ARRAY}
@@ -2895,7 +2899,7 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        {/* ✅ Trakt: Más reproducidas (con selector de período) */}
+        {/* Trakt: Más reproducidas (con selector de período) */}
         <RowWithTimeFilter
           title="Más reproducidas"
           weeklyData={dashboardData.traktPlayedWeekly || EMPTY_ARRAY}
@@ -2909,7 +2913,7 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        {/* ✅ Trakt: Más vistas (con selector de período) */}
+        {/* Trakt: Más vistas (con selector de período) */}
         <RowWithTimeFilter
           title="Más vistas"
           weeklyData={dashboardData.traktWatchedWeekly || EMPTY_ARRAY}
@@ -2923,7 +2927,7 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        {/* ✅ Trakt: Más coleccionadas (con selector de período) */}
+        {/* Trakt: Más coleccionadas (con selector de período) */}
         <RowWithTimeFilter
           title="Más coleccionadas"
           weeklyData={dashboardData.traktCollectedWeekly || EMPTY_ARRAY}

@@ -89,7 +89,7 @@ export function ExternalLinkButton({
   iconSize,
   className = "",
   loading = false,
-  fallbackHref = null, // ✅ si aún no está resuelto, puedes abrir búsqueda (opcional)
+  fallbackHref = null, // si aún no está resuelto, puedes abrir búsqueda (opcional)
 }) {
   const finalHref = href || fallbackHref || null;
   const disabled = !finalHref && !loading; // si loading=true mostramos el botón (placeholder)
@@ -114,7 +114,7 @@ export function ExternalLinkButton({
       aria-label={title}
       className={[
         "relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10",
-        disabled ? "opacity-0 pointer-events-none" : "", // ✅ si no hay link real, NO se muestra
+        disabled ? "opacity-0 pointer-events-none" : "", // si no hay link real, NO se muestra
         className,
       ].join(" ")}
       style={size ? { width: size, height: size } : undefined}
@@ -232,7 +232,7 @@ export function ActionShareButton({ title, text, url }) {
       url || (typeof window !== "undefined" ? window.location.href : "");
     if (!finalUrl) return;
 
-    // ✅ En móvil/WhatsApp: comparte SOLO el link (los OG tags harán la preview)
+    // En móvil/WhatsApp: comparte SOLO el link (los OG tags harán la preview)
     if (navigator.share) {
       try {
         await navigator.share({ url: finalUrl });

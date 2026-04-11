@@ -8,7 +8,7 @@ export default function TraktWatchedControl({
   connected,
   watched,
   plays,
-  badge, // ✅ NUEVO: permite mostrar texto (ej: "47%") en el badge
+  badge, // permite mostrar texto (ej: "47%") en el badge
   busy,
   onOpen,
 }) {

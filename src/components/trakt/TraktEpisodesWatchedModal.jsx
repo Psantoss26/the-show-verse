@@ -90,7 +90,7 @@ export default function TraktEpisodesWatchedModal({
   seasons = [],
   watchedBySeason = {},
 
-  // ✅ NUEVO (rewatch / vistas)
+  // (rewatch / vistas)
   showPlays = [], // array de plays (strings ISO o { watched_at })
   showReleaseDate = null, // ISO fecha estreno (opcional)
   onAddShowPlay, // (watchedAtIsoOrNull, meta) => Promise
@@ -118,10 +118,10 @@ export default function TraktEpisodesWatchedModal({
   const [movieEditValue, setMovieEditValue] = useState("");
   const [showError, setShowError] = useState("");
 
-  // ✅ local view fallback si el padre no controla activeView/onChangeView
+  // local view fallback si el padre no controla activeView/onChangeView
   const [localView, setLocalView] = useState("global");
 
-  // ✅ Modales extra
+  // Modales extra
   const [addPlayOpen, setAddPlayOpen] = useState(false);
   const [addPlayPreset, setAddPlayPreset] = useState("just_finished"); // just_finished | release_date | unknown | other_date
   const [addPlayOtherValue, setAddPlayOtherValue] = useState(
@@ -134,7 +134,7 @@ export default function TraktEpisodesWatchedModal({
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyLimit, setHistoryLimit] = useState(60);
 
-  // ✅ optimistic plays para que el dropdown/historial no “parpadee”
+  // optimistic plays para que el dropdown/historial no “parpadee”
   const [optimisticPlays, setOptimisticPlays] = useState([]); // array de ISO strings
 
   const panelRef = useRef(null);
@@ -171,7 +171,7 @@ export default function TraktEpisodesWatchedModal({
     [onChangeView],
   );
 
-  // ✅ Filtramos temporadas: > 0 (NO especiales)
+  // Filtramos temporadas: > 0 (NO especiales)
   const usableSeasons = useMemo(() => {
     const list = Array.isArray(seasons) ? seasons : [];
     return [...list]
@@ -181,13 +181,13 @@ export default function TraktEpisodesWatchedModal({
       .sort((a, b) => (a.season_number ?? 0) - (b.season_number ?? 0));
   }, [seasons]);
 
-  // ✅ watchedBySeason “activo” según vista (global o rewatch)
+  // watchedBySeason “activo” según vista (global o rewatch)
   const watchedBySeasonActive = useMemo(() => {
     if (!isRewatchView) return watchedBySeason || {};
     return watchedBySeasonRewatch || {};
   }, [isRewatchView, watchedBySeason, watchedBySeasonRewatch]);
 
-  // ✅ plays normalizados + optimistic
+  // plays normalizados + optimistic
   const normalizedPlays = useMemo(() => {
     const base = Array.isArray(showPlays) ? showPlays : [];
     const out = [];
@@ -254,7 +254,7 @@ export default function TraktEpisodesWatchedModal({
     );
   }, [totals]);
 
-  // ✅ marcar serie completa SOLO en global
+  // marcar serie completa SOLO en global
   const canToggleShow =
     isConnected && !isRewatchView && usableSeasons.length > 0 && !busyShow;
 
@@ -456,7 +456,7 @@ export default function TraktEpisodesWatchedModal({
     try {
       await onAddShowPlay(watchedAt, { preset: addPlayPreset });
 
-      // ✅ Si hay fecha, la usamos como “id” del rewatch y cambiamos a esa vista
+      // Si hay fecha, la usamos como “id” del rewatch y cambiamos a esa vista
       if (watchedAt) {
         setOptimisticPlays((prev) => {
           const arr = Array.isArray(prev) ? prev : [];
@@ -502,7 +502,7 @@ export default function TraktEpisodesWatchedModal({
         );
       }
 
-      // ✅ soporta ambas firmas comunes:
+      // soporta ambas firmas comunes:
       // (viewId, sn, en)  OR  (sn, en, viewId)
       if (onToggleEpisodeRewatch.length >= 3) {
         await onToggleEpisodeRewatch(effectiveViewId, sn, en);
@@ -780,7 +780,7 @@ export default function TraktEpisodesWatchedModal({
                 {onlyUnwatched ? "No vistos" : "Todos"}
               </button>
 
-              {/* ✅ NUEVO: Añadir visionado */}
+              {/* Añadir visionado */}
               <button
                 type="button"
                 disabled={!isConnected}
@@ -807,7 +807,7 @@ export default function TraktEpisodesWatchedModal({
                 Añadir visionado
               </button>
 
-              {/* ✅ NUEVO: Historial */}
+              {/* Historial */}
               <button
                 type="button"
                 disabled={!isConnected || normalizedPlays.length === 0}
@@ -838,7 +838,7 @@ export default function TraktEpisodesWatchedModal({
                 )}
               </button>
 
-              {/* ✅ SERIE COMPLETA (global) */}
+              {/* SERIE COMPLETA (global) */}
               <button
                 type="button"
                 disabled={!canToggleShow}

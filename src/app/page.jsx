@@ -32,7 +32,6 @@ import {
 export const revalidate = 1800; // 30 minutos
 export const maxDuration = 60; // Vercel Pro = 60s; Hobby = 10s (máximo posible)
 
-
 /* ====================================================================
  * MISMO CRITERIO QUE EN CLIENTE (MainDashboardClient.jsx):
  *  1) Idioma EN (si existe)
@@ -113,7 +112,7 @@ async function fetchBestBackdropServer(itemId, mediaType = "movie") {
 /* ====================================================================
  * TRAKT: Discover (Recommended / Anticipated) + hidratado con TMDb
  * ==================================================================== */
-// ✅ Funciones para obtener las claves en runtime (no en tiempo de build)
+// Funciones para obtener las claves en runtime (no en tiempo de build)
 function getTraktKey() {
   return (
     process.env.TRAKT_CLIENT_ID ||
@@ -148,7 +147,7 @@ async function fetchTrakt(path) {
   const headers = traktHeaders();
   if (!headers) return [];
 
-  // ✅ Timeout de 8s: evita que una petición lenta de Trakt bloquee
+  // Timeout de 8s: evita que una petición lenta de Trakt bloquee
   // el SSR completo del dashboard y haga que lleguen datos vacíos
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -166,8 +165,8 @@ async function fetchTrakt(path) {
     return Array.isArray(json) ? json : [];
   } catch (err) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      console.warn('[page.jsx] Trakt fetchTrakt timeout:', path);
+    if (err.name === "AbortError") {
+      console.warn("[page.jsx] Trakt fetchTrakt timeout:", path);
     }
     return [];
   }
@@ -365,7 +364,7 @@ async function getDashboardData(sessionId = null) {
       trending,
       popular,
 
-      // ✅ NUEVAS SECCIONES TRAKT - Contenido Mixto (películas + series)
+      // NUEVAS SECCIONES TRAKT - Contenido Mixto (películas + series)
       traktTrending,
       traktPopular,
       traktRecommended,
@@ -397,27 +396,43 @@ async function getDashboardData(sessionId = null) {
       fetchTrendingMovies(),
       fetchPopularMovies(),
 
-      // ✅ Trakt - Contenido Mixto (Movies + Shows)
+      // Trakt - Contenido Mixto (Movies + Shows)
       // Cada llamada tiene .catch(() => []) independiente: si una falla, las demás siguen
       TRAKT_KEY ? getTraktTrending(30).catch(() => []) : Promise.resolve([]),
       TRAKT_KEY ? getTraktPopular(30).catch(() => []) : Promise.resolve([]),
       TRAKT_KEY ? getTraktRecommended(30).catch(() => []) : Promise.resolve([]),
       TRAKT_KEY ? getTraktAnticipated(30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktMoviesAnticipated(30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktShowsAnticipated(30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktPlayed("weekly", 30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktPlayed("monthly", 30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktWatched("weekly", 30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktWatched("monthly", 30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktCollected("weekly", 30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktCollected("monthly", 30).catch(() => []) : Promise.resolve([]),
+      TRAKT_KEY
+        ? getTraktMoviesAnticipated(30).catch(() => [])
+        : Promise.resolve([]),
+      TRAKT_KEY
+        ? getTraktShowsAnticipated(30).catch(() => [])
+        : Promise.resolve([]),
+      TRAKT_KEY
+        ? getTraktPlayed("weekly", 30).catch(() => [])
+        : Promise.resolve([]),
+      TRAKT_KEY
+        ? getTraktPlayed("monthly", 30).catch(() => [])
+        : Promise.resolve([]),
+      TRAKT_KEY
+        ? getTraktWatched("weekly", 30).catch(() => [])
+        : Promise.resolve([]),
+      TRAKT_KEY
+        ? getTraktWatched("monthly", 30).catch(() => [])
+        : Promise.resolve([]),
+      TRAKT_KEY
+        ? getTraktCollected("weekly", 30).catch(() => [])
+        : Promise.resolve([]),
+      TRAKT_KEY
+        ? getTraktCollected("monthly", 30).catch(() => [])
+        : Promise.resolve([]),
     ]);
 
     const recommended = sessionId
       ? await fetchRecommendedMovies(sessionId)
       : [];
 
-    // ✅ Top 20 películas y Top 20 series por separado (con backdrops)
+    // Top 20 películas y Top 20 series por separado (con backdrops)
     const topMovies = topRatedMovies
       .map((m) => ({ ...m, media_type: "movie" }))
       .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
@@ -444,7 +459,7 @@ async function getDashboardData(sessionId = null) {
     const [topRatedMoviesWithBackdrop, topRatedTVWithBackdrop] =
       await Promise.all([addBackdrops(topMovies), addBackdrops(topShows)]);
 
-    // ✅ Eliminamos duplicados en las secciones de Trakt para evitar repeticiones
+    // Eliminamos duplicados en las secciones de Trakt para evitar repeticiones
     const cleanedTraktTrending = removeDuplicates(traktTrending);
     const cleanedTraktPopular = removeDuplicates(traktPopular);
     const cleanedTraktRecommended = removeDuplicates(traktRecommended);
@@ -484,7 +499,7 @@ async function getDashboardData(sessionId = null) {
       popular,
       recommended,
 
-      // ✅ NUEVAS SECCIONES TRAKT
+      // NUEVAS SECCIONES TRAKT
       traktTrending: cleanedTraktTrending,
       traktPopular: cleanedTraktPopular,
       traktRecommended: cleanedTraktRecommended,
