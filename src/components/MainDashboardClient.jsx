@@ -449,8 +449,8 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
       setReady(false);
       const mediaType =
         movie.media_type === "tv" ||
-        (movie.name && !movie.title) ||
-        movie.first_air_date
+          (movie.name && !movie.title) ||
+          movie.first_air_date
           ? "tv"
           : "movie";
       const preferred = await fetchBestPoster(movie.id, mediaType);
@@ -637,8 +637,8 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
           try {
             const mediaType =
               movie.media_type === "tv" ||
-              (movie.name && !movie.title) ||
-              movie.first_air_date
+                (movie.name && !movie.title) ||
+                movie.first_air_date
                 ? "tv"
                 : "movie";
             const preferred = await fetchBestBackdrop(movie.id, mediaType);
@@ -674,8 +674,8 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       // Detectar tipo de media
       const mediaType =
         movie.media_type === "tv" ||
-        (movie.name && !movie.title) ||
-        movie.first_air_date
+          (movie.name && !movie.title) ||
+          movie.first_air_date
           ? "tv"
           : "movie";
 
@@ -705,7 +705,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                 }
               }
             }
-          } catch {}
+          } catch { }
 
           let awards = null;
           let imdbRating = null;
@@ -730,7 +730,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                 imdbRating = Number(r);
               }
             }
-          } catch {}
+          } catch { }
 
           const next = { runtime, awards, imdbRating };
           movieExtrasCache.set(movie.id, next);
@@ -750,8 +750,8 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
 
   const mediaType =
     movie.media_type === "tv" ||
-    (movie.name && !movie.title) ||
-    movie.first_air_date
+      (movie.name && !movie.title) ||
+      movie.first_air_date
       ? "tv"
       : "movie";
   const href = `/details/${mediaType}/${movie.id}`;
@@ -860,13 +860,12 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
 
   const trailerSrc = trailer?.key
     ? `https://www.youtube-nocookie.com/embed/${trailer.key}` +
-      `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
-      `&controls=0&iv_load_policy=3&disablekb=1&fs=0` +
-      `&enablejsapi=1&origin=${
-        typeof window !== "undefined"
-          ? encodeURIComponent(window.location.origin)
-          : ""
-      }`
+    `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
+    `&controls=0&iv_load_policy=3&disablekb=1&fs=0` +
+    `&enablejsapi=1&origin=${typeof window !== "undefined"
+      ? encodeURIComponent(window.location.origin)
+      : ""
+    }`
     : null;
 
   return (
@@ -937,7 +936,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                         cmd("unMute");
                         cmd("setVolume", [30]);
                       }, 120);
-                    } catch {}
+                    } catch { }
                   }}
                 />
               </div>
@@ -1038,11 +1037,10 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
               onClick={handleToggleFavorite}
               disabled={loadingStates || updating}
               title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
-                favorite
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${favorite
                   ? "bg-gradient-to-br from-red-600/90 to-red-700/90 hover:from-red-500 hover:to-red-600 border-red-400/40 shadow-red-500/30 hover:shadow-red-500/50 text-white"
                   : "bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white"
-              }`}
+                }`}
             >
               {loadingStates || updating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -1059,11 +1057,10 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
               onClick={handleToggleWatchlist}
               disabled={loadingStates || updating}
               title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
-                watchlist
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${watchlist
                   ? "bg-gradient-to-br from-blue-600/90 to-blue-700/90 hover:from-blue-500 hover:to-blue-600 border-blue-400/40 shadow-blue-500/30 hover:shadow-blue-500/50 text-white"
                   : "bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white"
-              }`}
+                }`}
             >
               {loadingStates || updating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -1123,8 +1120,8 @@ function InlinePreviewCardAnticipated({
         setLoadingStates(true);
         const mediaType =
           movie.media_type === "tv" ||
-          (movie.name && !movie.title) ||
-          movie.first_air_date
+            (movie.name && !movie.title) ||
+            movie.first_air_date
             ? "tv"
             : "movie";
         const st = await getMediaAccountStates(mediaType, movie.id, session);
@@ -1182,8 +1179,8 @@ function InlinePreviewCardAnticipated({
       // Detectar tipo de media
       const mediaType =
         movie.media_type === "tv" ||
-        (movie.name && !movie.title) ||
-        movie.first_air_date
+          (movie.name && !movie.title) ||
+          movie.first_air_date
           ? "tv"
           : "movie";
 
@@ -1230,8 +1227,8 @@ function InlinePreviewCardAnticipated({
 
   const mediaType =
     movie.media_type === "tv" ||
-    (movie.name && !movie.title) ||
-    movie.first_air_date
+      (movie.name && !movie.title) ||
+      movie.first_air_date
       ? "tv"
       : "movie";
   const href = `/details/${mediaType}/${movie.id}`;
@@ -1333,10 +1330,10 @@ function InlinePreviewCardAnticipated({
   const release = movie?.release_date || null;
   const releaseText = release
     ? new Date(release).toLocaleDateString("es-ES", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
     : yearOf(movie) || "—";
 
   return (
@@ -1448,11 +1445,10 @@ function InlinePreviewCardAnticipated({
               onClick={handleToggleFavorite}
               disabled={loadingStates || updating}
               title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
-                favorite
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${favorite
                   ? "bg-gradient-to-br from-red-600/90 to-red-700/90 hover:from-red-500 hover:to-red-600 border-red-400/40 shadow-red-500/30 hover:shadow-red-500/50 text-white"
                   : "bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white"
-              }`}
+                }`}
             >
               {loadingStates || updating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -1469,11 +1465,10 @@ function InlinePreviewCardAnticipated({
               onClick={handleToggleWatchlist}
               disabled={loadingStates || updating}
               title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
-                watchlist
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${watchlist
                   ? "bg-gradient-to-br from-blue-600/90 to-blue-700/90 hover:from-blue-500 hover:to-blue-600 border-blue-400/40 shadow-blue-500/30 hover:shadow-blue-500/50 text-white"
                   : "bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white"
-              }`}
+                }`}
             >
               {loadingStates || updating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -1560,11 +1555,10 @@ const RowWithTimeFilter = memo(function RowWithTimeFilter({
               <button
                 key={key}
                 onClick={() => setSelectedPeriod(key)}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  selectedPeriod === key
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${selectedPeriod === key
                     ? "bg-white text-black"
                     : "text-neutral-400 hover:text-white"
-                }`}
+                  }`}
               >
                 {label}
               </button>
@@ -1656,11 +1650,10 @@ const RowWithSourceFilter = memo(function RowWithSourceFilter({
               <button
                 key={key}
                 onClick={() => setSelectedSource(key)}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  effectiveSource === key
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${effectiveSource === key
                     ? "bg-white text-black"
                     : "text-neutral-400 hover:text-white"
-                }`}
+                  }`}
               >
                 {label}
               </button>
@@ -2294,11 +2287,10 @@ const AnticipatedSection = memo(function AnticipatedSection({
           {movieItems?.length > 0 && (
             <button
               onClick={() => setActiveTab("movies")}
-              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                activeTab === "movies"
+              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${activeTab === "movies"
                   ? "bg-white text-black"
                   : "text-neutral-400 hover:text-white"
-              }`}
+                }`}
             >
               Películas
             </button>
@@ -2306,11 +2298,10 @@ const AnticipatedSection = memo(function AnticipatedSection({
           {tvItems?.length > 0 && (
             <button
               onClick={() => setActiveTab("series")}
-              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                activeTab === "series"
+              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${activeTab === "series"
                   ? "bg-white text-black"
                   : "text-neutral-400 hover:text-white"
-              }`}
+                }`}
             >
               Series
             </button>
@@ -2409,8 +2400,8 @@ function TopRatedHero({
 
             const mediaType =
               movie.media_type === "tv" ||
-              (movie.name && !movie.title) ||
-              movie.first_air_date
+                (movie.name && !movie.title) ||
+                movie.first_air_date
                 ? "tv"
                 : "movie";
             chosen = await fetchBestBackdrop(id, mediaType);
@@ -2518,11 +2509,10 @@ function TopRatedHero({
             {movieItems?.length > 0 && (
               <button
                 onClick={() => setActiveTab("movies")}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  activeTab === "movies"
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${activeTab === "movies"
                     ? "bg-white text-black"
                     : "text-neutral-400 hover:text-white"
-                }`}
+                  }`}
               >
                 Películas
               </button>
@@ -2530,11 +2520,10 @@ function TopRatedHero({
             {tvItems?.length > 0 && (
               <button
                 onClick={() => setActiveTab("series")}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  activeTab === "series"
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${activeTab === "series"
                     ? "bg-white text-black"
                     : "text-neutral-400 hover:text-white"
-                }`}
+                  }`}
               >
                 Series
               </button>
@@ -2606,8 +2595,8 @@ function TopRatedHero({
 
                   const mediaType =
                     movie.media_type === "tv" ||
-                    (movie.name && !movie.title) ||
-                    movie.first_air_date
+                      (movie.name && !movie.title) ||
+                      movie.first_air_date
                       ? "tv"
                       : "movie";
 
@@ -2644,9 +2633,8 @@ function TopRatedHero({
                             )} 1280w, ${buildImg(heroBackdrop, "original")} 2400w`}
                             sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
                             alt={movie.title || movie.name}
-                            className={`absolute inset-0 w-full h-full rounded-xl ${
-                              isMobile ? "object-contain" : "object-cover"
-                            } transition-transform duration-700 ease-out group-hover/hero:scale-105`}
+                            className={`absolute inset-0 w-full h-full rounded-xl ${isMobile ? "object-contain" : "object-cover"
+                              } transition-transform duration-700 ease-out group-hover/hero:scale-105`}
                             loading="lazy"
                             decoding="async"
                           />

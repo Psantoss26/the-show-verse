@@ -1863,7 +1863,10 @@ export default function DetailsClient({
     }
 
     try {
-      const r = await traktGetShowWatched({ tmdbId: Number(id) });
+      const r = await withTimeout(
+        traktGetShowWatched({ tmdbId: Number(id) }),
+        8000,
+      );
       setWatchedBySeason(r?.watchedBySeason || {});
     } catch {
       setWatchedBySeason({});
@@ -2223,22 +2226,34 @@ export default function DetailsClient({
   // Recarga el estado de Trakt (visto, rating, historial, watchlist) para el contenido actual
   const reloadTraktStatus = async () => {
     setTrakt((p) => ({ ...p, loading: true, error: "" }));
-    const json = await traktGetItemStatus({ type: traktType, tmdbId: id });
-
-    setTrakt({
-      loading: false,
-      connected: !!json.connected,
-      found: !!json.found,
-      traktUrl: json.traktUrl || null,
-      watched: !!json.watched,
-      plays: Number(json.plays || 0),
-      lastWatchedAt: json.lastWatchedAt || null,
-      rating: typeof json.rating === "number" ? json.rating : null, // si no usas rating, pon null
-      inWatchlist: !!json.inWatchlist,
-      progress: json.progress || null,
-      history: Array.isArray(json.history) ? json.history : [],
-      error: "",
-    });
+    try {
+      const json = await withTimeout(
+        traktGetItemStatus({ type: traktType, tmdbId: id }),
+        8000,
+      );
+      setTrakt({
+        loading: false,
+        connected: !!json.connected,
+        found: !!json.found,
+        traktUrl: json.traktUrl || null,
+        watched: !!json.watched,
+        plays: Number(json.plays || 0),
+        lastWatchedAt: json.lastWatchedAt || null,
+        rating: typeof json.rating === "number" ? json.rating : null,
+        inWatchlist: !!json.inWatchlist,
+        progress: json.progress || null,
+        history: Array.isArray(json.history) ? json.history : [],
+        error: "",
+      });
+    } catch (e) {
+      const isTimeout = e?.message === "Timeout";
+      const isRateLimit = /rate limit/i.test(e?.message || "");
+      setTrakt((p) => ({
+        ...p,
+        loading: false,
+        error: isTimeout ? "" : isRateLimit ? "Trakt: límite de peticiones alcanzado" : e?.message || "Error recargando Trakt",
+      }));
+    }
   };
 
   // Carga el scoreboard de Trakt (rating de la comunidad y estadisticas de uso)
@@ -2325,9 +2340,10 @@ export default function DetailsClient({
         setTraktStats(res?.stats ?? res ?? null);
       } catch (e) {
         if (cancelled) return;
-        // Si es timeout, no mostrar error al usuario
+        // Si es timeout o rate limit, no bloquear la UI
         const isTimeout = e?.message === "Timeout";
-        if (!isTimeout) {
+        const isRateLimit = /rate limit/i.test(e?.message || "");
+        if (!isTimeout && !isRateLimit) {
           setTraktStatsError(
             e?.message || "No se pudieron cargar estadísticas de Trakt",
           );
@@ -2393,12 +2409,13 @@ export default function DetailsClient({
         });
       } catch (e) {
         if (ignore) return;
-        // Si es timeout, no mostrar error al usuario
+        // Si es timeout o rate limit, no bloquear la UI
         const isTimeout = e?.message === "Timeout";
+        const isRateLimit = /rate limit/i.test(e?.message || "");
         setTrakt((p) => ({
           ...p,
           loading: false,
-          error: isTimeout ? "" : e?.message || "Error cargando Trakt",
+          error: isTimeout ? "" : isRateLimit ? "Trakt: límite de peticiones alcanzado, inténtalo en unos segundos" : e?.message || "Error cargando Trakt",
         }));
       }
     };

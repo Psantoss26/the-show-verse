@@ -64,28 +64,20 @@ export function buildTraktErrorMessage({ res, json, text, fallback }) {
 }
 
 export async function resolveTraktIdFromTmdb({ type, tmdbId }) {
-  try {
-    // ✅ Usar fetchTrakt con cache para evitar rate limiting
-    const json = await fetchTraktWithCache(
-      `/search/tmdb/${tmdbId}?type=${type}`,
-      { cacheTTL: 10 * 60 * 1000 }, // 10 minutos de cache para búsquedas
-    );
+  // ✅ Usar fetchTrakt con cache para evitar rate limiting
+  const json = await fetchTraktWithCache(
+    `/search/tmdb/${tmdbId}?type=${type}`,
+    { cacheTTL: 10 * 60 * 1000 }, // 10 minutos de cache para búsquedas
+  );
 
-    const first = Array.isArray(json) ? json[0] : null;
-    const item = first?.[type] || null;
-    const traktId = item?.ids?.trakt || null;
-    const slug = item?.ids?.slug || null;
+  const first = Array.isArray(json) ? json[0] : null;
+  const item = first?.[type] || null;
+  const traktId = item?.ids?.trakt || null;
+  const slug = item?.ids?.slug || null;
 
-    if (!traktId)
-      throw new Error("No se encontró el item en Trakt para ese TMDb ID");
-    return { traktId, slug };
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === "AbortError") {
-      throw new Error("Trakt request timeout");
-    }
-    throw err;
-  }
+  if (!traktId)
+    throw new Error("No se encontró el item en Trakt para ese TMDb ID");
+  return { traktId, slug };
 }
 
 export function readPaginationHeaders(res) {

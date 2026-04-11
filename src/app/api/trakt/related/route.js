@@ -51,16 +51,18 @@ async function fetchTrakt(path) {
 
     const { json, text } = await safeBody(res);
     if (!res.ok) {
-      const isCloudflare =
-        res.status === 403 &&
-        /cloudflare|attention required/i.test(String(text || ""));
-      console.error("Trakt related upstream failed", {
-        path,
-        status: res.status,
-        isCloudflare,
-        response: json,
-        responseText: json ? null : String(text || "").slice(0, 400),
-      });
+      if (res.status === 429) {
+        console.warn(`Trakt related rate limited on ${path}`);
+      } else {
+        const isCloudflare =
+          res.status === 403 &&
+          /cloudflare|attention required/i.test(String(text || ""));
+        console.warn("Trakt related upstream failed", {
+          path,
+          status: res.status,
+          isCloudflare,
+        });
+      }
       return [];
     }
     return Array.isArray(json) ? json : [];

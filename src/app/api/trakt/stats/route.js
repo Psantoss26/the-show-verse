@@ -5,6 +5,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 15; // Vercel: máximo tiempo de la función serverless
 
 export async function GET(req) {
+  // Timeout corto: stats/scoreboard son secundarios, no deben bloquear la UI
+  const ft = (path) => fetchTrakt(path, { timeoutMs: 4000 });
+
   try {
     const { searchParams } = new URL(req.url);
     const rawType = searchParams.get("type"); // 'movie' | 'show' | 'season' | 'episode'
@@ -25,7 +28,7 @@ export async function GET(req) {
     // ===============================
     if (type === "movie" || type === "show") {
       // 1) Mapear TMDb -> Trakt con cache
-      const search = await fetchTrakt(`/search/tmdb/${tmdbId}?type=${type}`);
+      const search = await ft(`/search/tmdb/${tmdbId}?type=${type}`);
       const item = search?.[0]?.[type];
       const ids = item?.ids;
 
@@ -40,7 +43,7 @@ export async function GET(req) {
       const path = type === "movie" ? "movies" : "shows";
 
       // 2) Obtener stats con cache
-      const stats = await fetchTrakt(`/${path}/${traktId}/stats`);
+      const stats = await ft(`/${path}/${traktId}/stats`);
 
       // Devolver formato consistente con datos completos
       return NextResponse.json({
@@ -77,7 +80,7 @@ export async function GET(req) {
     }
 
     // 1) Resolver SHOW en Trakt por TMDb ID
-    const searchShow = await fetchTrakt(`/search/tmdb/${tmdbId}?type=show`);
+    const searchShow = await ft(`/search/tmdb/${tmdbId}?type=show`);
     const showItem = searchShow?.[0]?.show;
     const traktShowId = showItem?.ids?.trakt;
 
@@ -90,9 +93,7 @@ export async function GET(req) {
 
     if (type === "season") {
       // 2) Obtener todas las temporadas
-      const seasons = await fetchTrakt(
-        `/shows/${traktShowId}/seasons?extended=full`,
-      );
+      const seasons = await ft(`/shows/${traktShowId}/seasons?extended=full`);
       const seasonObj = Array.isArray(seasons)
         ? seasons.find((s) => Number(s?.number) === seasonNumber)
         : null;
@@ -105,9 +106,7 @@ export async function GET(req) {
       }
 
       // 3) Intentar obtener stats (puede fallar)
-      const stats = await fetchTrakt(
-        `/seasons/${seasonObj.ids.trakt}/stats`,
-      ).catch(() => null);
+      const stats = await ft(`/seasons/${seasonObj.ids.trakt}/stats`).catch(() => null);
 
       return NextResponse.json({
         found: true,
@@ -128,7 +127,7 @@ export async function GET(req) {
 
     // EPISODE
     // 2) Obtener el episodio específico
-    const ep = await fetchTrakt(
+    const ep = await ft(
       `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
     );
     const epTraktId = ep?.ids?.trakt;
@@ -138,9 +137,7 @@ export async function GET(req) {
     }
 
     // 3) Intentar obtener stats del episodio
-    const stats = await fetchTrakt(`/episodes/${epTraktId}/stats`).catch(
-      () => null,
-    );
+    const stats = await ft(`/episodes/${epTraktId}/stats`).catch(() => null);
 
     return NextResponse.json({
       found: true,
@@ -158,13 +155,13 @@ export async function GET(req) {
       },
     });
   } catch (e) {
-    console.error("Trakt stats error:", e);
-    if (e?.name === "AbortError" || e?.message === "Trakt request timeout") {
-      return NextResponse.json(
-        { error: "Trakt request timeout", found: false },
-        { status: 504 },
-      );
+    const isTimeout = e?.name === "AbortError" || e?.message === "Trakt request timeout";
+    const isRateLimit = e?.status === 429 || /rate limit/i.test(e?.message || "");
+    if (isTimeout || isRateLimit) {
+      console.warn("Trakt stats unavailable:", e.message);
+      return NextResponse.json({ found: false });
     }
+    console.error("Trakt stats error:", e);
     return NextResponse.json(
       { error: e?.message || "Unexpected error", found: false },
       { status: 500 },

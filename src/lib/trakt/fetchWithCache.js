@@ -6,6 +6,7 @@ const TRAKT_BASE = "https://api.trakt.tv";
 // Cache en memoria con TTL
 const cache = new Map();
 const pendingRequests = new Map(); // Deduplicación de peticiones en vuelo
+const rateLimitCache = new Map(); // Cache negativo: rutas bloqueadas por 429
 
 // Configuración
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
@@ -21,6 +22,31 @@ function traktHeaders() {
     "trakt-api-key": key,
     "User-Agent": "TheShowVerse/1.0 (Next.js; Trakt OAuth)",
   };
+}
+
+/**
+ * Comprueba si una ruta está bloqueada por rate limit.
+ * Devuelve los segundos restantes (>0) o 0 si no está bloqueada.
+ */
+function getRateLimitSeconds(cacheKey) {
+  const entry = rateLimitCache.get(cacheKey);
+  if (!entry) return 0;
+  const remaining = Math.ceil((entry.until - Date.now()) / 1000);
+  if (remaining <= 0) {
+    rateLimitCache.delete(cacheKey);
+    return 0;
+  }
+  return remaining;
+}
+
+/**
+ * Guarda el bloqueo de rate limit para una ruta.
+ */
+function setRateLimitBlock(cacheKey, retryAfterSeconds) {
+  rateLimitCache.set(cacheKey, {
+    until: Date.now() + retryAfterSeconds * 1000,
+    retryAfter: retryAfterSeconds,
+  });
 }
 
 /**
@@ -82,29 +108,23 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
 
     clearTimeout(timeoutId);
 
-    // Manejar rate limiting (429)
+    // Manejar rate limiting (429) — falla rápido sin esperar
     if (res.status === 429) {
       const json = await res.json().catch(() => ({}));
-
-      // Obtener tiempo de espera del header o del response
       const retryAfter =
         res.headers.get("retry-after") || json.retry_after || 30;
-      const waitTime = parseInt(retryAfter) * 1000;
 
       console.warn(
-        `⚠️ Trakt rate limit (429) on ${path}, retry after ${retryAfter}s`,
+        `⚠️ Trakt rate limit (429) on ${path}, retry-after: ${retryAfter}s`,
       );
 
-      // Si aún tenemos reintentos disponibles
-      if (retryCount < MAX_RETRIES) {
-        await sleep(waitTime);
-        return fetchTraktWithRetry(path, options, retryCount + 1);
-      }
-
-      // Si ya no quedan reintentos, lanzar error
-      throw new Error(
-        `Trakt rate limit exceeded: ${json.detail || "Too many requests"}`,
+      // Lanzar inmediatamente sin dormir para no bloquear conexiones del navegador
+      const err = new Error(
+        `Trakt rate limit exceeded (retry after ${retryAfter}s)`,
       );
+      err.status = 429;
+      err.retryAfter = Number(retryAfter) || 30;
+      throw err;
     }
 
     const json = await res.json().catch(() => null);
@@ -165,6 +185,17 @@ export async function fetchTrakt(path, options = {}) {
   } = options;
   const cacheKey = `trakt:${path}`;
 
+  // 0. Comprobar bloqueo por rate limit (tiene prioridad sobre todo lo demás)
+  const rlSeconds = getRateLimitSeconds(cacheKey);
+  if (rlSeconds > 0) {
+    const err = new Error(
+      `Trakt rate limit exceeded (retry after ${rlSeconds}s)`,
+    );
+    err.status = 429;
+    err.retryAfter = rlSeconds;
+    throw err;
+  }
+
   // 1. Verificar cache
   if (useCache) {
     const cached = getFromCache(cacheKey);
@@ -186,6 +217,13 @@ export async function fetchTrakt(path, options = {}) {
         saveToCache(cacheKey, data, cacheTTL);
       }
       return data;
+    })
+    .catch((err) => {
+      // Cachear el bloqueo de rate limit para evitar más peticiones
+      if (err.status === 429) {
+        setRateLimitBlock(cacheKey, err.retryAfter || 30);
+      }
+      throw err;
     })
     .finally(() => {
       // Limpiar de pendientes
@@ -214,6 +252,7 @@ export async function fetchTraktMaybe(path, options = {}) {
 export function clearCache() {
   cache.clear();
   pendingRequests.clear();
+  rateLimitCache.clear();
 }
 
 /**

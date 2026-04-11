@@ -184,13 +184,8 @@ export async function GET(req) {
     const pg = readPaginationHeaders(res);
     return NextResponse.json({ items: listsWithPreviews, pagination: pg });
   } catch (e) {
-    // Si es timeout, devolver error 504 (Gateway Timeout)
-    if (e?.name === "AbortError") {
-      return NextResponse.json(
-        { error: "Trakt request timeout" },
-        { status: 504 },
-      );
-    }
-    return NextResponse.json({ error: e?.message || "Error" }, { status: 500 });
+    const isExpected = e?.status === 429 || /rate limit|timeout|no se encontr/i.test(e?.message || "");
+    if (!isExpected) console.warn("Trakt lists error:", e?.message);
+    return NextResponse.json({ items: [], pagination: { itemCount: 0, pageCount: 0, page: 1, limit: 10 } });
   }
 }

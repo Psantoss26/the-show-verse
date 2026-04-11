@@ -50,6 +50,8 @@ export async function GET(req) {
             pagination: pg
         })
     } catch (e) {
-        return NextResponse.json({ error: e?.message || 'Error' }, { status: 500 })
+        const isExpected = e?.status === 429 || /rate limit|timeout|no se encontr/i.test(e?.message || "");
+        if (!isExpected) console.warn("Trakt comments error:", e?.message);
+        return NextResponse.json({ items: [], pagination: { itemCount: 0, pageCount: 0, page: 1, limit: 20 } });
     }
 }
