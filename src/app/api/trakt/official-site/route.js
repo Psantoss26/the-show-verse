@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
+import { fetchTrakt } from "@/lib/trakt/fetchWithCache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID;
 
 function normalizeUrl(u) {
   if (!u) return null;
@@ -14,31 +13,10 @@ function normalizeUrl(u) {
     : `https://${s}`;
 }
 
-async function traktFetch(url, { signal } = {}) {
-  if (!TRAKT_CLIENT_ID) throw new Error("Missing TRAKT_CLIENT_ID");
-  const res = await fetch(url, {
-    signal,
-    headers: {
-      "Content-Type": "application/json",
-      "trakt-api-version": "2",
-      "trakt-api-key": TRAKT_CLIENT_ID,
-      "User-Agent": "TheShowVerse/1.0 (Next.js; Trakt OAuth)",
-    },
-    cache: "no-store",
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg =
-      json?.error || json?.message || `Trakt request failed: ${res.status}`;
-    throw new Error(msg);
-  }
-  return json;
-}
-
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const tmdbId = searchParams.get("tmdbId");
-  const type = searchParams.get("type"); // 'movie' | 'tv'
+  const type = searchParams.get("type");
 
   if (!tmdbId) {
     return NextResponse.json({ error: "Missing tmdbId" }, { status: 400 });
@@ -48,32 +26,38 @@ export async function GET(req) {
   const plural = traktType === "show" ? "shows" : "movies";
 
   try {
-    // 1) localizar el item en Trakt por TMDb id
-    const searchUrl = `https://api.trakt.tv/search/tmdb/${encodeURIComponent(tmdbId)}?type=${traktType}`;
-    const search = await traktFetch(searchUrl);
+    // Compartir cache con stats/scoreboard/community para evitar duplicar llamadas
+    const search = await fetchTrakt(
+      `/search/tmdb/${encodeURIComponent(tmdbId)}?type=${traktType}`,
+      { timeoutMs: 4000, cacheTTL: 10 * 60 * 1000 },
+    );
 
     const first = Array.isArray(search) ? search[0] : null;
     const item = first?.[traktType];
     const traktId = item?.ids?.trakt;
 
     if (!traktId) {
-      return NextResponse.json({ url: null }, { status: 200 });
+      return NextResponse.json({ url: null });
     }
 
-    // 2) pedir extended=full para sacar homepage
-    const detailsUrl = `https://api.trakt.tv/${plural}/${encodeURIComponent(String(traktId))}?extended=full`;
-    const details = await traktFetch(detailsUrl);
+    const details = await fetchTrakt(
+      `/${plural}/${encodeURIComponent(String(traktId))}?extended=full`,
+      { timeoutMs: 4000, cacheTTL: 24 * 60 * 60 * 1000 },
+    );
 
     const homepage = normalizeUrl(details?.homepage || null);
-
-    const res = NextResponse.json({ url: homepage || null }, { status: 200 });
-    // cache CDN suave (opcional)
+    const res = NextResponse.json({ url: homepage || null });
     res.headers.set(
       "Cache-Control",
       "public, s-maxage=86400, stale-while-revalidate=604800",
     );
     return res;
   } catch (e) {
-    return NextResponse.json({ error: e?.message || "Error" }, { status: 500 });
+    const isExpected =
+      e?.status === 429 || /rate limit|timeout/i.test(e?.message || "");
+    if (!isExpected) {
+      console.warn("Trakt official-site error:", e?.message);
+    }
+    return NextResponse.json({ url: null });
   }
 }

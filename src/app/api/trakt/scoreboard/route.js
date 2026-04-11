@@ -10,6 +10,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 15; // Vercel: máximo tiempo de la función serverless
 
 export async function GET(req) {
+  // Timeout corto: scoreboard es secundario, no debe bloquear la UI
+  const ft = (path) => fetchTrakt(path, { timeoutMs: 4000 });
+  const ftm = (path) => fetchTraktMaybe(path, { timeoutMs: 4000 });
+
   try {
     const { searchParams } = new URL(req.url);
     const type = normalizeType(searchParams.get("type")); // movie|show|season|episode
@@ -31,7 +35,7 @@ export async function GET(req) {
       const safeType = type;
       const plural = safeType === "show" ? "shows" : "movies";
 
-      const search = await fetchTrakt(
+      const search = await ft(
         `/search/tmdb/${tmdbId}?type=${safeType}`,
       );
       const hit = Array.isArray(search) ? search[0] : null;
@@ -43,8 +47,8 @@ export async function GET(req) {
       const traktId = ids.trakt;
 
       const [summary, stats] = await Promise.all([
-        fetchTrakt(`/${plural}/${traktId}?extended=full`),
-        fetchTrakt(`/${plural}/${traktId}/stats`),
+        ft(`/${plural}/${traktId}?extended=full`),
+        ft(`/${plural}/${traktId}/stats`),
       ]);
 
       const slug = summary?.ids?.slug || ids?.slug || traktId;
@@ -98,9 +102,8 @@ export async function GET(req) {
     }
 
     // 1) resolver SHOW en Trakt por TMDb showId (con timeout más largo)
-    const searchShow = await fetchTrakt(
+    const searchShow = await ft(
       `/search/tmdb/${tmdbId}?type=show`,
-      8000,
     );
     const showHit = Array.isArray(searchShow) ? searchShow[0] : null;
     const showItem = showHit?.show;
@@ -113,9 +116,8 @@ export async function GET(req) {
 
     if (type === "season") {
       // 2) temporadas del show para conseguir ids/rating/votes de temporada
-      const seasons = await fetchTrakt(
+      const seasons = await ft(
         `/shows/${traktShowId}/seasons?extended=full`,
-        8000,
       );
       const seasonObj = Array.isArray(seasons)
         ? seasons.find((s) => Number(s?.number) === Number(seasonNumber))
@@ -128,10 +130,9 @@ export async function GET(req) {
 
       // 3) stats (intentar dos endpoints en paralelo con timeout más largo)
       const [stats1, stats2] = await Promise.all([
-        fetchTraktMaybe(`/seasons/${seasonIds.trakt}/stats`, 6000),
-        fetchTraktMaybe(
+        ftm(`/seasons/${seasonIds.trakt}/stats`),
+        ftm(
           `/shows/${traktShowId}/seasons/${seasonNumber}/stats`,
-          6000,
         ),
       ]);
       const stats = stats1 || stats2 || null;
@@ -176,9 +177,8 @@ export async function GET(req) {
     }
 
     // EPISODE - optimizar con Promise.all para cargar datos en paralelo
-    const ep = await fetchTrakt(
+    const ep = await ft(
       `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
-      8000,
     );
     const epIds = ep?.ids;
     if (!epIds?.trakt) return NextResponse.json({ found: false });
@@ -187,10 +187,9 @@ export async function GET(req) {
 
     // Intentar obtener stats de dos endpoints en paralelo con timeout más largo
     const [stats1, stats2] = await Promise.all([
-      fetchTraktMaybe(`/episodes/${epIds.trakt}/stats`, 6000),
-      fetchTraktMaybe(
+      ftm(`/episodes/${epIds.trakt}/stats`),
+      ftm(
         `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
-        6000,
       ),
     ]);
     const stats = stats1 || stats2 || null;
@@ -232,19 +231,13 @@ export async function GET(req) {
       },
     });
   } catch (e) {
-    console.error("Trakt scoreboard error:", e);
-
-    // Diferenciar entre timeout y otros errores
-    if (e?.message === "Trakt request timeout" || e?.name === "AbortError") {
-      return NextResponse.json(
-        {
-          error: "Trakt request timeout",
-          found: false,
-        },
-        { status: 504 },
-      );
+    const isTimeout = e?.message === "Trakt request timeout" || e?.name === "AbortError";
+    const isRateLimit = e?.status === 429 || /rate limit/i.test(e?.message || "");
+    if (isTimeout || isRateLimit) {
+      console.warn("Trakt scoreboard unavailable:", e.message);
+      return NextResponse.json({ found: false });
     }
-
+    console.error("Trakt scoreboard error:", e);
     return NextResponse.json(
       {
         error: e?.message || "Error",
