@@ -94,6 +94,9 @@ export function ExternalLinkButton({
   const finalHref = href || fallbackHref || null;
   const disabled = !finalHref && !loading; // si loading=true mostramos el botón (placeholder)
 
+  // Detectar si es el icono de sitio web para aplicar ajuste posicional
+  const isWebIcon = icon?.includes("logo-Web");
+
   return (
     <button
       type="button"
@@ -124,7 +127,7 @@ export function ExternalLinkButton({
         src={icon}
         alt=""
         style={iconSize ? { width: iconSize, height: iconSize } : undefined}
-        className="w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain"
+        className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isWebIcon ? "relative top-[3px]" : ""}`}
         draggable="false"
       />
 
