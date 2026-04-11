@@ -179,7 +179,7 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
 
 export default function EpisodeRatingsGrid({
   ratings,
-  showId, // ✅ nuevo: TMDb show id para poder navegar
+  showId, // TMDb show id para poder navegar
   initialSource = "imdb", // compat
   density = "compact",
   fillMissingWithTmdb = false,
@@ -368,7 +368,7 @@ export default function EpisodeRatingsGrid({
         .forEach((s) => {
           s.episodes.forEach((ep) => {
             if (ep.displayRating == null) return;
-            // ✅ Guardamos el season/episode real para la navegación
+            // Guardamos el season/episode real para la navegación
             allEpisodes.push({
               ...ep,
               episodeNumber: counter++, // número “aplanado” (solo visual)
@@ -510,7 +510,7 @@ export default function EpisodeRatingsGrid({
     };
   };
 
-  // ✅ navegación a detalles
+  // navegación a detalles
   const goToEpisode = useCallback(
     (ep, seasonNumber, episodeNumber) => {
       if (!showId) return;
@@ -970,7 +970,7 @@ export default function EpisodeRatingsGrid({
     </div>
   );
 
-  // ✅ En móvil, si el grid es pesado, no lo montamos hasta que el usuario lo elija (y esté cerca en viewport)
+  // En móvil, si el grid es pesado, no lo montamos hasta que el usuario lo elija (y esté cerca en viewport)
   const shouldRenderHeavyGrid =
     layoutMode === "grid" && (!isTouchLike || !isHeavyGrid)
       ? true

@@ -1979,7 +1979,7 @@ export default function DetailsClient({
     const load = async () => {
       setTSentiment((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // ✅ Añadir timeout de 8 segundos para evitar bloqueos
+        // Añadir timeout de 8 segundos para evitar bloqueos
         const r = await withTimeout(
           traktGetComments({
             type: traktType, // 'movie' | 'show'
@@ -2034,7 +2034,7 @@ export default function DetailsClient({
         const reqLimit = isLikes30 ? 50 : 20;
         const page = isLikes30 ? 1 : tComments.page;
 
-        // ✅ Añadir timeout de 8 segundos para evitar bloqueos
+        // Añadir timeout de 8 segundos para evitar bloqueos
         const r = await withTimeout(
           traktGetComments({
             type: traktType,
@@ -2108,7 +2108,7 @@ export default function DetailsClient({
       if (type !== "tv") return;
       setTSeasons((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // ✅ Añadir timeout de 8 segundos para evitar bloqueos
+        // Añadir timeout de 8 segundos para evitar bloqueos
         const r = await withTimeout(
           traktGetShowSeasons({ tmdbId: id, extended: "full" }),
           8000,
@@ -2144,7 +2144,7 @@ export default function DetailsClient({
     const load = async () => {
       setTLists((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // ✅ Añadir timeout de 8 segundos para evitar bloqueos
+        // Añadir timeout de 8 segundos para evitar bloqueos
         const r = await withTimeout(
           traktGetLists({
             type: traktType,
@@ -2248,7 +2248,7 @@ export default function DetailsClient({
     const load = async () => {
       setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // ✅ Añadir timeout de 8 segundos para evitar bloqueos
+        // Añadir timeout de 8 segundos para evitar bloqueos
         const r = await withTimeout(
           traktGetScoreboard({ type: traktType, tmdbId: id }),
           8000,
@@ -2314,7 +2314,7 @@ export default function DetailsClient({
         setTraktStatsLoading(true);
         setTraktStatsError("");
 
-        // ✅ Añadir timeout de 8 segundos para evitar bloqueos
+        // Añadir timeout de 8 segundos para evitar bloqueos
         const res = await withTimeout(
           traktGetStats({ type: traktType, tmdbId: id }),
           8000,
@@ -2370,7 +2370,7 @@ export default function DetailsClient({
     const load = async () => {
       setTrakt((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // ✅ Añadir timeout de 8 segundos para evitar bloqueos
+        // Añadir timeout de 8 segundos para evitar bloqueos
         const json = await withTimeout(
           traktGetItemStatus({ type: traktType, tmdbId: id }),
           8000,

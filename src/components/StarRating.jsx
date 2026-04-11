@@ -15,18 +15,16 @@ const fmt = (v) => {
 export default function StarRating({
   rating,
   max = 10,
-
-  // ✅ NUEVO
   min = 1,
   step = 0.5,
 
-  // ✅ Soporte props (Legacy/New)
+  // Soporte props (Legacy/New)
   onRate,
   onRating,
   onClear,
   onClearRating,
 
-  // ✅ estado/conexión
+  // estado/conexión
   loading = false,
   connected = true,
   onConnect,
@@ -110,7 +108,7 @@ export default function StarRating({
     if (v == null) return;
 
     if (typeof rateFn === "function") {
-      // ✅ si rateFn devuelve false o lanza, NO cerramos
+      // si rateFn devuelve false o lanza, NO cerramos
       const ok = await rateFn(v);
       if (ok === false) return;
     }
