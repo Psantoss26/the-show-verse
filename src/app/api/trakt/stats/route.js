@@ -106,7 +106,9 @@ export async function GET(req) {
       }
 
       // 3) Intentar obtener stats (puede fallar)
-      const stats = await ft(`/seasons/${seasonObj.ids.trakt}/stats`).catch(() => null);
+      const stats = await ft(`/seasons/${seasonObj.ids.trakt}/stats`).catch(
+        () => null,
+      );
 
       return NextResponse.json({
         found: true,
@@ -155,8 +157,10 @@ export async function GET(req) {
       },
     });
   } catch (e) {
-    const isTimeout = e?.name === "AbortError" || e?.message === "Trakt request timeout";
-    const isRateLimit = e?.status === 429 || /rate limit/i.test(e?.message || "");
+    const isTimeout =
+      e?.name === "AbortError" || e?.message === "Trakt request timeout";
+    const isRateLimit =
+      e?.status === 429 || /rate limit/i.test(e?.message || "");
     if (isTimeout || isRateLimit) {
       console.warn("Trakt stats unavailable:", e.message);
       return NextResponse.json({ found: false });

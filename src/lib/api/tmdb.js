@@ -45,12 +45,12 @@ async function tmdb(path, params = {}, options = {}) {
     // En cliente: no-store (el browser ya gestiona su propio cache HTTP).
     const baseInit = IS_SERVER
       ? {
-        cache: "force-cache",
-        next: { revalidate: 60 * 10 }, // 10 minutos
-      }
+          cache: "force-cache",
+          next: { revalidate: 60 * 10 }, // 10 minutos
+        }
       : {
-        cache: "no-store",
-      };
+          cache: "no-store",
+        };
 
     const res = await fetch(buildUrl(path, params), {
       ...baseInit,
@@ -103,8 +103,13 @@ async function tmdb(path, params = {}, options = {}) {
 }
 
 /* -------------------- Películas (Movies) -------------------- */
-export async function fetchTopRatedMovies() {
-  const data = await tmdb("/movie/top_rated", { page: 1 });
+export async function fetchTopRatedMovies(minVotes = 1000) {
+  // Usar /discover en lugar de /top_rated para poder filtrar por votos mínimos
+  const data = await tmdb("/discover/movie", {
+    sort_by: "vote_average.desc",
+    "vote_count.gte": minVotes,
+    page: 1,
+  });
   return data?.results || [];
 }
 
@@ -228,8 +233,13 @@ export async function fetchPopularTV() {
   return data?.results || [];
 }
 
-export async function fetchTopRatedTV() {
-  const data = await tmdb("/tv/top_rated", { page: 1 });
+export async function fetchTopRatedTV(minVotes = 500) {
+  // Usar /discover en lugar de /top_rated para poder filtrar por votos mínimos
+  const data = await tmdb("/discover/tv", {
+    sort_by: "vote_average.desc",
+    "vote_count.gte": minVotes,
+    page: 1,
+  });
   return data?.results || [];
 }
 

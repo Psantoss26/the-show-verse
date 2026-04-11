@@ -172,7 +172,7 @@ function formatEpisodeBadge(meta) {
   return `T${pad2(meta.season)} · E${pad2(meta.episode)}`;
 }
 
-// ✅ NUEVO: formato para el TÍTULO (sin pad, sin punto)
+// formato para el TÍTULO (sin pad, sin punto)
 // Querías: "Juego de tronos T1 E1"
 function formatEpisodeInline(meta) {
   if (!meta) return null;
@@ -251,7 +251,7 @@ function getDetailsHref(entry) {
   // Serie / Episodio -> details/tv/:id ...
   const mediaType = "tv";
 
-  // ✅ Si es episodio, manda a la página del episodio
+  // Si es episodio, manda a la página del episodio
   if (isEpisodeEntry(entry)) {
     const meta = getEpisodeMeta(entry);
     if (meta?.season != null && meta?.episode != null) {
@@ -595,7 +595,9 @@ function CalendarWithPosters({
     return map;
   }, [historyItems]);
 
-  const selectedDayItems = selectedDayKey ? itemsByDay[selectedDayKey] || [] : [];
+  const selectedDayItems = selectedDayKey
+    ? itemsByDay[selectedDayKey] || []
+    : [];
   const selectedDayCollapsed = useMemo(
     () => collapseConsecutive(selectedDayItems),
     [selectedDayItems],
@@ -672,7 +674,11 @@ function CalendarWithPosters({
           return (
             <div
               key={d.toISOString()}
-              onClick={hasItems ? () => setSelectedDayKey(isSelected ? null : key) : undefined}
+              onClick={
+                hasItems
+                  ? () => setSelectedDayKey(isSelected ? null : key)
+                  : undefined
+              }
               className={[
                 "flex flex-col rounded-lg lg:rounded-xl border-2 transition-all relative overflow-visible",
                 hasItems ? "cursor-pointer hover:z-10" : "",
@@ -702,12 +708,14 @@ function CalendarWithPosters({
               >
                 <span>{d.getDate()}</span>
                 {hasItems && (
-                  <span className={[
-                    "text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-                    isSelected
-                      ? "bg-emerald-500/40 text-emerald-200"
-                      : "bg-emerald-500/20 text-emerald-300",
-                  ].join(" ")}>
+                  <span
+                    className={[
+                      "text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+                      isSelected
+                        ? "bg-emerald-500/40 text-emerald-200"
+                        : "bg-emerald-500/20 text-emerald-300",
+                    ].join(" ")}
+                  >
                     {items.length}
                   </span>
                 )}
@@ -718,14 +726,22 @@ function CalendarWithPosters({
                 <div
                   className="flex-1 flex items-center justify-center px-1 pb-1 min-h-0 overflow-visible"
                   onMouseMove={(e) => {
-                    const wrapper = e.currentTarget.querySelector("[data-poster-stack]");
+                    const wrapper = e.currentTarget.querySelector(
+                      "[data-poster-stack]",
+                    );
                     if (!wrapper) return;
                     const children = Array.from(wrapper.children);
                     const total = children.length;
                     if (total <= 1) return;
                     const rect = wrapper.getBoundingClientRect();
-                    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                    const activeIdx = Math.min(Math.floor(ratio * total), total - 1);
+                    const ratio = Math.max(
+                      0,
+                      Math.min(1, (e.clientX - rect.left) / rect.width),
+                    );
+                    const activeIdx = Math.min(
+                      Math.floor(ratio * total),
+                      total - 1,
+                    );
                     const spread = Math.min(16, rect.width / (total + 1));
                     const totalWidth = spread * (total - 1);
                     const startOffset = -totalWidth / 2;
@@ -737,7 +753,9 @@ function CalendarWithPosters({
                         child.style.opacity = "1";
                         child.style.filter = "brightness(1.1)";
                       } else {
-                        child.style.zIndex = String(total - Math.abs(i - activeIdx));
+                        child.style.zIndex = String(
+                          total - Math.abs(i - activeIdx),
+                        );
                         child.style.transform = `translateX(${xPos}px) scale(0.95)`;
                         child.style.opacity = "0.5";
                         child.style.filter = "brightness(0.7)";
@@ -746,7 +764,9 @@ function CalendarWithPosters({
                     });
                   }}
                   onMouseLeave={(e) => {
-                    const wrapper = e.currentTarget.querySelector("[data-poster-stack]");
+                    const wrapper = e.currentTarget.querySelector(
+                      "[data-poster-stack]",
+                    );
                     if (!wrapper) return;
                     const children = Array.from(wrapper.children);
                     children.forEach((child, i) => {
@@ -833,7 +853,8 @@ function CalendarWithPosters({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                    {selectedDayItems.length} {selectedDayItems.length === 1 ? "visto" : "vistos"}
+                    {selectedDayItems.length}{" "}
+                    {selectedDayItems.length === 1 ? "visto" : "vistos"}
                   </span>
                 </div>
               </div>
@@ -844,7 +865,9 @@ function CalendarWithPosters({
                   const isGroup = entry._group && entry._group.length > 1;
                   const title = getMainTitle(entry);
                   const type = getItemType(entry);
-                  const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null;
+                  const epMeta = isEpisodeEntry(entry)
+                    ? getEpisodeMeta(entry)
+                    : null;
                   const href = getDetailsHref(entry);
 
                   if (isGroup) {
@@ -874,12 +897,14 @@ function CalendarWithPosters({
                           {title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className={[
-                            "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded",
-                            type === "movie"
-                              ? "bg-sky-500/20 text-sky-300"
-                              : "bg-purple-500/20 text-purple-300",
-                          ].join(" ")}>
+                          <span
+                            className={[
+                              "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded",
+                              type === "movie"
+                                ? "bg-sky-500/20 text-sky-300"
+                                : "bg-purple-500/20 text-purple-300",
+                            ].join(" ")}
+                          >
                             {type === "movie" ? "Película" : "Serie"}
                           </span>
                           {type === "show" && epMeta && (
@@ -961,7 +986,9 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
           >
             <div className="border-t border-zinc-800/50 bg-zinc-900/30">
               {entry._group.map((sub, subIdx) => {
-                const subMeta = isEpisodeEntry(sub) ? getEpisodeMeta(sub) : null;
+                const subMeta = isEpisodeEntry(sub)
+                  ? getEpisodeMeta(sub)
+                  : null;
                 const subHref = getDetailsHref(sub);
                 return (
                   <Link
@@ -1072,11 +1099,12 @@ function CalendarPanel({
               disabled={!inMonth}
               className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all duration-200 text-sm font-bold
                 ${!inMonth ? "opacity-0 pointer-events-none" : "text-zinc-300"}
-                ${selected
-                  ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 z-10 scale-110"
-                  : isToday
-                    ? "bg-zinc-800 text-white border border-emerald-500/50"
-                    : "bg-zinc-900/50 hover:bg-zinc-800 hover:text-white hover:scale-105"
+                ${
+                  selected
+                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 z-10 scale-110"
+                    : isToday
+                      ? "bg-zinc-800 text-white border border-emerald-500/50"
+                      : "bg-zinc-900/50 hover:bg-zinc-800 hover:text-white hover:scale-105"
                 }`}
             >
               <span>{d.getDate()}</span>
@@ -1099,10 +1127,11 @@ function CalendarPanel({
 
       <button
         onClick={onToggleCalendarView}
-        className={`mt-6 w-full py-3 text-sm font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${showCalendarView
-          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-          : "bg-zinc-800/80 text-zinc-300 hover:bg-zinc-800 hover:text-white border border-white/5"
-          }`}
+        className={`mt-6 w-full py-3 text-sm font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
+          showCalendarView
+            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+            : "bg-zinc-800/80 text-zinc-300 hover:bg-zinc-800 hover:text-white border border-white/5"
+        }`}
       >
         <Calendar className="w-4 h-4" />{" "}
         {showCalendarView ? "Vista Normal" : "Vista Calendario"}
@@ -1221,8 +1250,9 @@ function SmartPoster({ entry, title, mode = "poster" }) {
   return (
     <div className="absolute inset-0 w-full h-full">
       <div
-        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${ready && src ? "opacity-0" : "opacity-100"
-          }`}
+        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
+          ready && src ? "opacity-0" : "opacity-100"
+        }`}
       >
         <Film className="w-8 h-8 text-zinc-700" />
       </div>
@@ -1233,8 +1263,9 @@ function SmartPoster({ entry, title, mode = "poster" }) {
           alt={title}
           loading="lazy"
           decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${ready ? "opacity-100" : "opacity-0"
-            }`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            ready ? "opacity-100" : "opacity-0"
+          }`}
         />
       )}
     </div>
@@ -1258,7 +1289,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
   const inlineEp =
     type === "show" && epMeta ? formatEpisodeInline(epMeta) : null;
 
-  // ✅ AQUÍ está la clave: el título incluye T1 E1
+  // AQUÍ está la clave: el título incluye T1 E1
   const title = inlineEp ? `${baseTitle} ${inlineEp}` : baseTitle;
 
   const year = getYear(entry);
@@ -1296,7 +1327,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
     setConfirmDel(false);
   };
 
-  // ✅ Optimized backdrop loading with Intersection Observer
+  // Optimized backdrop loading with Intersection Observer
   useEffect(() => {
     if (!hasBeenInView) return;
 
@@ -1339,8 +1370,9 @@ const HistoryItemCard = memo(function HistoryItemCard({
       <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
         <div className="absolute inset-0 w-full h-full">
           <div
-            className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${backdropReady && posterSrc ? "opacity-0" : "opacity-100"
-              }`}
+            className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
+              backdropReady && posterSrc ? "opacity-0" : "opacity-100"
+            }`}
           >
             <Film className="w-8 h-8 text-zinc-700" />
           </div>
@@ -1351,8 +1383,9 @@ const HistoryItemCard = memo(function HistoryItemCard({
               alt={title}
               loading="lazy"
               decoding="async"
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${backdropReady ? "opacity-100" : "opacity-0"
-                }`}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+                backdropReady ? "opacity-100" : "opacity-0"
+              }`}
             />
           )}
         </div>
@@ -1383,7 +1416,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
         </div>
       </div>
 
-      {/* ✅ Botón borrar: visible en móvil solo si editMode, en desktop al hover */}
+      {/* Botón borrar: visible en móvil solo si editMode, en desktop al hover */}
       {!confirmDel && (!isMobile || editMode) && (
         <button
           onClick={handleDeleteClick}
@@ -1395,7 +1428,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
         </button>
       )}
 
-      {/* ✅ Confirmación de borrado */}
+      {/* Confirmación de borrado */}
       <AnimatePresence>
         {confirmDel && (
           <motion.div
@@ -1536,10 +1569,10 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
       style={{ transformOrigin: "center center" }}
     >
-      {/* ✅ Poster Image */}
+      {/* Poster Image */}
       <Poster entry={entry} className="w-full h-full" />
 
-      {/* ✅ Desktop: Hover overlay with information */}
+      {/* Desktop: Hover overlay with information */}
       <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
           <div className="flex items-center gap-2 mb-1 -ml-0.5">
@@ -1565,7 +1598,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         </div>
       </div>
 
-      {/* ✅ Mobile: Compact badge indicator - solo en editMode */}
+      {/* Mobile: Compact badge indicator - solo en editMode */}
       {(!isMobile || editMode) && (
         <div className="absolute top-2 left-2 z-10 lg:hidden">
           <span
@@ -1576,7 +1609,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         </div>
       )}
 
-      {/* ✅ Delete button - appears on hover o en editMode mobile */}
+      {/* Delete button - appears on hover o en editMode mobile */}
       {!confirmDel && (!isMobile || editMode) && (
         <button
           onClick={handleDeleteClick}
@@ -1588,7 +1621,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         </button>
       )}
 
-      {/* ✅ Delete confirmation overlay */}
+      {/* Delete confirmation overlay */}
       <AnimatePresence>
         {confirmDel && (
           <motion.div
@@ -1701,10 +1734,11 @@ const HistoryGridCard = memo(function HistoryGridCard({
     <>
       <div className="flex items-center gap-2 mb-1 -ml-0.5">
         <span
-          className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === "movie"
-            ? "bg-sky-500/20 text-sky-200"
-            : "bg-purple-500/20 text-purple-200"
-            }`}
+          className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
+            type === "movie"
+              ? "bg-sky-500/20 text-sky-200"
+              : "bg-purple-500/20 text-purple-200"
+          }`}
         >
           {type === "movie" ? "Cine" : "TV"}
         </span>
@@ -1734,7 +1768,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
   const CardInner = (
     <div
       className={[
-        // ✅ IMPORTANTE: hover SOLO en desktop para evitar "hover pegajoso" en móvil
+        // IMPORTANTE: hover SOLO en desktop para evitar "hover pegajoso" en móvil
         "relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md",
         "lg:hover:shadow-emerald-900/20 transition-all",
         disabledCls,
@@ -1742,7 +1776,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
     >
       <Poster entry={entry} className="w-full h-full" />
 
-      {/* ✅ MÓVIL: banda inferior - solo en editMode */}
+      {/* MÓVIL: banda inferior - solo en editMode */}
       {(!isMobile || editMode) && (
         <div
           className={[
@@ -1757,7 +1791,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
         </div>
       )}
 
-      {/* ✅ DESKTOP: overlay más sutil con menos blur */}
+      {/* DESKTOP: overlay más sutil con menos blur */}
       <div
         className={[
           "absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3",
@@ -1769,10 +1803,11 @@ const HistoryGridCard = memo(function HistoryGridCard({
           {/* En desktop mostramos badge + título episodio en la misma línea (como ya tenías) */}
           <div className="flex items-center gap-2 mb-1 -ml-0.5">
             <span
-              className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === "movie"
-                ? "bg-sky-500/30 text-sky-200"
-                : "bg-purple-500/30 text-purple-200"
-                }`}
+              className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
+                type === "movie"
+                  ? "bg-sky-500/30 text-sky-200"
+                  : "bg-purple-500/30 text-purple-200"
+              }`}
             >
               {type === "movie" ? "Cine" : "TV"}
             </span>
@@ -1805,7 +1840,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
         </div>
       </div>
 
-      {/* ✅ Botón borrar: visible en móvil solo si editMode está activo, en desktop solo al hover */}
+      {/* Botón borrar: visible en móvil solo si editMode está activo, en desktop solo al hover */}
       {!confirmDel && (!isMobile || editMode) && (
         <button
           onClick={handleDeleteClick}
@@ -1821,7 +1856,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
         </button>
       )}
 
-      {/* ✅ Confirmación de borrado */}
+      {/* Confirmación de borrado */}
       <AnimatePresence>
         {confirmDel && (
           <motion.div
@@ -1987,7 +2022,7 @@ export default function HistoryClient() {
         (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
       );
 
-      // ✅ Optimized: Load only essential data, images loaded on-demand with Intersection Observer
+      // Optimized: Load only essential data, images loaded on-demand with Intersection Observer
       const enriched = await mapLimit(sorted, 15, async (e) => {
         const t = getItemType(e);
         const id = getTmdbId(e);
@@ -2191,7 +2226,9 @@ export default function HistoryClient() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <div className="h-px w-12 bg-emerald-500" />
-                <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">REGISTRO</span>
+                <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">
+                  REGISTRO
+                </span>
               </div>
               <div className="flex items-center gap-6">
                 <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
@@ -2213,7 +2250,9 @@ export default function HistoryClient() {
                       whileTap={{ scale: loading ? 1 : 0.95 }}
                       title="Sincronizar"
                     >
-                      <RotateCcw className={`w-5 h-5 text-white ${loading ? "animate-spin" : ""}`} />
+                      <RotateCcw
+                        className={`w-5 h-5 text-white ${loading ? "animate-spin" : ""}`}
+                      />
                     </motion.button>
 
                     <motion.button
@@ -2317,17 +2356,29 @@ export default function HistoryClient() {
               <motion.div
                 ref={(el) => {
                   if (el && !el.dataset.stickySetup) {
-                    el.dataset.stickySetup = 'true';
+                    el.dataset.stickySetup = "true";
                     const observer = new IntersectionObserver(
                       ([e]) => {
                         const isStuck = e.intersectionRatio < 1;
                         if (isStuck) {
-                          el.classList.add('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                          el.classList.add(
+                            "backdrop-blur-xl",
+                            "bg-gradient-to-br",
+                            "from-black/60",
+                            "via-black/50",
+                            "to-black/55",
+                          );
                         } else {
-                          el.classList.remove('backdrop-blur-xl', 'bg-gradient-to-br', 'from-black/60', 'via-black/50', 'to-black/55');
+                          el.classList.remove(
+                            "backdrop-blur-xl",
+                            "bg-gradient-to-br",
+                            "from-black/60",
+                            "via-black/50",
+                            "to-black/55",
+                          );
                         }
                       },
-                      { threshold: [1], rootMargin: '-65px 0px 0px 0px' }
+                      { threshold: [1], rootMargin: "-65px 0px 0px 0px" },
                     );
                     observer.observe(el);
                   }
@@ -2359,10 +2410,11 @@ export default function HistoryClient() {
                   <button
                     type="button"
                     onClick={() => setMobileFiltersOpen((v) => !v)}
-                    className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${mobileFiltersOpen
-                      ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                      : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
-                      }`}
+                    className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
+                      mobileFiltersOpen
+                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                    }`}
                   >
                     <SlidersHorizontal className="w-4 h-4" />
                   </button>
@@ -2537,30 +2589,33 @@ export default function HistoryClient() {
                             <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
                               <button
                                 onClick={() => setViewMode("list")}
-                                className={`flex-1 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "list"
-                                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                                  }`}
+                                className={`flex-1 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                                  viewMode === "list"
+                                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                                }`}
                                 title="Lista"
                               >
                                 <LayoutList className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => setViewMode("compact")}
-                                className={`flex-1 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "compact"
-                                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                                  }`}
+                                className={`flex-1 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                                  viewMode === "compact"
+                                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                                }`}
                                 title="Compacta"
                               >
                                 <Grid3x3 className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => setViewMode("grid")}
-                                className={`flex-1 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === "grid"
-                                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                                  }`}
+                                className={`flex-1 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                                  viewMode === "grid"
+                                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                                }`}
                                 title="Grid"
                               >
                                 <LayoutGrid className="w-4 h-4" />
@@ -2569,13 +2624,18 @@ export default function HistoryClient() {
 
                             <button
                               onClick={() => setEditMode(!editMode)}
-                              className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 ${editMode
-                                ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                                : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600"
-                                }`}
+                              className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 ${
+                                editMode
+                                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                                  : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600"
+                              }`}
                               title={editMode ? "Cancelar" : "Editar"}
                             >
-                              {editMode ? <X className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+                              {editMode ? (
+                                <X className="w-4 h-4" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
                             </button>
                           </div>
                         </div>
@@ -2750,30 +2810,33 @@ export default function HistoryClient() {
                   <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
                     <button
                       onClick={() => setViewMode("list")}
-                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "list"
-                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
+                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                        viewMode === "list"
+                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                      }`}
                       title="Vista Lista"
                     >
                       <LayoutList className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setViewMode("compact")}
-                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "compact"
-                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
+                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                        viewMode === "compact"
+                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                      }`}
                       title="Vista Compacta"
                     >
                       <Grid3x3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setViewMode("grid")}
-                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "grid"
-                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
+                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                        viewMode === "grid"
+                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                      }`}
                       title="Vista Cuadrícula"
                     >
                       <LayoutGrid className="w-4 h-4" />
@@ -2833,7 +2896,12 @@ export default function HistoryClient() {
             ) : (
               <div className="space-y-8">
                 {groupedWithCollapse.map((g, groupIndex) => {
-                  const renderItems = (CardComponent, entry, idx, extraProps = {}) => {
+                  const renderItems = (
+                    CardComponent,
+                    entry,
+                    idx,
+                    extraProps = {},
+                  ) => {
                     const isCollapsed = entry._group && entry._group.length > 1;
                     const collapseKey = `${g.key}:${getTmdbId(entry)}:${idx}`;
                     const isExpanded = expandedGroups.has(collapseKey);
@@ -2884,9 +2952,7 @@ export default function HistoryClient() {
                         <div
                           key={`expanded:${collapseKey}`}
                           className={
-                            viewMode === "list"
-                              ? "col-span-full"
-                              : "contents"
+                            viewMode === "list" ? "col-span-full" : "contents"
                           }
                         >
                           {/* Botón para colapsar de nuevo */}
@@ -2902,8 +2968,11 @@ export default function HistoryClient() {
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/25 transition-colors"
                             >
                               <Layers className="w-3.5 h-3.5" />
-                              {getMainTitle(entry)} · {entry._group.length} episodios
-                              <span className="text-emerald-500/60 ml-1">– Colapsar</span>
+                              {getMainTitle(entry)} · {entry._group.length}{" "}
+                              episodios
+                              <span className="text-emerald-500/60 ml-1">
+                                – Colapsar
+                              </span>
                             </button>
                           </div>
                           {entry._group.map((subEntry, subIdx) => (
@@ -2913,7 +2982,9 @@ export default function HistoryClient() {
                                 `${getTmdbId(subEntry)}:${subEntry?.watched_at}:${subIdx}`
                               }
                               entry={subEntry}
-                              busy={mutatingId === `del:${getHistoryId(subEntry)}`}
+                              busy={
+                                mutatingId === `del:${getHistoryId(subEntry)}`
+                              }
                               onRemoveFromHistory={removeFromHistory}
                               index={subIdx}
                               totalItems={entry._group.length}
@@ -2965,19 +3036,19 @@ export default function HistoryClient() {
                       {viewMode === "grid" ? (
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                           {g.collapsedItems.map((entry, idx) =>
-                            renderItems(HistoryGridCard, entry, idx)
+                            renderItems(HistoryGridCard, entry, idx),
                           )}
                         </div>
                       ) : viewMode === "compact" ? (
                         <div className="compact-cards-grid grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2">
                           {g.collapsedItems.map((entry, idx) =>
-                            renderItems(HistoryCompactCard, entry, idx)
+                            renderItems(HistoryCompactCard, entry, idx),
                           )}
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                           {g.collapsedItems.map((entry, idx) =>
-                            renderItems(HistoryItemCard, entry, idx)
+                            renderItems(HistoryItemCard, entry, idx),
                           )}
                         </div>
                       )}
@@ -3123,6 +3194,6 @@ export default function HistoryClient() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div >
+    </div>
   );
 }

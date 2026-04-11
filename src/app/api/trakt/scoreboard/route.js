@@ -35,9 +35,7 @@ export async function GET(req) {
       const safeType = type;
       const plural = safeType === "show" ? "shows" : "movies";
 
-      const search = await ft(
-        `/search/tmdb/${tmdbId}?type=${safeType}`,
-      );
+      const search = await ft(`/search/tmdb/${tmdbId}?type=${safeType}`);
       const hit = Array.isArray(search) ? search[0] : null;
       const item = hit?.[safeType];
       const ids = item?.ids;
@@ -102,9 +100,7 @@ export async function GET(req) {
     }
 
     // 1) resolver SHOW en Trakt por TMDb showId (con timeout más largo)
-    const searchShow = await ft(
-      `/search/tmdb/${tmdbId}?type=show`,
-    );
+    const searchShow = await ft(`/search/tmdb/${tmdbId}?type=show`);
     const showHit = Array.isArray(searchShow) ? searchShow[0] : null;
     const showItem = showHit?.show;
     const showIds = showItem?.ids;
@@ -116,9 +112,7 @@ export async function GET(req) {
 
     if (type === "season") {
       // 2) temporadas del show para conseguir ids/rating/votes de temporada
-      const seasons = await ft(
-        `/shows/${traktShowId}/seasons?extended=full`,
-      );
+      const seasons = await ft(`/shows/${traktShowId}/seasons?extended=full`);
       const seasonObj = Array.isArray(seasons)
         ? seasons.find((s) => Number(s?.number) === Number(seasonNumber))
         : null;
@@ -131,9 +125,7 @@ export async function GET(req) {
       // 3) stats (intentar dos endpoints en paralelo con timeout más largo)
       const [stats1, stats2] = await Promise.all([
         ftm(`/seasons/${seasonIds.trakt}/stats`),
-        ftm(
-          `/shows/${traktShowId}/seasons/${seasonNumber}/stats`,
-        ),
+        ftm(`/shows/${traktShowId}/seasons/${seasonNumber}/stats`),
       ]);
       const stats = stats1 || stats2 || null;
 
@@ -231,8 +223,10 @@ export async function GET(req) {
       },
     });
   } catch (e) {
-    const isTimeout = e?.message === "Trakt request timeout" || e?.name === "AbortError";
-    const isRateLimit = e?.status === 429 || /rate limit/i.test(e?.message || "");
+    const isTimeout =
+      e?.message === "Trakt request timeout" || e?.name === "AbortError";
+    const isRateLimit =
+      e?.status === 429 || /rate limit/i.test(e?.message || "");
     if (isTimeout || isRateLimit) {
       console.warn("Trakt scoreboard unavailable:", e.message);
       return NextResponse.json({ found: false });
