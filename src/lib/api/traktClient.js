@@ -256,6 +256,7 @@ export async function traktGetLists({
   tab = "popular",
   page = 1,
   limit = 10,
+  countOnly = false,
 }) {
   const qs = new URLSearchParams({
     type: String(type),
@@ -263,6 +264,7 @@ export async function traktGetLists({
     tab: String(tab),
     page: String(page),
     limit: String(limit),
+    countOnly: String(countOnly),
   });
   const res = await fetch(`/api/trakt/community/lists?${qs.toString()}`, {
     cache: "no-store",
@@ -397,7 +399,7 @@ export async function traktAddShowPlay({ tmdbId, watchedAt }) {
  * Obtiene las series en progreso del usuario
  */
 export async function traktGetInProgress() {
-  const res = await fetch('/api/trakt/show/in-progress', { cache: 'no-store' });
+  const res = await fetch("/api/trakt/show/in-progress", { cache: "no-store" });
   const json = await safeJson(res);
   if (!res.ok)
     throw new Error(json?.error || `Trakt in-progress HTTP ${res.status}`);
@@ -407,7 +409,7 @@ export async function traktGetInProgress() {
  * Obtiene las series completadas del usuario
  */
 export async function traktGetCompleted() {
-  const res = await fetch('/api/trakt/show/completed', { cache: 'no-store' });
+  const res = await fetch("/api/trakt/show/completed", { cache: "no-store" });
   const json = await safeJson(res);
   if (!res.ok)
     throw new Error(json?.error || `Trakt completed HTTP ${res.status}`);
