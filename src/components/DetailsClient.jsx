@@ -5627,25 +5627,31 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       <div className="w-px h-8 bg-white/20 flex-shrink-0" />
                     )}
                     <div className="flex flex-row flex-nowrap items-center gap-2">
-                      {externalLinks.slice(0, 5).map((link) => (
-                        <a
-                          key={link.id}
-                          href={link.href}
-                          target="_blank"
-                          rel="noreferrer"
-                          title={link.label}
-                          className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
-                        >
-                          <img
-                            src={link.icon}
-                            alt={link.label}
-                            className="w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain"
-                            onError={(e) => {
-                              e.target.style.display = "none";
-                            }}
-                          />
-                        </a>
-                      ))}
+                      {externalLinks.slice(0, 5).map((link) => {
+                        // Detectar si es Letterboxd para ajustar escala
+                        const isLetterboxdIcon =
+                          link.icon?.includes("logo-Letterboxd");
+
+                        return (
+                          <a
+                            key={link.id}
+                            href={link.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={link.label}
+                            className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
+                          >
+                            <img
+                              src={link.icon}
+                              alt={link.label}
+                              className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isLetterboxdIcon ? "scale-[1.2]" : ""}`}
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                              }}
+                            />
+                          </a>
+                        );
+                      })}
                     </div>
                   </>
                 )}
