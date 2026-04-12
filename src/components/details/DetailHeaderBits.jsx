@@ -97,6 +97,9 @@ export function ExternalLinkButton({
   // Detectar si es el icono de sitio web para aplicar ajuste posicional
   const isWebIcon = icon?.includes("logo-Web");
 
+  // Detectar si es el icono de Letterboxd para ajustar tamaño (PNG tiene mucho padding)
+  const isLetterboxdIcon = icon?.includes("logo-Letterboxd");
+
   return (
     <button
       type="button"
@@ -127,7 +130,7 @@ export function ExternalLinkButton({
         src={icon}
         alt=""
         style={iconSize ? { width: iconSize, height: iconSize } : undefined}
-        className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isWebIcon ? "relative top-[3px]" : ""}`}
+        className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isWebIcon ? "relative top-[3px]" : ""} ${isLetterboxdIcon ? "scale-[1.2]" : ""}`}
         draggable="false"
       />
 
