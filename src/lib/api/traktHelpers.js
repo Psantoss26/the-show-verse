@@ -4,27 +4,13 @@
  * Similar a Netflix y Amazon Prime Video
  */
 
-// ✅ Función para obtener la clave en runtime (no en tiempo de build)
-function getTraktKey() {
-  return (
-    process.env.TRAKT_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ||
-    process.env.TRAKT_API_KEY
-  );
-}
+import { fetchTrakt as fetchTraktWithCache } from "@/lib/trakt/fetchWithCache";
+
+// Cache de deduplicación: evita pedir el mismo TMDb ID varias veces en un mismo render
+const tmdbDetailsCache = new Map();
 
 function getTmdbKey() {
   return process.env.NEXT_PUBLIC_TMDB_API_KEY;
-}
-
-function traktHeaders() {
-  const TRAKT_KEY = getTraktKey();
-  if (!TRAKT_KEY) return null;
-  return {
-    "content-type": "application/json",
-    "trakt-api-version": "2",
-    "trakt-api-key": TRAKT_KEY,
-  };
 }
 
 async function safeJson(res) {
@@ -35,39 +21,23 @@ async function safeJson(res) {
   }
 }
 
-async function fetchTrakt(path, options = {}) {
-  const headers = traktHeaders();
-  if (!headers) return [];
-
-  // ✅ Timeout de 8s para cada llamada individual a Trakt.
-  // Sin esto, en Vercel (límite 10s) una sola petición lenta hace que
-  // el Promise.all completo del dashboard devuelva datos vacíos.
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
-
+/**
+ * Wrapper para usar el sistema centralizado de cache de Trakt
+ * con timeout de 20s en prod / 10s en dev
+ */
+async function fetchTrakt(path) {
   try {
-    const res = await fetch(`https://api.trakt.tv${path}`, {
-      headers,
-      next: { revalidate: 60 * 60 }, // 1h cache
-      signal: controller.signal,
-      ...options,
+    const data = await fetchTraktWithCache(path, {
+      useCache: true,
+      cacheTTL: 60 * 60 * 1000, // 1 hora
     });
-    clearTimeout(timeoutId);
-
-    const json = await safeJson(res);
-    if (!res.ok) return [];
-    return Array.isArray(json) ? json : [];
+    return Array.isArray(data) ? data : [];
   } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      console.warn('[traktHelpers] fetchTrakt timeout:', path);
-    }
+    // El error ya fue logueado por fetchWithCache
+    console.warn("[traktHelpers] Error fetching:", path, err.message);
     return [];
   }
 }
-
-// Cache de deduplicación: evita pedir el mismo TMDb ID varias veces en un mismo render
-const tmdbDetailsCache = new Map();
 
 async function fetchTmdbDetails(type, id) {
   const TMDB_KEY = getTmdbKey();
@@ -122,8 +92,13 @@ async function mapWithConcurrency(items, worker, concurrency = 8) {
  * Hydrata resultados de Trakt con detalles de TMDb
  */
 async function hydrateTraktResults(seeds, limit = 24) {
-  return await mapWithConcurrency(
-    seeds.slice(0, limit),
+  const filtered = seeds.slice(0, limit);
+  console.log(
+    `💧 [traktHelpers] Hydrating ${filtered.length} items from Trakt`,
+  );
+
+  const results = await mapWithConcurrency(
+    filtered,
     async (it) => {
       const details = await fetchTmdbDetails(
         it.media_type === "tv" ? "tv" : "movie",
@@ -148,16 +123,29 @@ async function hydrateTraktResults(seeds, limit = 24) {
     },
     15,
   );
+
+  console.log(
+    `✅ [traktHelpers] Hydrated ${results.length} items successfully`,
+  );
+  return results;
 }
 
 /**
  * TRENDING: Lo más popular de la semana (movies + shows alternados)
  */
 export async function getTraktTrending(limit = 24) {
+  console.log(
+    `📊 [getTraktTrending] Fetching trending content (limit: ${limit})`,
+  );
+
   const [movies, shows] = await Promise.all([
     fetchTrakt("/movies/trending?extended=full&limit=30"),
     fetchTrakt("/shows/trending?extended=full&limit=30"),
   ]);
+
+  console.log(
+    `📊 [getTraktTrending] Received ${movies.length} movies, ${shows.length} shows`,
+  );
 
   const movieSeeds = movies
     .map((x) => ({ media_type: "movie", tmdb: x?.movie?.ids?.tmdb }))
