@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { fetchTrakt, normalizeType } from "@/lib/trakt/fetchWithCache";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 15; // Vercel: máximo tiempo de la función serverless
+export const maxDuration = 25; // Vercel: aumentado para producción
 
 export async function GET(req) {
-  // Timeout corto: stats/scoreboard son secundarios, no deben bloquear la UI
-  const ft = (path) => fetchTrakt(path, { timeoutMs: 4000 });
+  // Timeout generoso para stats de Trakt (pueden ser lentas)
+  const timeoutMs = process.env.NODE_ENV === "production" ? 15000 : 12000;
+  const ft = (path) => fetchTrakt(path, { timeoutMs });
 
   try {
     const { searchParams } = new URL(req.url);
@@ -158,17 +159,47 @@ export async function GET(req) {
     });
   } catch (e) {
     const isTimeout =
-      e?.name === "AbortError" || e?.message === "Trakt request timeout";
+      e?.isTimeout ||
+      e?.name === "AbortError" ||
+      /timeout/i.test(e?.message || "");
     const isRateLimit =
       e?.status === 429 || /rate limit/i.test(e?.message || "");
-    if (isTimeout || isRateLimit) {
-      console.warn("Trakt stats unavailable:", e.message);
-      return NextResponse.json({ found: false });
+    const isNotFound = e?.status === 404;
+    const isServerError = e?.status >= 500 && e?.status < 600;
+
+    // Log para debugging
+    console.error("❌ [Trakt Stats] Error:", {
+      message: e?.message,
+      status: e?.status,
+      path: e?.path,
+      isTimeout,
+      isRateLimit,
+      isNotFound,
+      isServerError,
+    });
+
+    // Degradación graciosa: timeout, rate limit, errores 500 de Trakt
+    if (isTimeout || isRateLimit || isNotFound || isServerError) {
+      console.warn(
+        `⚠️ [Trakt Stats] Unavailable (${isTimeout ? "timeout" : isRateLimit ? "rate-limit" : isServerError ? "server-error" : "not-found"}):`,
+        e.message,
+      );
+      // Devolver stats vacías pero válidas (UI mostrará 0 o '-')
+      return NextResponse.json({
+        found: false,
+        stats: {
+          watchers: null,
+          plays: null,
+          collectors: null,
+          comments: null,
+          lists: null,
+          favorited: null,
+        },
+      });
     }
-    console.error("Trakt stats error:", e);
-    return NextResponse.json(
-      { error: e?.message || "Unexpected error", found: false },
-      { status: 500 },
-    );
+
+    // Otros errores: devolver found=false para no romper la UI
+    console.error("❌ [Trakt Stats] Unexpected error:", e.message);
+    return NextResponse.json({ found: false, stats: null });
   }
 }

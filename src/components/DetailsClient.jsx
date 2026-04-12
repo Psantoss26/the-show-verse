@@ -1865,7 +1865,7 @@ export default function DetailsClient({
     try {
       const r = await withTimeout(
         traktGetShowWatched({ tmdbId: Number(id) }),
-        8000,
+        25000,
       );
       setWatchedBySeason(r?.watchedBySeason || {});
     } catch {
@@ -1982,7 +1982,7 @@ export default function DetailsClient({
     const load = async () => {
       setTSentiment((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // Añadir timeout de 8 segundos para evitar bloqueos
+        // Timeout generoso para comentarios de Trakt
         const r = await withTimeout(
           traktGetComments({
             type: traktType, // 'movie' | 'show'
@@ -1991,7 +1991,7 @@ export default function DetailsClient({
             page: 1,
             limit: 50,
           }),
-          8000,
+          20000,
         );
         if (ignore) return;
         const items = Array.isArray(r?.items) ? r.items : [];
@@ -2037,7 +2037,7 @@ export default function DetailsClient({
         const reqLimit = isLikes30 ? 50 : 20;
         const page = isLikes30 ? 1 : tComments.page;
 
-        // Añadir timeout de 8 segundos para evitar bloqueos
+        // Timeout generoso para comentarios adicionales de Trakt
         const r = await withTimeout(
           traktGetComments({
             type: traktType,
@@ -2046,7 +2046,7 @@ export default function DetailsClient({
             page,
             limit: reqLimit,
           }),
-          8000,
+          20000,
         );
 
         if (ignore) return;
@@ -2111,10 +2111,10 @@ export default function DetailsClient({
       if (type !== "tv") return;
       setTSeasons((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // Añadir timeout de 8 segundos para evitar bloqueos
+        // Timeout generoso para temporadas de Trakt
         const r = await withTimeout(
           traktGetShowSeasons({ tmdbId: id, extended: "full" }),
-          8000,
+          20000,
         );
         if (ignore) return;
         setTSeasons({
@@ -2147,7 +2147,7 @@ export default function DetailsClient({
     const load = async () => {
       setTLists((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // Añadir timeout de 8 segundos para evitar bloqueos
+        // Timeout generoso para listas de Trakt
         const r = await withTimeout(
           traktGetLists({
             type: traktType,
@@ -2156,7 +2156,7 @@ export default function DetailsClient({
             page: tLists.page,
             limit: 6,
           }),
-          8000,
+          20000,
         );
         if (ignore) return;
 
@@ -2229,7 +2229,7 @@ export default function DetailsClient({
     try {
       const json = await withTimeout(
         traktGetItemStatus({ type: traktType, tmdbId: id }),
-        8000,
+        25000,
       );
       setTrakt({
         loading: false,
@@ -2267,10 +2267,10 @@ export default function DetailsClient({
     const load = async () => {
       setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // Añadir timeout de 8 segundos para evitar bloqueos
+        // Timeout generoso para scoreboard (primera carga puede tardar ~20s)
         const r = await withTimeout(
           traktGetScoreboard({ type: traktType, tmdbId: id }),
-          8000,
+          25000,
         );
         if (ignore) return;
 
@@ -2305,13 +2305,23 @@ export default function DetailsClient({
         });
       } catch (e) {
         if (!ignore) {
-          // Si es timeout, no mostrar error al usuario (carga silenciosa)
+          // No mostrar errores de timeout o rate limit (degradación silenciosa)
           const isTimeout = e?.message === "Timeout";
+          const isRateLimit = /rate limit|temporalmente no disponible/i.test(
+            e?.message || "",
+          );
+
+          // Solo mostrar errores críticos al usuario
+          const errorMsg =
+            isTimeout || isRateLimit
+              ? ""
+              : e?.message || "Error cargando scoreboard";
+
           setTScoreboard((p) => ({
             ...p,
             loading: false,
             found: false,
-            error: isTimeout ? "" : e?.message || "Error cargando scoreboard",
+            error: errorMsg,
           }));
         }
       }
@@ -2333,10 +2343,10 @@ export default function DetailsClient({
         setTraktStatsLoading(true);
         setTraktStatsError("");
 
-        // Añadir timeout de 8 segundos para evitar bloqueos
+        // Timeout generoso para stats (primera carga puede tardar ~20s)
         const res = await withTimeout(
           traktGetStats({ type: traktType, tmdbId: id }),
-          8000,
+          25000,
         );
         if (cancelled) return;
 
@@ -2390,10 +2400,10 @@ export default function DetailsClient({
     const load = async () => {
       setTrakt((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // Añadir timeout de 8 segundos para evitar bloqueos
+        // Timeout generoso para estado de Trakt (primera carga puede tardar ~20s)
         const json = await withTimeout(
           traktGetItemStatus({ type: traktType, tmdbId: id }),
-          8000,
+          25000,
         );
         if (ignore) return;
 

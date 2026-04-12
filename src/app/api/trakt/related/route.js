@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 10; // Límite máximo Vercel Hobby (s)
+export const maxDuration = 25; // Aumentado para producción
 export const revalidate = 3600; // 1h
 
 const TRAKT_KEY =
@@ -37,9 +37,10 @@ async function safeBody(res) {
 }
 
 async function fetchTrakt(path) {
-  // ✅ Timeout de 5s para evitar que Vercel cancele la función completa
+  // ✅ Timeout más generoso en producción
+  const timeoutMs = process.env.NODE_ENV === "production" ? 12000 : 8000;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch(`https://api.trakt.tv${path}`, {

@@ -3,6 +3,7 @@ import { fetchTrakt } from "@/lib/trakt/fetchWithCache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 20; // Aumentado para producción
 
 function normalizeUrl(u) {
   if (!u) return null;
@@ -24,12 +25,13 @@ export async function GET(req) {
 
   const traktType = type === "tv" ? "show" : "movie";
   const plural = traktType === "show" ? "shows" : "movies";
+  const timeoutMs = process.env.NODE_ENV === "production" ? 10000 : 6000;
 
   try {
     // Compartir cache con stats/scoreboard/community para evitar duplicar llamadas
     const search = await fetchTrakt(
       `/search/tmdb/${encodeURIComponent(tmdbId)}?type=${traktType}`,
-      { timeoutMs: 4000, cacheTTL: 10 * 60 * 1000 },
+      { timeoutMs, cacheTTL: 10 * 60 * 1000 },
     );
 
     const first = Array.isArray(search) ? search[0] : null;
@@ -42,7 +44,7 @@ export async function GET(req) {
 
     const details = await fetchTrakt(
       `/${plural}/${encodeURIComponent(String(traktId))}?extended=full`,
-      { timeoutMs: 4000, cacheTTL: 24 * 60 * 60 * 1000 },
+      { timeoutMs, cacheTTL: 24 * 60 * 60 * 1000 },
     );
 
     const homepage = normalizeUrl(details?.homepage || null);
