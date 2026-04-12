@@ -77,6 +77,7 @@ export async function GET(req) {
     const tab = (searchParams.get("tab") || "popular").toLowerCase();
     const page = searchParams.get("page") || "1";
     const limit = searchParams.get("limit") || "10";
+    const countOnly = searchParams.get("countOnly") === "true";
 
     if (!tmdbId)
       return NextResponse.json({ error: "Falta tmdbId" }, { status: 400 });
@@ -116,6 +117,12 @@ export async function GET(req) {
     }
 
     const lists = Array.isArray(json) ? json : [];
+    const pg = readPaginationHeaders(res);
+
+    // ✅ Si solo se pide el count, devolver solo la paginación sin procesar items
+    if (countOnly) {
+      return NextResponse.json({ items: [], pagination: pg, countOnly: true });
+    }
 
     const listsWithPreviews = await mapLimit(lists, 4, async (row) => {
       try {
@@ -181,7 +188,6 @@ export async function GET(req) {
       }
     });
 
-    const pg = readPaginationHeaders(res);
     return NextResponse.json({ items: listsWithPreviews, pagination: pg });
   } catch (e) {
     const isExpected =

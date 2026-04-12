@@ -2141,13 +2141,15 @@ export default function DetailsClient({
   }, [id, type]);
 
   // Carga las listas de Trakt que contienen este contenido (popular o trending)
+  // ⏱️ OPTIMIZACIÓN: Cargar DESPUÉS de scoreboard y stats (menor prioridad)
   useEffect(() => {
     let ignore = false;
+    let timeoutId = null;
 
     const load = async () => {
       setTLists((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // Timeout generoso para listas de Trakt
+        // Cargar 6 listas con todos sus detalles
         const r = await withTimeout(
           traktGetLists({
             type: traktType,
@@ -2155,6 +2157,7 @@ export default function DetailsClient({
             tab: tListsTab,
             page: tLists.page,
             limit: 6,
+            countOnly: false, // Siempre cargar listas completas con previews
           }),
           20000,
         );
@@ -2188,9 +2191,14 @@ export default function DetailsClient({
       }
     };
 
-    load();
+    // ⏱️ Delay de 1.5 segundos para dar prioridad a scoreboard y stats
+    timeoutId = setTimeout(() => {
+      load();
+    }, 1500);
+
     return () => {
       ignore = true;
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [id, traktType, tListsTab, tLists.page]);
 
