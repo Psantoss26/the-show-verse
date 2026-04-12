@@ -6,16 +6,22 @@ const TRAKT_BASE = "https://api.trakt.tv";
 // Cache en memoria con TTL
 const cache = new Map();
 const pendingRequests = new Map(); // Deduplicación de peticiones en vuelo
-const rateLimitCache = new Map(); // Cache negativo: rutas bloqueadas por 429
+let globalRateLimit = null; // Bloqueo GLOBAL cuando Trakt devuelve 429
 
 // Configuración
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+const CACHE_TTL = 60 * 60 * 1000; // 1 hora (Trakt data cambia lentamente)
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY = 1000; // 1 segundo
 
 function traktHeaders() {
   const key = process.env.TRAKT_CLIENT_ID;
-  if (!key) throw new Error("Missing TRAKT_CLIENT_ID");
+  if (!key) {
+    console.error(
+      "❌ TRAKT_CLIENT_ID no configurada. Variables TRAKT disponibles:",
+      Object.keys(process.env).filter((k) => k.includes("TRAKT")),
+    );
+    throw new Error("Missing TRAKT_CLIENT_ID environment variable");
+  }
   return {
     "Content-Type": "application/json",
     "trakt-api-version": "2",
@@ -25,42 +31,51 @@ function traktHeaders() {
 }
 
 /**
- * Comprueba si una ruta está bloqueada por rate limit.
+ * Comprueba si hay un bloqueo GLOBAL por rate limit.
  * Devuelve los segundos restantes (>0) o 0 si no está bloqueada.
  */
-function getRateLimitSeconds(cacheKey) {
-  const entry = rateLimitCache.get(cacheKey);
-  if (!entry) return 0;
-  const remaining = Math.ceil((entry.until - Date.now()) / 1000);
+function getGlobalRateLimitSeconds() {
+  if (!globalRateLimit) return 0;
+  const remaining = Math.ceil((globalRateLimit.until - Date.now()) / 1000);
   if (remaining <= 0) {
-    rateLimitCache.delete(cacheKey);
+    globalRateLimit = null;
     return 0;
   }
   return remaining;
 }
 
 /**
- * Guarda el bloqueo de rate limit para una ruta.
+ * Guarda el bloqueo GLOBAL de rate limit.
  */
-function setRateLimitBlock(cacheKey, retryAfterSeconds) {
-  rateLimitCache.set(cacheKey, {
-    until: Date.now() + retryAfterSeconds * 1000,
-    retryAfter: retryAfterSeconds,
-  });
+function setGlobalRateLimit(retryAfterSeconds) {
+  const until = Date.now() + retryAfterSeconds * 1000;
+  globalRateLimit = { until, retryAfter: retryAfterSeconds };
+  console.warn(
+    `🚫 Trakt API bloqueada globalmente por ${retryAfterSeconds}s (hasta ${new Date(until).toLocaleTimeString()})`,
+  );
 }
 
 /**
- * Obtiene datos del cache si están disponibles y no han expirado
+ * Obtiene datos del cache (incluso si están expirados, en caso de emergencia)
  */
-function getFromCache(cacheKey) {
+function getFromCache(cacheKey, allowStale = false) {
   const cached = cache.get(cacheKey);
   if (!cached) return null;
 
   const now = Date.now();
   if (now > cached.expiresAt) {
+    // Si permitimos datos stale (ej: durante rate limit), devolverlos
+    if (allowStale) {
+      console.log(`📦 Sirviendo datos STALE del cache para ${cacheKey}`);
+      return cached.data;
+    }
     cache.delete(cacheKey);
     return null;
   }
+
+  // Log cuando servimos datos frescos del cache
+  const remainingMin = Math.ceil((cached.expiresAt - now) / 60000);
+  console.log(`✅ Cache HIT: ${cacheKey} (expira en ${remainingMin}m)`);
 
   return cached.data;
 }
@@ -86,7 +101,13 @@ function sleep(ms) {
  * Realiza una petición a Trakt con retry automático y exponential backoff
  */
 async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
-  const { timeoutMs = 8000, signal, headers: customHeaders } = options;
+  // Timeout más generoso en producción (20s vs 10s) para evitar fallos
+  const defaultTimeout = process.env.NODE_ENV === "production" ? 20000 : 10000;
+  const {
+    timeoutMs = defaultTimeout,
+    signal,
+    headers: customHeaders,
+  } = options;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -127,21 +148,59 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
       throw err;
     }
 
-    const json = await res.json().catch(() => null);
+    // Intentar parsear JSON con mejor manejo de errores
+    let json = null;
+    const contentType = res.headers.get("content-type");
+    if (contentType?.includes("application/json")) {
+      try {
+        json = await res.json();
+      } catch (parseErr) {
+        if (!res.ok) {
+          console.error(
+            `❌ Error parsing Trakt JSON (${res.status}) for ${path}:`,
+            parseErr.message,
+          );
+        }
+      }
+    }
 
     // Otros errores de servidor (5xx) - reintentar con exponential backoff
-    if (res.status >= 500 && res.status < 600 && retryCount < MAX_RETRIES) {
-      const waitTime = BASE_RETRY_DELAY * Math.pow(2, retryCount);
-      console.warn(
-        `⚠️ Trakt server error (${res.status}) on ${path}, retrying in ${waitTime}ms`,
-      );
-      await sleep(waitTime);
-      return fetchTraktWithRetry(path, options, retryCount + 1);
+    // PERO: para endpoints de stats (/stats), NO reintentar - son errores de Trakt
+    const isStatsEndpoint = path.includes("/stats");
+
+    if (res.status >= 500 && res.status < 600) {
+      // Para /stats, fallar inmediatamente (no reintentar errores del servidor de Trakt)
+      if (isStatsEndpoint) {
+        console.warn(
+          `⚠️ Trakt server error (${res.status}) on ${path} - NO reintentando (problema de Trakt)`,
+        );
+        const msg =
+          json?.error || json?.message || `Trakt server error ${res.status}`;
+        const err = new Error(msg);
+        err.status = res.status;
+        err.path = path;
+        err.isServerError = true;
+        throw err;
+      }
+
+      // Para otros endpoints, reintentar con backoff
+      if (retryCount < MAX_RETRIES) {
+        const waitTime = BASE_RETRY_DELAY * Math.pow(2, retryCount);
+        console.warn(
+          `⚠️ Trakt server error (${res.status}) on ${path}, retrying in ${waitTime}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`,
+        );
+        await sleep(waitTime);
+        return fetchTraktWithRetry(path, options, retryCount + 1);
+      }
     }
 
     if (!res.ok) {
-      const msg = json?.error || json?.message || `Trakt error (${res.status})`;
-      throw new Error(msg);
+      const msg = json?.error || json?.message || `Trakt HTTP ${res.status}`;
+      console.error(`❌ Trakt error ${res.status} on ${path}: ${msg}`);
+      const err = new Error(msg);
+      err.status = res.status;
+      err.path = path;
+      throw err;
     }
 
     return json;
@@ -149,16 +208,25 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
     clearTimeout(timeoutId);
 
     if (err.name === "AbortError") {
-      throw new Error("Trakt request timeout");
+      console.warn(`⏱️ Trakt request timeout on ${path} after ${timeoutMs}ms`);
+      const timeoutErr = new Error(`Trakt request timeout (${timeoutMs}ms)`);
+      timeoutErr.isTimeout = true;
+      timeoutErr.path = path;
+      throw timeoutErr;
     }
 
     // Si el error es de red y tenemos reintentos, reintentar
     if (
       retryCount < MAX_RETRIES &&
-      (err.message.includes("fetch failed") || err.message.includes("network"))
+      (err.message.includes("fetch failed") ||
+        err.message.includes("network") ||
+        err.message.includes("ECONNREFUSED") ||
+        err.message.includes("ETIMEDOUT"))
     ) {
       const waitTime = BASE_RETRY_DELAY * Math.pow(2, retryCount);
-      console.warn(`⚠️ Network error on ${path}, retrying in ${waitTime}ms`);
+      console.warn(
+        `⚠️ Network error on ${path}, retrying in ${waitTime}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`,
+      );
       await sleep(waitTime);
       return fetchTraktWithRetry(path, options, retryCount + 1);
     }
@@ -185,14 +253,23 @@ export async function fetchTrakt(path, options = {}) {
   } = options;
   const cacheKey = `trakt:${path}`;
 
-  // 0. Comprobar bloqueo por rate limit (tiene prioridad sobre todo lo demás)
-  const rlSeconds = getRateLimitSeconds(cacheKey);
+  // 0. Comprobar bloqueo GLOBAL por rate limit
+  const rlSeconds = getGlobalRateLimitSeconds();
   if (rlSeconds > 0) {
+    // Intentar servir datos stale del cache si los hay
+    const staleData = getFromCache(cacheKey, true);
+    if (staleData !== null) {
+      console.log(`⚠️ Rate limit activo, sirviendo datos cache para ${path}`);
+      return staleData;
+    }
+
+    // Si no hay cache disponible, lanzar error
     const err = new Error(
-      `Trakt rate limit exceeded (retry after ${rlSeconds}s)`,
+      `Trakt API temporalmente no disponible (rate limit: ${rlSeconds}s)`,
     );
     err.status = 429;
     err.retryAfter = rlSeconds;
+    err.isRateLimit = true;
     throw err;
   }
 
@@ -206,10 +283,12 @@ export async function fetchTrakt(path, options = {}) {
 
   // 2. Deduplicación: si ya hay una petición en vuelo para esta ruta, esperarla
   if (pendingRequests.has(cacheKey)) {
+    console.log(`⏳ Esperando petición en vuelo: ${path}`);
     return pendingRequests.get(cacheKey);
   }
 
-  // 3. Crear nueva petición
+  // 3. Crear nueva petición (Cache MISS - petición HTTP real)
+  console.log(`🌐 Cache MISS → Petición HTTP a Trakt: ${path}`);
   const requestPromise = fetchTraktWithRetry(path, { ...fetchOptions, headers })
     .then((data) => {
       // Guardar en cache si está habilitado
@@ -219,9 +298,18 @@ export async function fetchTrakt(path, options = {}) {
       return data;
     })
     .catch((err) => {
-      // Cachear el bloqueo de rate limit para evitar más peticiones
+      // Guardar bloqueo GLOBAL cuando hay rate limit
       if (err.status === 429) {
-        setRateLimitBlock(cacheKey, err.retryAfter || 30);
+        setGlobalRateLimit(err.retryAfter || 300); // Default 5 minutos
+
+        // Intentar servir datos stale como último recurso
+        const staleData = getFromCache(cacheKey, true);
+        if (staleData !== null) {
+          console.log(
+            `⚠️ Rate limit alcanzado, sirviendo cache stale para ${path}`,
+          );
+          return staleData;
+        }
       }
       throw err;
     })
@@ -252,7 +340,7 @@ export async function fetchTraktMaybe(path, options = {}) {
 export function clearCache() {
   cache.clear();
   pendingRequests.clear();
-  rateLimitCache.clear();
+  globalRateLimit = null;
 }
 
 /**

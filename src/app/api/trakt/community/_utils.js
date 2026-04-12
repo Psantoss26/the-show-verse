@@ -5,9 +5,17 @@ import { fetchTrakt as fetchTraktWithCache } from "@/lib/trakt/fetchWithCache";
 const TRAKT_BASE = "https://api.trakt.tv";
 
 export function traktClientId() {
-  return (
-    process.env.TRAKT_CLIENT_ID || process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID || ""
-  );
+  const id =
+    process.env.TRAKT_CLIENT_ID ||
+    process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ||
+    "";
+  if (!id) {
+    console.error(
+      "❌ TRAKT_CLIENT_ID no configurada. Variables disponibles:",
+      Object.keys(process.env).filter((k) => k.includes("TRAKT")),
+    );
+  }
+  return id;
 }
 
 function traktUserAgent() {
@@ -65,9 +73,13 @@ export function buildTraktErrorMessage({ res, json, text, fallback }) {
 
 export async function resolveTraktIdFromTmdb({ type, tmdbId }) {
   // ✅ Usar fetchTrakt con cache para evitar rate limiting
+  const timeoutMs = process.env.NODE_ENV === "production" ? 12000 : 8000;
   const json = await fetchTraktWithCache(
     `/search/tmdb/${tmdbId}?type=${type}`,
-    { cacheTTL: 10 * 60 * 1000 }, // 10 minutos de cache para búsquedas
+    {
+      timeoutMs,
+      cacheTTL: 10 * 60 * 1000, // 10 minutos de cache para búsquedas
+    },
   );
 
   const first = Array.isArray(json) ? json[0] : null;

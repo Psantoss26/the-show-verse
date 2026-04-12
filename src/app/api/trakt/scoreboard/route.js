@@ -7,12 +7,13 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 15; // Vercel: máximo tiempo de la función serverless
+export const maxDuration = 30; // Vercel: aumentado para dar más margen en producción
 
 export async function GET(req) {
-  // Timeout corto: scoreboard es secundario, no debe bloquear la UI
-  const ft = (path) => fetchTrakt(path, { timeoutMs: 4000 });
-  const ftm = (path) => fetchTraktMaybe(path, { timeoutMs: 4000 });
+  // Timeout muy generoso para scoreboard (stats pueden ser muy lentas en Trakt)
+  const timeoutMs = process.env.NODE_ENV === "production" ? 18000 : 15000;
+  const ft = (path) => fetchTrakt(path, { timeoutMs });
+  const ftm = (path) => fetchTraktMaybe(path, { timeoutMs });
 
   try {
     const { searchParams } = new URL(req.url);
@@ -21,7 +22,15 @@ export async function GET(req) {
     const season = searchParams.get("season");
     const episode = searchParams.get("episode");
 
+    console.log(
+      `🎬 [Trakt Scoreboard] Request: type=${type}, tmdbId=${tmdbId}, season=${season}, episode=${episode}`,
+    );
+
     if (!type || !tmdbId) {
+      console.warn("⚠️ [Trakt Scoreboard] Missing required params:", {
+        type,
+        tmdbId,
+      });
       return NextResponse.json(
         { error: "Missing type/tmdbId" },
         { status: 400 },
@@ -44,10 +53,11 @@ export async function GET(req) {
 
       const traktId = ids.trakt;
 
-      const [summary, stats] = await Promise.all([
-        ft(`/${plural}/${traktId}?extended=full`),
-        ft(`/${plural}/${traktId}/stats`),
-      ]);
+      // Obtener stats (incluye rating/votes en algunos casos)
+      const stats = await ft(`/${plural}/${traktId}/stats`);
+
+      // Obtener summary solo si necesitamos rating/votes (no disponibles en stats)
+      const summary = await ft(`/${plural}/${traktId}`);
 
       const slug = summary?.ids?.slug || ids?.slug || traktId;
       const traktUrl =
@@ -224,20 +234,59 @@ export async function GET(req) {
     });
   } catch (e) {
     const isTimeout =
-      e?.message === "Trakt request timeout" || e?.name === "AbortError";
+      e?.isTimeout ||
+      e?.message?.includes("timeout") ||
+      e?.name === "AbortError";
     const isRateLimit =
       e?.status === 429 || /rate limit/i.test(e?.message || "");
-    if (isTimeout || isRateLimit) {
-      console.warn("Trakt scoreboard unavailable:", e.message);
+    const isMissingEnv = e?.message?.includes("TRAKT_CLIENT_ID");
+    const isNotFound = e?.status === 404;
+    const isServerError = e?.status >= 500 && e?.status < 600;
+
+    // Log detallado del error para debugging
+    console.error("❌ [Trakt Scoreboard] Error:", {
+      message: e?.message,
+      status: e?.status,
+      path: e?.path,
+      type: e?.name,
+      isTimeout,
+      isRateLimit,
+      isMissingEnv,
+      isNotFound,
+      stack: e?.stack?.split("\n").slice(0, 3).join("\n"),
+    });
+
+    // Degradación graciosa: timeouts, rate limits, errores 500
+    if (isTimeout || isRateLimit || isServerError) {
+      console.warn(
+        "⚠️ [Trakt Scoreboard] Unavailable (degradación graciosa):",
+        e.message,
+      );
       return NextResponse.json({ found: false });
     }
-    console.error("Trakt scoreboard error:", e);
-    return NextResponse.json(
-      {
-        error: e?.message || "Error",
-        found: false,
-      },
-      { status: 500 },
-    );
+
+    // Variable de entorno faltante: error crítico
+    if (isMissingEnv) {
+      console.error(
+        "❌ CRÍTICO: Variable de entorno TRAKT_CLIENT_ID no configurada en producción",
+      );
+      return NextResponse.json(
+        {
+          error: "Server configuration error",
+          found: false,
+        },
+        { status: 500 },
+      );
+    }
+
+    // 404: el contenido no existe en Trakt (normal)
+    if (isNotFound) {
+      console.log("ℹ️ [Trakt Scoreboard] Content not found in Trakt");
+      return NextResponse.json({ found: false });
+    }
+
+    // Otros errores: devolver found=false para no romper la UI
+    console.error("❌ [Trakt Scoreboard] Unexpected error:", e.message);
+    return NextResponse.json({ found: false });
   }
 }
