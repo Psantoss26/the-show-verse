@@ -32,6 +32,9 @@ import {
 export const revalidate = 1800; // 30 minutos
 export const maxDuration = 60; // Vercel Pro = 60s; Hobby = 10s (máximo posible)
 
+// ✅ Usar el sistema centralizado de cache de Trakt (sin duplicar fetchTrakt)
+// import { fetchTrakt } from '@/lib/trakt/fetchWithCache'; // Ya está en traktHelpers
+
 /* ====================================================================
  * MISMO CRITERIO QUE EN CLIENTE (MainDashboardClient.jsx):
  *  1) Idioma EN (si existe)
@@ -112,28 +115,6 @@ async function fetchBestBackdropServer(itemId, mediaType = "movie") {
 /* ====================================================================
  * TRAKT: Discover (Recommended / Anticipated) + hidratado con TMDb
  * ==================================================================== */
-// Funciones para obtener las claves en runtime (no en tiempo de build)
-function getTraktKey() {
-  return (
-    process.env.TRAKT_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ||
-    process.env.TRAKT_API_KEY
-  );
-}
-
-function getTmdbKey() {
-  return process.env.NEXT_PUBLIC_TMDB_API_KEY;
-}
-
-function traktHeaders() {
-  const TRAKT_KEY = getTraktKey();
-  if (!TRAKT_KEY) return null;
-  return {
-    "content-type": "application/json",
-    "trakt-api-version": "2",
-    "trakt-api-key": TRAKT_KEY,
-  };
-}
 
 async function safeJson(res) {
   try {
@@ -143,37 +124,8 @@ async function safeJson(res) {
   }
 }
 
-async function fetchTrakt(path) {
-  const headers = traktHeaders();
-  if (!headers) return [];
-
-  // Timeout de 8s: evita que una petición lenta de Trakt bloquee
-  // el SSR completo del dashboard y haga que lleguen datos vacíos
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-  try {
-    const res = await fetch(`https://api.trakt.tv${path}`, {
-      headers,
-      next: { revalidate: 60 * 60 }, // 1h
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    const json = await safeJson(res);
-    if (!res.ok) return [];
-    return Array.isArray(json) ? json : [];
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === "AbortError") {
-      console.warn("[page.jsx] Trakt fetchTrakt timeout:", path);
-    }
-    return [];
-  }
-}
-
 async function fetchTmdbDetails(type, id) {
-  const TMDB_KEY = getTmdbKey();
+  const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!TMDB_KEY || !type || !id) return null;
   const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&language=es-ES`;
   const res = await fetch(url, { next: { revalidate: 60 * 60 } });
@@ -352,8 +304,7 @@ function curateList(
 /* ======== Carga de datos en el SERVIDOR ======== */
 async function getDashboardData(sessionId = null) {
   try {
-    // Obtenemos la clave de Trakt en runtime
-    const TRAKT_KEY = getTraktKey();
+    console.log("🔄 [Dashboard] Iniciando carga de datos...");
 
     // Preparamos todas las llamadas en paralelo para optimizar
     const [
@@ -365,6 +316,7 @@ async function getDashboardData(sessionId = null) {
       popular,
 
       // NUEVAS SECCIONES TRAKT - Contenido Mixto (películas + series)
+      // traktHelpers maneja automáticamente el caso de TRAKT_KEY no definida
       traktTrending,
       traktPopular,
       traktRecommended,
@@ -398,35 +350,68 @@ async function getDashboardData(sessionId = null) {
 
       // Trakt - Contenido Mixto (Movies + Shows)
       // Cada llamada tiene .catch(() => []) independiente: si una falla, las demás siguen
-      TRAKT_KEY ? getTraktTrending(30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktPopular(30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktRecommended(30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY ? getTraktAnticipated(30).catch(() => []) : Promise.resolve([]),
-      TRAKT_KEY
-        ? getTraktMoviesAnticipated(30).catch(() => [])
-        : Promise.resolve([]),
-      TRAKT_KEY
-        ? getTraktShowsAnticipated(30).catch(() => [])
-        : Promise.resolve([]),
-      TRAKT_KEY
-        ? getTraktPlayed("weekly", 30).catch(() => [])
-        : Promise.resolve([]),
-      TRAKT_KEY
-        ? getTraktPlayed("monthly", 30).catch(() => [])
-        : Promise.resolve([]),
-      TRAKT_KEY
-        ? getTraktWatched("weekly", 30).catch(() => [])
-        : Promise.resolve([]),
-      TRAKT_KEY
-        ? getTraktWatched("monthly", 30).catch(() => [])
-        : Promise.resolve([]),
-      TRAKT_KEY
-        ? getTraktCollected("weekly", 30).catch(() => [])
-        : Promise.resolve([]),
-      TRAKT_KEY
-        ? getTraktCollected("monthly", 30).catch(() => [])
-        : Promise.resolve([]),
+      getTraktTrending(30).catch((err) => {
+        console.warn("❌ getTraktTrending failed:", err.message);
+        return [];
+      }),
+      getTraktPopular(30).catch((err) => {
+        console.warn("❌ getTraktPopular failed:", err.message);
+        return [];
+      }),
+      getTraktRecommended(30).catch((err) => {
+        console.warn("❌ getTraktRecommended failed:", err.message);
+        return [];
+      }),
+      getTraktAnticipated(30).catch((err) => {
+        console.warn("❌ getTraktAnticipated failed:", err.message);
+        return [];
+      }),
+      getTraktMoviesAnticipated(30).catch((err) => {
+        console.warn("❌ getTraktMoviesAnticipated failed:", err.message);
+        return [];
+      }),
+      getTraktShowsAnticipated(30).catch((err) => {
+        console.warn("❌ getTraktShowsAnticipated failed:", err.message);
+        return [];
+      }),
+      getTraktPlayed("weekly", 30).catch((err) => {
+        console.warn("❌ getTraktPlayed weekly failed:", err.message);
+        return [];
+      }),
+      getTraktPlayed("monthly", 30).catch((err) => {
+        console.warn("❌ getTraktPlayed monthly failed:", err.message);
+        return [];
+      }),
+      getTraktWatched("weekly", 30).catch((err) => {
+        console.warn("❌ getTraktWatched weekly failed:", err.message);
+        return [];
+      }),
+      getTraktWatched("monthly", 30).catch((err) => {
+        console.warn("❌ getTraktWatched monthly failed:", err.message);
+        return [];
+      }),
+      getTraktCollected("weekly", 30).catch((err) => {
+        console.warn("❌ getTraktCollected weekly failed:", err.message);
+        return [];
+      }),
+      getTraktCollected("monthly", 30).catch((err) => {
+        console.warn("❌ getTraktCollected monthly failed:", err.message);
+        return [];
+      }),
     ]);
+
+    console.log("✅ [Dashboard] Secciones de Trakt cargadas:", {
+      traktTrending: traktTrending.length,
+      traktPopular: traktPopular.length,
+      traktRecommended: traktRecommended.length,
+      traktAnticipated: traktAnticipated.length,
+      traktPlayedWeekly: traktPlayedWeekly.length,
+      traktPlayedMonthly: traktPlayedMonthly.length,
+      traktWatchedWeekly: traktWatchedWeekly.length,
+      traktWatchedMonthly: traktWatchedMonthly.length,
+      traktCollectedWeekly: traktCollectedWeekly.length,
+      traktCollectedMonthly: traktCollectedMonthly.length,
+    });
 
     const recommended = sessionId
       ? await fetchRecommendedMovies(sessionId)
