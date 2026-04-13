@@ -24,7 +24,7 @@ export default function TraktWatchedControl({
 
   // Ajustar el padding en función de la longitud: "1" -> más cuadrado, "100%" -> más alargado
   const chars = badgeText ? badgeText.length : 0;
-  const paddingX = chars >= 3 ? "px-1.5" : "px-1";
+  const paddingX = chars >= 3 ? "px-1.5" : "px-0.5";
 
   return (
     <div className="relative">
@@ -48,7 +48,7 @@ export default function TraktWatchedControl({
 
       {badgeText && (
         <span
-          className={`absolute -bottom-1.5 -right-1.5 min-w-[20px] h-[20px] ${paddingX} 
+          className={`absolute -bottom-1 -right-1.5 min-w-[18px] h-[18px] ${paddingX} 
             rounded-full text-[10px] font-bold tracking-tight leading-none
             bg-zinc-800/90 backdrop-blur-md text-white flex items-center justify-center 
             z-10 pointer-events-none shadow-md`}
