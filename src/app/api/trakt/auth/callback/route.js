@@ -58,8 +58,8 @@ function resolveWebRedirectUri(origin, req) {
 }
 
 function sanitizeNextPath(nextPath) {
-  if (!nextPath || typeof nextPath !== "string") return "/history";
-  if (!nextPath.startsWith("/")) return "/history";
+  if (!nextPath || typeof nextPath !== "string") return "/";
+  if (!nextPath.startsWith("/")) return "/";
   return nextPath;
 }
 
@@ -78,7 +78,7 @@ export async function GET(req) {
   const state = searchParams.get("state");
 
   const expected = req.cookies.get("trakt_oauth_state")?.value || null;
-  const nextCookie = req.cookies.get("trakt_oauth_next")?.value || "/history";
+  const nextCookie = req.cookies.get("trakt_oauth_next")?.value || "/";
   const nextPath = sanitizeNextPath(nextCookie);
 
   // Validación básica: debe tener code
