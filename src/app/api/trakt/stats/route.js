@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { fetchTrakt, normalizeType } from "@/lib/trakt/fetchWithCache";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 25; // Vercel: aumentado para producción
 
 export async function GET(req) {
-  // Timeout reducido para stats (tienden a fallar con 500, no debe bloquear)
-  const timeoutMs = process.env.NODE_ENV === "production" ? 5000 : 4000;
-  const ft = (path) => fetchTrakt(path, { timeoutMs });
+  // Timeout para búsqueda TMDb->Trakt (rápido)
+  const searchTimeoutMs = process.env.NODE_ENV === "production" ? 10000 : 8000;
+  // Timeout para stats (más margen para cold starts)
+  const statsTimeoutMs = process.env.NODE_ENV === "production" ? 12000 : 10000;
+  const ft = (path) => fetchTrakt(path, { timeoutMs: searchTimeoutMs });
+  const ftStats = (path) => fetchTrakt(path, { timeoutMs: statsTimeoutMs });
 
   try {
     const { searchParams } = new URL(req.url);
@@ -43,8 +47,8 @@ export async function GET(req) {
       const traktId = ids.trakt;
       const path = type === "movie" ? "movies" : "shows";
 
-      // 2) Obtener stats con cache
-      const stats = await ft(`/${path}/${traktId}/stats`);
+      // 2) Obtener stats con cache (timeout más alto para cold starts)
+      const stats = await ftStats(`/${path}/${traktId}/stats`);
 
       // Devolver formato consistente con datos completos
       return NextResponse.json({
@@ -107,9 +111,9 @@ export async function GET(req) {
       }
 
       // 3) Intentar obtener stats (puede fallar)
-      const stats = await ft(`/seasons/${seasonObj.ids.trakt}/stats`).catch(
-        () => null,
-      );
+      const stats = await ftStats(
+        `/seasons/${seasonObj.ids.trakt}/stats`,
+      ).catch(() => null);
 
       return NextResponse.json({
         found: true,
@@ -140,7 +144,9 @@ export async function GET(req) {
     }
 
     // 3) Intentar obtener stats del episodio
-    const stats = await ft(`/episodes/${epTraktId}/stats`).catch(() => null);
+    const stats = await ftStats(`/episodes/${epTraktId}/stats`).catch(
+      () => null,
+    );
 
     return NextResponse.json({
       found: true,

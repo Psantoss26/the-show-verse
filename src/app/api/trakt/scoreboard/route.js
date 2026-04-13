@@ -10,10 +10,14 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30; // Vercel: aumentado para dar más margen en producción
 
 export async function GET(req) {
+  // Headers de cache CDN: datos públicos, cachear 30min en Vercel CDN, servir stale 1h
+  const cacheHeaders = {
+    "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=3600",
+  };
   // Timeout para búsquedas y summary (rápido)
   const fastTimeoutMs = process.env.NODE_ENV === "production" ? 8000 : 6000;
-  // Timeout para stats (puede fallar, pero intentamos con timeout cortísimo)
-  const statsTimeoutMs = 2000; // 2 segundos máximo
+  // Timeout para stats (aumentado para soportar cold starts en Vercel)
+  const statsTimeoutMs = process.env.NODE_ENV === "production" ? 10000 : 10000;
 
   const ft = (path) => fetchTrakt(path, { timeoutMs: fastTimeoutMs });
   const ftStats = (path) =>
@@ -57,11 +61,11 @@ export async function GET(req) {
 
       const traktId = ids.trakt;
 
-      // Obtener summary (necesario, ~1-2s)
-      const summary = await ft(`/${plural}/${traktId}`);
-
-      // Intentar stats (timeout 2s, falla rápido si Trakt está lento)
-      const stats = await ftStats(`/${plural}/${traktId}/stats`);
+      // Obtener summary y stats en paralelo para reducir latencia total
+      const [summary, stats] = await Promise.all([
+        ft(`/${plural}/${traktId}`),
+        ftStats(`/${plural}/${traktId}/stats`),
+      ]);
 
       const slug = summary?.ids?.slug || ids?.slug || traktId;
       const traktUrl =
@@ -93,7 +97,7 @@ export async function GET(req) {
           justwatchDelta: null,
           justwatchCountry: "ES",
         },
-      });
+      }, { headers: cacheHeaders });
     }
 
     // -------------------------
@@ -179,7 +183,7 @@ export async function GET(req) {
           justwatchDelta: null,
           justwatchCountry: "ES",
         },
-      });
+      }, { headers: cacheHeaders });
     }
 
     // EPISODE - optimizar con Promise.all para cargar datos en paralelo
@@ -235,7 +239,7 @@ export async function GET(req) {
         justwatchDelta: null,
         justwatchCountry: "ES",
       },
-    });
+    }, { headers: cacheHeaders });
   } catch (e) {
     const isTimeout =
       e?.isTimeout ||

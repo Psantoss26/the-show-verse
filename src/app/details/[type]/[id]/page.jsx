@@ -10,7 +10,7 @@ import {
   getReviews,
   getActorMovies,
 } from "@/lib/api/tmdb";
-import { getTraktRelated } from "@/lib/api/traktClient";
+import { getTraktRelated, traktGetScoreboard } from "@/lib/api/traktClient";
 import DetailsClient from "@/components/DetailsClient";
 
 export default function DetailsPage() {
@@ -26,6 +26,12 @@ export default function DetailsPage() {
 
     const fetchAll = async () => {
       try {
+        // Lanzar scoreboard en paralelo (no bloqueante) - se resuelve junto con TMDB
+        const traktType = type === "tv" ? "show" : "movie";
+        const scoreboardPromise = type !== "person"
+          ? traktGetScoreboard({ type: traktType, tmdbId: id }).catch(() => null)
+          : Promise.resolve(null);
+
         const details = await getDetails(type, id);
         if (cancelled) return;
 
@@ -49,13 +55,14 @@ export default function DetailsPage() {
 
         // Resto de tipos (movie / tv): llamadas en paralelo — SIN getTraktRelated
         // getTraktRelated se carga a continuación de forma NO bloqueante
-        const [cast, reviews, watchProviders] = await Promise.all([
+        const [cast, reviews, watchProviders, scoreboard] = await Promise.all([
           getCredits(type, id).catch(() => ({ cast: [] })),
           getReviews(type, id).catch(() => ({ results: [] })),
           getWatchProviders(type, id, "ES").catch(() => ({
             providers: [],
             link: null,
           })),
+          scoreboardPromise,
         ]);
         if (cancelled) return;
 
@@ -72,6 +79,7 @@ export default function DetailsPage() {
           reviews: reviews?.results || [],
           providers,
           watchLink,
+          initialScoreboard: scoreboard || null,
         });
         setRenderReady(true);
 

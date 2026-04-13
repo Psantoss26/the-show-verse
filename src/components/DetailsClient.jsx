@@ -124,7 +124,6 @@ import {
   traktGetComments,
   traktGetLists,
   traktGetShowSeasons,
-  traktGetStats,
   traktGetScoreboard,
   traktSetRating,
   traktGetShowPlays,
@@ -278,6 +277,7 @@ export default function DetailsClient({
   providers,
   watchLink,
   reviews,
+  initialScoreboard,
 }) {
   const router = useRouter();
 
@@ -1857,11 +1857,6 @@ export default function DetailsClient({
     watchedBySeason,
   ]);
 
-  // -- Estadisticas de Trakt (watchers, plays, etc.) --
-  const [traktStats, setTraktStats] = useState(null);
-  const [traktStatsLoading, setTraktStatsLoading] = useState(false);
-  const [traktStatsError, setTraktStatsError] = useState("");
-
   // Carga los episodios vistos de una serie desde la API de Trakt
   const loadTraktShowWatched = useCallback(async () => {
     if (type !== "tv") return;
@@ -1887,27 +1882,60 @@ export default function DetailsClient({
   }, [type, id, trakt?.connected]);
 
   // -- Scoreboard de la comunidad (puntuaciones agregadas de multiples fuentes) --
-  const [tScoreboard, setTScoreboard] = useState({
+  // Si hay datos prefetched desde page.jsx, usarlos como estado inicial
+  const parseScoreboardData = (r) => {
+    if (!r?.found) return null;
+    const st = r?.stats || {};
+    return {
+      loading: false,
+      error: "",
+      found: true,
+      rating:
+        typeof r?.community?.rating === "number" ? r.community.rating : null,
+      votes:
+        typeof r?.community?.votes === "number" ? r.community.votes : null,
+      stats: {
+        watchers: typeof st?.watchers === "number" ? st.watchers : null,
+        plays: typeof st?.plays === "number" ? st.plays : null,
+        collectors: typeof st?.collectors === "number" ? st.collectors : null,
+        comments: typeof st?.comments === "number" ? st.comments : null,
+        lists: typeof st?.lists === "number" ? st.lists : null,
+        favorited: typeof st?.favorited === "number" ? st.favorited : null,
+      },
+      external: {
+        rtAudience: r?.external?.rtAudience ?? null,
+        justwatchRank: r?.external?.justwatchRank ?? null,
+        justwatchDelta: r?.external?.justwatchDelta ?? null,
+        justwatchCountry: r?.external?.justwatchCountry ?? "ES",
+      },
+    };
+  };
+
+  const defaultScoreboard = {
     loading: false,
     error: "",
     found: false,
-    rating: null, // Puntuacion de la comunidad (0..10)
-    votes: null, // Numero de votos de la comunidad
+    rating: null,
+    votes: null,
     stats: {
-      watchers: null, // Usuarios que estan viendo ahora
-      plays: null, // Numero total de reproducciones
-      collectors: null, // Usuarios que lo tienen en su biblioteca
-      comments: null, // Numero de comentarios
-      lists: null, // Numero de listas que lo incluyen
-      favorited: null, // Usuarios que lo marcaron como favorito
+      watchers: null,
+      plays: null,
+      collectors: null,
+      comments: null,
+      lists: null,
+      favorited: null,
     },
     external: {
-      rtAudience: null, // Rotten Tomatoes audiencia (reservado)
-      justwatchRank: null, // Ranking en JustWatch (reservado)
-      justwatchDelta: null, // Cambio en el ranking (reservado)
+      rtAudience: null,
+      justwatchRank: null,
+      justwatchDelta: null,
       justwatchCountry: "ES",
     },
-  });
+  };
+
+  const [tScoreboard, setTScoreboard] = useState(
+    () => parseScoreboardData(initialScoreboard) || defaultScoreboard,
+  );
 
   // Clave especial para indicar que una accion afecta al show completo (no un episodio)
   const SHOW_BUSY_KEY = "SHOW";
@@ -1985,59 +2013,19 @@ export default function DetailsClient({
     setTListsTab("popular");
   }, [id, traktType]);
 
-  // Carga el analisis de sentimiento (pros/contras) de los 50 comentarios mas votados
-  useEffect(() => {
-    let ignore = false;
-
-    const load = async () => {
-      setTSentiment((p) => ({ ...p, loading: true, error: "" }));
-      try {
-        // Timeout generoso para comentarios de Trakt
-        const r = await withTimeout(
-          traktGetComments({
-            type: traktType, // 'movie' | 'show'
-            tmdbId: id,
-            sort: "likes",
-            page: 1,
-            limit: 50,
-          }),
-          20000,
-        );
-        if (ignore) return;
-        const items = Array.isArray(r?.items) ? r.items : [];
-        const { pros, cons } = buildSentimentFromComments(items);
-        setTSentiment({
-          loading: false,
-          error: "",
-          pros,
-          cons,
-          sourceCount: items.length,
-        });
-      } catch (e) {
-        if (!ignore)
-          setTSentiment({
-            loading: false,
-            error: e?.message || "Error",
-            pros: [],
-            cons: [],
-            sourceCount: 0,
-          });
-      }
-    };
-
-    load();
-    return () => {
-      ignore = true;
-    };
-  }, [id, traktType]); // Datos publicos: no depende de conexion del usuario
-
   // Carga los comentarios de Trakt segun la pestana activa.
   // likes30: top con likes de los ultimos 30 dias. likesAll: top historico. recent: mas recientes.
+  // Cuando carga likes (sort=likes, limit=50), también computa el análisis de sentimiento
+  // para evitar una segunda petición duplicada al mismo endpoint.
   useEffect(() => {
     let ignore = false;
 
     const load = async () => {
       setTComments((p) => ({ ...p, loading: true, error: "" }));
+      // Cargar sentimiento en paralelo solo en la primera carga de likes
+      if (tCommentsTab !== "recent" && tComments.page <= 1) {
+        setTSentiment((p) => ({ ...p, loading: true, error: "" }));
+      }
 
       try {
         const isLikes30 = tCommentsTab === "likes30";
@@ -2067,6 +2055,18 @@ export default function DetailsClient({
           r?.pagination?.pageCount &&
           r?.pagination?.page < r?.pagination?.pageCount
         );
+
+        // Computar sentimiento desde los datos de likes (evita petición duplicada)
+        if (isLikes30 || (sort === "likes" && page === 1)) {
+          const { pros, cons } = buildSentimentFromComments(items);
+          setTSentiment({
+            loading: false,
+            error: "",
+            pros,
+            cons,
+            sourceCount: items.length,
+          });
+        }
 
         if (isLikes30) {
           const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -2279,68 +2279,95 @@ export default function DetailsClient({
   };
 
   // Carga el scoreboard de Trakt (rating de la comunidad y estadisticas de uso)
+  // Si ya tenemos datos prefetched con stats numéricas, solo refrescar en background
+  // Incluye retry: si found=true pero stats vienen vacías (cold start), reintenta
   useEffect(() => {
     let ignore = false;
 
+    const hasNumericStats = (st) =>
+      Object.values(st || {}).some((v) => typeof v === "number");
+
     const load = async () => {
-      setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
+      // Si ya tenemos datos completos del prefetch, guardar en cache y no bloquear
+      const prefetched = parseScoreboardData(initialScoreboard);
+      if (prefetched?.found && hasNumericStats(prefetched.stats)) {
+        // Guardar prefetch en localStorage para futuras visitas
+        try {
+          const cacheKey = `tsb_${traktType}_${id}`;
+          localStorage.setItem(cacheKey, JSON.stringify(prefetched));
+        } catch {}
+        return; // Ya tenemos datos válidos, no necesitamos fetch adicional
+      }
+
+      // Sin prefetch válido: restaurar datos de localStorage como cache stale
       try {
-        // Timeout reducido: stats puede fallar rápido (4-5s server), total ~10s
-        const r = await withTimeout(
-          traktGetScoreboard({ type: traktType, tmdbId: id }),
-          12000,
-        );
+        const cacheKey = `tsb_${traktType}_${id}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.found && hasNumericStats(parsed?.stats)) {
+            setTScoreboard({ ...parsed, loading: true, error: "" });
+          } else {
+            setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
+          }
+        } else {
+          setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
+        }
+      } catch {
+        setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
+      }
+
+      // Retry: hasta 3 intentos si found=true pero stats vacías (cold start en Vercel)
+      const delays = [0, 1500, 3000];
+      for (let attempt = 0; attempt < delays.length; attempt++) {
         if (ignore) return;
-
-        const rating =
-          typeof r?.community?.rating === "number" ? r.community.rating : null;
-        const votes =
-          typeof r?.community?.votes === "number" ? r.community.votes : null;
-
-        // Extraer estadisticas de uso de la comunidad
-        const st = r?.stats || {};
-        setTScoreboard({
-          loading: false,
-          error: "",
-          found: !!r?.found,
-          rating,
-          votes,
-          stats: {
-            watchers: typeof st?.watchers === "number" ? st.watchers : null,
-            plays: typeof st?.plays === "number" ? st.plays : null,
-            collectors:
-              typeof st?.collectors === "number" ? st.collectors : null,
-            comments: typeof st?.comments === "number" ? st.comments : null,
-            lists: typeof st?.lists === "number" ? st.lists : null,
-            favorited: typeof st?.favorited === "number" ? st.favorited : null,
-          },
-          external: {
-            rtAudience: r?.external?.rtAudience ?? null,
-            justwatchRank: r?.external?.justwatchRank ?? null,
-            justwatchDelta: r?.external?.justwatchDelta ?? null,
-            justwatchCountry: r?.external?.justwatchCountry ?? "ES",
-          },
-        });
-      } catch (e) {
-        if (!ignore) {
-          // No mostrar errores de timeout o rate limit (degradación silenciosa)
-          const isTimeout = e?.message === "Timeout";
-          const isRateLimit = /rate limit|temporalmente no disponible/i.test(
-            e?.message || "",
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, delays[attempt]));
+          if (ignore) return;
+        }
+        try {
+          const r = await withTimeout(
+            traktGetScoreboard({ type: traktType, tmdbId: id }),
+            14000,
           );
+          if (ignore) return;
 
-          // Solo mostrar errores críticos al usuario
-          const errorMsg =
-            isTimeout || isRateLimit
-              ? ""
-              : e?.message || "Error cargando scoreboard";
+          const result = parseScoreboardData(r) || defaultScoreboard;
+          setTScoreboard(result);
 
-          setTScoreboard((p) => ({
-            ...p,
-            loading: false,
-            found: false,
-            error: errorMsg,
-          }));
+          // Si encontró el item y tiene stats numéricas, guardar en cache y salir
+          if (result.found && hasNumericStats(result.stats)) {
+            try {
+              const cacheKey = `tsb_${traktType}_${id}`;
+              localStorage.setItem(cacheKey, JSON.stringify(result));
+            } catch {}
+            return;
+          }
+
+          // Si found=true pero sin stats, reintentar (cold start probable)
+          if (result.found && attempt < delays.length - 1) continue;
+          // Último intento o found=false: aceptar resultado
+          return;
+        } catch (e) {
+          if (ignore) return;
+          // En último intento, mostrar error
+          if (attempt === delays.length - 1) {
+            const isTimeout = e?.message === "Timeout";
+            const isRateLimit = /rate limit|temporalmente no disponible/i.test(
+              e?.message || "",
+            );
+            const errorMsg =
+              isTimeout || isRateLimit
+                ? ""
+                : e?.message || "Error cargando scoreboard";
+            setTScoreboard((p) => ({
+              ...p,
+              loading: false,
+              found: false,
+              error: errorMsg,
+            }));
+          }
+          // En intentos anteriores, reintentar silenciosamente
         }
       }
     };
@@ -2348,46 +2375,6 @@ export default function DetailsClient({
     load();
     return () => {
       ignore = true;
-    };
-  }, [id, traktType]);
-
-  // Carga las estadisticas detalladas de Trakt (watchers, plays, collectors, etc.)
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setTraktStatsLoading(true);
-        setTraktStatsError("");
-
-        // Timeout reducido: stats puede fallar rápido (4-5s server), total ~10s
-        const res = await withTimeout(
-          traktGetStats({ type: traktType, tmdbId: id }),
-          12000,
-        );
-        if (cancelled) return;
-
-        // El formato de respuesta puede variar: { stats } o directamente stats
-        setTraktStats(res?.stats ?? res ?? null);
-      } catch (e) {
-        if (cancelled) return;
-        // Si es timeout o rate limit, no bloquear la UI
-        const isTimeout = e?.message === "Timeout";
-        const isRateLimit = /rate limit/i.test(e?.message || "");
-        if (!isTimeout && !isRateLimit) {
-          setTraktStatsError(
-            e?.message || "No se pudieron cargar estadísticas de Trakt",
-          );
-        }
-        setTraktStats(null);
-      } finally {
-        if (!cancelled) setTraktStatsLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
     };
   }, [id, traktType]);
 
@@ -6178,7 +6165,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                  ================================================================= */}
               {/* Muestra estadísticas de Trakt en formato compacto con scroll horizontal */}
               {/* Visible en móvil sin recortes gracias al padding con safe-area */}
-              {!tScoreboard.loading && (
+              {/* Mostrar cuando hay stats numéricas (incluyendo de cache stale) */}
+              {Object.values(tScoreboard?.stats || {}).some(
+                (v) => typeof v === "number",
+              ) && (
                 <div className="border-t border-white/5 bg-black/10">
                   {/* Scroller con padding + safe-area para que no se recorte en bordes */}
                   <div
