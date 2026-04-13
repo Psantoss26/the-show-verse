@@ -1,10 +1,14 @@
 // src/app/details/tv/[id]/season/[season]/episode/[episode]/page.jsx
 import EpisodeDetailsClient from "@/components/EpisodeDetailsClient";
-import { getEpisodeRatings } from "@/lib/api/ratingsHelper";
+import {
+  getEpisodeImdbRating,
+  getEpisodeRatings,
+} from "@/lib/api/ratingsHelper";
 
 export const revalidate = 3600; // 1h
 
-const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const TMDB_API_KEY =
+  process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
 async function tmdbFetch(path) {
   const url = `https://api.themoviedb.org/3${path}${path.includes("?") ? "&" : "?"}api_key=${TMDB_API_KEY}&language=es-ES`;
@@ -16,7 +20,8 @@ async function tmdbFetch(path) {
 }
 
 export default async function EpisodePage({ params }) {
-  if (!TMDB_API_KEY) throw new Error("Missing NEXT_PUBLIC_TMDB_API_KEY");
+  if (!TMDB_API_KEY)
+    throw new Error("Missing TMDB_API_KEY or NEXT_PUBLIC_TMDB_API_KEY");
 
   const p = await params;
   const showId = Number(p?.id);
@@ -44,28 +49,38 @@ export default async function EpisodePage({ params }) {
 
   const showImdbId = show?.external_ids?.imdb_id || null;
 
-  // Obtener rating de este episodio específico usando el helper directamente (sin HTTP fetch)
+  // Obtener rating IMDb del episodio consultando solo la season requerida
   let imdb = null;
   if (showImdbId) {
     try {
-      const ratingsData = await getEpisodeRatings(showId, seasonNumber !== 0);
-      const targetSeason = ratingsData?.seasons?.find(
-        (s) => s.seasonNumber === seasonNumber,
-      );
-      const targetEpisode = targetSeason?.episodes?.find(
-        (ep) => ep.episodeNumber === episodeNumber,
+      imdb = await getEpisodeImdbRating(
+        showImdbId,
+        seasonNumber,
+        episodeNumber,
       );
 
-      if (targetEpisode) {
-        imdb = {
-          id: showImdbId,
-          rating:
-            typeof targetEpisode.imdb === "number" ? targetEpisode.imdb : null,
-          votes:
-            typeof targetEpisode.imdbVotes === "number"
-              ? targetEpisode.imdbVotes
-              : null,
-        };
+      if (!imdb?.rating) {
+        const ratingsData = await getEpisodeRatings(showId, true);
+        const targetSeason = ratingsData?.seasons?.find(
+          (s) => s.seasonNumber === seasonNumber,
+        );
+        const targetEpisode = targetSeason?.episodes?.find(
+          (ep) => ep.episodeNumber === episodeNumber,
+        );
+
+        if (targetEpisode) {
+          imdb = {
+            id: showImdbId,
+            rating:
+              typeof targetEpisode.imdb === "number"
+                ? targetEpisode.imdb
+                : null,
+            votes:
+              typeof targetEpisode.imdbVotes === "number"
+                ? targetEpisode.imdbVotes
+                : null,
+          };
+        }
       }
     } catch (e) {
       console.error("Error fetching episode rating:", e);
