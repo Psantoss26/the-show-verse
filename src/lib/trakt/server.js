@@ -61,18 +61,31 @@ export function readTraktCookies(cookieStore) {
 export function setTraktCookies(res, tokens) {
   const secure = process.env.NODE_ENV === "production";
 
+  // Calcular maxAge basado en expires_at_ms o usar valores por defecto
+  const now = Date.now();
+  const expiresAtMs = tokens.expires_at_ms || 0;
+
+  // Access token: usar tiempo real de expiración o 90 días como fallback
+  const accessMaxAge =
+    expiresAtMs > now
+      ? Math.floor((expiresAtMs - now) / 1000)
+      : 60 * 60 * 24 * 90; // 90 días (3 meses)
+
   res.cookies.set("trakt_access_token", tokens.access_token, {
     httpOnly: true,
     secure,
     sameSite: "lax",
     path: "/",
+    maxAge: accessMaxAge,
   });
 
+  // Refresh token: Trakt típicamente da 90 días, guardamos por 1 año para seguridad
   res.cookies.set("trakt_refresh_token", tokens.refresh_token, {
     httpOnly: true,
     secure,
     sameSite: "lax",
     path: "/",
+    maxAge: 60 * 60 * 24 * 365, // 1 año
   });
 
   res.cookies.set("trakt_expires_at", String(tokens.expires_at_ms), {
@@ -80,6 +93,7 @@ export function setTraktCookies(res, tokens) {
     secure,
     sameSite: "lax",
     path: "/",
+    maxAge: 60 * 60 * 24 * 365, // 1 año (debe durar lo mismo que refresh_token)
   });
 }
 

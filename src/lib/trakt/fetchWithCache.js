@@ -22,8 +22,13 @@ function traktHeaders() {
     );
     throw new Error("Missing TRAKT_CLIENT_ID environment variable");
   }
+  // 🐞 DEBUG: Log client ID (primeros y últimos 4 caracteres por seguridad)
+  console.log(
+    `🔑 Client ID being used: ${key.slice(0, 4)}...${key.slice(-4)} (length: ${key.length})`,
+  );
   return {
     "Content-Type": "application/json",
+    Accept: "application/json",
     "trakt-api-version": "2",
     "trakt-api-key": key,
     "User-Agent": "TheShowVerse/1.0 (Next.js; Trakt OAuth)",
@@ -162,6 +167,14 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
           );
         }
       }
+    } else if (!res.ok) {
+      // Si la respuesta es un error y no es JSON, loggear para debugging
+      const textPreview = await res.text().catch(() => "");
+      console.error(
+        `⚠️ Trakt returned non-JSON error (${res.status}) for ${path}`,
+      );
+      console.error(`   Content-Type: ${contentType}`);
+      console.error(`   Response preview: ${textPreview.substring(0, 200)}`);
     }
 
     // Otros errores de servidor (5xx) - reintentar con exponential backoff
@@ -196,6 +209,19 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
 
     if (!res.ok) {
       const msg = json?.error || json?.message || `Trakt HTTP ${res.status}`;
+
+      // 🐞 DEBUG: Log detalles completos del error 403
+      if (res.status === 403) {
+        console.error(`🚨 TRAKT 403 FORBIDDEN DETAILS:`);
+        console.error(`   Path: ${path}`);
+        console.error(
+          `   Response headers:`,
+          Object.fromEntries(res.headers.entries()),
+        );
+        console.error(`   Response body:`, json);
+        console.error(`   Request headers:`, options.headers);
+      }
+
       console.error(`❌ Trakt error ${res.status} on ${path}: ${msg}`);
       const err = new Error(msg);
       err.status = res.status;

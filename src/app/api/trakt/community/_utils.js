@@ -29,11 +29,11 @@ export async function traktHeaders({ includeAuth = false } = {}) {
   const clientId = traktClientId();
 
   const h = {
-    "content-type": "application/json",
-    accept: "application/json",
+    "Content-Type": "application/json",
+    Accept: "application/json",
     "trakt-api-version": "2",
     "trakt-api-key": clientId,
-    "user-agent": traktUserAgent(),
+    "User-Agent": traktUserAgent(),
   };
 
   if (!includeAuth) return h;
@@ -47,7 +47,7 @@ export async function traktHeaders({ includeAuth = false } = {}) {
     c.get("trakt_token")?.value ||
     "";
 
-  if (token) h.authorization = `Bearer ${token}`;
+  if (token) h.Authorization = `Bearer ${token}`;
   return h;
 }
 

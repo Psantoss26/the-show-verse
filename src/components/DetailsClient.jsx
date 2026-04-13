@@ -2804,7 +2804,33 @@ export default function DetailsClient({
         }),
       });
 
-      const json = await res.json().catch(() => ({}));
+      // Primero obtener el texto de la respuesta
+      const responseText = await res.text();
+
+      // Intentar parsearlo como JSON
+      let json;
+      try {
+        json = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error(
+          "[DetailsClient] Error parsing response as JSON:",
+          parseError,
+        );
+        console.error(
+          "[DetailsClient] Response text:",
+          responseText.substring(0, 300),
+        );
+        console.error("[DetailsClient] Response status:", res.status);
+        console.error(
+          "[DetailsClient] Response headers:",
+          Object.fromEntries(res.headers.entries()),
+        );
+
+        throw new Error(
+          "El servidor devolvió una respuesta inválida (no JSON). Revisa la consola del servidor y del navegador.",
+        );
+      }
+
       if (!res.ok)
         throw new Error(json?.error || "Error marcando serie en Trakt");
 
