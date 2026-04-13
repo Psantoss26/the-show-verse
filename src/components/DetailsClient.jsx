@@ -1719,8 +1719,16 @@ export default function DetailsClient({
       window.location.href = `/api/trakt/auth/start?next=/details/${type}/${id}`;
       return;
     }
-    // Trakt acepta valores enteros de 1 a 10
-    await setTraktRatingSafe(value == null ? null : Math.ceil(value));
+    try {
+      // Trakt acepta valores enteros de 1 a 10
+      await setTraktRatingSafe(value == null ? null : Math.ceil(value));
+    } catch (err) {
+      if (err?.code === "TRAKT_REAUTH_REQUIRED" || err?.status === 401) {
+        window.location.href = `/api/trakt/auth/start?next=/details/${type}/${id}`;
+        return false;
+      }
+      throw err;
+    }
 
     // Sincronizacion opcional hacia TMDb (skipSync evita bucle infinito)
     if (syncTrakt && session && TMDB_API_KEY) {
@@ -1748,6 +1756,7 @@ export default function DetailsClient({
     loading: false,
     connected: false,
     found: false,
+    traktId: null,
     traktUrl: null,
     watched: false,
     plays: 0,
@@ -2419,6 +2428,7 @@ export default function DetailsClient({
           loading: false,
           connected: !!json.connected,
           found: !!json.found,
+          traktId: json.traktId ?? null,
           traktUrl: json.traktUrl || null,
           watched: !!json.watched,
           plays: Number(json.plays || 0),
@@ -2608,8 +2618,12 @@ export default function DetailsClient({
     try {
       await traktSetRating({
         type: traktType, // 'movie' | 'show'
-        ids: { tmdb: Number(id) }, // lo que tu API route espera
+        ids: {
+          tmdb: Number(id),
+          ...(trakt.traktId != null ? { trakt: Number(trakt.traktId) } : {}),
+        },
         tmdbId: Number(id),
+        traktId: trakt.traktId != null ? Number(trakt.traktId) : undefined,
         rating: valueOrNull, // puede ser number o null
       });
       setTrakt((p) => ({
@@ -3217,16 +3231,26 @@ export default function DetailsClient({
       return;
     }
 
-    // 1. Enviar a TMDb (skipSync para evitar doble sincronizacion)
-    if (value === null) {
-      await clearTmdbRating({ skipSync: true });
-    } else {
-      await sendTmdbRating(value, { skipSync: true });
-    }
+    try {
+      setRatingError("");
 
-    // 2. Enviar a Trakt si esta conectado (Trakt usa null para borrar)
-    if (trakt.connected) {
-      await sendTraktRating(value); // sendTraktRating ya maneja null internamente
+      // 1. Enviar a TMDb (skipSync para evitar doble sincronizacion)
+      if (value === null) {
+        await clearTmdbRating({ skipSync: true });
+      } else {
+        await sendTmdbRating(value, { skipSync: true });
+      }
+
+      // 2. Enviar a Trakt si esta conectado (Trakt usa null para borrar)
+      if (trakt.connected) {
+        const traktOk = await sendTraktRating(value); // sendTraktRating ya maneja null internamente
+        if (traktOk === false) return false;
+      }
+
+      return true;
+    } catch (err) {
+      setRatingError(err?.message || "Error al sincronizar puntuacion");
+      return false;
     }
   };
 

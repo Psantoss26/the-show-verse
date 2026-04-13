@@ -4,8 +4,9 @@ import { cookies } from "next/headers";
 const TRAKT_BASE = "https://api.trakt.tv";
 const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID;
 
-function getTraktAccessTokenOrNull() {
-  return cookies().get("trakt_access_token")?.value || null;
+async function getTraktAccessTokenOrNull() {
+  const store = await cookies();
+  return store.get("trakt_access_token")?.value || null;
 }
 
 function traktHeaders(token) {
@@ -19,7 +20,7 @@ function traktHeaders(token) {
 
 export async function POST(req) {
   try {
-    const token = getTraktAccessTokenOrNull();
+    const token = await getTraktAccessTokenOrNull();
     if (!token)
       return NextResponse.json({ error: "Not connected" }, { status: 401 });
 

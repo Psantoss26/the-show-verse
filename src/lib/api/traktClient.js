@@ -344,7 +344,12 @@ export async function traktSetRating({
   });
 
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.error || "Trakt rating failed");
+  if (!res.ok) {
+    const err = new Error(json?.error || "Trakt rating failed");
+    err.status = res.status;
+    err.code = json?.code || null;
+    throw err;
+  }
   return json;
 }
 

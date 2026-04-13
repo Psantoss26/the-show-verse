@@ -74,6 +74,9 @@ export async function GET(req) {
 
   const origin = await originFromRequest(req);
   const redirectUri = resolveWebRedirectUri(origin);
+  const oauthScope = String(process.env.TRAKT_OAUTH_SCOPE || "public private")
+    .trim()
+    .replace(/\s+/g, " ");
 
   const state = randomState();
   const nextPath = sanitizeNextPath(
@@ -85,7 +88,8 @@ export async function GET(req) {
     `?response_type=code` +
     `&client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&state=${encodeURIComponent(state)}`;
+    `&state=${encodeURIComponent(state)}` +
+    `&scope=${encodeURIComponent(oauthScope)}`;
 
   // ✅ Debug opcional: /api/trakt/auth/start?debug=1
   if (req?.nextUrl?.searchParams?.get("debug") === "1") {
@@ -93,6 +97,7 @@ export async function GET(req) {
       origin,
       redirectUri,
       nextPath,
+      oauthScope,
       authorizeUrl: url,
       configuredRedirectUri: process.env.TRAKT_REDIRECT_URI || null,
     });
