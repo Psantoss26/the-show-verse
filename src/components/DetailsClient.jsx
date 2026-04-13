@@ -8419,11 +8419,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         onAddShowPlay={onAddShowPlay}
         // rewatch runs + vista activa
         rewatchRuns={rewatchRuns}
+        activeView={activeEpisodesView}
         activeEpisodesView={activeEpisodesView}
+        onChangeView={changeEpisodesView}
         onChangeEpisodesView={changeEpisodesView}
         onCreateRewatchRun={createRewatchRun}
         onDeleteRewatchRun={deleteRewatchRun}
         rewatchStartAt={rewatchStartAt}
+        watchedBySeasonRewatch={rewatchWatchedBySeason}
         rewatchWatchedBySeason={rewatchWatchedBySeason}
         onToggleEpisodeRewatch={toggleEpisodeRewatch}
       />

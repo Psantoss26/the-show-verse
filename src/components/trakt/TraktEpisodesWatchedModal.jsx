@@ -97,6 +97,10 @@ export default function TraktEpisodesWatchedModal({
   activeView, // 'global' o ISO del play (ej: '2024-01-01T12:00:00.000Z')
   onChangeView, // (viewId) => void
   watchedBySeasonRewatch = {}, // watchedBySeason del rewatch seleccionado (según activeView)
+  // aliases legacy desde DetailsClient
+  activeEpisodesView,
+  onChangeEpisodesView,
+  rewatchWatchedBySeason,
   onToggleEpisodeRewatch, // (viewId, seasonNumber, episodeNumber) o (season, episode, viewId)
   onCreateRewatchRun, // (startedAtIso) => Promise  (opcional, si quieres crear la vista rewatch en backend)
 
@@ -150,11 +154,34 @@ export default function TraktEpisodesWatchedModal({
   const hasShowHandler = typeof onToggleShowWatched === "function";
   const hasAddPlayHandler = typeof onAddShowPlay === "function";
 
+  const resolvedActiveView =
+    typeof activeView === "string" && activeView
+      ? activeView
+      : typeof activeEpisodesView === "string" && activeEpisodesView
+        ? activeEpisodesView
+        : null;
+
+  const resolvedOnChangeView =
+    typeof onChangeView === "function"
+      ? onChangeView
+      : typeof onChangeEpisodesView === "function"
+        ? onChangeEpisodesView
+        : null;
+
+  const resolvedWatchedBySeasonRewatch =
+    watchedBySeasonRewatch && typeof watchedBySeasonRewatch === "object"
+      ? watchedBySeasonRewatch
+      : rewatchWatchedBySeason && typeof rewatchWatchedBySeason === "object"
+        ? rewatchWatchedBySeason
+        : {};
+
   const effectiveViewId = useMemo(() => {
     const v =
-      typeof activeView === "string" && activeView ? activeView : localView;
+      typeof resolvedActiveView === "string" && resolvedActiveView
+        ? resolvedActiveView
+        : localView;
     return v || "global";
-  }, [activeView, localView]);
+  }, [resolvedActiveView, localView]);
 
   const isRewatchView = effectiveViewId !== "global";
 
@@ -162,13 +189,13 @@ export default function TraktEpisodesWatchedModal({
     (next) => {
       const v = next || "global";
       setShowError("");
-      if (typeof onChangeView === "function") {
-        onChangeView(v);
+      if (typeof resolvedOnChangeView === "function") {
+        resolvedOnChangeView(v);
       } else {
         setLocalView(v);
       }
     },
-    [onChangeView],
+    [resolvedOnChangeView],
   );
 
   // Filtramos temporadas: > 0 (NO especiales)
@@ -184,8 +211,8 @@ export default function TraktEpisodesWatchedModal({
   // watchedBySeason “activo” según vista (global o rewatch)
   const watchedBySeasonActive = useMemo(() => {
     if (!isRewatchView) return watchedBySeason || {};
-    return watchedBySeasonRewatch || {};
-  }, [isRewatchView, watchedBySeason, watchedBySeasonRewatch]);
+    return resolvedWatchedBySeasonRewatch || {};
+  }, [isRewatchView, watchedBySeason, resolvedWatchedBySeasonRewatch]);
 
   // plays normalizados + optimistic
   const normalizedPlays = useMemo(() => {
@@ -272,7 +299,7 @@ export default function TraktEpisodesWatchedModal({
     setHistoryQuery("");
     setHistoryLimit(60);
 
-    if (typeof onChangeView !== "function") setLocalView("global");
+    if (typeof resolvedOnChangeView !== "function") setLocalView("global");
 
     if (isMovie) {
       const fallbackIso = movieWatchedAt || new Date().toISOString();
@@ -291,7 +318,7 @@ export default function TraktEpisodesWatchedModal({
     setOnlyUnwatched(false);
     setViewMode("list");
     setQuery("");
-  }, [open, usableSeasons, isMovie, movieWatchedAt, onChangeView]);
+  }, [open, usableSeasons, isMovie, movieWatchedAt, resolvedOnChangeView]);
 
   // Shortcuts & Lock Scroll
   useEffect(() => {
