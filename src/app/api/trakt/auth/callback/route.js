@@ -63,6 +63,22 @@ function sanitizeNextPath(nextPath) {
   return nextPath;
 }
 
+function decodeStatePayload(encodedState) {
+  if (!encodedState) return null;
+  try {
+    const raw = Buffer.from(String(encodedState), "base64url").toString("utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const nonce = typeof parsed.n === "string" ? parsed.n : null;
+    const nextPath = sanitizeNextPath(
+      typeof parsed.p === "string" ? parsed.p : "/",
+    );
+    return { nonce, nextPath };
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(req) {
   const clientId = process.env.TRAKT_CLIENT_ID;
   const clientSecret = process.env.TRAKT_CLIENT_SECRET;
@@ -76,10 +92,14 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
   const state = searchParams.get("state");
+  const decodedState = decodeStatePayload(state);
+  const stateNonce = decodedState?.nonce || state;
 
   const expected = req.cookies.get("trakt_oauth_state")?.value || null;
-  const nextCookie = req.cookies.get("trakt_oauth_next")?.value || "/";
-  const nextPath = sanitizeNextPath(nextCookie);
+  const nextCookie = req.cookies.get("trakt_oauth_next")?.value || "";
+  const nextPath = sanitizeNextPath(
+    nextCookie || decodedState?.nextPath || "/",
+  );
 
   // Validación básica: debe tener code
   if (!code) {
@@ -91,10 +111,10 @@ export async function GET(req) {
   }
 
   // Validar state solo si AMBOS están presentes (cross-site redirects pueden no enviar cookies)
-  if (state && expected && state !== expected) {
+  if (stateNonce && expected && stateNonce !== expected) {
     console.error("❌ OAuth state mismatch:", {
       stateMatch: false,
-      receivedState: state?.slice(0, 10) + "...",
+      receivedState: stateNonce?.slice(0, 10) + "...",
       expectedState: expected?.slice(0, 10) + "...",
     });
     return NextResponse.json(

@@ -56,6 +56,10 @@ function randomState() {
   );
 }
 
+function encodeStatePayload(payload) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
 function sanitizeNextPath(nextPath) {
   // evita open-redirect: solo rutas internas
   if (!nextPath || typeof nextPath !== "string") return "/";
@@ -96,11 +100,12 @@ export async function GET(req) {
   const origin = await originFromRequest(req);
   const redirectUri = resolveWebRedirectUri(origin);
 
-  const state = randomState();
+  const nonce = randomState();
   const nextFromQuery = req?.nextUrl?.searchParams?.get("next") || "";
   const nextPath = sanitizeNextPath(
     nextFromQuery || nextPathFromReferer(req, origin),
   );
+  const state = encodeStatePayload({ n: nonce, p: nextPath });
 
   const url =
     `https://trakt.tv/oauth/authorize` +
@@ -124,23 +129,15 @@ export async function GET(req) {
 
   const secure = origin.startsWith("https://");
 
-  // Extract domain for cookie (vercel.app or custom domain)
-  const cookieDomain = origin.includes("vercel.app")
-    ? ".vercel.app"
-    : origin.includes("localhost")
-      ? undefined
-      : undefined; // Let browser handle domain for custom domains
-
   const cookieOptions = {
     httpOnly: true,
     sameSite: "lax",
     secure,
     path: "/",
     maxAge: 10 * 60, // 10 min
-    ...(cookieDomain ? { domain: cookieDomain } : {}),
   };
 
-  res.cookies.set("trakt_oauth_state", state, cookieOptions);
+  res.cookies.set("trakt_oauth_state", nonce, cookieOptions);
 
   // ✅ guardamos a dónde volver tras callback
   res.cookies.set("trakt_oauth_next", nextPath, cookieOptions);
