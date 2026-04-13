@@ -1,10 +1,14 @@
 // src/app/details/tv/[id]/season/[season]/page.jsx
 import SeasonDetailsClient from "@/components/SeasonDetailsClient";
-import { getEpisodeRatings } from "@/lib/api/ratingsHelper";
+import {
+  getEpisodeRatings,
+  getSeasonImdbAggregate,
+} from "@/lib/api/ratingsHelper";
 
 export const revalidate = 3600; // 1h
 
-const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const TMDB_API_KEY =
+  process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
 async function tmdbFetch(path) {
   const url = `https://api.themoviedb.org/3${path}${path.includes("?") ? "&" : "?"}api_key=${TMDB_API_KEY}&language=es-ES`;
@@ -16,7 +20,8 @@ async function tmdbFetch(path) {
 }
 
 export default async function SeasonPage({ params }) {
-  if (!TMDB_API_KEY) throw new Error("Missing NEXT_PUBLIC_TMDB_API_KEY");
+  if (!TMDB_API_KEY)
+    throw new Error("Missing TMDB_API_KEY or NEXT_PUBLIC_TMDB_API_KEY");
 
   const p = await params;
   const showId = Number(p?.id);
@@ -37,35 +42,38 @@ export default async function SeasonPage({ params }) {
 
   const showImdbId = show?.external_ids?.imdb_id || null;
 
-  // Obtener ratings de episodios usando el helper directamente (sin HTTP fetch)
+  // Obtener rating agregado IMDb de la temporada consultando solo la season requerida
   let imdb = null;
   if (showImdbId) {
     try {
-      const ratingsData = await getEpisodeRatings(showId, seasonNumber !== 0);
-      const targetSeason = ratingsData?.seasons?.find(
-        (s) => s.seasonNumber === seasonNumber,
-      );
+      imdb = await getSeasonImdbAggregate(showImdbId, seasonNumber);
 
-      if (targetSeason?.episodes?.length > 0) {
-        // Calcular promedio de IMDb para esta temporada
-        const imdbRatings = targetSeason.episodes
-          .map((ep) => ep.imdb)
-          .filter((r) => typeof r === "number" && r > 0);
+      if (!imdb) {
+        const ratingsData = await getEpisodeRatings(showId, true);
+        const targetSeason = ratingsData?.seasons?.find(
+          (s) => s.seasonNumber === seasonNumber,
+        );
 
-        const imdbVotes = targetSeason.episodes
-          .map((ep) => ep.imdbVotes)
-          .filter((v) => typeof v === "number" && v > 0);
+        if (targetSeason?.episodes?.length) {
+          const imdbRatings = targetSeason.episodes
+            .map((ep) => ep.imdb)
+            .filter((r) => typeof r === "number" && r > 0);
 
-        if (imdbRatings.length > 0) {
-          const avgRating =
-            imdbRatings.reduce((a, b) => a + b, 0) / imdbRatings.length;
-          const totalVotes = imdbVotes.reduce((a, b) => a + b, 0);
+          const imdbVotes = targetSeason.episodes
+            .map((ep) => ep.imdbVotes)
+            .filter((v) => typeof v === "number" && v > 0);
 
-          imdb = {
-            id: showImdbId,
-            rating: Number(avgRating.toFixed(1)),
-            votes: totalVotes > 0 ? totalVotes : null,
-          };
+          if (imdbRatings.length > 0) {
+            const avgRating =
+              imdbRatings.reduce((a, b) => a + b, 0) / imdbRatings.length;
+            const totalVotes = imdbVotes.reduce((a, b) => a + b, 0);
+
+            imdb = {
+              id: showImdbId,
+              rating: Number(avgRating.toFixed(1)),
+              votes: totalVotes > 0 ? totalVotes : null,
+            };
+          }
         }
       }
     } catch (e) {

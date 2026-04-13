@@ -3,8 +3,16 @@ const TMDB_API_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const RATINGS_REVALIDATE_SECONDS = 60 * 60 * 24 * 30; // 30 días
-const OMDB_API_KEY = process.env.OMDB_API_KEY;
+const OMDB_API_KEY =
+  process.env.OMDB_API_KEY || process.env.NEXT_PUBLIC_OMDB_API_KEY;
 const OMDB_BASE_URL = "https://www.omdbapi.com/";
+
+const g = globalThis;
+g.__omdbSeasonCache = g.__omdbSeasonCache || new Map();
+g.__omdbSeasonInflight = g.__omdbSeasonInflight || new Map();
+
+const omdbSeasonCache = g.__omdbSeasonCache;
+const omdbSeasonInflight = g.__omdbSeasonInflight;
 
 async function tmdbFetch(path, searchParams = {}) {
   if (!TMDB_API_KEY) {
@@ -48,21 +56,125 @@ async function tmdbFetch(path, searchParams = {}) {
 async function omdbFetchSeason(imdbId, seasonNumber) {
   if (!OMDB_API_KEY || !imdbId) return null;
 
-  const url = new URL(OMDB_BASE_URL);
-  url.searchParams.set("apikey", OMDB_API_KEY);
-  url.searchParams.set("i", imdbId);
-  url.searchParams.set("Season", String(seasonNumber));
+  const season = Number(seasonNumber);
+  if (!Number.isFinite(season) || season < 1) return null;
 
-  try {
-    const res = await fetch(url.toString(), {
-      next: { revalidate: RATINGS_REVALIDATE_SECONDS },
-    });
-    const json = await res.json();
-    if (!res.ok || json?.Response === "False") return null;
-    return json;
-  } catch {
+  const cacheKey = `${imdbId}:s${season}`;
+  const now = Date.now();
+  const cached = omdbSeasonCache.get(cacheKey);
+  if (cached && cached.exp > now) return cached.value;
+
+  if (omdbSeasonInflight.has(cacheKey)) {
+    return omdbSeasonInflight.get(cacheKey);
+  }
+
+  const fetchPromise = (async () => {
+    const url = new URL(OMDB_BASE_URL);
+    url.searchParams.set("apikey", OMDB_API_KEY);
+    url.searchParams.set("i", imdbId);
+    url.searchParams.set("season", String(season));
+
+    try {
+      const res = await fetch(url.toString(), {
+        next: { revalidate: RATINGS_REVALIDATE_SECONDS },
+      });
+      const json = await res.json();
+      const valid = res.ok && json?.Response !== "False";
+      const value = valid ? json : null;
+
+      // Exitos: cache largo. Errores (incluye limite de OMDb): cache corto.
+      omdbSeasonCache.set(cacheKey, {
+        exp: now + (valid ? RATINGS_REVALIDATE_SECONDS * 1000 : 5 * 60 * 1000),
+        value,
+      });
+
+      return value;
+    } catch {
+      omdbSeasonCache.set(cacheKey, {
+        exp: now + 60 * 1000,
+        value: null,
+      });
+      return null;
+    } finally {
+      omdbSeasonInflight.delete(cacheKey);
+    }
+  })();
+
+  omdbSeasonInflight.set(cacheKey, fetchPromise);
+  return fetchPromise;
+}
+
+function parseOmdbRating(raw) {
+  if (!raw || raw === "N/A") return null;
+  const rating = Number(raw);
+  return Number.isFinite(rating) && rating > 0 && rating <= 10 ? rating : null;
+}
+
+function parseOmdbVotes(raw) {
+  if (!raw || raw === "N/A") return null;
+  const votes = Number(String(raw).replace(/,/g, ""));
+  return Number.isFinite(votes) && votes > 0 ? votes : null;
+}
+
+export async function getSeasonImdbAggregate(imdbId, seasonNumber) {
+  if (!imdbId || !Number.isFinite(Number(seasonNumber))) return null;
+
+  const omdbSeason = await omdbFetchSeason(imdbId, Number(seasonNumber));
+  const episodes = Array.isArray(omdbSeason?.Episodes)
+    ? omdbSeason.Episodes
+    : [];
+  if (!episodes.length) return null;
+
+  const ratings = [];
+  let totalVotes = 0;
+
+  for (const ep of episodes) {
+    const r = parseOmdbRating(ep?.imdbRating);
+    const v = parseOmdbVotes(ep?.imdbVotes);
+    if (typeof r === "number") ratings.push(r);
+    if (typeof v === "number") totalVotes += v;
+  }
+
+  if (!ratings.length) return null;
+
+  return {
+    id: imdbId,
+    rating: Number(
+      (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1),
+    ),
+    votes: totalVotes > 0 ? totalVotes : null,
+  };
+}
+
+export async function getEpisodeImdbRating(
+  imdbId,
+  seasonNumber,
+  episodeNumber,
+) {
+  if (
+    !imdbId ||
+    !Number.isFinite(Number(seasonNumber)) ||
+    !Number.isFinite(Number(episodeNumber))
+  ) {
     return null;
   }
+
+  const omdbSeason = await omdbFetchSeason(imdbId, Number(seasonNumber));
+  const episodes = Array.isArray(omdbSeason?.Episodes)
+    ? omdbSeason.Episodes
+    : [];
+  if (!episodes.length) return null;
+
+  const target = episodes.find(
+    (ep) => Number(ep?.Episode) === Number(episodeNumber),
+  );
+  if (!target) return null;
+
+  return {
+    id: imdbId,
+    rating: parseOmdbRating(target?.imdbRating),
+    votes: parseOmdbVotes(target?.imdbVotes),
+  };
 }
 
 async function buildOmdbEpisodeMap(imdbId, maxSeasons = 10) {
@@ -129,6 +241,7 @@ function calculateAbsoluteEpisodeNumber(
 
   let absolute = episodeNumber;
   for (const s of allSeasons) {
+    if (!s || s.season_number === 0) continue;
     if (s.season_number >= seasonNumber) break;
     absolute += s.episode_count || 0;
   }
