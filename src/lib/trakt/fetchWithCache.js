@@ -22,10 +22,7 @@ function traktHeaders() {
     );
     throw new Error("Missing TRAKT_CLIENT_ID environment variable");
   }
-  // 🐞 DEBUG: Log client ID (primeros y últimos 4 caracteres por seguridad)
-  console.log(
-    `🔑 Client ID being used: ${key.slice(0, 4)}...${key.slice(-4)} (length: ${key.length})`,
-  );
+
   return {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -209,19 +206,6 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
 
     if (!res.ok) {
       const msg = json?.error || json?.message || `Trakt HTTP ${res.status}`;
-
-      // 🐞 DEBUG: Log detalles completos del error 403
-      if (res.status === 403) {
-        console.error(`🚨 TRAKT 403 FORBIDDEN DETAILS:`);
-        console.error(`   Path: ${path}`);
-        console.error(
-          `   Response headers:`,
-          Object.fromEntries(res.headers.entries()),
-        );
-        console.error(`   Response body:`, json);
-        console.error(`   Request headers:`, options.headers);
-      }
-
       console.error(`❌ Trakt error ${res.status} on ${path}: ${msg}`);
       const err = new Error(msg);
       err.status = res.status;

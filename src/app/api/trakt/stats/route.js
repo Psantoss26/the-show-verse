@@ -5,8 +5,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 25; // Vercel: aumentado para producción
 
 export async function GET(req) {
-  // Timeout generoso para stats de Trakt (pueden ser lentas)
-  const timeoutMs = process.env.NODE_ENV === "production" ? 15000 : 12000;
+  // Timeout reducido para stats (tienden a fallar con 500, no debe bloquear)
+  const timeoutMs = process.env.NODE_ENV === "production" ? 5000 : 4000;
   const ft = (path) => fetchTrakt(path, { timeoutMs });
 
   try {
