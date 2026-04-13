@@ -22,6 +22,10 @@ export default function TraktWatchedControl({
         ? String(plays)
         : null;
 
+  // Ajustar el padding en función de la longitud: "1" -> más cuadrado, "100%" -> más alargado
+  const chars = badgeText ? badgeText.length : 0;
+  const paddingX = chars >= 3 ? "px-1.5" : "px-1";
+
   return (
     <div className="relative">
       <LiquidButton
@@ -44,8 +48,10 @@ export default function TraktWatchedControl({
 
       {badgeText && (
         <span
-          className="absolute -bottom-1 -right-2 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold
-            bg-black/70 border border-black/70 text-white flex items-center justify-center z-10 pointer-events-none"
+          className={`absolute -bottom-1.5 -right-1.5 min-w-[20px] h-[20px] ${paddingX} 
+            rounded-full text-[10px] font-bold tracking-tight leading-none
+            bg-zinc-800/90 backdrop-blur-md text-white flex items-center justify-center 
+            z-10 pointer-events-none shadow-md`}
           aria-label={`Progreso: ${badgeText}`}
         >
           {badgeText}
