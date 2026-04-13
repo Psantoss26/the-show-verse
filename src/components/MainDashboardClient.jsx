@@ -1165,17 +1165,52 @@ function InlinePreviewCardAnticipated({
           setBackdropReady(true);
         }
       } else {
-        const chosen = movie.backdrop_path || movie.poster_path || null;
-        if (chosen) {
-          const url = buildImg(chosen, "w1280");
-          await preloadImage(url);
+        const cachedBackdrop = movieBackdropCache.get(movie.id);
+        if (cachedBackdrop !== undefined) {
           if (!abort) {
-            setBackdropPath(chosen);
-            setBackdropReady(true);
+            setBackdropPath(cachedBackdrop);
+            if (cachedBackdrop) {
+              const url = buildImg(cachedBackdrop, "w1280");
+              await preloadImage(url);
+              if (!abort) setBackdropReady(true);
+            } else {
+              setBackdropReady(false);
+            }
           }
-        } else if (!abort) {
-          setBackdropPath(null);
-          setBackdropReady(false);
+        } else {
+          try {
+            const mediaTypeForBackdrop =
+              movie.media_type === "tv" ||
+              (movie.name && !movie.title) ||
+              movie.first_air_date
+                ? "tv"
+                : "movie";
+            const preferred = await fetchBestBackdrop(
+              movie.id,
+              mediaTypeForBackdrop,
+            );
+            const chosen =
+              preferred || movie.backdrop_path || movie.poster_path || null;
+
+            movieBackdropCache.set(movie.id, chosen);
+
+            if (chosen) {
+              const url = buildImg(chosen, "w1280");
+              await preloadImage(url);
+              if (!abort) {
+                setBackdropPath(chosen);
+                setBackdropReady(true);
+              }
+            } else if (!abort) {
+              setBackdropPath(null);
+              setBackdropReady(false);
+            }
+          } catch {
+            if (!abort) {
+              setBackdropPath(null);
+              setBackdropReady(false);
+            }
+          }
         }
       }
 
