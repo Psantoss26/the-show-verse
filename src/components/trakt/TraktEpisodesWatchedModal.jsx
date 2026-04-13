@@ -18,6 +18,7 @@ import {
   Plus,
   History,
   ChevronDown,
+  Trash2,
 } from "lucide-react";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -94,6 +95,7 @@ export default function TraktEpisodesWatchedModal({
   showPlays = [], // array de plays (strings ISO o { watched_at })
   showReleaseDate = null, // ISO fecha estreno (opcional)
   onAddShowPlay, // (watchedAtIsoOrNull, meta) => Promise
+  rewatchRuns = [],
   activeView, // 'global' o ISO del play (ej: '2024-01-01T12:00:00.000Z')
   onChangeView, // (viewId) => void
   watchedBySeasonRewatch = {}, // watchedBySeason del rewatch seleccionado (según activeView)
@@ -103,6 +105,7 @@ export default function TraktEpisodesWatchedModal({
   rewatchWatchedBySeason,
   onToggleEpisodeRewatch, // (viewId, seasonNumber, episodeNumber) o (season, episode, viewId)
   onCreateRewatchRun, // (startedAtIso) => Promise  (opcional, si quieres crear la vista rewatch en backend)
+  onDeleteRewatchRun,
 
   busyKey = "",
   onToggleEpisodeWatched,
@@ -137,6 +140,7 @@ export default function TraktEpisodesWatchedModal({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyLimit, setHistoryLimit] = useState(60);
+  const [deleteRunBusyId, setDeleteRunBusyId] = useState("");
 
   // optimistic plays para que el dropdown/historial no “parpadee”
   const [optimisticPlays, setOptimisticPlays] = useState([]); // array de ISO strings
@@ -237,13 +241,44 @@ export default function TraktEpisodesWatchedModal({
     return uniq;
   }, [showPlays, optimisticPlays]);
 
+  const normalizedRuns = useMemo(() => {
+    const list = Array.isArray(rewatchRuns) ? rewatchRuns : [];
+    return list
+      .map((r) => {
+        const id = String(r?.id || r?.startedAt || "");
+        const startedAt = String(r?.startedAt || r?.id || "");
+        if (!id || !startedAt) return null;
+        return {
+          id,
+          startedAt,
+          label: r?.label || `Rewatch · ${formatDateTime(startedAt)}`,
+        };
+      })
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      );
+  }, [rewatchRuns]);
+
+  const rewatchItems = useMemo(() => {
+    if (normalizedRuns.length > 0) return normalizedRuns;
+    return normalizedPlays.map((iso) => ({
+      id: iso,
+      startedAt: iso,
+      label: `Rewatch · ${formatDateTime(iso)}`,
+    }));
+  }, [normalizedRuns, normalizedPlays]);
+
   const filteredHistory = useMemo(() => {
     const q = (historyQuery || "").trim().toLowerCase();
-    if (!q) return normalizedPlays;
-    return normalizedPlays.filter((iso) =>
-      formatDateTime(iso).toLowerCase().includes(q),
+    if (!q) return rewatchItems;
+    return rewatchItems.filter((item) =>
+      `${item?.label || ""} ${formatDateTime(item?.startedAt)}`
+        .toLowerCase()
+        .includes(q),
     );
-  }, [normalizedPlays, historyQuery]);
+  }, [rewatchItems, historyQuery]);
 
   const visibleHistory = useMemo(
     () => filteredHistory.slice(0, historyLimit),
@@ -507,6 +542,46 @@ export default function TraktEpisodesWatchedModal({
     }
   };
 
+  const handleDeleteRewatch = useCallback(
+    async (runId, startedAt) => {
+      setShowError("");
+      if (typeof onDeleteRewatchRun !== "function") {
+        setShowError("No se puede borrar este rewatch desde aquí.");
+        return;
+      }
+
+      if (!runId) return;
+      const ok = window.confirm("¿Borrar este rewatch de la lista?");
+      if (!ok) return;
+
+      setDeleteRunBusyId(runId);
+      try {
+        await onDeleteRewatchRun(runId);
+
+        // Limpia plays optimistas ligados a ese rewatch
+        if (startedAt) {
+          setOptimisticPlays((prev) =>
+            (Array.isArray(prev) ? prev : []).filter(
+              (iso) => iso !== startedAt,
+            ),
+          );
+        }
+
+        if (
+          effectiveViewId === runId ||
+          (startedAt && effectiveViewId === startedAt)
+        ) {
+          changeView("global");
+        }
+      } catch (e) {
+        setShowError(e?.message || "No se pudo borrar el rewatch.");
+      } finally {
+        setDeleteRunBusyId("");
+      }
+    },
+    [onDeleteRewatchRun, effectiveViewId, changeView],
+  );
+
   const toggleEpisode = async (sn, en) => {
     setShowError("");
     if (!isConnected) return;
@@ -731,8 +806,8 @@ export default function TraktEpisodesWatchedModal({
         </div>
 
         {/* Toolbar */}
-        <div className="px-5 py-3 border-b border-white/5 flex flex-col gap-3 bg-[#0b0b0b] shrink-0 z-20">
-          <div className="flex flex-col lg:flex-row gap-3">
+        <div className="px-5 py-3 border-b border-white/5 flex flex-col gap-2.5 bg-[#0b0b0b] shrink-0 z-20">
+          <div className="flex flex-col sm:flex-row gap-2.5">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
@@ -748,155 +823,155 @@ export default function TraktEpisodesWatchedModal({
             </div>
 
             {/* Selector de vista: Global / Rewatch por fecha (plays) */}
-            <div className="relative shrink-0">
+            <div className="relative w-full sm:w-auto sm:min-w-[260px] shrink-0">
               <select
                 value={effectiveViewId}
                 onChange={(e) => changeView(e.target.value)}
-                className="h-[38px] pl-3 pr-9 rounded-xl border text-xs font-black bg-zinc-900 border-white/10 text-zinc-200 hover:bg-zinc-800 transition outline-none"
+                className="h-[38px] w-full appearance-none pl-3 pr-10 rounded-xl border text-xs font-black bg-zinc-900 border-white/10 text-zinc-200 hover:bg-zinc-800 transition outline-none"
                 title="Cambiar vista (Global o Rewatch por visionado)"
                 disabled={!isConnected}
               >
                 <option value="global">Global (Trakt)</option>
-                {normalizedPlays.map((iso) => (
-                  <option key={iso} value={iso}>
-                    {`Rewatch · ${formatDateTime(iso)}`}
+                {rewatchItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
                   </option>
                 ))}
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             </div>
+          </div>
 
-            {/* Botones extra */}
-            <div className="flex gap-2 shrink-0 overflow-x-auto no-scrollbar">
-              <div className="flex bg-zinc-900 rounded-xl p-1 border border-white/5">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("list")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
-                    viewMode === "list"
-                      ? "bg-zinc-700 text-white shadow"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  <List className="w-3.5 h-3.5" /> Lista
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setViewMode("table")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
-                    viewMode === "table"
-                      ? "bg-zinc-700 text-white shadow"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  <Table2 className="w-3.5 h-3.5" /> Tabla
-                </button>
-              </div>
-
+          {/* Botones extra */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 shrink-0">
+            <div className="col-span-2 sm:col-span-1 sm:w-auto flex bg-zinc-900 rounded-xl p-1 border border-white/5">
               <button
                 type="button"
-                onClick={() => setOnlyUnwatched(!onlyUnwatched)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
-                  onlyUnwatched
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                    : "bg-zinc-900 border-white/5 text-zinc-400 hover:bg-zinc-800"
+                onClick={() => setViewMode("list")}
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                  viewMode === "list"
+                    ? "bg-zinc-700 text-white shadow"
+                    : "text-zinc-400 hover:text-white"
                 }`}
               >
-                <Filter className="w-3.5 h-3.5" />{" "}
-                {onlyUnwatched ? "No vistos" : "Todos"}
+                <List className="w-3.5 h-3.5" /> Lista
               </button>
 
-              {/* Añadir visionado */}
               <button
                 type="button"
-                disabled={!isConnected}
-                onClick={() => {
-                  setAddPlayError("");
-                  setAddPlayPreset("just_finished");
-                  setAddPlayOtherValue(
-                    toLocalDatetimeInput(new Date().toISOString()),
-                  );
-                  setAddPlayOpen(true);
-                }}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
-                  !isConnected
-                    ? "opacity-50 cursor-not-allowed bg-zinc-900 border-white/10 text-zinc-500"
-                    : "bg-zinc-900 border-white/10 text-zinc-200 hover:bg-zinc-800"
+                onClick={() => setViewMode("table")}
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                  viewMode === "table"
+                    ? "bg-zinc-700 text-white shadow"
+                    : "text-zinc-400 hover:text-white"
                 }`}
-                title={
-                  !isConnected
-                    ? "Conecta Trakt"
-                    : "Añadir un visionado y crear/switch a su rewatch"
-                }
               >
-                <Plus className="w-3.5 h-3.5" />
-                Añadir visionado
-              </button>
-
-              {/* Historial */}
-              <button
-                type="button"
-                disabled={!isConnected || normalizedPlays.length === 0}
-                onClick={() => {
-                  setHistoryQuery("");
-                  setHistoryLimit(60);
-                  setHistoryOpen(true);
-                }}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
-                  !isConnected || normalizedPlays.length === 0
-                    ? "opacity-50 cursor-not-allowed bg-white/5 border-white/10 text-zinc-500"
-                    : "bg-white/5 border-white/10 text-zinc-200 hover:bg-white/10"
-                }`}
-                title={
-                  !isConnected
-                    ? "Conecta Trakt"
-                    : normalizedPlays.length === 0
-                      ? "Sin visionados"
-                      : "Ver todos los visionados"
-                }
-              >
-                <History className="w-3.5 h-3.5 text-emerald-400" />
-                Historial
-                {isConnected && normalizedPlays.length > 0 && (
-                  <span className="ml-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-200">
-                    {normalizedPlays.length}
-                  </span>
-                )}
-              </button>
-
-              {/* SERIE COMPLETA (global) */}
-              <button
-                type="button"
-                disabled={!canToggleShow}
-                onClick={onClickToggleShow}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap
-                  ${
-                    showCompleted
-                      ? "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20"
-                      : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
-                  }
-                  ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
-                title={
-                  !isConnected
-                    ? "Conecta Trakt"
-                    : isRewatchView
-                      ? "En rewatch no se usa “marcar serie completa”"
-                      : usableSeasons.length === 0
-                        ? "Sin temporadas disponibles"
-                        : undefined
-                }
-              >
-                {busyShow ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : showCompleted ? (
-                  <EyeOff className="w-3.5 h-3.5" />
-                ) : (
-                  <Eye className="w-3.5 h-3.5" />
-                )}
-                {showCompleted ? "Quitar serie" : "Marcar serie"}
+                <Table2 className="w-3.5 h-3.5" /> Tabla
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setOnlyUnwatched(!onlyUnwatched)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${
+                onlyUnwatched
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                  : "bg-zinc-900 border-white/5 text-zinc-400 hover:bg-zinc-800"
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              {onlyUnwatched ? "No vistos" : "Todos"}
+            </button>
+
+            {/* Añadir visionado */}
+            <button
+              type="button"
+              disabled={!isConnected}
+              onClick={() => {
+                setAddPlayError("");
+                setAddPlayPreset("just_finished");
+                setAddPlayOtherValue(
+                  toLocalDatetimeInput(new Date().toISOString()),
+                );
+                setAddPlayOpen(true);
+              }}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${
+                !isConnected
+                  ? "opacity-50 cursor-not-allowed bg-zinc-900 border-white/10 text-zinc-500"
+                  : "bg-zinc-900 border-white/10 text-zinc-200 hover:bg-zinc-800"
+              }`}
+              title={
+                !isConnected
+                  ? "Conecta Trakt"
+                  : "Añadir un visionado y crear/switch a su rewatch"
+              }
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Añadir visionado
+            </button>
+
+            {/* Historial */}
+            <button
+              type="button"
+              disabled={!isConnected || normalizedPlays.length === 0}
+              onClick={() => {
+                setHistoryQuery("");
+                setHistoryLimit(60);
+                setHistoryOpen(true);
+              }}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${
+                !isConnected || normalizedPlays.length === 0
+                  ? "opacity-50 cursor-not-allowed bg-white/5 border-white/10 text-zinc-500"
+                  : "bg-white/5 border-white/10 text-zinc-200 hover:bg-white/10"
+              }`}
+              title={
+                !isConnected
+                  ? "Conecta Trakt"
+                  : rewatchItems.length === 0
+                    ? "Sin visionados"
+                    : "Ver todos los visionados"
+              }
+            >
+              <History className="w-3.5 h-3.5 text-emerald-400" />
+              Historial
+              {isConnected && rewatchItems.length > 0 && (
+                <span className="ml-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-200">
+                  {rewatchItems.length}
+                </span>
+              )}
+            </button>
+
+            {/* SERIE COMPLETA (global) */}
+            <button
+              type="button"
+              disabled={!canToggleShow}
+              onClick={onClickToggleShow}
+              className={`col-span-2 sm:col-span-1 px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap
+                ${
+                  showCompleted
+                    ? "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20"
+                    : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                }
+                ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
+              title={
+                !isConnected
+                  ? "Conecta Trakt"
+                  : isRewatchView
+                    ? "En rewatch no se usa “marcar serie completa”"
+                    : usableSeasons.length === 0
+                      ? "Sin temporadas disponibles"
+                      : undefined
+              }
+            >
+              {busyShow ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : showCompleted ? (
+                <EyeOff className="w-3.5 h-3.5" />
+              ) : (
+                <Eye className="w-3.5 h-3.5" />
+              )}
+              {showCompleted ? "Quitar serie" : "Marcar serie"}
+            </button>
           </div>
 
           {!!showError && (
@@ -1375,8 +1450,7 @@ export default function TraktEpisodesWatchedModal({
                       Historial de visionados
                     </h3>
                     <p className="text-xs text-zinc-400 mt-1">
-                      Plays registrados para esta serie (
-                      {normalizedPlays.length}).
+                      Plays registrados para esta serie ({rewatchItems.length}).
                     </p>
                   </div>
                   <button
@@ -1408,31 +1482,51 @@ export default function TraktEpisodesWatchedModal({
                         No hay resultados.
                       </div>
                     ) : (
-                      visibleHistory.map((iso) => (
+                      visibleHistory.map((item) => (
                         <div
-                          key={iso}
+                          key={item.id}
                           className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
                         >
                           <div className="min-w-0">
                             <div className="text-sm font-extrabold text-white truncate">
-                              {formatDate(iso)}
+                              {formatDate(item.startedAt)}
                             </div>
                             <div className="text-xs text-zinc-400 mt-0.5">
-                              {formatDateTime(iso)}
+                              {formatDateTime(item.startedAt)}
                             </div>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              changeView(iso);
-                              setHistoryOpen(false);
-                            }}
-                            className="shrink-0 px-3 py-2 rounded-xl border text-xs font-black bg-purple-500/10 border-purple-500/20 text-purple-200 hover:bg-purple-500/15 transition"
-                            title="Abrir esta vista rewatch"
-                          >
-                            Abrir rewatch
-                          </button>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                changeView(item.id);
+                                setHistoryOpen(false);
+                              }}
+                              className="px-3 py-2 rounded-xl border text-xs font-black bg-purple-500/10 border-purple-500/20 text-purple-200 hover:bg-purple-500/15 transition"
+                              title="Abrir esta vista rewatch"
+                            >
+                              Abrir rewatch
+                            </button>
+
+                            {typeof onDeleteRewatchRun === "function" && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteRewatch(item.id, item.startedAt)
+                                }
+                                disabled={deleteRunBusyId === item.id}
+                                className="px-2.5 py-2 rounded-xl border text-xs font-black bg-red-500/10 border-red-500/20 text-red-300 hover:bg-red-500/15 transition disabled:opacity-60"
+                                title="Borrar rewatch"
+                              >
+                                {deleteRunBusyId === item.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))
                     )}

@@ -254,31 +254,56 @@ export async function refreshAccessToken(refreshToken) {
   }
 }
 
-export async function traktFetch(path, { token, method = "GET", body } = {}) {
-  // ✅ Añadir timeout de 5 segundos para evitar bloqueos
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
+export async function traktFetch(
+  path,
+  { token, method = "GET", body, timeoutMs = 5000, retries = 0 } = {},
+) {
+  const url = `${TRAKT_API}${path}`;
+  const maxAttempts = Math.max(1, Number(retries || 0) + 1);
 
-  try {
-    const url = `${TRAKT_API}${path}`;
-    const res = await fetch(url, {
-      method,
-      headers: traktHeaders({ token }),
-      cache: "no-store",
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    const json = await safeJson(res);
-    return { ok: res.ok, status: res.status, json };
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === "AbortError") {
-      throw new Error("Trakt request timeout");
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: traktHeaders({ token }),
+        cache: "no-store",
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const json = await safeJson(res);
+
+      // Reintento corto para errores transitorios de upstream.
+      const isRetriableStatus = [502, 503, 504].includes(Number(res.status));
+      if (isRetriableStatus && attempt < maxAttempts) {
+        continue;
+      }
+
+      return { ok: res.ok, status: res.status, json };
+    } catch (err) {
+      clearTimeout(timeoutId);
+
+      if (err?.name === "AbortError") {
+        if (attempt < maxAttempts) {
+          continue;
+        }
+        const timeoutErr = new Error("Trakt request timeout");
+        timeoutErr.status = 504;
+        timeoutErr.isTimeout = true;
+        throw timeoutErr;
+      }
+
+      throw err;
     }
-    throw err;
   }
+
+  const fallbackErr = new Error("Trakt request failed");
+  fallbackErr.status = 500;
+  throw fallbackErr;
 }
 
 // ✅ Alias para compatibilidad con rutas antiguas (history/add|remove|update)
@@ -455,8 +480,18 @@ export async function traktRemoveHistoryEntries(token, { ids = [] }) {
     token,
     method: "POST",
     body: { ids: safeIds },
+    timeoutMs: 15000,
+    retries: 1,
   });
-  if (!r.ok) throw new Error(`Trakt remove history ids failed (${r.status})`);
+  if (!r.ok) {
+    const err = new Error(
+      r?.json?.error ||
+        r?.json?.message ||
+        `Trakt remove history ids failed (${r.status})`,
+    );
+    err.status = Number(r?.status || 500);
+    throw err;
+  }
   return r.json;
 }
 

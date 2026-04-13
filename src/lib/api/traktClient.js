@@ -370,9 +370,10 @@ export async function traktRemoveRating({ type, ids }) {
 }
 
 // ✅ GET plays + (opcional) progreso desde startAt (rewatch run)
-export async function traktGetShowPlays({ tmdbId, startAt } = {}) {
+export async function traktGetShowPlays({ tmdbId, startAt, endBefore } = {}) {
   const qs = new URLSearchParams({ tmdbId: String(tmdbId) });
   if (startAt) qs.set("startAt", String(startAt));
+  if (endBefore) qs.set("endBefore", String(endBefore));
 
   const res = await fetch(`/api/trakt/show/plays?${qs.toString()}`, {
     cache: "no-store",
@@ -380,6 +381,27 @@ export async function traktGetShowPlays({ tmdbId, startAt } = {}) {
   const json = await safeJson(res);
   if (!res.ok)
     throw new Error(json?.error || `Trakt show plays HTTP ${res.status}`);
+  return json;
+}
+
+export async function traktRemoveHistoryEntries({ ids } = {}) {
+  const safeIds = Array.isArray(ids)
+    ? ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)
+    : [];
+
+  if (!safeIds.length) return { ok: true, data: { deleted: 0 } };
+
+  const res = await fetch("/api/trakt/history/remove", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: safeIds }),
+  });
+
+  const json = await safeJson(res);
+  if (!res.ok)
+    throw new Error(
+      json?.error || `Trakt remove history entries HTTP ${res.status}`,
+    );
   return json;
 }
 
