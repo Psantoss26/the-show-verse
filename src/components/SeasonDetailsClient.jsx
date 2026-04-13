@@ -220,7 +220,7 @@ export default function SeasonDetailsClient({
         });
 
         if (res.status === 401) {
-          window.location.href = "/api/trakt/auth/start";
+          window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}`;
           return false;
         }
 
@@ -425,7 +425,7 @@ export default function SeasonDetailsClient({
                     loading={ratingLoading}
                     connected={traktConnected}
                     onConnect={() =>
-                      (window.location.href = "/api/trakt/auth/start")
+                      (window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}`)
                     }
                     onRating={handleRate}
                     onClearRating={() => handleRate(null)}

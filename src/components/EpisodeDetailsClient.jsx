@@ -222,7 +222,7 @@ export default function EpisodeDetailsClient({
         });
 
         if (res.status === 401) {
-          window.location.href = "/api/trakt/auth/start";
+          window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
           return;
         }
 
@@ -244,7 +244,7 @@ export default function EpisodeDetailsClient({
   // Trigger (mismo hueco visual que antes)
   const openRating = useCallback(() => {
     if (!traktConnected) {
-      window.location.href = "/api/trakt/auth/start";
+      window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
       return;
     }
     setIsRatingOpen(true);

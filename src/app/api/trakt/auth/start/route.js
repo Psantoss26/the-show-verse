@@ -58,8 +58,8 @@ function randomState() {
 
 function sanitizeNextPath(nextPath) {
   // evita open-redirect: solo rutas internas
-  if (!nextPath || typeof nextPath !== "string") return "/history";
-  if (!nextPath.startsWith("/")) return "/history";
+  if (!nextPath || typeof nextPath !== "string") return "/";
+  if (!nextPath.startsWith("/")) return "/";
   return nextPath;
 }
 
@@ -77,7 +77,7 @@ export async function GET(req) {
 
   const state = randomState();
   const nextPath = sanitizeNextPath(
-    req?.nextUrl?.searchParams?.get("next") || "/history",
+    req?.nextUrl?.searchParams?.get("next") || "/",
   );
 
   const url =

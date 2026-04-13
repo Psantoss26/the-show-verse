@@ -1716,7 +1716,7 @@ export default function DetailsClient({
   // Envia una puntuacion a Trakt y opcionalmente sincroniza con TMDb
   const sendTraktRating = async (value) => {
     if (!trakt.connected) {
-      window.location.href = "/api/trakt/auth/start";
+      window.location.href = `/api/trakt/auth/start?next=/details/${type}/${id}`;
       return;
     }
     // Trakt acepta valores enteros de 1 a 10
