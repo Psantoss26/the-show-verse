@@ -110,9 +110,9 @@ export async function GET(req) {
         );
       }
 
-      // 3) Intentar obtener stats (puede fallar)
+      // 3) Intentar obtener stats usando el endpoint correcto
       const stats = await ftStats(
-        `/seasons/${seasonObj.ids.trakt}/stats`,
+        `/shows/${traktShowId}/seasons/${seasonNumber}/stats`,
       ).catch(() => null);
 
       return NextResponse.json({
@@ -143,10 +143,10 @@ export async function GET(req) {
       return NextResponse.json({ error: "Episode not found" }, { status: 404 });
     }
 
-    // 3) Intentar obtener stats del episodio
-    const stats = await ftStats(`/episodes/${epTraktId}/stats`).catch(
-      () => null,
-    );
+    // 3) Intentar obtener stats del episodio usando el endpoint correcto
+    const stats = await ftStats(
+      `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
+    ).catch(() => null);
 
     return NextResponse.json({
       found: true,
