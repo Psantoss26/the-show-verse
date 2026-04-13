@@ -207,14 +207,23 @@ export async function GET(req) {
 
   const secure = origin.startsWith("https://");
 
+  // Calcular maxAge para las cookies
+  const now = Date.now();
+  const accessMaxAge =
+    expiresAtMs > now
+      ? Math.floor((expiresAtMs - now) / 1000)
+      : 60 * 60 * 24 * 90; // 90 días como fallback
+
   const res = NextResponse.redirect(new URL(nextPath, origin));
 
   // ✅ cookies que usa tu /auth/status y el resto de rutas
+  // IMPORTANTE: Incluir maxAge para que persistan entre sesiones del navegador
   res.cookies.set("trakt_access_token", tokenJson.access_token, {
     httpOnly: true,
     sameSite: "lax",
     secure,
     path: "/",
+    maxAge: accessMaxAge, // Duración real del token
   });
 
   res.cookies.set("trakt_refresh_token", tokenJson.refresh_token, {
@@ -222,6 +231,7 @@ export async function GET(req) {
     sameSite: "lax",
     secure,
     path: "/",
+    maxAge: 60 * 60 * 24 * 365, // 1 año (refresh token de Trakt dura ~90 días)
   });
 
   res.cookies.set("trakt_expires_at", String(expiresAtMs), {
@@ -229,6 +239,7 @@ export async function GET(req) {
     sameSite: "lax",
     secure,
     path: "/",
+    maxAge: 60 * 60 * 24 * 365, // 1 año (debe durar lo mismo que refresh_token)
   });
 
   // Limpieza
