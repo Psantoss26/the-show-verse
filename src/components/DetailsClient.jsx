@@ -6666,7 +6666,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
            ================================================================= */}
         {/* Sistema de navegación por secciones con detección de scroll */}
         {/* Incluye: Media, Actores, Recomendaciones, Comentarios, etc. */}
-        <div className="sm:mt-10">
+        <div className="mt-8 sm:mt-10">
           {/* Elemento centinela para detectar cuándo el menú debe quedar sticky */}
           <div ref={sentinelRef} className="h-px w-full" />
 
