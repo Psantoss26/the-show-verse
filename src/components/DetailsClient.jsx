@@ -1892,8 +1892,7 @@ export default function DetailsClient({
       found: true,
       rating:
         typeof r?.community?.rating === "number" ? r.community.rating : null,
-      votes:
-        typeof r?.community?.votes === "number" ? r.community.votes : null,
+      votes: typeof r?.community?.votes === "number" ? r.community.votes : null,
       stats: {
         watchers: typeof st?.watchers === "number" ? st.watchers : null,
         plays: typeof st?.plays === "number" ? st.plays : null,
@@ -6241,7 +6240,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
                 {/* Pestañas clicables para cambiar entre diferentes vistas de información */}
                 {/* Incluye: Detalles, Producción, Sinopsis, y Premios (si están disponibles) */}
-                <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
+                <div className="flex flex-wrap items-center gap-6 my-1.5 border-b border-white/10 pb-1">
                   {[
                     { id: "details", label: "Detalles" },
                     { id: "production", label: "Producción" },
