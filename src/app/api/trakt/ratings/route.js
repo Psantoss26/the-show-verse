@@ -8,6 +8,8 @@ export const dynamic = "force-dynamic";
 const TRAKT_API = "https://api.trakt.tv";
 const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID;
 const TRAKT_CLIENT_SECRET = process.env.TRAKT_CLIENT_SECRET;
+const TRAKT_USER_AGENT =
+  process.env.TRAKT_USER_AGENT || "TheShowVerse/1.0 (Next.js; Trakt Ratings)";
 const TRAKT_REDIRECT_URI =
   process.env.TRAKT_REDIRECT_URI ||
   (process.env.TRAKT_APP_ORIGIN
@@ -85,7 +87,13 @@ async function refreshIfNeeded(auth) {
 
   const res = await fetch(`${TRAKT_API}/oauth/token`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "trakt-api-version": "2",
+      "trakt-api-key": TRAKT_CLIENT_ID,
+      "User-Agent": TRAKT_USER_AGENT,
+    },
     body: JSON.stringify({
       grant_type: "refresh_token",
       refresh_token: refreshToken,
@@ -145,8 +153,10 @@ async function traktFetch(
     method,
     headers: {
       "Content-Type": "application/json",
+      Accept: "application/json",
       "trakt-api-version": "2",
       "trakt-api-key": TRAKT_CLIENT_ID,
+      "User-Agent": TRAKT_USER_AGENT,
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
@@ -357,8 +367,10 @@ export async function POST(req) {
     // ---- MOVIE / SHOW ----
     if (type === "movie" || type === "show") {
       const tmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb);
-      if (!Number.isFinite(tmdbId))
-        return respond({ error: "Missing tmdbId" }, 400);
+      const traktId = Number(body?.traktId ?? body?.ids?.trakt);
+
+      if (!Number.isFinite(tmdbId) && !Number.isFinite(traktId))
+        return respond({ error: "Missing tmdbId or traktId" }, 400);
 
       const rating = normalizeRating(body?.rating);
       const isRemove = rating === null;
@@ -366,12 +378,20 @@ export async function POST(req) {
       const endpoint = isRemove ? "/sync/ratings/remove" : "/sync/ratings";
       const key = type === "movie" ? "movies" : "shows";
 
+      // Construir IDs: preferir traktId si está disponible, sino tmdbId
+      const itemIds = {};
+      if (Number.isFinite(traktId)) {
+        itemIds.trakt = traktId;
+      } else if (Number.isFinite(tmdbId)) {
+        itemIds.tmdb = tmdbId;
+      }
+
       const payload = {
         [key]: [
           isRemove
-            ? { ids: { tmdb: tmdbId } }
+            ? { ids: itemIds }
             : {
-                ids: { tmdb: tmdbId },
+                ids: itemIds,
                 rating,
                 rated_at: new Date().toISOString(),
               },
@@ -385,6 +405,17 @@ export async function POST(req) {
       if (res.status === 401) return respond({ error: "Unauthorized" }, 401);
 
       const out = await res.json().catch(() => ({}));
+      if (res.status === 403) {
+        return respond(
+          {
+            error:
+              "Trakt requires write permissions for ratings. Reconnect Trakt and try again.",
+            code: "TRAKT_REAUTH_REQUIRED",
+            details: out,
+          },
+          403,
+        );
+      }
       if (!res.ok)
         return respond(
           { error: out?.error || "Trakt rating failed", details: out },
@@ -439,6 +470,17 @@ export async function POST(req) {
       if (res.status === 401) return respond({ error: "Unauthorized" }, 401);
 
       const out = await res.json().catch(() => ({}));
+      if (res.status === 403) {
+        return respond(
+          {
+            error:
+              "Trakt requires write permissions for ratings. Reconnect Trakt and try again.",
+            code: "TRAKT_REAUTH_REQUIRED",
+            details: out,
+          },
+          403,
+        );
+      }
       if (!res.ok)
         return respond(
           { error: out?.error || "Trakt rating failed", details: out },
@@ -509,6 +551,17 @@ export async function POST(req) {
       if (res.status === 401) return respond({ error: "Unauthorized" }, 401);
 
       const out = await res.json().catch(() => ({}));
+      if (res.status === 403) {
+        return respond(
+          {
+            error:
+              "Trakt requires write permissions for ratings. Reconnect Trakt and try again.",
+            code: "TRAKT_REAUTH_REQUIRED",
+            details: out,
+          },
+          403,
+        );
+      }
       if (!res.ok)
         return respond(
           { error: out?.error || "Trakt rating failed", details: out },

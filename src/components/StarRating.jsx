@@ -107,10 +107,14 @@ export default function StarRating({
     const v = normalize(value);
     if (v == null) return;
 
-    if (typeof rateFn === "function") {
-      // si rateFn devuelve false o lanza, NO cerramos
-      const ok = await rateFn(v);
-      if (ok === false) return;
+    try {
+      if (typeof rateFn === "function") {
+        // si rateFn devuelve false o lanza, NO cerramos
+        const ok = await rateFn(v);
+        if (ok === false) return;
+      }
+    } catch {
+      return;
     }
     setOpen(false);
   };
@@ -123,10 +127,14 @@ export default function StarRating({
     }
 
     let ok = true;
-    if (typeof clearFn === "function") {
-      ok = await clearFn();
-    } else if (typeof rateFn === "function") {
-      ok = await rateFn(null);
+    try {
+      if (typeof clearFn === "function") {
+        ok = await clearFn();
+      } else if (typeof rateFn === "function") {
+        ok = await rateFn(null);
+      }
+    } catch {
+      return;
     }
     if (ok === false) return;
     setOpen(false);
