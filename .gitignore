@@ -29,6 +29,8 @@ logs/
 Thumbs.db
 .idea/
 .vscode/
+.claude/
+tmpclaude*
 *.swp
 
 # --- Cobertura / tests ---
