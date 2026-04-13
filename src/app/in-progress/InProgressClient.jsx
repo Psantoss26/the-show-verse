@@ -1664,48 +1664,9 @@ export default function InProgressClient() {
                 className="lg:hidden overflow-visible"
               >
                 <div className="space-y-3 pt-1">
-                  {/* Section tabs */}
-                  <div className="flex gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800">
-                    <button
-                      onClick={() => setActiveTab("inprogress")}
-                      className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
-                        activeTab === "inprogress"
-                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
-                    >
-                      <Play
-                        className="w-3.5 h-3.5"
-                        fill={
-                          activeTab === "inprogress" ? "currentColor" : "none"
-                        }
-                      />
-                      Viendo
-                      {dataLoaded && (
-                        <span className="text-[10px] opacity-70">
-                          ({items.length})
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setActiveTab("completed")}
-                      className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
-                        activeTab === "completed"
-                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                      }`}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Completadas
-                      {completedLoaded && (
-                        <span className="text-[10px] opacity-70">
-                          ({completedItems.length})
-                        </span>
-                      )}
-                    </button>
-                  </div>
+                  {/* Fila 1: Ordenar + Agrupar */}
                   <div className="flex gap-2">
-                    <div className="flex-1">
+                    <div className="basis-1/2 min-w-0">
                       <InlineDropdown
                         label="Ordenar"
                         valueLabel={sortLabels[sortBy]}
@@ -1729,7 +1690,7 @@ export default function InProgressClient() {
                         )}
                       </InlineDropdown>
                     </div>
-                    <div className="flex-1">
+                    <div className="basis-1/2 min-w-0">
                       <InlineDropdown
                         label="Agrupar"
                         valueLabel={groupLabels[groupBy]}
@@ -1753,7 +1714,52 @@ export default function InProgressClient() {
                         )}
                       </InlineDropdown>
                     </div>
-                    <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
+                  </div>
+
+                  {/* Fila 2: Viendo/Completadas + Vista Tarjetas/Poster/Lista */}
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1 flex gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 min-w-0">
+                      <button
+                        onClick={() => setActiveTab("inprogress")}
+                        className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
+                          activeTab === "inprogress"
+                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
+                      >
+                        <Play
+                          className="w-3.5 h-3.5"
+                          fill={
+                            activeTab === "inprogress" ? "currentColor" : "none"
+                          }
+                        />
+                        Viendo
+                        {dataLoaded && (
+                          <span className="text-[10px] opacity-70">
+                            ({items.length})
+                          </span>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => setActiveTab("completed")}
+                        className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
+                          activeTab === "completed"
+                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Completadas
+                        {completedLoaded && (
+                          <span className="text-[10px] opacity-70">
+                            ({completedItems.length})
+                          </span>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
                       <button
                         onClick={() => setViewMode("cards")}
                         className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
