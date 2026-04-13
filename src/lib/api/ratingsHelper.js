@@ -120,7 +120,11 @@ async function buildOmdbEpisodeMap(imdbId, maxSeasons = 10) {
   return { map: episodeMap, seasons: omdbSeasons };
 }
 
-function calculateAbsoluteEpisodeNumber(seasonNumber, episodeNumber, allSeasons) {
+function calculateAbsoluteEpisodeNumber(
+  seasonNumber,
+  episodeNumber,
+  allSeasons,
+) {
   if (seasonNumber === 1) return episodeNumber;
 
   let absolute = episodeNumber;
@@ -166,7 +170,9 @@ export async function getEpisodeRatings(id, excludeSpecials = false) {
     })
     .sort((a, b) => a.season_number - b.season_number);
 
-  console.log(`[Ratings API] Serie ${id}: Pre-escaneando estructura de OMDb...`);
+  console.log(
+    `[Ratings API] Serie ${id}: Pre-escaneando estructura de OMDb...`,
+  );
   const omdbData = useOmdb
     ? await buildOmdbEpisodeMap(imdbId, 10)
     : { map: new Map(), seasons: [] };
@@ -217,7 +223,9 @@ export async function getEpisodeRatings(id, excludeSpecials = false) {
           const avg =
             values.length > 0
               ? Number(
-                  (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1),
+                  (values.reduce((a, b) => a + b, 0) / values.length).toFixed(
+                    1,
+                  ),
                 )
               : null;
 
