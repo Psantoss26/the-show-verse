@@ -1,11 +1,10 @@
 // src/app/details/tv/[id]/season/[season]/episode/[episode]/page.jsx
 import EpisodeDetailsClient from "@/components/EpisodeDetailsClient";
+import { getEpisodeRatings } from "@/lib/api/ratingsHelper";
 
 export const revalidate = 3600; // 1h
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-const OMDB_API_KEY =
-  process.env.OMDB_API_KEY || process.env.NEXT_PUBLIC_OMDB_API_KEY;
 
 async function tmdbFetch(path) {
   const url = `https://api.themoviedb.org/3${path}${path.includes("?") ? "&" : "?"}api_key=${TMDB_API_KEY}&language=es-ES`;
@@ -14,20 +13,6 @@ async function tmdbFetch(path) {
   if (!res.ok)
     throw new Error(json?.status_message || `TMDb error ${res.status}`);
   return json;
-}
-
-async function omdbFetch(imdbId) {
-  if (!OMDB_API_KEY || !imdbId) return null;
-  const url = `https://www.omdbapi.com/?i=${encodeURIComponent(imdbId)}&apikey=${encodeURIComponent(OMDB_API_KEY)}`;
-  const res = await fetch(url, { next: { revalidate } });
-  const json = await res.json().catch(() => null);
-  if (!res.ok || !json || json?.Response === "False") return null;
-  return json;
-}
-
-function parseOmdbRating(x) {
-  const n = Number(String(x || "").replace(",", "."));
-  return Number.isFinite(n) ? n : null;
 }
 
 export default async function EpisodePage({ params }) {
@@ -59,42 +44,28 @@ export default async function EpisodePage({ params }) {
 
   const showImdbId = show?.external_ids?.imdb_id || null;
 
-  // Obtener rating de este episodio específico desde el endpoint unificado
+  // Obtener rating de este episodio específico usando el helper directamente (sin HTTP fetch)
   let imdb = null;
   if (showImdbId) {
     try {
-      const baseUrl =
-        process.env.NEXT_PUBLIC_BASE_URL ||
-        (process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "http://localhost:3000");
-      const ratingsRes = await fetch(
-        `${baseUrl}/api/tv/${showId}/ratings?excludeSpecials=${seasonNumber !== 0}`,
-        { next: { revalidate }, cache: "force-cache" },
+      const ratingsData = await getEpisodeRatings(showId, seasonNumber !== 0);
+      const targetSeason = ratingsData?.seasons?.find(
+        (s) => s.seasonNumber === seasonNumber,
+      );
+      const targetEpisode = targetSeason?.episodes?.find(
+        (ep) => ep.episodeNumber === episodeNumber,
       );
 
-      if (ratingsRes.ok) {
-        const ratingsData = await ratingsRes.json();
-        const targetSeason = ratingsData?.seasons?.find(
-          (s) => s.seasonNumber === seasonNumber,
-        );
-        const targetEpisode = targetSeason?.episodes?.find(
-          (ep) => ep.episodeNumber === episodeNumber,
-        );
-
-        if (targetEpisode) {
-          imdb = {
-            id: showImdbId,
-            rating:
-              typeof targetEpisode.imdb === "number"
-                ? targetEpisode.imdb
-                : null,
-            votes:
-              typeof targetEpisode.imdbVotes === "number"
-                ? targetEpisode.imdbVotes
-                : null,
-          };
-        }
+      if (targetEpisode) {
+        imdb = {
+          id: showImdbId,
+          rating:
+            typeof targetEpisode.imdb === "number" ? targetEpisode.imdb : null,
+          votes:
+            typeof targetEpisode.imdbVotes === "number"
+              ? targetEpisode.imdbVotes
+              : null,
+        };
       }
     } catch (e) {
       console.error("Error fetching episode rating:", e);
