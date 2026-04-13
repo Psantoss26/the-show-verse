@@ -10,10 +10,14 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30; // Vercel: aumentado para dar más margen en producción
 
 export async function GET(req) {
-  // Timeout muy generoso para scoreboard (stats pueden ser muy lentas en Trakt)
-  const timeoutMs = process.env.NODE_ENV === "production" ? 18000 : 15000;
-  const ft = (path) => fetchTrakt(path, { timeoutMs });
-  const ftm = (path) => fetchTraktMaybe(path, { timeoutMs });
+  // Timeout para búsquedas y summary (rápido)
+  const fastTimeoutMs = process.env.NODE_ENV === "production" ? 8000 : 6000;
+  // Timeout para stats (puede fallar, pero intentamos con timeout cortísimo)
+  const statsTimeoutMs = 2000; // 2 segundos máximo
+
+  const ft = (path) => fetchTrakt(path, { timeoutMs: fastTimeoutMs });
+  const ftStats = (path) =>
+    fetchTraktMaybe(path, { timeoutMs: statsTimeoutMs });
 
   try {
     const { searchParams } = new URL(req.url);
@@ -53,11 +57,11 @@ export async function GET(req) {
 
       const traktId = ids.trakt;
 
-      // Obtener stats (incluye rating/votes en algunos casos)
-      const stats = await ft(`/${plural}/${traktId}/stats`);
-
-      // Obtener summary solo si necesitamos rating/votes (no disponibles en stats)
+      // Obtener summary (necesario, ~1-2s)
       const summary = await ft(`/${plural}/${traktId}`);
+
+      // Intentar stats (timeout 2s, falla rápido si Trakt está lento)
+      const stats = await ftStats(`/${plural}/${traktId}/stats`);
 
       const slug = summary?.ids?.slug || ids?.slug || traktId;
       const traktUrl =
@@ -132,10 +136,10 @@ export async function GET(req) {
       const seasonIds = seasonObj.ids;
       const traktUrl = `https://trakt.tv/shows/${showSlug}/seasons/${seasonNumber}`;
 
-      // 3) stats (intentar dos endpoints en paralelo con timeout más largo)
+      // 3) stats (intentar dos endpoints en paralelo con timeout reducido)
       const [stats1, stats2] = await Promise.all([
-        ftm(`/seasons/${seasonIds.trakt}/stats`),
-        ftm(`/shows/${traktShowId}/seasons/${seasonNumber}/stats`),
+        ftStats(`/seasons/${seasonIds.trakt}/stats`),
+        ftStats(`/shows/${traktShowId}/seasons/${seasonNumber}/stats`),
       ]);
       const stats = stats1 || stats2 || null;
 
@@ -187,10 +191,10 @@ export async function GET(req) {
 
     const traktUrl = `https://trakt.tv/shows/${showSlug}/seasons/${seasonNumber}/episodes/${episodeNumber}`;
 
-    // Intentar obtener stats de dos endpoints en paralelo con timeout más largo
+    // Intentar obtener stats de dos endpoints en paralelo con timeout reducido
     const [stats1, stats2] = await Promise.all([
-      ftm(`/episodes/${epIds.trakt}/stats`),
-      ftm(
+      ftStats(`/episodes/${epIds.trakt}/stats`),
+      ftStats(
         `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
       ),
     ]);

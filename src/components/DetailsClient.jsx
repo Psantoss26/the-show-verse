@@ -2275,10 +2275,10 @@ export default function DetailsClient({
     const load = async () => {
       setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
       try {
-        // Timeout generoso para scoreboard (primera carga puede tardar ~20s)
+        // Timeout reducido: stats puede fallar rápido (4-5s server), total ~10s
         const r = await withTimeout(
           traktGetScoreboard({ type: traktType, tmdbId: id }),
-          25000,
+          12000,
         );
         if (ignore) return;
 
@@ -2351,10 +2351,10 @@ export default function DetailsClient({
         setTraktStatsLoading(true);
         setTraktStatsError("");
 
-        // Timeout generoso para stats (primera carga puede tardar ~20s)
+        // Timeout reducido: stats puede fallar rápido (4-5s server), total ~10s
         const res = await withTimeout(
           traktGetStats({ type: traktType, tmdbId: id }),
-          25000,
+          12000,
         );
         if (cancelled) return;
 
