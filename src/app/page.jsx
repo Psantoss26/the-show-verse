@@ -29,7 +29,7 @@ import {
   removeDuplicates,
 } from "@/lib/api/traktHelpers";
 
-export const revalidate = 1800; // 30 minutos
+export const revalidate = 900; // 15 minutos (cache más frecuente)
 export const maxDuration = 60; // Vercel Pro = 60s; Hobby = 10s (máximo posible)
 
 // ✅ Usar el sistema centralizado de cache de Trakt (sin duplicar fetchTrakt)
@@ -306,7 +306,8 @@ async function getDashboardData(sessionId = null) {
   try {
     console.log("🔄 [Dashboard] Iniciando carga de datos...");
 
-    // Preparamos todas las llamadas en paralelo para optimizar
+    // ⚡ OPTIMIZACIÓN: Solo cargar secciones críticas en SSR (above-the-fold)
+    // El resto se cargará en el cliente de forma lazy
     const [
       topRatedMovies,
       topRatedTV,
@@ -315,20 +316,12 @@ async function getDashboardData(sessionId = null) {
       trending,
       popular,
 
-      // NUEVAS SECCIONES TRAKT - Contenido Mixto (películas + series)
-      // traktHelpers maneja automáticamente el caso de TRAKT_KEY no definida
+      // SECCIONES TRAKT CRÍTICAS (visible sin scroll)
       traktTrending,
       traktPopular,
-      traktRecommended,
       traktAnticipated,
       traktMoviesAnticipated,
       traktShowsAnticipated,
-      traktPlayedWeekly,
-      traktPlayedMonthly,
-      traktWatchedWeekly,
-      traktWatchedMonthly,
-      traktCollectedWeekly,
-      traktCollectedMonthly,
     ] = await Promise.all([
       // TMDb secciones originales
       fetchTopRatedMovies(2000), // Mínimo 2000 votos para películas top rated
@@ -348,7 +341,7 @@ async function getDashboardData(sessionId = null) {
       fetchTrendingMovies(),
       fetchPopularMovies(),
 
-      // Trakt - Contenido Mixto (Movies + Shows)
+      // ⚡ Trakt - Secciones críticas (30 items cada una, sin extended=full para optimizar)
       // Cada llamada tiene .catch(() => []) independiente: si una falla, las demás siguen
       getTraktTrending(30).catch((err) => {
         console.warn("❌ getTraktTrending failed:", err.message);
@@ -356,10 +349,6 @@ async function getDashboardData(sessionId = null) {
       }),
       getTraktPopular(30).catch((err) => {
         console.warn("❌ getTraktPopular failed:", err.message);
-        return [];
-      }),
-      getTraktRecommended(30).catch((err) => {
-        console.warn("❌ getTraktRecommended failed:", err.message);
         return [];
       }),
       getTraktAnticipated(30).catch((err) => {
@@ -374,44 +363,18 @@ async function getDashboardData(sessionId = null) {
         console.warn("❌ getTraktShowsAnticipated failed:", err.message);
         return [];
       }),
-      getTraktPlayed("weekly", 30).catch((err) => {
-        console.warn("❌ getTraktPlayed weekly failed:", err.message);
-        return [];
-      }),
-      getTraktPlayed("monthly", 30).catch((err) => {
-        console.warn("❌ getTraktPlayed monthly failed:", err.message);
-        return [];
-      }),
-      getTraktWatched("weekly", 30).catch((err) => {
-        console.warn("❌ getTraktWatched weekly failed:", err.message);
-        return [];
-      }),
-      getTraktWatched("monthly", 30).catch((err) => {
-        console.warn("❌ getTraktWatched monthly failed:", err.message);
-        return [];
-      }),
-      getTraktCollected("weekly", 30).catch((err) => {
-        console.warn("❌ getTraktCollected weekly failed:", err.message);
-        return [];
-      }),
-      getTraktCollected("monthly", 30).catch((err) => {
-        console.warn("❌ getTraktCollected monthly failed:", err.message);
-        return [];
-      }),
     ]);
 
-    console.log("✅ [Dashboard] Secciones de Trakt cargadas:", {
+    console.log("✅ [Dashboard] Secciones críticas de Trakt cargadas (SSR):", {
       traktTrending: traktTrending.length,
       traktPopular: traktPopular.length,
-      traktRecommended: traktRecommended.length,
       traktAnticipated: traktAnticipated.length,
-      traktPlayedWeekly: traktPlayedWeekly.length,
-      traktPlayedMonthly: traktPlayedMonthly.length,
-      traktWatchedWeekly: traktWatchedWeekly.length,
-      traktWatchedMonthly: traktWatchedMonthly.length,
-      traktCollectedWeekly: traktCollectedWeekly.length,
-      traktCollectedMonthly: traktCollectedMonthly.length,
+      traktMoviesAnticipated: traktMoviesAnticipated.length,
+      traktShowsAnticipated: traktShowsAnticipated.length,
     });
+    console.log(
+      "⏱️ [Dashboard] Secciones secundarias se cargarán en el cliente (lazy)",
+    );
 
     const recommended = sessionId
       ? await fetchRecommendedMovies(sessionId)
@@ -447,21 +410,12 @@ async function getDashboardData(sessionId = null) {
     // Eliminamos duplicados en las secciones de Trakt para evitar repeticiones
     const cleanedTraktTrending = removeDuplicates(traktTrending);
     const cleanedTraktPopular = removeDuplicates(traktPopular);
-    const cleanedTraktRecommended = removeDuplicates(traktRecommended);
     const cleanedTraktAnticipated = removeDuplicates(traktAnticipated);
     const cleanedTraktMoviesAnticipated = removeDuplicates(
       traktMoviesAnticipated,
     );
     const cleanedTraktShowsAnticipated = removeDuplicates(
       traktShowsAnticipated,
-    );
-    const cleanedTraktPlayedWeekly = removeDuplicates(traktPlayedWeekly);
-    const cleanedTraktPlayedMonthly = removeDuplicates(traktPlayedMonthly);
-    const cleanedTraktWatchedWeekly = removeDuplicates(traktWatchedWeekly);
-    const cleanedTraktWatchedMonthly = removeDuplicates(traktWatchedMonthly);
-    const cleanedTraktCollectedWeekly = removeDuplicates(traktCollectedWeekly);
-    const cleanedTraktCollectedMonthly = removeDuplicates(
-      traktCollectedMonthly,
     );
 
     return {
@@ -484,19 +438,21 @@ async function getDashboardData(sessionId = null) {
       popular,
       recommended,
 
-      // NUEVAS SECCIONES TRAKT
+      // SECCIONES TRAKT CRÍTICAS (SSR)
       traktTrending: cleanedTraktTrending,
       traktPopular: cleanedTraktPopular,
-      traktRecommended: cleanedTraktRecommended,
       traktAnticipated: cleanedTraktAnticipated,
       traktMoviesAnticipated: cleanedTraktMoviesAnticipated,
       traktShowsAnticipated: cleanedTraktShowsAnticipated,
-      traktPlayedWeekly: cleanedTraktPlayedWeekly,
-      traktPlayedMonthly: cleanedTraktPlayedMonthly,
-      traktWatchedWeekly: cleanedTraktWatchedWeekly,
-      traktWatchedMonthly: cleanedTraktWatchedMonthly,
-      traktCollectedWeekly: cleanedTraktCollectedWeekly,
-      traktCollectedMonthly: cleanedTraktCollectedMonthly,
+
+      // Secciones lazy (se cargarán en el cliente)
+      traktRecommended: [],
+      traktPlayedWeekly: [],
+      traktPlayedMonthly: [],
+      traktWatchedWeekly: [],
+      traktWatchedMonthly: [],
+      traktCollectedWeekly: [],
+      traktCollectedMonthly: [],
     };
   } catch (err) {
     console.error("Error cargando MainDashboard (SSR):", err);

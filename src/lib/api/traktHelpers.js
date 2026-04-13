@@ -70,7 +70,7 @@ function interleave(a, b, limit = 24) {
   return out;
 }
 
-async function mapWithConcurrency(items, worker, concurrency = 8) {
+async function mapWithConcurrency(items, worker, concurrency = 12) {
   const out = new Array(items.length);
   let idx = 0;
 
@@ -139,8 +139,8 @@ export async function getTraktTrending(limit = 24) {
   );
 
   const [movies, shows] = await Promise.all([
-    fetchTrakt("/movies/trending?extended=full&limit=30"),
-    fetchTrakt("/shows/trending?extended=full&limit=30"),
+    fetchTrakt("/movies/trending?limit=50"),
+    fetchTrakt("/shows/trending?limit=50"),
   ]);
 
   console.log(
@@ -164,8 +164,8 @@ export async function getTraktTrending(limit = 24) {
  */
 export async function getTraktPopular(limit = 24) {
   const [movies, shows] = await Promise.all([
-    fetchTrakt("/movies/popular?extended=full&limit=30"),
-    fetchTrakt("/shows/popular?extended=full&limit=30"),
+    fetchTrakt("/movies/popular?limit=50"),
+    fetchTrakt("/shows/popular?limit=50"),
   ]);
 
   const movieSeeds = movies
@@ -185,8 +185,8 @@ export async function getTraktPopular(limit = 24) {
  */
 export async function getTraktRecommended(limit = 24, period = "weekly") {
   const [movies, shows] = await Promise.all([
-    fetchTrakt(`/movies/recommended/${period}?extended=full&limit=30`),
-    fetchTrakt(`/shows/recommended/${period}?extended=full&limit=30`),
+    fetchTrakt(`/movies/recommended/${period}?limit=50`),
+    fetchTrakt(`/shows/recommended/${period}?limit=50`),
   ]);
 
   const movieSeeds = movies
@@ -206,8 +206,8 @@ export async function getTraktRecommended(limit = 24, period = "weekly") {
  */
 export async function getTraktAnticipated(limit = 24) {
   const [moviesRaw, showsRaw] = await Promise.all([
-    fetchTrakt("/movies/anticipated?extended=full&limit=30"),
-    fetchTrakt("/shows/anticipated?extended=full&limit=30"),
+    fetchTrakt("/movies/anticipated?limit=50"),
+    fetchTrakt("/shows/anticipated?limit=50"),
   ]);
 
   const movieSeeds = moviesRaw
@@ -231,8 +231,8 @@ export async function getTraktAnticipated(limit = 24) {
  */
 export async function getTraktPlayed(period = "weekly", limit = 24) {
   const [movies, shows] = await Promise.all([
-    fetchTrakt(`/movies/played/${period}?extended=full&limit=30`),
-    fetchTrakt(`/shows/played/${period}?extended=full&limit=30`),
+    fetchTrakt(`/movies/played/${period}?limit=50`),
+    fetchTrakt(`/shows/played/${period}?limit=50`),
   ]);
 
   const movieSeeds = movies
@@ -256,8 +256,8 @@ export async function getTraktPlayed(period = "weekly", limit = 24) {
  */
 export async function getTraktWatched(period = "weekly", limit = 24) {
   const [movies, shows] = await Promise.all([
-    fetchTrakt(`/movies/watched/${period}?extended=full&limit=30`),
-    fetchTrakt(`/shows/watched/${period}?extended=full&limit=30`),
+    fetchTrakt(`/movies/watched/${period}?limit=50`),
+    fetchTrakt(`/shows/watched/${period}?limit=50`),
   ]);
 
   const movieSeeds = movies
@@ -281,8 +281,8 @@ export async function getTraktWatched(period = "weekly", limit = 24) {
  */
 export async function getTraktCollected(period = "weekly", limit = 24) {
   const [movies, shows] = await Promise.all([
-    fetchTrakt(`/movies/collected/${period}?extended=full&limit=30`),
-    fetchTrakt(`/shows/collected/${period}?extended=full&limit=30`),
+    fetchTrakt(`/movies/collected/${period}?limit=50`),
+    fetchTrakt(`/shows/collected/${period}?limit=50`),
   ]);
 
   const movieSeeds = movies
@@ -305,7 +305,7 @@ export async function getTraktCollected(period = "weekly", limit = 24) {
  * SOLO PELÍCULAS - Trending
  */
 export async function getTraktMoviesTrending(limit = 40) {
-  const movies = await fetchTrakt("/movies/trending?extended=full&limit=50");
+  const movies = await fetchTrakt("/movies/trending?limit=50");
 
   const seeds = movies
     .map((x) => ({ media_type: "movie", tmdb: x?.movie?.ids?.tmdb }))
@@ -318,7 +318,7 @@ export async function getTraktMoviesTrending(limit = 40) {
  * SOLO PELÍCULAS - Popular
  */
 export async function getTraktMoviesPopular(limit = 40) {
-  const movies = await fetchTrakt("/movies/popular?extended=full&limit=50");
+  const movies = await fetchTrakt("/movies/popular?limit=50");
 
   const seeds = movies
     .map((m) => ({ media_type: "movie", tmdb: m?.ids?.tmdb }))
@@ -331,9 +331,7 @@ export async function getTraktMoviesPopular(limit = 40) {
  * SOLO PELÍCULAS - Recommended
  */
 export async function getTraktMoviesRecommended(limit = 40) {
-  const movies = await fetchTrakt(
-    "/movies/recommended/weekly?extended=full&limit=50",
-  );
+  const movies = await fetchTrakt("/movies/recommended/weekly?limit=50");
 
   const seeds = movies
     .map((m) => ({ media_type: "movie", tmdb: m?.ids?.tmdb }))
@@ -346,9 +344,7 @@ export async function getTraktMoviesRecommended(limit = 40) {
  * SOLO PELÍCULAS - Anticipated
  */
 export async function getTraktMoviesAnticipated(limit = 40) {
-  const moviesRaw = await fetchTrakt(
-    "/movies/anticipated?extended=full&limit=50",
-  );
+  const moviesRaw = await fetchTrakt("/movies/anticipated?limit=50");
 
   const seeds = moviesRaw
     .map((x) => x?.movie)
@@ -363,9 +359,7 @@ export async function getTraktMoviesAnticipated(limit = 40) {
  * SOLO PELÍCULAS - Played (weekly/monthly/yearly/all)
  */
 export async function getTraktMoviesPlayed(period = "weekly", limit = 40) {
-  const movies = await fetchTrakt(
-    `/movies/played/${period}?extended=full&limit=50`,
-  );
+  const movies = await fetchTrakt(`/movies/played/${period}?limit=50`);
 
   const seeds = movies
     .map((x) => x?.movie)
@@ -380,7 +374,7 @@ export async function getTraktMoviesPlayed(period = "weekly", limit = 40) {
  * SOLO SERIES - Trending
  */
 export async function getTraktShowsTrending(limit = 40) {
-  const shows = await fetchTrakt("/shows/trending?extended=full&limit=50");
+  const shows = await fetchTrakt("/shows/trending?limit=50");
 
   const seeds = shows
     .map((x) => ({ media_type: "tv", tmdb: x?.show?.ids?.tmdb }))
@@ -393,7 +387,7 @@ export async function getTraktShowsTrending(limit = 40) {
  * SOLO SERIES - Popular
  */
 export async function getTraktShowsPopular(limit = 40) {
-  const shows = await fetchTrakt("/shows/popular?extended=full&limit=50");
+  const shows = await fetchTrakt("/shows/popular?limit=50");
 
   const seeds = shows
     .map((s) => ({ media_type: "tv", tmdb: s?.ids?.tmdb }))
@@ -406,9 +400,7 @@ export async function getTraktShowsPopular(limit = 40) {
  * SOLO SERIES - Recommended
  */
 export async function getTraktShowsRecommended(limit = 40) {
-  const shows = await fetchTrakt(
-    "/shows/recommended/weekly?extended=full&limit=50",
-  );
+  const shows = await fetchTrakt("/shows/recommended/weekly?limit=50");
 
   const seeds = shows
     .map((s) => ({ media_type: "tv", tmdb: s?.ids?.tmdb }))
@@ -421,9 +413,7 @@ export async function getTraktShowsRecommended(limit = 40) {
  * SOLO SERIES - Anticipated
  */
 export async function getTraktShowsAnticipated(limit = 40) {
-  const showsRaw = await fetchTrakt(
-    "/shows/anticipated?extended=full&limit=50",
-  );
+  const showsRaw = await fetchTrakt("/shows/anticipated?limit=50");
 
   const seeds = showsRaw
     .map((x) => x?.show)
@@ -438,9 +428,7 @@ export async function getTraktShowsAnticipated(limit = 40) {
  * SOLO SERIES - Played (weekly/monthly/yearly/all)
  */
 export async function getTraktShowsPlayed(period = "weekly", limit = 40) {
-  const shows = await fetchTrakt(
-    `/shows/played/${period}?extended=full&limit=50`,
-  );
+  const shows = await fetchTrakt(`/shows/played/${period}?limit=50`);
 
   const seeds = shows
     .map((x) => x?.show)
