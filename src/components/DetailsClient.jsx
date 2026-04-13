@@ -130,6 +130,7 @@ import {
   traktGetShowPlays,
   traktAddShowPlay,
   traktAddEpisodePlay,
+  traktRemoveHistoryEntries,
 } from "@/lib/api/traktClient";
 
 // Menu lateral/sticky de navegacion por secciones
@@ -3324,6 +3325,42 @@ export default function DetailsClient({
     async (runId) => {
       if (!runId) return;
 
+      const baseRuns = Array.isArray(rewatchRuns) ? rewatchRuns : [];
+      const sortedRuns = [...baseRuns].sort(
+        (a, b) =>
+          new Date(b?.startedAt || b?.id || 0).getTime() -
+          new Date(a?.startedAt || a?.id || 0).getTime(),
+      );
+      const targetIdx = sortedRuns.findIndex(
+        (r) => (r?.id || r?.startedAt) === runId,
+      );
+      const targetRun = targetIdx >= 0 ? sortedRuns[targetIdx] : null;
+      const startAt = targetRun?.startedAt || String(runId);
+      const newerRun = targetIdx > 0 ? sortedRuns[targetIdx - 1] : null;
+      const endBefore = newerRun?.startedAt || null;
+
+      // 1) Borrar del historial de Trakt los plays de este run (ventana [startAt, endBefore))
+      if (trakt?.connected && type === "tv") {
+        const windowData = await traktGetShowPlays({
+          tmdbId: Number(id),
+          startAt,
+          ...(endBefore ? { endBefore } : {}),
+        });
+
+        const idsToRemove = Array.isArray(windowData?.historyIdsSince)
+          ? windowData.historyIdsSince
+          : [];
+
+        if (idsToRemove.length) {
+          const CHUNK = 300;
+          for (let i = 0; i < idsToRemove.length; i += CHUNK) {
+            await traktRemoveHistoryEntries({
+              ids: idsToRemove.slice(i, i + CHUNK),
+            });
+          }
+        }
+      }
+
       setRewatchRuns((prev) => {
         const base = Array.isArray(prev) ? prev : [];
         const next = base.filter((r) => r?.id !== runId);
@@ -3345,9 +3382,26 @@ export default function DetailsClient({
         setRewatchStartAt(null);
         await loadTraktShowPlays(null); // Volver a vista global
       }
+
+      // 2) Refrescar estado global de episodios vistos tras limpiar historial
+      if (trakt?.connected && type === "tv") {
+        try {
+          const fresh = await traktGetShowWatched({ tmdbId: Number(id) });
+          setWatchedBySeason(fresh?.watchedBySeason || {});
+        } catch {}
+
+        try {
+          await loadTraktShowPlays(wasActive ? null : rewatchStartAt || null);
+        } catch {}
+      }
     },
     [
       activeEpisodesView,
+      rewatchRuns,
+      trakt?.connected,
+      type,
+      id,
+      rewatchStartAt,
       episodesViewStorageKey,
       persistRuns,
       loadTraktShowPlays,

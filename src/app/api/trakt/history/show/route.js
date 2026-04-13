@@ -1,5 +1,10 @@
 // src/app/api/trakt/history/show/route.js
 import { NextResponse } from "next/server";
+import {
+  getValidTraktToken,
+  setTraktCookies,
+  clearTraktCookies,
+} from "@/lib/trakt/server";
 
 const TRAKT_BASE = "https://api.trakt.tv";
 
@@ -9,24 +14,28 @@ function traktUserAgent() {
   );
 }
 
-function pickTraktToken(cookieStore) {
-  // cookieStore: request.cookies
-  return (
-    cookieStore.get("trakt_access_token")?.value ||
-    cookieStore.get("trakt_token")?.value ||
-    cookieStore.get("access_token")?.value ||
-    null
-  );
-}
-
 export async function POST(request) {
   try {
-    const token = pickTraktToken(request.cookies);
+    const cookieStore = request.cookies;
+    const { token, refreshedTokens, shouldClear } =
+      await getValidTraktToken(cookieStore);
+
+    const respond = (payload, status = 200) => {
+      const res = NextResponse.json(payload, { status });
+      if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+      return res;
+    };
+
     if (!token) {
-      return NextResponse.json(
-        { error: "No hay token de Trakt (no conectado)." },
+      const res = NextResponse.json(
+        {
+          error: "No hay token de Trakt (no conectado).",
+          code: "TRAKT_REAUTH_REQUIRED",
+        },
         { status: 401 },
       );
+      if (shouldClear) clearTraktCookies(res);
+      return res;
     }
 
     let body;
@@ -87,11 +96,11 @@ export async function POST(request) {
         "[history/show] Trakt returned non-JSON response:",
         textResponse.substring(0, 300),
       );
-      return NextResponse.json(
+      return respond(
         {
           error: `Trakt API error (${searchRes.status}): Respuesta no válida (esperaba JSON, recibió ${contentType})`,
         },
-        { status: searchRes.status || 500 },
+        searchRes.status || 500,
       );
     }
 
@@ -107,58 +116,77 @@ export async function POST(request) {
     }
 
     if (!searchRes.ok) {
-      return NextResponse.json(
+      return respond(
         {
           error:
             searchJson?.error ||
             searchJson?.message ||
             "Error buscando show en Trakt",
+          ...(searchRes.status === 401 || searchRes.status === 403
+            ? { code: "TRAKT_REAUTH_REQUIRED" }
+            : {}),
         },
-        { status: searchRes.status },
+        searchRes.status,
       );
     }
 
     const show = searchJson?.[0]?.show;
     if (!show?.ids) {
-      return NextResponse.json(
+      return respond(
         { error: "No se encontró el show en Trakt con ese TMDB id." },
-        { status: 404 },
+        404,
       );
     }
 
-    // 2) Normaliza temporadas
+    const isAdd = Boolean(watchedAt);
+
+    // 2) Normaliza temporadas (solo requeridas para add)
     const cleanSeasonNumbers = (seasonNumbers || []).filter(
       (n) => typeof n === "number" && n > 0,
     );
 
-    if (cleanSeasonNumbers.length === 0) {
-      return NextResponse.json(
+    if (isAdd && cleanSeasonNumbers.length === 0) {
+      return respond(
         {
           error:
             "No hay temporadas válidas (seasonNumbers vacío). Pasa seasons al modal/padre.",
         },
-        { status: 400 },
+        400,
       );
     }
 
-    const seasons = cleanSeasonNumbers.map((number) =>
-      watchedAt ? { number, watched_at: watchedAt } : { number },
-    );
-
     // 3) Add o Remove
-    const url = watchedAt
+    const url = isAdd
       ? `${TRAKT_BASE}/sync/history`
       : `${TRAKT_BASE}/sync/history/remove`;
-    const payload = {
-      shows: [
-        {
-          title: show.title,
-          year: show.year,
-          ids: show.ids,
-          seasons,
-        },
-      ],
-    };
+
+    let payload;
+    if (isAdd) {
+      const seasons = cleanSeasonNumbers.map((number) => ({
+        number,
+        watched_at: watchedAt,
+      }));
+
+      payload = {
+        shows: [
+          {
+            title: show.title,
+            year: show.year,
+            ids: show.ids,
+            seasons,
+          },
+        ],
+      };
+    } else {
+      // Remove completo de la serie: evita payload grande por temporadas/episodios.
+      payload = {
+        shows: [
+          {
+            ids: show.ids,
+          },
+        ],
+      };
+    }
 
     console.log("[history/show] Syncing to Trakt:", { url, payload });
     const syncRes = await fetch(url, {
@@ -181,11 +209,11 @@ export async function POST(request) {
         "[history/show] Trakt sync returned non-JSON response:",
         textResponse.substring(0, 300),
       );
-      return NextResponse.json(
+      return respond(
         {
           error: `Trakt sync error (${syncRes.status}): Respuesta no válida (esperaba JSON, recibió ${syncContentType})`,
         },
-        { status: syncRes.status || 500 },
+        syncRes.status || 500,
       );
     }
 
@@ -198,24 +226,33 @@ export async function POST(request) {
     }
 
     if (!syncRes.ok) {
-      return NextResponse.json(
+      return respond(
         {
           error:
             syncJson?.error ||
             syncJson?.message ||
             "Error sincronizando en Trakt",
           details: syncJson,
+          ...(syncRes.status === 401 || syncRes.status === 403
+            ? { code: "TRAKT_REAUTH_REQUIRED" }
+            : {}),
         },
-        { status: syncRes.status },
+        syncRes.status,
       );
     }
 
     console.log("[history/show] Success:", syncJson);
-    return NextResponse.json(syncJson, { status: 200 });
+    return respond(syncJson, 200);
   } catch (e) {
     console.error("[history/show] Unexpected error:", e);
     return NextResponse.json(
-      { error: e?.message || "Error desconocido", stack: e?.stack },
+      {
+        error: e?.message || "Error desconocido",
+        stack: e?.stack,
+        ...(e?.status === 401 || e?.status === 403
+          ? { code: "TRAKT_REAUTH_REQUIRED" }
+          : {}),
+      },
       { status: 500 },
     );
   }
