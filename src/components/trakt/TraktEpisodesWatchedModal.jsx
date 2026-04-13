@@ -143,6 +143,7 @@ export default function TraktEpisodesWatchedModal({
   const [historyLimit, setHistoryLimit] = useState(60);
   const [deleteRunBusyId, setDeleteRunBusyId] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
 
   // optimistic plays para que el dropdown/historial no “parpadee”
   const [optimisticPlays, setOptimisticPlays] = useState([]); // array de ISO strings
@@ -272,6 +273,26 @@ export default function TraktEpisodesWatchedModal({
     }));
   }, [normalizedRuns, normalizedPlays]);
 
+  const activeViewLabel = useMemo(() => {
+    if (effectiveViewId === "global") return "Global";
+    return (
+      rewatchItems.find((item) => item.id === effectiveViewId)?.label ||
+      "Rewatch"
+    );
+  }, [effectiveViewId, rewatchItems]);
+
+  const viewMenuItems = useMemo(
+    () => [
+      { id: "global", label: "Global (Trakt)", kind: "global" },
+      ...rewatchItems.map((item) => ({
+        id: item.id,
+        label: item.label,
+        kind: "rewatch",
+      })),
+    ],
+    [rewatchItems],
+  );
+
   const filteredHistory = useMemo(() => {
     const q = (historyQuery || "").trim().toLowerCase();
     if (!q) return rewatchItems;
@@ -335,6 +356,7 @@ export default function TraktEpisodesWatchedModal({
     setHistoryOpen(false);
     setHistoryQuery("");
     setHistoryLimit(60);
+    setViewMenuOpen(false);
 
     if (typeof resolvedOnChangeView !== "function") setLocalView("global");
 
@@ -370,6 +392,15 @@ export default function TraktEpisodesWatchedModal({
       document.body.style.overflow = "";
     };
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!viewMenuOpen) return;
+    const onDocMouseDown = (e) => {
+      if (!e.target.closest("[data-view-menu]")) setViewMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [viewMenuOpen]);
 
   const loadSeason = useCallback(
     async (sn) => {
@@ -821,7 +852,7 @@ export default function TraktEpisodesWatchedModal({
                     ? "Buscar episodio..."
                     : "Buscar temporada..."
                 }
-                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition placeholder:text-zinc-600"
+                className="w-full h-10 xl:h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition placeholder:text-zinc-600"
               />
             </div>
             <button
@@ -849,21 +880,66 @@ export default function TraktEpisodesWatchedModal({
               >
                 <div className="space-y-2 pt-1">
                   {/* Fila 1: Selector de vista */}
-                  <div className="relative">
-                    <select
-                      value={effectiveViewId}
-                      onChange={(e) => changeView(e.target.value)}
-                      className="h-11 w-full appearance-none pl-4 pr-10 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-sm text-zinc-300 font-semibold outline-none transition"
+                  <div className="relative" data-view-menu="">
+                    <button
+                      type="button"
+                      onClick={() => setViewMenuOpen((v) => !v)}
                       disabled={!isConnected}
+                      className={`h-11 w-full inline-flex items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition ${
+                        !isConnected
+                          ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
+                          : "bg-gradient-to-r from-zinc-900 to-zinc-950 border-zinc-800 text-zinc-200 hover:border-emerald-500/40"
+                      }`}
                     >
-                      <option value="global">Global (Trakt)</option>
-                      {rewatchItems.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-red-500/10 border border-red-500/30 text-red-400 shrink-0">
+                        <Tv className="w-3.5 h-3.5" />
+                      </span>
+                      <span className="flex-1 text-left truncate">{activeViewLabel}</span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-zinc-500 transition-transform ${viewMenuOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    <AnimatePresence>
+                      {viewMenuOpen && isConnected && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -6 }}
+                          transition={{ duration: 0.16, ease: "easeOut" }}
+                          className="mt-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950"
+                        >
+                          <div className="max-h-56 overflow-y-auto sv-scroll py-1">
+                            {viewMenuItems.map((item) => {
+                              const active = item.id === effectiveViewId;
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => {
+                                    changeView(item.id);
+                                    setViewMenuOpen(false);
+                                  }}
+                                  className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
+                                    active
+                                      ? "bg-emerald-500/12 text-emerald-300"
+                                      : "text-zinc-300 hover:bg-white/5"
+                                  }`}
+                                >
+                                  {item.kind === "global" ? (
+                                    <Tv className="w-4 h-4 text-red-400 shrink-0" />
+                                  ) : (
+                                    <History className="w-4 h-4 text-emerald-400 shrink-0" />
+                                  )}
+                                  <span className="flex-1 truncate">{item.label}</span>
+                                  {active && <Check className="w-4 h-4 shrink-0" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Fila 2: Lista/Tabla + Todos */}
@@ -979,8 +1055,8 @@ export default function TraktEpisodesWatchedModal({
           </AnimatePresence>
 
           {/* Desktop: fila única */}
-          <div className="hidden lg:flex gap-3 items-center">
-            <div className="relative flex-1">
+          <div className="hidden lg:flex gap-1.5 xl:gap-3 items-center min-w-0">
+            <div className="relative flex-1 min-w-[140px] xl:min-w-[220px]">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
                 value={query}
@@ -995,22 +1071,67 @@ export default function TraktEpisodesWatchedModal({
             </div>
 
             {/* Selector de vista */}
-            <div className="relative shrink-0">
-              <select
-                value={effectiveViewId}
-                onChange={(e) => changeView(e.target.value)}
-                className="h-11 appearance-none pl-4 pr-10 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-sm text-zinc-300 font-semibold outline-none transition min-w-[180px]"
+            <div className="relative shrink-0 w-[122px] xl:w-[168px]" data-view-menu="">
+              <button
+                type="button"
+                onClick={() => setViewMenuOpen((v) => !v)}
                 disabled={!isConnected}
                 title="Cambiar vista (Global o Rewatch por visionado)"
+                className={`h-10 xl:h-11 w-full inline-flex items-center gap-2 rounded-xl border px-2.5 xl:px-3 text-[11px] xl:text-sm font-semibold transition ${
+                  !isConnected
+                    ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
+                    : "bg-gradient-to-r from-zinc-900 to-zinc-950 border-zinc-800 text-zinc-200 hover:border-emerald-500/40"
+                }`}
               >
-                <option value="global">Global (Trakt)</option>
-                {rewatchItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-red-500/10 border border-red-500/30 text-red-400 shrink-0">
+                  <Tv className="w-3 h-3" />
+                </span>
+                <span className="flex-1 text-left truncate">{activeViewLabel}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${viewMenuOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              <AnimatePresence>
+                {viewMenuOpen && isConnected && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="absolute z-40 top-full mt-1 left-0 w-[230px] overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl"
+                  >
+                    <div className="max-h-56 overflow-y-auto sv-scroll py-1">
+                      {viewMenuItems.map((item) => {
+                        const active = item.id === effectiveViewId;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              changeView(item.id);
+                              setViewMenuOpen(false);
+                            }}
+                            className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
+                              active
+                                ? "bg-emerald-500/12 text-emerald-300"
+                                : "text-zinc-300 hover:bg-white/5"
+                            }`}
+                          >
+                            {item.kind === "global" ? (
+                              <Tv className="w-4 h-4 text-red-400 shrink-0" />
+                            ) : (
+                              <History className="w-4 h-4 text-emerald-400 shrink-0" />
+                            )}
+                            <span className="flex-1 truncate">{item.label}</span>
+                            {active && <Check className="w-4 h-4 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Lista / Tabla */}
@@ -1018,24 +1139,26 @@ export default function TraktEpisodesWatchedModal({
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                title="Vista lista"
+                className={`w-9 h-8 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
                   viewMode === "list"
                     ? "bg-zinc-700 text-white shadow"
                     : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
                 }`}
               >
-                <List className="w-3.5 h-3.5" /> Lista
+                <List className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode("table")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                title="Vista tabla"
+                className={`w-9 h-8 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
                   viewMode === "table"
                     ? "bg-zinc-700 text-white shadow"
                     : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
                 }`}
               >
-                <Table2 className="w-3.5 h-3.5" /> Tabla
+                <Table2 className="w-3.5 h-3.5" />
               </button>
             </div>
 
@@ -1043,14 +1166,17 @@ export default function TraktEpisodesWatchedModal({
             <button
               type="button"
               onClick={() => setOnlyUnwatched(!onlyUnwatched)}
-              className={`h-11 inline-flex items-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap shrink-0 ${
+              className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl border text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 onlyUnwatched
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                   : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
               }`}
+              title={onlyUnwatched ? "Mostrar no vistos" : "Mostrar todos"}
             >
               <Filter className="w-4 h-4" />
-              {onlyUnwatched ? "No vistos" : "Todos"}
+              <span className="hidden xl:inline">
+                {onlyUnwatched ? "No vistos" : "Todos"}
+              </span>
             </button>
 
             {/* Añadir visionado */}
@@ -1065,14 +1191,16 @@ export default function TraktEpisodesWatchedModal({
                 );
                 setAddPlayOpen(true);
               }}
-              className={`h-11 inline-flex items-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap shrink-0 ${
+              className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl border text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 !isConnected
                   ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
                   : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
               }`}
               title={!isConnected ? "Conecta Trakt" : "Añadir un visionado"}
             >
-              <Plus className="w-4 h-4" /> Añadir visionado
+              <Plus className="w-4 h-4" />
+              <span className="hidden xl:inline">Añadir visionado</span>
+              <span className="xl:hidden">Añadir</span>
             </button>
 
             {/* Historial */}
@@ -1084,7 +1212,7 @@ export default function TraktEpisodesWatchedModal({
                 setHistoryLimit(60);
                 setHistoryOpen(true);
               }}
-              className={`h-11 inline-flex items-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap shrink-0 ${
+              className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl border text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 !isConnected || normalizedPlays.length === 0
                   ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
                   : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
@@ -1098,7 +1226,7 @@ export default function TraktEpisodesWatchedModal({
               }
             >
               <History className="w-4 h-4 text-emerald-400" />
-              Historial
+              <span className="hidden xl:inline">Historial</span>
               {isConnected && rewatchItems.length > 0 && (
                 <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-300">
                   {rewatchItems.length}
@@ -1111,7 +1239,7 @@ export default function TraktEpisodesWatchedModal({
               type="button"
               disabled={!canToggleShow}
               onClick={onClickToggleShow}
-              className={`h-11 inline-flex items-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap shrink-0
+              className={`h-10 w-10 xl:h-11 xl:w-11 inline-flex items-center justify-center rounded-xl border transition shrink-0
                 ${
                   showCompleted
                     ? "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20 hover:border-red-500/40"
@@ -1135,7 +1263,6 @@ export default function TraktEpisodesWatchedModal({
               ) : (
                 <Eye className="w-4 h-4" />
               )}
-              {showCompleted ? "Quitar serie" : "Marcar serie"}
             </button>
           </div>
 
