@@ -19,6 +19,7 @@ import {
   History,
   ChevronDown,
   Trash2,
+  SlidersHorizontal,
 } from "lucide-react";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -141,6 +142,7 @@ export default function TraktEpisodesWatchedModal({
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyLimit, setHistoryLimit] = useState(60);
   const [deleteRunBusyId, setDeleteRunBusyId] = useState("");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // optimistic plays para que el dropdown/historial no “parpadee”
   const [optimisticPlays, setOptimisticPlays] = useState([]); // array de ISO strings
@@ -806,10 +808,11 @@ export default function TraktEpisodesWatchedModal({
         </div>
 
         {/* Toolbar */}
-        <div className="px-5 py-3 border-b border-white/5 flex flex-col gap-3 bg-[#0b0b0b] shrink-0 z-20">
-          <div className="flex flex-col lg:flex-row gap-3">
+        <div className="px-4 py-3 border-b border-white/5 bg-[#0b0b0b] shrink-0 z-20 space-y-2">
+          {/* Móvil: búsqueda + toggle filtros */}
+          <div className="flex gap-2 lg:hidden">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -818,18 +821,187 @@ export default function TraktEpisodesWatchedModal({
                     ? "Buscar episodio..."
                     : "Buscar temporada..."
                 }
-                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition"
+                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition placeholder:text-zinc-600"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
+                mobileFiltersOpen
+                  ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Móvil: panel colapsable de filtros */}
+          <AnimatePresence>
+            {mobileFiltersOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className="lg:hidden overflow-hidden"
+              >
+                <div className="space-y-2 pt-1">
+                  {/* Fila 1: Selector de vista */}
+                  <div className="relative">
+                    <select
+                      value={effectiveViewId}
+                      onChange={(e) => changeView(e.target.value)}
+                      className="h-11 w-full appearance-none pl-4 pr-10 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-sm text-zinc-300 font-semibold outline-none transition"
+                      disabled={!isConnected}
+                    >
+                      <option value="global">Global (Trakt)</option>
+                      {rewatchItems.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                  </div>
+
+                  {/* Fila 2: Lista/Tabla + Todos */}
+                  <div className="flex gap-2">
+                    <div className="flex flex-1 gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("list")}
+                        className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
+                          viewMode === "list"
+                            ? "bg-zinc-700 text-white shadow"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
+                      >
+                        <List className="w-3.5 h-3.5" /> Lista
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("table")}
+                        className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
+                          viewMode === "table"
+                            ? "bg-zinc-700 text-white shadow"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
+                      >
+                        <Table2 className="w-3.5 h-3.5" /> Tabla
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setOnlyUnwatched(!onlyUnwatched)}
+                      className={`flex-1 h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap ${
+                        onlyUnwatched
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                      }`}
+                    >
+                      <Filter className="w-4 h-4" />
+                      {onlyUnwatched ? "No vistos" : "Todos"}
+                    </button>
+                  </div>
+
+                  {/* Fila 3: Añadir visionado + Historial */}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={!isConnected}
+                      onClick={() => {
+                        setAddPlayError("");
+                        setAddPlayPreset("just_finished");
+                        setAddPlayOtherValue(
+                          toLocalDatetimeInput(new Date().toISOString()),
+                        );
+                        setAddPlayOpen(true);
+                      }}
+                      className={`flex-1 h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap ${
+                        !isConnected
+                          ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
+                          : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
+                      }`}
+                    >
+                      <Plus className="w-4 h-4" /> Añadir visionado
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!isConnected || normalizedPlays.length === 0}
+                      onClick={() => {
+                        setHistoryQuery("");
+                        setHistoryLimit(60);
+                        setHistoryOpen(true);
+                      }}
+                      className={`flex-1 h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap ${
+                        !isConnected || normalizedPlays.length === 0
+                          ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
+                          : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
+                      }`}
+                    >
+                      <History className="w-4 h-4 text-emerald-400" />
+                      Historial
+                      {isConnected && rewatchItems.length > 0 && (
+                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-300">
+                          {rewatchItems.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Fila 4: Marcar/Quitar serie */}
+                  <button
+                    type="button"
+                    disabled={!canToggleShow}
+                    onClick={onClickToggleShow}
+                    className={`w-full h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap
+                      ${
+                        showCompleted
+                          ? "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20 hover:border-red-500/40"
+                          : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40"
+                      }
+                      ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    {busyShow ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : showCompleted ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                    {showCompleted ? "Quitar serie" : "Marcar serie"}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Desktop: fila única */}
+          <div className="hidden lg:flex gap-3 items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={
+                  viewMode === "list"
+                    ? "Buscar episodio..."
+                    : "Buscar temporada..."
+                }
+                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition placeholder:text-zinc-600"
               />
             </div>
 
-            {/* Selector de vista: Global / Rewatch por fecha (plays) */}
-            <div className="relative shrink-0 w-full lg:w-auto">
+            {/* Selector de vista */}
+            <div className="relative shrink-0">
               <select
                 value={effectiveViewId}
                 onChange={(e) => changeView(e.target.value)}
-                className="h-[38px] w-full appearance-none pl-3 pr-9 rounded-xl border text-xs font-black bg-zinc-900 border-white/10 text-zinc-200 hover:bg-zinc-800 transition outline-none"
-                title="Cambiar vista (Global o Rewatch por visionado)"
+                className="h-11 appearance-none pl-4 pr-10 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-sm text-zinc-300 font-semibold outline-none transition min-w-[180px]"
                 disabled={!isConnected}
+                title="Cambiar vista (Global o Rewatch por visionado)"
               >
                 <option value="global">Global (Trakt)</option>
                 {rewatchItems.map((item) => (
@@ -841,137 +1013,130 @@ export default function TraktEpisodesWatchedModal({
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             </div>
 
-            {/* Botones extra */}
-            <div className="grid grid-cols-2 lg:flex gap-2 shrink-0">
-              <div className="flex bg-zinc-900 rounded-xl p-1 border border-white/5">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("list")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
-                    viewMode === "list"
-                      ? "bg-zinc-700 text-white shadow"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  <List className="w-3.5 h-3.5" /> Lista
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setViewMode("table")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
-                    viewMode === "table"
-                      ? "bg-zinc-700 text-white shadow"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  <Table2 className="w-3.5 h-3.5" /> Tabla
-                </button>
-              </div>
-
+            {/* Lista / Tabla */}
+            <div className="flex gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 shrink-0">
               <button
                 type="button"
-                onClick={() => setOnlyUnwatched(!onlyUnwatched)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${
-                  onlyUnwatched
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                    : "bg-zinc-900 border-white/5 text-zinc-400 hover:bg-zinc-800"
+                onClick={() => setViewMode("list")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  viewMode === "list"
+                    ? "bg-zinc-700 text-white shadow"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
                 }`}
               >
-                <Filter className="w-3.5 h-3.5" />{" "}
-                {onlyUnwatched ? "No vistos" : "Todos"}
+                <List className="w-3.5 h-3.5" /> Lista
               </button>
-
-              {/* Añadir visionado */}
               <button
                 type="button"
-                disabled={!isConnected}
-                onClick={() => {
-                  setAddPlayError("");
-                  setAddPlayPreset("just_finished");
-                  setAddPlayOtherValue(
-                    toLocalDatetimeInput(new Date().toISOString()),
-                  );
-                  setAddPlayOpen(true);
-                }}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${
-                  !isConnected
-                    ? "opacity-50 cursor-not-allowed bg-zinc-900 border-white/10 text-zinc-500"
-                    : "bg-zinc-900 border-white/10 text-zinc-200 hover:bg-zinc-800"
+                onClick={() => setViewMode("table")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  viewMode === "table"
+                    ? "bg-zinc-700 text-white shadow"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
                 }`}
-                title={
-                  !isConnected
-                    ? "Conecta Trakt"
-                    : "Añadir un visionado y crear/switch a su rewatch"
-                }
               >
-                <Plus className="w-3.5 h-3.5" />
-                Añadir visionado
-              </button>
-
-              {/* Historial */}
-              <button
-                type="button"
-                disabled={!isConnected || normalizedPlays.length === 0}
-                onClick={() => {
-                  setHistoryQuery("");
-                  setHistoryLimit(60);
-                  setHistoryOpen(true);
-                }}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${
-                  !isConnected || normalizedPlays.length === 0
-                    ? "opacity-50 cursor-not-allowed bg-white/5 border-white/10 text-zinc-500"
-                    : "bg-white/5 border-white/10 text-zinc-200 hover:bg-white/10"
-                }`}
-                title={
-                  !isConnected
-                    ? "Conecta Trakt"
-                    : rewatchItems.length === 0
-                      ? "Sin visionados"
-                      : "Ver todos los visionados"
-                }
-              >
-                <History className="w-3.5 h-3.5 text-emerald-400" />
-                Historial
-                {isConnected && rewatchItems.length > 0 && (
-                  <span className="ml-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-200">
-                    {rewatchItems.length}
-                  </span>
-                )}
-              </button>
-
-              {/* SERIE COMPLETA (global) */}
-              <button
-                type="button"
-                disabled={!canToggleShow}
-                onClick={onClickToggleShow}
-                className={`col-span-2 lg:col-span-1 px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap
-                  ${
-                    showCompleted
-                      ? "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20"
-                      : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
-                  }
-                  ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
-                title={
-                  !isConnected
-                    ? "Conecta Trakt"
-                    : isRewatchView
-                      ? "En rewatch no se usa “marcar serie completa”"
-                      : usableSeasons.length === 0
-                        ? "Sin temporadas disponibles"
-                        : undefined
-                }
-              >
-                {busyShow ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : showCompleted ? (
-                  <EyeOff className="w-3.5 h-3.5" />
-                ) : (
-                  <Eye className="w-3.5 h-3.5" />
-                )}
-                {showCompleted ? "Quitar serie" : "Marcar serie"}
+                <Table2 className="w-3.5 h-3.5" /> Tabla
               </button>
             </div>
+
+            {/* Todos / No vistos */}
+            <button
+              type="button"
+              onClick={() => setOnlyUnwatched(!onlyUnwatched)}
+              className={`h-11 inline-flex items-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap shrink-0 ${
+                onlyUnwatched
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              {onlyUnwatched ? "No vistos" : "Todos"}
+            </button>
+
+            {/* Añadir visionado */}
+            <button
+              type="button"
+              disabled={!isConnected}
+              onClick={() => {
+                setAddPlayError("");
+                setAddPlayPreset("just_finished");
+                setAddPlayOtherValue(
+                  toLocalDatetimeInput(new Date().toISOString()),
+                );
+                setAddPlayOpen(true);
+              }}
+              className={`h-11 inline-flex items-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap shrink-0 ${
+                !isConnected
+                  ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
+              }`}
+              title={!isConnected ? "Conecta Trakt" : "Añadir un visionado"}
+            >
+              <Plus className="w-4 h-4" /> Añadir visionado
+            </button>
+
+            {/* Historial */}
+            <button
+              type="button"
+              disabled={!isConnected || normalizedPlays.length === 0}
+              onClick={() => {
+                setHistoryQuery("");
+                setHistoryLimit(60);
+                setHistoryOpen(true);
+              }}
+              className={`h-11 inline-flex items-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap shrink-0 ${
+                !isConnected || normalizedPlays.length === 0
+                  ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
+              }`}
+              title={
+                !isConnected
+                  ? "Conecta Trakt"
+                  : rewatchItems.length === 0
+                    ? "Sin visionados"
+                    : "Ver todos los visionados"
+              }
+            >
+              <History className="w-4 h-4 text-emerald-400" />
+              Historial
+              {isConnected && rewatchItems.length > 0 && (
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-300">
+                  {rewatchItems.length}
+                </span>
+              )}
+            </button>
+
+            {/* Marcar / Quitar serie */}
+            <button
+              type="button"
+              disabled={!canToggleShow}
+              onClick={onClickToggleShow}
+              className={`h-11 inline-flex items-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap shrink-0
+                ${
+                  showCompleted
+                    ? "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20 hover:border-red-500/40"
+                    : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40"
+                }
+                ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
+              title={
+                !isConnected
+                  ? "Conecta Trakt"
+                  : isRewatchView
+                    ? "En rewatch no se usa marcar serie completa"
+                    : usableSeasons.length === 0
+                      ? "Sin temporadas disponibles"
+                      : undefined
+              }
+            >
+              {busyShow ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : showCompleted ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+              {showCompleted ? "Quitar serie" : "Marcar serie"}
+            </button>
           </div>
 
           {!!showError && (
