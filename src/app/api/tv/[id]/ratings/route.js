@@ -80,6 +80,85 @@ async function omdbFetchSeason(imdbId, seasonNumber) {
 }
 
 /**
+ * Pre-escanea la estructura real de temporadas desde OMDb.
+ * Intenta cargar hasta maxSeasons temporadas para detectar la organización real.
+ * Retorna un mapa de episodios absolutos a { season, episode, rating, votes }.
+ */
+async function buildOmdbEpisodeMap(imdbId, maxSeasons = 10) {
+  if (!OMDB_API_KEY || !imdbId) return { map: new Map(), seasons: [] };
+
+  const omdbSeasons = [];
+  const episodeMap = new Map();
+  let absoluteCounter = 1;
+
+  for (let s = 1; s <= maxSeasons; s++) {
+    const omdbSeason = await omdbFetchSeason(imdbId, s);
+    if (!omdbSeason?.Episodes?.length) {
+      // Si no hay episodios en esta temporada, asumimos que terminó
+      if (s === 1) break; // Si ni Season 1 tiene datos, no hay nada
+      break;
+    }
+
+    const episodes = omdbSeason.Episodes.map((ep) => {
+      const episodeNumber = Number(ep.Episode);
+      if (!Number.isFinite(episodeNumber)) return null;
+
+      let rating = null;
+      let votes = null;
+
+      if (ep.imdbRating && ep.imdbRating !== "N/A") {
+        const r = Number(ep.imdbRating);
+        if (Number.isFinite(r) && r > 0 && r <= 10) rating = r;
+      }
+
+      if (ep.imdbVotes && ep.imdbVotes !== "N/A") {
+        const v = Number(String(ep.imdbVotes).replace(/,/g, ""));
+        if (Number.isFinite(v) && v > 0) votes = v;
+      }
+
+      const entry = {
+        season: s,
+        episode: episodeNumber,
+        rating,
+        votes,
+        title: ep.Title || null,
+      };
+
+      episodeMap.set(absoluteCounter, entry);
+      absoluteCounter++;
+
+      return entry;
+    }).filter(Boolean);
+
+    omdbSeasons.push({
+      seasonNumber: s,
+      episodeCount: episodes.length,
+      episodes,
+    });
+  }
+
+  return { map: episodeMap, seasons: omdbSeasons };
+}
+
+/**
+ * Calcula el número absoluto de episodio acumulando episodios de temporadas anteriores.
+ */
+function calculateAbsoluteEpisodeNumber(
+  seasonNumber,
+  episodeNumber,
+  allSeasons,
+) {
+  if (seasonNumber === 1) return episodeNumber;
+
+  let absolute = episodeNumber;
+  for (const s of allSeasons) {
+    if (s.season_number >= seasonNumber) break;
+    absolute += s.episode_count || 0;
+  }
+  return absolute;
+}
+
+/**
  * Ejecuta promesas en lotes para limitar la concurrencia.
  */
 async function runBatched(promisesFactories, batchSize = 4) {
@@ -129,59 +208,54 @@ export async function GET(request, context) {
       })
       .sort((a, b) => a.season_number - b.season_number);
 
-    // 2) Para cada temporada:
-    //    - /tv/{id}/season/{n} en TMDb
-    //    - Season en OMDb (IMDb) en una sola llamada
+    // PRE-ESCANEO: Construir mapa completo de episodios desde OMDb
+    // Esto nos da la estructura REAL de temporadas independientemente de cómo esté organizado en TMDb
+    console.log(
+      `[Ratings API] Serie ${id}: Pre-escaneando estructura de OMDb...`,
+    );
+    const omdbData = useOmdb
+      ? await buildOmdbEpisodeMap(imdbId, 10)
+      : { map: new Map(), seasons: [] };
+
+    if (omdbData.seasons.length > 0) {
+      console.log(
+        `[Ratings API] Serie ${id}: Detectadas ${omdbData.seasons.length} temporadas en OMDb con ${omdbData.map.size} episodios totales`,
+      );
+    }
+
+    // 2) Para cada temporada de TMDb, mapear a los episodios correctos de OMDb usando numeración absoluta
     const seasonFactories = seasons.map((seasonMeta) => async () => {
       try {
-        const [seasonDetail, omdbSeason] = await Promise.all([
-          tmdbFetch(`/tv/${id}/season/${seasonMeta.season_number}`, {
-            language: "es-ES",
-          }),
-          useOmdb
-            ? omdbFetchSeason(imdbId, seasonMeta.season_number)
-            : Promise.resolve(null),
-        ]);
+        const seasonDetail = await tmdbFetch(
+          `/tv/${id}/season/${seasonMeta.season_number}`,
+          { language: "es-ES" },
+        );
 
         const tmdbEpisodes = Array.isArray(seasonDetail.episodes)
           ? seasonDetail.episodes
           : [];
-        const omdbEpisodes = Array.isArray(omdbSeason?.Episodes)
-          ? omdbSeason.Episodes
-          : [];
-
-        // índice por número de episodio en OMDb
-        const omdbByEp = new Map();
-        for (const ep of omdbEpisodes) {
-          const n = Number(ep.Episode);
-          if (Number.isFinite(n)) omdbByEp.set(n, ep);
-        }
 
         const mappedEpisodes = tmdbEpisodes
           .filter((ep) => ep && typeof ep.episode_number === "number")
           .sort((a, b) => a.episode_number - b.episode_number)
           .map((ep) => {
-            // TMDb
+            // TMDb ratings
             const tmdbRating =
               typeof ep.vote_average === "number" ? ep.vote_average : null;
             const tmdbVotes =
               typeof ep.vote_count === "number" ? ep.vote_count : null;
 
-            // IMDb desde OMDb
-            const om = omdbByEp.get(ep.episode_number) || null;
-            let imdbRating = null;
-            let imdbVotes = null;
+            // Calcular número absoluto de episodio para buscar en el mapa de OMDb
+            const absoluteEpNumber = calculateAbsoluteEpisodeNumber(
+              seasonMeta.season_number,
+              ep.episode_number,
+              seasons,
+            );
 
-            if (om) {
-              if (om.imdbRating && om.imdbRating !== "N/A") {
-                const r = Number(om.imdbRating);
-                if (Number.isFinite(r)) imdbRating = r;
-              }
-              if (om.imdbVotes && om.imdbVotes !== "N/A") {
-                const v = Number(String(om.imdbVotes).replace(/,/g, ""));
-                if (Number.isFinite(v)) imdbVotes = v;
-              }
-            }
+            // Buscar en el mapa pre-construido de OMDb (usa estructura real de IMDb)
+            const omdbEntry = omdbData.map.get(absoluteEpNumber) || null;
+            const imdbRating = omdbEntry?.rating || null;
+            const imdbVotes = omdbEntry?.votes || null;
 
             // Usar TMDb como fallback de IMDb (no Trakt)
             const display = imdbRating ?? tmdbRating ?? null;
@@ -202,8 +276,9 @@ export async function GET(request, context) {
 
             return {
               episodeNumber: ep.episode_number,
-              name: ep.name || om?.Title || `Episodio ${ep.episode_number}`,
-              airDate: ep.air_date || om?.Released || null,
+              name:
+                ep.name || omdbEntry?.title || `Episodio ${ep.episode_number}`,
+              airDate: ep.air_date || null,
               tmdb: tmdbRating,
               tmdbVotes,
               imdb: imdbRating,
@@ -211,6 +286,14 @@ export async function GET(request, context) {
               display,
               source,
               avg,
+              // Info de debug para entender el mapeo
+              _debug: useOmdb
+                ? {
+                    absoluteNumber: absoluteEpNumber,
+                    omdbSeason: omdbEntry?.season || null,
+                    omdbEpisode: omdbEntry?.episode || null,
+                  }
+                : null,
             };
           });
 
@@ -245,10 +328,8 @@ export async function GET(request, context) {
     );
 
     const payload = {
-      meta: {
-        id: show.id,
-        name: show.name || show.original_name || "",
-        totalSeasons: seasonsWithEpisodes.length,
+      summary: {
+        seasons: seasonsWithEpisodes.length,
         totalEpisodes,
         sources: ["imdb", "tmdb", "avg"],
         cacheTtlDays: 30,
