@@ -671,21 +671,23 @@ const InProgressCard = memo(function InProgressCard({
                 )}
               </div>
               <div className="flex items-end justify-between gap-2">
-                <h5 className="text-white font-bold text-xs leading-tight line-clamp-2 flex-1">
-                  {title}
-                </h5>
+                <div className="flex-1 min-w-0">
+                  <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
+                    {title}
+                  </h5>
+                  {item.completed && item.aired && (
+                    <div className="mt-0.5 text-[10px] text-zinc-400 flex items-center gap-1">
+                      <Eye className="w-2.5 h-2.5" />
+                      {item.completed}/{item.aired} eps
+                    </div>
+                  )}
+                </div>
                 {activeTab === "completed" && item.user_rating && (
                   <span className="text-yellow-400 text-lg font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
                     {item.user_rating}
                   </span>
                 )}
               </div>
-              {item.completed && item.aired && (
-                <div className="mt-0.5 text-[10px] text-zinc-400 flex items-center gap-1">
-                  <Eye className="w-2.5 h-2.5" />
-                  {item.completed}/{item.aired} eps
-                </div>
-              )}
             </div>
 
             {/* Overlay con gradientes - desktop hover */}
@@ -809,9 +811,9 @@ const InProgressCard = memo(function InProgressCard({
             <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black/60 to-transparent" />
 
             {/* Progress circular gauge badge / User rating badge - solid dark bg for readability */}
-            <div className="absolute top-2.5 right-2.5">
+            <div className="absolute bottom-1 right-1">
               <div
-                className="rounded-full p-1"
+                className="rounded-full"
                 style={{
                   background: "rgba(0,0,0,0.75)",
                   boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
@@ -819,14 +821,14 @@ const InProgressCard = memo(function InProgressCard({
               >
                 {activeTab === "completed" ? (
                   item.user_rating ? (
-                    <div className="w-12 h-12 rounded-full bg-yellow-500/15 border-2 border-yellow-400 flex items-center justify-center">
-                      <span className="text-base font-black font-mono text-yellow-400">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full bg-yellow-500/15 border-2 border-yellow-400 flex items-center justify-center">
+                      <span className="text-sm sm:text-base font-black font-mono text-yellow-400">
                         {item.user_rating}
                       </span>
                     </div>
                   ) : null
                 ) : (
-                  <CircularProgress pct={item.pct} colors={colors} size={48} />
+                  <CircularProgress pct={item.pct} colors={colors} size={40} />
                 )}
               </div>
             </div>
