@@ -63,6 +63,27 @@ function sanitizeNextPath(nextPath) {
   return nextPath;
 }
 
+function nextPathFromReferer(req, origin) {
+  const referer = req?.headers?.get("referer") || "";
+  if (!referer) return "/";
+
+  try {
+    const refUrl = new URL(referer);
+    const currentOrigin = cleanOrigin(origin);
+    const refOrigin = cleanOrigin(refUrl.origin);
+
+    // Solo aceptamos la misma app para evitar open-redirect.
+    if (!refOrigin || refOrigin !== currentOrigin) return "/";
+
+    const path = `${refUrl.pathname || "/"}${refUrl.search || ""}`;
+    const safePath = sanitizeNextPath(path);
+    if (safePath.startsWith("/api/trakt/auth/")) return "/";
+    return safePath;
+  } catch {
+    return "/";
+  }
+}
+
 export async function GET(req) {
   const clientId = process.env.TRAKT_CLIENT_ID;
   if (!clientId) {
@@ -76,8 +97,9 @@ export async function GET(req) {
   const redirectUri = resolveWebRedirectUri(origin);
 
   const state = randomState();
+  const nextFromQuery = req?.nextUrl?.searchParams?.get("next") || "";
   const nextPath = sanitizeNextPath(
-    req?.nextUrl?.searchParams?.get("next") || "/",
+    nextFromQuery || nextPathFromReferer(req, origin),
   );
 
   const url =
