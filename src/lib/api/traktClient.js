@@ -168,7 +168,7 @@ export async function traktGetHistory({
   from,
   to,
   page = 1,
-  limit = 200,
+  limit = "all",
   extended = "full",
 } = {}) {
   const qs = new URLSearchParams();

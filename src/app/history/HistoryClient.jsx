@@ -2016,7 +2016,11 @@ export default function HistoryClient() {
   const loadHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const json = await traktGetHistory({ type: "all", page: 1, limit: 200 });
+      const json = await traktGetHistory({
+        type: "all",
+        page: 1,
+        limit: "all",
+      });
       const { items } = normalizeHistoryResponse(json);
       const sorted = [...items].sort(
         (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
