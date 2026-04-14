@@ -348,28 +348,13 @@ export default function DetailsClient({
   const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] =
     useState(null);
 
-  // posterViewMode: controla QUE imagen se muestra (poster vertical vs preview horizontal).
-  // Se inicializa desde localStorage global para mantener la preferencia del usuario.
-  const [posterViewMode, setPosterViewMode] = useState(() => {
-    if (typeof window === "undefined") return "poster";
-    try {
-      return window.localStorage.getItem(globalViewModeStorageKey) || "poster";
-    } catch {
-      return "poster";
-    }
-  });
+  // El primer render debe ser determinista para evitar hydration mismatch.
+  // La preferencia real del usuario se restaura en cliente justo después.
+  const [posterViewMode, setPosterViewMode] = useState("poster");
 
-  // posterLayoutMode: controla el LAYOUT (ancho/ratio) de forma separada.
-  // Esto permite redimensionar el contenedor antes de cargar la imagen de backdrop,
-  // evitando saltos visuales durante la transicion.
-  const [posterLayoutMode, setPosterLayoutMode] = useState(() => {
-    if (typeof window === "undefined") return "poster";
-    try {
-      return window.localStorage.getItem(globalViewModeStorageKey) || "poster";
-    } catch {
-      return "poster";
-    }
-  });
+  // Control separado del layout para secuenciar las transiciones de ratio.
+  const [posterLayoutMode, setPosterLayoutMode] = useState("poster");
+  const [posterModeHydrated, setPosterModeHydrated] = useState(false);
 
   // -- Imagen de fondo (background) con transicion suave --
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null);
@@ -1267,6 +1252,20 @@ export default function DetailsClient({
    * del usuario desde localStorage (poster, backdrop, background seleccionados).
    * Se ejecuta antes del paint para evitar flashes visuales.
    */
+  useLayoutEffect(() => {
+    try {
+      const savedMode =
+        window.localStorage.getItem(globalViewModeStorageKey) || "poster";
+      setPosterViewMode(savedMode);
+      setPosterLayoutMode(savedMode);
+    } catch {
+      setPosterViewMode("poster");
+      setPosterLayoutMode("poster");
+    } finally {
+      setPosterModeHydrated(true);
+    }
+  }, [globalViewModeStorageKey]);
+
   useLayoutEffect(() => {
     setPosterResolved(false);
     setPosterLowLoaded(false);
@@ -3754,7 +3753,7 @@ export default function DetailsClient({
 
   // Persistir el modo de vista globalmente y sincronizar layoutMode
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !posterModeHydrated) return;
     try {
       window.localStorage.setItem(globalViewModeStorageKey, posterViewMode);
       // Sincronizar layoutMode cuando posterViewMode cambie (excepto durante transiciones)
@@ -3763,7 +3762,12 @@ export default function DetailsClient({
         setPosterLayoutMode(posterViewMode);
       }
     } catch {}
-  }, [posterViewMode, globalViewModeStorageKey, posterToggleBusy]);
+  }, [
+    posterViewMode,
+    globalViewModeStorageKey,
+    posterToggleBusy,
+    posterModeHydrated,
+  ]);
 
   // Copia la URL original de una imagen de TMDb al portapapeles
   const handleCopyImageUrl = async (filePath) => {
@@ -6201,11 +6205,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <ActionShareButton
                     title={title}
                     text={`Echa un vistazo a ${title} en The Show Verse`}
-                    url={
-                      typeof window !== "undefined"
-                        ? `${window.location.origin}/details/${type}/${id}`
-                        : undefined
-                    }
                   />
                 </div>
               </div>

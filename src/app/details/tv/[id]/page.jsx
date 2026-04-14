@@ -1,62 +1,22 @@
-// /src/app/details/tv/[id]/page.jsx
-'use client'
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import {
-  getDetails,
-  getRecommendations,
-  getCredits,
-  getProviders,
-  getReviews
-} from '@/lib/api/tmdb'
-import DetailsClient from '@/components/DetailsClient'
+import { notFound } from "next/navigation";
+import DetailsPageLoader from "@/components/DetailsPageLoader";
+import { getDetails } from "@/lib/api/tmdb";
 
-export default function TvDetailsPage() {
-  const { id } = useParams()
+export const revalidate = 600;
 
-  const [data, setData] = useState(null)
-  const [recommendations, setRecommendations] = useState([])
-  const [castData, setCastData] = useState([])
-  const [providers, setProviders] = useState([])
-  const [reviews, setReviews] = useState([])
+export default async function TvDetailsPage({ params }) {
+  const p = await params;
+  const id = p?.id;
 
-  useEffect(() => {
-    const fetchDetails = async () => {
-      const details = await getDetails('tv', id)
-      setData(details)
+  if (!id) {
+    notFound();
+  }
 
-      const [
-        recs,
-        revs,
-        provs,
-        cast
-      ] = await Promise.all([
-        getRecommendations('tv', id),
-        getReviews('tv', id),
-        getProviders('tv', id),
-        getCredits('tv', id)
-      ])
+  const data = await getDetails("tv", id);
 
-      setRecommendations(recs?.results || [])
-      setReviews(revs?.results || [])
-      setProviders(provs?.results?.ES?.flatrate || [])
-      setCastData(cast?.cast || [])
-    }
+  if (!data) {
+    notFound();
+  }
 
-    fetchDetails()
-  }, [id])
-
-  if (!data) return null
-
-  return (
-    <DetailsClient
-      type="tv"
-      id={id}
-      data={data}
-      recommendations={recommendations}
-      castData={castData}
-      providers={providers}
-      reviews={reviews}
-    />
-  )
+  return <DetailsPageLoader type="tv" id={id} data={data} />;
 }

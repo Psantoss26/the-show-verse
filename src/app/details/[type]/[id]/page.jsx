@@ -1,135 +1,23 @@
-// /src/app/details/[type]/[id]/page.jsx
-"use client";
+import { notFound } from "next/navigation";
+import DetailsPageLoader from "@/components/DetailsPageLoader";
+import { getDetails } from "@/lib/api/tmdb";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import {
-  getDetails,
-  getCredits,
-  getWatchProviders,
-  getReviews,
-  getActorMovies,
-} from "@/lib/api/tmdb";
-import { getTraktRelated, traktGetScoreboard } from "@/lib/api/traktClient";
-import DetailsClient from "@/components/DetailsClient";
+export const revalidate = 600;
 
-export default function DetailsPage() {
-  const { type, id } = useParams();
+export default async function DetailsPage({ params }) {
+  const p = await params;
+  const type = String(p?.type || "").toLowerCase();
+  const id = p?.id;
 
-  const [renderReady, setRenderReady] = useState(false);
-  const [propsToRender, setPropsToRender] = useState({});
+  if (!id || (type !== "movie" && type !== "tv")) {
+    notFound();
+  }
 
-  useEffect(() => {
-    if (!type || !id) return;
+  const data = await getDetails(type, id);
 
-    let cancelled = false;
+  if (!data) {
+    notFound();
+  }
 
-    const fetchAll = async () => {
-      try {
-        const traktType = type === "tv" ? "show" : "movie";
-        const detailsPromise = getDetails(type, id);
-        const scoreboardPromise =
-          type !== "person"
-            ? traktGetScoreboard({ type: traktType, tmdbId: id }).catch(
-                () => null,
-              )
-            : Promise.resolve(null);
-        const castPromise =
-          type !== "person"
-            ? getCredits(type, id).catch(() => ({ cast: [] }))
-            : Promise.resolve({ cast: [] });
-        const reviewsPromise =
-          type !== "person"
-            ? getReviews(type, id).catch(() => ({ results: [] }))
-            : Promise.resolve({ results: [] });
-        const watchProvidersPromise =
-          type !== "person"
-            ? getWatchProviders(type, id, "ES").catch(() => ({
-                providers: [],
-                link: null,
-              }))
-            : Promise.resolve({ providers: [], link: null });
-        const relatedPromise =
-          type !== "person"
-            ? getTraktRelated({ type, tmdbId: id }).catch(() => ({
-                results: [],
-              }))
-            : Promise.resolve({ results: [] });
-
-        const details = await detailsPromise;
-        if (cancelled) return;
-
-        if (type === "person") {
-          // Vista de persona: filmografía en vez de providers/reviews
-          const actorMovies = await getActorMovies(id).catch(() => ({ cast: [] }));
-          if (cancelled) return;
-          setPropsToRender({
-            type,
-            id,
-            data: details,
-            castData: actorMovies?.cast || [],
-            recommendations: [],
-            providers: [],
-            watchLink: null,
-            reviews: [],
-          });
-          setRenderReady(true);
-          return;
-        }
-
-        const scoreboard = await scoreboardPromise;
-        if (cancelled) return;
-
-        // Renderizar tan pronto como tengamos detalles + scoreboard.
-        setPropsToRender({
-          type,
-          id,
-          data: details,
-          castData: [],
-          recommendations: [],
-          reviews: [],
-          providers: [],
-          watchLink: null,
-          initialScoreboard: scoreboard || null,
-        });
-        setRenderReady(true);
-
-        const [cast, reviews, watchProviders, related] = await Promise.all([
-          castPromise,
-          reviewsPromise,
-          watchProvidersPromise,
-          relatedPromise,
-        ]);
-        if (cancelled) return;
-
-        const providers = watchProviders?.providers || [];
-        const watchLink = watchProviders?.link || null;
-
-        setPropsToRender({
-          type,
-          id,
-          data: details,
-          castData: cast?.cast || [],
-          recommendations: related?.results || [],
-          reviews: reviews?.results || [],
-          providers,
-          watchLink,
-          initialScoreboard: scoreboard || null,
-        });
-      } catch (err) {
-        console.error("Error cargando detalles:", err);
-        // No dejar la página en blanco aunque falle algo inesperado
-        if (!cancelled) setRenderReady(true);
-      }
-    };
-
-    fetchAll();
-    return () => {
-      cancelled = true;
-    };
-  }, [type, id]);
-
-  if (!renderReady) return null;
-
-  return <DetailsClient {...propsToRender} />;
+  return <DetailsPageLoader type={type} id={id} data={data} />;
 }
