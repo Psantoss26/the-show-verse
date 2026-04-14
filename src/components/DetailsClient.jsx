@@ -407,6 +407,7 @@ export default function DetailsClient({
 
   // -- Refs y estado para scroll horizontal de la galeria de imagenes --
   const imagesScrollRef = useRef(null);
+  const contentTopRef = useRef(null);
   const [isHoveredImages, setIsHoveredImages] = useState(false);
   const [canPrevImages, setCanPrevImages] = useState(false); // Hay scroll a la izquierda
   const [canNextImages, setCanNextImages] = useState(false); // Hay scroll a la derecha
@@ -4789,6 +4790,34 @@ export default function DetailsClient({
     }
   }, [sectionItems, activeSection]);
 
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let raf = 0;
+    raf = window.requestAnimationFrame(() => {
+      const contentEl = contentTopRef.current;
+      if (!contentEl) {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        return;
+      }
+
+      const navHeight =
+        document.querySelector("nav")?.getBoundingClientRect().height || 64;
+      const nextTop =
+        window.scrollY + contentEl.getBoundingClientRect().top - navHeight;
+
+      window.scrollTo({
+        top: Math.max(0, nextTop),
+        left: 0,
+        behavior: "auto",
+      });
+    });
+
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, [type, id]);
+
   // =====================================================
   // IMDb para recomendaciones: solo hover (no auto)
   // =====================================================
@@ -5508,7 +5537,10 @@ export default function DetailsClient({
       </div>
 
       {/* --- CONTENIDO PRINCIPAL --- */}
-      <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
+      <div
+        ref={contentTopRef}
+        className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto"
+      >
         {/* =================================================================
             HEADER HERO SECTION (Diseño Final Solicitado)
            ================================================================= */}
@@ -8270,7 +8302,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
             <section id="section-cast" ref={registerSection("cast")}>
               {/* === REPARTO PRINCIPAL (Cast) === */}
-              {castData && castData.length > 0 && (
+              {castDataForUI && castDataForUI.length > 0 && (
                 <section className="mb-16">
                   <SectionTitle title="Reparto Principal" icon={Users} />
                   <Swiper
