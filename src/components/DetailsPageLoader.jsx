@@ -69,7 +69,8 @@ export default function DetailsPageLoader(props) {
     const loadPriorityScoreboard = async () => {
       try {
         const externalIds = await getExternalIds(type, id).catch(() => null);
-        const imdbId = externalIds?.imdb_id || data?.external_ids?.imdb_id || "";
+        const imdbId =
+          externalIds?.imdb_id || data?.external_ids?.imdb_id || "";
 
         const res = await fetch(
           `/api/scoreboard/public?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&imdb=${encodeURIComponent(imdbId || "")}`,
@@ -83,8 +84,7 @@ export default function DetailsPageLoader(props) {
           ...prev,
           initialScoreboard: json,
         }));
-      } catch {
-      }
+      } catch {}
     };
 
     const loadTraktRelatedDeferred = async () => {
