@@ -152,6 +152,7 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
 
     // Intentar parsear JSON con mejor manejo de errores
     let json = null;
+    let errorText = null;
     const contentType = res.headers.get("content-type");
     if (contentType?.includes("application/json")) {
       try {
@@ -162,16 +163,18 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
             `❌ Error parsing Trakt JSON (${res.status}) for ${path}:`,
             parseErr.message,
           );
+          // Intentar leer como texto para debugging
+          errorText = await res.text().catch(() => null);
         }
       }
     } else if (!res.ok) {
-      // Si la respuesta es un error y no es JSON, loggear para debugging
-      const textPreview = await res.text().catch(() => "");
+      // Si la respuesta es un error y no es JSON, capturar el texto
+      errorText = await res.text().catch(() => "");
       console.error(
         `⚠️ Trakt returned non-JSON error (${res.status}) for ${path}`,
       );
       console.error(`   Content-Type: ${contentType}`);
-      console.error(`   Response preview: ${textPreview.substring(0, 200)}`);
+      console.error(`   Response preview: ${errorText.substring(0, 200)}`);
     }
 
     // Otros errores de servidor (5xx) - reintentar con exponential backoff
@@ -205,11 +208,24 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
     }
 
     if (!res.ok) {
-      const msg = json?.error || json?.message || `Trakt HTTP ${res.status}`;
+      // Construir mensaje de error con texto capturado si no hay JSON
+      const msg = 
+        json?.error || 
+        json?.message || 
+        (errorText && errorText.length < 100 ? errorText : null) ||
+        `Trakt HTTP ${res.status}`;
+      
       console.error(`❌ Trakt error ${res.status} on ${path}: ${msg}`);
+      
+      // 403 puede ser auth expirado o rate limiting disfrazado
+      if (res.status === 403) {
+        console.warn(`⚠️ Trakt 403 Forbidden - posible token inválido o rate limit`);
+      }
+      
       const err = new Error(msg);
       err.status = res.status;
       err.path = path;
+      err.isForbidden = res.status === 403;
       throw err;
     }
 

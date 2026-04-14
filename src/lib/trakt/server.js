@@ -321,7 +321,12 @@ export async function traktSearchByTmdb(token, { type, tmdbId }) {
     `/search/tmdb/${encodeURIComponent(tmdbId)}?type=${encodeURIComponent(type)}`,
     { token },
   );
-  if (!r.ok) throw new Error("Trakt search failed");
+  if (!r.ok) {
+    const err = new Error(r.json?.error || r.json?.message || `Trakt search failed (HTTP ${r.status})`);
+    err.status = r.status;
+    err.isForbidden = r.status === 403;
+    throw err;
+  }
   const arr = Array.isArray(r.json) ? r.json : [];
   return arr[0] || null;
 }
