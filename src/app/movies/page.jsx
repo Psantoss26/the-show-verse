@@ -11,15 +11,6 @@ import {
   fetchMindBendingMovies,
 } from "@/lib/api/tmdb";
 
-import {
-  getTraktMoviesTrending,
-  getTraktMoviesPopular,
-  getTraktMoviesRecommended,
-  getTraktMoviesAnticipated,
-  getTraktMoviesPlayed,
-  removeDuplicates,
-} from "@/lib/api/traktHelpers";
-
 // Ajusta el revalidate según lo fresco que quieras el contenido
 export const revalidate = 1800; // 30 minutos
 
@@ -120,16 +111,6 @@ async function getDashboardData() {
       vengeance,
       mind,
       baseSections,
-
-      // ✅ NUEVAS SECCIONES TRAKT - Solo Películas
-      traktTrending,
-      traktPopular,
-      traktRecommended,
-      traktAnticipated,
-      traktPlayedWeekly,
-      traktPlayedMonthly,
-      traktPlayedYearly,
-      traktPlayedAll,
     ] = await Promise.all([
       // TMDb originales
       fetchPopularMedia({ type: "movie", language: lang }),
@@ -167,16 +148,6 @@ async function getDashboardData() {
       fetchMovieSections
         ? fetchMovieSections({ language: lang })
         : Promise.resolve({}),
-
-      // ✅ Trakt - Solo Películas
-      getTraktMoviesTrending(24),
-      getTraktMoviesPopular(24),
-      getTraktMoviesRecommended(24),
-      getTraktMoviesAnticipated(24),
-      getTraktMoviesPlayed("weekly", 24),
-      getTraktMoviesPlayed("monthly", 24),
-      getTraktMoviesPlayed("yearly", 24),
-      getTraktMoviesPlayed("all", 24),
     ]);
 
     const top_imdb_raw = await topImdbPromise;
@@ -290,16 +261,6 @@ async function getDashboardData() {
       curatedBaseSections["Por género"] = curatedByGenre;
     }
 
-    // ✅ Limpieza de duplicados en secciones Trakt
-    const cleanedTraktTrending = removeDuplicates(traktTrending);
-    const cleanedTraktPopular = removeDuplicates(traktPopular);
-    const cleanedTraktRecommended = removeDuplicates(traktRecommended);
-    const cleanedTraktAnticipated = removeDuplicates(traktAnticipated);
-    const cleanedTraktPlayedWeekly = removeDuplicates(traktPlayedWeekly);
-    const cleanedTraktPlayedMonthly = removeDuplicates(traktPlayedMonthly);
-    const cleanedTraktPlayedYearly = removeDuplicates(traktPlayedYearly);
-    const cleanedTraktPlayedAll = removeDuplicates(traktPlayedAll);
-
     return {
       // TMDb originales
       popular: curatedPopular,
@@ -311,16 +272,6 @@ async function getDashboardData() {
       romance: curatedRomance,
       vengeance: curatedVengeance,
       ...curatedBaseSections,
-
-      // ✅ NUEVAS SECCIONES TRAKT
-      traktTrending: cleanedTraktTrending,
-      traktPopular: cleanedTraktPopular,
-      traktRecommended: cleanedTraktRecommended,
-      traktAnticipated: cleanedTraktAnticipated,
-      traktPlayedWeekly: cleanedTraktPlayedWeekly,
-      traktPlayedMonthly: cleanedTraktPlayedMonthly,
-      traktPlayedYearly: cleanedTraktPlayedYearly,
-      traktPlayedAll: cleanedTraktPlayedAll,
     };
   } catch (err) {
     console.error("Error cargando la página de películas (SSR):", err);

@@ -5,10 +5,6 @@ import { cookies } from "next/headers";
 import {
   fetchTopRatedMovies,
   fetchTopRatedTV,
-  fetchCultClassics,
-  fetchTopActionMovies,
-  fetchPopularInUS,
-  fetchRisingMovies,
   fetchTrendingMovies,
   fetchPopularMovies,
   fetchRecommendedMovies,
@@ -19,13 +15,9 @@ import {
 import {
   getTraktTrending,
   getTraktPopular,
-  getTraktRecommended,
   getTraktAnticipated,
   getTraktMoviesAnticipated,
   getTraktShowsAnticipated,
-  getTraktPlayed,
-  getTraktWatched,
-  getTraktCollected,
   removeDuplicates,
 } from "@/lib/api/traktHelpers";
 
@@ -110,151 +102,6 @@ async function fetchBestBackdropServer(itemId, mediaType = "movie") {
   } catch {
     return null;
   }
-}
-
-/* ====================================================================
- * TRAKT: Discover (Recommended / Anticipated) + hidratado con TMDb
- * ==================================================================== */
-
-async function safeJson(res) {
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-async function fetchTmdbDetails(type, id) {
-  const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  if (!TMDB_KEY || !type || !id) return null;
-  const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&language=es-ES`;
-  const res = await fetch(url, { next: { revalidate: 60 * 60 } });
-  const json = await safeJson(res);
-  if (!res.ok) return null;
-  return json;
-}
-
-function interleave(a, b, limit = 24) {
-  const out = [];
-  let i = 0;
-  while (out.length < limit && (i < a.length || i < b.length)) {
-    if (i < a.length) out.push(a[i]);
-    if (out.length >= limit) break;
-    if (i < b.length) out.push(b[i]);
-    i++;
-  }
-  return out;
-}
-
-async function mapWithConcurrency(items, worker, concurrency = 8) {
-  const out = new Array(items.length);
-  let idx = 0;
-
-  const runners = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    async () => {
-      while (idx < items.length) {
-        const cur = idx++;
-        out[cur] = await worker(items[cur]).catch(() => null);
-      }
-    },
-  );
-
-  await Promise.all(runners);
-  return out.filter(Boolean);
-}
-
-async function getTraktDiscoverRecommended(limit = 24) {
-  // Movies + TV, alternado
-  const [movies, shows] = await Promise.all([
-    fetchTrakt(`/movies/recommended/weekly?extended=full&limit=30`),
-    fetchTrakt(`/shows/recommended/weekly?extended=full&limit=30`),
-  ]);
-
-  const movieSeeds = movies
-    .map((m) => ({ media_type: "movie", tmdb: m?.ids?.tmdb }))
-    .filter((x) => x.tmdb);
-
-  const showSeeds = shows
-    .map((s) => ({ media_type: "tv", tmdb: s?.ids?.tmdb }))
-    .filter((x) => x.tmdb);
-
-  const mixed = interleave(movieSeeds, showSeeds, limit);
-
-  return await mapWithConcurrency(
-    mixed,
-    async (it) => {
-      const details = await fetchTmdbDetails(
-        it.media_type === "tv" ? "tv" : "movie",
-        it.tmdb,
-      );
-      // si no hay poster, se ve feo en tu grid (y además te rompe consistencia)
-      if (!details?.id || !details?.poster_path) return null;
-
-      return {
-        id: details.id,
-        media_type: it.media_type,
-        title: details.title || null,
-        name: details.name || null,
-        poster_path: details.poster_path || null,
-        backdrop_path: details.backdrop_path || null,
-        release_date: details.release_date || null,
-        first_air_date: details.first_air_date || null,
-        vote_average: details.vote_average ?? null,
-        runtime: details.runtime ?? null,
-        number_of_episodes: details.number_of_episodes ?? null,
-      };
-    },
-    8,
-  );
-}
-
-async function getTraktDiscoverAnticipated(limit = 24) {
-  // anticipated devuelve wrappers { list_count, movie/show }
-  const [moviesRaw, showsRaw] = await Promise.all([
-    fetchTrakt(`/movies/anticipated?extended=full&limit=30`),
-    fetchTrakt(`/shows/anticipated?extended=full&limit=30`),
-  ]);
-
-  const movieSeeds = moviesRaw
-    .map((x) => x?.movie)
-    .filter(Boolean)
-    .map((m) => ({ media_type: "movie", tmdb: m?.ids?.tmdb }))
-    .filter((x) => x.tmdb);
-
-  const showSeeds = showsRaw
-    .map((x) => x?.show)
-    .filter(Boolean)
-    .map((s) => ({ media_type: "tv", tmdb: s?.ids?.tmdb }))
-    .filter((x) => x.tmdb);
-
-  const mixed = interleave(movieSeeds, showSeeds, limit);
-
-  return await mapWithConcurrency(
-    mixed,
-    async (it) => {
-      const details = await fetchTmdbDetails(
-        it.media_type === "tv" ? "tv" : "movie",
-        it.tmdb,
-      );
-      if (!details?.id || !details?.poster_path) return null;
-
-      return {
-        id: details.id,
-        media_type: it.media_type,
-        title: details.title || null,
-        name: details.name || null,
-        poster_path: details.poster_path || null,
-        backdrop_path: details.backdrop_path || null,
-        release_date: details.release_date || null,
-        first_air_date: details.first_air_date || null,
-        vote_average: details.vote_average ?? null,
-        runtime: details.runtime ?? null,
-        number_of_episodes: details.number_of_episodes ?? null,
-      };
-    },
-    8,
-  );
 }
 
 /* ======== Curado de listas (mismo criterio que Películas/Series) ======== */
@@ -399,7 +246,11 @@ async function getDashboardData(sessionId = null) {
           return {
             ...m,
             backdrop_path:
-              preferred || m.backdrop_path || m.poster_path || null,
+              preferred ||
+              m.backdrop_path ||
+              m.poster_path ||
+              m.profile_path ||
+              null,
           };
         }),
       );
