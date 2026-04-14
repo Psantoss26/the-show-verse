@@ -26,17 +26,13 @@ export default function DetailsPage() {
 
     const fetchAll = async () => {
       try {
-        // Prioridad alta: detalles base + scoreboard de Trakt
+        // Lanzar scoreboard en paralelo (no bloqueante) - se resuelve junto con TMDB
         const traktType = type === "tv" ? "show" : "movie";
         const scoreboardPromise = type !== "person"
           ? traktGetScoreboard({ type: traktType, tmdbId: id }).catch(() => null)
           : Promise.resolve(null);
 
-        const detailsPromise = getDetails(type, id);
-        const [details, scoreboard] = await Promise.all([
-          detailsPromise,
-          scoreboardPromise,
-        ]);
+        const details = await getDetails(type, id);
         if (cancelled) return;
 
         if (type === "person") {
@@ -57,42 +53,35 @@ export default function DetailsPage() {
           return;
         }
 
-        // Renderizar cuanto antes con los datos críticos
-        setPropsToRender({
-          type,
-          id,
-          data: details,
-          castData: [],
-          recommendations: [],
-          reviews: [],
-          providers: [],
-          watchLink: null,
-          initialScoreboard: scoreboard || null,
-        });
-        setRenderReady(true);
-
-        // Cargas secundarias en background
-        Promise.all([
+        // Resto de tipos (movie / tv): llamadas en paralelo — SIN getTraktRelated
+        // getTraktRelated se carga a continuación de forma NO bloqueante
+        const [cast, reviews, watchProviders, scoreboard] = await Promise.all([
           getCredits(type, id).catch(() => ({ cast: [] })),
           getReviews(type, id).catch(() => ({ results: [] })),
           getWatchProviders(type, id, "ES").catch(() => ({
             providers: [],
             link: null,
           })),
-        ])
-          .then(([cast, reviews, watchProviders]) => {
-            if (cancelled) return;
-            setPropsToRender((prev) => ({
-              ...prev,
-              castData: cast?.cast || [],
-              reviews: reviews?.results || [],
-              providers: watchProviders?.providers || [],
-              watchLink: watchProviders?.link || null,
-            }));
-          })
-          .catch(() => {
-            // silencioso: DetailsClient soporta datos vacíos
-          });
+          scoreboardPromise,
+        ]);
+        if (cancelled) return;
+
+        const providers = watchProviders?.providers || [];
+        const watchLink = watchProviders?.link || null;
+
+        // ✅ Renderizar de inmediato con recomendaciones vacías (sin esperar Trakt)
+        setPropsToRender({
+          type,
+          id,
+          data: details,
+          castData: cast?.cast || [],
+          recommendations: [],
+          reviews: reviews?.results || [],
+          providers,
+          watchLink,
+          initialScoreboard: scoreboard || null,
+        });
+        setRenderReady(true);
 
         // ✅ Cargar recomendaciones de Trakt en segundo plano, sin bloquear
         getTraktRelated({ type, tmdbId: id })
