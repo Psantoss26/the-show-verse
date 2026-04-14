@@ -567,13 +567,17 @@ export default function EpisodeDetailsClient({
 
         {/* === ESTILOS PARA SSR SWIPER FIX (EVITAR SALTOS) === */}
         {!isMounted && (
-          <style dangerouslySetInnerHTML={{ __html: `
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
             .ssr-swiper-fix .swiper-slide { width: calc(33.333% - 8px) !important; margin-right: 12px !important; display: block; }
             @media (min-width: 500px) { .ssr-swiper-fix .swiper-slide { width: calc(33.333% - 9.33px) !important; margin-right: 14px !important; } }
             @media (min-width: 768px) { .ssr-swiper-fix .swiper-slide { width: calc(25% - 12px) !important; margin-right: 16px !important; } }
             @media (min-width: 1024px) { .ssr-swiper-fix .swiper-slide { width: calc(20% - 14.4px) !important; margin-right: 18px !important; } }
             @media (min-width: 1280px) { .ssr-swiper-fix .swiper-slide { width: calc(16.666% - 16.67px) !important; margin-right: 20px !important; } }
-          ` }} />
+          `,
+            }}
+          />
         )}
 
         {/* === Reparto del episodio === */}
