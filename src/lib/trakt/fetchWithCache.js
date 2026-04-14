@@ -13,6 +13,10 @@ const CACHE_TTL = 60 * 60 * 1000; // 1 hora (Trakt data cambia lentamente)
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY = 1000; // 1 segundo
 
+function isExpectedUpstreamStatus(status) {
+  return [403, 404, 405, 429].includes(Number(status));
+}
+
 function traktHeaders() {
   const key = process.env.TRAKT_CLIENT_ID;
   if (!key) {
@@ -154,12 +158,15 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
     let json = null;
     let errorText = null;
     const contentType = res.headers.get("content-type");
+    const expectedStatus = isExpectedUpstreamStatus(res.status);
+    const logUnexpected = expectedStatus ? console.warn : console.error;
+
     if (contentType?.includes("application/json")) {
       try {
         json = await res.json();
       } catch (parseErr) {
         if (!res.ok) {
-          console.error(
+          logUnexpected(
             `❌ Error parsing Trakt JSON (${res.status}) for ${path}:`,
             parseErr.message,
           );
@@ -170,11 +177,11 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
     } else if (!res.ok) {
       // Si la respuesta es un error y no es JSON, capturar el texto
       errorText = await res.text().catch(() => "");
-      console.error(
+      logUnexpected(
         `⚠️ Trakt returned non-JSON error (${res.status}) for ${path}`,
       );
-      console.error(`   Content-Type: ${contentType}`);
-      console.error(`   Response preview: ${errorText.substring(0, 200)}`);
+      logUnexpected(`   Content-Type: ${contentType}`);
+      logUnexpected(`   Response preview: ${errorText.substring(0, 200)}`);
     }
 
     // Otros errores de servidor (5xx) - reintentar con exponential backoff
@@ -215,7 +222,7 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
         (errorText && errorText.length < 100 ? errorText : null) ||
         `Trakt HTTP ${res.status}`;
       
-      console.error(`❌ Trakt error ${res.status} on ${path}: ${msg}`);
+      logUnexpected(`❌ Trakt error ${res.status} on ${path}: ${msg}`);
       
       // 403 puede ser auth expirado o rate limiting disfrazado
       if (res.status === 403) {

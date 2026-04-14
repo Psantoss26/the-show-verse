@@ -112,11 +112,9 @@ export async function getTraktScoreboardData({
     const seasonIds = seasonObj.ids;
     const traktUrl = `https://trakt.tv/shows/${showSlug}/seasons/${seasonNumber}`;
 
-    const [stats1, stats2] = await Promise.all([
-      ftStats(`/seasons/${seasonIds.trakt}/stats`),
-      ftStats(`/shows/${traktShowId}/seasons/${seasonNumber}/stats`),
-    ]);
-    const stats = stats1 || stats2 || null;
+    const stats =
+      (await ftStats(`/shows/${traktShowId}/seasons/${seasonNumber}/stats`)) ||
+      null;
 
     return {
       found: true,
@@ -163,13 +161,10 @@ export async function getTraktScoreboardData({
   if (!epIds?.trakt) return { found: false };
 
   const traktUrl = `https://trakt.tv/shows/${showSlug}/seasons/${seasonNumber}/episodes/${episodeNumber}`;
-  const [stats1, stats2] = await Promise.all([
-    ftStats(`/episodes/${epIds.trakt}/stats`),
-    ftStats(
+  const stats =
+    (await ftStats(
       `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
-    ),
-  ]);
-  const stats = stats1 || stats2 || null;
+    )) || null;
 
   return {
     found: true,
