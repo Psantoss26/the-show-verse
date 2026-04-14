@@ -1,7 +1,5 @@
 // src/app/details/tv/[id]/season/[season]/episode/[episode]/page.jsx
 import EpisodeDetailsClient from "@/components/EpisodeDetailsClient";
-import { getCachedEpisodeImdbData } from "@/lib/api/ratingsCached";
-import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
 export const revalidate = 3600; // 1h
 
@@ -43,32 +41,9 @@ export default async function EpisodePage({ params }) {
     `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}?append_to_response=credits,external_ids`,
   );
 
-  const scoreboardPromise = getCachedTraktScoreboardData({
-    type: "episode",
-    tmdbId: showId,
-    season: seasonNumber,
-    episode: episodeNumber,
-  }).catch(() => null);
-
-  const imdbPromise = showPromise
-    .then((show) =>
-      getCachedEpisodeImdbData({
-        showId,
-        imdbId: show?.external_ids?.imdb_id || null,
-        seasonNumber,
-        episodeNumber,
-      }),
-    )
-    .catch((e) => {
-      console.error("Error fetching cached episode IMDb:", e);
-      return null;
-    });
-
-  const [show, episode, initialScoreboard, imdb] = await Promise.all([
+  const [show, episode] = await Promise.all([
     showPromise,
     episodePromise,
-    scoreboardPromise,
-    imdbPromise,
   ]);
 
   const showImdbId = show?.external_ids?.imdb_id || null;
@@ -84,8 +59,7 @@ export default async function EpisodePage({ params }) {
       episodeNumber={episodeNumber}
       show={show}
       episode={episode}
-      initialScoreboard={initialScoreboard}
-      imdb={imdb}
+      imdbId={showImdbId}
       imdbUrl={imdbUrl}
     />
   );

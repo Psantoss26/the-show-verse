@@ -51,6 +51,7 @@ export default function EpisodeDetailsClient({
   episode,
   initialScoreboard,
   imdb,
+  imdbId,
   imdbUrl,
 }) {
   const router = useRouter();
@@ -127,6 +128,7 @@ export default function EpisodeDetailsClient({
   const [tScoreboard, setTScoreboard] = useState(
     () => parseScoreboardData(initialScoreboard) || defaultScoreboard,
   );
+  const [imdbData, setImdbData] = useState(imdb || null);
 
   const traktDecimal = useMemo(() => {
     if (tScoreboard.rating == null) return null;
@@ -194,6 +196,38 @@ export default function EpisodeDetailsClient({
     initialScoreboard,
     parseScoreboardData,
   ]);
+
+  useEffect(() => {
+    setImdbData(imdb || null);
+  }, [imdb]);
+
+  useEffect(() => {
+    if (imdb?.rating != null || !imdbId) return;
+
+    let alive = true;
+
+    (async () => {
+      try {
+        const qs = new URLSearchParams({
+          season: String(seasonNumber),
+          episode: String(episodeNumber),
+          imdbId: String(imdbId),
+        });
+        const res = await fetch(`/api/tv/${showId}/episode-imdb?${qs}`, {
+          cache: "force-cache",
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!alive) return;
+        setImdbData(json?.imdb || null);
+      } catch {
+        if (alive) setImdbData(null);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [showId, seasonNumber, episodeNumber, imdbId, imdb]);
 
   // =========================
   // Rating SOLO Trakt + StarRating
@@ -640,13 +674,15 @@ export default function EpisodeDetailsClient({
                     />
                   )}
 
-                  {imdb?.rating != null && (
+                  {imdbData?.rating != null && (
                     <CompactBadge
                       logo="/logo-IMDb.png"
                       logoClassName="h-5 sm:h-5"
-                      value={Number(imdb.rating).toFixed(1)}
+                      value={Number(imdbData.rating).toFixed(1)}
                       sub={
-                        imdb?.votes ? formatCountShort(imdb.votes) : undefined
+                        imdbData?.votes
+                          ? formatCountShort(imdbData.votes)
+                          : undefined
                       }
                       href={imdbUrl || undefined}
                     />
