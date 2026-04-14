@@ -340,6 +340,51 @@ export default function EpisodeDetailsClient({
     void reloadEpisodeTraktState();
   }, [reloadEpisodeTraktState]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const timers = [];
+
+    const syncEpisodeTraktState = async () => {
+      const latest = await reloadEpisodeTraktState();
+      if (cancelled) return;
+      if (latest?.connected) setTraktConnected(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void syncEpisodeTraktState();
+      }
+    };
+
+    window.addEventListener("focus", syncEpisodeTraktState);
+    window.addEventListener("pageshow", syncEpisodeTraktState);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Reintentos suaves al cargar para cubrir el caso en que las cookies de
+    // Trakt se acaban de restaurar y el primer fetch llega demasiado pronto.
+    if (trakt.loading || (!trakt.connected && !trakt.error)) {
+      [900, 2200].forEach((delay) => {
+        const timer = window.setTimeout(() => {
+          void syncEpisodeTraktState();
+        }, delay);
+        timers.push(timer);
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
+      window.removeEventListener("focus", syncEpisodeTraktState);
+      window.removeEventListener("pageshow", syncEpisodeTraktState);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [
+    reloadEpisodeTraktState,
+    trakt.loading,
+    trakt.connected,
+    trakt.error,
+  ]);
+
   // Toggle watched para el episodio
   const toggleEpisodeWatched = useCallback(async () => {
     if (trakt.loading || watchedBusy) return;
