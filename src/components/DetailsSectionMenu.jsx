@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useLayoutEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 export default function DetailsSectionMenu({
   items = [],
@@ -17,6 +17,7 @@ export default function DetailsSectionMenu({
 
   const containerRef = useRef(null);
   const innerRef = useRef(null);
+  const shouldReduceMotion = useReducedMotion();
 
   const [scale, setScale] = useState(1);
   const [fits, setFits] = useState(true);
@@ -74,7 +75,15 @@ export default function DetailsSectionMenu({
   if (safeItems.length === 0) return null;
 
   return (
-    <div className={["w-full", className].join(" ")}>
+    <motion.div
+      initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: shouldReduceMotion ? 0 : 0.4,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className={["w-full", className].join(" ")}
+    >
       <nav className={["mx-auto w-full", maxWidthClass].join(" ")}>
         <div
           className={[
@@ -123,6 +132,19 @@ export default function DetailsSectionMenu({
                             onClick={() => onChange?.(item.id)}
                             type="button"
                             aria-current={active ? "page" : undefined}
+                            initial={
+                              shouldReduceMotion
+                                ? false
+                                : { opacity: 0, y: 6, scale: 0.99 }
+                            }
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{
+                              duration: shouldReduceMotion ? 0 : 0.32,
+                              delay: shouldReduceMotion
+                                ? 0
+                                : 0.03 + index * 0.035,
+                              ease: [0.22, 1, 0.36, 1],
+                            }}
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
                             className={[
@@ -234,6 +256,6 @@ export default function DetailsSectionMenu({
           </div>
         </div>
       </nav>
-    </div>
+    </motion.div>
   );
 }
