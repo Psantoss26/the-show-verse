@@ -4,6 +4,7 @@ import {
   getEpisodeRatings,
   getSeasonImdbAggregate,
 } from "@/lib/api/ratingsHelper";
+import { getTraktScoreboardData } from "@/lib/trakt/scoreboard";
 
 export const revalidate = 3600; // 1h
 
@@ -35,9 +36,16 @@ export default async function SeasonPage({ params }) {
     );
   }
 
-  const [show, season] = await Promise.all([
+  const scoreboardPromise = getTraktScoreboardData({
+    type: "season",
+    tmdbId: showId,
+    season: seasonNumber,
+  }).catch(() => null);
+
+  const [show, season, initialScoreboard] = await Promise.all([
     tmdbFetch(`/tv/${showId}?append_to_response=external_ids`),
     tmdbFetch(`/tv/${showId}/season/${seasonNumber}`),
+    scoreboardPromise,
   ]);
 
   const showImdbId = show?.external_ids?.imdb_id || null;
@@ -91,6 +99,7 @@ export default async function SeasonPage({ params }) {
       seasonNumber={seasonNumber}
       show={show}
       season={season}
+      initialScoreboard={initialScoreboard}
       imdb={imdb}
       imdbUrl={imdbUrl}
     />

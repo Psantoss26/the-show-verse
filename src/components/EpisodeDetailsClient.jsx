@@ -48,6 +48,7 @@ export default function EpisodeDetailsClient({
   episodeNumber,
   show,
   episode,
+  initialScoreboard,
   imdb,
   imdbUrl,
 }) {
@@ -97,14 +98,34 @@ export default function EpisodeDetailsClient({
     setIsMounted(true);
   }, []);
 
+  const parseScoreboardData = useCallback((r) => {
+    if (!r?.found) return null;
+    return {
+      loading: false,
+      rating:
+        typeof r?.community?.rating === "number" ? r.community.rating : null,
+      votes:
+        typeof r?.community?.votes === "number" ? r.community.votes : null,
+      stats: r?.stats || null,
+      traktUrl: r?.traktUrl || null,
+    };
+  }, []);
+
+  const defaultScoreboard = useMemo(
+    () => ({
+      loading: false,
+      rating: null,
+      votes: null,
+      stats: null,
+      traktUrl: null,
+    }),
+    [],
+  );
+
   // Trakt scoreboard
-  const [tScoreboard, setTScoreboard] = useState({
-    loading: true,
-    rating: null,
-    votes: null,
-    stats: null,
-    traktUrl: null,
-  });
+  const [tScoreboard, setTScoreboard] = useState(
+    () => parseScoreboardData(initialScoreboard) || defaultScoreboard,
+  );
 
   const traktDecimal = useMemo(() => {
     if (tScoreboard.rating == null) return null;
@@ -117,6 +138,9 @@ export default function EpisodeDetailsClient({
     let alive = true;
     (async () => {
       try {
+        const prefetched = parseScoreboardData(initialScoreboard);
+        if (prefetched) return;
+
         setTScoreboard((s) => ({ ...s, loading: true }));
         const res = await fetch(
           `/api/trakt/scoreboard?type=episode&tmdbId=${showId}&season=${seasonNumber}&episode=${episodeNumber}`,
@@ -162,7 +186,13 @@ export default function EpisodeDetailsClient({
     return () => {
       alive = false;
     };
-  }, [showId, seasonNumber, episodeNumber]);
+  }, [
+    showId,
+    seasonNumber,
+    episodeNumber,
+    initialScoreboard,
+    parseScoreboardData,
+  ]);
 
   // =========================
   // Rating SOLO Trakt + StarRating
