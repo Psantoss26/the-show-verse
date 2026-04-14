@@ -2241,31 +2241,40 @@ export default function DetailsClient({
   }, [syncTrakt]);
 
   // Recarga el estado de Trakt (visto, rating, historial, watchlist) para el contenido actual
-  const reloadTraktStatus = useCallback(async () => {
-    setTrakt((p) => ({ ...p, loading: true, error: "" }));
+  const reloadTraktStatus = useCallback(async ({ background = false } = {}) => {
+    if (!background) {
+      setTrakt((p) => ({ ...p, loading: true, error: "" }));
+    }
+
     try {
       const json = await withTimeout(
         traktGetItemStatus({ type: traktType, tmdbId: id }),
         25000,
       );
 
-      const nextState = {
-        loading: false,
-        connected: !!json.connected,
-        found: !!json.found,
-        traktId: json.traktId ?? null,
-        traktUrl: json.traktUrl || null,
-        watched: !!json.watched,
-        plays: Number(json.plays || 0),
-        lastWatchedAt: json.lastWatchedAt || null,
-        rating: typeof json.rating === "number" ? json.rating : null,
-        inWatchlist: !!json.inWatchlist,
-        progress: json.progress || null,
-        history: Array.isArray(json.history) ? json.history : [],
-        error: "",
-      };
+      let nextState = null;
+      setTrakt((prev) => {
+        const preserveTvWatched =
+          endpointType === "tv" && watchedBySeasonLoaded;
 
-      setTrakt(nextState);
+        nextState = {
+          ...prev,
+          loading: false,
+          connected: !!json.connected,
+          found: !!json.found,
+          traktId: json.traktId ?? null,
+          traktUrl: json.traktUrl || null,
+          watched: preserveTvWatched ? prev.watched : !!json.watched,
+          plays: Number(json.plays || 0),
+          lastWatchedAt: json.lastWatchedAt || null,
+          rating: typeof json.rating === "number" ? json.rating : null,
+          inWatchlist: !!json.inWatchlist,
+          progress: json.progress || null,
+          history: Array.isArray(json.history) ? json.history : [],
+          error: "",
+        };
+        return nextState;
+      });
       return nextState;
     } catch (e) {
       const isTimeout = e?.message === "Timeout";
@@ -2283,17 +2292,19 @@ export default function DetailsClient({
           ...p,
           loading: false,
           connected: isTransient ? p.connected : false,
-          error: isTimeout
-            ? ""
-            : isRateLimit
-              ? "Trakt: límite de peticiones alcanzado"
-              : e?.message || "Error recargando Trakt",
+          error: background
+            ? p.error
+            : isTimeout
+              ? ""
+              : isRateLimit
+                ? "Trakt: límite de peticiones alcanzado"
+                : e?.message || "Error recargando Trakt",
         };
         return nextState;
       });
       return nextState;
     }
-  }, [traktType, id]);
+  }, [traktType, id, endpointType, watchedBySeasonLoaded]);
 
   // Carga el scoreboard de Trakt (rating de la comunidad y estadisticas de uso)
   // Si ya tenemos datos prefetched con stats numéricas, solo refrescar en background
@@ -2424,7 +2435,7 @@ export default function DetailsClient({
     const timers = [];
 
     const syncTraktState = async () => {
-      const latest = await reloadTraktStatus();
+      const latest = await reloadTraktStatus({ background: true });
       if (cancelled || !latest?.connected || type !== "tv") return;
       await loadTraktShowWatched();
     };
