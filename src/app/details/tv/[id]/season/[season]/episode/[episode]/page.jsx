@@ -1,10 +1,7 @@
 // src/app/details/tv/[id]/season/[season]/episode/[episode]/page.jsx
 import EpisodeDetailsClient from "@/components/EpisodeDetailsClient";
-import {
-  getEpisodeImdbRating,
-  getEpisodeRatings,
-} from "@/lib/api/ratingsHelper";
-import { getTraktScoreboardData } from "@/lib/trakt/scoreboard";
+import { getCachedEpisodeImdbData } from "@/lib/api/ratingsCached";
+import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
 export const revalidate = 3600; // 1h
 
@@ -41,60 +38,40 @@ export default async function EpisodePage({ params }) {
     );
   }
 
-  const scoreboardPromise = getTraktScoreboardData({
+  const showPromise = tmdbFetch(`/tv/${showId}?append_to_response=external_ids`);
+  const episodePromise = tmdbFetch(
+    `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}?append_to_response=credits,external_ids`,
+  );
+
+  const scoreboardPromise = getCachedTraktScoreboardData({
     type: "episode",
     tmdbId: showId,
     season: seasonNumber,
     episode: episodeNumber,
   }).catch(() => null);
 
-  const [show, episode, initialScoreboard] = await Promise.all([
-    tmdbFetch(`/tv/${showId}?append_to_response=external_ids`),
-    tmdbFetch(
-      `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}?append_to_response=credits,external_ids`,
-    ),
+  const imdbPromise = showPromise
+    .then((show) =>
+      getCachedEpisodeImdbData({
+        showId,
+        imdbId: show?.external_ids?.imdb_id || null,
+        seasonNumber,
+        episodeNumber,
+      }),
+    )
+    .catch((e) => {
+      console.error("Error fetching cached episode IMDb:", e);
+      return null;
+    });
+
+  const [show, episode, initialScoreboard, imdb] = await Promise.all([
+    showPromise,
+    episodePromise,
     scoreboardPromise,
+    imdbPromise,
   ]);
 
   const showImdbId = show?.external_ids?.imdb_id || null;
-
-  // Obtener rating IMDb del episodio consultando solo la season requerida
-  let imdb = null;
-  if (showImdbId) {
-    try {
-      imdb = await getEpisodeImdbRating(
-        showImdbId,
-        seasonNumber,
-        episodeNumber,
-      );
-
-      if (!imdb?.rating) {
-        const ratingsData = await getEpisodeRatings(showId, true);
-        const targetSeason = ratingsData?.seasons?.find(
-          (s) => s.seasonNumber === seasonNumber,
-        );
-        const targetEpisode = targetSeason?.episodes?.find(
-          (ep) => ep.episodeNumber === episodeNumber,
-        );
-
-        if (targetEpisode) {
-          imdb = {
-            id: showImdbId,
-            rating:
-              typeof targetEpisode.imdb === "number"
-                ? targetEpisode.imdb
-                : null,
-            votes:
-              typeof targetEpisode.imdbVotes === "number"
-                ? targetEpisode.imdbVotes
-                : null,
-          };
-        }
-      }
-    } catch (e) {
-      console.error("Error fetching episode rating:", e);
-    }
-  }
 
   const imdbUrl = showImdbId
     ? `https://www.imdb.com/title/${showImdbId}/episodes?season=${seasonNumber}`
