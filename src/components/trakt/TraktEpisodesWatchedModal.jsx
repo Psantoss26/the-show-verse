@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Check,
@@ -116,6 +117,7 @@ export default function TraktEpisodesWatchedModal({
 
   onToggleShowWatched, // marcar serie completa (global)
 }) {
+  const router = useRouter();
   const [activeSeason, setActiveSeason] = useState(null);
   const [displaySeason, setDisplaySeason] = useState(null);
   const [onlyUnwatched, setOnlyUnwatched] = useState(false);
@@ -649,6 +651,15 @@ export default function TraktEpisodesWatchedModal({
     }
   };
 
+  const openEpisodeDetails = useCallback(
+    (sn, en) => {
+      if (!tmdbId || mediaType !== "tv") return;
+      onClose?.();
+      router.push(`/details/tv/${tmdbId}/season/${sn}/episode/${en}`);
+    },
+    [router, tmdbId, mediaType, onClose],
+  );
+
   if (!open) return null;
 
   const PanelClass =
@@ -894,7 +905,9 @@ export default function TraktEpisodesWatchedModal({
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-red-500/10 border border-red-500/30 text-red-400 shrink-0">
                         <Tv className="w-3.5 h-3.5" />
                       </span>
-                      <span className="flex-1 text-left truncate">{activeViewLabel}</span>
+                      <span className="flex-1 text-left truncate">
+                        {activeViewLabel}
+                      </span>
                       <ChevronDown
                         className={`w-4 h-4 text-zinc-500 transition-transform ${viewMenuOpen ? "rotate-180" : ""}`}
                       />
@@ -931,8 +944,12 @@ export default function TraktEpisodesWatchedModal({
                                   ) : (
                                     <History className="w-4 h-4 text-emerald-400 shrink-0" />
                                   )}
-                                  <span className="flex-1 truncate">{item.label}</span>
-                                  {active && <Check className="w-4 h-4 shrink-0" />}
+                                  <span className="flex-1 truncate">
+                                    {item.label}
+                                  </span>
+                                  {active && (
+                                    <Check className="w-4 h-4 shrink-0" />
+                                  )}
                                 </button>
                               );
                             })}
@@ -1071,7 +1088,10 @@ export default function TraktEpisodesWatchedModal({
             </div>
 
             {/* Selector de vista */}
-            <div className="relative shrink-0 w-[122px] xl:w-[168px]" data-view-menu="">
+            <div
+              className="relative shrink-0 w-[122px] xl:w-[168px]"
+              data-view-menu=""
+            >
               <button
                 type="button"
                 onClick={() => setViewMenuOpen((v) => !v)}
@@ -1086,7 +1106,9 @@ export default function TraktEpisodesWatchedModal({
                 <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-red-500/10 border border-red-500/30 text-red-400 shrink-0">
                   <Tv className="w-3 h-3" />
                 </span>
-                <span className="flex-1 text-left truncate">{activeViewLabel}</span>
+                <span className="flex-1 text-left truncate">
+                  {activeViewLabel}
+                </span>
                 <ChevronDown
                   className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${viewMenuOpen ? "rotate-180" : ""}`}
                 />
@@ -1123,7 +1145,9 @@ export default function TraktEpisodesWatchedModal({
                             ) : (
                               <History className="w-4 h-4 text-emerald-400 shrink-0" />
                             )}
-                            <span className="flex-1 truncate">{item.label}</span>
+                            <span className="flex-1 truncate">
+                              {item.label}
+                            </span>
                             {active && <Check className="w-4 h-4 shrink-0" />}
                           </button>
                         );
@@ -1402,7 +1426,16 @@ export default function TraktEpisodesWatchedModal({
                       return (
                         <div
                           key={en}
-                          className="group flex gap-3 sm:gap-4 p-2 sm:p-3 rounded-xl bg-zinc-900/30 border border-white/5 hover:bg-zinc-800/50 hover:border-white/10 transition"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => openEpisodeDetails(sn, en)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              openEpisodeDetails(sn, en);
+                            }
+                          }}
+                          className="group flex gap-3 sm:gap-4 p-2 sm:p-3 rounded-xl bg-zinc-900/30 border border-white/5 hover:bg-zinc-800/50 hover:border-white/10 transition cursor-pointer"
                         >
                           <div className="w-24 sm:w-32 aspect-video bg-zinc-800 rounded-lg overflow-hidden shrink-0 relative">
                             {img ? (
@@ -1447,7 +1480,10 @@ export default function TraktEpisodesWatchedModal({
                               <button
                                 type="button"
                                 disabled={busy}
-                                onClick={() => toggleEpisode(sn, en)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleEpisode(sn, en);
+                                }}
                                 className={`p-2 rounded-lg transition shrink-0 ${
                                   watched
                                     ? isRewatchView

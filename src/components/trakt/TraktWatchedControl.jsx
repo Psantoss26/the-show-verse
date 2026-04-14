@@ -10,10 +10,11 @@ export default function TraktWatchedControl({
   plays,
   badge, // permite mostrar texto (ej: "47%") en el badge
   busy,
+  loading = false,
   onOpen,
 }) {
-  // Solo deshabilitar si está ocupado Y conectado (no deshabilitar cuando no está conectado)
-  const disabled = connected && !!busy;
+  // Deshabilitar mientras se está resolviendo el estado o hay una operación en curso
+  const disabled = !!loading || !!busy;
 
   const badgeText =
     typeof badge === "string" && badge.trim().length > 0
@@ -36,11 +37,13 @@ export default function TraktWatchedControl({
         groupId="details-actions"
         className="flex-shrink-0"
         title={
-          !connected
-            ? "Conecta Trakt para usar Vistos"
-            : watched
-              ? "Ver historial de vistos (Trakt)"
-              : "Marcar / gestionar vistos (Trakt)"
+          loading
+            ? "Cargando estado de Trakt..."
+            : !connected
+              ? "Conecta Trakt para usar Vistos"
+              : watched
+                ? "Ver historial de vistos (Trakt)"
+                : "Marcar / gestionar vistos (Trakt)"
         }
       >
         {watched ? <Eye className="w-6 h-6" /> : <EyeOff className="w-6 h-6" />}
