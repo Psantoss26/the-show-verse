@@ -142,7 +142,10 @@ export async function GET(req) {
 
         // ✅ Timeout de 3s por lista para 5 previews
         const previewController = new AbortController();
-        const previewTimeout = setTimeout(() => previewController.abort(), 3000);
+        const previewTimeout = setTimeout(
+          () => previewController.abort(),
+          3000,
+        );
 
         try {
           // ✅ OJO: extended=images (no full,images)

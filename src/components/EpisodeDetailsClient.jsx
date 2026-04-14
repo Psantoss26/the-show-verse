@@ -35,6 +35,12 @@ import {
   formatCountShort,
 } from "@/lib/details/formatters";
 import StarRating from "@/components/StarRating";
+import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
+import {
+  traktGetItemStatus,
+  traktGetShowWatched,
+  traktSetEpisodeWatched,
+} from "@/lib/api/traktClient";
 
 export default function EpisodeDetailsClient({
   showId,
@@ -167,6 +173,16 @@ export default function EpisodeDetailsClient({
   const [ratingLoading, setRatingLoading] = useState(false);
   const [traktConnected, setTraktConnected] = useState(true);
 
+  // Estado de Trakt para watched
+  const [trakt, setTrakt] = useState({
+    loading: true,
+    connected: false,
+    found: false,
+    watched: false,
+    error: "",
+  });
+  const [watchedBusy, setWatchedBusy] = useState(false);
+
   // Cargar rating del usuario (Trakt)
   useEffect(() => {
     let alive = true;
@@ -254,6 +270,103 @@ export default function EpisodeDetailsClient({
     }
     setIsRatingOpen(true);
   }, [traktConnected]);
+
+  // Cargar estado de Trakt para watched
+  useEffect(() => {
+    let ignore = false;
+
+    const load = async () => {
+      setTrakt((p) => ({ ...p, loading: true, error: "" }));
+      try {
+        // Verificar conexión Trakt con el item status de la serie
+        const statusRes = await traktGetItemStatus({
+          type: "show",
+          tmdbId: showId,
+        });
+
+        if (!statusRes.connected) {
+          if (ignore) return;
+          setTrakt({
+            loading: false,
+            connected: false,
+            found: false,
+            watched: false,
+            error: "",
+          });
+          return;
+        }
+
+        // Cargar episodios vistos de la serie
+        const watchedRes = await traktGetShowWatched({ tmdbId: showId });
+        if (ignore) return;
+
+        // Buscar si este episodio específico está visto
+        const episodes = watchedRes?.episodes || {};
+        const seasonKey = `s${seasonNumber}`;
+        const seasonEps = episodes[seasonKey] || [];
+        const isWatched = seasonEps.includes(Number(episodeNumber));
+
+        setTrakt({
+          loading: false,
+          connected: true,
+          found: true,
+          watched: isWatched,
+          error: "",
+        });
+      } catch (e) {
+        if (ignore) return;
+        console.error("Error cargando estado Trakt:", e);
+        setTrakt({
+          loading: false,
+          connected: false,
+          found: false,
+          watched: false,
+          error: e?.message || "Error",
+        });
+      }
+    };
+
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, [showId, seasonNumber, episodeNumber]);
+
+  // Toggle watched para el episodio
+  const toggleEpisodeWatched = useCallback(async () => {
+    if (!trakt.connected) {
+      window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
+      return;
+    }
+
+    if (watchedBusy) return;
+
+    const newWatched = !trakt.watched;
+    setWatchedBusy(true);
+
+    try {
+      await traktSetEpisodeWatched({
+        tmdbId: showId,
+        season: seasonNumber,
+        episode: episodeNumber,
+        watched: newWatched,
+      });
+
+      setTrakt((p) => ({ ...p, watched: newWatched }));
+    } catch (e) {
+      console.error("Error al marcar episodio:", e);
+      // Podrías mostrar un toast o notificación aquí
+    } finally {
+      setWatchedBusy(false);
+    }
+  }, [
+    trakt.connected,
+    trakt.watched,
+    watchedBusy,
+    showId,
+    seasonNumber,
+    episodeNumber,
+  ]);
 
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
@@ -433,6 +546,19 @@ export default function EpisodeDetailsClient({
                 <div className="w-px h-6 bg-white/10 shrink-0" />
 
                 <div className="flex items-center gap-3 shrink-0">
+                  {/* Botón de visionado */}
+                  {!trakt.loading && (
+                    <TraktWatchedControl
+                      connected={trakt.connected}
+                      watched={trakt.watched}
+                      plays={null}
+                      badge={null}
+                      busy={watchedBusy}
+                      onOpen={toggleEpisodeWatched}
+                    />
+                  )}
+
+                  {/* Botón de rating */}
                   <StarRating
                     open={isRatingOpen}
                     rating={userRating}
@@ -567,13 +693,17 @@ export default function EpisodeDetailsClient({
 
         {/* === ESTILOS PARA SSR SWIPER FIX (EVITAR SALTOS) === */}
         {!isMounted && (
-          <style dangerouslySetInnerHTML={{ __html: `
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
             .ssr-swiper-fix .swiper-slide { width: calc(33.333% - 8px) !important; margin-right: 12px !important; display: block; }
             @media (min-width: 500px) { .ssr-swiper-fix .swiper-slide { width: calc(33.333% - 9.33px) !important; margin-right: 14px !important; } }
             @media (min-width: 768px) { .ssr-swiper-fix .swiper-slide { width: calc(25% - 12px) !important; margin-right: 16px !important; } }
             @media (min-width: 1024px) { .ssr-swiper-fix .swiper-slide { width: calc(20% - 14.4px) !important; margin-right: 18px !important; } }
             @media (min-width: 1280px) { .ssr-swiper-fix .swiper-slide { width: calc(16.666% - 16.67px) !important; margin-right: 20px !important; } }
-          ` }} />
+          `,
+            }}
+          />
         )}
 
         {/* === Reparto del episodio === */}
