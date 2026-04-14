@@ -1945,8 +1945,21 @@ export default function DetailsClient({
     },
   };
 
+  const hasNumericScoreboardStats = (stats) =>
+    Object.values(stats || {}).some((v) => typeof v === "number");
+
+  const initialParsedScoreboard = useMemo(
+    () => parseScoreboardData(initialScoreboard),
+    [initialScoreboard],
+  );
+
   const [tScoreboard, setTScoreboard] = useState(
-    () => parseScoreboardData(initialScoreboard) || defaultScoreboard,
+    () => initialParsedScoreboard || defaultScoreboard,
+  );
+  const [traktDeferredReady, setTraktDeferredReady] = useState(
+    () =>
+      !!initialParsedScoreboard?.found &&
+      hasNumericScoreboardStats(initialParsedScoreboard?.stats),
   );
 
   // Clave especial para indicar que una accion afecta al show completo (no un episodio)
@@ -1995,6 +2008,26 @@ export default function DetailsClient({
     total: 0,
   });
 
+  useEffect(() => {
+    setTScoreboard(initialParsedScoreboard || defaultScoreboard);
+
+    const hasPrefetchedScoreboard =
+      !!initialParsedScoreboard?.found &&
+      hasNumericScoreboardStats(initialParsedScoreboard?.stats);
+
+    setTraktDeferredReady(hasPrefetchedScoreboard);
+  }, [id, initialParsedScoreboard]);
+
+  useEffect(() => {
+    if (traktDeferredReady || tScoreboard.loading) return;
+
+    const timer = window.setTimeout(() => {
+      setTraktDeferredReady(true);
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [traktDeferredReady, tScoreboard.loading]);
+
   // Resetear todos los datos de la comunidad de Trakt al cambiar de contenido
   useEffect(() => {
     setTSentiment({
@@ -2030,6 +2063,8 @@ export default function DetailsClient({
   // Cuando carga likes (sort=likes, limit=50), también computa el análisis de sentimiento
   // para evitar una segunda petición duplicada al mismo endpoint.
   useEffect(() => {
+    if (!traktDeferredReady) return;
+
     let ignore = false;
 
     const load = async () => {
@@ -2113,7 +2148,7 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, traktType, tCommentsTab, tComments.page]);
+  }, [id, traktType, tCommentsTab, tComments.page, traktDeferredReady]);
 
   // Resetear paginacion de comentarios al cambiar de pestana
   useEffect(() => {
@@ -2128,6 +2163,8 @@ export default function DetailsClient({
 
   // Carga las temporadas de la serie desde Trakt (con datos extendidos)
   useEffect(() => {
+    if (!traktDeferredReady) return;
+
     let ignore = false;
     const load = async () => {
       if (type !== "tv") return;
@@ -2160,11 +2197,13 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, type]);
+  }, [id, type, traktDeferredReady]);
 
   // Carga las listas de Trakt que contienen este contenido (popular o trending)
   // ⏱️ OPTIMIZACIÓN: Cargar DESPUÉS de scoreboard y stats (menor prioridad)
   useEffect(() => {
+    if (!traktDeferredReady) return;
+
     let ignore = false;
     let timeoutId = null;
 
@@ -2213,16 +2252,16 @@ export default function DetailsClient({
       }
     };
 
-    // ⏱️ Delay de 1.5 segundos para dar prioridad a scoreboard y stats
+    // ⏱️ Delay adicional para dejar que scoreboard y stats se asienten primero
     timeoutId = setTimeout(() => {
       load();
-    }, 1500);
+    }, 900);
 
     return () => {
       ignore = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [id, traktType, tListsTab, tLists.page]);
+  }, [id, traktType, tListsTab, tLists.page, traktDeferredReady]);
 
   // Resetear paginacion de listas al cambiar de pestana
   useEffect(() => {
@@ -2328,13 +2367,14 @@ export default function DetailsClient({
   useEffect(() => {
     let ignore = false;
 
-    const hasNumericStats = (st) =>
-      Object.values(st || {}).some((v) => typeof v === "number");
+    const hasNumericStats = hasNumericScoreboardStats;
 
     const load = async () => {
       // Si ya tenemos datos completos del prefetch, guardar en cache y no bloquear
       const prefetched = parseScoreboardData(initialScoreboard);
       if (prefetched?.found && hasNumericStats(prefetched.stats)) {
+        setTScoreboard(prefetched);
+        setTraktDeferredReady(true);
         // Guardar prefetch en localStorage para futuras visitas
         try {
           const cacheKey = `tsb_${traktType}_${id}`;
@@ -2443,10 +2483,13 @@ export default function DetailsClient({
   // Carga inicial del estado de Trakt para el contenido actual
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
+    if (!traktDeferredReady) return;
     void reloadTraktStatus();
-  }, [reloadTraktStatus]);
+  }, [reloadTraktStatus, traktDeferredReady]);
 
   useEffect(() => {
+    if (!traktDeferredReady) return;
+
     let cancelled = false;
     const timers = [];
 
@@ -2491,6 +2534,7 @@ export default function DetailsClient({
     trakt.loading,
     trakt.connected,
     trakt.error,
+    traktDeferredReady,
   ]);
 
   const handleOpenTraktWatched = useCallback(async () => {
@@ -2526,8 +2570,9 @@ export default function DetailsClient({
 
   // Trigger para cargar episodios vistos cuando cambian las dependencias
   useEffect(() => {
+    if (!traktDeferredReady) return;
     loadTraktShowWatched();
-  }, [loadTraktShowWatched]);
+  }, [loadTraktShowWatched, traktDeferredReady]);
 
   /**
    * Carga los plays (visionados completos) de la serie desde Trakt.

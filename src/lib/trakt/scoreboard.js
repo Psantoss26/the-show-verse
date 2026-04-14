@@ -4,6 +4,70 @@ import {
   normalizeType,
 } from "@/lib/trakt/fetchWithCache";
 
+const EMPTY_STATS = {
+  watchers: null,
+  plays: null,
+  collectors: null,
+  comments: null,
+  lists: null,
+  favorited: null,
+};
+
+function shapeStats(stats) {
+  if (!stats) return EMPTY_STATS;
+  return {
+    watchers: typeof stats?.watchers === "number" ? stats.watchers : null,
+    plays: typeof stats?.plays === "number" ? stats.plays : null,
+    collectors: typeof stats?.collectors === "number" ? stats.collectors : null,
+    comments: typeof stats?.comments === "number" ? stats.comments : null,
+    lists: typeof stats?.lists === "number" ? stats.lists : null,
+    favorited: typeof stats?.favorited === "number" ? stats.favorited : null,
+  };
+}
+
+async function fetchOptionalStats(paths, fetcher, budgetMs = 1500) {
+  const validPaths = (Array.isArray(paths) ? paths : []).filter(Boolean);
+  if (!validPaths.length) return null;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let pending = validPaths.length;
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(null);
+    }, budgetMs);
+
+    for (const path of validPaths) {
+      fetcher(path)
+        .then((result) => {
+          if (settled) return;
+          if (result) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(result);
+            return;
+          }
+          pending -= 1;
+          if (pending === 0) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(null);
+          }
+        })
+        .catch(() => {
+          pending -= 1;
+          if (!settled && pending === 0) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(null);
+          }
+        });
+    }
+  });
+}
+
 export async function getTraktScoreboardData({
   type,
   tmdbId,
@@ -19,8 +83,8 @@ export async function getTraktScoreboardData({
     throw err;
   }
 
-  const fastTimeoutMs = process.env.NODE_ENV === "production" ? 8000 : 6000;
-  const statsTimeoutMs = process.env.NODE_ENV === "production" ? 10000 : 10000;
+  const fastTimeoutMs = process.env.NODE_ENV === "production" ? 5000 : 4000;
+  const statsTimeoutMs = process.env.NODE_ENV === "production" ? 12000 : 10000;
 
   const ft = (path) => fetchTrakt(path, { timeoutMs: fastTimeoutMs });
   const ftStats = (path) =>
@@ -39,10 +103,12 @@ export async function getTraktScoreboardData({
     if (!ids?.trakt) return { found: false };
 
     const traktId = ids.trakt;
-    const [summary, stats] = await Promise.all([
-      ft(`/${plural}/${traktId}`),
-      ftStats(`/${plural}/${traktId}/stats`),
-    ]);
+    const summary = await ft(`/${plural}/${traktId}`);
+    const stats = await fetchOptionalStats(
+      [`/${plural}/${traktId}/stats`],
+      ftStats,
+      1500,
+    );
 
     const slug = summary?.ids?.slug || ids?.slug || traktId;
     const traktUrl =
@@ -58,16 +124,7 @@ export async function getTraktScoreboardData({
         rating: typeof summary?.rating === "number" ? summary.rating : null,
         votes: typeof summary?.votes === "number" ? summary.votes : null,
       },
-      stats: {
-        watchers: typeof stats?.watchers === "number" ? stats.watchers : null,
-        plays: typeof stats?.plays === "number" ? stats.plays : null,
-        collectors:
-          typeof stats?.collectors === "number" ? stats.collectors : null,
-        comments: typeof stats?.comments === "number" ? stats.comments : null,
-        lists: typeof stats?.lists === "number" ? stats.lists : null,
-        favorited:
-          typeof stats?.favorited === "number" ? stats.favorited : null,
-      },
+      stats: shapeStats(stats),
       external: {
         rtAudience: null,
         justwatchRank: null,
@@ -112,9 +169,14 @@ export async function getTraktScoreboardData({
     const seasonIds = seasonObj.ids;
     const traktUrl = `https://trakt.tv/shows/${showSlug}/seasons/${seasonNumber}`;
 
-    const stats =
-      (await ftStats(`/shows/${traktShowId}/seasons/${seasonNumber}/stats`)) ||
-      null;
+    const stats = await fetchOptionalStats(
+      [
+        `/seasons/${seasonIds.trakt}/stats`,
+        `/shows/${traktShowId}/seasons/${seasonNumber}/stats`,
+      ],
+      ftStats,
+      1500,
+    );
 
     return {
       found: true,
@@ -124,27 +186,7 @@ export async function getTraktScoreboardData({
         rating: typeof seasonObj?.rating === "number" ? seasonObj.rating : null,
         votes: typeof seasonObj?.votes === "number" ? seasonObj.votes : null,
       },
-      stats: stats
-        ? {
-            watchers:
-              typeof stats?.watchers === "number" ? stats.watchers : null,
-            plays: typeof stats?.plays === "number" ? stats.plays : null,
-            collectors:
-              typeof stats?.collectors === "number" ? stats.collectors : null,
-            comments:
-              typeof stats?.comments === "number" ? stats.comments : null,
-            lists: typeof stats?.lists === "number" ? stats.lists : null,
-            favorited:
-              typeof stats?.favorited === "number" ? stats.favorited : null,
-          }
-        : {
-            watchers: null,
-            plays: null,
-            collectors: null,
-            comments: null,
-            lists: null,
-            favorited: null,
-          },
+      stats: shapeStats(stats),
       external: {
         rtAudience: null,
         justwatchRank: null,
@@ -161,10 +203,14 @@ export async function getTraktScoreboardData({
   if (!epIds?.trakt) return { found: false };
 
   const traktUrl = `https://trakt.tv/shows/${showSlug}/seasons/${seasonNumber}/episodes/${episodeNumber}`;
-  const stats =
-    (await ftStats(
+  const stats = await fetchOptionalStats(
+    [
+      `/episodes/${epIds.trakt}/stats`,
       `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
-    )) || null;
+    ],
+    ftStats,
+    1500,
+  );
 
   return {
     found: true,
@@ -174,26 +220,7 @@ export async function getTraktScoreboardData({
       rating: typeof ep?.rating === "number" ? ep.rating : null,
       votes: typeof ep?.votes === "number" ? ep.votes : null,
     },
-    stats: stats
-      ? {
-          watchers: typeof stats?.watchers === "number" ? stats.watchers : null,
-          plays: typeof stats?.plays === "number" ? stats.plays : null,
-          collectors:
-            typeof stats?.collectors === "number" ? stats.collectors : null,
-          comments:
-            typeof stats?.comments === "number" ? stats.comments : null,
-          lists: typeof stats?.lists === "number" ? stats.lists : null,
-          favorited:
-            typeof stats?.favorited === "number" ? stats.favorited : null,
-        }
-      : {
-          watchers: null,
-          plays: null,
-          collectors: null,
-          comments: null,
-          lists: null,
-          favorited: null,
-        },
+    stats: shapeStats(stats),
     external: {
       rtAudience: null,
       justwatchRank: null,
