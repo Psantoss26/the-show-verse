@@ -1436,32 +1436,29 @@ const HistoryItemCard = memo(function HistoryItemCard({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/95 z-20 flex items-center justify-end px-4 gap-3 rounded-xl"
+            className="absolute inset-0 bg-black/95 z-20 flex items-center justify-center px-3 gap-2 rounded-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <span className="text-red-200 text-xs lg:text-sm font-bold mr-auto">
-              <span className="lg:hidden">Eliminar</span>
-              <span className="hidden lg:inline">¿Eliminar del historial?</span>
+            <span className="text-red-200 text-[10px] sm:text-xs lg:text-sm font-bold tracking-wide">
+              ¿Eliminar?
             </span>
             <button
               onClick={handleCancel}
-              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold transition-colors flex items-center gap-1.5"
+              className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
               aria-label="Cancelar"
             >
-              <X className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Cancelar</span>
+              <X className="w-4 h-4" />
             </button>
             <button
               onClick={handleConfirm}
-              className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
+              className="p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
               aria-label="Borrar"
             >
               {busy ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
               )}
-              <span className="hidden lg:inline">Borrar</span>
             </button>
           </motion.div>
         )}
@@ -1632,30 +1629,27 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
             className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-3 text-center pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-red-200 text-[11px] lg:text-xs font-bold mb-3">
-              <span className="lg:hidden">Eliminar</span>
-              <span className="hidden lg:inline">¿Eliminar del historial?</span>
+            <p className="text-red-200 text-[11px] sm:text-xs lg:text-sm font-bold mb-2.5 tracking-wide">
+              ¿Eliminar del historial?
             </p>
             <div className="flex gap-2 w-full">
               <button
                 onClick={handleCancel}
-                className="flex-1 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold transition-colors flex items-center justify-center gap-1"
+                className="flex-1 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
                 aria-label="Cancelar"
               >
-                <X className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">Cancelar</span>
+                <X className="w-4 h-4" />
               </button>
               <button
                 onClick={handleConfirm}
-                className="flex-1 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                className="flex-1 p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
                 aria-label="Borrar"
               >
                 {busy ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 )}
-                <span className="hidden lg:inline">Borrar</span>
               </button>
             </div>
           </motion.div>
@@ -1867,30 +1861,27 @@ const HistoryGridCard = memo(function HistoryGridCard({
             className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-4 text-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-red-200 text-xs lg:text-sm font-bold mb-3">
-              <span className="lg:hidden">Eliminar</span>
-              <span className="hidden lg:inline">¿Eliminar del historial?</span>
+            <p className="text-red-200 text-xs sm:text-sm lg:text-base font-bold mb-3 tracking-wide">
+              ¿Eliminar del historial?
             </p>
             <div className="flex gap-2 w-full">
               <button
                 onClick={handleCancel}
-                className="flex-1 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                className="flex-1 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
                 aria-label="Cancelar"
               >
-                <X className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">Cancelar</span>
+                <X className="w-4 h-4" />
               </button>
               <button
                 onClick={handleConfirm}
-                className="flex-1 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                className="flex-1 p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
                 aria-label="Borrar"
               >
                 {busy ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 )}
-                <span className="hidden lg:inline">Borrar</span>
               </button>
             </div>
           </motion.div>
