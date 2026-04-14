@@ -8196,7 +8196,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     >
                       {collectionData.items.map((m) => (
                         <SwiperSlide key={m.id}>
-                          <a
+                          <Link
                             href={`/details/movie/${m.id}`}
                             className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                             title={m.title}
@@ -8228,7 +8228,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 ) : null}
                               </div>
                             </div>
-                          </a>
+                          </Link>
                         </SwiperSlide>
                       ))}
                     </Swiper>
@@ -8259,7 +8259,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   >
                     {castDataForUI.slice(0, 20).map((actor) => (
                       <SwiperSlide key={actor.id}>
-                        <a
+                        <Link
                           href={`/details/person/${actor.id}`}
                           className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                         >
@@ -8287,7 +8287,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </p>
                             </div>
                           </div>
-                        </a>
+                        </Link>
                       </SwiperSlide>
                     ))}
                   </Swiper>
@@ -8333,7 +8333,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                       return (
                         <SwiperSlide key={rec.id}>
-                          <a
+                          <Link
                             href={`/details/${rec.media_type || type}/${rec.id}`}
                             className="block group"
                             onMouseEnter={() => prefetchRecImdb(rec)}
@@ -8409,7 +8409,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 </div>
                               </div>
                             </div>
-                          </a>
+                          </Link>
                         </SwiperSlide>
                       );
                     })}

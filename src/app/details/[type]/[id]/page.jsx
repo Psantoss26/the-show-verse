@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
-import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
 export const revalidate = 600;
 
@@ -14,10 +13,7 @@ export default async function DetailsPage({ params }) {
     notFound();
   }
 
-  const [data, initialScoreboard] = await Promise.all([
-    getDetails(type, id),
-    getCachedTraktScoreboardData({ type, tmdbId: id }).catch(() => null),
-  ]);
+  const data = await getDetails(type, id);
 
   if (!data) {
     notFound();
@@ -28,7 +24,6 @@ export default async function DetailsPage({ params }) {
       type={type}
       id={id}
       data={data}
-      initialScoreboard={initialScoreboard}
     />
   );
 }
