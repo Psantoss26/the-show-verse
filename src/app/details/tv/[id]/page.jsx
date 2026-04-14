@@ -17,7 +17,7 @@ export default async function TvDetailsPage({ params }) {
     getCachedTraktScoreboardData({ type: "show", tmdbId: id }).catch(
       () => null,
     ),
-    new Promise((resolve) => setTimeout(() => resolve(null), 1800)),
+    new Promise((resolve) => setTimeout(() => resolve(null), 3200)),
   ]);
 
   const [data, initialScoreboard] = await Promise.all([

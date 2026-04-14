@@ -1,84 +1,59 @@
 import { NextResponse } from "next/server";
-import { getTraktScoreboardData } from "@/lib/trakt/scoreboard";
+import { normalizeType } from "@/lib/trakt/fetchWithCache";
+import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 30; // Vercel: aumentado para dar más margen en producción
+export const revalidate = 1800;
+export const maxDuration = 15;
+
+const cacheHeaders = {
+  "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=3600",
+};
 
 export async function GET(req) {
-  const cacheHeaders = {
-    "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=3600",
-  };
-
   try {
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type");
+    const type = normalizeType(searchParams.get("type"));
     const tmdbId = searchParams.get("tmdbId");
     const season = searchParams.get("season");
     const episode = searchParams.get("episode");
 
-    const data = await getTraktScoreboardData({
+    if (!type || !tmdbId) {
+      return NextResponse.json(
+        { found: false, error: "Missing type/tmdbId" },
+        { status: 400, headers: cacheHeaders },
+      );
+    }
+
+    const result = await getCachedTraktScoreboardData({
       type,
       tmdbId,
-      season,
-      episode,
+      season: season ?? undefined,
+      episode: episode ?? undefined,
     });
-    return NextResponse.json(data, { headers: cacheHeaders });
+
+    return NextResponse.json(result || { found: false }, {
+      headers: cacheHeaders,
+    });
   } catch (e) {
-    const isTimeout =
+    const isRecoverable =
       e?.isTimeout ||
-      e?.message?.includes("timeout") ||
-      e?.name === "AbortError";
-    const isRateLimit =
-      e?.status === 429 || /rate limit/i.test(e?.message || "");
-    const isMissingEnv = e?.message?.includes("TRAKT_CLIENT_ID");
-    const isNotFound = e?.status === 404;
-    const isServerError = e?.status >= 500 && e?.status < 600;
+      e?.status === 429 ||
+      e?.name === "AbortError" ||
+      (e?.status >= 500 && e?.status < 600) ||
+      /timeout|rate limit/i.test(e?.message || "");
 
-    // Log detallado del error para debugging
-    console.error("❌ [Trakt Scoreboard] Error:", {
-      message: e?.message,
-      status: e?.status,
-      path: e?.path,
-      type: e?.name,
-      isTimeout,
-      isRateLimit,
-      isMissingEnv,
-      isNotFound,
-      stack: e?.stack?.split("\n").slice(0, 3).join("\n"),
-    });
-
-    // Degradación graciosa: timeouts, rate limits, errores 500
-    if (isTimeout || isRateLimit || isServerError) {
-      console.warn(
-        "⚠️ [Trakt Scoreboard] Unavailable (degradación graciosa):",
-        e.message,
-      );
-      return NextResponse.json({ found: false });
+    if (isRecoverable) {
+      return NextResponse.json({ found: false }, { headers: cacheHeaders });
     }
 
-    // Variable de entorno faltante: error crítico
-    if (isMissingEnv) {
-      console.error(
-        "❌ CRÍTICO: Variable de entorno TRAKT_CLIENT_ID no configurada en producción",
-      );
-      return NextResponse.json(
-        {
-          error: "Server configuration error",
-          found: false,
-        },
-        { status: 500 },
-      );
-    }
-
-    // 404: el contenido no existe en Trakt (normal)
-    if (isNotFound) {
-      console.log("ℹ️ [Trakt Scoreboard] Content not found in Trakt");
-      return NextResponse.json({ found: false });
-    }
-
-    // Otros errores: devolver found=false para no romper la UI
-    console.error("❌ [Trakt Scoreboard] Unexpected error:", e.message);
-    return NextResponse.json({ found: false });
+    return NextResponse.json(
+      {
+        found: false,
+        error: e?.message || "Unexpected error",
+      },
+      { status: 500, headers: cacheHeaders },
+    );
   }
 }

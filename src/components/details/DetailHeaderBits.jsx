@@ -16,6 +16,7 @@ export function CompactBadge({
   className = "",
   hideSubOnMobile = false,
   logoClassName = "",
+  animateOnMount = true,
 }) {
   const MotionComp = href ? motion.a : onClick ? motion.button : motion.div;
   const isInteractive = !!(href || onClick);
@@ -27,10 +28,14 @@ export function CompactBadge({
       target={href ? "_blank" : undefined}
       rel={href ? "noopener noreferrer" : undefined}
       type={onClick && !href ? "button" : undefined}
-      initial={{ opacity: 0, y: 6, scale: 0.99 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      initial={animateOnMount ? { opacity: 0, y: 6, scale: 0.99 } : false}
+      animate={animateOnMount ? { opacity: 1, y: 0, scale: 1 } : undefined}
       whileHover={isInteractive ? { y: -1 } : undefined}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      transition={
+        animateOnMount
+          ? { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
+          : undefined
+      }
       className={`
         flex items-center gap-2.5 group select-none min-w-0
         ${isInteractive ? "cursor-pointer" : ""}
