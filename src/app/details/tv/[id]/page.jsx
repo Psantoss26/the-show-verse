@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
-import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
 export const revalidate = 600;
 
@@ -13,28 +12,11 @@ export default async function TvDetailsPage({ params }) {
     notFound();
   }
 
-  const initialScoreboardPromise = Promise.race([
-    getCachedTraktScoreboardData({ type: "show", tmdbId: id }).catch(
-      () => null,
-    ),
-    new Promise((resolve) => setTimeout(() => resolve(null), 3200)),
-  ]);
-
-  const [data, initialScoreboard] = await Promise.all([
-    getDetails("tv", id),
-    initialScoreboardPromise,
-  ]);
+  const data = await getDetails("tv", id);
 
   if (!data) {
     notFound();
   }
 
-  return (
-    <DetailsPageLoader
-      type="tv"
-      id={id}
-      data={data}
-      initialScoreboard={initialScoreboard}
-    />
-  );
+  return <DetailsPageLoader type="tv" id={id} data={data} />;
 }
