@@ -1754,7 +1754,7 @@ export default function DetailsClient({
 
   // Estado principal de Trakt para este contenido
   const [trakt, setTrakt] = useState({
-    loading: false,
+    loading: true,
     connected: false,
     found: false,
     traktId: null,
@@ -2241,17 +2241,19 @@ export default function DetailsClient({
   }, [syncTrakt]);
 
   // Recarga el estado de Trakt (visto, rating, historial, watchlist) para el contenido actual
-  const reloadTraktStatus = async () => {
+  const reloadTraktStatus = useCallback(async () => {
     setTrakt((p) => ({ ...p, loading: true, error: "" }));
     try {
       const json = await withTimeout(
         traktGetItemStatus({ type: traktType, tmdbId: id }),
         25000,
       );
-      setTrakt({
+
+      const nextState = {
         loading: false,
         connected: !!json.connected,
         found: !!json.found,
+        traktId: json.traktId ?? null,
         traktUrl: json.traktUrl || null,
         watched: !!json.watched,
         plays: Number(json.plays || 0),
@@ -2261,21 +2263,37 @@ export default function DetailsClient({
         progress: json.progress || null,
         history: Array.isArray(json.history) ? json.history : [],
         error: "",
-      });
+      };
+
+      setTrakt(nextState);
+      return nextState;
     } catch (e) {
       const isTimeout = e?.message === "Timeout";
-      const isRateLimit = /rate limit/i.test(e?.message || "");
-      setTrakt((p) => ({
-        ...p,
-        loading: false,
-        error: isTimeout
-          ? ""
-          : isRateLimit
-            ? "Trakt: límite de peticiones alcanzado"
-            : e?.message || "Error recargando Trakt",
-      }));
+      const isRateLimit = /rate limit|temporalmente no disponible/i.test(
+        e?.message || "",
+      );
+      const isTransient =
+        isTimeout ||
+        isRateLimit ||
+        /aborted|fetch|network|server error/i.test(e?.message || "");
+
+      let nextState = null;
+      setTrakt((p) => {
+        nextState = {
+          ...p,
+          loading: false,
+          connected: isTransient ? p.connected : false,
+          error: isTimeout
+            ? ""
+            : isRateLimit
+              ? "Trakt: límite de peticiones alcanzado"
+              : e?.message || "Error recargando Trakt",
+        };
+        return nextState;
+      });
+      return nextState;
     }
-  };
+  }, [traktType, id]);
 
   // Carga el scoreboard de Trakt (rating de la comunidad y estadisticas de uso)
   // Si ya tenemos datos prefetched con stats numéricas, solo refrescar en background
@@ -2392,62 +2410,45 @@ export default function DetailsClient({
   // Recargar estado de Trakt al abrir el modal de historial
   useEffect(() => {
     if (!traktWatchedOpen) return;
-    reloadTraktStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traktWatchedOpen]);
+    void reloadTraktStatus();
+  }, [traktWatchedOpen, reloadTraktStatus]);
 
   // Carga inicial del estado de Trakt para el contenido actual
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
-    let ignore = false;
+    void reloadTraktStatus();
+  }, [reloadTraktStatus]);
 
-    const load = async () => {
-      setTrakt((p) => ({ ...p, loading: true, error: "" }));
-      try {
-        // Timeout generoso para estado de Trakt (primera carga puede tardar ~20s)
-        const json = await withTimeout(
-          traktGetItemStatus({ type: traktType, tmdbId: id }),
-          25000,
-        );
-        if (ignore) return;
+  const handleOpenTraktWatched = useCallback(async () => {
+    if (trakt.loading || traktBusy) return;
 
-        setTrakt({
-          loading: false,
-          connected: !!json.connected,
-          found: !!json.found,
-          traktId: json.traktId ?? null,
-          traktUrl: json.traktUrl || null,
-          watched: !!json.watched,
-          plays: Number(json.plays || 0),
-          lastWatchedAt: json.lastWatchedAt || null,
-          rating: typeof json.rating === "number" ? json.rating : null, // si no usas rating, pon null
-          inWatchlist: !!json.inWatchlist,
-          progress: json.progress || null,
-          history: Array.isArray(json.history) ? json.history : [],
-          error: "",
-        });
-      } catch (e) {
-        if (ignore) return;
-        // Si es timeout o rate limit, no bloquear la UI
-        const isTimeout = e?.message === "Timeout";
-        const isRateLimit = /rate limit/i.test(e?.message || "");
-        setTrakt((p) => ({
-          ...p,
-          loading: false,
-          error: isTimeout
-            ? ""
-            : isRateLimit
-              ? "Trakt: límite de peticiones alcanzado, inténtalo en unos segundos"
-              : e?.message || "Error cargando Trakt",
-        }));
-      }
-    };
+    let connected = !!trakt.connected;
+    if (!connected) {
+      const latest = await reloadTraktStatus();
+      connected = !!latest?.connected;
+    }
 
-    load();
-    return () => {
-      ignore = true;
-    };
-  }, [id, traktType]);
+    if (!connected) {
+      window.location.assign(
+        `/api/trakt/auth/start?next=/details/${type}/${id}`,
+      );
+      return;
+    }
+
+    if (endpointType === "tv") {
+      setTraktEpisodesOpen(true);
+    } else {
+      setTraktWatchedOpen(true);
+    }
+  }, [
+    trakt.loading,
+    traktBusy,
+    trakt.connected,
+    reloadTraktStatus,
+    type,
+    id,
+    endpointType,
+  ]);
 
   // Trigger para cargar episodios vistos cuando cambian las dependencias
   useEffect(() => {
@@ -5842,17 +5843,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 plays={endpointType === "tv" ? 0 : trakt.plays}
                 badge={endpointType === "tv" ? tvProgressBadge : null}
                 busy={!!traktBusy}
-                onOpen={() => {
-                  if (!trakt.connected) {
-                    window.location.assign(
-                      `/api/trakt/auth/start?next=/details/${type}/${id}`,
-                    );
-                  } else if (endpointType === "tv") {
-                    setTraktEpisodesOpen(true);
-                  } else {
-                    setTraktWatchedOpen(true);
-                  }
-                }}
+                loading={trakt.loading}
+                onOpen={handleOpenTraktWatched}
               />
 
               {/* Componente de puntuación con estrellas - Rating unificado TMDb + Trakt */}

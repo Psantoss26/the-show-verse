@@ -271,98 +271,134 @@ export default function EpisodeDetailsClient({
     setIsRatingOpen(true);
   }, [traktConnected]);
 
-  // Cargar estado de Trakt para watched
-  useEffect(() => {
-    let ignore = false;
+  const reloadEpisodeTraktState = useCallback(async () => {
+    setTrakt((p) => ({ ...p, loading: true, error: "" }));
+    try {
+      const statusRes = await traktGetItemStatus({
+        type: "show",
+        tmdbId: Number(showId),
+      });
 
-    const load = async () => {
-      setTrakt((p) => ({ ...p, loading: true, error: "" }));
-      try {
-        // Verificar conexión Trakt con el item status de la serie
-        const statusRes = await traktGetItemStatus({
-          type: "show",
-          tmdbId: showId,
-        });
-
-        if (!statusRes.connected) {
-          if (ignore) return;
-          setTrakt({
-            loading: false,
-            connected: false,
-            found: false,
-            watched: false,
-            error: "",
-          });
-          return;
-        }
-
-        // Cargar episodios vistos de la serie
-        const watchedRes = await traktGetShowWatched({ tmdbId: showId });
-        if (ignore) return;
-
-        // Buscar si este episodio específico está visto
-        const episodes = watchedRes?.episodes || {};
-        const seasonKey = `s${seasonNumber}`;
-        const seasonEps = episodes[seasonKey] || [];
-        const isWatched = seasonEps.includes(Number(episodeNumber));
-
-        setTrakt({
-          loading: false,
-          connected: true,
-          found: true,
-          watched: isWatched,
-          error: "",
-        });
-      } catch (e) {
-        if (ignore) return;
-        console.error("Error cargando estado Trakt:", e);
-        setTrakt({
+      if (!statusRes?.connected) {
+        const nextState = {
           loading: false,
           connected: false,
           found: false,
           watched: false,
-          error: e?.message || "Error",
-        });
+          error: "",
+        };
+        setTrakt(nextState);
+        setTraktConnected(false);
+        return nextState;
       }
-    };
 
-    load();
-    return () => {
-      ignore = true;
-    };
+      setTraktConnected(true);
+
+      const watchedRes = await traktGetShowWatched({ tmdbId: Number(showId) });
+      const watchedBySeason = watchedRes?.watchedBySeason || {};
+      const seasonEps =
+        watchedBySeason?.[Number(seasonNumber)] ||
+        watchedBySeason?.[String(Number(seasonNumber))] ||
+        [];
+      const isWatched =
+        Array.isArray(seasonEps) && seasonEps.includes(Number(episodeNumber));
+
+      const nextState = {
+        loading: false,
+        connected: true,
+        found: watchedRes?.found !== false,
+        watched: isWatched,
+        error: "",
+      };
+
+      setTrakt(nextState);
+      return nextState;
+    } catch (e) {
+      console.error("Error cargando estado Trakt:", e);
+      const isTransient =
+        /timeout|rate limit|tempor|aborted|fetch|network/i.test(
+          e?.message || "",
+        );
+
+      let nextState = null;
+      setTrakt((prev) => {
+        nextState = {
+          ...prev,
+          loading: false,
+          connected: isTransient ? prev.connected : false,
+          error: isTransient ? "" : e?.message || "Error",
+        };
+        return nextState;
+      });
+
+      if (!isTransient) setTraktConnected(false);
+      return nextState;
+    }
   }, [showId, seasonNumber, episodeNumber]);
+
+  useEffect(() => {
+    void reloadEpisodeTraktState();
+  }, [reloadEpisodeTraktState]);
 
   // Toggle watched para el episodio
   const toggleEpisodeWatched = useCallback(async () => {
-    if (!trakt.connected) {
+    if (trakt.loading || watchedBusy) return;
+
+    let connected = !!trakt.connected;
+    if (!connected) {
+      const latest = await reloadEpisodeTraktState();
+      connected = !!latest?.connected;
+    }
+
+    if (!connected) {
       window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
       return;
     }
-
-    if (watchedBusy) return;
 
     const newWatched = !trakt.watched;
     setWatchedBusy(true);
 
     try {
-      await traktSetEpisodeWatched({
-        tmdbId: showId,
-        season: seasonNumber,
-        episode: episodeNumber,
+      const res = await traktSetEpisodeWatched({
+        tmdbId: Number(showId),
+        season: Number(seasonNumber),
+        episode: Number(episodeNumber),
         watched: newWatched,
       });
 
-      setTrakt((p) => ({ ...p, watched: newWatched }));
+      const watchedBySeason = res?.watchedBySeason || {};
+      const seasonEps =
+        watchedBySeason?.[Number(seasonNumber)] ||
+        watchedBySeason?.[String(Number(seasonNumber))] ||
+        [];
+      const isWatched =
+        Array.isArray(seasonEps) && seasonEps.includes(Number(episodeNumber));
+
+      setTrakt((p) => ({
+        ...p,
+        loading: false,
+        connected: true,
+        found: res?.found !== false,
+        watched: Array.isArray(seasonEps) ? isWatched : newWatched,
+        error: "",
+      }));
     } catch (e) {
       console.error("Error al marcar episodio:", e);
-      // Podrías mostrar un toast o notificación aquí
+      const needsReauth = /401|unauthorized/i.test(e?.message || "");
+      if (needsReauth) {
+        window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
+        return;
+      }
+      await reloadEpisodeTraktState();
     } finally {
       setWatchedBusy(false);
     }
   }, [
+    trakt.loading,
     trakt.connected,
     trakt.watched,
     watchedBusy,
+    reloadEpisodeTraktState,
     showId,
     seasonNumber,
     episodeNumber,
@@ -547,16 +583,15 @@ export default function EpisodeDetailsClient({
 
                 <div className="flex items-center gap-3 shrink-0">
                   {/* Botón de visionado */}
-                  {!trakt.loading && (
-                    <TraktWatchedControl
-                      connected={trakt.connected}
-                      watched={trakt.watched}
-                      plays={null}
-                      badge={null}
-                      busy={watchedBusy}
-                      onOpen={toggleEpisodeWatched}
-                    />
-                  )}
+                  <TraktWatchedControl
+                    connected={trakt.connected}
+                    watched={trakt.watched}
+                    plays={null}
+                    badge={null}
+                    busy={watchedBusy}
+                    loading={trakt.loading}
+                    onOpen={toggleEpisodeWatched}
+                  />
 
                   {/* Botón de rating */}
                   <StarRating

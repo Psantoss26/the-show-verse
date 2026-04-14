@@ -33,6 +33,7 @@ export async function GET(request) {
   let token = null;
   let refreshedTokens = null;
   let shouldClear = false;
+  let authVerified = false;
 
   try {
     const t = await getValidTraktToken(cookieStore);
@@ -53,19 +54,36 @@ export async function GET(request) {
       clearTraktCookies(res);
       return res;
     }
+    authVerified = true;
 
     let hit = null;
     try {
       hit = await traktSearchByTmdb(token, { type, tmdbId });
     } catch (searchErr) {
-      // Si falla la búsqueda por 403, puede ser rate limit o token inválido
-      if (searchErr.status === 403 || searchErr.isForbidden) {
-        console.warn(`⚠️ Trakt search 403 para ${type}/${tmdbId} - tratando como desconectado`);
-        const res = NextResponse.json({ connected: false });
-        clearTraktCookies(res);
+      const isTransient =
+        searchErr?.status === 403 ||
+        searchErr?.status === 429 ||
+        /timeout|tempor|aborted|fetch/i.test(searchErr?.message || "");
+
+      if (isTransient) {
+        console.warn(
+          `⚠️ Trakt lookup temporal para ${type}/${tmdbId}; preservando sesión`,
+        );
+        const res = NextResponse.json({
+          connected: true,
+          found: false,
+          traktId: null,
+          traktUrl: null,
+          watched: false,
+          plays: 0,
+          lastWatchedAt: null,
+          history: [],
+          error: searchErr?.message || "Trakt lookup failed",
+        });
+        if (refreshedTokens) setTraktCookies(res, refreshedTokens);
         return res;
       }
-      // Otros errores, propagar
+
       throw searchErr;
     }
 
@@ -108,9 +126,27 @@ export async function GET(request) {
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
     return res;
   } catch (e) {
+    const transientAfterAuth =
+      authVerified &&
+      (e?.status === 403 ||
+        e?.status === 429 ||
+        /timeout|tempor|aborted|fetch/i.test(e?.message || ""));
+
     const res = NextResponse.json(
-      { connected: false, error: e?.message || "Trakt status failed" },
-      { status: 500 },
+      transientAfterAuth
+        ? {
+            connected: true,
+            found: false,
+            traktId: null,
+            traktUrl: null,
+            watched: false,
+            plays: 0,
+            lastWatchedAt: null,
+            history: [],
+            error: e?.message || "Trakt status failed",
+          }
+        : { connected: false, error: e?.message || "Trakt status failed" },
+      { status: transientAfterAuth ? 200 : 500 },
     );
     // si refrescó antes de fallar, guardamos cookies igualmente
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
