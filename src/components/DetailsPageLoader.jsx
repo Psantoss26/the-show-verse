@@ -87,7 +87,7 @@ export default function DetailsPageLoader(props) {
       () => {
         void loadTraktRelatedDeferred();
       },
-      initialScoreboard?.found ? 700 : 1800,
+      initialScoreboard?.found ? 900 : type === "tv" ? 3200 : 1800,
     );
 
     return () => {

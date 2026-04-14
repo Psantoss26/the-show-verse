@@ -3851,6 +3851,8 @@ export default function DetailsClient({
   // pedir official site a Trakt (si existe, pisa el de TMDb)
   useEffect(() => {
     if (!id) return;
+    if (endpointType === "tv" && !traktDeferredReady) return;
+
     const ac = new AbortController();
 
     (async () => {
@@ -3872,7 +3874,7 @@ export default function DetailsClient({
     })();
 
     return () => ac.abort();
-  }, [id, endpointType]);
+  }, [id, endpointType, traktDeferredReady]);
 
   const justWatchUrl = title
     ? `https://www.justwatch.com/es/buscar?q=${encodeURIComponent(title)}`
@@ -6091,9 +6093,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* Sección de badges compactos que muestran las puntuaciones y votos de cada plataforma */}
                   <div className="flex items-center gap-4 sm:gap-5 shrink-0">
                     {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
-                    {tScoreboard.loading && (
-                      <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                    )}
+                    <div className="absolute opacity-0 pointer-events-none w-4 h-4">
+                      {tScoreboard.loading ? (
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      ) : null}
+                    </div>
 
                     {/* Badge de TMDb - Muestra la puntuación promedio y número de votos */}
                     <CompactBadge
@@ -6116,6 +6120,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             : undefined
                         }
                         href={trakt?.traktUrl}
+                        animateOnMount={false}
                         onClick={
                           !trakt?.connected
                             ? () =>
@@ -6140,6 +6145,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               ? formatCountShort(tScoreboard.votes)
                               : undefined
                           }
+                          animateOnMount={false}
                           onClick={() =>
                             window.location.assign(
                               `/api/trakt/auth/start?next=/details/${type}/${id}`,

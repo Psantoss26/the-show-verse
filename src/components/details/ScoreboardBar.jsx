@@ -292,9 +292,11 @@ export default function ScoreboardBar({
       >
         {/* A) Ratings */}
         <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-          {tScoreboard.loading ? (
-            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-          ) : null}
+          <div className="w-4 h-4 shrink-0">
+            {tScoreboard.loading ? (
+              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            ) : null}
+          </div>
 
           <CompactBadge
             logo="/logo-TMDb.png"
