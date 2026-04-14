@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo, useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -526,19 +527,19 @@ export default function EpisodeDetailsClient({
             <ArrowLeft className="w-4 h-4" /> Volver
           </button>
 
-          <a
+          <Link
             href={`/details/tv/${showId}/season/${seasonNumber}`}
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
           >
             Temporada {seasonNumber}
-          </a>
+          </Link>
 
-          <a
+          <Link
             href={`/details/tv/${showId}`}
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
           >
             <MonitorPlay className="w-4 h-4" /> {showName}
-          </a>
+          </Link>
         </div>
 
         {/* Hero */}
@@ -833,7 +834,7 @@ export default function EpisodeDetailsClient({
             >
               {cast.slice(0, 20).map((actor) => (
                 <SwiperSlide key={actor.id}>
-                  <a
+                  <Link
                     href={`/details/person/${actor.id}`}
                     className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                   >
@@ -861,7 +862,7 @@ export default function EpisodeDetailsClient({
                         </p>
                       </div>
                     </div>
-                  </a>
+                  </Link>
                 </SwiperSlide>
               ))}
             </Swiper>
@@ -885,7 +886,7 @@ export default function EpisodeDetailsClient({
             >
               {guestStars.slice(0, 20).map((actor) => (
                 <SwiperSlide key={actor.id}>
-                  <a
+                  <Link
                     href={`/details/person/${actor.id}`}
                     className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                   >
@@ -913,7 +914,7 @@ export default function EpisodeDetailsClient({
                         </p>
                       </div>
                     </div>
-                  </a>
+                  </Link>
                 </SwiperSlide>
               ))}
             </Swiper>

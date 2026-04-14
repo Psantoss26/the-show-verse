@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -311,12 +312,12 @@ export default function SeasonDetailsClient({
             <ArrowLeft className="w-4 h-4" /> Volver
           </button>
 
-          <a
+          <Link
             href={`/details/tv/${showId}`}
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
           >
             <MonitorPlay className="w-4 h-4" /> {showName}
-          </a>
+          </Link>
         </div>
 
         {/* Hero */}
@@ -653,7 +654,7 @@ export default function SeasonDetailsClient({
                     const href = `/details/tv/${showId}/season/${seasonNumber}/episode/${epNum}`;
 
                     return (
-                      <a
+                      <Link
                         key={`${seasonNumber}-${epNum}`}
                         href={href}
                         className="group block rounded-2xl border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition overflow-hidden"
@@ -710,7 +711,7 @@ export default function SeasonDetailsClient({
                             </p>
                           </div>
                         </div>
-                      </a>
+                      </Link>
                     );
                   })}
                 </div>
@@ -732,7 +733,7 @@ export default function SeasonDetailsClient({
                     const href = `/details/tv/${showId}/season/${seasonNumber}/episode/${epNum}`;
 
                     return (
-                      <a
+                      <Link
                         key={`grid-${seasonNumber}-${epNum}`}
                         href={href}
                         className="
@@ -803,7 +804,7 @@ export default function SeasonDetailsClient({
                             </div>
                           </div>
                         </div>
-                      </a>
+                      </Link>
                     );
                   })}
                 </div>
