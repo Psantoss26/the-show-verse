@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import DetailsClient from "@/components/DetailsClient";
-import { getReviews, getWatchProviders } from "@/lib/api/tmdb";
+import { getReviews, getWatchProviders, getExternalIds } from "@/lib/api/tmdb";
 import { getTraktRelated } from "@/lib/api/traktClient";
 
 const EMPTY_ARRAY = [];
@@ -11,6 +11,7 @@ const EMPTY_DEFERRED = {
   providers: EMPTY_ARRAY,
   watchLink: null,
   reviews: EMPTY_ARRAY,
+  initialScoreboard: null,
 };
 
 export default function DetailsPageLoader(props) {
@@ -37,6 +38,7 @@ export default function DetailsPageLoader(props) {
 
     let cancelled = false;
     let relatedTimer = null;
+    let scoreboardTimer = null;
 
     const loadCoreDeferredData = async () => {
       try {
@@ -64,6 +66,27 @@ export default function DetailsPageLoader(props) {
       }
     };
 
+    const loadPriorityScoreboard = async () => {
+      try {
+        const externalIds = await getExternalIds(type, id).catch(() => null);
+        const imdbId = externalIds?.imdb_id || data?.external_ids?.imdb_id || "";
+
+        const res = await fetch(
+          `/api/scoreboard/public?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&imdb=${encodeURIComponent(imdbId || "")}`,
+          { cache: "no-store" },
+        );
+
+        const json = await res.json().catch(() => null);
+        if (cancelled || !json) return;
+
+        setDeferredData((prev) => ({
+          ...prev,
+          initialScoreboard: json,
+        }));
+      } catch {
+      }
+    };
+
     const loadTraktRelatedDeferred = async () => {
       try {
         const related = await getTraktRelated({ type, tmdbId: id }).catch(
@@ -83,15 +106,24 @@ export default function DetailsPageLoader(props) {
 
     loadCoreDeferredData();
 
+    scoreboardTimer = window.setTimeout(() => {
+      void loadPriorityScoreboard();
+    }, 50);
+
     relatedTimer = window.setTimeout(
       () => {
         void loadTraktRelatedDeferred();
       },
-      initialScoreboard?.found ? 900 : type === "tv" ? 3200 : 1800,
+      deferredData.initialScoreboard?.found || initialScoreboard?.found
+        ? 900
+        : type === "tv"
+          ? 3200
+          : 1800,
     );
 
     return () => {
       cancelled = true;
+      if (scoreboardTimer) window.clearTimeout(scoreboardTimer);
       if (relatedTimer) window.clearTimeout(relatedTimer);
     };
   }, [type, id, data, initialScoreboard]);
@@ -102,7 +134,7 @@ export default function DetailsPageLoader(props) {
       id={id}
       data={data}
       castData={initialCastData}
-      initialScoreboard={initialScoreboard}
+      initialScoreboard={deferredData.initialScoreboard ?? initialScoreboard}
       reviews={
         deferredData.reviews !== EMPTY_ARRAY
           ? deferredData.reviews
