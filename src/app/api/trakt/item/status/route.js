@@ -54,7 +54,20 @@ export async function GET(request) {
       return res;
     }
 
-    const hit = await traktSearchByTmdb(token, { type, tmdbId });
+    let hit = null;
+    try {
+      hit = await traktSearchByTmdb(token, { type, tmdbId });
+    } catch (searchErr) {
+      // Si falla la búsqueda por 403, puede ser rate limit o token inválido
+      if (searchErr.status === 403 || searchErr.isForbidden) {
+        console.warn(`⚠️ Trakt search 403 para ${type}/${tmdbId} - tratando como desconectado`);
+        const res = NextResponse.json({ connected: false });
+        clearTraktCookies(res);
+        return res;
+      }
+      // Otros errores, propagar
+      throw searchErr;
+    }
 
     if (!hit) {
       const res = NextResponse.json({
