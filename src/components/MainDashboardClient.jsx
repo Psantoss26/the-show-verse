@@ -170,6 +170,22 @@ function preloadImage(src) {
   });
 }
 
+function runWhenBrowserIdle(callback, { timeout = 1500, delay = 250 } = {}) {
+  if (typeof window === "undefined") return () => {};
+
+  if (typeof window.requestIdleCallback === "function") {
+    const idleId = window.requestIdleCallback(callback, { timeout });
+    return () => {
+      if (typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+    };
+  }
+
+  const timeoutId = window.setTimeout(callback, delay);
+  return () => window.clearTimeout(timeoutId);
+}
+
 /* =================== CACHÉS COMPARTIDOS (cliente) =================== */
 const movieExtrasCache = new Map();
 const movieBackdropCache = new Map();
@@ -405,7 +421,6 @@ async function getBestTrailerCached(itemId, mediaType = "movie") {
 function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
   const [posterPath, setPosterPath] = useState(null);
   const [ready, setReady] = useState(false);
-  const { poster: userPoster } = getArtworkPreference(movie.id);
 
   useEffect(() => {
     let abort = false;
@@ -426,11 +441,17 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
       }
 
       // Si todavía NO sabemos si hay override (porque aún no cargó el fetch batch),
-      // NO elijas un póster alternativo, porque luego harás swap.
+      // pintamos con el poster base y dejamos que el override lo sustituya después.
       if (posterOverride === undefined) {
+        const existingPoster =
+          movie.poster_path ||
+          movie.backdrop_path ||
+          movie.profile_path ||
+          null;
         if (!abort) {
-          setPosterPath(null);
-          setReady(false);
+          if (existingPoster) cache.current.set(movie.id, existingPoster);
+          setPosterPath(existingPoster);
+          setReady(!!existingPoster);
         }
         return;
       }
@@ -441,6 +462,19 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
         await preloadImage(url);
         if (!abort) {
           setPosterPath(cached);
+          setReady(true);
+        }
+        return;
+      }
+
+      const existingPoster =
+        movie.poster_path || movie.backdrop_path || movie.profile_path || null;
+      if (existingPoster) {
+        const url = buildImg(existingPoster, "w342");
+        await preloadImage(url);
+        if (!abort) {
+          cache.current.set(movie.id, existingPoster);
+          setPosterPath(existingPoster);
           setReady(true);
         }
         return;
@@ -2396,7 +2430,6 @@ function TopRatedHero({
   const isInView = useInView(heroRef, { once: true, margin: "0px" });
 
   const [heroBackdrops, setHeroBackdrops] = useState({});
-  const [heroLoaded, setHeroLoaded] = useState(false);
 
   // Cargar backdrops para AMBAS listas para evitar flash al cambiar de tab
   const allItems = useMemo(() => {
@@ -2410,10 +2443,7 @@ function TopRatedHero({
   }, [movieItems, tvItems]);
 
   useEffect(() => {
-    if (!allItems || allItems.length === 0) {
-      setHeroLoaded(true);
-      return;
-    }
+    if (!allItems || allItems.length === 0) return;
 
     let canceled = false;
 
@@ -2438,7 +2468,6 @@ function TopRatedHero({
 
             let chosen = movie?.backdrop_path || movie?.poster_path || null;
             if (chosen) {
-              await preloadImage(buildImg(chosen, "w780"));
               return [id, chosen];
             }
 
@@ -2465,7 +2494,6 @@ function TopRatedHero({
         }
 
         setHeroBackdrops(map);
-        setHeroLoaded(true);
       } catch (err) {
         if (canceled) return;
         console.error("Error cargando backdrops del hero", err);
@@ -2475,7 +2503,6 @@ function TopRatedHero({
           map[movie.id] = movie.backdrop_path || movie.poster_path || null;
         }
         setHeroBackdrops(map);
-        setHeroLoaded(true);
       }
     };
 
@@ -2583,166 +2610,149 @@ function TopRatedHero({
         onMouseEnter={() => setIsHoveredHero(true)}
         onMouseLeave={() => setIsHoveredHero(false)}
       >
-        {!heroLoaded ? (
-          <div className="flex gap-4 overflow-hidden">
-            {items.slice(0, 1).map((movie) => (
-              <div
-                key={movie.id}
-                className="relative w-full rounded-xl bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 aspect-[16/9] overflow-hidden"
-              >
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-                  variants={shimmer}
-                  animate="animate"
-                  style={{ backgroundSize: "200% 100%" }}
-                />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
-              <Swiper
-                key={heroKey}
-                slidesPerView={isMobile ? 1 : 3}
-                spaceBetween={isMobile ? 12 : 16}
-                autoplay={hydrated ? { delay: 5000 } : false}
-                onSwiper={handleSwiper}
-                onSlideChange={updateNav}
-                onResize={updateNav}
-                onReachBeginning={updateNav}
-                onReachEnd={updateNav}
-                loop={false}
-                watchOverflow={true}
-                grabCursor={!isMobile}
-                simulateTouch={true}
-                allowTouchMove={true}
-                preventClicks={true}
-                preventClicksPropagation={true}
-                threshold={isMobile ? 2 : 5}
-                touchRatio={isMobile ? 1.5 : 1}
-                freeMode={
-                  !isMobile
-                    ? { enabled: true, momentum: true, momentumRatio: 0.5 }
-                    : false
-                }
-                modules={[Navigation, Autoplay, FreeMode]}
-                className="group relative"
-                breakpoints={{
-                  0: { slidesPerView: 1, spaceBetween: 12 },
-                  1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 },
-                }}
-              >
-                {items.map((movie) => {
-                  const heroBackdrop = heroBackdrops[movie.id] || null;
-                  const slideClass = isMobile
-                    ? "!w-full select-none"
-                    : "select-none";
+        <>
+          <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
+            <Swiper
+              key={heroKey}
+              slidesPerView={isMobile ? 1 : 3}
+              spaceBetween={isMobile ? 12 : 16}
+              autoplay={hydrated ? { delay: 5000 } : false}
+              onSwiper={handleSwiper}
+              onSlideChange={updateNav}
+              onResize={updateNav}
+              onReachBeginning={updateNav}
+              onReachEnd={updateNav}
+              loop={false}
+              watchOverflow={true}
+              grabCursor={!isMobile}
+              simulateTouch={true}
+              allowTouchMove={true}
+              preventClicks={true}
+              preventClicksPropagation={true}
+              threshold={isMobile ? 2 : 5}
+              touchRatio={isMobile ? 1.5 : 1}
+              freeMode={
+                !isMobile
+                  ? { enabled: true, momentum: true, momentumRatio: 0.5 }
+                  : false
+              }
+              modules={[Navigation, Autoplay, FreeMode]}
+              className="group relative"
+              breakpoints={{
+                0: { slidesPerView: 1, spaceBetween: 12 },
+                1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 },
+              }}
+            >
+              {items.map((movie) => {
+                const heroBackdrop =
+                  heroBackdrops[movie.id] ||
+                  movie.backdrop_path ||
+                  movie.poster_path ||
+                  null;
+                const slideClass = isMobile
+                  ? "!w-full select-none"
+                  : "select-none";
 
-                  const mediaType =
-                    movie.media_type === "tv" ||
-                    (movie.name && !movie.title) ||
-                    movie.first_air_date
-                      ? "tv"
-                      : "movie";
+                const mediaType =
+                  movie.media_type === "tv" ||
+                  (movie.name && !movie.title) ||
+                  movie.first_air_date
+                    ? "tv"
+                    : "movie";
 
-                  if (!heroBackdrop) {
-                    return (
-                      <SwiperSlide key={movie.id} className={slideClass}>
-                        <Link href={`/details/${mediaType}/${movie.id}`}>
-                          {
-                            // CAMBIO: rounded-3xl -> rounded-xl
-                          }
-                          <div className="relative rounded-xl bg-neutral-900 aspect-[16/9]" />
-                        </Link>
-                      </SwiperSlide>
-                    );
-                  }
-
+                if (!heroBackdrop) {
                   return (
                     <SwiperSlide key={movie.id} className={slideClass}>
                       <Link href={`/details/${mediaType}/${movie.id}`}>
-                        <motion.div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero">
-                          <img
-                            src={buildImg(heroBackdrop, "w780")}
-                            alt=""
-                            aria-hidden="true"
-                            className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                          <img
-                            src={buildImg(heroBackdrop, "w1280")}
-                            srcSet={`${buildImg(heroBackdrop, "w780")} 780w, ${buildImg(
-                              heroBackdrop,
-                              "w1280",
-                            )} 1280w, ${buildImg(heroBackdrop, "original")} 2400w`}
-                            sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
-                            alt={movie.title || movie.name}
-                            className={`absolute inset-0 w-full h-full rounded-xl ${
-                              isMobile ? "object-contain" : "object-cover"
-                            } transition-transform duration-700 ease-out group-hover/hero:scale-105`}
-                            loading="lazy"
-                            decoding="async"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
-                        </motion.div>
+                        <div className="relative rounded-xl bg-neutral-900 aspect-[16/9]" />
                       </Link>
                     </SwiperSlide>
                   );
-                })}
-              </Swiper>
-            </div>
+                }
 
-            <AnimatePresence>
-              {showPrev && !isMobile && (
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  type="button"
-                  onClick={handlePrevClick}
-                  className="absolute inset-y-0 left-0 w-32 z-20
+                return (
+                  <SwiperSlide key={movie.id} className={slideClass}>
+                    <Link href={`/details/${mediaType}/${movie.id}`}>
+                      <motion.div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero">
+                        <img
+                          src={buildImg(heroBackdrop, "w780")}
+                          alt=""
+                          aria-hidden="true"
+                          className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        <img
+                          src={buildImg(heroBackdrop, "w1280")}
+                          srcSet={`${buildImg(heroBackdrop, "w780")} 780w, ${buildImg(
+                            heroBackdrop,
+                            "w1280",
+                          )} 1280w, ${buildImg(heroBackdrop, "original")} 2400w`}
+                          sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
+                          alt={movie.title || movie.name}
+                          className={`absolute inset-0 w-full h-full rounded-xl ${
+                            isMobile ? "object-contain" : "object-cover"
+                          } transition-transform duration-700 ease-out group-hover/hero:scale-105`}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
+                      </motion.div>
+                    </Link>
+                  </SwiperSlide>
+                );
+              })}
+            </Swiper>
+          </div>
+
+          <AnimatePresence>
+            {showPrev && !isMobile && (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                type="button"
+                onClick={handlePrevClick}
+                className="absolute inset-y-0 left-0 w-32 z-20
                                 hidden sm:flex items-center justify-start
                                 bg-gradient-to-r from-black/70 via-black/40 via-30% via-black/20 via-60% to-transparent
                                 hover:from-black/85 hover:via-black/55 hover:via-30% hover:via-black/30 hover:via-60%
                                 transition-all duration-500 pointer-events-auto group/nav backdrop-blur-[2px]"
+              >
+                <motion.span
+                  className="ml-5 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
+                  whileHover={{ x: -5 }}
                 >
-                  <motion.span
-                    className="ml-5 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
-                    whileHover={{ x: -5 }}
-                  >
-                    ‹
-                  </motion.span>
-                </motion.button>
-              )}
-            </AnimatePresence>
+                  ‹
+                </motion.span>
+              </motion.button>
+            )}
+          </AnimatePresence>
 
-            <AnimatePresence>
-              {showNext && !isMobile && (
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  type="button"
-                  onClick={handleNextClick}
-                  className="absolute inset-y-0 right-0 w-32 z-20
+          <AnimatePresence>
+            {showNext && !isMobile && (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                type="button"
+                onClick={handleNextClick}
+                className="absolute inset-y-0 right-0 w-32 z-20
                                 hidden sm:flex items-center justify-end
                                 bg-gradient-to-l from-black/70 via-black/40 via-30% via-black/20 via-60% to-transparent
                                 hover:from-black/85 hover:via-black/55 hover:via-30% hover:via-black/30 hover:via-60%
                                 transition-all duration-500 pointer-events-auto group/nav backdrop-blur-[2px]"
+              >
+                <motion.span
+                  className="mr-5 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
+                  whileHover={{ x: 5 }}
                 >
-                  <motion.span
-                    className="mr-5 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
-                    whileHover={{ x: 5 }}
-                  >
-                    ›
-                  </motion.span>
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </>
-        )}
+                  ›
+                </motion.span>
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </>
       </div>
     </motion.div>
   );
@@ -2766,7 +2776,6 @@ export default function MainDashboardClient({ initialData }) {
     traktCollectedWeekly: [],
     traktCollectedMonthly: [],
   });
-  const [lazyLoading, setLazyLoading] = useState(false);
 
   // Combinar datos iniciales (SSR) con secciones lazy (cliente)
   const dashboardData = useMemo(
@@ -2854,22 +2863,19 @@ export default function MainDashboardClient({ initialData }) {
       }
     };
 
-    loadOverrides();
+    const cancelIdle = runWhenBrowserIdle(loadOverrides);
+
     return () => {
       cancelled = true;
+      cancelIdle();
     };
   }, [allMovieIds]);
 
   // ⚡ Carga progresiva de secciones secundarias (lazy loading)
   useEffect(() => {
     let cancelled = false;
-
     const loadLazySections = async () => {
-      // Esperar 1 segundo para que las secciones críticas se rendericen primero
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       if (cancelled) return;
-      setLazyLoading(true);
 
       try {
         console.log("⏱️ [Dashboard] Cargando secciones secundarias (lazy)...");
@@ -2936,14 +2942,17 @@ export default function MainDashboardClient({ initialData }) {
         });
       } catch (err) {
         console.error("❌ Error cargando secciones lazy:", err);
-      } finally {
-        if (!cancelled) setLazyLoading(false);
       }
     };
 
-    loadLazySections();
+    const cancelIdle = runWhenBrowserIdle(loadLazySections, {
+      timeout: 2500,
+      delay: 800,
+    });
+
     return () => {
       cancelled = true;
+      cancelIdle();
     };
   }, []); // Solo ejecutar una vez al montar
 

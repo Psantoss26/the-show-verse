@@ -4,19 +4,9 @@ import SeriesPageClient from "./SeriesPageClient";
 import {
   fetchPopularMedia,
   fetchMediaByGenre,
-  fetchMediaByKeyword,
   fetchTVSections,
   fetchRomanceSeriesWithGoodReviews,
 } from "@/lib/api/tmdb";
-
-import {
-  getTraktShowsTrending,
-  getTraktShowsPopular,
-  getTraktShowsRecommended,
-  getTraktShowsAnticipated,
-  getTraktShowsPlayed,
-  removeDuplicates,
-} from "@/lib/api/traktHelpers";
 
 export const revalidate = 1800; // 30 min
 
@@ -111,16 +101,6 @@ async function getDashboardData() {
       romance,
       animation,
       baseSections,
-
-      // ✅ NUEVAS SECCIONES TRAKT - Solo Series
-      traktTrending,
-      traktPopular,
-      traktRecommended,
-      traktAnticipated,
-      traktPlayedWeekly,
-      traktPlayedMonthly,
-      traktPlayedYearly,
-      traktPlayedAll,
     ] = await Promise.all([
       // TMDb originales
       fetchPopularMedia({ type: "tv", language: lang }),
@@ -155,16 +135,6 @@ async function getDashboardData() {
       fetchTVSections
         ? fetchTVSections({ language: lang })
         : Promise.resolve({}),
-
-      // ✅ Trakt - Solo Series
-      getTraktShowsTrending(24),
-      getTraktShowsPopular(24),
-      getTraktShowsRecommended(24),
-      getTraktShowsAnticipated(24),
-      getTraktShowsPlayed("weekly", 24),
-      getTraktShowsPlayed("monthly", 24),
-      getTraktShowsPlayed("yearly", 24),
-      getTraktShowsPlayed("all", 24),
     ]);
 
     const top_imdb_raw = await topImdbPromise;
@@ -282,16 +252,6 @@ async function getDashboardData() {
       curatedBaseSections["Por género"] = curatedByGenre;
     }
 
-    // ✅ Limpieza de duplicados en secciones Trakt
-    const cleanedTraktTrending = removeDuplicates(traktTrending);
-    const cleanedTraktPopular = removeDuplicates(traktPopular);
-    const cleanedTraktRecommended = removeDuplicates(traktRecommended);
-    const cleanedTraktAnticipated = removeDuplicates(traktAnticipated);
-    const cleanedTraktPlayedWeekly = removeDuplicates(traktPlayedWeekly);
-    const cleanedTraktPlayedMonthly = removeDuplicates(traktPlayedMonthly);
-    const cleanedTraktPlayedYearly = removeDuplicates(traktPlayedYearly);
-    const cleanedTraktPlayedAll = removeDuplicates(traktPlayedAll);
-
     // Objeto final de dashboard que se envía al cliente
     const dashboard = {
       // TMDb originales
@@ -303,16 +263,6 @@ async function getDashboardData() {
       romance: curatedRomance,
       animation: curatedAnimation,
       ...curatedBaseSections,
-
-      // ✅ NUEVAS SECCIONES TRAKT
-      traktTrending: cleanedTraktTrending,
-      traktPopular: cleanedTraktPopular,
-      traktRecommended: cleanedTraktRecommended,
-      traktAnticipated: cleanedTraktAnticipated,
-      traktPlayedWeekly: cleanedTraktPlayedWeekly,
-      traktPlayedMonthly: cleanedTraktPlayedMonthly,
-      traktPlayedYearly: cleanedTraktPlayedYearly,
-      traktPlayedAll: cleanedTraktPlayedAll,
     };
 
     return dashboard;

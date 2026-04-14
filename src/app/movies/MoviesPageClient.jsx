@@ -417,11 +417,23 @@ function PosterImage({ movie, cache }) {
         return;
       }
 
-      // 3) Mejor poster (EN + máxima resolución)
+      // 3) Usar primero el poster ya disponible para no bloquear el primer render
+      const existingPoster = movie.poster_path || movie.backdrop_path || null;
+      if (existingPoster) {
+        const url = buildImg(existingPoster, "w342");
+        await preloadImage(url);
+        if (!abort) {
+          cache.current.set(movie.id, existingPoster);
+          setPosterPath(existingPoster);
+          setReady(true);
+        }
+        return;
+      }
+
+      // 4) Solo buscar una alternativa si realmente falta artwork base
       setReady(false);
       const preferred = await fetchBestPoster(movie.id);
-      const chosen =
-        preferred || movie.poster_path || movie.backdrop_path || null;
+      const chosen = preferred || null;
 
       const url = chosen ? buildImg(chosen, "w342") : null;
       await preloadImage(url);
@@ -513,11 +525,16 @@ function Top10MobileBackdropCard({ movie, rank }) {
       }
 
       let chosen = null;
-      try {
-        const preferred = await fetchBestBackdrop(movie.id);
-        chosen = preferred || null;
-      } catch {
-        chosen = null;
+      const existingBackdrop = movie.backdrop_path || movie.poster_path || null;
+      if (existingBackdrop) {
+        chosen = existingBackdrop;
+      } else {
+        try {
+          const preferred = await fetchBestBackdrop(movie.id);
+          chosen = preferred || null;
+        } catch {
+          chosen = null;
+        }
       }
 
       movieBackdropCache.set(movie.id, chosen);
@@ -667,26 +684,39 @@ function InlinePreviewCard({ movie, heightClass }) {
             }
           }
         } else {
-          try {
-            const preferred = await fetchBestBackdrop(movie.id);
-            const chosen = preferred || null;
-            movieBackdropCache.set(movie.id, chosen);
+          const existingBackdrop =
+            movie.backdrop_path || movie.poster_path || null;
 
-            if (chosen) {
-              const url = buildImg(chosen, "w1280");
-              await preloadImage(url);
-              if (!abort) {
-                setBackdropPath(chosen);
-                setBackdropReady(true);
-              }
-            } else if (!abort) {
-              setBackdropPath(null);
-              setBackdropReady(false);
-            }
-          } catch {
+          if (existingBackdrop) {
+            movieBackdropCache.set(movie.id, existingBackdrop);
+            const url = buildImg(existingBackdrop, "w1280");
+            await preloadImage(url);
             if (!abort) {
-              setBackdropPath(null);
-              setBackdropReady(false);
+              setBackdropPath(existingBackdrop);
+              setBackdropReady(true);
+            }
+          } else {
+            try {
+              const preferred = await fetchBestBackdrop(movie.id);
+              const chosen = preferred || null;
+              movieBackdropCache.set(movie.id, chosen);
+
+              if (chosen) {
+                const url = buildImg(chosen, "w1280");
+                await preloadImage(url);
+                if (!abort) {
+                  setBackdropPath(chosen);
+                  setBackdropReady(true);
+                }
+              } else if (!abort) {
+                setBackdropPath(null);
+                setBackdropReady(false);
+              }
+            } catch {
+              if (!abort) {
+                setBackdropPath(null);
+                setBackdropReady(false);
+              }
             }
           }
         }
