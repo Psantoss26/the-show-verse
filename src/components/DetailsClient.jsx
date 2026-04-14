@@ -1513,6 +1513,19 @@ export default function DetailsClient({
   const displayPosterPath =
     posterViewMode === "preview" ? previewBackdropPath : basePosterDisplayPath;
 
+  // Precarga ambas variantes para que el cambio entre poster y preview sea instantáneo.
+  useEffect(() => {
+    if (basePosterDisplayPath) {
+      void preloadTmdb(basePosterDisplayPath, "w342");
+      void preloadTmdb(basePosterDisplayPath, "w780");
+    }
+
+    if (previewBackdropPath) {
+      void preloadTmdb(previewBackdropPath, "w780");
+      void preloadTmdb(previewBackdropPath, "w1280");
+    }
+  }, [basePosterDisplayPath, previewBackdropPath]);
+
   // Comprueba si una ruta pertenece a la lista de backdrops (no posters)
   const isBackdropPath = useCallback(
     (path) => {
@@ -3627,13 +3640,11 @@ export default function DetailsClient({
   };
 
   /**
-   * Cicla entre modo poster y preview con animacion de layout.
-   * 1) Si va a preview: primero cambia el layout (aspect-ratio) y luego la imagen.
-   * 2) Si va a poster: primero cambia la imagen y luego reduce el layout.
-   * Usa una secuencia incremental para manejar clicks rapidos y cancelar transiciones obsoletas.
+   * Alterna entre poster y preview sin bloquear la UI.
+   * Precarga ambas variantes por adelantado y deja que el crossfade
+   * y el cambio de aspect-ratio ocurran a la vez para que el gesto se sienta inmediato.
    */
-  const handleCyclePoster = useCallback(async () => {
-    // Alternar entre poster actual y backdrop de vista previa (sin sobrescribir)
+  const handleCyclePoster = useCallback(() => {
     const posterPath =
       asTmdbPath(selectedPosterPath) ||
       asTmdbPath(basePosterPath) ||
@@ -3647,100 +3658,42 @@ export default function DetailsClient({
 
     if (!posterPath || !previewPath) return;
 
-    // Determinar el siguiente modo basandose en el modo solicitado
-    // Esto permite clicks rápidos seguidos incluso si todavía no hemos cambiado
-    // posterViewMode (por ejemplo, mientras el layout se redimensiona).
     const currentMode = posterRequestedModeRef.current || posterViewMode;
     const nextMode = currentMode === "preview" ? "poster" : "preview";
     const targetPath = nextMode === "preview" ? previewPath : posterPath;
+    const lowSize = nextMode === "preview" ? "w780" : "w342";
+    const highSize = nextMode === "preview" ? "w1280" : "w780";
 
-    // Incrementar secuencia antes de iniciar la transicion
     const seq = (posterToggleSeqRef.current += 1);
     posterRequestedModeRef.current = nextMode;
     setPosterToggleBusy(true);
 
-    const abortIfStale = () =>
-      posterToggleSeqRef.current !== seq ||
-      posterRequestedModeRef.current !== nextMode;
-
-    const safeFinish = () => {
-      if (posterToggleSeqRef.current === seq) {
-        // Pequeño delay para evitar parpadeos de estado busy
-        setTimeout(() => {
-          if (posterToggleSeqRef.current === seq) setPosterToggleBusy(false);
-        }, 150);
-      }
-    };
-
-    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-
-    const waitFrames = () =>
-      new Promise((resolve) => {
-        if (typeof requestAnimationFrame !== "function") return resolve();
-        requestAnimationFrame(() => requestAnimationFrame(resolve));
-      });
-
-    // 1) Si vamos a preview (backdrop), primero forzar el layout (ratio/ancho)
-    // y esperamos a que la tarjeta se redimensione antes de cambiar la imagen.
-    if (nextMode === "preview") {
-      setPosterLayoutMode("preview");
-      await waitFrames();
-      // Esperar a la mitad de la transicion CSS (250ms de 500ms)
-      // para que el aspect-ratio cambie primero
-      await wait(250);
-      if (abortIfStale()) return;
-    }
-
-    // Verificar si la imagen ya esta en cache (instantaneo)
-    const checkCached = () => {
-      const testImg = new Image();
-      testImg.src = `https://image.tmdb.org/t/p/w780${targetPath}`;
-      return testImg.complete && testImg.naturalWidth > 0;
-    };
+    void preloadTmdb(targetPath, lowSize);
+    void preloadTmdb(targetPath, highSize);
 
     const applyMode = () => {
-      if (abortIfStale()) return;
-
-      // Cambiar la imagen despues de que el layout haya empezado a cambiar
-      setPosterViewMode(nextMode);
-
-      // Si volvemos a poster, reducir el layout despues del swap
-      if (nextMode === "poster") {
-        // Esperar a la mitad de la transicion antes de cambiar el layout
-        setTimeout(() => {
-          if (abortIfStale()) return;
-          setPosterLayoutMode("poster");
-        }, 250);
+      if (
+        posterToggleSeqRef.current !== seq ||
+        posterRequestedModeRef.current !== nextMode
+      ) {
+        return;
       }
 
-      safeFinish();
+      setPosterLayoutMode(nextMode);
+      setPosterViewMode(nextMode);
+
+      window.setTimeout(() => {
+        if (posterToggleSeqRef.current === seq) {
+          setPosterToggleBusy(false);
+        }
+      }, 180);
     };
 
-    // Si ya esta en cache, cambiar sin precarga adicional
-    if (checkCached()) {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(applyMode);
+    } else {
       applyMode();
-      return;
     }
-
-    // Precargar la imagen con timeout (evita esperas eternas)
-    await new Promise((resolve) => {
-      const img = new Image();
-      const timeout = setTimeout(() => {
-        resolve(false); // timeout: continuar de todas formas
-      }, 400); // Timeout corto ya que esperamos antes
-
-      img.onload = () => {
-        clearTimeout(timeout);
-        resolve(true);
-      };
-      img.onerror = () => {
-        clearTimeout(timeout);
-        resolve(false);
-      };
-      img.src = `https://image.tmdb.org/t/p/w780${targetPath}`;
-    });
-
-    applyMode();
   }, [
     selectedPosterPath,
     basePosterPath,
@@ -3749,7 +3702,6 @@ export default function DetailsClient({
     selectedPreviewBackdropPath,
     previewBackdropFallback,
     posterViewMode,
-    globalViewModeStorageKey,
   ]);
 
   // Persistir el modo de vista globalmente y sincronizar layoutMode
@@ -5230,18 +5182,6 @@ export default function DetailsClient({
 
         setPosterTransitioning(!!prev); // Solo transición si había imagen anterior
         setPosterImgError(false);
-
-        // Limpiar transicion despues del tiempo configurado
-        if (prev) {
-          const timer = setTimeout(() => {
-            setPosterTransitioning(false);
-            setPrevPosterPath(null);
-          }, 500);
-
-          return () => {
-            clearTimeout(timer);
-          };
-        }
       } else {
         // Si displayPosterPath es null, resetear estados
         setPosterLowLoaded(false);
@@ -5262,46 +5202,30 @@ export default function DetailsClient({
     prevDisplayBackdropRef.current = previewBackdropPath;
     backdropLoadTokenRef.current += 1;
 
-    // Solo manejar cuando estamos en modo preview
-    if (posterViewMode === "preview") {
-      if (prev !== previewBackdropPath) {
-        // Verificar si la nueva imagen ya esta precargada
-        if (previewBackdropPath) {
-          const checkIfLoaded = (size) => {
-            const testImg = new Image();
-            testImg.src = `https://image.tmdb.org/t/p/${size}${previewBackdropPath}`;
-            return testImg.complete && testImg.naturalWidth > 0;
-          };
+    if (prev === previewBackdropPath) return;
 
-          const isLowPreloaded = checkIfLoaded("w780");
-          const isHighPreloaded = checkIfLoaded("w1280");
+    if (previewBackdropPath) {
+      const checkIfLoaded = (size) => {
+        const testImg = new Image();
+        testImg.src = `https://image.tmdb.org/t/p/${size}${previewBackdropPath}`;
+        return testImg.complete && testImg.naturalWidth > 0;
+      };
 
-          // Si esta precargada, marcar como cargada inmediatamente
-          if (isLowPreloaded) {
-            setBackdropLowLoaded(true);
-            setBackdropHighLoaded(isHighPreloaded);
-            setBackdropResolved(true);
-          } else {
-            setBackdropLowLoaded(false);
-            setBackdropHighLoaded(false);
-            setBackdropResolved(true);
-          }
+      const isLowPreloaded = checkIfLoaded("w780");
+      const isHighPreloaded = checkIfLoaded("w1280");
 
-          setBackdropImgError(false);
-        } else {
-          // Si previewBackdropPath es null, resetear estados
-          setBackdropLowLoaded(false);
-          setBackdropHighLoaded(false);
-        }
-      }
-    } else {
-      // Si no estamos en modo preview, resetear estados del backdrop
-      setBackdropLowLoaded(false);
-      setBackdropHighLoaded(false);
+      setBackdropLowLoaded(isLowPreloaded);
+      setBackdropHighLoaded(isHighPreloaded);
+      setBackdropResolved(true);
       setBackdropImgError(false);
-      setBackdropResolved(false);
+      return;
     }
-  }, [previewBackdropPath, posterViewMode]);
+
+    setBackdropLowLoaded(false);
+    setBackdropHighLoaded(false);
+    setBackdropImgError(false);
+    setBackdropResolved(false);
+  }, [previewBackdropPath]);
 
   const posterAspectIsBackdrop =
     posterTransitioning && prevPosterPath
@@ -5339,6 +5263,17 @@ export default function DetailsClient({
     posterViewMode === "preview" ? backdropLoadToken : posterLoadToken;
   const currentLoadTokenRef =
     posterViewMode === "preview" ? backdropLoadTokenRef : posterLoadTokenRef;
+
+  // Limpiar transicion suavemente solo despues de cargar (evita destellos en internet lento)
+  useEffect(() => {
+    if (currentLowLoaded && prevPosterPath) {
+      const timer = setTimeout(() => {
+        setPrevPosterPath(null);
+        setPosterTransitioning(false);
+      }, 800); // Dar suficiente tiempo para que la animacion de fade termine
+      return () => clearTimeout(timer);
+    }
+  }, [currentLowLoaded, prevPosterPath]);
 
   // Skeleton mientras:
   // - no hemos “resuelto” si hay poster
@@ -5547,7 +5482,7 @@ export default function DetailsClient({
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 animate-in fade-in duration-700 slide-in-from-bottom-4 items-start">
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
-            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-all duration-500 ${
+            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-[max-width] duration-500 ease-out ${
               isBackdropPoster
                 ? "max-w-full lg:max-w-[600px]"
                 : "max-w-[280px] lg:max-w-[320px]"
@@ -5591,33 +5526,39 @@ export default function DetailsClient({
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10" />
 
                   <div
-                    className={`relative bg-neutral-950 will-change-auto ${
+                    className={`relative bg-neutral-950 will-change-auto overflow-hidden ${
                       isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
                     }`}
                     style={{
                       transition:
-                        "aspect-ratio 500ms cubic-bezier(0.4, 0, 0.2, 1)",
+                        "aspect-ratio 500ms cubic-bezier(0.25, 1, 0.5, 1)",
+                      contain: "layout paint",
                     }}
                   >
-                    {/* Imagen anterior (permanece visible durante la transición) */}
-                    {prevPosterPath && posterTransitioning && (
-                      <div
-                        className="absolute inset-0 transition-opacity duration-500 ease-in-out"
-                        style={{ opacity: currentLowLoaded ? 0 : 1 }}
-                      >
-                        <img
-                          src={`https://image.tmdb.org/t/p/w780${prevPosterPath}`}
-                          alt={title}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          style={{
-                            transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
-                          }}
-                        />
-                      </div>
-                    )}
+                    {/* Imagen anterior (permanece visible hasta que la nueva carga) */}
+                    <AnimatePresence>
+                      {prevPosterPath && posterTransitioning && !currentLowLoaded && (
+                        <motion.div
+                          key="prev-poster"
+                          initial={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.45, ease: "easeInOut" }}
+                          className="absolute inset-0 z-0"
+                        >
+                          <img
+                            src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
+                            alt={title}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            style={{
+                              transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
+                            }}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {posterLowUrl && !currentImgError && (
-                      <div key={displayPosterPath} className="absolute inset-0">
+                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10">
                         {/* LOW */}
                         <img
                           src={posterLowUrl}
@@ -5653,7 +5594,7 @@ export default function DetailsClient({
                               setPosterResolved(true);
                             }
                           }}
-                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out
+                          className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500 ease-out will-change-[opacity,transform]
 ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
                             transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
@@ -5681,7 +5622,7 @@ ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-
                               }
                             }}
                             onError={() => {}}
-                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out
+                            className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500 ease-out will-change-[opacity,transform]
 ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
                               transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
@@ -6025,11 +5966,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     : "Mostrar vista previa"
                 }
               >
-                {posterToggleBusy ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <ImageIcon className="w-5 h-5" />
-                )}
+                <ImageIcon
+                  className={`w-5 h-5 transition-all duration-200 ${
+                    posterToggleBusy ? "scale-95 opacity-75" : "scale-100"
+                  }`}
+                />
               </LiquidButton>
             </div>
 
