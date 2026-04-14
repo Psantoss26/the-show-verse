@@ -197,7 +197,7 @@ export async function GET(req) {
           }
 
           return { ...row, previewPosters: previews };
-        } catch (timeoutErr) {
+        } catch {
           clearTimeout(previewTimeout);
           // Si timeout, devolver sin previews
           return { ...row, previewPosters: [] };
