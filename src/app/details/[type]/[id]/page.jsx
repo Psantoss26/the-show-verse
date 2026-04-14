@@ -26,13 +26,37 @@ export default function DetailsPage() {
 
     const fetchAll = async () => {
       try {
-        // Lanzar scoreboard en paralelo (no bloqueante) - se resuelve junto con TMDB
         const traktType = type === "tv" ? "show" : "movie";
-        const scoreboardPromise = type !== "person"
-          ? traktGetScoreboard({ type: traktType, tmdbId: id }).catch(() => null)
-          : Promise.resolve(null);
+        const detailsPromise = getDetails(type, id);
+        const scoreboardPromise =
+          type !== "person"
+            ? traktGetScoreboard({ type: traktType, tmdbId: id }).catch(
+                () => null,
+              )
+            : Promise.resolve(null);
+        const castPromise =
+          type !== "person"
+            ? getCredits(type, id).catch(() => ({ cast: [] }))
+            : Promise.resolve({ cast: [] });
+        const reviewsPromise =
+          type !== "person"
+            ? getReviews(type, id).catch(() => ({ results: [] }))
+            : Promise.resolve({ results: [] });
+        const watchProvidersPromise =
+          type !== "person"
+            ? getWatchProviders(type, id, "ES").catch(() => ({
+                providers: [],
+                link: null,
+              }))
+            : Promise.resolve({ providers: [], link: null });
+        const relatedPromise =
+          type !== "person"
+            ? getTraktRelated({ type, tmdbId: id }).catch(() => ({
+                results: [],
+              }))
+            : Promise.resolve({ results: [] });
 
-        const details = await getDetails(type, id);
+        const details = await detailsPromise;
         if (cancelled) return;
 
         if (type === "person") {
@@ -53,51 +77,45 @@ export default function DetailsPage() {
           return;
         }
 
-        // Resto de tipos (movie / tv): llamadas en paralelo — SIN getTraktRelated
-        // getTraktRelated se carga a continuación de forma NO bloqueante
-        const [cast, reviews, watchProviders, scoreboard] = await Promise.all([
-          getCredits(type, id).catch(() => ({ cast: [] })),
-          getReviews(type, id).catch(() => ({ results: [] })),
-          getWatchProviders(type, id, "ES").catch(() => ({
-            providers: [],
-            link: null,
-          })),
-          scoreboardPromise,
+        const scoreboard = await scoreboardPromise;
+        if (cancelled) return;
+
+        // Renderizar tan pronto como tengamos detalles + scoreboard.
+        setPropsToRender({
+          type,
+          id,
+          data: details,
+          castData: [],
+          recommendations: [],
+          reviews: [],
+          providers: [],
+          watchLink: null,
+          initialScoreboard: scoreboard || null,
+        });
+        setRenderReady(true);
+
+        const [cast, reviews, watchProviders, related] = await Promise.all([
+          castPromise,
+          reviewsPromise,
+          watchProvidersPromise,
+          relatedPromise,
         ]);
         if (cancelled) return;
 
         const providers = watchProviders?.providers || [];
         const watchLink = watchProviders?.link || null;
 
-        // ✅ Renderizar de inmediato con recomendaciones vacías (sin esperar Trakt)
         setPropsToRender({
           type,
           id,
           data: details,
           castData: cast?.cast || [],
-          recommendations: [],
+          recommendations: related?.results || [],
           reviews: reviews?.results || [],
           providers,
           watchLink,
           initialScoreboard: scoreboard || null,
         });
-        setRenderReady(true);
-
-        // ✅ Cargar recomendaciones de Trakt en segundo plano, sin bloquear
-        getTraktRelated({ type, tmdbId: id })
-          .then((related) => {
-            if (cancelled) return;
-            const results = related?.results || [];
-            if (results.length > 0) {
-              setPropsToRender((prev) => ({
-                ...prev,
-                recommendations: results,
-              }));
-            }
-          })
-          .catch(() => {
-            // Silencioso: si Trakt falla para este título, no hay recomendaciones
-          });
       } catch (err) {
         console.error("Error cargando detalles:", err);
         // No dejar la página en blanco aunque falle algo inesperado
