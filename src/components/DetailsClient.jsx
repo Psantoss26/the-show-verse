@@ -2419,6 +2419,53 @@ export default function DetailsClient({
     void reloadTraktStatus();
   }, [reloadTraktStatus]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const timers = [];
+
+    const syncTraktState = async () => {
+      const latest = await reloadTraktStatus();
+      if (cancelled || !latest?.connected || type !== "tv") return;
+      await loadTraktShowWatched();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void syncTraktState();
+      }
+    };
+
+    window.addEventListener("focus", syncTraktState);
+    window.addEventListener("pageshow", syncTraktState);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Si el primer intento llegó antes de que Trakt refrescara la sesión,
+    // reintentamos una o dos veces sin exigir recarga manual.
+    if (trakt.loading || (!trakt.connected && !trakt.error)) {
+      [900, 2200].forEach((delay) => {
+        const timer = window.setTimeout(() => {
+          void syncTraktState();
+        }, delay);
+        timers.push(timer);
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
+      window.removeEventListener("focus", syncTraktState);
+      window.removeEventListener("pageshow", syncTraktState);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [
+    reloadTraktStatus,
+    loadTraktShowWatched,
+    type,
+    trakt.loading,
+    trakt.connected,
+    trakt.error,
+  ]);
+
   const handleOpenTraktWatched = useCallback(async () => {
     if (trakt.loading || traktBusy) return;
 
