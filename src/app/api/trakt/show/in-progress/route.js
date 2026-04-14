@@ -12,6 +12,7 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const TMDB_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -63,7 +64,30 @@ async function mapLimit(arr, limit, fn) {
   return out;
 }
 
-export async function GET(request) {
+function isTransientTraktStatus(status) {
+  return [403, 408, 429, 500, 502, 503, 504].includes(Number(status));
+}
+
+async function fetchShowProgress(token, traktId, { timeoutMs = 12000, retries = 1 } = {}) {
+  const progressRes = await traktFetch(
+    `/shows/${encodeURIComponent(traktId)}/progress/watched?hidden=false&specials=false&count_specials=false`,
+    { token, timeoutMs, retries },
+  );
+
+  if (!progressRes.ok) {
+    const err = new Error(
+      progressRes?.json?.error ||
+        progressRes?.json?.message ||
+        `Trakt show progress failed (${progressRes.status})`,
+    );
+    err.status = progressRes.status;
+    throw err;
+  }
+
+  return progressRes.json || null;
+}
+
+export async function GET() {
   const cookieStore = await cookies();
   const { accessToken, refreshToken, expiresAtMs } =
     readTraktCookies(cookieStore);
@@ -84,14 +108,23 @@ export async function GET(request) {
     }
 
     // 1. Obtener todas las series vistas por el usuario (sync/watched/shows devuelve info de progreso)
-    const watchedRes = await traktFetch(
-      "/sync/watched/shows?extended=noseasons",
-      { token },
-    );
+    const watchedRes = await traktFetch("/sync/watched/shows?extended=noseasons", {
+      token,
+      timeoutMs: 15000,
+      retries: 1,
+    });
     if (!watchedRes.ok)
       throw new Error(`Trakt watched shows failed (${watchedRes.status})`);
 
-    const watchedShows = Array.isArray(watchedRes.json) ? watchedRes.json : [];
+    const watchedShowsRaw = Array.isArray(watchedRes.json) ? watchedRes.json : [];
+    const watchedShows = watchedShowsRaw.filter((item, index, arr) => {
+      const traktId = item?.show?.ids?.trakt;
+      if (!traktId) return false;
+      return (
+        arr.findIndex((candidate) => candidate?.show?.ids?.trakt === traktId) ===
+        index
+      );
+    });
 
     // 1.5. Obtener ratings del usuario para todas las series
     let userRatingsMap = new Map();
@@ -101,7 +134,7 @@ export async function GET(request) {
       while (page <= 20) {
         const ratingsRes = await traktFetch(
           `/sync/ratings/shows?extended=full&page=${page}&limit=${limit}`,
-          { token },
+          { token, timeoutMs: 12000, retries: 1 },
         );
         if (!ratingsRes.ok) break;
 
@@ -122,21 +155,20 @@ export async function GET(request) {
       console.warn("Failed to fetch user ratings:", err);
     }
 
-    // 2. Para cada serie, obtener el progreso detallado
-    const progressResults = await mapLimit(watchedShows, 6, async (item) => {
+    // 2. Para cada serie, obtener el progreso detallado. Si Trakt falla de forma
+    // transitoria, guardamos el candidato para una segunda pasada más conservadora.
+    const failedCandidates = [];
+    const progressResults = await mapLimit(watchedShows, 4, async (item) => {
       const show = item?.show;
       const traktId = show?.ids?.trakt;
       const tmdbId = show?.ids?.tmdb;
       if (!traktId || !tmdbId) return null;
 
       try {
-        const progressRes = await traktFetch(
-          `/shows/${encodeURIComponent(traktId)}/progress/watched?hidden=false&specials=false&count_specials=false`,
-          { token },
-        );
-        if (!progressRes.ok) return null;
-
-        const progress = progressRes.json;
+        const progress = await fetchShowProgress(token, traktId, {
+          timeoutMs: 12000,
+          retries: 1,
+        });
         const aired = progress?.aired || 0;
         const completed = progress?.completed || 0;
 
@@ -179,12 +211,72 @@ export async function GET(request) {
           lastWatchedAt,
           user_rating: userRating,
         };
-      } catch {
+      } catch (err) {
+        if (isTransientTraktStatus(err?.status) || err?.isTimeout) {
+          failedCandidates.push(item);
+        }
         return null;
       }
     });
 
-    const inProgress = progressResults.filter(Boolean);
+    const retriedResults = await mapLimit(
+      failedCandidates,
+      2,
+      async (item) => {
+        const show = item?.show;
+        const traktId = show?.ids?.trakt;
+        const tmdbId = show?.ids?.tmdb;
+        if (!traktId || !tmdbId) return null;
+
+        try {
+          const progress = await fetchShowProgress(token, traktId, {
+            timeoutMs: 18000,
+            retries: 2,
+          });
+          const aired = progress?.aired || 0;
+          const completed = progress?.completed || 0;
+
+          if (completed <= 0 || completed >= aired) return null;
+
+          const pct = aired > 0 ? Math.round((completed / aired) * 100) : 0;
+          const nextEp = progress?.next_episode || null;
+          const lastEp = progress?.last_episode || null;
+          const lastWatchedAt =
+            progress?.last_watched_at || item?.last_watched_at || null;
+          const userRating = userRatingsMap.get(Number(traktId)) || null;
+
+          return {
+            traktId,
+            tmdbId,
+            title: show?.title || "Sin título",
+            year: show?.year || null,
+            aired,
+            completed,
+            pct,
+            nextEpisode: nextEp
+              ? {
+                  season: nextEp.season,
+                  number: nextEp.number,
+                  title: nextEp.title || null,
+                }
+              : null,
+            lastEpisode: lastEp
+              ? {
+                  season: lastEp.season,
+                  number: lastEp.number,
+                  title: lastEp.title || null,
+                }
+              : null,
+            lastWatchedAt,
+            user_rating: userRating,
+          };
+        } catch {
+          return null;
+        }
+      },
+    );
+
+    const inProgress = [...progressResults, ...retriedResults].filter(Boolean);
 
     // Ordenar por último visto (más reciente primero)
     inProgress.sort((a, b) => {
