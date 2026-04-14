@@ -1935,6 +1935,12 @@ export default function DetailsClient({
   const [tScoreboard, setTScoreboard] = useState(
     () => parseScoreboardData(initialScoreboard) || defaultScoreboard,
   );
+  const [traktPriorityReady, setTraktPriorityReady] = useState(false);
+  const [scoreboardPriorityReady, setScoreboardPriorityReady] = useState(() => {
+    const prefetched = parseScoreboardData(initialScoreboard);
+    return !!prefetched?.found;
+  });
+  const secondaryPhaseEnabled = traktPriorityReady && scoreboardPriorityReady;
 
   // Clave especial para indicar que una accion afecta al show completo (no un episodio)
   const SHOW_BUSY_KEY = "SHOW";
@@ -1982,6 +1988,11 @@ export default function DetailsClient({
     total: 0,
   });
 
+  useEffect(() => {
+    setTraktPriorityReady(false);
+    setScoreboardPriorityReady(!!parseScoreboardData(initialScoreboard)?.found);
+  }, [id, traktType, initialScoreboard]);
+
   // Resetear todos los datos de la comunidad de Trakt al cambiar de contenido
   useEffect(() => {
     setTSentiment({
@@ -2018,6 +2029,8 @@ export default function DetailsClient({
   // para evitar una segunda petición duplicada al mismo endpoint.
   useEffect(() => {
     let ignore = false;
+
+    if (!secondaryPhaseEnabled) return;
 
     const load = async () => {
       setTComments((p) => ({ ...p, loading: true, error: "" }));
@@ -2100,7 +2113,7 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, traktType, tCommentsTab, tComments.page]);
+  }, [id, traktType, tCommentsTab, tComments.page, secondaryPhaseEnabled]);
 
   // Resetear paginacion de comentarios al cambiar de pestana
   useEffect(() => {
@@ -2116,6 +2129,7 @@ export default function DetailsClient({
   // Carga las temporadas de la serie desde Trakt (con datos extendidos)
   useEffect(() => {
     let ignore = false;
+    if (!secondaryPhaseEnabled) return;
     const load = async () => {
       if (type !== "tv") return;
       setTSeasons((p) => ({ ...p, loading: true, error: "" }));
@@ -2147,13 +2161,15 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, type]);
+  }, [id, type, secondaryPhaseEnabled]);
 
   // Carga las listas de Trakt que contienen este contenido (popular o trending)
   // ⏱️ OPTIMIZACIÓN: Cargar DESPUÉS de scoreboard y stats (menor prioridad)
   useEffect(() => {
     let ignore = false;
     let timeoutId = null;
+
+    if (!secondaryPhaseEnabled) return;
 
     const load = async () => {
       setTLists((p) => ({ ...p, loading: true, error: "" }));
@@ -2209,7 +2225,7 @@ export default function DetailsClient({
       ignore = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [id, traktType, tListsTab, tLists.page]);
+  }, [id, traktType, tListsTab, tLists.page, secondaryPhaseEnabled]);
 
   // Resetear paginacion de listas al cambiar de pestana
   useEffect(() => {
@@ -2274,6 +2290,8 @@ export default function DetailsClient({
             ? "Trakt: límite de peticiones alcanzado"
             : e?.message || "Error recargando Trakt",
       }));
+    } finally {
+      setTraktPriorityReady(true);
     }
   };
 
@@ -2295,6 +2313,7 @@ export default function DetailsClient({
           const cacheKey = `tsb_${traktType}_${id}`;
           localStorage.setItem(cacheKey, JSON.stringify(prefetched));
         } catch {}
+        setScoreboardPriorityReady(true);
         return; // Ya tenemos datos válidos, no necesitamos fetch adicional
       }
 
@@ -2340,12 +2359,17 @@ export default function DetailsClient({
               const cacheKey = `tsb_${traktType}_${id}`;
               localStorage.setItem(cacheKey, JSON.stringify(result));
             } catch {}
+            setScoreboardPriorityReady(true);
             return;
           }
 
           // Si found=true pero sin stats, reintentar (cold start probable)
+          if (result.found && attempt === 0) {
+            setScoreboardPriorityReady(true);
+          }
           if (result.found && attempt < delays.length - 1) continue;
           // Último intento o found=false: aceptar resultado
+          setScoreboardPriorityReady(true);
           return;
         } catch (e) {
           if (ignore) return;
@@ -2365,6 +2389,7 @@ export default function DetailsClient({
               found: false,
               error: errorMsg,
             }));
+            setScoreboardPriorityReady(true);
           }
           // En intentos anteriores, reintentar silenciosamente
         }
@@ -3787,6 +3812,7 @@ export default function DetailsClient({
   // pedir official site a Trakt (si existe, pisa el de TMDb)
   useEffect(() => {
     if (!id) return;
+    if (!secondaryPhaseEnabled) return;
     const ac = new AbortController();
 
     (async () => {
@@ -3808,7 +3834,7 @@ export default function DetailsClient({
     })();
 
     return () => ac.abort();
-  }, [id, endpointType]);
+  }, [id, endpointType, secondaryPhaseEnabled]);
 
   const justWatchUrl = title
     ? `https://www.justwatch.com/es/buscar?q=${encodeURIComponent(title)}`
@@ -4896,12 +4922,14 @@ export default function DetailsClient({
       }
     };
 
+    if (!secondaryPhaseEnabled) return;
     fetchProviders();
-  }, [title, id, endpointType, yearIso, data.imdb_id]);
+  }, [title, id, endpointType, yearIso, data.imdb_id, secondaryPhaseEnabled]);
 
   // ====== PLEX: Cargar disponibilidad desde servidor local ======
   useEffect(() => {
     if (!title || !id) return;
+    if (!secondaryPhaseEnabled) return;
 
     // Cambiar clave de caché para forzar recarga con nuevas URLs corregidas
     const cacheKey = `plex-v13:${endpointType}:${id}`;
@@ -5012,7 +5040,7 @@ export default function DetailsClient({
     };
 
     fetchPlex();
-  }, [title, id, endpointType, yearIso, data.imdb_id]);
+  }, [title, id, endpointType, yearIso, data.imdb_id, secondaryPhaseEnabled]);
 
   // ====== COMBINAR PROVIDERS: JustWatch + Plex ======
   const limitedProviders = useMemo(() => {
