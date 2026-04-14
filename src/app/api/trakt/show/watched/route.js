@@ -1,63 +1,116 @@
 // src/app/api/trakt/show/watched/route.js
-import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { NextResponse } from "next/server";
 import {
-    readTraktCookies,
-    tokenIsExpired,
-    refreshAccessToken,
-    setTraktCookies,
-    traktSearchByTmdb,
+  getValidTraktToken,
+  setTraktCookies,
+  clearTraktCookies,
+  traktApi,
+  traktSearchByTmdb,
+  traktGetProgressWatchedForShow,
+  mapProgressWatchedBySeason,
+} from "@/lib/trakt/server";
 
-    // ✅ CAMBIO: progress watched
-    traktGetProgressWatchedForShow,
-    mapProgressWatchedBySeason,
-} from '@/lib/trakt/server'
-
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 10;
 
 export async function GET(request) {
-    const cookieStore = await cookies()
-    const { accessToken, refreshToken, expiresAtMs } = readTraktCookies(cookieStore)
+  const tmdbId = request.nextUrl.searchParams.get("tmdbId");
+  if (!tmdbId) {
+    return NextResponse.json({ error: "Missing tmdbId" }, { status: 400 });
+  }
 
-    const tmdbId = request.nextUrl.searchParams.get('tmdbId')
-    if (!tmdbId) return NextResponse.json({ error: 'Missing tmdbId' }, { status: 400 })
+  const cookieStore = request.cookies;
+  let token = null;
+  let refreshedTokens = null;
+  let shouldClear = false;
+  let authVerified = false;
 
-    if (!accessToken && !refreshToken) {
-        return NextResponse.json({ connected: false })
+  try {
+    const t = await getValidTraktToken(cookieStore);
+    token = t.token;
+    refreshedTokens = t.refreshedTokens;
+    shouldClear = t.shouldClear;
+
+    if (!token) {
+      const res = NextResponse.json({ connected: false, found: false, watchedBySeason: {} });
+      if (shouldClear) clearTraktCookies(res);
+      return res;
     }
 
-    let token = accessToken
-    let refreshedTokens = null
+    const auth = await traktApi("/users/settings", { token });
+    if (!auth.ok) {
+      if (auth.status === 401) {
+        const res = NextResponse.json({ connected: false, found: false, watchedBySeason: {} });
+        clearTraktCookies(res);
+        return res;
+      }
 
-    try {
-        if (!token || tokenIsExpired(expiresAtMs)) {
-            if (!refreshToken) return NextResponse.json({ connected: false })
-            refreshedTokens = await refreshAccessToken(refreshToken)
-            token = refreshedTokens.access_token
-        }
-
-        const hit = await traktSearchByTmdb(token, { type: 'show', tmdbId })
-        const traktId = hit?.show?.ids?.trakt
-
-        if (!traktId) {
-            const res = NextResponse.json({ connected: true, found: false, watchedBySeason: {} })
-            if (refreshedTokens) setTraktCookies(res, refreshedTokens)
-            return res
-        }
-
-        const progress = await traktGetProgressWatchedForShow(token, { traktId })
-        const watchedBySeason = mapProgressWatchedBySeason(progress)
-
-        const res = NextResponse.json({ connected: true, found: true, traktId, watchedBySeason })
-        if (refreshedTokens) setTraktCookies(res, refreshedTokens)
-        return res
-    } catch (e) {
-        const res = NextResponse.json(
-            { connected: true, error: e?.message || 'Trakt show watched failed' },
-            { status: 500 }
-        )
-        if (refreshedTokens) setTraktCookies(res, refreshedTokens)
-        return res
+      const res = NextResponse.json(
+        {
+          connected: true,
+          found: false,
+          watchedBySeason: {},
+          degraded: true,
+          upstreamStatus: auth.status,
+          error: "Trakt upstream check failed",
+        },
+        { status: 200 },
+      );
+      if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+      return res;
     }
+    authVerified = true;
+
+    const hit = await traktSearchByTmdb(token, { type: "show", tmdbId });
+    const traktId = hit?.show?.ids?.trakt || null;
+
+    if (!traktId) {
+      const res = NextResponse.json({
+        connected: true,
+        found: false,
+        traktId: null,
+        watchedBySeason: {},
+      });
+      if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+      return res;
+    }
+
+    const progress = await traktGetProgressWatchedForShow(token, { traktId });
+    const watchedBySeason = mapProgressWatchedBySeason(progress);
+
+    const res = NextResponse.json({
+      connected: true,
+      found: true,
+      traktId,
+      watchedBySeason,
+    });
+    if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+    return res;
+  } catch (e) {
+    const transientAfterAuth =
+      authVerified &&
+      (e?.status === 403 ||
+        e?.status === 429 ||
+        /timeout|tempor|aborted|fetch/i.test(e?.message || ""));
+
+    const res = NextResponse.json(
+      transientAfterAuth
+        ? {
+            connected: true,
+            found: false,
+            watchedBySeason: {},
+            error: e?.message || "Trakt show watched failed",
+          }
+        : {
+            connected: false,
+            found: false,
+            watchedBySeason: {},
+            error: e?.message || "Trakt show watched failed",
+          },
+      { status: transientAfterAuth ? 200 : 500 },
+    );
+    if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+    return res;
+  }
 }
