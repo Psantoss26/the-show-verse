@@ -1,20 +1,38 @@
 // src/components/details/AnimatedSection.jsx
 "use client";
 
-import { motion } from "framer-motion";
-import { useInView } from "framer-motion";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef } from "react";
+
+function baseTransition(
+  delay = 0,
+  duration = 0.55,
+  shouldReduceMotion = false,
+) {
+  if (shouldReduceMotion) return { duration: 0 };
+  return {
+    duration,
+    delay,
+    ease: [0.22, 1, 0.36, 1],
+  };
+}
 
 export function AnimatedSection({ children, className = "", delay = 0 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const shouldReduceMotion = useReducedMotion();
+
+  const hidden = shouldReduceMotion
+    ? { opacity: 1, y: 0 }
+    : { opacity: 0, y: 18 };
 
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 20 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-      transition={{ duration: 0.5, delay }}
+      initial={hidden}
+      animate={isInView || shouldReduceMotion ? { opacity: 1, y: 0 } : hidden}
+      transition={baseTransition(delay, 0.46, shouldReduceMotion)}
+      style={{ willChange: shouldReduceMotion ? "auto" : "transform, opacity" }}
       className={className}
     >
       {children}
@@ -30,6 +48,7 @@ export function FadeIn({
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const shouldReduceMotion = useReducedMotion();
 
   const directions = {
     up: { y: 20 },
@@ -38,15 +57,19 @@ export function FadeIn({
     right: { x: -20 },
   };
 
-  const initial = { opacity: 0, ...directions[direction] };
-  const animate = isInView ? { opacity: 1, y: 0, x: 0 } : initial;
+  const initial = shouldReduceMotion
+    ? { opacity: 1, x: 0, y: 0 }
+    : { opacity: 0, ...directions[direction] };
+
+  const animate =
+    isInView || shouldReduceMotion ? { opacity: 1, y: 0, x: 0 } : initial;
 
   return (
     <motion.div
       ref={ref}
       initial={initial}
       animate={animate}
-      transition={{ duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] }}
+      transition={baseTransition(delay, 0.6, shouldReduceMotion)}
       className={className}
     >
       {children}
@@ -56,14 +79,24 @@ export function FadeIn({
 
 export function ScaleIn({ children, className = "", delay = 0 }) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true });
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const shouldReduceMotion = useReducedMotion();
+
+  const initial = shouldReduceMotion
+    ? { opacity: 1, scale: 1, y: 0 }
+    : { opacity: 0, scale: 0.985, y: 10 };
 
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.4, delay }}
+      initial={initial}
+      animate={
+        isInView || shouldReduceMotion
+          ? { opacity: 1, scale: 1, y: 0 }
+          : initial
+      }
+      transition={baseTransition(delay, 0.38, shouldReduceMotion)}
+      style={{ willChange: shouldReduceMotion ? "auto" : "transform, opacity" }}
       className={className}
     >
       {children}
@@ -78,18 +111,20 @@ export function StaggerContainer({
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const shouldReduceMotion = useReducedMotion();
 
   return (
     <motion.div
       ref={ref}
       initial="hidden"
-      animate={isInView ? "visible" : "hidden"}
+      animate={isInView || shouldReduceMotion ? "visible" : "hidden"}
       variants={{
-        hidden: { opacity: 0 },
+        hidden: { opacity: shouldReduceMotion ? 1 : 0 },
         visible: {
           opacity: 1,
           transition: {
-            staggerChildren: staggerDelay,
+            staggerChildren: shouldReduceMotion ? 0 : staggerDelay,
+            delayChildren: shouldReduceMotion ? 0 : 0.02,
           },
         },
       }}
@@ -101,14 +136,18 @@ export function StaggerContainer({
 }
 
 export function StaggerItem({ children, className = "" }) {
+  const shouldReduceMotion = useReducedMotion();
+
   return (
     <motion.div
       variants={{
-        hidden: { opacity: 0, y: 20 },
+        hidden: shouldReduceMotion
+          ? { opacity: 1, y: 0 }
+          : { opacity: 0, y: 10 },
         visible: {
           opacity: 1,
           y: 0,
-          transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+          transition: baseTransition(0, 0.34, shouldReduceMotion),
         },
       }}
       className={className}
@@ -125,17 +164,22 @@ export function SlideInFromSide({
   delay = 0,
 }) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true });
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const shouldReduceMotion = useReducedMotion();
 
-  const initial =
-    from === "left" ? { opacity: 0, x: -50 } : { opacity: 0, x: 50 };
+  const initial = shouldReduceMotion
+    ? { opacity: 1, x: 0 }
+    : from === "left"
+      ? { opacity: 0, x: -26 }
+      : { opacity: 0, x: 26 };
 
   return (
     <motion.div
       ref={ref}
       initial={initial}
-      animate={isInView ? { opacity: 1, x: 0 } : initial}
-      transition={{ duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] }}
+      animate={isInView || shouldReduceMotion ? { opacity: 1, x: 0 } : initial}
+      transition={baseTransition(delay, 0.46, shouldReduceMotion)}
+      style={{ willChange: shouldReduceMotion ? "auto" : "transform, opacity" }}
       className={className}
     >
       {children}

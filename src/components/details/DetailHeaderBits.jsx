@@ -2,8 +2,8 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Star, Share2, Check } from "lucide-react";
-import LiquidButton from "../LiquidButton";
 
 export function CompactBadge({
   logo,
@@ -17,16 +17,20 @@ export function CompactBadge({
   hideSubOnMobile = false,
   logoClassName = "",
 }) {
-  const Comp = href ? "a" : onClick ? "button" : "div";
+  const MotionComp = href ? motion.a : onClick ? motion.button : motion.div;
   const isInteractive = !!(href || onClick);
 
   return (
-    <Comp
+    <MotionComp
       href={href}
       onClick={onClick}
       target={href ? "_blank" : undefined}
       rel={href ? "noopener noreferrer" : undefined}
       type={onClick && !href ? "button" : undefined}
+      initial={{ opacity: 0, y: 6, scale: 0.99 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      whileHover={isInteractive ? { y: -1 } : undefined}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       className={`
         flex items-center gap-2.5 group select-none min-w-0
         ${isInteractive ? "cursor-pointer" : ""}
@@ -76,7 +80,7 @@ export function CompactBadge({
           )}
         </div>
       </div>
-    </Comp>
+    </MotionComp>
   );
 }
 
@@ -89,43 +93,36 @@ export function ExternalLinkButton({
   iconSize,
   className = "",
   loading = false,
-  fallbackHref = null, // si aún no está resuelto, puedes abrir búsqueda (opcional)
+  fallbackHref = null,
 }) {
   const finalHref = href || fallbackHref || null;
-  const disabled = !finalHref && !loading; // si loading=true mostramos el botón (placeholder)
-
-  // Detectar si es el icono de sitio web para aplicar ajuste posicional
+  const disabled = !finalHref && !loading;
   const isWebIcon = icon?.includes("logo-Web");
-
-  // Detectar si es el icono de Letterboxd para ajustar tamaño (PNG tiene mucho padding)
   const isLetterboxdIcon = icon?.includes("logo-Letterboxd");
 
   return (
-    <button
+    <motion.button
       type="button"
       disabled={disabled}
+      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-
-        // si está loading y NO hay href final (ni fallback), no hacemos nada
         if (!finalHref) return;
-
-        // si te pasan onClick, respétalo
         if (onClick) return onClick(e);
-
         window.open(finalHref, "_blank", "noopener,noreferrer");
       }}
       title={title}
       aria-label={title}
       className={[
         "relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10",
-        disabled ? "opacity-0 pointer-events-none" : "", // si no hay link real, NO se muestra
+        disabled ? "opacity-0 pointer-events-none" : "",
         className,
       ].join(" ")}
       style={size ? { width: size, height: size } : undefined}
     >
-      {/* Logo */}
       <img
         src={icon}
         alt=""
@@ -134,26 +131,31 @@ export function ExternalLinkButton({
         draggable="false"
       />
 
-      {/* Overlay loading (no “apaga” el icono) */}
       {loading && (
         <span className="absolute inset-0 grid place-items-center">
           <span className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white/70 animate-spin" />
         </span>
       )}
-    </button>
+    </motion.button>
   );
 }
 
 export function MiniStat({ icon: Icon, value, tooltip }) {
   return (
-    <div className="flex items-center gap-2 group shrink-0" title={tooltip}>
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      className="flex items-center gap-2 group shrink-0"
+      title={tooltip}
+    >
       <div className="p-1.5 bg-white/5 rounded-full group-hover:bg-white/10 transition-colors">
         <Icon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" />
       </div>
       <span className="text-xs font-semibold text-zinc-400 font-mono tracking-tight group-hover:text-zinc-300">
         {value}
       </span>
-    </div>
+    </motion.div>
   );
 }
 
@@ -166,8 +168,11 @@ export function UnifiedRateButton({
 }) {
   if (!connected) {
     return (
-      <button
+      <motion.button
         onClick={onConnect}
+        initial={{ opacity: 0, y: 8, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         className="flex items-center gap-2 px-3 h-9 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
         title="Conectar para puntuar"
       >
@@ -175,14 +180,17 @@ export function UnifiedRateButton({
         <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
           Rate
         </span>
-      </button>
+      </motion.button>
     );
   }
 
   const hasRating = rating && rating > 0;
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className={`
       relative group flex items-center justify-center gap-2 px-3 h-9 rounded-full transition-all border cursor-pointer
       ${
@@ -226,7 +234,7 @@ export function UnifiedRateButton({
           ))}
         </select>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -238,17 +246,13 @@ export function ActionShareButton({ title, text, url }) {
       url || (typeof window !== "undefined" ? window.location.href : "");
     if (!finalUrl) return;
 
-    // En móvil/WhatsApp: comparte SOLO el link (los OG tags harán la preview)
     if (navigator.share) {
       try {
-        await navigator.share({ url: finalUrl });
+        await navigator.share({ title, text, url: finalUrl });
         return;
-      } catch {
-        // cancelado o no soportado completamente → fallback a copiar
-      }
+      } catch {}
     }
 
-    // Fallback: copiar
     try {
       await navigator.clipboard.writeText(finalUrl);
       setCopied(true);
@@ -259,9 +263,12 @@ export function ActionShareButton({ title, text, url }) {
   };
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={handleShare}
+      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className="group inline-flex items-center justify-center gap-2 rounded-xl border transition-all duration-300 p-2 sm:px-3 sm:py-2 bg-transparent border-white/10 text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
       title={copied ? "¡Enlace copiado!" : "Compartir"}
     >
@@ -273,6 +280,6 @@ export function ActionShareButton({ title, text, url }) {
       <span className="hidden sm:block text-sm font-medium">
         {copied ? "Copiado" : "Compartir"}
       </span>
-    </button>
+    </motion.button>
   );
 }

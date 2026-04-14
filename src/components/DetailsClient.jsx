@@ -27,7 +27,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/swiper-bundle.css";
 
 // -- Animaciones con Framer Motion --
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 // -- Componentes internos del proyecto --
 import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
@@ -2254,70 +2254,73 @@ export default function DetailsClient({
   }, [syncTrakt]);
 
   // Recarga el estado de Trakt (visto, rating, historial, watchlist) para el contenido actual
-  const reloadTraktStatus = useCallback(async ({ background = false } = {}) => {
-    if (!background) {
-      setTrakt((p) => ({ ...p, loading: true, error: "" }));
-    }
+  const reloadTraktStatus = useCallback(
+    async ({ background = false } = {}) => {
+      if (!background) {
+        setTrakt((p) => ({ ...p, loading: true, error: "" }));
+      }
 
-    try {
-      const json = await withTimeout(
-        traktGetItemStatus({ type: traktType, tmdbId: id }),
-        25000,
-      );
+      try {
+        const json = await withTimeout(
+          traktGetItemStatus({ type: traktType, tmdbId: id }),
+          25000,
+        );
 
-      let nextState = null;
-      setTrakt((prev) => {
-        const preserveTvWatched =
-          endpointType === "tv" && watchedBySeasonLoaded;
+        let nextState = null;
+        setTrakt((prev) => {
+          const preserveTvWatched =
+            endpointType === "tv" && watchedBySeasonLoaded;
 
-        nextState = {
-          ...prev,
-          loading: false,
-          connected: !!json.connected,
-          found: !!json.found,
-          traktId: json.traktId ?? null,
-          traktUrl: json.traktUrl || null,
-          watched: preserveTvWatched ? prev.watched : !!json.watched,
-          plays: Number(json.plays || 0),
-          lastWatchedAt: json.lastWatchedAt || null,
-          rating: typeof json.rating === "number" ? json.rating : null,
-          inWatchlist: !!json.inWatchlist,
-          progress: json.progress || null,
-          history: Array.isArray(json.history) ? json.history : [],
-          error: "",
-        };
+          nextState = {
+            ...prev,
+            loading: false,
+            connected: !!json.connected,
+            found: !!json.found,
+            traktId: json.traktId ?? null,
+            traktUrl: json.traktUrl || null,
+            watched: preserveTvWatched ? prev.watched : !!json.watched,
+            plays: Number(json.plays || 0),
+            lastWatchedAt: json.lastWatchedAt || null,
+            rating: typeof json.rating === "number" ? json.rating : null,
+            inWatchlist: !!json.inWatchlist,
+            progress: json.progress || null,
+            history: Array.isArray(json.history) ? json.history : [],
+            error: "",
+          };
+          return nextState;
+        });
         return nextState;
-      });
-      return nextState;
-    } catch (e) {
-      const isTimeout = e?.message === "Timeout";
-      const isRateLimit = /rate limit|temporalmente no disponible/i.test(
-        e?.message || "",
-      );
-      const isTransient =
-        isTimeout ||
-        isRateLimit ||
-        /aborted|fetch|network|server error/i.test(e?.message || "");
+      } catch (e) {
+        const isTimeout = e?.message === "Timeout";
+        const isRateLimit = /rate limit|temporalmente no disponible/i.test(
+          e?.message || "",
+        );
+        const isTransient =
+          isTimeout ||
+          isRateLimit ||
+          /aborted|fetch|network|server error/i.test(e?.message || "");
 
-      let nextState = null;
-      setTrakt((p) => {
-        nextState = {
-          ...p,
-          loading: false,
-          connected: isTransient ? p.connected : false,
-          error: background
-            ? p.error
-            : isTimeout
-              ? ""
-              : isRateLimit
-                ? "Trakt: límite de peticiones alcanzado"
-                : e?.message || "Error recargando Trakt",
-        };
+        let nextState = null;
+        setTrakt((p) => {
+          nextState = {
+            ...p,
+            loading: false,
+            connected: isTransient ? p.connected : false,
+            error: background
+              ? p.error
+              : isTimeout
+                ? ""
+                : isRateLimit
+                  ? "Trakt: límite de peticiones alcanzado"
+                  : e?.message || "Error recargando Trakt",
+          };
+          return nextState;
+        });
         return nextState;
-      });
-      return nextState;
-    }
-  }, [traktType, id, endpointType, watchedBySeasonLoaded]);
+      }
+    },
+    [traktType, id, endpointType, watchedBySeasonLoaded],
+  );
 
   // Carga el scoreboard de Trakt (rating de la comunidad y estadisticas de uso)
   // Si ya tenemos datos prefetched con stats numéricas, solo refrescar en background
@@ -5294,7 +5297,8 @@ export default function DetailsClient({
   const posterCardRef = useRef(null);
   const posterShineRef = useRef(null);
   const posterRafRef = useRef(0);
-  const [poster3dEnabled, setPoster3dEnabled] = useState(true);
+  const prefersReducedMotion = useReducedMotion();
+  const [poster3dEnabled, setPoster3dEnabled] = useState(false);
   // ====== Poster 3D Idle / Tilt (ORDEN CORRECTO) ======
   const posterIdleRafRef = useRef(0);
   const posterIsInteractingRef = useRef(false);
@@ -5305,13 +5309,62 @@ export default function DetailsClient({
   const posterStateRef = useRef({ rx: 0, ry: 0, s: 1 });
   const posterLastInputRef = useRef(0);
 
-  const POSTER_MAX = 12; // grados
-  const POSTER_SCALE = 1.06; // escala al hover
+  const POSTER_MAX = 10; // grados
+  const POSTER_SCALE = 1.03; // escala al hover
   const POSTER_OVERSCAN = 1.02; // Minimo para no perder nitidez
-  const IDLE_DELAY = 220; // ms sin interacción => idle
 
   // Overscan
-  const posterImgOverscan = poster3dEnabled ? 1.12 : 1;
+  const posterImgOverscan = poster3dEnabled ? 1.08 : 1;
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setPoster3dEnabled(false);
+      return;
+    }
+
+    if (typeof window === "undefined") return;
+
+    const media = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const update = () => setPoster3dEnabled(media.matches);
+
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, [prefersReducedMotion]);
+
+  const kickPosterAnimation = useCallback(() => {
+    if (!poster3dEnabled || posterAnimRafRef.current) return;
+
+    const el = posterTiltRef.current;
+    if (!el) return;
+
+    const loop = () => {
+      const cur = posterStateRef.current;
+      const target = posterTargetRef.current;
+      const k = posterIsInteractingRef.current ? 0.18 : 0.14;
+
+      cur.rx += (target.rx - cur.rx) * k;
+      cur.ry += (target.ry - cur.ry) * k;
+      cur.s += (target.s - cur.s) * k;
+
+      el.style.transform =
+        `translateZ(0px) rotateX(${cur.rx.toFixed(3)}deg) rotateY(${cur.ry.toFixed(3)}deg) ` +
+        `scale3d(${cur.s.toFixed(4)}, ${cur.s.toFixed(4)}, ${cur.s.toFixed(4)})`;
+
+      const isSettled =
+        Math.abs(target.rx - cur.rx) < 0.02 &&
+        Math.abs(target.ry - cur.ry) < 0.02 &&
+        Math.abs(target.s - cur.s) < 0.002;
+
+      if (posterIsInteractingRef.current || !isSettled) {
+        posterAnimRafRef.current = requestAnimationFrame(loop);
+      } else {
+        posterAnimRafRef.current = 0;
+      }
+    };
+
+    posterAnimRafRef.current = requestAnimationFrame(loop);
+  }, [poster3dEnabled]);
 
   const setPosterTargetFromPointer = useCallback(
     (clientX, clientY) => {
@@ -5332,74 +5385,45 @@ export default function DetailsClient({
       const rx = ((y - cy) / cy) * -POSTER_MAX;
       const ry = ((x - cx) / cx) * POSTER_MAX;
 
+      posterIsInteractingRef.current = true;
       posterTargetRef.current = { rx, ry, s: POSTER_SCALE };
-      posterLastInputRef.current =
-        typeof performance !== "undefined" ? performance.now() : Date.now();
+      kickPosterAnimation();
     },
-    [poster3dEnabled],
+    [kickPosterAnimation, poster3dEnabled],
   );
 
   const resetPosterTarget = useCallback(() => {
+    posterIsInteractingRef.current = false;
     posterTargetRef.current = { rx: 0, ry: 0, s: 1 };
-    posterLastInputRef.current =
-      typeof performance !== "undefined" ? performance.now() : Date.now();
-  }, []);
+    kickPosterAnimation();
+  }, [kickPosterAnimation]);
 
-  // Animacion 3D del poster/backdrop
+  // Animacion 3D del poster/backdrop solo cuando hay interaccion
   useEffect(() => {
-    if (!poster3dEnabled) return;
-
     const el = posterTiltRef.current;
     if (!el) return;
 
-    let mounted = true;
-
-    // Resetear posterLastInputRef para que idle funcione inmediatamente al cambiar imagen
-    posterLastInputRef.current =
-      typeof performance !== "undefined" ? performance.now() : Date.now();
-
-    const loop = (t) => {
-      if (!mounted) return;
-
-      const now =
-        t ??
-        (typeof performance !== "undefined" ? performance.now() : Date.now());
-      const idle = now - posterLastInputRef.current > IDLE_DELAY;
-
-      let target = posterTargetRef.current;
-
-      // Idle automatico cuando no hay interaccion (mas visual pero estable)
-      if (idle) {
-        const dt = now / 1000;
-        target = {
-          rx: Math.sin(dt * 1.05) * 5.5,
-          ry: Math.cos(dt * 0.9) * 8.5,
-          s: 1.03 + Math.sin(dt * 1.6) * 0.01,
-        };
-      }
-
-      const cur = posterStateRef.current;
-
-      // LERP suave (fluido y responsivo)
-      const k = 0.14;
-      cur.rx += (target.rx - cur.rx) * k;
-      cur.ry += (target.ry - cur.ry) * k;
-      cur.s += (target.s - cur.s) * k;
-
+    if (!poster3dEnabled) {
       el.style.transform =
-        `translateZ(0px) rotateX(${cur.rx.toFixed(3)}deg) rotateY(${cur.ry.toFixed(3)}deg) ` +
-        `scale3d(${cur.s.toFixed(4)}, ${cur.s.toFixed(4)}, ${cur.s.toFixed(4)})`;
+        "translateZ(0px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)";
+      if (posterAnimRafRef.current) {
+        cancelAnimationFrame(posterAnimRafRef.current);
+        posterAnimRafRef.current = 0;
+      }
+      return;
+    }
 
-      posterAnimRafRef.current = requestAnimationFrame(loop);
-    };
-
-    posterAnimRafRef.current = requestAnimationFrame(loop);
+    posterIsInteractingRef.current = false;
+    posterTargetRef.current = { rx: 0, ry: 0, s: 1 };
+    posterStateRef.current = { rx: 0, ry: 0, s: 1 };
+    el.style.transform =
+      "translateZ(0px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)";
 
     return () => {
-      mounted = false;
-      if (posterAnimRafRef.current)
+      if (posterAnimRafRef.current) {
         cancelAnimationFrame(posterAnimRafRef.current);
-      posterAnimRafRef.current = 0;
+        posterAnimRafRef.current = 0;
+      }
     };
   }, [poster3dEnabled, displayPosterPath]);
 
@@ -5479,7 +5503,12 @@ export default function DetailsClient({
         {/* =================================================================
             HEADER HERO SECTION (Diseño Final Solicitado)
            ================================================================= */}
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 animate-in fade-in duration-700 slide-in-from-bottom-4 items-start">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 items-start transform-gpu"
+        >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
             className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-[max-width] duration-500 ease-out ${
@@ -5537,24 +5566,26 @@ export default function DetailsClient({
                   >
                     {/* Imagen anterior (permanece visible hasta que la nueva carga) */}
                     <AnimatePresence>
-                      {prevPosterPath && posterTransitioning && !currentLowLoaded && (
-                        <motion.div
-                          key="prev-poster"
-                          initial={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.45, ease: "easeInOut" }}
-                          className="absolute inset-0 z-0"
-                        >
-                          <img
-                            src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
-                            alt={title}
-                            className="absolute inset-0 w-full h-full object-cover"
-                            style={{
-                              transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
-                            }}
-                          />
-                        </motion.div>
-                      )}
+                      {prevPosterPath &&
+                        posterTransitioning &&
+                        !currentLowLoaded && (
+                          <motion.div
+                            key="prev-poster"
+                            initial={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.45, ease: "easeInOut" }}
+                            className="absolute inset-0 z-0"
+                          >
+                            <img
+                              src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
+                              alt={title}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              style={{
+                                transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
+                              }}
+                            />
+                          </motion.div>
+                        )}
                     </AnimatePresence>
 
                     {posterLowUrl && !currentImgError && (
@@ -5645,11 +5676,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Providers Grid + Enlaces Externos (cuando es backdrop) */}
             {(limitedProviders && limitedProviders.length > 0) ||
             (isBackdropPoster && externalLinks.length > 0) ? (
-              <div className="flex flex-row flex-nowrap justify-center items-center gap-3 w-full px-1 py-2 overflow-x-auto [scrollbar-width:none]">
+              <StaggerContainer
+                className="flex flex-row flex-nowrap justify-center items-center gap-3 w-full px-1 py-2 overflow-x-auto [scrollbar-width:none]"
+                staggerDelay={0.05}
+              >
                 {/* Providers - Solo si hay plataformas */}
                 {limitedProviders && limitedProviders.length > 0 && (
                   <div className="flex flex-row flex-nowrap items-center gap-2">
-                    {limitedProviders.map((p) => {
+                    {limitedProviders.map((p, index) => {
                       const isPlexProvider = p.isPlex === true;
 
                       // Para Plex: enlazar a /api/plex/open (página de redirección
@@ -5704,9 +5738,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       }
 
                       return (
-                        <a
+                        <motion.a
                           key={p.provider_id}
                           href={providerLink}
+                          initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          transition={{
+                            duration: 0.28,
+                            delay: 0.03 + index * 0.04,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
                           target={
                             // Para Plex: la página /api/plex/open se carga en la
                             // misma pestaña (navegación completa = más fiable para
@@ -5747,7 +5788,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               title="Disponible en tu servidor local"
                             />
                           )}
-                        </a>
+                        </motion.a>
                       );
                     })}
                   </div>
@@ -5761,15 +5802,22 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       <div className="w-px h-8 bg-white/20 flex-shrink-0" />
                     )}
                     <div className="flex flex-row flex-nowrap items-center gap-2">
-                      {externalLinks.slice(0, 5).map((link) => {
+                      {externalLinks.slice(0, 5).map((link, index) => {
                         // Detectar si es Letterboxd para ajustar escala
                         const isLetterboxdIcon =
                           link.icon?.includes("logo-Letterboxd");
 
                         return (
-                          <a
+                          <motion.a
                             key={link.id}
                             href={link.href}
+                            initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{
+                              duration: 0.28,
+                              delay: 0.06 + index * 0.04,
+                              ease: [0.22, 1, 0.36, 1],
+                            }}
                             target="_blank"
                             rel="noreferrer"
                             title={link.label}
@@ -5783,13 +5831,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 e.target.style.display = "none";
                               }}
                             />
-                          </a>
+                          </motion.a>
                         );
                       })}
                     </div>
                   </>
                 )}
-              </div>
+              </StaggerContainer>
             ) : null}
           </div>
 
@@ -5800,7 +5848,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             }`}
           >
             {/* 1. TÍTULO Y CABECERA */}
-            <div className="mb-5 px-1">
+            <FadeIn delay={0.06} className="mb-5 px-1">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
                 {title}
               </h1>
@@ -5846,133 +5894,135 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   ))}
                 </div>
               </div>
-            </div>
+            </FadeIn>
 
             {/* =================================================================
                 BARRA DE ACCIONES PRINCIPALES
                ================================================================= */}
             {/* Sección de botones de acción rápida: reproducir tráiler, marcar como visto,
                 puntuar, agregar a favoritos, watchlist y listas, cambiar portada */}
-            <div className="flex flex-wrap items-center gap-2 mb-6 px-1">
-              {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
-              <LiquidButton
-                onClick={() => openVideo(preferredVideo)}
-                disabled={!preferredVideo}
-                activeColor="yellow"
-                groupId="details-actions"
-                className={preferredVideo ? "!bg-white !text-black" : ""}
-                title={preferredVideo ? "Ver Tráiler" : "Sin Tráiler"}
-              >
-                <Play
-                  className={`w-5 h-5 fill-current ${preferredVideo ? "ml-0.5" : ""}`}
-                />
-              </LiquidButton>
-
-              {/* Separador vertical entre el botón de tráiler y los controles de Trakt */}
-              <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
-
-              {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
-              <TraktWatchedControl
-                connected={trakt.connected}
-                watched={trakt.watched}
-                plays={endpointType === "tv" ? 0 : trakt.plays}
-                badge={endpointType === "tv" ? tvProgressBadge : null}
-                busy={!!traktBusy}
-                loading={trakt.loading}
-                onOpen={handleOpenTraktWatched}
-              />
-
-              {/* Componente de puntuación con estrellas - Rating unificado TMDb + Trakt */}
-              {/* Permite al usuario puntuar el contenido, sincronizando entre ambas plataformas */}
-              <StarRating
-                rating={unifiedUserRating}
-                max={10}
-                loading={accountStatesLoading || ratingLoading || !!traktBusy}
-                onRate={handleUnifiedRate}
-                connected={!!session || trakt.connected}
-                onConnect={() => {
-                  window.location.href = "/login";
-                }}
-              />
-
-              {/* Botón de Favoritos - Añade o quita el contenido de la lista de favoritos del usuario */}
-              <LiquidButton
-                onClick={toggleFavorite}
-                disabled={favLoading}
-                active={favorite}
-                activeColor="red"
-                groupId="details-actions"
-                title="Favorito"
-              >
-                {favLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Heart
-                    className={`w-5 h-5 ${favorite ? "fill-current" : ""}`}
-                  />
-                )}
-              </LiquidButton>
-
-              {/* Botón de Watchlist - Añade o quita el contenido de la lista de pendientes */}
-              <LiquidButton
-                onClick={toggleWatchlist}
-                disabled={wlLoading}
-                active={watchlist}
-                activeColor="blue"
-                groupId="details-actions"
-                title="Watchlist"
-              >
-                {wlLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <BookmarkPlus
-                    className={`w-5 h-5 ${watchlist ? "fill-current" : ""}`}
-                  />
-                )}
-              </LiquidButton>
-
-              {/* Botón de añadir a listas personalizadas - Solo visible si el usuario tiene acceso a listas */}
-              {canUseLists && (
+            <FadeIn delay={0.12} className="mb-6 px-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
                 <LiquidButton
-                  onClick={openListsModal}
-                  disabled={listsPresenceLoading}
-                  active={listActive}
-                  activeColor="purple"
+                  onClick={() => openVideo(preferredVideo)}
+                  disabled={!preferredVideo}
+                  activeColor="yellow"
                   groupId="details-actions"
-                  title="Añadir a lista"
+                  className={preferredVideo ? "!bg-white !text-black" : ""}
+                  title={preferredVideo ? "Ver Tráiler" : "Sin Tráiler"}
                 >
-                  {listsPresenceLoading ? (
+                  <Play
+                    className={`w-5 h-5 fill-current ${preferredVideo ? "ml-0.5" : ""}`}
+                  />
+                </LiquidButton>
+
+                {/* Separador vertical entre el botón de tráiler y los controles de Trakt */}
+                <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
+
+                {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
+                <TraktWatchedControl
+                  connected={trakt.connected}
+                  watched={trakt.watched}
+                  plays={endpointType === "tv" ? 0 : trakt.plays}
+                  badge={endpointType === "tv" ? tvProgressBadge : null}
+                  busy={!!traktBusy}
+                  loading={trakt.loading}
+                  onOpen={handleOpenTraktWatched}
+                />
+
+                {/* Componente de puntuación con estrellas - Rating unificado TMDb + Trakt */}
+                {/* Permite al usuario puntuar el contenido, sincronizando entre ambas plataformas */}
+                <StarRating
+                  rating={unifiedUserRating}
+                  max={10}
+                  loading={accountStatesLoading || ratingLoading || !!traktBusy}
+                  onRate={handleUnifiedRate}
+                  connected={!!session || trakt.connected}
+                  onConnect={() => {
+                    window.location.href = "/login";
+                  }}
+                />
+
+                {/* Botón de Favoritos - Añade o quita el contenido de la lista de favoritos del usuario */}
+                <LiquidButton
+                  onClick={toggleFavorite}
+                  disabled={favLoading}
+                  active={favorite}
+                  activeColor="red"
+                  groupId="details-actions"
+                  title="Favorito"
+                >
+                  {favLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <ListVideo className="w-5 h-5" />
+                    <Heart
+                      className={`w-5 h-5 ${favorite ? "fill-current" : ""}`}
+                    />
                   )}
                 </LiquidButton>
-              )}
 
-              {/* Botón para cambiar entre vista de portada y vista previa (backdrop) */}
-              {/* Permite alternar la imagen principal entre el póster y el backdrop */}
-              <LiquidButton
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleCyclePoster();
-                }}
-                active={posterViewMode === "preview"}
-                activeColor="orange"
-                groupId="details-actions"
-                title={
-                  posterViewMode === "preview"
-                    ? "Mostrar portada"
-                    : "Mostrar vista previa"
-                }
-              >
-                <ImageIcon
-                  className={`w-5 h-5 transition-all duration-200 ${
-                    posterToggleBusy ? "scale-95 opacity-75" : "scale-100"
-                  }`}
-                />
-              </LiquidButton>
-            </div>
+                {/* Botón de Watchlist - Añade o quita el contenido de la lista de pendientes */}
+                <LiquidButton
+                  onClick={toggleWatchlist}
+                  disabled={wlLoading}
+                  active={watchlist}
+                  activeColor="blue"
+                  groupId="details-actions"
+                  title="Watchlist"
+                >
+                  {wlLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <BookmarkPlus
+                      className={`w-5 h-5 ${watchlist ? "fill-current" : ""}`}
+                    />
+                  )}
+                </LiquidButton>
+
+                {/* Botón de añadir a listas personalizadas - Solo visible si el usuario tiene acceso a listas */}
+                {canUseLists && (
+                  <LiquidButton
+                    onClick={openListsModal}
+                    disabled={listsPresenceLoading}
+                    active={listActive}
+                    activeColor="purple"
+                    groupId="details-actions"
+                    title="Añadir a lista"
+                  >
+                    {listsPresenceLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ListVideo className="w-5 h-5" />
+                    )}
+                  </LiquidButton>
+                )}
+
+                {/* Botón para cambiar entre vista de portada y vista previa (backdrop) */}
+                {/* Permite alternar la imagen principal entre el póster y el backdrop */}
+                <LiquidButton
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCyclePoster();
+                  }}
+                  active={posterViewMode === "preview"}
+                  activeColor="orange"
+                  groupId="details-actions"
+                  title={
+                    posterViewMode === "preview"
+                      ? "Mostrar portada"
+                      : "Mostrar vista previa"
+                  }
+                >
+                  <ImageIcon
+                    className={`w-5 h-5 transition-all duration-200 ${
+                      posterToggleBusy ? "scale-95 opacity-75" : "scale-100"
+                    }`}
+                  />
+                </LiquidButton>
+              </div>
+            </FadeIn>
 
             {/* =================================================================
                 PANEL DE PUNTUACIONES Y ESTADÍSTICAS
@@ -5980,9 +6030,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Tarjeta compacta que muestra los ratings de diferentes plataformas
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
-            <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
-              <div
-                className="
+            <ScaleIn delay={0.18} className="mb-6">
+              <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden">
+                <div
+                  className="
       py-3
       pl-[calc(1rem+env(safe-area-inset-left))]
       pr-[calc(1.25rem+env(safe-area-inset-right))]
@@ -5990,267 +6041,268 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
       flex items-center gap-3 sm:gap-4
       overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
     "
-              >
-                {/* ========== A. RATINGS - Puntuaciones de diferentes plataformas ========== */}
-                {/* Sección de badges compactos que muestran las puntuaciones y votos de cada plataforma */}
-                <div className="flex items-center gap-4 sm:gap-5 shrink-0">
-                  {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
-                  {tScoreboard.loading && (
-                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  )}
+                >
+                  {/* ========== A. RATINGS - Puntuaciones de diferentes plataformas ========== */}
+                  {/* Sección de badges compactos que muestran las puntuaciones y votos de cada plataforma */}
+                  <div className="flex items-center gap-4 sm:gap-5 shrink-0">
+                    {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
+                    {tScoreboard.loading && (
+                      <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    )}
 
-                  {/* Badge de TMDb - Muestra la puntuación promedio y número de votos */}
-                  <CompactBadge
-                    logo="/logo-TMDb.png"
-                    logoClassName="h-2 sm:h-4"
-                    value={data.vote_average?.toFixed(1)}
-                    sub={formatCountShort(data.vote_count)}
-                    href={tmdbDetailUrl}
-                  />
-
-                  {/* Badge de Trakt - Muestra puntuación en formato decimal cuando el usuario está conectado */}
-                  {/* En móvil sin sufijo, en desktop con % */}
-                  {traktDecimal && (
+                    {/* Badge de TMDb - Muestra la puntuación promedio y número de votos */}
                     <CompactBadge
-                      logo="/logo-Trakt.png"
-                      value={traktDecimal}
-                      sub={
-                        tScoreboard.votes
-                          ? formatCountShort(tScoreboard.votes)
-                          : undefined
-                      }
-                      href={trakt?.traktUrl}
-                      onClick={
-                        !trakt?.connected
-                          ? () =>
-                              window.location.assign(
-                                `/api/trakt/auth/start?next=/details/${type}/${id}`,
-                              )
-                          : undefined
-                      }
+                      logo="/logo-TMDb.png"
+                      logoClassName="h-2 sm:h-4"
+                      value={data.vote_average?.toFixed(1)}
+                      sub={formatCountShort(data.vote_count)}
+                      href={tmdbDetailUrl}
                     />
-                  )}
 
-                  {/* Badge de Trakt alternativo cuando no hay conexión pero existe score público */}
-                  {/* Se muestra solo si el usuario no está conectado a Trakt pero hay datos públicos disponibles */}
-                  {!traktDecimal &&
-                    !trakt?.connected &&
-                    tScoreboard?.rating && (
+                    {/* Badge de Trakt - Muestra puntuación en formato decimal cuando el usuario está conectado */}
+                    {/* En móvil sin sufijo, en desktop con % */}
+                    {traktDecimal && (
                       <CompactBadge
                         logo="/logo-Trakt.png"
-                        value={Number(tScoreboard.rating).toFixed(1)}
+                        value={traktDecimal}
                         sub={
                           tScoreboard.votes
                             ? formatCountShort(tScoreboard.votes)
                             : undefined
                         }
-                        onClick={() =>
-                          window.location.assign(
-                            `/api/trakt/auth/start?next=/details/${type}/${id}`,
-                          )
+                        href={trakt?.traktUrl}
+                        onClick={
+                          !trakt?.connected
+                            ? () =>
+                                window.location.assign(
+                                  `/api/trakt/auth/start?next=/details/${type}/${id}`,
+                                )
+                            : undefined
                         }
                       />
                     )}
 
-                  {/* Badge de IMDb - Muestra rating y votos, enlaza al título en IMDb */}
-                  {extras.imdbRating && (
-                    <CompactBadge
-                      logo="/logo-IMDb.png"
-                      logoClassName="h-5 sm:h-5"
-                      value={Number(extras.imdbRating).toFixed(1)}
-                      sub={formatCountShort(extras.imdbVotes)}
-                      href={
-                        resolvedImdbId
-                          ? `https://www.imdb.com/title/${resolvedImdbId}`
-                          : undefined
-                      }
-                    />
-                  )}
+                    {/* Badge de Trakt alternativo cuando no hay conexión pero existe score público */}
+                    {/* Se muestra solo si el usuario no está conectado a Trakt pero hay datos públicos disponibles */}
+                    {!traktDecimal &&
+                      !trakt?.connected &&
+                      tScoreboard?.rating && (
+                        <CompactBadge
+                          logo="/logo-Trakt.png"
+                          value={Number(tScoreboard.rating).toFixed(1)}
+                          sub={
+                            tScoreboard.votes
+                              ? formatCountShort(tScoreboard.votes)
+                              : undefined
+                          }
+                          onClick={() =>
+                            window.location.assign(
+                              `/api/trakt/auth/start?next=/details/${type}/${id}`,
+                            )
+                          }
+                        />
+                      )}
 
-                  {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm) */}
-                  {/* Muestra el porcentaje de audiencia de RT, prioriza datos de Trakt sobre OMDb */}
-                  {(tScoreboard?.external?.rtAudience != null ||
-                    extras.rtScore != null) && (
-                    <div className="hidden sm:block">
+                    {/* Badge de IMDb - Muestra rating y votos, enlaza al título en IMDb */}
+                    {extras.imdbRating && (
                       <CompactBadge
-                        logo="/logo-RottenTomatoes.png"
-                        value={
-                          tScoreboard?.external?.rtAudience != null
-                            ? Math.round(tScoreboard.external.rtAudience)
-                            : extras.rtScore != null
-                              ? Math.round(extras.rtScore)
-                              : null
+                        logo="/logo-IMDb.png"
+                        logoClassName="h-5 sm:h-5"
+                        value={Number(extras.imdbRating).toFixed(1)}
+                        sub={formatCountShort(extras.imdbVotes)}
+                        href={
+                          resolvedImdbId
+                            ? `https://www.imdb.com/title/${resolvedImdbId}`
+                            : undefined
                         }
-                        suffix="%"
                       />
-                    </div>
-                  )}
+                    )}
 
-                  {/* Badge de Metacritic - Solo visible en desktop (>= sm) */}
-                  {/* Muestra la puntuación de Metacritic sobre 100 */}
-                  {extras.mcScore != null && (
-                    <div className="hidden sm:block">
-                      <CompactBadge
-                        logo="/logo-Metacritic.png"
-                        value={Math.round(extras.mcScore)}
-                        suffix="/100"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* ========== Separador vertical 1 ========== */}
-                {/* Solo se muestra cuando NO estamos en modo backdrop */}
-                {!isBackdropPoster && (
-                  <div className="w-px h-6 bg-white/10 shrink-0" />
-                )}
-
-                {/* ========== B. ENLACES EXTERNOS ========== */}
-                {/* Botones para acceder a páginas externas (Web oficial, FilmAffinity, JustWatch, etc.) */}
-                {/* Solo se muestran aquí cuando NO estamos en modo backdrop (en ese modo se muestran abajo con las plataformas) */}
-                {!isBackdropPoster && (
-                  <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
-                    {/* Versión Desktop: iconos normales de enlaces externos */}
-                    <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
-                      {/* Sitio web oficial */}
+                    {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm) */}
+                    {/* Muestra el porcentaje de audiencia de RT, prioriza datos de Trakt sobre OMDb */}
+                    {(tScoreboard?.external?.rtAudience != null ||
+                      extras.rtScore != null) && (
                       <div className="hidden sm:block">
-                        <ExternalLinkButton
-                          icon="/logo-Web.png"
-                          href={officialSiteUrl}
+                        <CompactBadge
+                          logo="/logo-RottenTomatoes.png"
+                          value={
+                            tScoreboard?.external?.rtAudience != null
+                              ? Math.round(tScoreboard.external.rtAudience)
+                              : extras.rtScore != null
+                                ? Math.round(extras.rtScore)
+                                : null
+                          }
+                          suffix="%"
                         />
                       </div>
+                    )}
 
-                      {/* FilmAffinity - búsqueda del título */}
-                      <ExternalLinkButton
-                        icon="/logoFilmaffinity.png"
-                        href={filmAffinitySearchUrl}
-                      />
-
-                      {/* JustWatch - dónde ver el contenido */}
-                      <ExternalLinkButton
-                        icon="/logo-JustWatch.png"
-                        title="JustWatch"
-                        href={jwHref}
-                        fallbackHref={justWatchUrl}
-                      />
-
-                      {/* Letterboxd - solo para películas */}
-                      {isMovie && (
-                        <ExternalLinkButton
-                          icon="/logo-Letterboxd.png"
-                          href={letterboxdUrl}
+                    {/* Badge de Metacritic - Solo visible en desktop (>= sm) */}
+                    {/* Muestra la puntuación de Metacritic sobre 100 */}
+                    {extras.mcScore != null && (
+                      <div className="hidden sm:block">
+                        <CompactBadge
+                          logo="/logo-Metacritic.png"
+                          value={Math.round(extras.mcScore)}
+                          suffix="/100"
                         />
-                      )}
-
-                      {/* SeriesGraph - solo para series */}
-                      {type === "tv" && (
-                        <ExternalLinkButton
-                          icon="/logoseriesgraph.png"
-                          href={seriesGraphUrl}
-                        />
-                      )}
-                    </div>
-
-                    {/* Versión Móvil: botón "..." que abre modal de enlaces */}
-                    <button
-                      type="button"
-                      onClick={() => setExternalLinksOpen(true)}
-                      className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center
-                 border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
-                      title="Enlaces"
-                      aria-label="Abrir enlaces externos"
-                    >
-                      <MoreHorizontal className="w-5 h-5" />
-                    </button>
+                      </div>
+                    )}
                   </div>
-                )}
 
-                {/* ========== Separador vertical 2 ========== */}
-                {/* Solo visible en desktop (>= md) y cuando NO estamos en modo backdrop */}
-                {!isBackdropPoster && (
-                  <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
-                )}
+                  {/* ========== Separador vertical 1 ========== */}
+                  {/* Solo se muestra cuando NO estamos en modo backdrop */}
+                  {!isBackdropPoster && (
+                    <div className="w-px h-6 bg-white/10 shrink-0" />
+                  )}
 
-                {/* ========== Botón de Compartir ========== */}
-                {/* Permite compartir el contenido usando la API Web Share o copiando el enlace */}
-                {/* Se mantiene pegado al extremo derecho con ml-auto */}
-                <div className="ml-auto shrink-0">
-                  <ActionShareButton
-                    title={title}
-                    text={`Echa un vistazo a ${title} en The Show Verse`}
-                  />
+                  {/* ========== B. ENLACES EXTERNOS ========== */}
+                  {/* Botones para acceder a páginas externas (Web oficial, FilmAffinity, JustWatch, etc.) */}
+                  {/* Solo se muestran aquí cuando NO estamos en modo backdrop (en ese modo se muestran abajo con las plataformas) */}
+                  {!isBackdropPoster && (
+                    <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
+                      {/* Versión Desktop: iconos normales de enlaces externos */}
+                      <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
+                        {/* Sitio web oficial */}
+                        <div className="hidden sm:block">
+                          <ExternalLinkButton
+                            icon="/logo-Web.png"
+                            href={officialSiteUrl}
+                          />
+                        </div>
+
+                        {/* FilmAffinity - búsqueda del título */}
+                        <ExternalLinkButton
+                          icon="/logoFilmaffinity.png"
+                          href={filmAffinitySearchUrl}
+                        />
+
+                        {/* JustWatch - dónde ver el contenido */}
+                        <ExternalLinkButton
+                          icon="/logo-JustWatch.png"
+                          title="JustWatch"
+                          href={jwHref}
+                          fallbackHref={justWatchUrl}
+                        />
+
+                        {/* Letterboxd - solo para películas */}
+                        {isMovie && (
+                          <ExternalLinkButton
+                            icon="/logo-Letterboxd.png"
+                            href={letterboxdUrl}
+                          />
+                        )}
+
+                        {/* SeriesGraph - solo para series */}
+                        {type === "tv" && (
+                          <ExternalLinkButton
+                            icon="/logoseriesgraph.png"
+                            href={seriesGraphUrl}
+                          />
+                        )}
+                      </div>
+
+                      {/* Versión Móvil: botón "..." que abre modal de enlaces */}
+                      <button
+                        type="button"
+                        onClick={() => setExternalLinksOpen(true)}
+                        className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center
+                 border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
+                        title="Enlaces"
+                        aria-label="Abrir enlaces externos"
+                      >
+                        <MoreHorizontal className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ========== Separador vertical 2 ========== */}
+                  {/* Solo visible en desktop (>= md) y cuando NO estamos en modo backdrop */}
+                  {!isBackdropPoster && (
+                    <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
+                  )}
+
+                  {/* ========== Botón de Compartir ========== */}
+                  {/* Permite compartir el contenido usando la API Web Share o copiando el enlace */}
+                  {/* Se mantiene pegado al extremo derecho con ml-auto */}
+                  <div className="ml-auto shrink-0">
+                    <ActionShareButton
+                      title={title}
+                      text={`Echa un vistazo a ${title} en The Show Verse`}
+                    />
+                  </div>
                 </div>
-              </div>
-              {/* =================================================================
+                {/* =================================================================
                   FOOTER DE ESTADÍSTICAS (Watchers, Plays, Lists, Favorited)
                  ================================================================= */}
-              {/* Muestra estadísticas de Trakt en formato compacto con scroll horizontal */}
-              {/* Visible en móvil sin recortes gracias al padding con safe-area */}
-              {/* Mostrar cuando hay stats numéricas (incluyendo de cache stale) */}
-              {Object.values(tScoreboard?.stats || {}).some(
-                (v) => typeof v === "number",
-              ) && (
-                <div className="border-t border-white/5 bg-black/10">
-                  {/* Scroller con padding + safe-area para que no se recorte en bordes */}
-                  <div
-                    className="
+                {/* Muestra estadísticas de Trakt en formato compacto con scroll horizontal */}
+                {/* Visible en móvil sin recortes gracias al padding con safe-area */}
+                {/* Mostrar cuando hay stats numéricas (incluyendo de cache stale) */}
+                {Object.values(tScoreboard?.stats || {}).some(
+                  (v) => typeof v === "number",
+                ) && (
+                  <div className="border-t border-white/5 bg-black/10">
+                    {/* Scroller con padding + safe-area para que no se recorte en bordes */}
+                    <div
+                      className="
         overflow-x-auto
         [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
         py-2
         pl-[calc(1rem+env(safe-area-inset-left))]
         pr-[calc(1rem+env(safe-area-inset-right))]
       "
-                  >
-                    {/* Contenedor interno con min-w-max para evitar que se corten los últimos elementos */}
-                    <div className="flex items-center gap-3 min-w-max">
-                      {/* Watchers - Usuarios que siguen este contenido */}
-                      <div className="shrink-0">
-                        <MiniStat
-                          icon={Eye}
-                          value={formatVoteCount(
-                            tScoreboard?.stats?.watchers ?? 0,
-                          )}
-                          tooltip="Watchers"
-                        />
-                      </div>
+                    >
+                      {/* Contenedor interno con min-w-max para evitar que se corten los últimos elementos */}
+                      <div className="flex items-center gap-3 min-w-max">
+                        {/* Watchers - Usuarios que siguen este contenido */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Eye}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.watchers ?? 0,
+                            )}
+                            tooltip="Watchers"
+                          />
+                        </div>
 
-                      {/* Plays - Número de reproducciones totales */}
-                      <div className="shrink-0">
-                        <MiniStat
-                          icon={Play}
-                          value={formatVoteCount(
-                            tScoreboard?.stats?.plays ?? 0,
-                          )}
-                          tooltip="Plays"
-                        />
-                      </div>
+                        {/* Plays - Número de reproducciones totales */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Play}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.plays ?? 0,
+                            )}
+                            tooltip="Plays"
+                          />
+                        </div>
 
-                      {/* Lists - Cantidad de listas que incluyen este contenido */}
-                      <div className="shrink-0">
-                        <MiniStat
-                          icon={List}
-                          value={formatVoteCount(
-                            tScoreboard?.stats?.lists ?? 0,
-                          )}
-                          tooltip="Lists"
-                        />
-                      </div>
+                        {/* Lists - Cantidad de listas que incluyen este contenido */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={List}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.lists ?? 0,
+                            )}
+                            tooltip="Lists"
+                          />
+                        </div>
 
-                      {/* Favorited - Usuarios que lo han marcado como favorito */}
-                      <div className="shrink-0">
-                        <MiniStat
-                          icon={Heart}
-                          value={formatVoteCount(
-                            tScoreboard?.stats?.favorited ?? 0,
-                          )}
-                          tooltip="Favorited"
-                        />
+                        {/* Favorited - Usuarios que lo han marcado como favorito */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Heart}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.favorited ?? 0,
+                            )}
+                            tooltip="Favorited"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </ScaleIn>
 
             {/* =================================================================
                 CONTENEDOR DE TABS Y CONTENIDO - Información detallada
@@ -6258,227 +6310,235 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Sistema de tabs para mostrar información adicional: Detalles, Producción, Sinopsis, Premios */}
             {/* Solo visible cuando NO estamos en modo backdrop (en ese modo se muestra más abajo) */}
             {!isBackdropPoster && (
-              <div>
-                {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
-                {/* Pestañas clicables para cambiar entre diferentes vistas de información */}
-                {/* Incluye: Detalles, Producción, Sinopsis, y Premios (si están disponibles) */}
-                <div className="flex flex-wrap items-center gap-6 my-1.5 border-b border-white/10 pb-1">
-                  {[
-                    { id: "details", label: "Detalles" },
-                    { id: "production", label: "Producción" },
-                    { id: "synopsis", label: "Sinopsis" },
-                    ...(extras.awards
-                      ? [{ id: "awards", label: "Premios" }]
-                      : []),
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
+              <FadeIn delay={0.24}>
+                <div>
+                  {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
+                  {/* Pestañas clicables para cambiar entre diferentes vistas de información */}
+                  {/* Incluye: Detalles, Producción, Sinopsis, y Premios (si están disponibles) */}
+                  <div className="flex flex-wrap items-center gap-6 my-1.5 border-b border-white/10 pb-1">
+                    {[
+                      { id: "details", label: "Detalles" },
+                      { id: "production", label: "Producción" },
+                      { id: "synopsis", label: "Sinopsis" },
+                      ...(extras.awards
+                        ? [{ id: "awards", label: "Premios" }]
+                        : []),
+                    ].map((tab) => (
+                      <motion.button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        whileHover={{ y: -1 }}
+                        whileTap={{ scale: 0.98 }}
+                        className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
           ${
             activeTab === tab.id
               ? "text-white border-yellow-500"
               : "text-zinc-500 border-transparent hover:text-zinc-300"
           }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* ========== ÁREA DE CONTENIDO DE TABS ========== */}
-                {/* Muestra el contenido de la tab activa con animaciones de transición */}
-                {/* Usa AnimatePresence de Framer Motion para animar cambios entre tabs */}
-                <div className="relative min-h-[100px]">
-                  <AnimatePresence mode="wait">
-                    {/* ===== TAB 1: SINOPSIS ===== */}
-                    {/* Muestra el tagline (si existe) y la descripción completa del contenido */}
-                    {activeTab === "synopsis" && (
-                      <motion.div
-                        key="synopsis"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
                       >
-                        <div className="p-5 rounded-2xl bg-white/5 border border-white/5">
-                          {data.tagline && (
-                            <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
-                              “{data.tagline}”
-                            </div>
-                          )}
-                          <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
-                            {data.overview || "No hay descripción disponible."}
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
+                        {tab.label}
+                      </motion.button>
+                    ))}
+                  </div>
 
-                    {/* ===== TAB 2: DETALLES ===== */}
-                    {/* Información técnica: título original, formato, fechas, presupuesto, recaudación */}
-                    {activeTab === "details" && (
-                      <motion.div
-                        key="details"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                          {/* Tarjeta: Título Original - Nombre del contenido en su idioma original */}
-                          <VisualMetaCard
-                            icon={type === "movie" ? FilmIcon : MonitorPlay}
-                            label="Título Original"
-                            value={
-                              type === "movie"
-                                ? data.original_title
-                                : data.original_name
-                            }
-                            expanded={true}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                          />
+                  {/* ========== ÁREA DE CONTENIDO DE TABS ========== */}
+                  {/* Muestra el contenido de la tab activa con animaciones de transición */}
+                  {/* Usa AnimatePresence de Framer Motion para animar cambios entre tabs */}
+                  <div className="relative min-h-[100px]">
+                    <AnimatePresence mode="wait">
+                      {/* ===== TAB 1: SINOPSIS ===== */}
+                      {/* Muestra el tagline (si existe) y la descripción completa del contenido */}
+                      {activeTab === "synopsis" && (
+                        <motion.div
+                          key="synopsis"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <div className="p-5 rounded-2xl bg-white/5 border border-white/5">
+                            {data.tagline && (
+                              <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
+                                “{data.tagline}”
+                              </div>
+                            )}
+                            <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
+                              {data.overview ||
+                                "No hay descripción disponible."}
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
 
-                          {/* Tarjeta: Formato - Solo para series (número de temporadas y episodios) */}
-                          {type !== "movie" ? (
+                      {/* ===== TAB 2: DETALLES ===== */}
+                      {/* Información técnica: título original, formato, fechas, presupuesto, recaudación */}
+                      {activeTab === "details" && (
+                        <motion.div
+                          key="details"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                            {/* Tarjeta: Título Original - Nombre del contenido en su idioma original */}
                             <VisualMetaCard
-                              icon={Layers}
-                              label="Formato"
+                              icon={type === "movie" ? FilmIcon : MonitorPlay}
+                              label="Título Original"
                               value={
-                                data.number_of_seasons
-                                  ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
-                                  : "—"
+                                type === "movie"
+                                  ? data.original_title
+                                  : data.original_name
                               }
+                              expanded={true}
                               className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
-                          ) : null}
 
-                          {/* Tarjeta: Fecha de Estreno/Inicio - Película: fecha de estreno, Serie: fecha de inicio */}
-                          <VisualMetaCard
-                            icon={CalendarIcon}
-                            label={type === "movie" ? "Estreno" : "Inicio"}
-                            value={releaseDateValue || "—"}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                          />
+                            {/* Tarjeta: Formato - Solo para series (número de temporadas y episodios) */}
+                            {type !== "movie" ? (
+                              <VisualMetaCard
+                                icon={Layers}
+                                label="Formato"
+                                value={
+                                  data.number_of_seasons
+                                    ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
+                                    : "—"
+                                }
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              />
+                            ) : null}
 
-                          {/* Tarjeta: Finalización/Última Emisión - Solo para series */}
-                          {type !== "movie" && lastAirDateValue && (
+                            {/* Tarjeta: Fecha de Estreno/Inicio - Película: fecha de estreno, Serie: fecha de inicio */}
                             <VisualMetaCard
                               icon={CalendarIcon}
-                              label={
-                                data.status === "Ended"
-                                  ? "Finalización"
-                                  : "Última emisión"
-                              }
-                              value={lastAirDateValue || "En emisión"}
+                              label={type === "movie" ? "Estreno" : "Inicio"}
+                              value={releaseDateValue || "—"}
                               className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
-                          )}
 
-                          {/* Tarjetas de Presupuesto y Recaudación - Solo para películas */}
-                          {type === "movie" && (
-                            <>
+                            {/* Tarjeta: Finalización/Última Emisión - Solo para series */}
+                            {type !== "movie" && lastAirDateValue && (
                               <VisualMetaCard
-                                icon={BadgeDollarSignIcon}
-                                label="Presupuesto"
-                                value={budgetValue || "—"}
+                                icon={CalendarIcon}
+                                label={
+                                  data.status === "Ended"
+                                    ? "Finalización"
+                                    : "Última emisión"
+                                }
+                                value={lastAirDateValue || "En emisión"}
                                 className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                               />
-                              <VisualMetaCard
-                                icon={TrendingUp}
-                                label="Recaudación"
-                                value={revenueValue || "—"}
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                              />
-                            </>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
+                            )}
 
-                    {/* ===== TAB 3: PRODUCCIÓN Y EQUIPO ===== */}
-                    {/* Información sobre el equipo creativo: director/creadores, canal, productoras */}
-                    {activeTab === "production" && (
-                      <motion.div
-                        key="production"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                          {/* Tarjeta: Director (Cine) / Creadores (TV) - Equipo principal creativo */}
-                          <VisualMetaCard
-                            icon={Users}
-                            label={type === "movie" ? "Director" : "Creadores"}
-                            value={
-                              type === "movie"
-                                ? movieDirector || "Desconocido"
-                                : createdByNames || "Desconocido"
-                            }
-                            expanded={true}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                          />
+                            {/* Tarjetas de Presupuesto y Recaudación - Solo para películas */}
+                            {type === "movie" && (
+                              <>
+                                <VisualMetaCard
+                                  icon={BadgeDollarSignIcon}
+                                  label="Presupuesto"
+                                  value={budgetValue || "—"}
+                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                                />
+                                <VisualMetaCard
+                                  icon={TrendingUp}
+                                  label="Recaudación"
+                                  value={revenueValue || "—"}
+                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                                />
+                              </>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
 
-                          {/* Canal (solo TV) */}
-                          {type !== "movie" ? (
+                      {/* ===== TAB 3: PRODUCCIÓN Y EQUIPO ===== */}
+                      {/* Información sobre el equipo creativo: director/creadores, canal, productoras */}
+                      {activeTab === "production" && (
+                        <motion.div
+                          key="production"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                            {/* Tarjeta: Director (Cine) / Creadores (TV) - Equipo principal creativo */}
                             <VisualMetaCard
-                              icon={MonitorPlay}
-                              label="Canal"
-                              value={network || "—"}
+                              icon={Users}
+                              label={
+                                type === "movie" ? "Director" : "Creadores"
+                              }
+                              value={
+                                type === "movie"
+                                  ? movieDirector || "Desconocido"
+                                  : createdByNames || "Desconocido"
+                              }
+                              expanded={true}
                               className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
-                          ) : null}
 
-                          {/* Producción (ambos) */}
-                          <VisualMetaCard
-                            icon={Building2}
-                            label="Producción"
-                            value={production || "—"}
-                            expanded={true}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                          />
-                        </div>
-                      </motion.div>
-                    )}
+                            {/* Canal (solo TV) */}
+                            {type !== "movie" ? (
+                              <VisualMetaCard
+                                icon={MonitorPlay}
+                                label="Canal"
+                                value={network || "—"}
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              />
+                            ) : null}
 
-                    {/* 4. PREMIOS */}
-                    {activeTab === "awards" && extras.awards && (
-                      <motion.div
-                        key="awards"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-6">
-                          <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
+                            {/* Producción (ambos) */}
+                            <VisualMetaCard
+                              icon={Building2}
+                              label="Producción"
+                              value={production || "—"}
+                              expanded={true}
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            />
+                          </div>
+                        </motion.div>
+                      )}
 
-                          <div className="flex items-start gap-4 relative z-10">
-                            <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
-                              <Trophy className="w-8 h-8" />
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="text-lg font-bold text-white mb-2">
-                                Reconocimientos
-                              </h3>
-                              <p className="text-base font-medium text-yellow-100/90 leading-relaxed whitespace-pre-line">
-                                {extras.awards}
-                              </p>
+                      {/* 4. PREMIOS */}
+                      {activeTab === "awards" && extras.awards && (
+                        <motion.div
+                          key="awards"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-6">
+                            <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
+
+                            <div className="flex items-start gap-4 relative z-10">
+                              <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
+                                <Trophy className="w-8 h-8" />
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="text-lg font-bold text-white mb-2">
+                                  Reconocimientos
+                                </h3>
+                                <p className="text-base font-medium text-yellow-100/90 leading-relaxed whitespace-pre-line">
+                                  {extras.awards}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
-              </div>
+              </FadeIn>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
         {isBackdropPoster && (
-          <div className="mt-8 w-full">
+          <FadeIn delay={0.24} className="mt-8 w-full">
             {/* --- MENÚ DE NAVEGACIÓN --- */}
             <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
               {[
@@ -6487,9 +6547,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 { id: "synopsis", label: "Sinopsis" },
                 ...(extras.awards ? [{ id: "awards", label: "Premios" }] : []),
               ].map((tab) => (
-                <button
+                <motion.button
                   key={tab.id}
+                  type="button"
                   onClick={() => setActiveTab(tab.id)}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.98 }}
                   className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
         ${
           activeTab === tab.id
@@ -6498,7 +6561,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         }`}
                 >
                   {tab.label}
-                </button>
+                </motion.button>
               ))}
             </div>
 
@@ -6680,7 +6743,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
               </AnimatePresence>
             </div>
-          </div>
+          </FadeIn>
         )}
 
         {/* =================================================================
