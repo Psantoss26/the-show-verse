@@ -7,6 +7,45 @@ async function safeJson(res) {
   }
 }
 
+let traktAuthBootstrapPromise = null;
+let traktAuthBootstrapAt = 0;
+let traktAuthBootstrapValue = null;
+
+async function ensureTraktAuthReady({ force = false } = {}) {
+  if (typeof window === "undefined") return { connected: false };
+
+  const now = Date.now();
+  if (
+    !force &&
+    traktAuthBootstrapValue &&
+    now - traktAuthBootstrapAt < 5000
+  ) {
+    return traktAuthBootstrapValue;
+  }
+
+  if (!force && traktAuthBootstrapPromise) {
+    return traktAuthBootstrapPromise;
+  }
+
+  traktAuthBootstrapPromise = (async () => {
+    const res = await fetch("/api/trakt/auth/status", {
+      cache: "no-store",
+      credentials: "include",
+    });
+    const json = await safeJson(res);
+    const status = json || { connected: false };
+    traktAuthBootstrapValue = status;
+    traktAuthBootstrapAt = Date.now();
+    return status;
+  })();
+
+  try {
+    return await traktAuthBootstrapPromise;
+  } finally {
+    traktAuthBootstrapPromise = null;
+  }
+}
+
 /**
  * Normaliza watchedAt para enviar al backend de forma consistente.
  * Devuelve "YYYY-MM-DD" o null
@@ -77,9 +116,7 @@ function normalizeWatchedAtForHistoryApi(input) {
 }
 
 export async function traktAuthStatus() {
-  const res = await fetch("/api/trakt/auth/status", { cache: "no-store" });
-  const json = await safeJson(res);
-  return json || { connected: false };
+  return ensureTraktAuthReady({ force: true });
 }
 
 export async function traktDisconnect() {
@@ -90,8 +127,11 @@ export async function traktDisconnect() {
 }
 
 export async function traktGetItemStatus({ type, tmdbId }) {
+  const auth = await ensureTraktAuthReady();
+  if (!auth?.connected) return { connected: false };
+
   const url = `/api/trakt/item/status?type=${encodeURIComponent(type)}&tmdbId=${encodeURIComponent(tmdbId)}`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, { cache: "no-store", credentials: "include" });
   const json = await safeJson(res);
   if (!res.ok)
     throw new Error(json?.error || `Trakt status HTTP ${res.status}`);
@@ -190,10 +230,14 @@ export async function traktGetHistory({
 
 /** ✅ NUEVO/CLAVE: carga episodios vistos por show (SIN especiales) */
 export async function traktGetShowWatched({ tmdbId }) {
+  const auth = await ensureTraktAuthReady();
+  if (!auth?.connected) return { connected: false, found: false, watchedBySeason: {} };
+
   const res = await fetch(
     `/api/trakt/show/watched?tmdbId=${encodeURIComponent(tmdbId)}`,
     {
       cache: "no-store",
+      credentials: "include",
     },
   );
   const json = await safeJson(res);
