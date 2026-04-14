@@ -93,9 +93,9 @@ export async function GET(req) {
     const base = type === "movie" ? "movies" : "shows";
     const url = `https://api.trakt.tv/${base}/${traktId}/lists/${tab}?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`;
 
-    // ✅ Timeout de 5s solo para el fetch inicial de listas
+    // ✅ Timeout de 4s para el fetch inicial (deja 6s para previews)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     const res = await fetch(url, {
       headers,
@@ -124,8 +124,8 @@ export async function GET(req) {
       return NextResponse.json({ items: [], pagination: pg, countOnly: true });
     }
 
-    // Reducir concurrencia a 2 y añadir timeout por preview para evitar 504
-    const listsWithPreviews = await mapLimit(lists, 2, async (row) => {
+    // Concurrencia 3 con timeout 3s (6 listas = 2 rondas × 3s = 6s)
+    const listsWithPreviews = await mapLimit(lists, 3, async (row) => {
       try {
         const listObj = row?.list || row || {};
         const userObj = row?.user || listObj?.user || {};
@@ -140,16 +140,16 @@ export async function GET(req) {
           return { ...row, previewPosters: [] };
         }
 
-        // ✅ Timeout agresivo de 2s por lista para evitar bloqueos
+        // ✅ Timeout de 3s por lista para 5 previews
         const previewController = new AbortController();
-        const previewTimeout = setTimeout(() => previewController.abort(), 2000);
+        const previewTimeout = setTimeout(() => previewController.abort(), 3000);
 
         try {
-          // ✅ OJO: extended=images (no full,images), reducir a 3 items
+          // ✅ OJO: extended=images (no full,images)
           const itemsUrl =
             `https://api.trakt.tv/users/${encodeURIComponent(userId)}` +
             `/lists/${encodeURIComponent(String(listId))}` +
-            `/items?limit=3&extended=images`;
+            `/items?limit=5&extended=images`;
 
           const itemsRes = await fetch(itemsUrl, {
             headers,
@@ -171,9 +171,9 @@ export async function GET(req) {
               return poster?.medium || poster?.thumb || poster?.full || null;
             })
             .filter(Boolean)
-            .slice(0, 3);
+            .slice(0, 5);
 
-          // 2) Fallback a TMDb si Trakt no devuelve imágenes (solo primeros 2 para velocidad)
+          // 2) Fallback a TMDb si Trakt no devuelve imágenes
           if (previews.length === 0) {
             const candidates = arr
               .map((i) => {
@@ -184,13 +184,13 @@ export async function GET(req) {
                 return null;
               })
               .filter(Boolean)
-              .slice(0, 2);
+              .slice(0, 5);
 
             const tmdbPosters = await Promise.all(
               candidates.map((c) => fetchTmdbPosterUrl(c.kind, c.tmdb)),
             );
 
-            previews = tmdbPosters.filter(Boolean).slice(0, 3);
+            previews = tmdbPosters.filter(Boolean).slice(0, 5);
           }
 
           return { ...row, previewPosters: previews };
