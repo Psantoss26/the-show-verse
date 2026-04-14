@@ -93,7 +93,7 @@ export async function GET(req) {
     const base = type === "movie" ? "movies" : "shows";
     const url = `https://api.trakt.tv/${base}/${traktId}/lists/${tab}?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`;
 
-    // ✅ Añadir timeout de 5 segundos para evitar bloqueos
+    // ✅ Timeout de 5s solo para el fetch inicial de listas
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -124,7 +124,8 @@ export async function GET(req) {
       return NextResponse.json({ items: [], pagination: pg, countOnly: true });
     }
 
-    const listsWithPreviews = await mapLimit(lists, 4, async (row) => {
+    // Reducir concurrencia a 2 y añadir timeout por preview para evitar 504
+    const listsWithPreviews = await mapLimit(lists, 2, async (row) => {
       try {
         const listObj = row?.list || row || {};
         const userObj = row?.user || listObj?.user || {};
@@ -139,49 +140,65 @@ export async function GET(req) {
           return { ...row, previewPosters: [] };
         }
 
-        // ✅ OJO: extended=images (no full,images)
-        const itemsUrl =
-          `https://api.trakt.tv/users/${encodeURIComponent(userId)}` +
-          `/lists/${encodeURIComponent(String(listId))}` +
-          `/items?limit=5&extended=images`;
+        // ✅ Timeout agresivo de 2s por lista para evitar bloqueos
+        const previewController = new AbortController();
+        const previewTimeout = setTimeout(() => previewController.abort(), 2000);
 
-        const itemsRes = await fetch(itemsUrl, { headers, cache: "no-store" });
-        if (!itemsRes.ok) return { ...row, previewPosters: [] };
+        try {
+          // ✅ OJO: extended=images (no full,images), reducir a 3 items
+          const itemsUrl =
+            `https://api.trakt.tv/users/${encodeURIComponent(userId)}` +
+            `/lists/${encodeURIComponent(String(listId))}` +
+            `/items?limit=3&extended=images`;
 
-        const itemsJson = await itemsRes.json().catch(() => []);
-        const arr = Array.isArray(itemsJson) ? itemsJson : [];
+          const itemsRes = await fetch(itemsUrl, {
+            headers,
+            cache: "no-store",
+            signal: previewController.signal,
+          });
+          clearTimeout(previewTimeout);
 
-        // 1) Intento Trakt images
-        let previews = arr
-          .map((i) => {
-            const entity = i?.movie || i?.show || null;
-            const poster = entity?.images?.poster;
-            return poster?.medium || poster?.thumb || poster?.full || null;
-          })
-          .filter(Boolean)
-          .slice(0, 5);
+          if (!itemsRes.ok) return { ...row, previewPosters: [] };
 
-        // 2) Fallback a TMDb si Trakt no devuelve imágenes
-        if (previews.length === 0) {
-          const candidates = arr
+          const itemsJson = await itemsRes.json().catch(() => []);
+          const arr = Array.isArray(itemsJson) ? itemsJson : [];
+
+          // 1) Intento Trakt images
+          let previews = arr
             .map((i) => {
-              if (i?.movie?.ids?.tmdb)
-                return { kind: "movie", tmdb: i.movie.ids.tmdb };
-              if (i?.show?.ids?.tmdb)
-                return { kind: "tv", tmdb: i.show.ids.tmdb };
-              return null;
+              const entity = i?.movie || i?.show || null;
+              const poster = entity?.images?.poster;
+              return poster?.medium || poster?.thumb || poster?.full || null;
             })
             .filter(Boolean)
-            .slice(0, 5);
+            .slice(0, 3);
 
-          const tmdbPosters = await Promise.all(
-            candidates.map((c) => fetchTmdbPosterUrl(c.kind, c.tmdb)),
-          );
+          // 2) Fallback a TMDb si Trakt no devuelve imágenes (solo primeros 2 para velocidad)
+          if (previews.length === 0) {
+            const candidates = arr
+              .map((i) => {
+                if (i?.movie?.ids?.tmdb)
+                  return { kind: "movie", tmdb: i.movie.ids.tmdb };
+                if (i?.show?.ids?.tmdb)
+                  return { kind: "tv", tmdb: i.show.ids.tmdb };
+                return null;
+              })
+              .filter(Boolean)
+              .slice(0, 2);
 
-          previews = tmdbPosters.filter(Boolean).slice(0, 5);
+            const tmdbPosters = await Promise.all(
+              candidates.map((c) => fetchTmdbPosterUrl(c.kind, c.tmdb)),
+            );
+
+            previews = tmdbPosters.filter(Boolean).slice(0, 3);
+          }
+
+          return { ...row, previewPosters: previews };
+        } catch (timeoutErr) {
+          clearTimeout(previewTimeout);
+          // Si timeout, devolver sin previews
+          return { ...row, previewPosters: [] };
         }
-
-        return { ...row, previewPosters: previews };
       } catch (err) {
         console.error("Error fetching list previews", err);
         return { ...row, previewPosters: [] };
