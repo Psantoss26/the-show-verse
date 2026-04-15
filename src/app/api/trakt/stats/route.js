@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchTrakt, normalizeType } from "@/lib/trakt/fetchWithCache";
+import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,12 +19,13 @@ export async function GET(req) {
     const rawType = searchParams.get("type"); // 'movie' | 'show' | 'season' | 'episode'
     const type = normalizeType(rawType) || rawType;
     const tmdbId = searchParams.get("tmdbId");
+    const traktIdParam = searchParams.get("traktId");
     const season = searchParams.get("season");
     const episode = searchParams.get("episode");
 
-    if (!tmdbId || !type) {
+    if ((!tmdbId && !traktIdParam) || !type) {
       return NextResponse.json(
-        { error: "Missing/invalid type or tmdbId" },
+        { error: "Missing/invalid type or tmdbId/traktId" },
         { status: 400 },
       );
     }
@@ -32,19 +34,18 @@ export async function GET(req) {
     // MOVIE / SHOW
     // ===============================
     if (type === "movie" || type === "show") {
-      // 1) Mapear TMDb -> Trakt con cache
-      const search = await ft(`/search/tmdb/${tmdbId}?type=${type}`);
-      const item = search?.[0]?.[type];
-      const ids = item?.ids;
+      const resolved = traktIdParam
+        ? { traktId: String(traktIdParam), ids: { trakt: String(traktIdParam) } }
+        : await resolveTraktEntityFromTmdb({ type, tmdbId });
+      const ids = resolved?.ids;
+      const traktId = resolved?.traktId;
 
-      if (!ids?.trakt) {
+      if (!traktId) {
         return NextResponse.json(
           { error: "Trakt item not found" },
           { status: 404 },
         );
       }
-
-      const traktId = ids.trakt;
       const path = type === "movie" ? "movies" : "shows";
 
       // 2) Obtener stats con cache (timeout más alto para cold starts)
@@ -85,9 +86,10 @@ export async function GET(req) {
     }
 
     // 1) Resolver SHOW en Trakt por TMDb ID
-    const searchShow = await ft(`/search/tmdb/${tmdbId}?type=show`);
-    const showItem = searchShow?.[0]?.show;
-    const traktShowId = showItem?.ids?.trakt;
+    const resolvedShow = traktIdParam
+      ? { traktId: String(traktIdParam) }
+      : await resolveTraktEntityFromTmdb({ type: "show", tmdbId });
+    const traktShowId = resolvedShow?.traktId;
 
     if (!traktShowId) {
       return NextResponse.json(

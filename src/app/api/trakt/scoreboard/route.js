@@ -15,12 +15,13 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const type = normalizeType(searchParams.get("type"));
     const tmdbId = searchParams.get("tmdbId");
+    const traktId = searchParams.get("traktId");
     const season = searchParams.get("season");
     const episode = searchParams.get("episode");
 
-    if (!type || !tmdbId) {
+    if (!type || (!tmdbId && !traktId)) {
       return NextResponse.json(
-        { found: false, error: "Missing type/tmdbId" },
+        { found: false, error: "Missing type/tmdbId/traktId" },
         { status: 400, headers: cacheHeaders },
       );
     }
@@ -28,6 +29,7 @@ export async function GET(req) {
     const result = await getCachedTraktScoreboardData({
       type,
       tmdbId,
+      traktId,
       season: season ?? undefined,
       episode: episode ?? undefined,
     });

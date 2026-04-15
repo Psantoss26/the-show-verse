@@ -41,6 +41,8 @@ export default function DetailsPageLoader(props) {
     if (!type || !id || !hasData || type === "person") return;
 
     let cancelled = false;
+    let priorityTimer = null;
+    let secondaryTimer = null;
 
     const loadPriorityDeferredData = async () => {
       try {
@@ -118,11 +120,18 @@ export default function DetailsPageLoader(props) {
       }
     };
 
-    loadPriorityDeferredData();
-    loadSecondaryDeferredData();
+    priorityTimer = window.setTimeout(() => {
+      void loadPriorityDeferredData();
+    }, 350);
+
+    secondaryTimer = window.setTimeout(() => {
+      void loadSecondaryDeferredData();
+    }, 1200);
 
     return () => {
       cancelled = true;
+      if (priorityTimer) window.clearTimeout(priorityTimer);
+      if (secondaryTimer) window.clearTimeout(secondaryTimer);
     };
   }, [type, id, hasData]);
 

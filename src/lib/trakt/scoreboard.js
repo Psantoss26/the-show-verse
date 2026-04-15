@@ -3,6 +3,7 @@ import {
   fetchTraktMaybe,
   normalizeType,
 } from "@/lib/trakt/fetchWithCache";
+import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
 
 const EMPTY_STATS = {
   watchers: null,
@@ -71,13 +72,16 @@ async function fetchOptionalStats(paths, fetcher, budgetMs = 1500) {
 export async function getTraktScoreboardData({
   type,
   tmdbId,
+  traktId,
   season,
   episode,
 } = {}) {
   const normalizedType = normalizeType(type);
   const normalizedTmdbId = tmdbId != null ? String(tmdbId) : "";
+  const normalizedTraktId =
+    traktId != null && String(traktId).trim() ? String(traktId).trim() : null;
 
-  if (!normalizedType || !normalizedTmdbId) {
+  if (!normalizedType || (!normalizedTmdbId && !normalizedTraktId)) {
     const err = new Error("Missing type/tmdbId");
     err.status = 400;
     throw err;
@@ -85,8 +89,8 @@ export async function getTraktScoreboardData({
 
   // Timeouts reducidos + sin reintentos: evita que backoff sleeps agoten el
   // maxDuration de Vercel. El cliente ya reintenta hasta 3 veces si falla.
-  const fastTimeoutMs = process.env.NODE_ENV === "production" ? 4000 : 3000;
-  const statsTimeoutMs = process.env.NODE_ENV === "production" ? 4000 : 3000;
+  const fastTimeoutMs = process.env.NODE_ENV === "production" ? 4500 : 3000;
+  const statsTimeoutMs = process.env.NODE_ENV === "production" ? 5000 : 3000;
 
   const ft = (path) =>
     fetchTrakt(path, { timeoutMs: fastTimeoutMs, maxRetries: 0 });
@@ -95,25 +99,28 @@ export async function getTraktScoreboardData({
 
   if (normalizedType === "movie" || normalizedType === "show") {
     const plural = normalizedType === "show" ? "shows" : "movies";
+    const resolved = normalizedTraktId
+      ? { traktId: normalizedTraktId, ids: { trakt: normalizedTraktId } }
+      : await resolveTraktEntityFromTmdb({
+          type: normalizedType,
+          tmdbId: normalizedTmdbId,
+        });
+    const ids = resolved?.ids;
+    const resolvedTraktId = resolved?.traktId;
 
-    const search = await ft(
-      `/search/tmdb/${encodeURIComponent(normalizedTmdbId)}?type=${normalizedType}`,
-    );
-    const hit = Array.isArray(search) ? search[0] : null;
-    const item = hit?.[normalizedType];
-    const ids = item?.ids;
-
-    if (!ids?.trakt) return { found: false };
-
-    const traktId = ids.trakt;
+    if (!resolvedTraktId) return { found: false };
 
     // Ejecutar en paralelo: summary necesita traktId pero es independiente de stats
     const [summary, stats] = await Promise.all([
-      ft(`/${plural}/${traktId}`).catch(() => null),
-      fetchOptionalStats([`/${plural}/${traktId}/stats`], ftStats, 3000),
+      ft(`/${plural}/${resolvedTraktId}`).catch(() => null),
+      fetchOptionalStats(
+        [`/${plural}/${resolvedTraktId}/stats`],
+        ftStats,
+        process.env.NODE_ENV === "production" ? 5000 : 3000,
+      ),
     ]);
 
-    const slug = summary?.ids?.slug || ids?.slug || traktId;
+    const slug = summary?.ids?.slug || resolved?.slug || ids?.slug || resolvedTraktId;
     const traktUrl =
       normalizedType === "show"
         ? `https://trakt.tv/shows/${slug}`
@@ -149,17 +156,16 @@ export async function getTraktScoreboardData({
     throw err;
   }
 
-  const searchShow = await ft(
-    `/search/tmdb/${encodeURIComponent(normalizedTmdbId)}?type=show`,
-  );
-  const showHit = Array.isArray(searchShow) ? searchShow[0] : null;
-  const showItem = showHit?.show;
-  const showIds = showItem?.ids;
+  const resolvedShow = normalizedTraktId
+    ? { traktId: normalizedTraktId, ids: { trakt: normalizedTraktId } }
+    : await resolveTraktEntityFromTmdb({
+        type: "show",
+        tmdbId: normalizedTmdbId,
+      });
+  const traktShowId = resolvedShow?.traktId;
+  const showSlug = resolvedShow?.slug || traktShowId;
 
-  if (!showIds?.trakt) return { found: false };
-
-  const traktShowId = showIds.trakt;
-  const showSlug = showIds?.slug || traktShowId;
+  if (!traktShowId) return { found: false };
 
   if (normalizedType === "season") {
     // Ejecutar en paralelo: la lista de temporadas (con rating) y las stats
@@ -169,7 +175,7 @@ export async function getTraktScoreboardData({
       fetchOptionalStats(
         [`/shows/${traktShowId}/seasons/${seasonNumber}/stats`],
         ftStats,
-        3000,
+        process.env.NODE_ENV === "production" ? 5000 : 3000,
       ),
     ]);
     const seasonObj = Array.isArray(seasons)
@@ -210,7 +216,7 @@ export async function getTraktScoreboardData({
         `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
       ],
       ftStats,
-      3000,
+      process.env.NODE_ENV === "production" ? 5000 : 3000,
     ),
   ]);
   const epIds = ep?.ids;

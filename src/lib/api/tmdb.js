@@ -322,11 +322,37 @@ export async function getWatchProviders(type, id, region = "ES") {
 }
 
 /* -------------------- Detalles / Imágenes / IDs externos -------------------- */
-export async function getDetails(type, id) {
-  const data = await tmdb(`/${type}/${id}`, {
-    append_to_response: "external_ids,credits,images,reviews",
-    include_image_language: "es,en,null",
-  });
+export async function getDetails(type, id, params = {}) {
+  const {
+    appendToResponse,
+    append_to_response,
+    includeImageLanguage,
+    include_image_language,
+    ...restParams
+  } = params || {};
+
+  const resolvedAppend =
+    appendToResponse ?? append_to_response ?? "external_ids";
+  const resolvedIncludeImageLanguage =
+    includeImageLanguage ??
+    include_image_language ??
+    (typeof resolvedAppend === "string" && resolvedAppend.includes("images")
+      ? "es,en,null"
+      : undefined);
+
+  const requestParams = {
+    ...restParams,
+  };
+
+  if (resolvedAppend) {
+    requestParams.append_to_response = resolvedAppend;
+  }
+
+  if (resolvedIncludeImageLanguage) {
+    requestParams.include_image_language = resolvedIncludeImageLanguage;
+  }
+
+  const data = await tmdb(`/${type}/${id}`, requestParams);
   if (type === "tv" && data) {
     data.imdb_id = data?.external_ids?.imdb_id || null;
   }
