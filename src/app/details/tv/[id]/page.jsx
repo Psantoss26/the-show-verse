@@ -6,6 +6,7 @@ import {
   getTraktItemStatusFromCookieStore,
   getTraktShowWatchedFromCookieStore,
 } from "@/lib/trakt/server";
+import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
 export const revalidate = 600;
 
@@ -27,24 +28,33 @@ export default async function TvDetailsPage({ params }) {
   }
 
   const cookieStore = await cookies();
-  const [data, initialTraktStatus, initialShowWatched] = await Promise.all([
-    getDetails("tv", id),
-    resolveWithin(
-      getTraktItemStatusFromCookieStore(cookieStore, {
-        type: "show",
-        tmdbId: id,
-      }).catch(() => null),
-      900,
-      null,
-    ),
-    resolveWithin(
-      getTraktShowWatchedFromCookieStore(cookieStore, {
-        tmdbId: id,
-      }).catch(() => null),
-      950,
-      null,
-    ),
-  ]);
+  const [data, initialTraktStatus, initialShowWatched, initialScoreboard] =
+    await Promise.all([
+      getDetails("tv", id),
+      resolveWithin(
+        getTraktItemStatusFromCookieStore(cookieStore, {
+          type: "show",
+          tmdbId: id,
+        }).catch(() => null),
+        900,
+        null,
+      ),
+      resolveWithin(
+        getTraktShowWatchedFromCookieStore(cookieStore, {
+          tmdbId: id,
+        }).catch(() => null),
+        950,
+        null,
+      ),
+      // Scoreboard de Trakt: rating comunidad + estadísticas (watchers, plays, etc.)
+      resolveWithin(
+        getCachedTraktScoreboardData({ type: "show", tmdbId: id }).catch(
+          () => null,
+        ),
+        4000,
+        null,
+      ),
+    ]);
 
   if (!data) {
     notFound();
@@ -57,6 +67,7 @@ export default async function TvDetailsPage({ params }) {
       data={data}
       initialTraktStatus={initialTraktStatus}
       initialShowWatched={initialShowWatched}
+      initialScoreboard={initialScoreboard}
     />
   );
 }
