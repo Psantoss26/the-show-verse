@@ -33,8 +33,8 @@ import {
 
 // ================== CONSTANTS ==================
 
-const CACHE_KEY_PREFIX = "showverse:plex-library:v4";
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_KEY_PREFIX = "showverse:plex-library:v5";
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutos - coincide con revalidación del servidor
 const DEFAULT_FETCH_LIMIT = 2000;
 const EXPANDED_FETCH_LIMIT = 10000;
 const MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE = 120;
@@ -491,7 +491,8 @@ function openPlexLink(item) {
     return;
   }
 
-  const desktopUrl = webUrl || universalUrl || playUrl || mobileUrl || mobileAltUrl;
+  const desktopUrl =
+    webUrl || universalUrl || playUrl || mobileUrl || mobileAltUrl;
   if (desktopUrl) {
     window.open(desktopUrl, "_blank", "noopener,noreferrer");
   }
@@ -515,15 +516,15 @@ function LibraryMediaCard({
   const duration = formatDuration(item?.durationMs);
   const canOpen = Boolean(
     item?.links?.web ||
-      item?.links?.mobile ||
-      item?.links?.mobileAlt ||
-      item?.links?.mobileRaw ||
-      item?.links?.play ||
-      item?.links?.playLegacy ||
-      item?.links?.playRaw ||
-      item?.links?.universal ||
-      item?.links?.androidIntent ||
-      item?.links?.androidIntentPlay,
+    item?.links?.mobile ||
+    item?.links?.mobileAlt ||
+    item?.links?.mobileRaw ||
+    item?.links?.play ||
+    item?.links?.playLegacy ||
+    item?.links?.playRaw ||
+    item?.links?.universal ||
+    item?.links?.androidIntent ||
+    item?.links?.androidIntentPlay,
   );
   const resolutions = Array.isArray(item?.resolutions) ? item.resolutions : [];
 
@@ -897,7 +898,7 @@ export default function BibliotecaClient() {
 
       if (!force && hasWindow) {
         try {
-          const raw = window.sessionStorage.getItem(cacheKey);
+          const raw = window.localStorage.getItem(cacheKey);
           if (raw) {
             const cached = JSON.parse(raw);
             if (
@@ -928,8 +929,9 @@ export default function BibliotecaClient() {
       if (background) setIsExpandingDataset(true);
 
       try {
+        // Usar force-cache para aprovechar caché del navegador, excepto en refresh manual
         const response = await fetch(`/api/plex/library?limit=${safeLimit}`, {
-          cache: "no-store",
+          cache: force ? "no-store" : "force-cache",
         });
         const json = await response.json().catch(() => null);
 
@@ -953,9 +955,9 @@ export default function BibliotecaClient() {
 
         if (hasWindow) {
           const payload = JSON.stringify({ timestamp: now, payload: json });
-          window.sessionStorage.setItem(cacheKey, payload);
+          window.localStorage.setItem(cacheKey, payload);
           if (safeLimit > DEFAULT_FETCH_LIMIT) {
-            window.sessionStorage.setItem(
+            window.localStorage.setItem(
               getCacheKey(DEFAULT_FETCH_LIMIT),
               payload,
             );

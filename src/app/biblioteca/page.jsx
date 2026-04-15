@@ -6,9 +6,9 @@ export const metadata = {
     "Dashboard de tu biblioteca Plex con contenido y resoluciones disponibles.",
 };
 
-export const dynamic = "force-dynamic";
+// Usar revalidación en lugar de force-dynamic para mejor performance
+export const revalidate = 1800; // 30 minutos
 
 export default function BibliotecaPage() {
   return <BibliotecaClient />;
 }
-

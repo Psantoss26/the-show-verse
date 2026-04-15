@@ -26,8 +26,8 @@ const IMG = "https://image.tmdb.org/t/p";
 const REGION = "ES";
 const LANG = "es-ES";
 
-// SessionStorage keys
-const SESSION_KEYS = {
+// LocalStorage keys para persistencia entre sesiones
+const STORAGE_KEYS = {
   CONTENT: "discover_content",
   SORT: "discover_sort",
   PROVIDERS: "discover_providers",
@@ -42,84 +42,121 @@ const SESSION_KEYS = {
   RUNTIME_RANGE: "discover_runtime_range",
   KEYWORDS: "discover_keywords",
 };
+const SECTION_STORAGE_PREFIX = "discover_section_open";
 
-// Helper para cargar filtros desde sessionStorage
-function loadFiltersFromSession() {
-  if (typeof window === "undefined") return {};
+function getDefaultDiscoverFilters() {
+  return {
+    content: "movie",
+    sortPreset: "pop_desc",
+    selectedProviders: [],
+    seenMode: "all",
+    dateFrom: "",
+    dateTo: "",
+    selectedGenres: [],
+    selectedCerts: [],
+    lang: "",
+    scoreRange: [0, 10],
+    minVotes: 0,
+    runtimeRange: [0, 360],
+    selectedKeywords: [],
+  };
+}
+
+function readStoredBoolean(key, fallback = false) {
+  if (typeof window === "undefined" || !key) return fallback;
   try {
-    return {
-      content: sessionStorage.getItem(SESSION_KEYS.CONTENT) || "movie",
-      sortPreset: sessionStorage.getItem(SESSION_KEYS.SORT) || "pop_desc",
-      selectedProviders: JSON.parse(
-        sessionStorage.getItem(SESSION_KEYS.PROVIDERS) || "[]",
-      ),
-      seenMode: sessionStorage.getItem(SESSION_KEYS.SEEN_MODE) || "all",
-      dateFrom: sessionStorage.getItem(SESSION_KEYS.DATE_FROM) || "",
-      dateTo: sessionStorage.getItem(SESSION_KEYS.DATE_TO) || "",
-      selectedGenres: JSON.parse(
-        sessionStorage.getItem(SESSION_KEYS.GENRES) || "[]",
-      ),
-      selectedCerts: JSON.parse(
-        sessionStorage.getItem(SESSION_KEYS.CERTS) || "[]",
-      ),
-      lang: sessionStorage.getItem(SESSION_KEYS.LANG) || "",
-      scoreRange: JSON.parse(
-        sessionStorage.getItem(SESSION_KEYS.SCORE_RANGE) || "[0, 10]",
-      ),
-      minVotes: Number(sessionStorage.getItem(SESSION_KEYS.MIN_VOTES) || "0"),
-      runtimeRange: JSON.parse(
-        sessionStorage.getItem(SESSION_KEYS.RUNTIME_RANGE) || "[0, 360]",
-      ),
-      selectedKeywords: JSON.parse(
-        sessionStorage.getItem(SESSION_KEYS.KEYWORDS) || "[]",
-      ),
-    };
-  } catch (e) {
-    console.error("Error al cargar filtros desde sessionStorage:", e);
-    return {};
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return raw === "1";
+  } catch {
+    return fallback;
   }
 }
 
-// Helper para guardar filtros en sessionStorage
-function saveFiltersToSession(filters) {
+// Helper para cargar filtros desde localStorage
+function loadFiltersFromStorage() {
+  const defaults = getDefaultDiscoverFilters();
+  if (typeof window === "undefined") return defaults;
+  try {
+    return {
+      content: localStorage.getItem(STORAGE_KEYS.CONTENT) || defaults.content,
+      sortPreset:
+        localStorage.getItem(STORAGE_KEYS.SORT) || defaults.sortPreset,
+      selectedProviders: JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.PROVIDERS) ||
+          JSON.stringify(defaults.selectedProviders),
+      ),
+      seenMode: localStorage.getItem(STORAGE_KEYS.SEEN_MODE) || defaults.seenMode,
+      dateFrom: localStorage.getItem(STORAGE_KEYS.DATE_FROM) || defaults.dateFrom,
+      dateTo: localStorage.getItem(STORAGE_KEYS.DATE_TO) || defaults.dateTo,
+      selectedGenres: JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.GENRES) ||
+          JSON.stringify(defaults.selectedGenres),
+      ),
+      selectedCerts: JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.CERTS) ||
+          JSON.stringify(defaults.selectedCerts),
+      ),
+      lang: localStorage.getItem(STORAGE_KEYS.LANG) || defaults.lang,
+      scoreRange: JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.SCORE_RANGE) ||
+          JSON.stringify(defaults.scoreRange),
+      ),
+      minVotes: Number(
+        localStorage.getItem(STORAGE_KEYS.MIN_VOTES) || String(defaults.minVotes),
+      ),
+      runtimeRange: JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.RUNTIME_RANGE) ||
+          JSON.stringify(defaults.runtimeRange),
+      ),
+      selectedKeywords: JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.KEYWORDS) ||
+          JSON.stringify(defaults.selectedKeywords),
+      ),
+    };
+  } catch (e) {
+    console.error("Error al cargar filtros desde localStorage:", e);
+    return defaults;
+  }
+}
+
+// Helper para guardar filtros en localStorage
+function saveFiltersToStorage(filters) {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(SESSION_KEYS.CONTENT, filters.content || "movie");
-    sessionStorage.setItem(SESSION_KEYS.SORT, filters.sortPreset || "pop_desc");
-    sessionStorage.setItem(
-      SESSION_KEYS.PROVIDERS,
+    localStorage.setItem(STORAGE_KEYS.CONTENT, filters.content || "movie");
+    localStorage.setItem(STORAGE_KEYS.SORT, filters.sortPreset || "pop_desc");
+    localStorage.setItem(
+      STORAGE_KEYS.PROVIDERS,
       JSON.stringify(filters.selectedProviders || []),
     );
-    sessionStorage.setItem(SESSION_KEYS.SEEN_MODE, filters.seenMode || "all");
-    sessionStorage.setItem(SESSION_KEYS.DATE_FROM, filters.dateFrom || "");
-    sessionStorage.setItem(SESSION_KEYS.DATE_TO, filters.dateTo || "");
-    sessionStorage.setItem(
-      SESSION_KEYS.GENRES,
+    localStorage.setItem(STORAGE_KEYS.SEEN_MODE, filters.seenMode || "all");
+    localStorage.setItem(STORAGE_KEYS.DATE_FROM, filters.dateFrom || "");
+    localStorage.setItem(STORAGE_KEYS.DATE_TO, filters.dateTo || "");
+    localStorage.setItem(
+      STORAGE_KEYS.GENRES,
       JSON.stringify(filters.selectedGenres || []),
     );
-    sessionStorage.setItem(
-      SESSION_KEYS.CERTS,
+    localStorage.setItem(
+      STORAGE_KEYS.CERTS,
       JSON.stringify(filters.selectedCerts || []),
     );
-    sessionStorage.setItem(SESSION_KEYS.LANG, filters.lang || "");
-    sessionStorage.setItem(
-      SESSION_KEYS.SCORE_RANGE,
+    localStorage.setItem(STORAGE_KEYS.LANG, filters.lang || "");
+    localStorage.setItem(
+      STORAGE_KEYS.SCORE_RANGE,
       JSON.stringify(filters.scoreRange || [0, 10]),
     );
-    sessionStorage.setItem(
-      SESSION_KEYS.MIN_VOTES,
-      String(filters.minVotes || 0),
-    );
-    sessionStorage.setItem(
-      SESSION_KEYS.RUNTIME_RANGE,
+    localStorage.setItem(STORAGE_KEYS.MIN_VOTES, String(filters.minVotes || 0));
+    localStorage.setItem(
+      STORAGE_KEYS.RUNTIME_RANGE,
       JSON.stringify(filters.runtimeRange || [0, 360]),
     );
-    sessionStorage.setItem(
-      SESSION_KEYS.KEYWORDS,
+    localStorage.setItem(
+      STORAGE_KEYS.KEYWORDS,
       JSON.stringify(filters.selectedKeywords || []),
     );
   } catch (e) {
-    console.error("Error al guardar filtros en sessionStorage:", e);
+    console.error("Error al guardar filtros en localStorage:", e);
   }
 }
 
@@ -189,11 +226,30 @@ function Section({
   children,
   defaultOpen = false,
   overflowVisible = false,
+  storageKey,
 }) {
   const [open, setOpen] = useState(!!defaultOpen);
+  const [storageReady, setStorageReady] = useState(() => !storageKey);
+
   useEffect(() => {
-    setOpen(!!defaultOpen);
-  }, [defaultOpen]);
+    if (!storageKey) {
+      setOpen(!!defaultOpen);
+      setStorageReady(true);
+      return;
+    }
+
+    setOpen(readStoredBoolean(storageKey, !!defaultOpen));
+    setStorageReady(true);
+  }, [defaultOpen, storageKey]);
+
+  useEffect(() => {
+    if (!storageKey || !storageReady) return;
+    try {
+      window.localStorage.setItem(storageKey, open ? "1" : "0");
+    } catch {
+      // ignore storage write errors
+    }
+  }, [open, storageKey, storageReady]);
 
   return (
     <details
@@ -595,8 +651,9 @@ function ProviderIcon({ provider, active, onToggle }) {
 ========================= */
 export default function DiscoverClient() {
   const { session, account, hydrated } = useAuth();
+  const [filtersReady, setFiltersReady] = useState(false);
 
-  // --- State Filters (inicializados con valores por defecto para evitar hydration error) ---
+  // --- State Filters (con defaults SSR-safe; se restauran tras montar) ---
   const [content, setContent] = useState("movie");
   const [sortPreset, setSortPreset] = useState("pop_desc");
   const [providersAll, setProvidersAll] = useState([]);
@@ -634,31 +691,28 @@ export default function DiscoverClient() {
 
   const hasSession = hydrated && !!session && !!account?.id;
 
-  // Cargar filtros desde sessionStorage solo en el cliente (después del primer render)
   useEffect(() => {
-    const savedFilters = loadFiltersFromSession();
-    if (savedFilters.content) setContent(savedFilters.content);
-    if (savedFilters.sortPreset) setSortPreset(savedFilters.sortPreset);
-    if (savedFilters.selectedProviders)
-      setSelectedProviders(savedFilters.selectedProviders);
-    if (savedFilters.seenMode) setSeenMode(savedFilters.seenMode);
-    if (savedFilters.dateFrom) setDateFrom(savedFilters.dateFrom);
-    if (savedFilters.dateTo) setDateTo(savedFilters.dateTo);
-    if (savedFilters.selectedGenres)
-      setSelectedGenres(savedFilters.selectedGenres);
-    if (savedFilters.selectedCerts)
-      setSelectedCerts(savedFilters.selectedCerts);
-    if (savedFilters.lang) setLang(savedFilters.lang);
-    if (savedFilters.scoreRange) setScoreRange(savedFilters.scoreRange);
-    if (savedFilters.minVotes !== undefined) setMinVotes(savedFilters.minVotes);
-    if (savedFilters.runtimeRange) setRuntimeRange(savedFilters.runtimeRange);
-    if (savedFilters.selectedKeywords)
-      setSelectedKeywords(savedFilters.selectedKeywords);
-  }, []); // Solo ejecutar una vez al montar
+    const savedFilters = loadFiltersFromStorage();
+    setContent(savedFilters.content);
+    setSortPreset(savedFilters.sortPreset);
+    setSelectedProviders(savedFilters.selectedProviders);
+    setSeenMode(savedFilters.seenMode);
+    setDateFrom(savedFilters.dateFrom);
+    setDateTo(savedFilters.dateTo);
+    setSelectedGenres(savedFilters.selectedGenres);
+    setSelectedCerts(savedFilters.selectedCerts);
+    setLang(savedFilters.lang);
+    setScoreRange(savedFilters.scoreRange);
+    setMinVotes(savedFilters.minVotes);
+    setRuntimeRange(savedFilters.runtimeRange);
+    setSelectedKeywords(savedFilters.selectedKeywords);
+    setFiltersReady(true);
+  }, []);
 
-  // Guardar filtros en sessionStorage cuando cambien
+  // Guardar filtros en localStorage cuando cambien
   useEffect(() => {
-    saveFiltersToSession({
+    if (!filtersReady) return;
+    saveFiltersToStorage({
       content,
       sortPreset,
       selectedProviders,
@@ -674,6 +728,7 @@ export default function DiscoverClient() {
       selectedKeywords,
     });
   }, [
+    filtersReady,
     content,
     sortPreset,
     selectedProviders,
@@ -942,6 +997,8 @@ export default function DiscoverClient() {
 
   // --- Fetch Items ---
   useEffect(() => {
+    if (!filtersReady) return;
+
     let cancelled = false;
     const ac = new AbortController();
     async function fetchDiscoverForType(type) {
@@ -1010,6 +1067,7 @@ export default function DiscoverClient() {
       ac.abort();
     };
   }, [
+    filtersReady,
     content,
     discoverParams,
     page,
@@ -1023,8 +1081,10 @@ export default function DiscoverClient() {
 
   // Reset page on filter change
   useEffect(() => {
+    if (!filtersReady) return;
     setPage(1);
   }, [
+    filtersReady,
     content,
     sortPreset,
     selectedProviders,
@@ -1116,6 +1176,7 @@ export default function DiscoverClient() {
               <Section
                 title="Ordenar"
                 defaultOpen
+                storageKey={`${SECTION_STORAGE_PREFIX}:sort`}
                 right={
                   <span className="text-[10px] text-zinc-500">
                     {
@@ -1135,6 +1196,7 @@ export default function DiscoverClient() {
 
               <Section
                 title="Dónde se puede ver"
+                storageKey={`${SECTION_STORAGE_PREFIX}:providers`}
                 right={
                   <span className="text-[10px] text-zinc-500">
                     {selectedProviders.length > 0
@@ -1206,7 +1268,11 @@ export default function DiscoverClient() {
                 </div>
               </Section>
 
-              <Section title="Filtros" defaultOpen>
+              <Section
+                title="Filtros"
+                defaultOpen
+                storageKey={`${SECTION_STORAGE_PREFIX}:seen`}
+              >
                 <div className="space-y-1">
                   <div className="text-[10px] font-bold text-zinc-600 uppercase mb-2">
                     Muéstrame
@@ -1240,7 +1306,10 @@ export default function DiscoverClient() {
                 </div>
               </Section>
 
-              <Section title="Fechas de estreno">
+              <Section
+                title="Fechas de estreno"
+                storageKey={`${SECTION_STORAGE_PREFIX}:dates`}
+              >
                 <div className="space-y-3">
                   <div className="space-y-1">
                     <label className="text-[10px] text-zinc-500">Desde</label>
@@ -1271,6 +1340,7 @@ export default function DiscoverClient() {
 
               <Section
                 title="Géneros"
+                storageKey={`${SECTION_STORAGE_PREFIX}:genres`}
                 right={
                   <span className="text-[10px] text-zinc-500">
                     {selectedGenres.length > 0 ? selectedGenres.length : ""}
@@ -1296,7 +1366,10 @@ export default function DiscoverClient() {
                 </div>
               </Section>
 
-              <Section title="Certificación">
+              <Section
+                title="Certificación"
+                storageKey={`${SECTION_STORAGE_PREFIX}:certs`}
+              >
                 <div className="flex flex-wrap gap-2">
                   {certsAll.map((c) => (
                     <Chip
@@ -1318,6 +1391,7 @@ export default function DiscoverClient() {
 
               <Section
                 title="Puntuación"
+                storageKey={`${SECTION_STORAGE_PREFIX}:score`}
                 right={<Star className="w-3 h-3 text-orange-500" />}
               >
                 <DualRange
@@ -1343,6 +1417,7 @@ export default function DiscoverClient() {
 
               <Section
                 title="Duración"
+                storageKey={`${SECTION_STORAGE_PREFIX}:runtime`}
                 right={<Clock className="w-3 h-3 text-zinc-500" />}
               >
                 <DualRange
@@ -1356,7 +1431,10 @@ export default function DiscoverClient() {
                 />
               </Section>
 
-              <Section title="Keywords">
+              <Section
+                title="Keywords"
+                storageKey={`${SECTION_STORAGE_PREFIX}:keywords`}
+              >
                 <input
                   value={keywordQuery}
                   onChange={(e) => setKeywordQuery(e.target.value)}
