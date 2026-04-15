@@ -1138,39 +1138,44 @@ export default function InProgressClient() {
   const [completedLoading, setCompletedLoading] = useState(false);
   const [completedLoaded, setCompletedLoaded] = useState(false);
 
-  // UI
-  const [viewMode, setViewMode] = useState(() => {
-    if (typeof window === "undefined") return "cards";
-    const saved = window.localStorage.getItem("showverse:inprogress:viewMode");
-    return saved === "cards" || saved === "compact" || saved === "poster"
-      ? saved
-      : "cards";
-  });
-  const [sortBy, setSortBy] = useState(() => {
-    if (typeof window === "undefined") return "recent";
-    const saved = window.localStorage.getItem("showverse:inprogress:sortBy");
-    return saved || "recent";
-  });
-  const [groupBy, setGroupBy] = useState(() => {
-    if (typeof window === "undefined") return "none";
-    const saved = window.localStorage.getItem("showverse:inprogress:groupBy");
-    return saved || "none";
-  });
+  // UI — fixed SSR-safe defaults to avoid hydration mismatch
+  const [viewMode, setViewMode] = useState("cards");
+  const [sortBy, setSortBy] = useState("recent");
+  const [groupBy, setGroupBy] = useState("none");
   const [q, setQ] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
+  // Restore preferences from localStorage after mount (avoids SSR/client hydration mismatch)
+  useEffect(() => {
+    const savedView = window.localStorage.getItem(
+      "showverse:inprogress:viewMode",
+    );
+    if (
+      savedView === "cards" ||
+      savedView === "compact" ||
+      savedView === "poster"
+    ) {
+      setViewMode(savedView);
+    }
+    const savedSort = window.localStorage.getItem(
+      "showverse:inprogress:sortBy",
+    );
+    if (savedSort) setSortBy(savedSort);
+    const savedGroup = window.localStorage.getItem(
+      "showverse:inprogress:groupBy",
+    );
+    if (savedGroup) setGroupBy(savedGroup);
+  }, []);
+
   // Persist
   useEffect(() => {
-    if (typeof window === "undefined") return;
     window.localStorage.setItem("showverse:inprogress:viewMode", viewMode);
   }, [viewMode]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
     window.localStorage.setItem("showverse:inprogress:sortBy", sortBy);
   }, [sortBy]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
     window.localStorage.setItem("showverse:inprogress:groupBy", groupBy);
   }, [groupBy]);
 
@@ -1809,9 +1814,9 @@ export default function InProgressClient() {
                 className="lg:hidden overflow-visible"
               >
                 <div className="space-y-3 pt-1">
-                  {/* Fila 1: Ordenar + Agrupar */}
-                  <div className="flex gap-2">
-                    <div className="basis-1/2 min-w-0">
+                  {/* Fila 1: Ordenar + tabs Viendo/Completadas (solo icono) */}
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1 min-w-0">
                       <InlineDropdown
                         label="Ordenar"
                         valueLabel={sortLabels[sortBy]}
@@ -1835,7 +1840,40 @@ export default function InProgressClient() {
                         )}
                       </InlineDropdown>
                     </div>
-                    <div className="basis-1/2 min-w-0">
+                    <div className="flex w-28 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
+                      <button
+                        onClick={() => setActiveTab("inprogress")}
+                        title={`Viendo${dataLoaded ? ` (${items.length})` : ""}`}
+                        className={`flex-1 h-full rounded-lg transition-all flex items-center justify-center ${
+                          activeTab === "inprogress"
+                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
+                      >
+                        <Play
+                          className="w-4 h-4"
+                          fill={
+                            activeTab === "inprogress" ? "currentColor" : "none"
+                          }
+                        />
+                      </button>
+                      <button
+                        onClick={() => setActiveTab("completed")}
+                        title={`Completadas${completedLoaded ? ` (${completedItems.length})` : ""}`}
+                        className={`flex-1 h-full rounded-lg transition-all flex items-center justify-center ${
+                          activeTab === "completed"
+                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                        }`}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Fila 2: Agrupar + botones de vista */}
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1 min-w-0">
                       <InlineDropdown
                         label="Agrupar"
                         valueLabel={groupLabels[groupBy]}
@@ -1859,55 +1897,11 @@ export default function InProgressClient() {
                         )}
                       </InlineDropdown>
                     </div>
-                  </div>
-
-                  {/* Fila 2: Viendo/Completadas + Vista Tarjetas/Poster/Lista */}
-                  <div className="flex gap-2 items-center">
-                    <div className="flex-1 flex gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 min-w-0">
-                      <button
-                        onClick={() => setActiveTab("inprogress")}
-                        className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
-                          activeTab === "inprogress"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
-                      >
-                        <Play
-                          className="w-3.5 h-3.5"
-                          fill={
-                            activeTab === "inprogress" ? "currentColor" : "none"
-                          }
-                        />
-                        Viendo
-                        {dataLoaded && (
-                          <span className="text-[10px] opacity-70">
-                            ({items.length})
-                          </span>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => setActiveTab("completed")}
-                        className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
-                          activeTab === "completed"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Completadas
-                        {completedLoaded && (
-                          <span className="text-[10px] opacity-70">
-                            ({completedItems.length})
-                          </span>
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
+                    <div className="flex w-28 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
                       <button
                         onClick={() => setViewMode("cards")}
-                        className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        title="Tarjetas"
+                        className={`flex-1 h-full rounded-lg transition-all flex items-center justify-center ${
                           viewMode === "cards"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
@@ -1917,7 +1911,8 @@ export default function InProgressClient() {
                       </button>
                       <button
                         onClick={() => setViewMode("poster")}
-                        className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        title="Poster"
+                        className={`flex-1 h-full rounded-lg transition-all flex items-center justify-center ${
                           viewMode === "poster"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
@@ -1927,7 +1922,8 @@ export default function InProgressClient() {
                       </button>
                       <button
                         onClick={() => setViewMode("compact")}
-                        className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        title="Lista"
+                        className={`flex-1 h-full rounded-lg transition-all flex items-center justify-center ${
                           viewMode === "compact"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
