@@ -12,97 +12,8 @@ import {
   fetchMediaByGenre,
 } from "@/lib/api/tmdb";
 
-import {
-  getTraktTrending,
-  getTraktPopular,
-  getTraktAnticipated,
-  getTraktMoviesAnticipated,
-  getTraktShowsAnticipated,
-  removeDuplicates,
-} from "@/lib/api/traktHelpers";
-
-export const revalidate = 900; // 15 minutos (cache más frecuente)
+export const revalidate = 3600; // 1 hora — reduce cold starts en Vercel
 export const maxDuration = 60; // Vercel Pro = 60s; Hobby = 10s (máximo posible)
-
-// ✅ Usar el sistema centralizado de cache de Trakt (sin duplicar fetchTrakt)
-// import { fetchTrakt } from '@/lib/trakt/fetchWithCache'; // Ya está en traktHelpers
-
-/* ====================================================================
- * MISMO CRITERIO QUE EN CLIENTE (MainDashboardClient.jsx):
- *  1) Idioma EN (si existe)
- *  2) Mejor resolución (área)
- *  3) Votos (vote_count, luego vote_average)
- * ==================================================================== */
-function pickBestBackdropByLangResVotesServer(list, opts = {}) {
-  const {
-    preferLangs = ["en", "en-US"],
-    resolutionWindow = 0.98,
-    minWidth = 1200,
-  } = opts;
-
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  const area = (img) => (img?.width || 0) * (img?.height || 0);
-  const lang = (img) => img?.iso_639_1 || null;
-
-  const sizeFiltered =
-    minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
-  const pool0 = sizeFiltered.length ? sizeFiltered : list;
-
-  const hasPreferred = pool0.some((b) => preferLangs.includes(lang(b)));
-  const pool1 = hasPreferred
-    ? pool0.filter((b) => preferLangs.includes(lang(b)))
-    : pool0;
-
-  const maxArea = Math.max(...pool1.map(area));
-  const threshold =
-    maxArea * (typeof resolutionWindow === "number" ? resolutionWindow : 1.0);
-  const pool2 = pool1.filter((b) => area(b) >= threshold);
-
-  const sorted = [...pool2].sort((a, b) => {
-    const aA = area(a);
-    const bA = area(b);
-    if (bA !== aA) return bA - aA;
-    const w = (b.width || 0) - (a.width || 0);
-    if (w !== 0) return w;
-    const vc = (b.vote_count || 0) - (a.vote_count || 0);
-    if (vc !== 0) return vc;
-    const va = (b.vote_average || 0) - (a.vote_average || 0);
-    return va;
-  });
-
-  return sorted[0] || null;
-}
-
-/* ========= Backdrop preferido (SERVER) ========= */
-async function fetchBestBackdropServer(itemId, mediaType = "movie") {
-  try {
-    const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-    if (!apiKey || !itemId) return null;
-
-    const type = mediaType === "tv" ? "tv" : "movie";
-    const url =
-      `https://api.themoviedb.org/3/${type}/${itemId}/images` +
-      `?api_key=${apiKey}` +
-      `&include_image_language=en,en-US,es,es-ES,null`;
-
-    const r = await fetch(url, { cache: "force-cache" });
-    if (!r.ok) return null;
-
-    const j = await r.json();
-    const backs = Array.isArray(j?.backdrops) ? j.backdrops : [];
-
-    const best = pickBestBackdropByLangResVotesServer(backs, {
-      preferLangs: ["en", "en-US"],
-      resolutionWindow: 0.98,
-      minWidth: 1200,
-    });
-
-    return best?.file_path || null;
-  } catch {
-    return null;
-  }
-}
 
 /* ======== Curado de listas (mismo criterio que Películas/Series) ======== */
 const sortByVotes = (list = []) =>
@@ -151,128 +62,46 @@ function curateList(
 /* ======== Carga de datos en el SERVIDOR ======== */
 async function getDashboardData(sessionId = null) {
   try {
-    console.log("🔄 [Dashboard] Iniciando carga de datos...");
-
-    // ⚡ OPTIMIZACIÓN: Solo cargar secciones críticas en SSR (above-the-fold)
-    // El resto se cargará en el cliente de forma lazy
-    const [
-      topRatedMovies,
-      topRatedTV,
-      awarded,
-      dramaTV,
-      trending,
-      popular,
-
-      // SECCIONES TRAKT CRÍTICAS (visible sin scroll)
-      traktTrending,
-      traktPopular,
-      traktAnticipated,
-      traktMoviesAnticipated,
-      traktShowsAnticipated,
-    ] = await Promise.all([
-      // TMDb secciones originales
-      fetchTopRatedMovies(2000), // Mínimo 2000 votos para películas top rated
-      fetchTopRatedTV(1000), // Mínimo 1000 votos para series top rated
-      discoverMovies({
-        "vote_average.gte": 7.5,
-        "vote_count.gte": 2000,
-        sort_by: "vote_average.desc",
-        page: 1,
-      }),
-      fetchMediaByGenre({
-        type: "tv",
-        genreId: 18,
-        minVotes: 800,
-        language: "es-ES",
-      }),
-      fetchTrendingMovies(),
-      fetchPopularMovies(),
-
-      // ⚡ Trakt - Secciones críticas (30 items cada una, sin extended=full para optimizar)
-      // Cada llamada tiene .catch(() => []) independiente: si una falla, las demás siguen
-      getTraktTrending(30).catch((err) => {
-        console.warn("❌ getTraktTrending failed:", err.message);
-        return [];
-      }),
-      getTraktPopular(30).catch((err) => {
-        console.warn("❌ getTraktPopular failed:", err.message);
-        return [];
-      }),
-      getTraktAnticipated(30).catch((err) => {
-        console.warn("❌ getTraktAnticipated failed:", err.message);
-        return [];
-      }),
-      getTraktMoviesAnticipated(30).catch((err) => {
-        console.warn("❌ getTraktMoviesAnticipated failed:", err.message);
-        return [];
-      }),
-      getTraktShowsAnticipated(30).catch((err) => {
-        console.warn("❌ getTraktShowsAnticipated failed:", err.message);
-        return [];
-      }),
-    ]);
-
-    console.log("✅ [Dashboard] Secciones críticas de Trakt cargadas (SSR):", {
-      traktTrending: traktTrending.length,
-      traktPopular: traktPopular.length,
-      traktAnticipated: traktAnticipated.length,
-      traktMoviesAnticipated: traktMoviesAnticipated.length,
-      traktShowsAnticipated: traktShowsAnticipated.length,
-    });
-    console.log(
-      "⏱️ [Dashboard] Secciones secundarias se cargarán en el cliente (lazy)",
-    );
+    // Solo TMDb — rápido y cacheable. Trakt se carga lazy en el cliente.
+    const [topRatedMovies, topRatedTV, awarded, dramaTV, trending, popular] =
+      await Promise.all([
+        fetchTopRatedMovies(2000),
+        fetchTopRatedTV(1000),
+        discoverMovies({
+          "vote_average.gte": 7.5,
+          "vote_count.gte": 2000,
+          sort_by: "vote_average.desc",
+          page: 1,
+        }),
+        fetchMediaByGenre({
+          type: "tv",
+          genreId: 18,
+          minVotes: 800,
+          language: "es-ES",
+        }),
+        fetchTrendingMovies(),
+        fetchPopularMovies(),
+      ]);
 
     const recommended = sessionId
       ? await fetchRecommendedMovies(sessionId)
       : [];
 
-    // Top 20 películas y Top 20 series por separado (con backdrops)
-    const topMovies = topRatedMovies
+    // Top 20 películas y Top 20 series — se usan los backdrop_path del endpoint de lista.
+    // La mejora a backdrop EN se hace client-side en TopRatedHero (ya implementado).
+    const topRatedMoviesSSR = topRatedMovies
       .map((m) => ({ ...m, media_type: "movie" }))
       .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
       .slice(0, 20);
 
-    const topShows = topRatedTV
+    const topRatedTVSSR = topRatedTV
       .map((s) => ({ ...s, media_type: "tv" }))
       .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
       .slice(0, 20);
 
-    const addBackdrops = (list) =>
-      Promise.all(
-        list.map(async (m) => {
-          const mediaType = m.media_type === "tv" ? "tv" : "movie";
-          const preferred = await fetchBestBackdropServer(m.id, mediaType);
-          return {
-            ...m,
-            backdrop_path:
-              preferred ||
-              m.backdrop_path ||
-              m.poster_path ||
-              m.profile_path ||
-              null,
-          };
-        }),
-      );
-
-    const [topRatedMoviesWithBackdrop, topRatedTVWithBackdrop] =
-      await Promise.all([addBackdrops(topMovies), addBackdrops(topShows)]);
-
-    // Eliminamos duplicados en las secciones de Trakt para evitar repeticiones
-    const cleanedTraktTrending = removeDuplicates(traktTrending);
-    const cleanedTraktPopular = removeDuplicates(traktPopular);
-    const cleanedTraktAnticipated = removeDuplicates(traktAnticipated);
-    const cleanedTraktMoviesAnticipated = removeDuplicates(
-      traktMoviesAnticipated,
-    );
-    const cleanedTraktShowsAnticipated = removeDuplicates(
-      traktShowsAnticipated,
-    );
-
     return {
-      // TMDb originales
-      topRatedMovies: topRatedMoviesWithBackdrop,
-      topRatedTV: topRatedTVWithBackdrop,
+      topRatedMovies: topRatedMoviesSSR,
+      topRatedTV: topRatedTVSSR,
       awarded: curateList(awarded, {
         minVotes: 1200,
         minRating: 6.8,
@@ -289,14 +118,12 @@ async function getDashboardData(sessionId = null) {
       popular,
       recommended,
 
-      // SECCIONES TRAKT CRÍTICAS (SSR)
-      traktTrending: cleanedTraktTrending,
-      traktPopular: cleanedTraktPopular,
-      traktAnticipated: cleanedTraktAnticipated,
-      traktMoviesAnticipated: cleanedTraktMoviesAnticipated,
-      traktShowsAnticipated: cleanedTraktShowsAnticipated,
-
-      // Secciones lazy (se cargarán en el cliente)
+      // Todas las secciones Trakt se cargan en el cliente (lazy)
+      traktTrending: [],
+      traktPopular: [],
+      traktAnticipated: [],
+      traktMoviesAnticipated: [],
+      traktShowsAnticipated: [],
       traktRecommended: [],
       traktPlayedWeekly: [],
       traktPlayedMonthly: [],
