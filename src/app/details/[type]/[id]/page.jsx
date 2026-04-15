@@ -6,6 +6,7 @@ import {
   getTraktItemStatusFromCookieStore,
   getTraktShowWatchedFromCookieStore,
 } from "@/lib/trakt/server";
+import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
 export const revalidate = 600;
 
@@ -28,35 +29,50 @@ export default async function DetailsPage({ params }) {
   }
 
   const cookieStore = await cookies();
-  const [data, initialTraktStatus, initialShowWatched, wpResult] =
-    await Promise.all([
-      getDetails(type, id),
-      resolveWithin(
-        getTraktItemStatusFromCookieStore(cookieStore, {
-          type: type === "tv" ? "show" : "movie",
-          tmdbId: id,
-        }).catch(() => null),
-        type === "tv" ? 900 : 750,
-        null,
+  const traktType = type === "tv" ? "show" : "movie";
+  const [
+    data,
+    initialTraktStatus,
+    initialShowWatched,
+    wpResult,
+    initialScoreboard,
+  ] = await Promise.all([
+    getDetails(type, id),
+    resolveWithin(
+      getTraktItemStatusFromCookieStore(cookieStore, {
+        type: traktType,
+        tmdbId: id,
+      }).catch(() => null),
+      type === "tv" ? 900 : 750,
+      null,
+    ),
+    type === "tv"
+      ? resolveWithin(
+          getTraktShowWatchedFromCookieStore(cookieStore, {
+            tmdbId: id,
+          }).catch(() => null),
+          950,
+          null,
+        )
+      : Promise.resolve(null),
+    resolveWithin(
+      getWatchProviders(type, id, "ES").catch(() => ({
+        providers: [],
+        link: null,
+      })),
+      1200,
+      { providers: [], link: null },
+    ),
+    // Scoreboard de Trakt: rating comunidad + estadísticas (watchers, plays, etc.)
+    // Usa unstable_cache (300s) → instantáneo en cache hit, ~4s en cold start
+    resolveWithin(
+      getCachedTraktScoreboardData({ type: traktType, tmdbId: id }).catch(
+        () => null,
       ),
-      type === "tv"
-        ? resolveWithin(
-            getTraktShowWatchedFromCookieStore(cookieStore, {
-              tmdbId: id,
-            }).catch(() => null),
-            950,
-            null,
-          )
-        : Promise.resolve(null),
-      resolveWithin(
-        getWatchProviders(type, id, "ES").catch(() => ({
-          providers: [],
-          link: null,
-        })),
-        1200,
-        { providers: [], link: null },
-      ),
-    ]);
+      4000,
+      null,
+    ),
+  ]);
 
   if (!data) {
     notFound();
@@ -83,6 +99,7 @@ export default async function DetailsPage({ params }) {
       initialWatchLink={initialWatchLink}
       initialTraktStatus={initialTraktStatus}
       initialShowWatched={initialShowWatched}
+      initialScoreboard={initialScoreboard}
     />
   );
 }
