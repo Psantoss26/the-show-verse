@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import DetailsClient from "@/components/DetailsClient";
-import { getReviews, getWatchProviders } from "@/lib/api/tmdb";
+import { getCredits, getReviews, getWatchProviders } from "@/lib/api/tmdb";
 import { getTraktRelated } from "@/lib/api/traktClient";
 
 const EMPTY_ARRAY = [];
 const EMPTY_DEFERRED = {
+  castData: EMPTY_ARRAY,
   recommendations: EMPTY_ARRAY,
   providers: EMPTY_ARRAY,
   watchLink: null,
@@ -39,9 +40,30 @@ export default function DetailsPageLoader(props) {
     if (!type || !id || !data || type === "person") return;
 
     let cancelled = false;
-    let relatedTimer = null;
 
-    const loadCoreDeferredData = async () => {
+    const loadPriorityDeferredData = async () => {
+      try {
+        const [credits, related] = await Promise.all([
+          getCredits(type, id).catch(() => ({ cast: [] })),
+          getTraktRelated({ type, tmdbId: id }).catch(() => ({ results: [] })),
+        ]);
+
+        if (cancelled) return;
+
+        setDeferredData((prev) => ({
+          ...prev,
+          castData: Array.isArray(credits?.cast) ? credits.cast : EMPTY_ARRAY,
+          recommendations: related?.results || EMPTY_ARRAY,
+        }));
+      } catch (error) {
+        console.error(
+          "Error cargando datos prioritarios del detalle:",
+          error,
+        );
+      }
+    };
+
+    const loadSecondaryDeferredData = async () => {
       try {
         const [reviews, watchProviders] = await Promise.all([
           getReviews(type, id).catch(() => ({ results: [] })),
@@ -67,48 +89,24 @@ export default function DetailsPageLoader(props) {
       }
     };
 
-    const loadTraktRelatedDeferred = async () => {
-      try {
-        const related = await getTraktRelated({ type, tmdbId: id }).catch(
-          () => ({ results: [] }),
-        );
-
-        if (cancelled) return;
-
-        setDeferredData((prev) => ({
-          ...prev,
-          recommendations: related?.results || EMPTY_ARRAY,
-        }));
-      } catch (error) {
-        console.error("Error cargando recomendaciones de Trakt:", error);
-      }
-    };
-
-    loadCoreDeferredData();
-
-    relatedTimer = window.setTimeout(
-      () => {
-        void loadTraktRelatedDeferred();
-      },
-      deferredData.initialScoreboard?.found || initialScoreboard?.found
-        ? 900
-        : type === "tv"
-          ? 3200
-          : 1800,
-    );
+    loadPriorityDeferredData();
+    loadSecondaryDeferredData();
 
     return () => {
       cancelled = true;
-      if (relatedTimer) window.clearTimeout(relatedTimer);
     };
-  }, [type, id, data, initialScoreboard]);
+  }, [type, id, data]);
 
   return (
     <DetailsClient
       type={type}
       id={id}
       data={data}
-      castData={initialCastData}
+      castData={
+        deferredData.castData !== EMPTY_ARRAY
+          ? deferredData.castData
+          : initialCastData
+      }
       initialTraktStatus={initialTraktStatus}
       initialShowWatched={initialShowWatched}
       initialScoreboard={deferredData.initialScoreboard ?? initialScoreboard}
