@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getPlexAccessToken } from "@/lib/plex/auth";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
+export const revalidate = 1800; // Revalidar cada 30 minutos (1800 segundos)
 
 const RESOLUTION_ORDER = [
   "8K",
@@ -49,7 +50,10 @@ function normalizeBaseUrl(rawUrl) {
 }
 
 function resolvePlexBaseUrls() {
-  const configuredUrls = [process.env.PLEX_URL, ...(process.env.PLEX_URLS || "").split(",")]
+  const configuredUrls = [
+    process.env.PLEX_URL,
+    ...(process.env.PLEX_URLS || "").split(","),
+  ]
     .map((value) => String(value || "").trim())
     .filter(Boolean);
 
@@ -66,7 +70,10 @@ function resolvePlexBaseUrls() {
 
     try {
       const parsed = new URL(normalized);
-      if (parsed.protocol === "https:" && isPrivateOrLocalHost(parsed.hostname)) {
+      if (
+        parsed.protocol === "https:" &&
+        isPrivateOrLocalHost(parsed.hostname)
+      ) {
         expandedCandidates.push(`http://${parsed.host}`);
       }
     } catch {
@@ -144,7 +151,9 @@ async function fetchAllPlexMetadata({
     });
 
     const container = json?.MediaContainer || {};
-    const metadata = Array.isArray(container.Metadata) ? container.Metadata : [];
+    const metadata = Array.isArray(container.Metadata)
+      ? container.Metadata
+      : [];
     if (!metadata.length) break;
 
     allItems.push(...metadata);
@@ -336,12 +345,7 @@ function getMetadataKey(item) {
   return String(item.key).replace(/\/children$/i, "");
 }
 
-function buildPlexItemLinks({
-  item,
-  machineIdentifier,
-  baseUrl,
-  itemType,
-}) {
+function buildPlexItemLinks({ item, machineIdentifier, baseUrl, itemType }) {
   const metadataKey = getMetadataKey(item);
   if (!metadataKey) {
     return {
@@ -490,7 +494,9 @@ export async function GET(request) {
       : [];
 
     const sections = sectionsRaw
-      .filter((section) => section?.type === "movie" || section?.type === "show")
+      .filter(
+        (section) => section?.type === "movie" || section?.type === "show",
+      )
       .filter((section) =>
         sectionFilter ? String(section.key) === String(sectionFilter) : true,
       )
@@ -543,7 +549,9 @@ export async function GET(request) {
             );
             if (!showKey) continue;
 
-            const episodeResolutions = extractResolutionsFromMedia(episode?.Media);
+            const episodeResolutions = extractResolutionsFromMedia(
+              episode?.Media,
+            );
             if (!episodeResolutions.length) continue;
 
             const current = showResolutionMap.get(showKey) || new Set();
@@ -668,7 +676,9 @@ export async function GET(request) {
         status: 200,
         headers: {
           "Cache-Control":
-            "public, s-maxage=300, stale-while-revalidate=600",
+            "public, s-maxage=1800, stale-while-revalidate=3600, max-age=900",
+          "CDN-Cache-Control": "public, s-maxage=1800",
+          "Vercel-CDN-Cache-Control": "public, s-maxage=1800",
         },
       },
     );
