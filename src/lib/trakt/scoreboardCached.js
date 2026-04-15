@@ -11,7 +11,10 @@ const getCachedScoreboard = unstable_cache(
     });
   },
   ["trakt-scoreboard-public"],
-  { revalidate: 1800 },
+  // 5 min: si el primer intento devuelve stats nulas (timeout de Trakt en cold
+  // start), el resultado parcial no queda cacheado 30 min. El cliente tiene
+  // su propio fallback a /api/trakt/stats para el caso de cache HIT con stats nulas.
+  { revalidate: 300 },
 );
 
 export async function getCachedTraktScoreboardData({

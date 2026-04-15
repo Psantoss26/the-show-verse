@@ -2330,13 +2330,20 @@ const AnticipatedSection = memo(function AnticipatedSection({
   overridesReady,
 }) {
   const [activeTab, setActiveTab] = useState("movies");
-  const items = activeTab === "movies" ? movieItems : tvItems;
 
-  if (
+  // null = aún cargando; [] = cargado y vacío → ocultar sección
+  const loading = movieItems === null && tvItems === null;
+  const empty =
+    !loading &&
     (!movieItems || movieItems.length === 0) &&
-    (!tvItems || tvItems.length === 0)
-  )
-    return null;
+    (!tvItems || tvItems.length === 0);
+
+  const items = activeTab === "movies" ? (movieItems ?? []) : (tvItems ?? []);
+
+  if (empty) return null;
+
+  // Número de skeletons para que el placeholder tenga la misma altura aprox.
+  const SKELETON_COUNT = isMobile ? 2 : 6;
 
   return (
     <motion.div
@@ -2359,48 +2366,65 @@ const AnticipatedSection = memo(function AnticipatedSection({
           </h3>
         </div>
 
-        <div className="flex gap-1 bg-white/5 rounded-full p-1">
-          {movieItems?.length > 0 && (
-            <button
-              onClick={() => setActiveTab("movies")}
-              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                activeTab === "movies"
-                  ? "bg-white text-black"
-                  : "text-neutral-400 hover:text-white"
-              }`}
-            >
-              Películas
-            </button>
-          )}
-          {tvItems?.length > 0 && (
-            <button
-              onClick={() => setActiveTab("series")}
-              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                activeTab === "series"
-                  ? "bg-white text-black"
-                  : "text-neutral-400 hover:text-white"
-              }`}
-            >
-              Series
-            </button>
-          )}
-        </div>
+        {!loading && (
+          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+            {movieItems?.length > 0 && (
+              <button
+                onClick={() => setActiveTab("movies")}
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  activeTab === "movies"
+                    ? "bg-white text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Películas
+              </button>
+            )}
+            {tvItems?.length > 0 && (
+              <button
+                onClick={() => setActiveTab("series")}
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  activeTab === "series"
+                    ? "bg-white text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Series
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Contenido con las tarjetas anticipated */}
-      <Row
-        title=""
-        hideTitle={true}
-        items={items}
-        isMobile={isMobile}
-        hydrated={hydrated}
-        posterCacheRef={posterCacheRef}
-        posterOverrides={posterOverrides}
-        backdropOverrides={backdropOverrides}
-        overridesReady={overridesReady}
-        previewKind="anticipated"
-        eager={true}
-      />
+      {/* Skeleton mientras carga */}
+      {loading ? (
+        <div className="flex gap-3 overflow-hidden">
+          {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-shrink-0 rounded-xl bg-neutral-900 animate-pulse"
+              style={{
+                width: isMobile ? "calc(50% - 6px)" : "calc(16.666% - 10px)",
+                aspectRatio: "2/3",
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <Row
+          title=""
+          hideTitle={true}
+          items={items}
+          isMobile={isMobile}
+          hydrated={hydrated}
+          posterCacheRef={posterCacheRef}
+          posterOverrides={posterOverrides}
+          backdropOverrides={backdropOverrides}
+          overridesReady={overridesReady}
+          previewKind="anticipated"
+          eager={true}
+        />
+      )}
     </motion.div>
   );
 });
@@ -2429,7 +2453,7 @@ function TopRatedHero({
   const [canNext, setCanNext] = useState(false);
   const isInView = useInView(heroRef, { once: true, margin: "0px" });
 
-  const [heroBackdrops, setHeroBackdrops] = useState({});
+  const [heroBackdrops, setHeroBackdrops] = useState(null);
 
   // Cargar backdrops para AMBAS listas para evitar flash al cambiar de tab
   const allItems = useMemo(() => {
@@ -2641,10 +2665,9 @@ function TopRatedHero({
             >
               {items.map((movie) => {
                 const heroBackdrop =
-                  heroBackdrops[movie.id] ||
-                  movie.backdrop_path ||
-                  movie.poster_path ||
-                  null;
+                  heroBackdrops !== null
+                    ? (heroBackdrops[movie.id] ?? null)
+                    : null; // null mientras carga → muestra placeholder neutral
                 const slideClass = isMobile
                   ? "!w-full select-none"
                   : "select-none";
@@ -2767,8 +2790,9 @@ export default function MainDashboardClient({ initialData }) {
     // Secciones Trakt (todas lazy — no bloquean SSR)
     traktTrending: [],
     traktPopular: [],
-    traktMoviesAnticipated: [],
-    traktShowsAnticipated: [],
+    // null = aún cargando (muestra skeleton); [] = cargado pero vacío (oculta sección)
+    traktMoviesAnticipated: null,
+    traktShowsAnticipated: null,
     traktRecommended: [],
     traktPlayedWeekly: [],
     traktPlayedMonthly: [],

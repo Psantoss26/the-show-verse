@@ -1,5 +1,6 @@
 // src/app/api/trakt/community/_utils.js
 import { cookies } from "next/headers";
+import { unstable_cache } from "next/cache";
 import { fetchTrakt as fetchTraktWithCache } from "@/lib/trakt/fetchWithCache";
 
 const TRAKT_BASE = "https://api.trakt.tv";
@@ -71,25 +72,38 @@ export function buildTraktErrorMessage({ res, json, text, fallback }) {
   return json?.error || json?.message || fallback;
 }
 
+// Cache cross-instancia (Vercel KV/filesystem) para resolver TMDb→Trakt ID.
+// Múltiples rutas llaman a este endpoint en paralelo; sin cache compartido
+// cada instancia de función hace su propia petición a Trakt y las peticiones
+// concurrentes activan el rate-limit (403). Con unstable_cache, el primer
+// resolve se comparte entre todas las instancias durante 1 hora.
+const _resolveIdCached = unstable_cache(
+  async (type, tmdbIdStr) => {
+    const timeoutMs = process.env.NODE_ENV === "production" ? 8000 : 6000;
+    const json = await fetchTraktWithCache(
+      `/search/tmdb/${tmdbIdStr}?type=${type}`,
+      {
+        timeoutMs,
+        maxRetries: 0,
+        cacheTTL: 60 * 60 * 1000, // 1h en cache de módulo
+      },
+    );
+
+    const first = Array.isArray(json) ? json[0] : null;
+    const item = first?.[type] || null;
+    const traktId = item?.ids?.trakt || null;
+    const slug = item?.ids?.slug || null;
+
+    if (!traktId)
+      throw new Error("No se encontró el item en Trakt para ese TMDb ID");
+    return { traktId, slug };
+  },
+  ["trakt-tmdb-resolve"],
+  { revalidate: 3600 }, // 1h en cache persistente cross-instancia
+);
+
 export async function resolveTraktIdFromTmdb({ type, tmdbId }) {
-  // ✅ Usar fetchTrakt con cache para evitar rate limiting
-  const timeoutMs = process.env.NODE_ENV === "production" ? 12000 : 8000;
-  const json = await fetchTraktWithCache(
-    `/search/tmdb/${tmdbId}?type=${type}`,
-    {
-      timeoutMs,
-      cacheTTL: 10 * 60 * 1000, // 10 minutos de cache para búsquedas
-    },
-  );
-
-  const first = Array.isArray(json) ? json[0] : null;
-  const item = first?.[type] || null;
-  const traktId = item?.ids?.trakt || null;
-  const slug = item?.ids?.slug || null;
-
-  if (!traktId)
-    throw new Error("No se encontró el item en Trakt para ese TMDb ID");
-  return { traktId, slug };
+  return _resolveIdCached(String(type), String(tmdbId));
 }
 
 export function readPaginationHeaders(res) {
