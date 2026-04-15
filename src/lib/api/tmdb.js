@@ -324,7 +324,8 @@ export async function getWatchProviders(type, id, region = "ES") {
 /* -------------------- Detalles / Imágenes / IDs externos -------------------- */
 export async function getDetails(type, id) {
   const data = await tmdb(`/${type}/${id}`, {
-    append_to_response: "external_ids",
+    append_to_response: "external_ids,credits,images,reviews",
+    include_image_language: "es,en,null",
   });
   if (type === "tv" && data) {
     data.imdb_id = data?.external_ids?.imdb_id || null;

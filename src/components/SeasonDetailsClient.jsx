@@ -218,8 +218,7 @@ export default function SeasonDetailsClient({
       loading: false,
       rating:
         typeof r?.community?.rating === "number" ? r.community.rating : null,
-      votes:
-        typeof r?.community?.votes === "number" ? r.community.votes : null,
+      votes: typeof r?.community?.votes === "number" ? r.community.votes : null,
       stats: r?.stats || null,
       traktUrl: r?.traktUrl || null,
     };
@@ -240,6 +239,11 @@ export default function SeasonDetailsClient({
     () => parseScoreboardData(initialScoreboard),
     [initialScoreboard, parseScoreboardData],
   );
+
+  // Scroll al inicio al montar
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, []);
 
   // Trakt scoreboard
   const [tScoreboard, setTScoreboard] = useState(

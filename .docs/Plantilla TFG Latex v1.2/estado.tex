@@ -10,29 +10,17 @@ Esta fragmentación genera una sobrecarga de elección en cada usuario, lo que p
 
 La necesidad de una capa de abstracción sobre las plataformas de \textit{streaming} ha generado el desarrollo de aplicaciones conocidas como \textbf{media trackers}.
 
-\subsection{Protocolos de autenticación: OAuth 2.0}
+\subsection{Autenticación y APIs REST}
 
-OAuth 2.0 es el estándar que permite a una aplicación actuar en nombre de un usuario en un servicio externo sin que ese servicio tenga que proporcionarle su contraseña. En \textit{The Show Verse} se utiliza para conectar la cuenta de Trakt.tv del usuario con la aplicación.
-
-El flujo implementado (Authorization Code) funciona de la siguiente manera:
-
-\begin{enumerate}
-\item Cuando el usuario pulsa «Conectar con Trakt», la ruta \texttt{/api/trakt/auth/start} genera un código aleatorio de seguridad (\texttt{state}) para evitar ataques CSRF, construye la URL de autorización de Trakt y redirige al usuario.
-\item El usuario introduce sus credenciales en Trakt y concede permisos. Trakt redirige de vuelta a \texttt{/api/trakt/auth/callback} incluyendo un \texttt{code} de un solo uso y el mismo \texttt{state}.
-\item La ruta de \textit{callback} verifica el \texttt{state} e intercambia el \texttt{code} por un \texttt{access\_token} y un \texttt{refresh\_token} directamente desde el servidor.
-\item Ambos tokens se guardan en cookies \texttt{httpOnly} con los atributos \texttt{Secure} y \texttt{SameSite=Lax}, de forma que el JavaScript del navegador no puede leerlos en ningún momento.
-\item Cuando el \texttt{access\_token} expira, la aplicación lo renueva automáticamente usando el \texttt{refresh\_token}.
-\end{enumerate}
-
-\subsection{APIs REST}
+Se hace uso del estándar OAuth 2.0 para la autenticación con Trakt.tv, que es el servicio que ofrece la funcionalidad de seguimiento más completa y que actúa como punto central de la gestión del contenido del usuario. TMDb también ofrece soporte para autenticación mediante OAuth 2.0, aunque en este caso se ha optado por un sistema de autenticación basado en API Key para simplificar la integración y evitar la complejidad adicional de gestionar tokens de acceso y renovación.
 
 Las APIs utilizadas en este proyecto siguen el estilo REST con las siguientes especificidades:
 
-\textbf{TMDb API v3} es una API REST pública con autenticación por API Key. Proporciona acceso a su base de datos de más de 800.000 películas y 150.000 series de televisión, con soporte para más de 40 idiomas. Su límite de peticiones es de 40 peticiones por 10 segundos para cuentas gratuitas \parencite{TMDb:2024}.
+\textbf{TMDb API v3} es una API REST pública con autenticación por API Key. Proporciona acceso a su base de datos de más de 800.000 películas y 150.000 series de televisión, con soporte para más de 40 idiomas. Su límite de peticiones es de 40 peticiones por 10 segundos para cuentas gratuitas.
 
-\textbf{Trakt.tv API v2} combina autenticación por API Key para \textit{endpoints} públicos con OAuth 2.0 Bearer Token para \textit{endpoints} autenticados. Un aspecto técnico relevante es el sistema de identificadores: Trakt mantiene sus propios slugs e IDs, pero acepta identificadores de IMDb y TMDb mediante el \textit{endpoint} de búsqueda por ID externo \parencite{Trakt:2024}.
+\textbf{Trakt.tv API v2} combina autenticación por API Key para \textit{endpoints} públicos con OAuth 2.0 Bearer Token para \textit{endpoints} autenticados. Un aspecto técnico relevante es el sistema de identificadores: Trakt mantiene sus propios slugs e IDs, pero acepta identificadores de IMDb y TMDb mediante el \textit{endpoint} de búsqueda por ID externo.
 
-\textbf{OMDb API} se utiliza como fuente complementaria para enriquecer fichas con metadatos y puntuaciones externas vinculadas al identificador de IMDb. Su integración se realiza mediante peticiones de lectura a través de la API interna del proyecto para unificar formato de respuesta y control de errores.
+\textbf{OMDb API} se utiliza como fuente complementaria para los metadatos y puntuaciones externas vinculadas al identificador de IMDb. Su integración se realiza mediante peticiones de lectura a través de la API interna del proyecto para unificar el formato de respuesta y control de errores.
 
 \textbf{JustWatch} se integra para obtener enlaces de disponibilidad en plataformas de \textit{streaming}. En este caso no se consume una API REST pública oficial, sino que se encapsula la consulta en rutas internas del proyecto que normalizan parámetros, validan resultados y aplican caché antes de exponer el enlace en la interfaz.
 
@@ -40,15 +28,23 @@ Las APIs utilizadas en este proyecto siguen el estilo REST con las siguientes es
 
 \subsection{Rendimiento web}
 
-Las estrategias de optimización más relevantes para este proyecto incluyen: Server-Side Rendering para reducir el LCP, el componente \texttt{<Image>} de Next.js para optimización automática de imágenes (conversión a WebP, \textit{lazy loading}, reserva de espacio para prevenir CLS), y el \textit{code splitting} automático por ruta para reducir el tiempo de carga inicial \parencite{Google:2024a,Google:2024b}.
+El rendimiento de \textit{The Show Verse} se basa en una estrategia aplicada en código en tres niveles. Primero, en la capa de renderizado, las rutas de detalle de temporada y episodio usan \textit{Incremental Static Regeneration} con \texttt{revalidate=3600}, lo que permite servir contenido inicial rápido desde infraestructura de Vercel sin renunciar a la actualización periódica de datos. Segundo, en la capa de datos, los \textit{endpoints} de \textit{scoreboard} incorporan caché de servidor con \texttt{unstable\_cache} (30 minutos) y cabeceras \texttt{Cache-Control} con \texttt{s-maxage} y \texttt{stale-while-revalidate}, reduciendo peticiones repetidas a Trakt y estabilizando la latencia cuando hay picos de tráfico o límites de cuota.
+
+Tercero, en cliente se implementan cachés en memoria y deduplicación de peticiones en vuelo (\texttt{Map} de resultados e \textit{inflight requests}) para evitar recálculos y llamadas duplicadas al navegar entre vistas. Además, se combinan \texttt{AbortController}, \textit{timeouts} y carga diferida tras primer render para que las consultas secundarias no bloqueen la interacción principal ni degraden la percepción de fluidez. Este enfoque se alinea con las métricas monitorizadas en Vercel (\textit{Core Web Vitals}) y con los resultados de producción ya obtenidos en Lighthouse: \textit{Performance} 92/100, LCP de 1,8 s, CLS de 0,05 y FID de 45 ms, valores dentro de los umbrales recomendados para una experiencia web rápida y estable.
 
 \subsection{Diseño de interfaz}
 
-El diseño de \textit{The Show Verse} se basa en el uso de los \textit{backdrops} y \textit{posters} obtenidos de TMDb como elemento principal de la interfaz.
+El diseño de \textit{The Show Verse} se basa en el uso de los \textit{backdrops} y \textit{posters} obtenidos de TMDb y el desarrollo de componentes visuales propios como elementos principales de la interfaz.
 
-\textbf{Modo oscuro y backdrops de fondo.} El color de base de la aplicación es el negro (\texttt{\#000000}) y las páginas de detalle cuentan con as imágenes de fondo que se despliegan a pantalla completa con un gradiente en los bordes y los elementos superpuestos utilizan un fondo semi-transparente con desenfoque.
+\textbf{Modo oscuro y backdrops de fondo.} El color de base de la aplicación es el negro (\texttt{\#000000}) y las páginas de detalle cuentan con las imágenes de fondo que se despliegan a pantalla completa con un gradiente en los bordes y los elementos superpuestos utilizan un fondo semi-transparente con desenfoque.
 
-\textbf{Animaciones de entrada y transiciones.} Las animaciones se gestionan mediante Framer Motion \parencite{Framer:2024}, usando \texttt{AnimatePresence} para la entrada y salida de componentes. Para listas largas (más de 30 elementos), el retraso entre tarjetas se reduce automáticamente para que la animación no resulte lenta.
+\textbf{Sistemas de visualización y densidad de información.} La interfaz incorpora diferentes tipos de vista: \textit{Grid} para exploración visual rápida basada en portadas, \textit{List} para consulta equilibrada de metadatos y \textit{Compact} para navegación intensiva con mayor densidad de elementos por pantalla. Esta diferenciación permite que el usuario elija entre contexto visual, detalle informativo o eficiencia de escaneo, según el momento de uso.
+
+\textbf{Interacciones de \textit{hover} y realimentación visual.} En dispositivos con puntero, los estados \textit{hover} se utilizan para comunicar interactividad sin sobrecargar la interfaz: elevación suave de tarjetas, cambios controlados de contraste, resaltado de acciones primarias y aparición progresiva de controles secundarios (por ejemplo, acceso a detalle o acciones rápidas). Estas microinteracciones reducen ambigüedad, mejoran la descubribilidad de funciones y aportan sensación de respuesta inmediata.
+
+\textbf{Animaciones de entrada y transiciones.} Las animaciones se gestionan mediante Framer Motion \parencite{Framer:2024}, usando \texttt{AnimatePresence} para la entrada y salida de componentes. Se priorizan transiciones cortas y consistentes para reforzar la continuidad entre vistas, evitando efectos decorativos que penalicen legibilidad o rendimiento. Para listas largas (más de 30 elementos), el retraso entre tarjetas se reduce automáticamente para mantener una percepción de fluidez homogénea.
+
+\textbf{Adaptación \textit{responsive} y consistencia entre dispositivos.} El diseño mantiene una jerarquía visual estable entre escritorio y móvil: en pantallas amplias se favorece la comparación simultánea de bloques, mientras que en móvil se prioriza la lectura secuencial y la accesibilidad táctil. De este modo, los mismos patrones de navegación, feedback visual y organización de contenido se preservan en distintos tamaños de pantalla, reduciendo la curva de aprendizaje de la aplicación.
 
 \section{Trabajos relacionados}
 

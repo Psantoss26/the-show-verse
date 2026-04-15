@@ -97,6 +97,7 @@ export default function EpisodeDetailsClient({
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     setIsMounted(true);
   }, []);
 
@@ -106,8 +107,7 @@ export default function EpisodeDetailsClient({
       loading: false,
       rating:
         typeof r?.community?.rating === "number" ? r.community.rating : null,
-      votes:
-        typeof r?.community?.votes === "number" ? r.community.votes : null,
+      votes: typeof r?.community?.votes === "number" ? r.community.votes : null,
       stats: r?.stats || null,
       traktUrl: r?.traktUrl || null,
     };
@@ -443,12 +443,7 @@ export default function EpisodeDetailsClient({
       window.removeEventListener("pageshow", syncEpisodeTraktState);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [
-    reloadEpisodeTraktState,
-    trakt.loading,
-    trakt.connected,
-    trakt.error,
-  ]);
+  }, [reloadEpisodeTraktState, trakt.loading, trakt.connected, trakt.error]);
 
   // Toggle watched para el episodio
   const toggleEpisodeWatched = useCallback(async () => {

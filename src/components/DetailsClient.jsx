@@ -803,9 +803,7 @@ export default function DetailsClient({
 
   const [videos, setVideos] = useState([]); // Lista de videos disponibles
   const [videosLoading, setVideosLoading] = useState(() => !!TMDB_API_KEY);
-  const [videosResolved, setVideosResolved] = useState(
-    () => !TMDB_API_KEY,
-  );
+  const [videosResolved, setVideosResolved] = useState(() => !TMDB_API_KEY);
   const [videosError, setVideosError] = useState("");
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); // Video seleccionado para el modal
@@ -1405,25 +1403,82 @@ export default function DetailsClient({
       }
 
       if (endpointType === "tv" && TMDB_API_KEY) {
-        try {
-          setImagesLoading(true);
-          setImagesError("");
+        // Si el servidor ya proporcionó las imágenes (via append_to_response=images),
+        // usarlas directamente con los selectores TV-optimizados y omitir el fetch adicional.
+        const hasServerImages =
+          (data?.images?.posters?.length ?? 0) > 0 ||
+          (data?.images?.backdrops?.length ?? 0) > 0;
 
-          const { posters, backdrops } = await fetchTVImages({
-            showId: id,
-            apiKey: TMDB_API_KEY,
-          });
-          const bestPoster = pickBestPosterTV(posters);
+        const tvPosters = hasServerImages ? data.images.posters || [] : null;
+        const tvBackdrops = hasServerImages
+          ? data.images.backdrops || []
+          : null;
+
+        if (!hasServerImages) {
+          try {
+            setImagesLoading(true);
+            setImagesError("");
+
+            const fetched = await fetchTVImages({
+              showId: id,
+              apiKey: TMDB_API_KEY,
+            });
+
+            if (!cancelled) {
+              const bestPoster = pickBestPosterTV(fetched.posters);
+              const bestBackdropForBackground = pickBestBackdropTVNeutralFirst(
+                fetched.backdrops,
+              );
+              const bestBackdropForPreviewCalc = pickBestBackdropForPreview(
+                fetched.backdrops,
+              );
+
+              const bestPosterPath = asTmdbPath(bestPoster);
+              const bestBackdropPath = asTmdbPath(bestBackdropForBackground);
+              const bestPreviewPath = asTmdbPath(bestBackdropForPreviewCalc);
+
+              const savedGlobalMode =
+                typeof window !== "undefined"
+                  ? window.localStorage.getItem(
+                      "showverse:global:posterViewMode",
+                    )
+                  : null;
+
+              if (savedGlobalMode === "preview" && bestPreviewPath) {
+                await preloadTmdb(bestPreviewPath, "w780");
+              }
+              if (bestPosterPath) await preloadTmdb(bestPosterPath, "w780");
+
+              if (!cancelled) {
+                if (bestPosterPath) poster = bestPosterPath;
+                if (bestBackdropPath) backdrop = bestBackdropPath;
+
+                setImagesState((prev) => ({
+                  posters: mergeUniqueImages(prev.posters, fetched.posters),
+                  backdrops: mergeUniqueImages(
+                    prev.backdrops,
+                    fetched.backdrops,
+                  ),
+                }));
+              }
+            }
+          } catch (e) {
+            if (!cancelled) console.error("Error cargando imagenes TV:", e);
+          } finally {
+            if (!cancelled) setImagesLoading(false);
+          }
+        } else {
+          // Imágenes del servidor: aplicar selectores TV-optimizados sin fetch adicional
+          const bestPoster = pickBestPosterTV(tvPosters);
           const bestBackdropForBackground =
-            pickBestBackdropTVNeutralFirst(backdrops);
+            pickBestBackdropTVNeutralFirst(tvBackdrops);
           const bestBackdropForPreviewCalc =
-            pickBestBackdropForPreview(backdrops);
+            pickBestBackdropForPreview(tvBackdrops);
 
           const bestPosterPath = asTmdbPath(bestPoster);
           const bestBackdropPath = asTmdbPath(bestBackdropForBackground);
           const bestPreviewPath = asTmdbPath(bestBackdropForPreviewCalc);
 
-          // Precargar backdrop de vista previa primero si estamos en modo preview
           const savedGlobalMode =
             typeof window !== "undefined"
               ? window.localStorage.getItem("showverse:global:posterViewMode")
@@ -1432,23 +1487,13 @@ export default function DetailsClient({
           if (savedGlobalMode === "preview" && bestPreviewPath) {
             await preloadTmdb(bestPreviewPath, "w780");
           }
-
           if (bestPosterPath) await preloadTmdb(bestPosterPath, "w780");
 
           if (!cancelled) {
             if (bestPosterPath) poster = bestPosterPath;
             if (bestBackdropPath) backdrop = bestBackdropPath;
-
-            // Fusionar imagenes nuevas con las existentes (sin duplicados)
-            setImagesState((prev) => ({
-              posters: mergeUniqueImages(prev.posters, posters),
-              backdrops: mergeUniqueImages(prev.backdrops, backdrops),
-            }));
+            // Las imágenes ya fueron mergeadas en el bloque data?.images de arriba
           }
-        } catch (e) {
-          if (!cancelled) console.error("Error cargando imagenes TV:", e);
-        } finally {
-          if (!cancelled) setImagesLoading(false);
         }
       }
 
@@ -1794,7 +1839,8 @@ export default function DetailsClient({
   const traktType = endpointType === "tv" ? "show" : "movie";
 
   const hasInitialTraktStatus = useMemo(
-    () => !!initialTraktStatus && typeof initialTraktStatus.connected === "boolean",
+    () =>
+      !!initialTraktStatus && typeof initialTraktStatus.connected === "boolean",
     [initialTraktStatus],
   );
 
@@ -1871,7 +1917,9 @@ export default function DetailsClient({
   }, []);
 
   // -- Episodios vistos por temporada (solo TV) --
-  const [watchedBySeason, setWatchedBySeason] = useState(initialWatchedBySeason); // { seasonNumber: [episodeNumber, ...] }
+  const [watchedBySeason, setWatchedBySeason] = useState(
+    initialWatchedBySeason,
+  ); // { seasonNumber: [episodeNumber, ...] }
   const [watchedBySeasonLoaded, setWatchedBySeasonLoaded] = useState(
     hasInitialShowWatched,
   ); // true cuando se cargo el estado
@@ -2668,8 +2716,9 @@ export default function DetailsClient({
     if (typeof window !== "undefined") {
       if (!hasInitialTraktStatus) {
         try {
-          const cachedStatusRaw =
-            window.localStorage.getItem(traktStatusStorageKey);
+          const cachedStatusRaw = window.localStorage.getItem(
+            traktStatusStorageKey,
+          );
           const cachedStatus = cachedStatusRaw
             ? JSON.parse(cachedStatusRaw)
             : null;
@@ -7337,67 +7386,67 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 >
                   {/* --- COLECCIÓN --- */}
                   <section className="mb-10">
-                  <SectionTitle title="Colección" icon={Layers} />
+                    <SectionTitle title="Colección" icon={Layers} />
 
-                  {collectionLoading ? (
-                    <div className="mt-4 text-sm text-zinc-400">
-                      Cargando colección…
-                    </div>
-                  ) : collectionData?.items?.length ? (
-                    <Swiper
-                      spaceBetween={12}
-                      slidesPerView={3}
-                      breakpoints={{
-                        500: { slidesPerView: 3, spaceBetween: 14 },
-                        768: { slidesPerView: 4, spaceBetween: 16 },
-                        1024: { slidesPerView: 5, spaceBetween: 18 },
-                        1280: { slidesPerView: 6, spaceBetween: 20 },
-                      }}
-                      className="pb-8"
-                    >
-                      {collectionData.items.map((m) => (
-                        <SwiperSlide key={m.id}>
-                          <Link
-                            href={`/details/movie/${m.id}`}
-                            className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                            title={m.title}
-                          >
-                            <div className="aspect-[2/3] overflow-hidden relative">
-                              {m.poster_path ? (
-                                <img
-                                  src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
-                                  alt={m.title}
-                                  className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.06]"
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                                  <ImageOff className="w-10 h-10 opacity-60" />
-                                </div>
-                              )}
+                    {collectionLoading ? (
+                      <div className="mt-4 text-sm text-zinc-400">
+                        Cargando colección…
+                      </div>
+                    ) : collectionData?.items?.length ? (
+                      <Swiper
+                        spaceBetween={12}
+                        slidesPerView={3}
+                        breakpoints={{
+                          500: { slidesPerView: 3, spaceBetween: 14 },
+                          768: { slidesPerView: 4, spaceBetween: 16 },
+                          1024: { slidesPerView: 5, spaceBetween: 18 },
+                          1280: { slidesPerView: 6, spaceBetween: 20 },
+                        }}
+                        className="pb-8"
+                      >
+                        {collectionData.items.map((m) => (
+                          <SwiperSlide key={m.id}>
+                            <Link
+                              href={`/details/movie/${m.id}`}
+                              className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                              title={m.title}
+                            >
+                              <div className="aspect-[2/3] overflow-hidden relative">
+                                {m.poster_path ? (
+                                  <img
+                                    src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
+                                    alt={m.title}
+                                    className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.06]"
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
+                                    <ImageOff className="w-10 h-10 opacity-60" />
+                                  </div>
+                                )}
 
-                              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
-                              <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
-                                <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
-                                  {m.title}
-                                </p>
-                                {m.release_date ? (
-                                  <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                                    {m.release_date?.slice(0, 4)}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
+                                <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
+                                  <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
+                                    {m.title}
                                   </p>
-                                ) : null}
+                                  {m.release_date ? (
+                                    <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
+                                      {m.release_date?.slice(0, 4)}
+                                    </p>
+                                  ) : null}
+                                </div>
                               </div>
-                            </div>
-                          </Link>
-                        </SwiperSlide>
-                      ))}
-                    </Swiper>
-                  ) : (
-                    <div className="mt-4 text-sm text-zinc-400">
-                      No hay datos de colección.
-                    </div>
-                  )}
+                            </Link>
+                          </SwiperSlide>
+                        ))}
+                      </Swiper>
+                    ) : (
+                      <div className="mt-4 text-sm text-zinc-400">
+                        No hay datos de colección.
+                      </div>
+                    )}
                   </section>
                 </AnimatedSection>
               </section>
@@ -7414,349 +7463,144 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
                 {(type === "movie" || type === "tv") && (
                   <section className="mb-16" ref={artworkControlsWrapRef}>
-                  {/* ========== Header de la Sección de Media ========== */}
-                  {/* Incluye título y controles (tabs y filtros) */}
-                  <div className="mb-6 flex items-center justify-between gap-3">
-                    {/* Título de la sección - Alineado a la izquierda */}
-                    <SectionTitle
-                      title="Portadas y fondos"
-                      icon={ImageIcon}
-                      className="mb-0 mt-4"
-                    />
+                    {/* ========== Header de la Sección de Media ========== */}
+                    {/* Incluye título y controles (tabs y filtros) */}
+                    <div className="mb-6 flex items-center justify-between gap-3">
+                      {/* Título de la sección - Alineado a la izquierda */}
+                      <SectionTitle
+                        title="Portadas y fondos"
+                        icon={ImageIcon}
+                        className="mb-0 mt-4"
+                      />
 
-                    {/* ========== Controles de Filtrado ========== */}
-                    {/* Desktop: Tabs + Filtros en línea | Móvil: Botón que abre modal */}
-                    <div className="flex items-center gap-2 sm:gap-3 h-10 md:h-11">
-                      {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
-                      <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
-                        {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
-                        <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 w-fit h-10 md:h-11">
-                          {["posters", "backdrops", "background"].map((tab) => (
-                            <button
-                              key={tab}
-                              type="button"
-                              onClick={() => setActiveImagesTab(tab)}
-                              className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
+                      {/* ========== Controles de Filtrado ========== */}
+                      {/* Desktop: Tabs + Filtros en línea | Móvil: Botón que abre modal */}
+                      <div className="flex items-center gap-2 sm:gap-3 h-10 md:h-11">
+                        {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
+                        <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
+                          {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
+                          <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 w-fit h-10 md:h-11">
+                            {["posters", "backdrops", "background"].map(
+                              (tab) => (
+                                <button
+                                  key={tab}
+                                  type="button"
+                                  onClick={() => setActiveImagesTab(tab)}
+                                  className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
               ${
                 activeImagesTab === tab
                   ? "bg-white/10 text-white shadow"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
-                              style={{ WebkitTapHighlightColor: "transparent" }}
-                            >
-                              {tab === "posters"
-                                ? "Portada"
-                                : tab === "backdrops"
-                                  ? "Vista previa"
-                                  : "Fondo"}
-                            </button>
-                          ))}
-                        </div>
+                                  style={{
+                                    WebkitTapHighlightColor: "transparent",
+                                  }}
+                                >
+                                  {tab === "posters"
+                                    ? "Portada"
+                                    : tab === "backdrops"
+                                      ? "Vista previa"
+                                      : "Fondo"}
+                                </button>
+                              ),
+                            )}
+                          </div>
 
-                        {/* Resolución (sin label superior) */}
-                        <div ref={resMenuRef} className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setResMenuOpen((v) => !v)}
-                            className="h-10 md:h-11 inline-flex items-center justify-between gap-2 min-w-[150px]
+                          {/* Resolución (sin label superior) */}
+                          <div ref={resMenuRef} className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setResMenuOpen((v) => !v)}
+                              className="h-10 md:h-11 inline-flex items-center justify-between gap-2 min-w-[150px]
             px-3 rounded-xl bg-neutral-800/80 border border-white/10
             hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/15 transition-all duration-300
             text-sm text-zinc-200"
-                            title="Resolución"
-                            aria-label="Resolución"
-                            style={{ WebkitTapHighlightColor: "transparent" }}
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
-                                RES
-                              </span>
-                              <span className="font-semibold">
-                                {imagesResFilter === "all"
-                                  ? "Todas"
-                                  : imagesResFilter === "720p"
-                                    ? "720p"
-                                    : imagesResFilter === "1080p"
-                                      ? "1080p"
-                                      : imagesResFilter === "2k"
-                                        ? "2K"
-                                        : "4K"}
-                              </span>
-                            </span>
-                            <ChevronDown
-                              className={`w-4 h-4 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
-                            />
-                          </button>
-
-                          <AnimatePresence>
-                            {resMenuOpen && (
-                              <motion.div
-                                initial={{ opacity: 0, y: 6, scale: 0.98 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                                transition={{ duration: 0.14, ease: "easeOut" }}
-                                className="absolute left-0 top-full z-[9999] mt-2 w-44 rounded-2xl
-                border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
-                              >
-                                <div className="py-1">
-                                  {[
-                                    { id: "all", label: "Todas" },
-                                    { id: "720p", label: "720p" },
-                                    { id: "1080p", label: "1080p" },
-                                    { id: "2k", label: "2K" },
-                                    { id: "4k", label: "4K" },
-                                  ].map((opt) => {
-                                    const active = imagesResFilter === opt.id;
-                                    return (
-                                      <button
-                                        key={opt.id}
-                                        type="button"
-                                        onClick={() => {
-                                          setImagesResFilter(opt.id);
-                                          setResMenuOpen(false);
-                                        }}
-                                        className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
-                        transition ${active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5"}`}
-                                      >
-                                        <span className="font-semibold">
-                                          {opt.label}
-                                        </span>
-                                        {active && (
-                                          <Check className="w-4 h-4 text-emerald-300" />
-                                        )}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-
-                        {/* Idioma (sin label) */}
-                        {activeImagesTab !== "background" && (
-                          <div
-                            className="h-10 md:h-11 flex items-center rounded-xl bg-neutral-800/80 border border-white/10 p-1"
-                            title="Idioma"
-                            aria-label="Idioma"
-                          >
-                            <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
-                              <button
-                                type="button"
-                                onClick={() => setLangES((v) => !v)}
-                                className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
-                ${langES ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
-                                style={{
-                                  WebkitTapHighlightColor: "transparent",
-                                }}
-                              >
-                                ES
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setLangEN((v) => !v)}
-                                className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
-                ${langEN ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
-                                style={{
-                                  WebkitTapHighlightColor: "transparent",
-                                }}
-                              >
-                                EN
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ===================== MÓVIL: botón filtros + reset ===================== */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setArtworkControlsOpen((v) => !v);
-                          setResMenuOpen(false);
-                        }}
-                        className="sm:hidden inline-flex items-center justify-center w-10 h-10 rounded-xl
-        border border-white/10 bg-neutral-800/80 text-zinc-200
-        hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/20 transition-all duration-300
-        transform-gpu hover:-translate-y-0.5"
-                        title="Filtros"
-                        aria-label="Filtros"
-                        style={{ WebkitTapHighlightColor: "transparent" }}
-                      >
-                        <SlidersHorizontal className="w-5 h-5" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleResetArtwork}
-                        className="inline-flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
-        border border-red-500/30 bg-red-500/10 text-red-400
-        hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45 transition"
-                        title="Restaurar valores por defecto"
-                        aria-label="Restaurar valores por defecto"
-                        style={{ WebkitTapHighlightColor: "transparent" }}
-                      >
-                        <RotateCcw className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Panel movil desplegable en 2 filas maximo */}
-                  <AnimatePresence>
-                    {artworkControlsOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.16, ease: "easeOut" }}
-                        className="sm:hidden mb-4"
-                      >
-                        <div>
-                          {/* Todo en una sola fila con iconos */}
-                          <div className="flex items-center gap-2">
-                            {/* Tabs con iconos - compacto */}
-                            <div className="flex bg-white/5 rounded-xl p-1 border border-white/10">
-                              <button
-                                type="button"
-                                onClick={() => setActiveImagesTab("posters")}
-                                className={`p-2 rounded-lg transition-all ${
-                                  activeImagesTab === "posters"
-                                    ? "bg-white/10 text-white shadow"
-                                    : "text-zinc-400 hover:text-zinc-200"
-                                }`}
-                                style={{
-                                  WebkitTapHighlightColor: "transparent",
-                                }}
-                                title="Portada"
-                              >
-                                <ImageIcon className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setActiveImagesTab("backdrops")}
-                                className={`p-2 rounded-lg transition-all ${
-                                  activeImagesTab === "backdrops"
-                                    ? "bg-white/10 text-white shadow"
-                                    : "text-zinc-400 hover:text-zinc-200"
-                                }`}
-                                style={{
-                                  WebkitTapHighlightColor: "transparent",
-                                }}
-                                title="Vista previa"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setActiveImagesTab("background")}
-                                className={`p-2 rounded-lg transition-all ${
-                                  activeImagesTab === "background"
-                                    ? "bg-white/10 text-white shadow"
-                                    : "text-zinc-400 hover:text-zinc-200"
-                                }`}
-                                style={{
-                                  WebkitTapHighlightColor: "transparent",
-                                }}
-                                title="Fondo"
-                              >
-                                <Layers className="w-4 h-4" />
-                              </button>
-                            </div>
-
-                            {/* Resolución móvil - más compacto */}
-                            <div ref={resMenuRef} className="relative flex-1">
-                              <button
-                                type="button"
-                                onClick={() => setResMenuOpen((v) => !v)}
-                                className="h-10 w-full inline-flex items-center justify-between gap-2
-                  px-3 rounded-xl bg-black/35 border border-white/10
-                  hover:bg-black/45 hover:border-white/15 transition text-sm text-zinc-200"
-                                title="Resolución"
-                                aria-label="Resolución"
-                                style={{
-                                  WebkitTapHighlightColor: "transparent",
-                                }}
-                              >
-                                <span className="inline-flex items-center gap-2 truncate">
-                                  <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
-                                    RES
-                                  </span>
-                                  <span className="font-semibold truncate">
-                                    {imagesResFilter === "all"
-                                      ? "Todas"
-                                      : imagesResFilter === "720p"
-                                        ? "720p"
-                                        : imagesResFilter === "1080p"
-                                          ? "1080p"
-                                          : imagesResFilter === "2k"
-                                            ? "2K"
-                                            : "4K"}
-                                  </span>
+                              title="Resolución"
+                              aria-label="Resolución"
+                              style={{ WebkitTapHighlightColor: "transparent" }}
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
+                                  RES
                                 </span>
-                                <ChevronDown
-                                  className={`w-4 h-4 shrink-0 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
-                                />
-                              </button>
+                                <span className="font-semibold">
+                                  {imagesResFilter === "all"
+                                    ? "Todas"
+                                    : imagesResFilter === "720p"
+                                      ? "720p"
+                                      : imagesResFilter === "1080p"
+                                        ? "1080p"
+                                        : imagesResFilter === "2k"
+                                          ? "2K"
+                                          : "4K"}
+                                </span>
+                              </span>
+                              <ChevronDown
+                                className={`w-4 h-4 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
+                              />
+                            </button>
 
-                              <AnimatePresence>
-                                {resMenuOpen && (
-                                  <motion.div
-                                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                                    transition={{
-                                      duration: 0.14,
-                                      ease: "easeOut",
-                                    }}
-                                    className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
-                      border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
-                                  >
-                                    <div className="py-1">
-                                      {[
-                                        { id: "all", label: "Todas" },
-                                        { id: "720p", label: "720p" },
-                                        { id: "1080p", label: "1080p" },
-                                        { id: "2k", label: "2K" },
-                                        { id: "4k", label: "4K" },
-                                      ].map((opt) => {
-                                        const active =
-                                          imagesResFilter === opt.id;
-                                        return (
-                                          <button
-                                            key={opt.id}
-                                            type="button"
-                                            onClick={() => {
-                                              setImagesResFilter(opt.id);
-                                              setResMenuOpen(false);
-                                            }}
-                                            className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
-                              transition ${active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5"}`}
-                                          >
-                                            <span className="font-semibold">
-                                              {opt.label}
-                                            </span>
-                                            {active && (
-                                              <Check className="w-4 h-4 text-emerald-300" />
-                                            )}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
+                            <AnimatePresence>
+                              {resMenuOpen && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                                  transition={{
+                                    duration: 0.14,
+                                    ease: "easeOut",
+                                  }}
+                                  className="absolute left-0 top-full z-[9999] mt-2 w-44 rounded-2xl
+                border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
+                                >
+                                  <div className="py-1">
+                                    {[
+                                      { id: "all", label: "Todas" },
+                                      { id: "720p", label: "720p" },
+                                      { id: "1080p", label: "1080p" },
+                                      { id: "2k", label: "2K" },
+                                      { id: "4k", label: "4K" },
+                                    ].map((opt) => {
+                                      const active = imagesResFilter === opt.id;
+                                      return (
+                                        <button
+                                          key={opt.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setImagesResFilter(opt.id);
+                                            setResMenuOpen(false);
+                                          }}
+                                          className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
+                        transition ${active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5"}`}
+                                        >
+                                          <span className="font-semibold">
+                                            {opt.label}
+                                          </span>
+                                          {active && (
+                                            <Check className="w-4 h-4 text-emerald-300" />
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
 
-                            {/* Idioma móvil - compacto */}
-                            {activeImagesTab !== "background" && (
-                              <div className="flex gap-1.5 bg-black/35 border border-white/10 rounded-xl p-1.5 h-10">
+                          {/* Idioma (sin label) */}
+                          {activeImagesTab !== "background" && (
+                            <div
+                              className="h-10 md:h-11 flex items-center rounded-xl bg-neutral-800/80 border border-white/10 p-1"
+                              title="Idioma"
+                              aria-label="Idioma"
+                            >
+                              <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
                                 <button
                                   type="button"
                                   onClick={() => setLangES((v) => !v)}
-                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${
-                                    langES
-                                      ? "bg-zinc-800 text-white"
-                                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                                  }`}
+                                  className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
+                ${langES ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
@@ -7766,11 +7610,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => setLangEN((v) => !v)}
-                                  className={`px-3 rounded-lg text-xs font-medium transition-all ${
-                                    langEN
-                                      ? "bg-zinc-800 text-white"
-                                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                                  }`}
+                                  className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
+                ${langEN ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
@@ -7778,128 +7619,343 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   EN
                                 </button>
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
 
-                  {!!imagesError && (
-                    <div className="text-sm text-red-400 mb-3">
-                      {imagesError}
+                        {/* ===================== MÓVIL: botón filtros + reset ===================== */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setArtworkControlsOpen((v) => !v);
+                            setResMenuOpen(false);
+                          }}
+                          className="sm:hidden inline-flex items-center justify-center w-10 h-10 rounded-xl
+        border border-white/10 bg-neutral-800/80 text-zinc-200
+        hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/20 transition-all duration-300
+        transform-gpu hover:-translate-y-0.5"
+                          title="Filtros"
+                          aria-label="Filtros"
+                          style={{ WebkitTapHighlightColor: "transparent" }}
+                        >
+                          <SlidersHorizontal className="w-5 h-5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleResetArtwork}
+                          className="inline-flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
+        border border-red-500/30 bg-red-500/10 text-red-400
+        hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45 transition"
+                          title="Restaurar valores por defecto"
+                          aria-label="Restaurar valores por defecto"
+                          style={{ WebkitTapHighlightColor: "transparent" }}
+                        >
+                          <RotateCcw className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
-                  )}
 
-                  {(() => {
-                    const {
-                      ordered,
-                      isPoster,
-                      isBackdropTab,
-                      aspect,
-                      size,
-                      activePath,
-                    } = artworkSelection;
-
-                    if (
-                      (!ordered || ordered.length === 0) &&
-                      (imagesLoading || !artworkInitialized)
-                    ) {
-                      return null;
-                    }
-
-                    if (!ordered || ordered.length === 0) {
-                      return (
-                        <div className="text-sm text-zinc-400">
-                          No hay imágenes disponibles con los filtros actuales.
-                        </div>
-                      );
-                    }
-
-                    // 2 en movil y 4 en desktop para backdrops (vista previa / fondo)
-                    const isBackdropLike = activeImagesTab !== "posters";
-
-                    const breakpoints = isPoster
-                      ? {
-                          500: { slidesPerView: 3, spaceBetween: 14 },
-                          640: { slidesPerView: 4, spaceBetween: 14 },
-                          768: { slidesPerView: 5, spaceBetween: 16 },
-                          1024: { slidesPerView: 6, spaceBetween: 18 },
-                          1280: { slidesPerView: 7, spaceBetween: 18 },
-                        }
-                      : {
-                          0: { slidesPerView: 2, spaceBetween: 12 },
-                          640: { slidesPerView: 3, spaceBetween: 14 },
-                          768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 4, spaceBetween: 18 },
-                          1280: { slidesPerView: 4, spaceBetween: 20 },
-                        };
-
-                    return (
-                      <div className="relative overflow-x-hidden overflow-y-visible">
-                        {/* Loading visual: una fila de 7 tarjetas placeholder */}
-                        {!artworkRowReady && (
-                          <div
-                            className="grid grid-cols-7 gap-[18px] pb-8 pt-3"
-                            aria-hidden="true"
-                          >
-                            {Array.from({ length: 7 }).map((_, i) => (
-                              <div
-                                key={i}
-                                className={`rounded-2xl bg-white/5 animate-pulse ${aspect}`}
-                              />
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Carrusel: aparece "de golpe" cuando ya están cargadas */}
-                        {artworkRowReady && (
-                          <Swiper
-                            key={activeImagesTab}
-                            spaceBetween={12}
-                            slidesPerView={isBackdropLike ? 2 : 3}
-                            breakpoints={breakpoints}
-                            className="pb-8"
-                          >
-                            {ordered.map((img, index) => {
-                              const filePath = img?.file_path;
-                              if (!filePath) return null;
-
-                              const isActive = activePath === filePath;
-                              const resText = imgResLabel(img);
-                              const isPriority = index < artworkPreloadCount;
-                              const imgAlt = isPoster
-                                ? `Portada de ${title}`
-                                : isBackdropTab
-                                  ? `Vista previa de ${title}`
-                                  : `Fondo de ${title}`;
-
-                              const imgSrc = `https://image.tmdb.org/t/p/${size}${filePath}`;
-                              const imgSrcSet = isPoster
-                                ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w342${filePath} 342w, https://image.tmdb.org/t/p/w500${filePath} 500w`
-                                : `https://image.tmdb.org/t/p/w300${filePath} 300w, https://image.tmdb.org/t/p/w780${filePath} 780w, https://image.tmdb.org/t/p/w1280${filePath} 1280w`;
-                              const imgSizes = isPoster
-                                ? "(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 140px"
-                                : "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px";
-
-                              return (
-                                <SwiperSlide
-                                  key={filePath}
-                                  className="h-full pt-3 pb-3"
+                    {/* Panel movil desplegable en 2 filas maximo */}
+                    <AnimatePresence>
+                      {artworkControlsOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.16, ease: "easeOut" }}
+                          className="sm:hidden mb-4"
+                        >
+                          <div>
+                            {/* Todo en una sola fila con iconos */}
+                            <div className="flex items-center gap-2">
+                              {/* Tabs con iconos - compacto */}
+                              <div className="flex bg-white/5 rounded-xl p-1 border border-white/10">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveImagesTab("posters")}
+                                  className={`p-2 rounded-lg transition-all ${
+                                    activeImagesTab === "posters"
+                                      ? "bg-white/10 text-white shadow"
+                                      : "text-zinc-400 hover:text-zinc-200"
+                                  }`}
+                                  style={{
+                                    WebkitTapHighlightColor: "transparent",
+                                  }}
+                                  title="Portada"
                                 >
-                                  <div
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => {
-                                      if (activeImagesTab === "posters")
-                                        handleSelectPoster(filePath);
-                                      else if (activeImagesTab === "backdrops")
-                                        handleSelectPreviewBackdrop(filePath);
-                                      else handleSelectBackground(filePath);
+                                  <ImageIcon className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setActiveImagesTab("backdrops")
+                                  }
+                                  className={`p-2 rounded-lg transition-all ${
+                                    activeImagesTab === "backdrops"
+                                      ? "bg-white/10 text-white shadow"
+                                      : "text-zinc-400 hover:text-zinc-200"
+                                  }`}
+                                  style={{
+                                    WebkitTapHighlightColor: "transparent",
+                                  }}
+                                  title="Vista previa"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setActiveImagesTab("background")
+                                  }
+                                  className={`p-2 rounded-lg transition-all ${
+                                    activeImagesTab === "background"
+                                      ? "bg-white/10 text-white shadow"
+                                      : "text-zinc-400 hover:text-zinc-200"
+                                  }`}
+                                  style={{
+                                    WebkitTapHighlightColor: "transparent",
+                                  }}
+                                  title="Fondo"
+                                >
+                                  <Layers className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              {/* Resolución móvil - más compacto */}
+                              <div ref={resMenuRef} className="relative flex-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setResMenuOpen((v) => !v)}
+                                  className="h-10 w-full inline-flex items-center justify-between gap-2
+                  px-3 rounded-xl bg-black/35 border border-white/10
+                  hover:bg-black/45 hover:border-white/15 transition text-sm text-zinc-200"
+                                  title="Resolución"
+                                  aria-label="Resolución"
+                                  style={{
+                                    WebkitTapHighlightColor: "transparent",
+                                  }}
+                                >
+                                  <span className="inline-flex items-center gap-2 truncate">
+                                    <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
+                                      RES
+                                    </span>
+                                    <span className="font-semibold truncate">
+                                      {imagesResFilter === "all"
+                                        ? "Todas"
+                                        : imagesResFilter === "720p"
+                                          ? "720p"
+                                          : imagesResFilter === "1080p"
+                                            ? "1080p"
+                                            : imagesResFilter === "2k"
+                                              ? "2K"
+                                              : "4K"}
+                                    </span>
+                                  </span>
+                                  <ChevronDown
+                                    className={`w-4 h-4 shrink-0 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
+                                  />
+                                </button>
+
+                                <AnimatePresence>
+                                  {resMenuOpen && (
+                                    <motion.div
+                                      initial={{
+                                        opacity: 0,
+                                        y: 6,
+                                        scale: 0.98,
+                                      }}
+                                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                                      exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                                      transition={{
+                                        duration: 0.14,
+                                        ease: "easeOut",
+                                      }}
+                                      className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
+                      border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
+                                    >
+                                      <div className="py-1">
+                                        {[
+                                          { id: "all", label: "Todas" },
+                                          { id: "720p", label: "720p" },
+                                          { id: "1080p", label: "1080p" },
+                                          { id: "2k", label: "2K" },
+                                          { id: "4k", label: "4K" },
+                                        ].map((opt) => {
+                                          const active =
+                                            imagesResFilter === opt.id;
+                                          return (
+                                            <button
+                                              key={opt.id}
+                                              type="button"
+                                              onClick={() => {
+                                                setImagesResFilter(opt.id);
+                                                setResMenuOpen(false);
+                                              }}
+                                              className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
+                              transition ${active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5"}`}
+                                            >
+                                              <span className="font-semibold">
+                                                {opt.label}
+                                              </span>
+                                              {active && (
+                                                <Check className="w-4 h-4 text-emerald-300" />
+                                              )}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+
+                              {/* Idioma móvil - compacto */}
+                              {activeImagesTab !== "background" && (
+                                <div className="flex gap-1.5 bg-black/35 border border-white/10 rounded-xl p-1.5 h-10">
+                                  <button
+                                    type="button"
+                                    onClick={() => setLangES((v) => !v)}
+                                    className={`px-3 rounded-lg text-xs font-medium transition-all ${
+                                      langES
+                                        ? "bg-zinc-800 text-white"
+                                        : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                    }`}
+                                    style={{
+                                      WebkitTapHighlightColor: "transparent",
                                     }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault();
+                                  >
+                                    ES
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setLangEN((v) => !v)}
+                                    className={`px-3 rounded-lg text-xs font-medium transition-all ${
+                                      langEN
+                                        ? "bg-zinc-800 text-white"
+                                        : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                    }`}
+                                    style={{
+                                      WebkitTapHighlightColor: "transparent",
+                                    }}
+                                  >
+                                    EN
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {!!imagesError && (
+                      <div className="text-sm text-red-400 mb-3">
+                        {imagesError}
+                      </div>
+                    )}
+
+                    {(() => {
+                      const {
+                        ordered,
+                        isPoster,
+                        isBackdropTab,
+                        aspect,
+                        size,
+                        activePath,
+                      } = artworkSelection;
+
+                      if (
+                        (!ordered || ordered.length === 0) &&
+                        (imagesLoading || !artworkInitialized)
+                      ) {
+                        return null;
+                      }
+
+                      if (!ordered || ordered.length === 0) {
+                        return (
+                          <div className="text-sm text-zinc-400">
+                            No hay imágenes disponibles con los filtros
+                            actuales.
+                          </div>
+                        );
+                      }
+
+                      // 2 en movil y 4 en desktop para backdrops (vista previa / fondo)
+                      const isBackdropLike = activeImagesTab !== "posters";
+
+                      const breakpoints = isPoster
+                        ? {
+                            500: { slidesPerView: 3, spaceBetween: 14 },
+                            640: { slidesPerView: 4, spaceBetween: 14 },
+                            768: { slidesPerView: 5, spaceBetween: 16 },
+                            1024: { slidesPerView: 6, spaceBetween: 18 },
+                            1280: { slidesPerView: 7, spaceBetween: 18 },
+                          }
+                        : {
+                            0: { slidesPerView: 2, spaceBetween: 12 },
+                            640: { slidesPerView: 3, spaceBetween: 14 },
+                            768: { slidesPerView: 4, spaceBetween: 16 },
+                            1024: { slidesPerView: 4, spaceBetween: 18 },
+                            1280: { slidesPerView: 4, spaceBetween: 20 },
+                          };
+
+                      return (
+                        <div className="relative overflow-x-hidden overflow-y-visible">
+                          {/* Loading visual: una fila de 7 tarjetas placeholder */}
+                          {!artworkRowReady && (
+                            <div
+                              className="grid grid-cols-7 gap-[18px] pb-8 pt-3"
+                              aria-hidden="true"
+                            >
+                              {Array.from({ length: 7 }).map((_, i) => (
+                                <div
+                                  key={i}
+                                  className={`rounded-2xl bg-white/5 animate-pulse ${aspect}`}
+                                />
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Carrusel: aparece "de golpe" cuando ya están cargadas */}
+                          {artworkRowReady && (
+                            <Swiper
+                              key={activeImagesTab}
+                              spaceBetween={12}
+                              slidesPerView={isBackdropLike ? 2 : 3}
+                              breakpoints={breakpoints}
+                              className="pb-8"
+                            >
+                              {ordered.map((img, index) => {
+                                const filePath = img?.file_path;
+                                if (!filePath) return null;
+
+                                const isActive = activePath === filePath;
+                                const resText = imgResLabel(img);
+                                const isPriority = index < artworkPreloadCount;
+                                const imgAlt = isPoster
+                                  ? `Portada de ${title}`
+                                  : isBackdropTab
+                                    ? `Vista previa de ${title}`
+                                    : `Fondo de ${title}`;
+
+                                const imgSrc = `https://image.tmdb.org/t/p/${size}${filePath}`;
+                                const imgSrcSet = isPoster
+                                  ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w342${filePath} 342w, https://image.tmdb.org/t/p/w500${filePath} 500w`
+                                  : `https://image.tmdb.org/t/p/w300${filePath} 300w, https://image.tmdb.org/t/p/w780${filePath} 780w, https://image.tmdb.org/t/p/w1280${filePath} 1280w`;
+                                const imgSizes = isPoster
+                                  ? "(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 140px"
+                                  : "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px";
+
+                                return (
+                                  <SwiperSlide
+                                    key={filePath}
+                                    className="h-full pt-3 pb-3"
+                                  >
+                                    <div
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={() => {
                                         if (activeImagesTab === "posters")
                                           handleSelectPoster(filePath);
                                         else if (
@@ -7907,59 +7963,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         )
                                           handleSelectPreviewBackdrop(filePath);
                                         else handleSelectBackground(filePath);
-                                      }
-                                    }}
-                                    className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
-                        transition-all duration-300 transform-gpu hover:-translate-y-1
-                        ${
-                          isActive
-                            ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
-                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
-                        }`}
-                                    title="Seleccionar"
-                                    style={{
-                                      WebkitTapHighlightColor: "transparent",
-                                    }}
-                                  >
-                                    <div
-                                      className={`w-full ${aspect} bg-black/40`}
-                                    >
-                                      <img
-                                        src={imgSrc}
-                                        srcSet={imgSrcSet}
-                                        sizes={imgSizes}
-                                        alt={imgAlt}
-                                        loading={isPriority ? "eager" : "lazy"}
-                                        fetchPriority={
-                                          isPriority ? "high" : "auto"
-                                        }
-                                        decoding="async"
-                                        className="w-full h-full object-cover transition-transform duration-700 transform-gpu
-                            group-hover:scale-[1.08]"
-                                      />
-                                    </div>
-
-                                    {isActive && (
-                                      <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-400 rounded-full shadow-lg shadow-emerald-500/50 ring-2 ring-white/20" />
-                                    )}
-
-                                    {resText && (
-                                      <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <span
-                                          className="text-[10px] font-bold tracking-wide px-2 py-1 rounded-full
-                            bg-black/70 border border-white/15 text-zinc-100"
-                                        >
-                                          {resText}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    <div
-                                      role="button"
-                                      tabIndex={0}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleCopyImageUrl(filePath);
                                       }}
                                       onKeyDown={(e) => {
                                         if (
@@ -7967,25 +7970,96 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           e.key === " "
                                         ) {
                                           e.preventDefault();
-                                          e.stopPropagation();
-                                          handleCopyImageUrl(filePath);
+                                          if (activeImagesTab === "posters")
+                                            handleSelectPoster(filePath);
+                                          else if (
+                                            activeImagesTab === "backdrops"
+                                          )
+                                            handleSelectPreviewBackdrop(
+                                              filePath,
+                                            );
+                                          else handleSelectBackground(filePath);
                                         }
                                       }}
-                                      className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
-                          opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
-                                      title="Copiar URL"
+                                      className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
+                        transition-all duration-300 transform-gpu hover:-translate-y-1
+                        ${
+                          isActive
+                            ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
+                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
+                        }`}
+                                      title="Seleccionar"
+                                      style={{
+                                        WebkitTapHighlightColor: "transparent",
+                                      }}
                                     >
-                                      <LinkIcon size={14} />
+                                      <div
+                                        className={`w-full ${aspect} bg-black/40`}
+                                      >
+                                        <img
+                                          src={imgSrc}
+                                          srcSet={imgSrcSet}
+                                          sizes={imgSizes}
+                                          alt={imgAlt}
+                                          loading={
+                                            isPriority ? "eager" : "lazy"
+                                          }
+                                          fetchPriority={
+                                            isPriority ? "high" : "auto"
+                                          }
+                                          decoding="async"
+                                          className="w-full h-full object-cover transition-transform duration-700 transform-gpu
+                            group-hover:scale-[1.08]"
+                                        />
+                                      </div>
+
+                                      {isActive && (
+                                        <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-400 rounded-full shadow-lg shadow-emerald-500/50 ring-2 ring-white/20" />
+                                      )}
+
+                                      {resText && (
+                                        <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <span
+                                            className="text-[10px] font-bold tracking-wide px-2 py-1 rounded-full
+                            bg-black/70 border border-white/15 text-zinc-100"
+                                          >
+                                            {resText}
+                                          </span>
+                                        </div>
+                                      )}
+
+                                      <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleCopyImageUrl(filePath);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (
+                                            e.key === "Enter" ||
+                                            e.key === " "
+                                          ) {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleCopyImageUrl(filePath);
+                                          }
+                                        }}
+                                        className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
+                          opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
+                                        title="Copiar URL"
+                                      >
+                                        <LinkIcon size={14} />
+                                      </div>
                                     </div>
-                                  </div>
-                                </SwiperSlide>
-                              );
-                            })}
-                          </Swiper>
-                        )}
-                      </div>
-                    );
-                  })()}
+                                  </SwiperSlide>
+                                );
+                              })}
+                            </Swiper>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </section>
                 )}
               </AnimatedSection>
@@ -8038,18 +8112,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       )}
 
                       {!!videosError && (
-                        <div className="text-sm text-red-400">{videosError}</div>
+                        <div className="text-sm text-red-400">
+                          {videosError}
+                        </div>
                       )}
 
                       {videosResolved &&
                         !videosLoading &&
                         !videosError &&
                         videos.length === 0 && (
-                      <div className="text-sm text-zinc-400">
-                        No hay tráileres o vídeos disponibles en TMDb para este
-                        título.
-                      </div>
-                      )}
+                          <div className="text-sm text-zinc-400">
+                            No hay tráileres o vídeos disponibles en TMDb para
+                            este título.
+                          </div>
+                        )}
 
                       {videos.length > 0 && (
                         <Swiper
@@ -8139,7 +8215,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       </span>
                                       {v.published_at && (
                                         <>
-                                          <span className="text-zinc-600">·</span>
+                                          <span className="text-zinc-600">
+                                            ·
+                                          </span>
                                           <span className="shrink-0">
                                             {new Date(
                                               v.published_at,
@@ -8167,102 +8245,102 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {/* Trakt: sentimientos (AI summary) - Solo mostrar si no hay error */}
                 {!tSentiment.error && (
                   <section className="mb-12">
-                  <SectionTitle
-                    title="Análisis de Sentimientos"
-                    icon={Sparkles}
-                  />
+                    <SectionTitle
+                      title="Análisis de Sentimientos"
+                      icon={Sparkles}
+                    />
 
-                  <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
-                    {/* Header del bloque */}
-                    <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
-                      <div className="flex items-center gap-4">
-                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
-                          <img
-                            src="/logo-Trakt.png"
-                            alt="Trakt"
-                            className="h-full w-full object-cover"
-                          />
+                    <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
+                      {/* Header del bloque */}
+                      <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
+                            <img
+                              src="/logo-Trakt.png"
+                              alt="Trakt"
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-bold leading-tight text-white">
+                              Trakt Community Pulse
+                            </h3>
+                            <p className="text-xs font-medium text-zinc-400">
+                              Resumen por IA basado en comentarios sobre{" "}
+                              <span className="text-zinc-200">{title}</span>
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-base font-bold leading-tight text-white">
-                            Trakt Community Pulse
-                          </h3>
-                          <p className="text-xs font-medium text-zinc-400">
-                            Resumen por IA basado en comentarios sobre{" "}
-                            <span className="text-zinc-200">{title}</span>
-                          </p>
-                        </div>
+                        {tSentiment.loading && (
+                          <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+                        )}
                       </div>
-                      {tSentiment.loading && (
-                        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
-                      )}
-                    </div>
 
-                    <div className="p-6">
-                      {/* Sin mostrar error, directamente el contenido */}
-                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        {/* Columna Positiva */}
-                        <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
-                          <div className="mb-4 flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
-                              <ThumbsUp className="h-4 w-4" />
+                      <div className="p-6">
+                        {/* Sin mostrar error, directamente el contenido */}
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                          {/* Columna Positiva */}
+                          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
+                            <div className="mb-4 flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+                                <ThumbsUp className="h-4 w-4" />
+                              </div>
+                              <span className="font-bold tracking-wide text-emerald-100">
+                                Lo Bueno
+                              </span>
                             </div>
-                            <span className="font-bold tracking-wide text-emerald-100">
-                              Lo Bueno
-                            </span>
+
+                            {tSentiment.pros?.length ? (
+                              <ul className="space-y-3">
+                                {tSentiment.pros.map((s, i) => (
+                                  <li
+                                    key={i}
+                                    className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300"
+                                  >
+                                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                                    <span>{s}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div className="text-sm italic text-zinc-500">
+                                No hay suficientes datos positivos.
+                              </div>
+                            )}
                           </div>
 
-                          {tSentiment.pros?.length ? (
-                            <ul className="space-y-3">
-                              {tSentiment.pros.map((s, i) => (
-                                <li
-                                  key={i}
-                                  className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300"
-                                >
-                                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
-                                  <span>{s}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <div className="text-sm italic text-zinc-500">
-                              No hay suficientes datos positivos.
+                          {/* Columna Negativa */}
+                          <div className="relative overflow-hidden rounded-2xl border border-rose-500/20 bg-gradient-to-b from-rose-500/10 to-transparent p-5">
+                            <div className="mb-4 flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
+                                <ThumbsDown className="h-4 w-4" />
+                              </div>
+                              <span className="font-bold tracking-wide text-rose-100">
+                                Lo Malo
+                              </span>
                             </div>
-                          )}
-                        </div>
 
-                        {/* Columna Negativa */}
-                        <div className="relative overflow-hidden rounded-2xl border border-rose-500/20 bg-gradient-to-b from-rose-500/10 to-transparent p-5">
-                          <div className="mb-4 flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
-                              <ThumbsDown className="h-4 w-4" />
-                            </div>
-                            <span className="font-bold tracking-wide text-rose-100">
-                              Lo Malo
-                            </span>
+                            {tSentiment.cons?.length ? (
+                              <ul className="space-y-3">
+                                {tSentiment.cons.map((s, i) => (
+                                  <li
+                                    key={i}
+                                    className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300"
+                                  >
+                                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]" />
+                                    <span>{s}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div className="text-sm italic text-zinc-500">
+                                No hay suficientes datos negativos.
+                              </div>
+                            )}
                           </div>
-
-                          {tSentiment.cons?.length ? (
-                            <ul className="space-y-3">
-                              {tSentiment.cons.map((s, i) => (
-                                <li
-                                  key={i}
-                                  className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300"
-                                >
-                                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]" />
-                                  <span>{s}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <div className="text-sm italic text-zinc-500">
-                              No hay suficientes datos negativos.
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
                   </section>
                 )}
               </AnimatedSection>
@@ -8276,138 +8354,138 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               <section id="section-seasons" ref={registerSection("seasons")}>
                 <AnimatedSection delay={0.04}>
                   <section className="mb-12">
-                  <SectionTitle title="Temporadas" icon={Layers} />
+                    <SectionTitle title="Temporadas" icon={Layers} />
 
-                  <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {tSeasons.loading && (
-                      <div className="col-span-full py-10 flex justify-center">
-                        <Loader2 className="animate-spin text-white/50" />
-                      </div>
-                    )}
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {tSeasons.loading && (
+                        <div className="col-span-full py-10 flex justify-center">
+                          <Loader2 className="animate-spin text-white/50" />
+                        </div>
+                      )}
 
-                    {!tSeasons.loading &&
-                      (tSeasons.items || []).map((s) => {
-                        const sn = Number(s?.number);
-                        const titleSeason =
-                          sn === 0 ? "Especiales" : `Temporada ${sn}`;
-                        const rating =
-                          typeof s?.rating === "number" ? s.rating : null;
+                      {!tSeasons.loading &&
+                        (tSeasons.items || []).map((s) => {
+                          const sn = Number(s?.number);
+                          const titleSeason =
+                            sn === 0 ? "Especiales" : `Temporada ${sn}`;
+                          const rating =
+                            typeof s?.rating === "number" ? s.rating : null;
 
-                        // Lógica de progreso (usa TMDb para saber total)
-                        const tmdbSeason = (data?.seasons || []).find(
-                          (x) => Number(x?.season_number) === sn,
-                        );
-                        const totalEp =
-                          Number(tmdbSeason?.episode_count || 0) || null;
-                        const watchedEp = Array.isArray(watchedBySeason?.[sn])
-                          ? watchedBySeason[sn].length
-                          : 0;
-                        const percentage = totalEp
-                          ? Math.round((watchedEp / totalEp) * 100)
-                          : 0;
+                          // Lógica de progreso (usa TMDb para saber total)
+                          const tmdbSeason = (data?.seasons || []).find(
+                            (x) => Number(x?.season_number) === sn,
+                          );
+                          const totalEp =
+                            Number(tmdbSeason?.episode_count || 0) || null;
+                          const watchedEp = Array.isArray(watchedBySeason?.[sn])
+                            ? watchedBySeason[sn].length
+                            : 0;
+                          const percentage = totalEp
+                            ? Math.round((watchedEp / totalEp) * 100)
+                            : 0;
 
-                        const isComplete = percentage === 100;
-                        const barColor = isComplete
-                          ? "bg-emerald-500"
-                          : "bg-yellow-500";
+                          const isComplete = percentage === 100;
+                          const barColor = isComplete
+                            ? "bg-emerald-500"
+                            : "bg-yellow-500";
 
-                        return (
-                          <button
-                            key={sn}
-                            type="button"
-                            onClick={() =>
-                              router.push(`/details/tv/${id}/season/${sn}`)
-                            }
-                            onMouseEnter={() => prefetchSeasonDetails(sn)}
-                            onFocus={() => prefetchSeasonDetails(sn)}
-                            onTouchStart={() => prefetchSeasonDetails(sn)}
-                            className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5
+                          return (
+                            <button
+                              key={sn}
+                              type="button"
+                              onClick={() =>
+                                router.push(`/details/tv/${id}/season/${sn}`)
+                              }
+                              onMouseEnter={() => prefetchSeasonDetails(sn)}
+                              onFocus={() => prefetchSeasonDetails(sn)}
+                              onTouchStart={() => prefetchSeasonDetails(sn)}
+                              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5
                              transition-all hover:-translate-y-1 hover:border-white/20 hover:bg-white/10 hover:shadow-xl
                              text-left w-full"
-                            title={`Ver ${titleSeason}`}
-                          >
-                            {/* Fondo decorativo del número de temporada */}
-                            <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10">
-                              {sn}
-                            </div>
-
-                            <div className="relative p-5">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <h4 className="text-lg font-extrabold text-white">
-                                    {titleSeason}
-                                  </h4>
-
-                                  <div className="mt-1 flex items-center gap-2 text-xs font-medium text-zinc-400">
-                                    {rating != null && (
-                                      <span className="flex items-center gap-1 text-yellow-400">
-                                        <Star className="h-3 w-3 fill-yellow-400" />{" "}
-                                        {rating.toFixed(1)}
-                                      </span>
-                                    )}
-                                    {totalEp != null && (
-                                      <span>• {totalEp} episodios</span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Botón externo a Trakt (NO navega a la season page) */}
-                                {trakt?.traktUrl && (
-                                  <a
-                                    href={`${trakt.traktUrl}/seasons/${sn}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      window.open(
-                                        `${trakt.traktUrl}/seasons/${sn}`,
-                                        "_blank",
-                                        "noopener,noreferrer",
-                                      );
-                                    }}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
-                                    title="Ver en Trakt"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                )}
+                              title={`Ver ${titleSeason}`}
+                            >
+                              {/* Fondo decorativo del número de temporada */}
+                              <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10">
+                                {sn}
                               </div>
 
-                              {/* Barra de Progreso */}
-                              {totalEp != null && (
-                                <div className="mt-6">
-                                  <div className="mb-1.5 flex items-end justify-between text-xs font-bold">
-                                    <span
-                                      className={
-                                        percentage > 0
-                                          ? "text-white"
-                                          : "text-zinc-500"
-                                      }
-                                    >
-                                      {watchedEp}{" "}
-                                      <span className="text-zinc-500 font-normal">
-                                        vistos
-                                      </span>
-                                    </span>
-                                    <span className="text-zinc-500">
-                                      {percentage}%
-                                    </span>
+                              <div className="relative p-5">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <h4 className="text-lg font-extrabold text-white">
+                                      {titleSeason}
+                                    </h4>
+
+                                    <div className="mt-1 flex items-center gap-2 text-xs font-medium text-zinc-400">
+                                      {rating != null && (
+                                        <span className="flex items-center gap-1 text-yellow-400">
+                                          <Star className="h-3 w-3 fill-yellow-400" />{" "}
+                                          {rating.toFixed(1)}
+                                        </span>
+                                      )}
+                                      {totalEp != null && (
+                                        <span>• {totalEp} episodios</span>
+                                      )}
+                                    </div>
                                   </div>
 
-                                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                                    <div
-                                      className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                                      style={{ width: `${percentage}%` }}
-                                    />
-                                  </div>
+                                  {/* Botón externo a Trakt (NO navega a la season page) */}
+                                  {trakt?.traktUrl && (
+                                    <a
+                                      href={`${trakt.traktUrl}/seasons/${sn}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        window.open(
+                                          `${trakt.traktUrl}/seasons/${sn}`,
+                                          "_blank",
+                                          "noopener,noreferrer",
+                                        );
+                                      }}
+                                      className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
+                                      title="Ver en Trakt"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                  </div>
+
+                                {/* Barra de Progreso */}
+                                {totalEp != null && (
+                                  <div className="mt-6">
+                                    <div className="mb-1.5 flex items-end justify-between text-xs font-bold">
+                                      <span
+                                        className={
+                                          percentage > 0
+                                            ? "text-white"
+                                            : "text-zinc-500"
+                                        }
+                                      >
+                                        {watchedEp}{" "}
+                                        <span className="text-zinc-500 font-normal">
+                                          vistos
+                                        </span>
+                                      </span>
+                                      <span className="text-zinc-500">
+                                        {percentage}%
+                                      </span>
+                                    </div>
+
+                                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                                      <div
+                                        className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                                        style={{ width: `${percentage}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                    </div>
                   </section>
                 </AnimatedSection>
               </section>
@@ -8423,35 +8501,35 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* Subsección: Episodios y sus valoraciones */}
                   {type === "tv" ? (
                     <section className="mb-10">
-                    <SectionTitle
-                      title="Valoración de Episodios"
-                      icon={TrendingUp}
-                    />
-                    <div className="p-0">
-                      {ratingsLoading && (
-                        <p className="text-sm text-gray-300 mb-2">
-                          Cargando ratings…
-                        </p>
-                      )}
-                      {ratingsError && (
-                        <p className="text-sm text-red-400 mb-2">
-                          {ratingsError}
-                        </p>
-                      )}
-                      {!ratingsLoading && !ratingsError && !ratings && (
-                        <p className="text-sm text-zinc-400 mb-2">
-                          No hay datos de episodios disponibles.
-                        </p>
-                      )}
-                      {!!ratings && !ratingsError && (
-                        <EpisodeRatingsGrid
-                          ratings={ratings}
-                          showId={Number(id)}
-                          density="compact"
-                          fallbackSource="tmdb"
-                        />
-                      )}
-                    </div>
+                      <SectionTitle
+                        title="Valoración de Episodios"
+                        icon={TrendingUp}
+                      />
+                      <div className="p-0">
+                        {ratingsLoading && (
+                          <p className="text-sm text-gray-300 mb-2">
+                            Cargando ratings…
+                          </p>
+                        )}
+                        {ratingsError && (
+                          <p className="text-sm text-red-400 mb-2">
+                            {ratingsError}
+                          </p>
+                        )}
+                        {!ratingsLoading && !ratingsError && !ratings && (
+                          <p className="text-sm text-zinc-400 mb-2">
+                            No hay datos de episodios disponibles.
+                          </p>
+                        )}
+                        {!!ratings && !ratingsError && (
+                          <EpisodeRatingsGrid
+                            ratings={ratings}
+                            showId={Number(id)}
+                            density="compact"
+                            fallbackSource="tmdb"
+                          />
+                        )}
+                      </div>
                     </section>
                   ) : (
                     <div className="text-sm text-zinc-400">
@@ -8467,73 +8545,75 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {/* CRÍTICAS */}
                 {reviews && reviews.length > 0 && (
                   <section className="mb-10">
-                  <div className="flex items-center justify-between mb-2">
-                    <SectionTitle
-                      title="Críticas de Usuarios"
-                      icon={MessageSquareIcon}
-                    />
-                    {reviewLimit < reviews.length && (
-                      <button
-                        onClick={() => setReviewLimit((prev) => prev + 2)}
-                        className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
-                      >
-                        Ver más
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {reviews.slice(0, reviewLimit).map((r) => {
-                      const avatar = r.author_details?.avatar_path
-                        ? r.author_details.avatar_path.startsWith("/https")
-                          ? r.author_details.avatar_path.slice(1)
-                          : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
-                        : `https://ui-avatars.com/api/?name=${r.author}&background=random`;
-
-                      return (
-                        <div
-                          key={r.id}
-                          className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
+                    <div className="flex items-center justify-between mb-2">
+                      <SectionTitle
+                        title="Críticas de Usuarios"
+                        icon={MessageSquareIcon}
+                      />
+                      {reviewLimit < reviews.length && (
+                        <button
+                          onClick={() => setReviewLimit((prev) => prev + 2)}
+                          className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
                         >
-                          <div className="flex items-center gap-4">
-                            <img
-                              src={avatar}
-                              alt={r.author}
-                              className="w-12 h-12 rounded-full object-cover shadow-lg"
-                            />
-                            <div>
-                              <h4 className="font-bold text-white">
-                                {r.author}
-                              </h4>
-                              <div className="flex items-center gap-2 text-xs text-gray-400">
-                                <span>
-                                  {new Date(r.created_at).toLocaleDateString()}
-                                </span>
-                                {r.author_details?.rating && (
-                                  <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
-                                    ★ {r.author_details.rating}
+                          Ver más
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {reviews.slice(0, reviewLimit).map((r) => {
+                        const avatar = r.author_details?.avatar_path
+                          ? r.author_details.avatar_path.startsWith("/https")
+                            ? r.author_details.avatar_path.slice(1)
+                            : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
+                          : `https://ui-avatars.com/api/?name=${r.author}&background=random`;
+
+                        return (
+                          <div
+                            key={r.id}
+                            className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
+                          >
+                            <div className="flex items-center gap-4">
+                              <img
+                                src={avatar}
+                                alt={r.author}
+                                className="w-12 h-12 rounded-full object-cover shadow-lg"
+                              />
+                              <div>
+                                <h4 className="font-bold text-white">
+                                  {r.author}
+                                </h4>
+                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                  <span>
+                                    {new Date(
+                                      r.created_at,
+                                    ).toLocaleDateString()}
                                   </span>
-                                )}
+                                  {r.author_details?.rating && (
+                                    <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
+                                      ★ {r.author_details.rating}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
-                            "{r.content.replace(/<[^>]*>?/gm, "")}"
-                          </div>
+                            <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
+                              "{r.content.replace(/<[^>]*>?/gm, "")}"
+                            </div>
 
-                          <a
-                            href={r.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
-                          >
-                            Leer review completa en TMDb &rarr;
-                          </a>
-                        </div>
-                      );
-                    })}
-                  </div>
+                            <a
+                              href={r.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
+                            >
+                              Leer review completa en TMDb &rarr;
+                            </a>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </section>
                 )}
               </AnimatedSection>
@@ -8542,174 +8622,179 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {/* ===================================================== */}
                 {/* Trakt: comentarios */}
                 <section className="mb-10">
-                <div className="mb-2 flex items-center justify-between gap-4">
-                  {/* Mantiene SectionTitle (mismo tamano), pero sin mb interno aqui */}
-                  <SectionTitle
-                    title="Comentarios"
-                    icon={MessageSquareIcon}
-                    className="mb-0"
-                  />
+                  <div className="mb-2 flex items-center justify-between gap-4">
+                    {/* Mantiene SectionTitle (mismo tamano), pero sin mb interno aqui */}
+                    <SectionTitle
+                      title="Comentarios"
+                      icon={MessageSquareIcon}
+                      className="mb-0"
+                    />
 
-                  {/* Bloque derecho centrado al titulo */}
-                  <div className="flex items-center gap-2 h-10 md:h-11 transform-gpu -translate-y-[3px] md:-translate-y-[10px]">
-                    <a
-                      href={
-                        trakt?.traktUrl
-                          ? `${trakt.traktUrl}/comments`
-                          : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                      className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5
+                    {/* Bloque derecho centrado al titulo */}
+                    <div className="flex items-center gap-2 h-10 md:h-11 transform-gpu -translate-y-[3px] md:-translate-y-[10px]">
+                      <a
+                        href={
+                          trakt?.traktUrl
+                            ? `${trakt.traktUrl}/comments`
+                            : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5
         px-4 h-10 md:h-11 text-xs font-bold uppercase tracking-wider text-zinc-300 transition
         hover:border-yellow-500/50 hover:bg-yellow-500/10 hover:text-yellow-400"
-                      style={{ WebkitTapHighlightColor: "transparent" }}
-                    >
-                      <span className="hidden sm:inline">Ver en Trakt</span>
-                      {tComments.total > 0 && (
-                        <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white">
-                          {tComments.total}
-                        </span>
-                      )}
-                      <ExternalLink className="h-3 w-3 opacity-50 transition group-hover:opacity-100" />
-                    </a>
+                        style={{ WebkitTapHighlightColor: "transparent" }}
+                      >
+                        <span className="hidden sm:inline">Ver en Trakt</span>
+                        {tComments.total > 0 && (
+                          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white">
+                            {tComments.total}
+                          </span>
+                        )}
+                        <ExternalLink className="h-3 w-3 opacity-50 transition group-hover:opacity-100" />
+                      </a>
 
-                    <a
-                      href={
-                        trakt?.traktUrl
-                          ? `${trakt.traktUrl}/comments`
-                          : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 rounded-full bg-white text-black
+                      <a
+                        href={
+                          trakt?.traktUrl
+                            ? `${trakt.traktUrl}/comments`
+                            : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-2 rounded-full bg-white text-black
         px-4 h-10 md:h-11 text-xs font-bold uppercase tracking-wider transition hover:bg-zinc-200"
-                      style={{ WebkitTapHighlightColor: "transparent" }}
-                    >
-                      <Plus className="h-3 w-3" />
-                      <span className="hidden sm:inline">Escribir</span>
-                    </a>
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/20 backdrop-blur-sm">
-                  {/* Filtros estilo Tabs Modernos */}
-                  <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-4 py-3">
-                    <div className="flex gap-1 rounded-xl bg-black/40 p-1">
-                      {[
-                        { id: "likes30", label: "Top 30 Días" },
-                        { id: "likesAll", label: "Top Histórico" },
-                        { id: "recent", label: "Recientes" },
-                      ].map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => setTCommentsTab(t.id)}
-                          className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
-                            tCommentsTab === t.id
-                              ? "bg-zinc-700 text-white shadow-md"
-                              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-                          }`}
-                        >
-                          {t.label}
-                        </button>
-                      ))}
+                        style={{ WebkitTapHighlightColor: "transparent" }}
+                      >
+                        <Plus className="h-3 w-3" />
+                        <span className="hidden sm:inline">Escribir</span>
+                      </a>
                     </div>
-                    {tComments.loading && (
-                      <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-                    )}
                   </div>
 
-                  <div className="space-y-4 p-4 sm:p-6">
-                    {!tComments.loading &&
-                      (tComments.items || []).length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
-                          <MessageSquareIcon className="mb-2 h-8 w-8 opacity-20" />
-                          <p className="text-sm">Sé el primero en comentar.</p>
-                        </div>
+                  <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/20 backdrop-blur-sm">
+                    {/* Filtros estilo Tabs Modernos */}
+                    <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-4 py-3">
+                      <div className="flex gap-1 rounded-xl bg-black/40 p-1">
+                        {[
+                          { id: "likes30", label: "Top 30 Días" },
+                          { id: "likesAll", label: "Top Histórico" },
+                          { id: "recent", label: "Recientes" },
+                        ].map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setTCommentsTab(t.id)}
+                            className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
+                              tCommentsTab === t.id
+                                ? "bg-zinc-700 text-white shadow-md"
+                                : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                      {tComments.loading && (
+                        <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
                       )}
+                    </div>
 
-                    {(tComments.items || [])
-                      .slice(0, COMMENTS_SECTION_LIMIT)
-                      .map((c) => {
-                      const user = c?.user || {};
-                      const avatar =
-                        user?.images?.avatar?.full ||
-                        user?.images?.avatar?.medium ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.username || "User")}`;
-                      const text = stripHtml(
-                        c?.comment?.comment ?? c?.comment ?? "",
-                      );
-                      const created = c?.created_at
-                        ? formatDateTimeEs(c.created_at)
-                        : "";
-                      const likes = Number(c?.likes || 0);
-
-                      return (
-                        <div
-                          key={String(c?.id || `${user?.username}-${created}`)}
-                          className="group relative flex gap-4 rounded-2xl bg-white/5 p-5 transition hover:bg-white/10"
-                        >
-                          {/* Avatar */}
-                          <div className="shrink-0">
-                            <img
-                              src={avatar}
-                              alt={user?.username}
-                              className="h-12 w-12 rounded-full object-cover shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20"
-                            />
+                    <div className="space-y-4 p-4 sm:p-6">
+                      {!tComments.loading &&
+                        (tComments.items || []).length === 0 && (
+                          <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
+                            <MessageSquareIcon className="mb-2 h-8 w-8 opacity-20" />
+                            <p className="text-sm">
+                              Sé el primero en comentar.
+                            </p>
                           </div>
+                        )}
 
-                          {/* Content */}
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex items-baseline justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-white group-hover:text-yellow-400 transition-colors cursor-pointer">
-                                  {user?.name || user?.username || "Usuario"}
-                                </span>
-                                {user?.vip && (
-                                  <span className="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-500">
-                                    VIP
+                      {(tComments.items || [])
+                        .slice(0, COMMENTS_SECTION_LIMIT)
+                        .map((c) => {
+                          const user = c?.user || {};
+                          const avatar =
+                            user?.images?.avatar?.full ||
+                            user?.images?.avatar?.medium ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.username || "User")}`;
+                          const text = stripHtml(
+                            c?.comment?.comment ?? c?.comment ?? "",
+                          );
+                          const created = c?.created_at
+                            ? formatDateTimeEs(c.created_at)
+                            : "";
+                          const likes = Number(c?.likes || 0);
+
+                          return (
+                            <div
+                              key={String(
+                                c?.id || `${user?.username}-${created}`,
+                              )}
+                              className="group relative flex gap-4 rounded-2xl bg-white/5 p-5 transition hover:bg-white/10"
+                            >
+                              {/* Avatar */}
+                              <div className="shrink-0">
+                                <img
+                                  src={avatar}
+                                  alt={user?.username}
+                                  className="h-12 w-12 rounded-full object-cover shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20"
+                                />
+                              </div>
+
+                              {/* Content */}
+                              <div className="min-w-0 flex-1">
+                                <div className="mb-1 flex items-baseline justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-white group-hover:text-yellow-400 transition-colors cursor-pointer">
+                                      {user?.name ||
+                                        user?.username ||
+                                        "Usuario"}
+                                    </span>
+                                    {user?.vip && (
+                                      <span className="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-500">
+                                        VIP
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-zinc-500">
+                                    {created}
                                   </span>
-                                )}
+                                </div>
+
+                                <div className="relative text-sm leading-relaxed text-zinc-300">
+                                  {/* Icono de comillas decorativo */}
+                                  <span className="absolute -left-3 -top-1 font-serif text-4xl text-white/5">
+                                    “
+                                  </span>
+                                  <p className="whitespace-pre-line">{text}</p>
+                                </div>
+
+                                {/* Actions Footer */}
+                                <div className="mt-3 flex items-center gap-4 border-t border-white/5 pt-3">
+                                  <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2 py-1 text-xs font-medium text-emerald-400">
+                                    <ThumbsUp className="h-3 w-3" /> {likes}
+                                  </div>
+                                  <a
+                                    href={
+                                      trakt?.traktUrl
+                                        ? `${trakt.traktUrl}/comments`
+                                        : undefined
+                                    }
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="ml-auto text-xs font-semibold text-zinc-500 hover:text-white transition-colors"
+                                  >
+                                    Responder en Trakt →
+                                  </a>
+                                </div>
                               </div>
-                              <span className="text-xs text-zinc-500">
-                                {created}
-                              </span>
                             </div>
-
-                            <div className="relative text-sm leading-relaxed text-zinc-300">
-                              {/* Icono de comillas decorativo */}
-                              <span className="absolute -left-3 -top-1 font-serif text-4xl text-white/5">
-                                “
-                              </span>
-                              <p className="whitespace-pre-line">{text}</p>
-                            </div>
-
-                            {/* Actions Footer */}
-                            <div className="mt-3 flex items-center gap-4 border-t border-white/5 pt-3">
-                              <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2 py-1 text-xs font-medium text-emerald-400">
-                                <ThumbsUp className="h-3 w-3" /> {likes}
-                              </div>
-                              <a
-                                href={
-                                  trakt?.traktUrl
-                                    ? `${trakt.traktUrl}/comments`
-                                    : undefined
-                                }
-                                target="_blank"
-                                rel="noreferrer"
-                                className="ml-auto text-xs font-semibold text-zinc-500 hover:text-white transition-colors"
-                              >
-                                Responder en Trakt →
-                              </a>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-
+                          );
+                        })}
+                    </div>
                   </div>
-                </div>
                 </section>
               </AnimatedSection>
             </section>
@@ -8720,180 +8805,184 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {/* Trakt: listas - Solo mostrar si no hay error */}
                 {!tLists.error && (
                   <section className="mb-12">
-                  <div className="mb-6 flex items-center justify-between">
-                    <SectionTitle title="Listas" icon={ListVideo} />
+                    <div className="mb-6 flex items-center justify-between">
+                      <SectionTitle title="Listas" icon={ListVideo} />
 
-                    {/* Selector de Listas */}
-                    <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
-                      {["popular", "trending"].map((tab) => (
-                        <button
-                          key={tab}
-                          onClick={() => setTListsTab(tab)}
-                          className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${
-                            tListsTab === tab
-                              ? "bg-white text-black shadow-lg scale-105"
-                              : "text-zinc-400 hover:text-white hover:bg-white/5"
-                          }`}
-                        >
-                          {tab}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                    {tLists.loading ? (
-                      <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
-                        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-                        <span className="text-sm font-medium animate-pulse">
-                          Buscando listas y portadas...
-                        </span>
-                      </div>
-                    ) : (
-                      (tLists.items || []).map((row) => {
-                        const list = row?.list || row || {};
-                        const user = row?.user || list?.user || {};
-                        const previews = row?.previewPosters || [];
-
-                        const name = list?.name || "Lista";
-                        const itemCount = Number(
-                          list?.item_count || list?.items || 0,
-                        );
-                        const likes = Number(list?.likes || 0);
-                        const username = user?.username || user?.name || null;
-                        const slug = list?.ids?.slug || null;
-                        const traktId = list?.ids?.trakt || null;
-
-                        // Ruta interna (slug si existe; si no, traktId)
-                        const internalUrl =
-                          username && (slug || traktId)
-                            ? `/lists/trakt/${encodeURIComponent(username)}/${encodeURIComponent(String(slug || traktId))}`
-                            : null;
-
-                        // (opcional) enlace externo a Trakt, pero ya NO es el click principal
-                        const traktUrl =
-                          username && (slug || traktId)
-                            ? `https://trakt.tv/users/${username}/lists/${slug || traktId}`
-                            : null;
-
-                        const avatar =
-                          user?.images?.avatar?.full ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(username || "user")}&background=random`;
-
-                        const disabled = !internalUrl;
-
-                        return (
-                          <Link
-                            key={String(
-                              traktId || `${username}-${slug}` || name,
-                            )}
-                            href={internalUrl || "#"}
-                            aria-disabled={disabled}
-                            className={[
-                              "group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500",
-                              "hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)]",
-                              disabled ? "pointer-events-none opacity-60" : "",
-                            ].join(" ")}
+                      {/* Selector de Listas */}
+                      <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
+                        {["popular", "trending"].map((tab) => (
+                          <button
+                            key={tab}
+                            onClick={() => setTListsTab(tab)}
+                            className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${
+                              tListsTab === tab
+                                ? "bg-white text-black shadow-lg scale-105"
+                                : "text-zinc-400 hover:text-white hover:bg-white/5"
+                            }`}
                           >
-                            {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS) */}
-                            <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
-                              {previews.length > 0 ? (
-                                <div className="h-full w-full flex items-center justify-center overflow-visible">
-                                  <PosterStack posters={previews} />
-                                </div>
-                              ) : (
-                                <div className="flex h-full items-center justify-center opacity-10">
-                                  <ListVideo className="h-20 w-20" />
-                                </div>
+                            {tab}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                      {tLists.loading ? (
+                        <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
+                          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                          <span className="text-sm font-medium animate-pulse">
+                            Buscando listas y portadas...
+                          </span>
+                        </div>
+                      ) : (
+                        (tLists.items || []).map((row) => {
+                          const list = row?.list || row || {};
+                          const user = row?.user || list?.user || {};
+                          const previews = row?.previewPosters || [];
+
+                          const name = list?.name || "Lista";
+                          const itemCount = Number(
+                            list?.item_count || list?.items || 0,
+                          );
+                          const likes = Number(list?.likes || 0);
+                          const username = user?.username || user?.name || null;
+                          const slug = list?.ids?.slug || null;
+                          const traktId = list?.ids?.trakt || null;
+
+                          // Ruta interna (slug si existe; si no, traktId)
+                          const internalUrl =
+                            username && (slug || traktId)
+                              ? `/lists/trakt/${encodeURIComponent(username)}/${encodeURIComponent(String(slug || traktId))}`
+                              : null;
+
+                          // (opcional) enlace externo a Trakt, pero ya NO es el click principal
+                          const traktUrl =
+                            username && (slug || traktId)
+                              ? `https://trakt.tv/users/${username}/lists/${slug || traktId}`
+                              : null;
+
+                          const avatar =
+                            user?.images?.avatar?.full ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(username || "user")}&background=random`;
+
+                          const disabled = !internalUrl;
+
+                          return (
+                            <Link
+                              key={String(
+                                traktId || `${username}-${slug}` || name,
                               )}
+                              href={internalUrl || "#"}
+                              aria-disabled={disabled}
+                              className={[
+                                "group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500",
+                                "hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)]",
+                                disabled
+                                  ? "pointer-events-none opacity-60"
+                                  : "",
+                              ].join(" ")}
+                            >
+                              {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS) */}
+                              <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
+                                {previews.length > 0 ? (
+                                  <div className="h-full w-full flex items-center justify-center overflow-visible">
+                                    <PosterStack posters={previews} />
+                                  </div>
+                                ) : (
+                                  <div className="flex h-full items-center justify-center opacity-10">
+                                    <ListVideo className="h-20 w-20" />
+                                  </div>
+                                )}
 
-                              {/* Botón externo (opcional) sin romper el Link */}
-                              {traktUrl && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    window.open(
-                                      traktUrl,
-                                      "_blank",
-                                      "noopener,noreferrer",
-                                    );
-                                  }}
-                                  className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-zinc-200 border border-white/10 hover:border-indigo-400/30 hover:text-white"
-                                  title="Ver en Trakt"
-                                >
-                                  Trakt
-                                </button>
-                              )}
-                            </div>
-
-                            {/* 2. CONTENIDO DE TEXTO */}
-                            <div className="relative flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
-                              <div>
-                                <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
-                                  {name}
-                                </h4>
-
-                                {list?.description && (
-                                  <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
-                                    {stripHtml(list.description)}
-                                  </p>
+                                {/* Botón externo (opcional) sin romper el Link */}
+                                {traktUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      window.open(
+                                        traktUrl,
+                                        "_blank",
+                                        "noopener,noreferrer",
+                                      );
+                                    }}
+                                    className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-zinc-200 border border-white/10 hover:border-indigo-400/30 hover:text-white"
+                                    title="Ver en Trakt"
+                                  >
+                                    Trakt
+                                  </button>
                                 )}
                               </div>
 
-                              {/* Footer */}
-                              <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <img
-                                    src={avatar}
-                                    alt={username || "user"}
-                                    className="h-6 w-6 rounded-full ring-1 ring-white/20"
-                                  />
-                                  <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px]">
-                                    {username || "—"}
-                                  </span>
+                              {/* 2. CONTENIDO DE TEXTO */}
+                              <div className="relative flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
+                                <div>
+                                  <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
+                                    {name}
+                                  </h4>
+
+                                  {list?.description && (
+                                    <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                                      {stripHtml(list.description)}
+                                    </p>
+                                  )}
                                 </div>
 
-                                <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
-                                  <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
-                                    {itemCount} items
-                                  </span>
-                                  <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
-                                    <ThumbsUp className="h-3 w-3" /> {likes}
-                                  </span>
+                                {/* Footer */}
+                                <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <img
+                                      src={avatar}
+                                      alt={username || "user"}
+                                      className="h-6 w-6 rounded-full ring-1 ring-white/20"
+                                    />
+                                    <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px]">
+                                      {username || "—"}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
+                                    <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
+                                      {itemCount} items
+                                    </span>
+                                    <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
+                                      <ThumbsUp className="h-3 w-3" /> {likes}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </Link>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {tLists.hasMore && (
-                    <div className="mt-8 flex justify-center">
-                      <button
-                        onClick={() =>
-                          setTLists((p) => ({ ...p, page: (p.page || 1) + 1 }))
-                        }
-                        className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold focus:outline-none"
-                      >
-                        <span className="absolute h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
-                        <span className="relative flex items-center gap-2 rounded-full bg-black px-6 py-2.5 transition-all duration-300 group-hover:bg-opacity-0">
-                          <span className="bg-gradient-to-r from-indigo-200 to-white bg-clip-text text-transparent group-hover:text-white">
-                            Cargar más listas
-                          </span>
-                          <ChevronDown className="h-4 w-4 text-indigo-300 group-hover:text-white" />
-                        </span>
-                      </button>
+                            </Link>
+                          );
+                        })
+                      )}
                     </div>
-                  )}
+
+                    {tLists.hasMore && (
+                      <div className="mt-8 flex justify-center">
+                        <button
+                          onClick={() =>
+                            setTLists((p) => ({
+                              ...p,
+                              page: (p.page || 1) + 1,
+                            }))
+                          }
+                          className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold focus:outline-none"
+                        >
+                          <span className="absolute h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+                          <span className="relative flex items-center gap-2 rounded-full bg-black px-6 py-2.5 transition-all duration-300 group-hover:bg-opacity-0">
+                            <span className="bg-gradient-to-r from-indigo-200 to-white bg-clip-text text-transparent group-hover:text-white">
+                              Cargar más listas
+                            </span>
+                            <ChevronDown className="h-4 w-4 text-indigo-300 group-hover:text-white" />
+                          </span>
+                        </button>
+                      </div>
+                    )}
                   </section>
                 )}
               </AnimatedSection>
             </section>
-
           </div>
         </div>
       </div>

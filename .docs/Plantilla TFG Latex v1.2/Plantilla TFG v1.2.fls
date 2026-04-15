@@ -380,6 +380,9 @@ INPUT .\estado.tex
 INPUT .\estado.tex
 INPUT .\estado.tex
 INPUT estado.tex
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmbi8t.tfm
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmbi8t.vf
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmbi8r.tfm
 INPUT .\aspectos.tex
 INPUT .\aspectos.tex
 INPUT .\aspectos.tex
