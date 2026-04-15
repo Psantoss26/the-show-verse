@@ -2192,8 +2192,6 @@ export default function DetailsClient({
 
   // Carga los comentarios de Trakt segun la pestana activa.
   // likes30: top con likes de los ultimos 30 dias. likesAll: top historico. recent: mas recientes.
-  // Cuando carga likes (sort=likes, limit=50), también computa el análisis de sentimiento
-  // para evitar una segunda petición duplicada al mismo endpoint.
   useEffect(() => {
     if (!traktDeferredReady) return;
 
@@ -2201,10 +2199,6 @@ export default function DetailsClient({
 
     const load = async () => {
       setTComments((p) => ({ ...p, loading: true, error: "" }));
-      // Cargar sentimiento en paralelo solo en la primera carga de likes
-      if (tCommentsTab !== "recent" && tComments.page <= 1) {
-        setTSentiment((p) => ({ ...p, loading: true, error: "" }));
-      }
 
       try {
         const isLikes30 = tCommentsTab === "likes30";
@@ -2234,18 +2228,6 @@ export default function DetailsClient({
           r?.pagination?.pageCount &&
           r?.pagination?.page < r?.pagination?.pageCount
         );
-
-        // Computar sentimiento desde los datos de likes (evita petición duplicada)
-        if (isLikes30 || (sort === "likes" && page === 1)) {
-          const { pros, cons } = buildSentimentFromComments(items);
-          setTSentiment({
-            loading: false,
-            error: "",
-            pros,
-            cons,
-            sourceCount: items.length,
-          });
-        }
 
         if (isLikes30) {
           const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -2288,6 +2270,72 @@ export default function DetailsClient({
     traktDeferredReady,
     COMMENTS_SECTION_LIMIT,
   ]);
+
+  // Carga independiente del análisis de sentimiento para que no dependa
+  // de la pestaña activa de comentarios.
+  useEffect(() => {
+    if (!traktDeferredReady) return;
+
+    let ignore = false;
+
+    const loadSentiment = async () => {
+      setTSentiment({
+        loading: true,
+        error: "",
+        pros: [],
+        cons: [],
+        sourceCount: 0,
+      });
+
+      try {
+        const r = await withTimeout(
+          traktGetComments({
+            type: traktType,
+            tmdbId: id,
+            sort: "likes",
+            page: 1,
+            limit: 50,
+          }),
+          20000,
+        );
+
+        if (ignore) return;
+
+        const allItems = Array.isArray(r?.items) ? r.items : [];
+        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const recentItems = allItems.filter((c) => {
+          const t = new Date(c?.created_at || 0).getTime();
+          return Number.isFinite(t) && t >= cutoff;
+        });
+
+        const sourceItems = recentItems.length > 0 ? recentItems : allItems;
+        const { pros, cons } = buildSentimentFromComments(sourceItems);
+
+        setTSentiment({
+          loading: false,
+          error: "",
+          pros,
+          cons,
+          sourceCount: sourceItems.length,
+        });
+      } catch (e) {
+        if (ignore) return;
+        setTSentiment({
+          loading: false,
+          error: e?.message || "Error",
+          pros: [],
+          cons: [],
+          sourceCount: 0,
+        });
+      }
+    };
+
+    loadSentiment();
+
+    return () => {
+      ignore = true;
+    };
+  }, [id, traktType, traktDeferredReady]);
 
   // Resetear paginacion de comentarios al cambiar de pestana
   useEffect(() => {
