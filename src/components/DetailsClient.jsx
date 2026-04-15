@@ -2111,7 +2111,7 @@ export default function DetailsClient({
   });
 
   // -- Comentarios de Trakt con paginacion y pestanas --
-  const [tCommentsTab, setTCommentsTab] = useState("likes30"); // "likes30" (top 30 dias) | "likesAll" (top historico) | "recent"
+  const [tCommentsTab, setTCommentsTab] = useState("recent"); // "likes30" (top 30 dias) | "likesAll" (top historico) | "recent"
   const [tComments, setTComments] = useState({
     loading: false,
     error: "",
@@ -2120,6 +2120,7 @@ export default function DetailsClient({
     hasMore: false,
     total: 0,
   });
+  const COMMENTS_SECTION_LIMIT = 5;
 
   // -- Temporadas de Trakt (datos de temporadas para series TV) --
   const [tSeasons, setTSeasons] = useState({
@@ -2176,7 +2177,7 @@ export default function DetailsClient({
       hasMore: false,
       total: 0,
     });
-    setTCommentsTab("likes30");
+    setTCommentsTab("recent");
     setTSeasons({ loading: false, error: "", items: [] });
     setTLists({
       loading: false,
@@ -2210,7 +2211,7 @@ export default function DetailsClient({
         const sort = tCommentsTab === "recent" ? "newest" : "likes";
 
         // Para likes30: pedimos mas y filtramos por fecha (ultimos 30 dias)
-        const reqLimit = isLikes30 ? 50 : 20;
+        const reqLimit = isLikes30 ? 50 : COMMENTS_SECTION_LIMIT;
         const page = isLikes30 ? 1 : tComments.page;
 
         // Timeout generoso para comentarios adicionales de Trakt
@@ -2279,7 +2280,14 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, traktType, tCommentsTab, tComments.page, traktDeferredReady]);
+  }, [
+    id,
+    traktType,
+    tCommentsTab,
+    tComments.page,
+    traktDeferredReady,
+    COMMENTS_SECTION_LIMIT,
+  ]);
 
   // Resetear paginacion de comentarios al cambiar de pestana
   useEffect(() => {
@@ -4800,6 +4808,35 @@ export default function DetailsClient({
   const sectionItems = useMemo(() => {
     const items = [];
 
+    // Reparto
+    items.push({
+      id: "cast",
+      label: "Reparto",
+      icon: Users,
+      count: castDataForUI?.length ? castDataForUI.length : undefined,
+    });
+
+    // Recomendaciones
+    items.push({
+      id: "recs",
+      label: "Recomendaciones",
+      icon: MonitorPlay,
+      count: Array.isArray(recommendations)
+        ? recommendations.length
+        : undefined,
+    });
+
+    // Coleccion
+    if (collectionId) {
+      items.push({
+        id: "collection",
+        label: "Colección",
+        icon: Layers,
+        count: collectionData?.items?.length || undefined,
+        loading: collectionLoading && !collectionData,
+      });
+    }
+
     // Media = Imagenes + Videos (unificado)
     const postersCount = imagesState?.posters?.length || 0;
     const backdropsCount = imagesState?.backdrops?.length || 0;
@@ -4858,35 +4895,6 @@ export default function DetailsClient({
       label: "Listas",
       icon: ListVideo,
       count: Array.isArray(tLists?.items) ? tLists.items.length : undefined,
-    });
-
-    // Coleccion
-    if (collectionId) {
-      items.push({
-        id: "collection",
-        label: "Colección",
-        icon: Layers,
-        count: collectionData?.items?.length || undefined,
-        loading: collectionLoading && !collectionData,
-      });
-    }
-
-    // Reparto
-    items.push({
-      id: "cast",
-      label: "Reparto",
-      icon: Users,
-      count: castDataForUI?.length ? castDataForUI.length : undefined,
-    });
-
-    // Recomendaciones (texto completo)
-    items.push({
-      id: "recs",
-      label: "Recomendaciones",
-      icon: MonitorPlay,
-      count: Array.isArray(recommendations)
-        ? recommendations.length
-        : undefined,
     });
 
     return items;
@@ -7061,6 +7069,258 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           {/* Todas las secciones se muestran en orden sin ocultarse */}
           {/* Cada sección se registra para el sistema de detección de scroll */}
           <div className="mt-6 space-y-14">
+            <section id="section-cast" ref={registerSection("cast")}>
+              <AnimatedSection delay={0.04}>
+                {/* === REPARTO PRINCIPAL (Cast) === */}
+                {castDataForUI && castDataForUI.length > 0 && (
+                  <section className="mb-16">
+                    <SectionTitle title="Reparto Principal" icon={Users} />
+                    <Swiper
+                      spaceBetween={12}
+                      slidesPerView={3}
+                      breakpoints={{
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 5, spaceBetween: 18 },
+                        1280: { slidesPerView: 6, spaceBetween: 20 },
+                      }}
+                      className="pb-8"
+                    >
+                      {castDataForUI.slice(0, 20).map((actor) => (
+                        <SwiperSlide key={actor.id}>
+                          <Link
+                            href={`/details/person/${actor.id}`}
+                            className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                          >
+                            <div className="aspect-[2/3] overflow-hidden relative">
+                              {actor.profile_path ? (
+                                <img
+                                  src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
+                                  alt={actor.name}
+                                  className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
+                                  <UsersIconComponent size={40} />
+                                </div>
+                              )}
+
+                              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
+
+                              <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
+                                <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
+                                  {actor.name}
+                                </p>
+                                <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
+                                  {actor.character}
+                                </p>
+                              </div>
+                            </div>
+                          </Link>
+                        </SwiperSlide>
+                      ))}
+                    </Swiper>
+                  </section>
+                )}
+              </AnimatedSection>
+            </section>
+
+            <section id="section-recs" ref={registerSection("recs")}>
+              <AnimatedSection delay={0.04}>
+                {/* === RECOMENDACIONES === */}
+                {recommendations && recommendations.length > 0 && (
+                  <section className="mb-16">
+                    <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
+
+                    <Swiper
+                      spaceBetween={12}
+                      slidesPerView={3}
+                      breakpoints={{
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 5, spaceBetween: 18 },
+                        1280: { slidesPerView: 6, spaceBetween: 20 },
+                      }}
+                    >
+                      {recommendations.slice(0, 15).map((rec) => {
+                        const recTitle = rec.title || rec.name;
+                        const recDate =
+                          rec.release_date || rec.first_air_date || "";
+                        const recYear = recDate ? recDate.slice(0, 4) : "";
+                        const isMovie = rec.media_type
+                          ? rec.media_type === "movie"
+                          : type === "movie";
+
+                        const tmdbScore =
+                          typeof rec.vote_average === "number" &&
+                          rec.vote_average > 0
+                            ? rec.vote_average
+                            : null;
+
+                        const imdbScore =
+                          recImdbRatings[rec.id] != null
+                            ? recImdbRatings[rec.id]
+                            : undefined;
+
+                        return (
+                          <SwiperSlide key={rec.id}>
+                            <Link
+                              href={`/details/${rec.media_type || type}/${rec.id}`}
+                              className="block group"
+                              onMouseEnter={() => prefetchRecImdb(rec)}
+                              onFocus={() => prefetchRecImdb(rec)}
+                            >
+                              <div className="mt-3 relative rounded-xl overflow-hidden shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] bg-neutral-900 aspect-[2/3]">
+                                <img
+                                  src={
+                                    rec.poster_path
+                                      ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
+                                      : "/placeholder.png"
+                                  }
+                                  alt={recTitle}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                />
+
+                                <div className="absolute inset-0 transition-opacity duration-300 flex flex-col justify-between opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+                                  <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
+                                    <span
+                                      className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                                        isMovie
+                                          ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                                          : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                      }`}
+                                    >
+                                      {isMovie ? "PELÍCULA" : "SERIE"}
+                                    </span>
+
+                                    <div className="flex flex-col items-end gap-1">
+                                      {tmdbScore && (
+                                        <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                          <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
+                                            {tmdbScore.toFixed(1)}
+                                          </span>
+                                          <img
+                                            src="/logo-TMDb.png"
+                                            alt=""
+                                            className="w-auto h-2.5 opacity-100"
+                                          />
+                                        </div>
+                                      )}
+                                      {imdbScore != null && (
+                                        <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                          <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
+                                            {Number(imdbScore).toFixed(1)}
+                                          </span>
+                                          <img
+                                            src="/logo-IMDb.png"
+                                            alt=""
+                                            className="w-auto h-3 opacity-100"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
+                                    <div className="flex items-end justify-between gap-3">
+                                      <div className="min-w-0 text-left">
+                                        <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">
+                                          {recTitle}
+                                        </h3>
+                                        {recYear && (
+                                          <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
+                                            {recYear}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </Link>
+                          </SwiperSlide>
+                        );
+                      })}
+                    </Swiper>
+                  </section>
+                )}
+              </AnimatedSection>
+            </section>
+
+            {collectionId && (
+              <section
+                id="section-collection"
+                ref={registerSection("collection")}
+              >
+                <AnimatedSection delay={0.04}>
+                  {/* --- COLECCIÓN --- */}
+                  <section className="mb-10">
+                  <SectionTitle title="Colección" icon={Layers} />
+
+                  {collectionLoading ? (
+                    <div className="mt-4 text-sm text-zinc-400">
+                      Cargando colección…
+                    </div>
+                  ) : collectionData?.items?.length ? (
+                    <Swiper
+                      spaceBetween={12}
+                      slidesPerView={3}
+                      breakpoints={{
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 5, spaceBetween: 18 },
+                        1280: { slidesPerView: 6, spaceBetween: 20 },
+                      }}
+                      className="pb-8"
+                    >
+                      {collectionData.items.map((m) => (
+                        <SwiperSlide key={m.id}>
+                          <Link
+                            href={`/details/movie/${m.id}`}
+                            className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                            title={m.title}
+                          >
+                            <div className="aspect-[2/3] overflow-hidden relative">
+                              {m.poster_path ? (
+                                <img
+                                  src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
+                                  alt={m.title}
+                                  className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.06]"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
+                                  <ImageOff className="w-10 h-10 opacity-60" />
+                                </div>
+                              )}
+
+                              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
+                              <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
+                                <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
+                                  {m.title}
+                                </p>
+                                {m.release_date ? (
+                                  <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
+                                    {m.release_date?.slice(0, 4)}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          </Link>
+                        </SwiperSlide>
+                      ))}
+                    </Swiper>
+                  ) : (
+                    <div className="mt-4 text-sm text-zinc-400">
+                      No hay datos de colección.
+                    </div>
+                  )}
+                  </section>
+                </AnimatedSection>
+              </section>
+            )}
+
             {/* =================================================================
                 SECCIÓN: MEDIA (Portadas y Fondos)
                ================================================================= */}
@@ -8276,7 +8536,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         </div>
                       )}
 
-                    {(tComments.items || []).slice(0, 10).map((c) => {
+                    {(tComments.items || [])
+                      .slice(0, COMMENTS_SECTION_LIMIT)
+                      .map((c) => {
                       const user = c?.user || {};
                       const avatar =
                         user?.images?.avatar?.full ||
@@ -8353,20 +8615,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       );
                     })}
 
-                    {tComments.hasMore && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setTComments((p) => ({
-                            ...p,
-                            page: (p.page || 1) + 1,
-                          }))
-                        }
-                        className="w-full rounded-xl border border-dashed border-white/10 py-4 text-xs font-bold uppercase tracking-widest text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
-                      >
-                        Cargar más comentarios
-                      </button>
-                    )}
                   </div>
                 </div>
                 </section>
@@ -8380,7 +8628,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {!tLists.error && (
                   <section className="mb-12">
                   <div className="mb-6 flex items-center justify-between">
-                    <SectionTitle title="Listas Populares" icon={ListVideo} />
+                    <SectionTitle title="Listas" icon={ListVideo} />
 
                     {/* Selector de Listas */}
                     <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
@@ -8553,260 +8801,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </AnimatedSection>
             </section>
 
-            {collectionId && (
-              <section
-                id="section-collection"
-                ref={registerSection("collection")}
-              >
-                <AnimatedSection delay={0.04}>
-                  {/* --- COLECCIÓN --- */}
-                  <section className="mb-10">
-                  <SectionTitle title="Colección" icon={Layers} />
-
-                  {collectionLoading ? (
-                    <div className="mt-4 text-sm text-zinc-400">
-                      Cargando colección…
-                    </div>
-                  ) : collectionData?.items?.length ? (
-                    <Swiper
-                      spaceBetween={12}
-                      slidesPerView={3}
-                      breakpoints={{
-                        500: { slidesPerView: 3, spaceBetween: 14 },
-                        768: { slidesPerView: 4, spaceBetween: 16 },
-                        1024: { slidesPerView: 5, spaceBetween: 18 },
-                        1280: { slidesPerView: 6, spaceBetween: 20 },
-                      }}
-                      className="pb-8"
-                    >
-                      {collectionData.items.map((m) => (
-                        <SwiperSlide key={m.id}>
-                          <Link
-                            href={`/details/movie/${m.id}`}
-                            className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                            title={m.title}
-                          >
-                            <div className="aspect-[2/3] overflow-hidden relative">
-                              {m.poster_path ? (
-                                <img
-                                  src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
-                                  alt={m.title}
-                                  className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.06]"
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                                  <ImageOff className="w-10 h-10 opacity-60" />
-                                </div>
-                              )}
-
-                              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
-                              <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
-                                <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
-                                  {m.title}
-                                </p>
-                                {m.release_date ? (
-                                  <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                                    {m.release_date?.slice(0, 4)}
-                                  </p>
-                                ) : null}
-                              </div>
-                            </div>
-                          </Link>
-                        </SwiperSlide>
-                      ))}
-                    </Swiper>
-                  ) : (
-                    <div className="mt-4 text-sm text-zinc-400">
-                      No hay datos de colección.
-                    </div>
-                  )}
-                  </section>
-                </AnimatedSection>
-              </section>
-            )}
-
-            <section id="section-cast" ref={registerSection("cast")}>
-              <AnimatedSection delay={0.04}>
-                {/* === REPARTO PRINCIPAL (Cast) === */}
-                {castDataForUI && castDataForUI.length > 0 && (
-                  <section className="mb-16">
-                  <SectionTitle title="Reparto Principal" icon={Users} />
-                  <Swiper
-                    spaceBetween={12}
-                    slidesPerView={3}
-                    breakpoints={{
-                      500: { slidesPerView: 3, spaceBetween: 14 },
-                      768: { slidesPerView: 4, spaceBetween: 16 },
-                      1024: { slidesPerView: 5, spaceBetween: 18 },
-                      1280: { slidesPerView: 6, spaceBetween: 20 },
-                    }}
-                    className="pb-8"
-                  >
-                    {castDataForUI.slice(0, 20).map((actor) => (
-                      <SwiperSlide key={actor.id}>
-                        <Link
-                          href={`/details/person/${actor.id}`}
-                          className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                        >
-                          <div className="aspect-[2/3] overflow-hidden relative">
-                            {actor.profile_path ? (
-                              <img
-                                src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
-                                alt={actor.name}
-                                className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                                <UsersIconComponent size={40} />
-                              </div>
-                            )}
-
-                            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
-
-                            <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
-                              <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
-                                {actor.name}
-                              </p>
-                              <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                                {actor.character}
-                              </p>
-                            </div>
-                          </div>
-                        </Link>
-                      </SwiperSlide>
-                    ))}
-                  </Swiper>
-                  </section>
-                )}
-              </AnimatedSection>
-            </section>
-
-            <section id="section-recs" ref={registerSection("recs")}>
-              <AnimatedSection delay={0.04}>
-                {/* === RECOMENDACIONES === */}
-                {recommendations && recommendations.length > 0 && (
-                  <section className="mb-16">
-                  <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
-
-                  <Swiper
-                    spaceBetween={12}
-                    slidesPerView={3}
-                    breakpoints={{
-                      500: { slidesPerView: 3, spaceBetween: 14 },
-                      768: { slidesPerView: 4, spaceBetween: 16 },
-                      1024: { slidesPerView: 5, spaceBetween: 18 },
-                      1280: { slidesPerView: 6, spaceBetween: 20 },
-                    }}
-                  >
-                    {recommendations.slice(0, 15).map((rec) => {
-                      const recTitle = rec.title || rec.name;
-                      const recDate =
-                        rec.release_date || rec.first_air_date || "";
-                      const recYear = recDate ? recDate.slice(0, 4) : "";
-                      const isMovie = rec.media_type
-                        ? rec.media_type === "movie"
-                        : type === "movie";
-
-                      const tmdbScore =
-                        typeof rec.vote_average === "number" &&
-                        rec.vote_average > 0
-                          ? rec.vote_average
-                          : null;
-
-                      const imdbScore =
-                        recImdbRatings[rec.id] != null
-                          ? recImdbRatings[rec.id]
-                          : undefined;
-
-                      return (
-                        <SwiperSlide key={rec.id}>
-                          <Link
-                            href={`/details/${rec.media_type || type}/${rec.id}`}
-                            className="block group"
-                            onMouseEnter={() => prefetchRecImdb(rec)}
-                            onFocus={() => prefetchRecImdb(rec)}
-                          >
-                            <div className="mt-3 relative rounded-xl overflow-hidden shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] bg-neutral-900 aspect-[2/3]">
-                              <img
-                                src={
-                                  rec.poster_path
-                                    ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
-                                    : "/placeholder.png"
-                                }
-                                alt={recTitle}
-                                className="absolute inset-0 w-full h-full object-cover"
-                              />
-
-                              {/* Overlay con gradientes */}
-                              <div className="absolute inset-0 transition-opacity duration-300 flex flex-col justify-between opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
-                                {/* Top gradient con tipo y ratings */}
-                                <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                                  <span
-                                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                                      isMovie
-                                        ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                        : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                    }`}
-                                  >
-                                    {isMovie ? "PELÍCULA" : "SERIE"}
-                                  </span>
-
-                                  <div className="flex flex-col items-end gap-1">
-                                    {tmdbScore && (
-                                      <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                        <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                                          {tmdbScore.toFixed(1)}
-                                        </span>
-                                        <img
-                                          src="/logo-TMDb.png"
-                                          alt=""
-                                          className="w-auto h-2.5 opacity-100"
-                                        />
-                                      </div>
-                                    )}
-                                    {imdbScore != null && (
-                                      <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                        <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                                          {Number(imdbScore).toFixed(1)}
-                                        </span>
-                                        <img
-                                          src="/logo-IMDb.png"
-                                          alt=""
-                                          className="w-auto h-3 opacity-100"
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Bottom gradient con título y año */}
-                                <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                                  <div className="flex items-end justify-between gap-3">
-                                    <div className="min-w-0 text-left">
-                                      <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">
-                                        {recTitle}
-                                      </h3>
-                                      {recYear && (
-                                        <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
-                                          {recYear}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </Link>
-                        </SwiperSlide>
-                      );
-                    })}
-                  </Swiper>
-                  </section>
-                )}
-              </AnimatedSection>
-            </section>
           </div>
         </div>
       </div>
