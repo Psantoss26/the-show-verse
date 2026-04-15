@@ -43,10 +43,12 @@ export default async function DetailsPage({ params }) {
     // Scoreboard de Trakt: rating comunidad + estadísticas (watchers, plays, etc.)
     // Si no entra rápido, lo termina de cargar el cliente sin bloquear la apertura visual.
     resolveWithin(
-      getCachedTraktScoreboardData({ type: traktType, tmdbId: id }).catch(
-        () => null,
-      ),
-      600,
+      getCachedTraktScoreboardData({
+        type: traktType,
+        tmdbId: id,
+        includeStats: false,
+      }).catch(() => null),
+      500,
       null,
     ),
   ]);

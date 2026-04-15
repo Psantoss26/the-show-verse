@@ -1,213 +1,164 @@
+import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
 import { fetchTrakt, normalizeType } from "@/lib/trakt/fetchWithCache";
 import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = 25; // Vercel: aumentado para producción
+export const maxDuration = 12;
 
-export async function GET(req) {
-  // Timeout para búsqueda TMDb->Trakt (rápido)
-  const searchTimeoutMs = process.env.NODE_ENV === "production" ? 10000 : 8000;
-  // Timeout para stats (más margen para cold starts)
-  const statsTimeoutMs = process.env.NODE_ENV === "production" ? 12000 : 10000;
-  const ft = (path) => fetchTrakt(path, { timeoutMs: searchTimeoutMs });
-  const ftStats = (path) => fetchTrakt(path, { timeoutMs: statsTimeoutMs });
+const CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=600, stale-while-revalidate=3600",
+};
 
-  try {
-    const { searchParams } = new URL(req.url);
-    const rawType = searchParams.get("type"); // 'movie' | 'show' | 'season' | 'episode'
-    const type = normalizeType(rawType) || rawType;
-    const tmdbId = searchParams.get("tmdbId");
-    const traktIdParam = searchParams.get("traktId");
-    const season = searchParams.get("season");
-    const episode = searchParams.get("episode");
+const EMPTY_STATS = {
+  watchers: null,
+  plays: null,
+  collectors: null,
+  comments: null,
+  lists: null,
+  favorited: null,
+};
 
-    if ((!tmdbId && !traktIdParam) || !type) {
-      return NextResponse.json(
-        { error: "Missing/invalid type or tmdbId/traktId" },
-        { status: 400 },
-      );
+function shapeStats(stats) {
+  if (!stats) return EMPTY_STATS;
+  return {
+    watchers: typeof stats?.watchers === "number" ? stats.watchers : null,
+    plays: typeof stats?.plays === "number" ? stats.plays : null,
+    collectors: typeof stats?.collectors === "number" ? stats.collectors : null,
+    comments: typeof stats?.comments === "number" ? stats.comments : null,
+    lists: typeof stats?.lists === "number" ? stats.lists : null,
+    favorited: typeof stats?.favorited === "number" ? stats.favorited : null,
+  };
+}
+
+const getCachedTraktStats = unstable_cache(
+  async (type, tmdbId = "", traktId = "", season = "", episode = "") => {
+    const normalizedType = normalizeType(type) || String(type || "").trim();
+    const normalizedTmdbId = tmdbId != null ? String(tmdbId) : "";
+    const normalizedTraktId =
+      traktId != null && String(traktId).trim() ? String(traktId).trim() : null;
+    const seasonNumber = season != null && season !== "" ? Number(season) : null;
+    const episodeNumber =
+      episode != null && episode !== "" ? Number(episode) : null;
+
+    if (!normalizedType || (!normalizedTmdbId && !normalizedTraktId)) {
+      return { found: false, stats: EMPTY_STATS };
     }
 
-    // ===============================
-    // MOVIE / SHOW
-    // ===============================
-    if (type === "movie" || type === "show") {
-      const resolved = traktIdParam
-        ? { traktId: String(traktIdParam), ids: { trakt: String(traktIdParam) } }
-        : await resolveTraktEntityFromTmdb({ type, tmdbId });
-      const ids = resolved?.ids;
-      const traktId = resolved?.traktId;
-
-      if (!traktId) {
-        return NextResponse.json(
-          { error: "Trakt item not found" },
-          { status: 404 },
-        );
-      }
-      const path = type === "movie" ? "movies" : "shows";
-
-      // 2) Obtener stats con cache (timeout más alto para cold starts)
-      const stats = await ftStats(`/${path}/${traktId}/stats`);
-
-      // Devolver formato consistente con datos completos
-      return NextResponse.json({
-        found: true,
-        traktId,
-        ids,
-        stats: {
-          watchers: typeof stats?.watchers === "number" ? stats.watchers : null,
-          plays: typeof stats?.plays === "number" ? stats.plays : null,
-          collectors:
-            typeof stats?.collectors === "number" ? stats.collectors : null,
-          comments: typeof stats?.comments === "number" ? stats.comments : null,
-          lists: typeof stats?.lists === "number" ? stats.lists : null,
-          favorited:
-            typeof stats?.favorited === "number" ? stats.favorited : null,
-        },
+    const statsTimeoutMs = process.env.NODE_ENV === "production" ? 6500 : 4500;
+    const fetchStats = (path) =>
+      fetchTrakt(path, {
+        timeoutMs: statsTimeoutMs,
+        maxRetries: 0,
+        cacheTTL: 10 * 60 * 1000,
       });
-    }
 
-    // ===============================
-    // SEASON / EPISODE
-    // ===============================
-    const seasonNumber = season != null ? Number(season) : null;
-    const episodeNumber = episode != null ? Number(episode) : null;
+    if (normalizedType === "movie" || normalizedType === "show") {
+      const resolved = normalizedTraktId
+        ? { traktId: normalizedTraktId, ids: { trakt: normalizedTraktId } }
+        : await resolveTraktEntityFromTmdb({
+            type: normalizedType,
+            tmdbId: normalizedTmdbId,
+          });
+
+      if (!resolved?.traktId) {
+        return { found: false, stats: EMPTY_STATS };
+      }
+
+      const plural = normalizedType === "show" ? "shows" : "movies";
+      const stats = await fetchStats(`/${plural}/${resolved.traktId}/stats`);
+
+      return {
+        found: true,
+        traktId: resolved.traktId,
+        ids: resolved?.ids || { trakt: resolved.traktId },
+        stats: shapeStats(stats),
+      };
+    }
 
     if (
       !Number.isFinite(seasonNumber) ||
-      (type === "episode" && !Number.isFinite(episodeNumber))
+      (normalizedType === "episode" && !Number.isFinite(episodeNumber))
     ) {
-      return NextResponse.json(
-        { error: "Missing season/episode params" },
-        { status: 400 },
-      );
+      return { found: false, stats: EMPTY_STATS };
     }
 
-    // 1) Resolver SHOW en Trakt por TMDb ID
-    const resolvedShow = traktIdParam
-      ? { traktId: String(traktIdParam) }
-      : await resolveTraktEntityFromTmdb({ type: "show", tmdbId });
-    const traktShowId = resolvedShow?.traktId;
+    const resolvedShow = normalizedTraktId
+      ? { traktId: normalizedTraktId }
+      : await resolveTraktEntityFromTmdb({
+          type: "show",
+          tmdbId: normalizedTmdbId,
+        });
 
-    if (!traktShowId) {
-      return NextResponse.json(
-        { error: "Trakt show not found" },
-        { status: 404 },
-      );
+    if (!resolvedShow?.traktId) {
+      return { found: false, stats: EMPTY_STATS };
     }
 
-    if (type === "season") {
-      // 2) Obtener todas las temporadas
-      const seasons = await ft(`/shows/${traktShowId}/seasons?extended=full`);
-      const seasonObj = Array.isArray(seasons)
-        ? seasons.find((s) => Number(s?.number) === seasonNumber)
-        : null;
+    const statsPath =
+      normalizedType === "season"
+        ? `/shows/${resolvedShow.traktId}/seasons/${seasonNumber}/stats`
+        : `/shows/${resolvedShow.traktId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`;
 
-      if (!seasonObj?.ids?.trakt) {
-        return NextResponse.json(
-          { error: "Season not found" },
-          { status: 404 },
-        );
-      }
+    const stats = await fetchStats(statsPath);
 
-      // 3) Intentar obtener stats (puede fallar)
-      const stats = await ftStats(
-        `/seasons/${seasonObj.ids.trakt}/stats`,
-      ).catch(() => null);
-
-      return NextResponse.json({
-        found: true,
-        traktId: seasonObj.ids.trakt,
-        ids: seasonObj.ids,
-        stats: {
-          watchers: typeof stats?.watchers === "number" ? stats.watchers : null,
-          plays: typeof stats?.plays === "number" ? stats.plays : null,
-          collectors:
-            typeof stats?.collectors === "number" ? stats.collectors : null,
-          comments: typeof stats?.comments === "number" ? stats.comments : null,
-          lists: typeof stats?.lists === "number" ? stats.lists : null,
-          favorited:
-            typeof stats?.favorited === "number" ? stats.favorited : null,
-        },
-      });
-    }
-
-    // EPISODE
-    // 2) Obtener el episodio específico
-    const ep = await ft(
-      `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
-    );
-    const epTraktId = ep?.ids?.trakt;
-
-    if (!epTraktId) {
-      return NextResponse.json({ error: "Episode not found" }, { status: 404 });
-    }
-
-    // 3) Intentar obtener stats del episodio
-    const stats = await ftStats(`/episodes/${epTraktId}/stats`).catch(
-      () => null,
-    );
-
-    return NextResponse.json({
+    return {
       found: true,
-      traktId: epTraktId,
-      ids: ep.ids,
-      stats: {
-        watchers: typeof stats?.watchers === "number" ? stats.watchers : null,
-        plays: typeof stats?.plays === "number" ? stats.plays : null,
-        collectors:
-          typeof stats?.collectors === "number" ? stats.collectors : null,
-        comments: typeof stats?.comments === "number" ? stats.comments : null,
-        lists: typeof stats?.lists === "number" ? stats.lists : null,
-        favorited:
-          typeof stats?.favorited === "number" ? stats.favorited : null,
-      },
+      traktId: resolvedShow.traktId,
+      ids: null,
+      stats: shapeStats(stats),
+    };
+  },
+  ["trakt-stats-public"],
+  { revalidate: 600 },
+);
+
+export async function GET(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const rawType = searchParams.get("type");
+    const type = normalizeType(rawType) || rawType;
+    const tmdbId = searchParams.get("tmdbId");
+    const traktId = searchParams.get("traktId");
+    const season = searchParams.get("season");
+    const episode = searchParams.get("episode");
+
+    if ((!tmdbId && !traktId) || !type) {
+      return NextResponse.json(
+        { error: "Missing/invalid type or tmdbId/traktId" },
+        { status: 400, headers: CACHE_HEADERS },
+      );
+    }
+
+    const result = await getCachedTraktStats(
+      String(type || ""),
+      String(tmdbId || ""),
+      traktId == null ? "" : String(traktId),
+      season == null ? "" : String(season),
+      episode == null ? "" : String(episode),
+    );
+
+    return NextResponse.json(result || { found: false, stats: EMPTY_STATS }, {
+      headers: CACHE_HEADERS,
     });
   } catch (e) {
-    const isTimeout =
+    const isRecoverable =
       e?.isTimeout ||
+      e?.status === 404 ||
+      e?.status === 429 ||
       e?.name === "AbortError" ||
-      /timeout/i.test(e?.message || "");
-    const isRateLimit =
-      e?.status === 429 || /rate limit/i.test(e?.message || "");
-    const isNotFound = e?.status === 404;
-    const isServerError = e?.status >= 500 && e?.status < 600;
+      (e?.status >= 500 && e?.status < 600) ||
+      /timeout|rate limit/i.test(e?.message || "");
 
-    // Log para debugging
-    console.error("❌ [Trakt Stats] Error:", {
-      message: e?.message,
-      status: e?.status,
-      path: e?.path,
-      isTimeout,
-      isRateLimit,
-      isNotFound,
-      isServerError,
-    });
-
-    // Degradación graciosa: timeout, rate limit, errores 500 de Trakt
-    if (isTimeout || isRateLimit || isNotFound || isServerError) {
-      console.warn(
-        `⚠️ [Trakt Stats] Unavailable (${isTimeout ? "timeout" : isRateLimit ? "rate-limit" : isServerError ? "server-error" : "not-found"}):`,
-        e.message,
+    if (isRecoverable) {
+      return NextResponse.json(
+        { found: false, stats: EMPTY_STATS },
+        { headers: CACHE_HEADERS },
       );
-      // Devolver stats vacías pero válidas (UI mostrará 0 o '-')
-      return NextResponse.json({
-        found: false,
-        stats: {
-          watchers: null,
-          plays: null,
-          collectors: null,
-          comments: null,
-          lists: null,
-          favorited: null,
-        },
-      });
     }
 
-    // Otros errores: devolver found=false para no romper la UI
-    console.error("❌ [Trakt Stats] Unexpected error:", e.message);
-    return NextResponse.json({ found: false, stats: null });
+    return NextResponse.json(
+      { found: false, error: e?.message || "Unexpected error", stats: EMPTY_STATS },
+      { status: 500, headers: CACHE_HEADERS },
+    );
   }
 }
