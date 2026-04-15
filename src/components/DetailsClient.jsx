@@ -7300,7 +7300,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 id="section-collection"
                 ref={registerSection("collection")}
               >
-                <AnimatedSection delay={0.04}>
+                <AnimatedSection
+                  delay={0.04}
+                  margin={"0px 0px -24% 0px"}
+                >
                   {/* --- COLECCIÓN --- */}
                   <section className="mb-10">
                   <SectionTitle title="Colección" icon={Layers} />
@@ -7373,7 +7376,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 SECCIÓN: MEDIA (Portadas y Fondos)
                ================================================================= */}
             <section id="section-media" ref={registerSection("media")}>
-              <AnimatedSection delay={0.04}>
+              <AnimatedSection
+                delay={0.04}
+                margin={"0px 0px -24% 0px"}
+              >
                 {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
                 {(type === "movie" || type === "tv") && (
                   <section className="mb-16" ref={artworkControlsWrapRef}>
@@ -7951,7 +7957,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   })()}
                   </section>
                 )}
+              </AnimatedSection>
 
+              <AnimatedSection delay={0.04}>
                 {/* =================================================================
                     SECCIÓN: TRÁILER Y VÍDEOS
                    ================================================================= */}

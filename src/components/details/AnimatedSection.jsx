@@ -17,9 +17,14 @@ function baseTransition(
   };
 }
 
-export function AnimatedSection({ children, className = "", delay = 0 }) {
+export function AnimatedSection({
+  children,
+  className = "",
+  delay = 0,
+  margin = "-100px",
+}) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const isInView = useInView(ref, { once: true, margin });
   const shouldReduceMotion = useReducedMotion();
 
   const hidden = shouldReduceMotion
