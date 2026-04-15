@@ -47,6 +47,18 @@ import useTraktLists from "@/lib/hooks/useTraktLists";
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const imdbRatingsCache = new Map();
 const PRELOAD_FIRST_N_LISTS = 3;
+const LISTS_MENU_PREFS_KEY = "showverse:lists:menu:v1";
+const VALID_SORT_MODES = new Set([
+  "items_desc",
+  "items_asc",
+  "likes_desc",
+  "likes_asc",
+  "name_asc",
+  "name_desc",
+]);
+const VALID_VIEW_MODES = new Set(["grid", "rows", "list"]);
+const VALID_SOURCES = new Set(["tmdb", "trakt", "collections"]);
+const VALID_TRAKT_MODES = new Set(["trending", "popular"]);
 
 const readOmdbCache = (imdbId) => {
   if (!imdbId || typeof window === "undefined") return null;
@@ -78,6 +90,65 @@ const writeOmdbCache = (imdbId, patch) => {
     // ignore
   }
 };
+
+function getListCacheKey(listOrSource, maybeId) {
+  if (typeof listOrSource === "object" && listOrSource !== null) {
+    return `${listOrSource?.source || "unknown"}:${String(listOrSource?.id || "")}`;
+  }
+  return `${String(listOrSource || "unknown")}:${String(maybeId || "")}`;
+}
+
+function ListsLoaderState({ message = "Cargando listas...", fullscreen = false }) {
+  return (
+    <div
+      className={
+        fullscreen
+          ? "min-h-screen bg-[#101010] flex items-center justify-center"
+          : "flex flex-col items-center justify-center py-32"
+      }
+    >
+      <div className="flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
+        <span className="text-neutral-500 text-sm font-medium animate-pulse">
+          {message}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function readListsMenuPrefs() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LISTS_MENU_PREFS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      query: typeof parsed?.query === "string" ? parsed.query : "",
+      sortMode: VALID_SORT_MODES.has(parsed?.sortMode)
+        ? parsed.sortMode
+        : "items_desc",
+      viewMode: VALID_VIEW_MODES.has(parsed?.viewMode)
+        ? parsed.viewMode
+        : "rows",
+      source: VALID_SOURCES.has(parsed?.source) ? parsed.source : "trakt",
+      traktMode: VALID_TRAKT_MODES.has(parsed?.traktMode)
+        ? parsed.traktMode
+        : "trending",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeListsMenuPrefs(prefs) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LISTS_MENU_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // ignore
+  }
+}
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
 const useIsMobileLayout = (breakpointPx = 768) => {
@@ -742,7 +813,7 @@ function ListNavWrapper({ list, className = "", children }) {
 
   if (href) {
     return (
-      <Link href={href} className={className}>
+      <Link href={href} scroll className={className}>
         {children}
       </Link>
     );
@@ -759,13 +830,19 @@ function ListNavWrapper({ list, className = "", children }) {
   return <div className={className}>{children}</div>;
 }
 
-function GridListCard({ list, itemsState, ensureListItems, canUse, onDelete }) {
-  const listId = String(list?.id || "");
+const GridListCard = memo(function GridListCard({
+  list,
+  itemsState,
+  ensureListItems,
+  canUse,
+  onDelete,
+}) {
+  const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
   const [ref, inView] = useInView();
 
   useEffect(() => {
-    if (inView) ensureListItems(listId);
-  }, [inView, ensureListItems, listId]);
+    if (inView) ensureListItems(cacheKey);
+  }, [inView, ensureListItems, cacheKey]);
 
   const isLoading = itemsState === null || itemsState === undefined;
   const items = Array.isArray(itemsState) ? itemsState : [];
@@ -815,9 +892,9 @@ function GridListCard({ list, itemsState, ensureListItems, canUse, onDelete }) {
       </ListNavWrapper>
     </div>
   );
-}
+});
 
-function RowListSection({
+const RowListSection = memo(function RowListSection({
   list,
   itemsState,
   ensureListItems,
@@ -825,12 +902,12 @@ function RowListSection({
   canUse,
   onDelete,
 }) {
-  const listId = String(list?.id || "");
+  const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
   const [ref, inView] = useInView();
 
   useEffect(() => {
-    if (inView) ensureListItems(listId);
-  }, [inView, ensureListItems, listId]);
+    if (inView) ensureListItems(cacheKey);
+  }, [inView, ensureListItems, cacheKey]);
 
   const isLoading = itemsState === null || itemsState === undefined;
   const items = Array.isArray(itemsState) ? itemsState : [];
@@ -872,6 +949,7 @@ function RowListSection({
           {list?.internalUrl ? (
             <Link
               href={list.internalUrl}
+              scroll
               className="h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600/15 border border-purple-500/30 px-4 text-xs font-black uppercase tracking-wider text-purple-200 hover:bg-purple-600/22 hover:border-purple-500/45 transition flex-1 sm:flex-none"
             >
               Ver todo <ChevronRight className="w-4 h-4" />
@@ -900,15 +978,21 @@ function RowListSection({
       )}
     </section>
   );
-}
+});
 
-function ListModeRow({ list, itemsState, ensureListItems, canUse, onDelete }) {
-  const listId = String(list?.id || "");
+const ListModeRow = memo(function ListModeRow({
+  list,
+  itemsState,
+  ensureListItems,
+  canUse,
+  onDelete,
+}) {
+  const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
   const [ref, inView] = useInView();
 
   useEffect(() => {
-    if (inView) ensureListItems(listId);
-  }, [inView, ensureListItems, listId]);
+    if (inView) ensureListItems(cacheKey);
+  }, [inView, ensureListItems, cacheKey]);
 
   const isLoading = itemsState === null || itemsState === undefined;
   const items = Array.isArray(itemsState) ? itemsState : [];
@@ -969,7 +1053,7 @@ function ListModeRow({ list, itemsState, ensureListItems, canUse, onDelete }) {
       </ListNavWrapper>
     </div>
   );
-}
+});
 
 // ================== MAIN PAGE ==================
 export default function ListsPage() {
@@ -980,6 +1064,7 @@ export default function ListsPage() {
     canUse,
     lists,
     loading,
+    initialized: tmdbInitialized,
     error,
     refresh,
     loadMore,
@@ -990,6 +1075,7 @@ export default function ListsPage() {
   const { session, account } = useAuth();
 
   const [authStatus, setAuthStatus] = useState("checking");
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
@@ -1000,22 +1086,47 @@ export default function ListsPage() {
 
   // ✅ NUEVO: selector de fuente
   const [source, setSource] = useState("trakt"); // 'tmdb' | 'trakt' | 'collections'
-  const [traktMode, setTraktMode] = useState("trending"); // trending | popular | user
+  const [traktMode, setTraktMode] = useState("trending"); // trending | popular
+  const [prefsHydrated, setPrefsHydrated] = useState(false);
 
   const trakt = useTraktLists({ mode: traktMode });
   const [featuredCollections, setFeaturedCollections] = useState([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const [collectionsResolvedKey, setCollectionsResolvedKey] = useState(null);
   const [searchedCollections, setSearchedCollections] = useState([]);
 
-  // Map: listId -> undefined (no pedido) | null (cargando) | Array(items)
+  // Map: `${source}:${id}` -> undefined (no pedido) | null (cargando) | Array(items)
   const [itemsMap, setItemsMap] = useState({});
   const itemsMapRef = useRef(itemsMap);
   const inFlight = useRef(new Set());
-  const controllersRef = useRef(new Map()); // listId -> AbortController
+  const controllersRef = useRef(new Map()); // cacheKey -> AbortController
 
   useEffect(() => {
     itemsMapRef.current = itemsMap;
   }, [itemsMap]);
+
+  useEffect(() => {
+    const prefs = readListsMenuPrefs();
+    if (prefs) {
+      setQuery(prefs.query);
+      setSortMode(prefs.sortMode);
+      setViewMode(prefs.viewMode);
+      setSource(prefs.source);
+      setTraktMode(prefs.traktMode);
+    }
+    setPrefsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!prefsHydrated) return;
+    writeListsMenuPrefs({
+      query,
+      sortMode,
+      viewMode,
+      source,
+      traktMode,
+    });
+  }, [prefsHydrated, query, sortMode, viewMode, source, traktMode]);
 
   // ✅ Auth
   useEffect(() => {
@@ -1025,40 +1136,50 @@ export default function ListsPage() {
   }, [session, account]);
 
   const safeTmdbLists = Array.isArray(lists) ? lists : [];
+  const collectionsQueryKey =
+    source !== "collections"
+      ? null
+      : deferredQuery.trim()
+        ? `search:${deferredQuery.trim().toLowerCase()}`
+        : "featured";
 
   // ✅ carga colecciones destacadas cuando toca
   useEffect(() => {
     if (source !== "collections") {
-      setFeaturedCollections([]);
-      setSearchedCollections([]);
       return;
     }
-
-    // Limpiar búsqueda al cambiar a colecciones
-    setSearchedCollections([]);
+    if (deferredQuery.trim()) {
+      return;
+    }
+    if (featuredCollections.length > 0) {
+      setCollectionsResolvedKey("featured");
+      return;
+    }
 
     let alive = true;
     (async () => {
       try {
         setCollectionsLoading(true);
         const res = await fetch("/api/tmdb/collections/featured", {
-          cache: "no-store", // Cambiar a no-store para evitar problemas de caché
+          cache: "force-cache",
         });
         const j = await res.json().catch(() => ({}));
         if (!alive) return;
         const cols = Array.isArray(j?.collections) ? j.collections : [];
-        console.log("📦 Colecciones cargadas:", cols.length, cols);
         setFeaturedCollections(cols);
       } catch {
         if (alive) setFeaturedCollections([]);
       } finally {
-        if (alive) setCollectionsLoading(false);
+        if (alive) {
+          setCollectionsResolvedKey("featured");
+          setCollectionsLoading(false);
+        }
       }
     })();
     return () => {
       alive = false;
     };
-  }, [source]);
+  }, [source, deferredQuery, featuredCollections.length]);
 
   // ✅ búsqueda dinámica de colecciones
   useEffect(() => {
@@ -1087,7 +1208,12 @@ export default function ListsPage() {
           setSearchedCollections([]);
         }
       } finally {
-        if (alive) setCollectionsLoading(false);
+        if (alive) {
+          setCollectionsResolvedKey(
+            `search:${deferredQuery.trim().toLowerCase()}`,
+          );
+          setCollectionsLoading(false);
+        }
       }
     })();
 
@@ -1110,7 +1236,6 @@ export default function ListsPage() {
 
     if (source === "trakt") {
       const arr = Array.isArray(trakt?.lists) ? trakt.lists : [];
-      console.log("🔍 Trakt lists raw:", arr.length, arr);
       return arr.map((l) => ({
         ...l,
         source: "trakt",
@@ -1160,13 +1285,17 @@ export default function ListsPage() {
 
   const visibleCount = filtered.length;
 
-  // ✅ reset caches al cambiar de fuente/modo (evita previews cruzados)
+  const activeListsMap = useMemo(
+    () =>
+      new Map(activeLists.map((list) => [getListCacheKey(list), list])),
+    [activeLists],
+  );
+
+  // ✅ al cambiar de fuente/modo abortamos solicitudes en vuelo, pero conservamos caché resuelta
   useEffect(() => {
     controllersRef.current.forEach((c) => c.abort());
     controllersRef.current.clear();
     inFlight.current.clear();
-    setItemsMap({});
-    imdbRatingsCache.clear();
   }, [source, traktMode]);
 
   const listsTitle =
@@ -1185,22 +1314,28 @@ export default function ListsPage() {
 
   // ✅ ensureListItems multi-origen
   const ensureListItems = useCallback(
-    async (listId) => {
+    async (listLike) => {
+      const listObj =
+        typeof listLike === "object" && listLike !== null
+          ? listLike
+          : activeListsMap.get(String(listLike)) ||
+            activeListsMap.get(getListCacheKey(source, listLike));
+      const listId = String(listObj?.id || "");
+      const cacheKey = getListCacheKey(listObj);
+
       if (!listId) return;
 
       // ya cargado o cargando
-      if (itemsMapRef.current[listId] !== undefined) return;
-      if (inFlight.current.has(listId)) return;
+      if (itemsMapRef.current[cacheKey] !== undefined) return;
+      if (inFlight.current.has(cacheKey)) return;
 
-      // busca el objeto de lista en el “filtered” actual
-      const listObj = filtered.find((x) => String(x?.id) === String(listId));
       const src = listObj?.source || source;
 
-      inFlight.current.add(listId);
-      setItemsMap((prev) => ({ ...prev, [listId]: null }));
+      inFlight.current.add(cacheKey);
+      setItemsMap((prev) => ({ ...prev, [cacheKey]: null }));
 
       const ctrl = new AbortController();
-      controllersRef.current.set(listId, ctrl);
+      controllersRef.current.set(cacheKey, ctrl);
 
       try {
         if (src === "tmdb") {
@@ -1211,7 +1346,7 @@ export default function ListsPage() {
             signal: ctrl.signal,
           });
           const items = Array.isArray(json?.items) ? json.items : [];
-          setItemsMap((prev) => ({ ...prev, [listId]: items }));
+          setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
           return;
         }
 
@@ -1226,7 +1361,7 @@ export default function ListsPage() {
           const j = await res.json().catch(() => ({}));
 
           const normalized = normalizeTraktItemsToCards(j?.items);
-          setItemsMap((prev) => ({ ...prev, [listId]: normalized }));
+          setItemsMap((prev) => ({ ...prev, [cacheKey]: normalized }));
           return;
         }
 
@@ -1240,30 +1375,30 @@ export default function ListsPage() {
         );
         const j = await res.json().catch(() => ({}));
         const items = Array.isArray(j?.items) ? j.items : [];
-        setItemsMap((prev) => ({ ...prev, [listId]: items }));
+        setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
       } catch (e) {
         if (e?.name === "AbortError") {
           // vuelve a “no pedido” para que pueda pedirse después
           setItemsMap((prev) => {
             const next = { ...prev };
-            delete next[listId];
+            delete next[cacheKey];
             return next;
           });
           return;
         }
-        setItemsMap((prev) => ({ ...prev, [listId]: [] }));
+        setItemsMap((prev) => ({ ...prev, [cacheKey]: [] }));
       } finally {
-        inFlight.current.delete(listId);
-        controllersRef.current.delete(listId);
+        inFlight.current.delete(cacheKey);
+        controllersRef.current.delete(cacheKey);
       }
     },
-    [filtered, source],
+    [activeListsMap, source],
   );
 
   // ✅ precarga solo las primeras N listas visibles (el resto lo hace InView)
   useEffect(() => {
     const first = filtered.slice(0, PRELOAD_FIRST_N_LISTS);
-    for (const l of first) ensureListItems(String(l?.id || ""));
+    for (const l of first) ensureListItems(getListCacheKey(l));
   }, [filtered, ensureListItems]);
 
   const handleCreate = async (name, desc) => {
@@ -1284,7 +1419,8 @@ export default function ListsPage() {
     if (!ok) return;
 
     // abort preview si estaba cargando
-    const ctrl = controllersRef.current.get(String(listId));
+    const cacheKey = getListCacheKey("tmdb", listId);
+    const ctrl = controllersRef.current.get(cacheKey);
     if (ctrl) ctrl.abort();
 
     await del(listId);
@@ -1292,7 +1428,7 @@ export default function ListsPage() {
     // limpia preview cache
     setItemsMap((prev) => {
       const next = { ...prev };
-      delete next[String(listId)];
+      delete next[cacheKey];
       return next;
     });
   };
@@ -1303,7 +1439,6 @@ export default function ListsPage() {
     controllersRef.current.clear();
     inFlight.current.clear();
     setItemsMap({});
-    imdbRatingsCache.clear();
 
     if (source === "tmdb") refresh();
     else if (source === "trakt") trakt?.refresh?.();
@@ -1313,7 +1448,7 @@ export default function ListsPage() {
       setSearchedCollections([]);
       setFeaturedCollections([]);
       setCollectionsLoading(true);
-      fetch("/api/tmdb/collections/featured", { cache: "no-store" })
+      fetch("/api/tmdb/collections/featured", { cache: "force-cache" })
         .then((r) => r.json().catch(() => ({})))
         .then((j) =>
           setFeaturedCollections(
@@ -1324,13 +1459,54 @@ export default function ListsPage() {
     }
   };
 
-  // loader auth
-  if (authStatus === "checking") {
-    return (
-      <div className="min-h-screen bg-[#101010] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
-      </div>
-    );
+  const loadingUnified =
+    source === "tmdb"
+      ? loading
+      : source === "trakt"
+        ? trakt?.loading
+        : collectionsLoading;
+
+  const sourceInitialized =
+    !prefsHydrated
+      ? false
+      : source === "tmdb"
+        ? !!tmdbInitialized
+        : source === "trakt"
+          ? !!trakt?.initialized
+          : collectionsResolvedKey === collectionsQueryKey;
+
+  useEffect(() => {
+    if (hasCompletedInitialLoad) return;
+    if (authStatus === "authenticated" && sourceInitialized) {
+      setHasCompletedInitialLoad(true);
+    }
+  }, [authStatus, sourceInitialized, hasCompletedInitialLoad]);
+
+  const errorUnified =
+    source === "tmdb" ? error : source === "trakt" ? trakt?.error : "";
+
+  const loadingMessage =
+    authStatus === "checking"
+      ? "Preparando listas..."
+      : source === "collections"
+        ? "Cargando colecciones..."
+        : "Cargando listas...";
+
+  const showInitialLoader =
+    authStatus === "checking" ||
+    (authStatus === "authenticated" &&
+      !hasCompletedInitialLoad &&
+      !sourceInitialized);
+
+  const showContentLoader =
+    hasCompletedInitialLoad &&
+    (!sourceInitialized || (loadingUnified && visibleCount === 0));
+
+  // ✅ readonly: Trakt y Colecciones no crean/borran ni loadMore
+  const canEdit = !!canUse && source === "tmdb";
+
+  if (showInitialLoader) {
+    return <ListsLoaderState fullscreen message={loadingMessage} />;
   }
 
   if (authStatus === "anonymous") {
@@ -1355,19 +1531,6 @@ export default function ListsPage() {
       </div>
     );
   }
-
-  const loadingUnified =
-    source === "tmdb"
-      ? loading
-      : source === "trakt"
-        ? trakt?.loading
-        : collectionsLoading;
-
-  const errorUnified =
-    source === "tmdb" ? error : source === "trakt" ? trakt?.error : "";
-
-  // ✅ readonly: Trakt y Colecciones no crean/borran ni loadMore
-  const canEdit = !!canUse && source === "tmdb";
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-purple-500/30">
@@ -1554,9 +1717,7 @@ export default function ListsPage() {
                           valueLabel={
                             traktMode === "trending"
                               ? "Trending"
-                              : traktMode === "popular"
-                                ? "Popular"
-                                : "Mis listas"
+                              : "Popular"
                           }
                           icon={Filter}
                         >
@@ -1579,15 +1740,6 @@ export default function ListsPage() {
                                 }}
                               >
                                 Popular
-                              </DropdownItem>
-                              <DropdownItem
-                                active={traktMode === "user"}
-                                onClick={() => {
-                                  setTraktMode("user");
-                                  close();
-                                }}
-                              >
-                                Mis listas
                               </DropdownItem>
                             </>
                           )}
@@ -1730,7 +1882,7 @@ export default function ListsPage() {
                       title="Refrescar"
                     >
                       <RefreshCcw
-                        className={`w-4 h-4 ${loadingUnified ? "animate-spin text-purple-500" : ""}`}
+                        className={`w-4 h-4 ${loadingUnified && !showContentLoader ? "animate-spin text-purple-500" : ""}`}
                       />
                     </button>
 
@@ -1825,9 +1977,7 @@ export default function ListsPage() {
                 valueLabel={
                   traktMode === "trending"
                     ? "Trending"
-                    : traktMode === "popular"
-                      ? "Popular"
-                      : "Mis listas"
+                    : "Popular"
                 }
                 icon={Filter}
               >
@@ -1850,15 +2000,6 @@ export default function ListsPage() {
                       }}
                     >
                       Popular
-                    </DropdownItem>
-                    <DropdownItem
-                      active={traktMode === "user"}
-                      onClick={() => {
-                        setTraktMode("user");
-                        close();
-                      }}
-                    >
-                      Mis listas
                     </DropdownItem>
                   </>
                 )}
@@ -1984,7 +2125,7 @@ export default function ListsPage() {
               title="Refrescar"
             >
               <RefreshCcw
-                className={`w-4 h-4 ${loadingUnified ? "animate-spin text-purple-500" : ""}`}
+                className={`w-4 h-4 ${loadingUnified && !showContentLoader ? "animate-spin text-purple-500" : ""}`}
               />
             </button>
 
@@ -2019,15 +2160,8 @@ export default function ListsPage() {
         ) : null}
 
         {/* CONTENT */}
-        {loadingUnified && visibleCount === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32">
-            <Loader2 className="w-10 h-10 animate-spin text-purple-500 mb-4" />
-            <span className="text-neutral-500 text-sm font-medium animate-pulse">
-              {source === "collections"
-                ? "Cargando colecciones..."
-                : "Cargando listas..."}
-            </span>
-          </div>
+        {showContentLoader ? (
+          <ListsLoaderState message={loadingMessage} />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
             <ListVideo className="w-16 h-16 text-neutral-700 mb-4" />
@@ -2046,11 +2180,11 @@ export default function ListsPage() {
           <>
             {viewMode === "grid" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filtered.map((l, idx) => (
+                {filtered.map((l) => (
                   <GridListCard
-                    key={`${l.source}-${l.id}-${idx}`}
+                    key={`${l.source}-${l.id}`}
                     list={l}
-                    itemsState={itemsMap[String(l.id)]}
+                    itemsState={itemsMap[getListCacheKey(l)]}
                     ensureListItems={ensureListItems}
                     canUse={canEdit}
                     onDelete={handleDelete}
@@ -2061,11 +2195,11 @@ export default function ListsPage() {
 
             {viewMode === "rows" && (
               <div className="space-y-12">
-                {filtered.map((l, idx) => (
+                {filtered.map((l) => (
                   <RowListSection
-                    key={`${l.source}-${l.id}-${idx}`}
+                    key={`${l.source}-${l.id}`}
                     list={l}
-                    itemsState={itemsMap[String(l.id)]}
+                    itemsState={itemsMap[getListCacheKey(l)]}
                     ensureListItems={ensureListItems}
                     isMobile={isMobile}
                     canUse={canEdit}
@@ -2077,11 +2211,11 @@ export default function ListsPage() {
 
             {viewMode === "list" && (
               <div className="flex flex-col gap-3">
-                {filtered.map((l, idx) => (
+                {filtered.map((l) => (
                   <ListModeRow
-                    key={`${l.source}-${l.id}-${idx}`}
+                    key={`${l.source}-${l.id}`}
                     list={l}
-                    itemsState={itemsMap[String(l.id)]}
+                    itemsState={itemsMap[getListCacheKey(l)]}
                     ensureListItems={ensureListItems}
                     canUse={canEdit}
                     onDelete={handleDelete}
