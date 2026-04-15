@@ -9,6 +9,15 @@ import {
 
 export const revalidate = 600;
 
+function resolveWithin(promise, timeoutMs, fallback = null) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(fallback), timeoutMs);
+    }),
+  ]);
+}
+
 export default async function DetailsPage({ params }) {
   const p = await params;
   const type = String(p?.type || "").toLowerCase();
@@ -21,14 +30,22 @@ export default async function DetailsPage({ params }) {
   const cookieStore = await cookies();
   const [data, initialTraktStatus, initialShowWatched] = await Promise.all([
     getDetails(type, id),
-    getTraktItemStatusFromCookieStore(cookieStore, {
-      type: type === "tv" ? "show" : "movie",
-      tmdbId: id,
-    }).catch(() => null),
+    resolveWithin(
+      getTraktItemStatusFromCookieStore(cookieStore, {
+        type: type === "tv" ? "show" : "movie",
+        tmdbId: id,
+      }).catch(() => null),
+      type === "tv" ? 900 : 750,
+      null,
+    ),
     type === "tv"
-      ? getTraktShowWatchedFromCookieStore(cookieStore, {
-          tmdbId: id,
-        }).catch(() => null)
+      ? resolveWithin(
+          getTraktShowWatchedFromCookieStore(cookieStore, {
+            tmdbId: id,
+          }).catch(() => null),
+          950,
+          null,
+        )
       : Promise.resolve(null),
   ]);
 
