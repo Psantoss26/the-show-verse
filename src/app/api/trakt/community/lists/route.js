@@ -211,8 +211,10 @@ export async function GET(req) {
     return NextResponse.json({ items: listsWithPreviews, pagination: pg });
   } catch (e) {
     const isExpected =
+      e?.status === 403 ||
+      e?.status === 404 ||
       e?.status === 429 ||
-      /rate limit|timeout|no se encontr/i.test(e?.message || "");
+      /rate limit|timeout|no se encontr|forbidden/i.test(e?.message || "");
     if (!isExpected) console.warn("Trakt lists error:", e?.message);
     return NextResponse.json({
       items: [],

@@ -39,10 +39,13 @@ export async function GET(req) {
   } catch (e) {
     const isRecoverable =
       e?.isTimeout ||
+      e?.status === 403 ||
+      e?.status === 404 ||
+      e?.status === 405 ||
       e?.status === 429 ||
       e?.name === "AbortError" ||
       (e?.status >= 500 && e?.status < 600) ||
-      /timeout|rate limit/i.test(e?.message || "");
+      /timeout|rate limit|forbidden/i.test(e?.message || "");
 
     if (isRecoverable) {
       return NextResponse.json({ found: false }, { headers: cacheHeaders });

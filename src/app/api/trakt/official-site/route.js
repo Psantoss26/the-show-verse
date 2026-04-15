@@ -56,7 +56,10 @@ export async function GET(req) {
     return res;
   } catch (e) {
     const isExpected =
-      e?.status === 429 || /rate limit|timeout/i.test(e?.message || "");
+      e?.status === 403 ||
+      e?.status === 404 ||
+      e?.status === 429 ||
+      /rate limit|timeout|forbidden/i.test(e?.message || "");
     if (!isExpected) {
       console.warn("Trakt official-site error:", e?.message);
     }

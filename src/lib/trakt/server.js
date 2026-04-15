@@ -381,6 +381,116 @@ export function computeHistorySummary({ searchHit, history, type }) {
   return { found: true, traktUrl, watched, plays, lastWatchedAt };
 }
 
+export async function getTraktItemStatusFromCookieStore(
+  cookieStore,
+  { type, tmdbId },
+) {
+  if (type !== "movie" && type !== "show") {
+    return { connected: false, error: "Invalid type. Use movie|show." };
+  }
+  if (!tmdbId) {
+    return { connected: false, error: "Missing tmdbId" };
+  }
+
+  let token = null;
+  let authVerified = false;
+
+  try {
+    const t = await getValidTraktToken(cookieStore);
+    token = t.token;
+
+    if (!token) {
+      return { connected: false };
+    }
+
+    const auth = await traktApi("/users/settings", { token });
+    if (!auth.ok) {
+      return { connected: false };
+    }
+    authVerified = true;
+
+    let hit = null;
+    try {
+      hit = await traktSearchByTmdb(token, { type, tmdbId });
+    } catch (searchErr) {
+      const isTransient =
+        searchErr?.status === 403 ||
+        searchErr?.status === 429 ||
+        /timeout|tempor|aborted|fetch/i.test(searchErr?.message || "");
+
+      if (isTransient) {
+        return {
+          connected: true,
+          found: false,
+          traktId: null,
+          traktUrl: null,
+          watched: false,
+          plays: 0,
+          lastWatchedAt: null,
+          history: [],
+          error: searchErr?.message || "Trakt lookup failed",
+        };
+      }
+
+      throw searchErr;
+    }
+
+    if (!hit) {
+      return {
+        connected: true,
+        found: false,
+        traktId: null,
+        traktUrl: null,
+        watched: false,
+        plays: 0,
+        lastWatchedAt: null,
+        history: [],
+      };
+    }
+
+    const obj = type === "movie" ? hit.movie : hit.show;
+    const traktId = obj?.ids?.trakt;
+
+    let history = [];
+    if (traktId) {
+      history = await traktGetHistoryForItem(token, {
+        type,
+        traktId,
+        limit: 10,
+      });
+    }
+
+    const summary = computeHistorySummary({ searchHit: hit, history, type });
+
+    return {
+      connected: true,
+      ...summary,
+      traktId: traktId || null,
+      history: mapHistoryEntries(history),
+    };
+  } catch (e) {
+    const transientAfterAuth =
+      authVerified &&
+      (e?.status === 403 ||
+        e?.status === 429 ||
+        /timeout|tempor|aborted|fetch/i.test(e?.message || ""));
+
+    return transientAfterAuth
+      ? {
+          connected: true,
+          found: false,
+          traktId: null,
+          traktUrl: null,
+          watched: false,
+          plays: 0,
+          lastWatchedAt: null,
+          history: [],
+          error: e?.message || "Trakt status failed",
+        }
+      : { connected: false, error: e?.message || "Trakt status failed" };
+  }
+}
+
 /* ===========================
    ✅ FECHAS: arregla el bug
    - Acepta "YYYY-MM-DD"
@@ -658,4 +768,84 @@ export function mapProgressWatchedBySeason(progressPayload) {
   }
 
   return out;
+}
+
+export async function getTraktShowWatchedFromCookieStore(
+  cookieStore,
+  { tmdbId },
+) {
+  if (!tmdbId) {
+    return { connected: false, found: false, watchedBySeason: {} };
+  }
+
+  let token = null;
+  let authVerified = false;
+
+  try {
+    const t = await getValidTraktToken(cookieStore);
+    token = t.token;
+
+    if (!token) {
+      return { connected: false, found: false, watchedBySeason: {} };
+    }
+
+    const auth = await traktApi("/users/settings", { token });
+    if (!auth.ok) {
+      if (auth.status === 401) {
+        return { connected: false, found: false, watchedBySeason: {} };
+      }
+
+      return {
+        connected: true,
+        found: false,
+        watchedBySeason: {},
+        degraded: true,
+        upstreamStatus: auth.status,
+        error: "Trakt upstream check failed",
+      };
+    }
+    authVerified = true;
+
+    const hit = await traktSearchByTmdb(token, { type: "show", tmdbId });
+    const traktId = hit?.show?.ids?.trakt || null;
+
+    if (!traktId) {
+      return {
+        connected: true,
+        found: false,
+        traktId: null,
+        watchedBySeason: {},
+      };
+    }
+
+    const progress = await traktGetProgressWatchedForShow(token, { traktId });
+    const watchedBySeason = mapProgressWatchedBySeason(progress);
+
+    return {
+      connected: true,
+      found: true,
+      traktId,
+      watchedBySeason,
+    };
+  } catch (e) {
+    const transientAfterAuth =
+      authVerified &&
+      (e?.status === 403 ||
+        e?.status === 429 ||
+        /timeout|tempor|aborted|fetch/i.test(e?.message || ""));
+
+    return transientAfterAuth
+      ? {
+          connected: true,
+          found: false,
+          watchedBySeason: {},
+          error: e?.message || "Trakt show watched failed",
+        }
+      : {
+          connected: false,
+          found: false,
+          watchedBySeason: {},
+          error: e?.message || "Trakt show watched failed",
+        };
+  }
 }
