@@ -33,11 +33,128 @@ import {
 } from "@/lib/details/formatters";
 import StarRating from "@/components/StarRating";
 
+const seasonScoreboardCache = new Map();
+const seasonScoreboardInflight = new Map();
+const seasonImdbCache = new Map();
+const seasonImdbInflight = new Map();
+
+function scheduleAfterFirstPaint(task, delay = 0) {
+  if (typeof window === "undefined") return () => {};
+
+  let cancelled = false;
+  let idleId = null;
+  const timerId = window.setTimeout(() => {
+    if (cancelled) return;
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(
+        () => {
+          if (!cancelled) task();
+        },
+        { timeout: 1200 },
+      );
+      return;
+    }
+
+    task();
+  }, delay);
+
+  return () => {
+    cancelled = true;
+    window.clearTimeout(timerId);
+    if (idleId != null && typeof window.cancelIdleCallback === "function") {
+      window.cancelIdleCallback(idleId);
+    }
+  };
+}
+
+async function fetchSeasonScoreboardCached({ showId, seasonNumber, signal }) {
+  const key = `${showId}:${seasonNumber}`;
+  if (seasonScoreboardCache.has(key)) {
+    return seasonScoreboardCache.get(key);
+  }
+  if (seasonScoreboardInflight.has(key)) {
+    return seasonScoreboardInflight.get(key);
+  }
+
+  const promise = fetch(
+    `/api/scoreboard/public?type=season&id=${encodeURIComponent(showId)}&season=${encodeURIComponent(seasonNumber)}`,
+    {
+      cache: "force-cache",
+      signal,
+    },
+  )
+    .then(async (res) => {
+      const json = await res.json().catch(() => null);
+      const value = res.ok && json?.found ? json : null;
+      if (value) {
+        seasonScoreboardCache.set(key, value);
+      }
+      return value;
+    })
+    .catch((error) => {
+      if (error?.name === "AbortError") throw error;
+      return null;
+    })
+    .finally(() => {
+      seasonScoreboardInflight.delete(key);
+    });
+
+  seasonScoreboardInflight.set(key, promise);
+  return promise;
+}
+
+async function fetchSeasonImdbCached({
+  showId,
+  showImdbId,
+  seasonNumber,
+  signal,
+}) {
+  const key = `${showId}:${showImdbId}:${seasonNumber}`;
+  if (seasonImdbCache.has(key)) {
+    return seasonImdbCache.get(key);
+  }
+  if (seasonImdbInflight.has(key)) {
+    return seasonImdbInflight.get(key);
+  }
+
+  const promise = fetch(
+    `/api/ratings/season?showId=${encodeURIComponent(showId)}&imdbId=${encodeURIComponent(showImdbId)}&season=${encodeURIComponent(seasonNumber)}`,
+    {
+      cache: "force-cache",
+      signal,
+    },
+  )
+    .then(async (res) => {
+      const json = await res.json().catch(() => null);
+      const value =
+        res.ok &&
+        (typeof json?.rating === "number" || typeof json?.votes === "number")
+          ? json
+          : null;
+      if (value) {
+        seasonImdbCache.set(key, value);
+      }
+      return value;
+    })
+    .catch((error) => {
+      if (error?.name === "AbortError") throw error;
+      return null;
+    })
+    .finally(() => {
+      seasonImdbInflight.delete(key);
+    });
+
+  seasonImdbInflight.set(key, promise);
+  return promise;
+}
+
 export default function SeasonDetailsClient({
   showId,
   seasonNumber,
   show,
   season,
+  showImdbId,
   initialScoreboard,
   imdb,
   imdbUrl,
@@ -119,10 +236,38 @@ export default function SeasonDetailsClient({
     [],
   );
 
+  const parsedInitialScoreboard = useMemo(
+    () => parseScoreboardData(initialScoreboard),
+    [initialScoreboard, parseScoreboardData],
+  );
+
   // Trakt scoreboard
   const [tScoreboard, setTScoreboard] = useState(
-    () => parseScoreboardData(initialScoreboard) || defaultScoreboard,
+    () => parsedInitialScoreboard || defaultScoreboard,
   );
+  const [imdbData, setImdbData] = useState(() => imdb || null);
+
+  useEffect(() => {
+    setTScoreboard(parsedInitialScoreboard || defaultScoreboard);
+  }, [parsedInitialScoreboard, defaultScoreboard, showId, seasonNumber]);
+
+  useEffect(() => {
+    const key = `${showId}:${seasonNumber}`;
+    if (parsedInitialScoreboard) {
+      seasonScoreboardCache.set(key, initialScoreboard);
+    }
+  }, [showId, seasonNumber, parsedInitialScoreboard, initialScoreboard]);
+
+  useEffect(() => {
+    setImdbData(imdb || null);
+  }, [imdb, showId, seasonNumber]);
+
+  useEffect(() => {
+    const key = `${showId}:${showImdbId}:${seasonNumber}`;
+    if (imdb && showImdbId) {
+      seasonImdbCache.set(key, imdb);
+    }
+  }, [showId, showImdbId, seasonNumber, imdb]);
 
   const traktDecimal = useMemo(() => {
     if (tScoreboard.rating == null) return null;
@@ -132,58 +277,69 @@ export default function SeasonDetailsClient({
   }, [tScoreboard.rating]);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const prefetched = parseScoreboardData(initialScoreboard);
-        if (prefetched) return;
+    if (parsedInitialScoreboard) return;
 
+    let alive = true;
+    const controller = new AbortController();
+    const cancelSchedule = scheduleAfterFirstPaint(async () => {
+      try {
         setTScoreboard((s) => ({ ...s, loading: true }));
-        const res = await fetch(
-          `/api/trakt/scoreboard?type=season&tmdbId=${showId}&season=${seasonNumber}`,
-          { cache: "no-store" },
-        );
-        const json = await res.json().catch(() => null);
+        const json = await fetchSeasonScoreboardCached({
+          showId,
+          seasonNumber,
+          signal: controller.signal,
+        });
         if (!alive) return;
 
-        if (res.ok && json?.found) {
-          setTScoreboard({
-            loading: false,
-            rating:
-              typeof json?.community?.rating === "number"
-                ? json.community.rating
-                : null,
-            votes:
-              typeof json?.community?.votes === "number"
-                ? json.community.votes
-                : null,
-            stats: json?.stats || null,
-            traktUrl: json?.traktUrl || null,
-          });
-        } else {
-          setTScoreboard({
-            loading: false,
-            rating: null,
-            votes: null,
-            stats: null,
-            traktUrl: null,
-          });
-        }
-      } catch {
-        if (alive)
-          setTScoreboard({
-            loading: false,
-            rating: null,
-            votes: null,
-            stats: null,
-            traktUrl: null,
-          });
+        const parsed = parseScoreboardData(json);
+        setTScoreboard(parsed || defaultScoreboard);
+      } catch (error) {
+        if (!alive || error?.name === "AbortError") return;
+        setTScoreboard(defaultScoreboard);
       }
-    })();
+    }, 80);
+
     return () => {
       alive = false;
+      controller.abort();
+      cancelSchedule();
     };
-  }, [showId, seasonNumber, initialScoreboard, parseScoreboardData]);
+  }, [
+    showId,
+    seasonNumber,
+    parsedInitialScoreboard,
+    parseScoreboardData,
+    defaultScoreboard,
+  ]);
+
+  useEffect(() => {
+    if (imdb || !showImdbId) return;
+
+    let alive = true;
+    const controller = new AbortController();
+    const cancelSchedule = scheduleAfterFirstPaint(async () => {
+      try {
+        const nextImdb = await fetchSeasonImdbCached({
+          showId,
+          showImdbId,
+          seasonNumber,
+          signal: controller.signal,
+        });
+        if (alive) {
+          setImdbData(nextImdb);
+        }
+      } catch (error) {
+        if (!alive || error?.name === "AbortError") return;
+        setImdbData(null);
+      }
+    }, 120);
+
+    return () => {
+      alive = false;
+      controller.abort();
+      cancelSchedule();
+    };
+  }, [showId, showImdbId, seasonNumber, imdb]);
 
   // Rate (Trakt)
   const [userRating, setUserRating] = useState(null);
@@ -193,12 +349,16 @@ export default function SeasonDetailsClient({
   // cargar rating actual del usuario al entrar
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const controller = new AbortController();
+    const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
         setRatingLoading(true);
         const res = await fetch(
           `/api/trakt/ratings?type=season&tmdbId=${Number(showId)}&season=${Number(seasonNumber)}`,
-          { cache: "no-store" },
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
         );
 
         if (!alive) return;
@@ -213,6 +373,7 @@ export default function SeasonDetailsClient({
         const json = await res.json().catch(() => ({}));
         setUserRating(typeof json?.rating === "number" ? json.rating : null);
       } catch (e) {
+        if (e?.name === "AbortError") return;
         console.error(e);
         if (alive) {
           // si falla la carga, no rompemos UI
@@ -221,10 +382,12 @@ export default function SeasonDetailsClient({
       } finally {
         if (alive) setRatingLoading(false);
       }
-    })();
+    }, 160);
 
     return () => {
       alive = false;
+      controller.abort();
+      cancelSchedule();
     };
   }, [showId, seasonNumber]);
 
@@ -421,13 +584,15 @@ export default function SeasonDetailsClient({
                     />
                   )}
 
-                  {imdb?.rating != null && (
+                  {imdbData?.rating != null && (
                     <CompactBadge
                       logo="/logo-IMDb.png"
                       logoClassName="h-5 sm:h-5"
-                      value={Number(imdb.rating).toFixed(1)}
+                      value={Number(imdbData.rating).toFixed(1)}
                       sub={
-                        imdb?.votes ? formatCountShort(imdb.votes) : undefined
+                        imdbData?.votes
+                          ? formatCountShort(imdbData.votes)
+                          : undefined
                       }
                       href={imdbUrl || undefined}
                     />
