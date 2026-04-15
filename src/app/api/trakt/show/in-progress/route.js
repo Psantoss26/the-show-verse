@@ -12,11 +12,50 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 45;
 
 const TMDB_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_BASE = "https://api.themoviedb.org/3";
+
+// ---------------------------------------------------------------------------
+// Caché en memoria del lado servidor (por instancia Node). Permite que cargas
+// sucesivas dentro de la misma instancia sean prácticamente instantáneas.
+// Clave: primeros 24 caracteres del access token (suficiente para unicidad).
+// ---------------------------------------------------------------------------
+const _progressCache = new Map(); // cacheKey -> { ts, data }
+const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutos
+
+function _getCacheKey(token) {
+  return typeof token === "string" && token.length > 0
+    ? token.slice(0, 24)
+    : null;
+}
+
+function _readCache(key) {
+  if (!key) return null;
+  const entry = _progressCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) {
+    _progressCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function _writeCache(key, data) {
+  if (!key) return;
+  // Limitar tamaño máximo para evitar fugas de memoria
+  if (_progressCache.size >= 200) {
+    _progressCache.delete(_progressCache.keys().next().value);
+  }
+  _progressCache.set(key, { ts: Date.now(), data });
+}
+
+export function invalidateInProgressCache(token) {
+  const key = _getCacheKey(token);
+  if (key) _progressCache.delete(key);
+}
 
 async function safeJson(res) {
   try {
@@ -64,11 +103,11 @@ async function mapLimit(arr, limit, fn) {
   return out;
 }
 
-function isTransientTraktStatus(status) {
-  return [403, 408, 429, 500, 502, 503, 504].includes(Number(status));
-}
-
-async function fetchShowProgress(token, traktId, { timeoutMs = 12000, retries = 1 } = {}) {
+async function fetchShowProgress(
+  token,
+  traktId,
+  { timeoutMs = 10000, retries = 0 } = {},
+) {
   const progressRes = await traktFetch(
     `/shows/${encodeURIComponent(traktId)}/progress/watched?hidden=false&specials=false&count_specials=false`,
     { token, timeoutMs, retries },
@@ -107,29 +146,42 @@ export async function GET() {
       token = refreshedTokens.access_token;
     }
 
-    // 1. Obtener todas las series vistas por el usuario (sync/watched/shows devuelve info de progreso)
-    const watchedRes = await traktFetch("/sync/watched/shows?extended=noseasons", {
-      token,
-      timeoutMs: 15000,
-      retries: 1,
-    });
+    // Devolver desde caché si los datos aún son frescos (≤3 min)
+    const cacheKey = _getCacheKey(token);
+    const cachedData = _readCache(cacheKey);
+    if (cachedData) {
+      const res = NextResponse.json(cachedData);
+      if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+      return res;
+    }
+
+    // 1. Obtener todas las series vistas por el usuario
+    const watchedRes = await traktFetch(
+      "/sync/watched/shows?extended=noseasons",
+      {
+        token,
+        timeoutMs: 15000,
+        retries: 1,
+      },
+    );
     if (!watchedRes.ok)
       throw new Error(`Trakt watched shows failed (${watchedRes.status})`);
 
-    const watchedShowsRaw = Array.isArray(watchedRes.json) ? watchedRes.json : [];
+    const watchedShowsRaw = Array.isArray(watchedRes.json)
+      ? watchedRes.json
+      : [];
     const watchedShows = watchedShowsRaw.filter((item, index, arr) => {
       const traktId = item?.show?.ids?.trakt;
       if (!traktId) return false;
       return (
-        arr.findIndex((candidate) => candidate?.show?.ids?.trakt === traktId) ===
-        index
+        arr.findIndex(
+          (candidate) => candidate?.show?.ids?.trakt === traktId,
+        ) === index
       );
     });
 
-    // 2. Para cada serie, obtener el progreso detallado. Si Trakt falla de forma
-    // transitoria, guardamos el candidato para una segunda pasada más conservadora.
-    const failedCandidates = [];
-    const progressResults = await mapLimit(watchedShows, 4, async (item) => {
+    // 2. Progreso detallado de cada serie (concurrencia 8 para reducir tiempo a la mitad)
+    const progressResults = await mapLimit(watchedShows, 8, async (item) => {
       const show = item?.show;
       const traktId = show?.ids?.trakt;
       const tmdbId = show?.ids?.tmdb;
@@ -137,8 +189,8 @@ export async function GET() {
 
       try {
         const progress = await fetchShowProgress(token, traktId, {
-          timeoutMs: 12000,
-          retries: 1,
+          timeoutMs: 10000,
+          retries: 0,
         });
         const aired = progress?.aired || 0;
         const completed = progress?.completed || 0;
@@ -147,14 +199,11 @@ export async function GET() {
         if (completed <= 0 || completed >= aired) return null;
 
         const pct = aired > 0 ? Math.round((completed / aired) * 100) : 0;
-
-        // Info del siguiente episodio
         const nextEp = progress?.next_episode || null;
-
-        // Info del último episodio visto
         const lastEp = progress?.last_episode || null;
         const lastWatchedAt =
           progress?.last_watched_at || item?.last_watched_at || null;
+
         return {
           traktId,
           tmdbId,
@@ -179,69 +228,12 @@ export async function GET() {
             : null,
           lastWatchedAt,
         };
-      } catch (err) {
-        if (isTransientTraktStatus(err?.status) || err?.isTimeout) {
-          failedCandidates.push(item);
-        }
+      } catch {
         return null;
       }
     });
 
-    const retriedResults = await mapLimit(
-      failedCandidates,
-      2,
-      async (item) => {
-        const show = item?.show;
-        const traktId = show?.ids?.trakt;
-        const tmdbId = show?.ids?.tmdb;
-        if (!traktId || !tmdbId) return null;
-
-        try {
-          const progress = await fetchShowProgress(token, traktId, {
-            timeoutMs: 18000,
-            retries: 2,
-          });
-          const aired = progress?.aired || 0;
-          const completed = progress?.completed || 0;
-
-          if (completed <= 0 || completed >= aired) return null;
-
-          const pct = aired > 0 ? Math.round((completed / aired) * 100) : 0;
-          const nextEp = progress?.next_episode || null;
-          const lastEp = progress?.last_episode || null;
-          const lastWatchedAt =
-            progress?.last_watched_at || item?.last_watched_at || null;
-          return {
-            traktId,
-            tmdbId,
-            title: show?.title || "Sin título",
-            year: show?.year || null,
-            aired,
-            completed,
-            pct,
-            nextEpisode: nextEp
-              ? {
-                  season: nextEp.season,
-                  number: nextEp.number,
-                  title: nextEp.title || null,
-                }
-              : null,
-            lastEpisode: lastEp
-              ? {
-                  season: lastEp.season,
-                  number: lastEp.number,
-                  title: lastEp.title || null,
-                }
-              : null,
-            lastWatchedAt,
-          };
-        } catch {
-          return null;
-        }
-      },
-    );
-
-    const inProgress = [...progressResults, ...retriedResults].filter(Boolean);
+    const inProgress = progressResults.filter(Boolean);
 
     // Ordenar por último visto (más reciente primero)
     inProgress.sort((a, b) => {
@@ -250,7 +242,7 @@ export async function GET() {
       return tb - ta;
     });
 
-    // 3. Enriquecer con datos de TMDb
+    // 3. Enriquecer con datos de TMDb (ya están en caché ISR de Next.js)
     const enriched = await mapLimit(inProgress, 8, async (item) => {
       const tmdb = await fetchTmdbShow(item.tmdbId).catch(() => null);
       return {
@@ -270,7 +262,7 @@ export async function GET() {
       };
     });
 
-    const res = NextResponse.json({
+    const responseData = {
       connected: true,
       items: enriched,
       stats: {
@@ -287,8 +279,12 @@ export async function GET() {
           0,
         ),
       },
-    });
+    };
 
+    // Guardar en caché servidor para las siguientes cargas
+    _writeCache(cacheKey, responseData);
+
+    const res = NextResponse.json(responseData);
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
     return res;
   } catch (e) {
