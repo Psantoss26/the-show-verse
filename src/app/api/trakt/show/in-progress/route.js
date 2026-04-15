@@ -126,35 +126,6 @@ export async function GET() {
       );
     });
 
-    // 1.5. Obtener ratings del usuario para todas las series
-    let userRatingsMap = new Map();
-    try {
-      let page = 1;
-      const limit = 100;
-      while (page <= 20) {
-        const ratingsRes = await traktFetch(
-          `/sync/ratings/shows?extended=full&page=${page}&limit=${limit}`,
-          { token, timeoutMs: 12000, retries: 1 },
-        );
-        if (!ratingsRes.ok) break;
-
-        const ratings = ratingsRes.json;
-        if (!Array.isArray(ratings) || ratings.length === 0) break;
-
-        for (const ratingItem of ratings) {
-          const traktId = ratingItem?.show?.ids?.trakt;
-          const rating = ratingItem?.rating;
-          if (traktId && typeof rating === "number") {
-            userRatingsMap.set(Number(traktId), rating);
-          }
-        }
-
-        page++;
-      }
-    } catch (err) {
-      console.warn("Failed to fetch user ratings:", err);
-    }
-
     // 2. Para cada serie, obtener el progreso detallado. Si Trakt falla de forma
     // transitoria, guardamos el candidato para una segunda pasada más conservadora.
     const failedCandidates = [];
@@ -184,8 +155,6 @@ export async function GET() {
         const lastEp = progress?.last_episode || null;
         const lastWatchedAt =
           progress?.last_watched_at || item?.last_watched_at || null;
-        const userRating = userRatingsMap.get(Number(traktId)) || null;
-
         return {
           traktId,
           tmdbId,
@@ -209,7 +178,6 @@ export async function GET() {
               }
             : null,
           lastWatchedAt,
-          user_rating: userRating,
         };
       } catch (err) {
         if (isTransientTraktStatus(err?.status) || err?.isTimeout) {
@@ -243,8 +211,6 @@ export async function GET() {
           const lastEp = progress?.last_episode || null;
           const lastWatchedAt =
             progress?.last_watched_at || item?.last_watched_at || null;
-          const userRating = userRatingsMap.get(Number(traktId)) || null;
-
           return {
             traktId,
             tmdbId,
@@ -268,7 +234,6 @@ export async function GET() {
                 }
               : null,
             lastWatchedAt,
-            user_rating: userRating,
           };
         } catch {
           return null;

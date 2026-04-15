@@ -28,13 +28,10 @@ import {
 } from "lucide-react";
 
 import {
-  traktAuthStatus,
   traktGetInProgress,
   traktGetCompleted,
   traktDisconnect,
 } from "@/lib/api/traktClient";
-
-const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
 // ----------------------------
 // HELPERS
@@ -141,27 +138,14 @@ function getProgressColor(pct) {
 }
 
 // ----------------------------
-// POSTER LOADING
+// SHARED CACHE / IMAGES
 // ----------------------------
-const posterChoiceCache = new Map();
-const posterInFlight = new Map();
+const IN_PROGRESS_CACHE_KEY = "showverse:trakt:in-progress:v1";
+const IN_PROGRESS_CACHE_TTL = 1000 * 60 * 5;
 
 const buildImg = (path, size = "w500") => {
   if (!path) return null;
   return `https://image.tmdb.org/t/p/${size}${path}`;
-};
-
-const preloadImage = (url) => {
-  return new Promise((resolve) => {
-    if (!url) {
-      resolve();
-      return;
-    }
-    const img = new Image();
-    img.onload = () => resolve();
-    img.onerror = () => resolve();
-    img.src = url;
-  });
 };
 
 const getPosterPreference = (type, id) => {
@@ -173,64 +157,38 @@ const getPosterPreference = (type, id) => {
   return window.localStorage.getItem(key) || null;
 };
 
-function pickBestPosterEN(posters) {
-  if (!Array.isArray(posters) || posters.length === 0) return null;
-
-  const maxVotes = posters.reduce(
-    (max, p) => ((p.vote_count || 0) > max ? p.vote_count || 0 : max),
-    0,
-  );
-  const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes);
-  if (!withMaxVotes.length) return null;
-
-  const preferredLangs = new Set(["en", "en-US"]);
-  const enGroup = withMaxVotes.filter(
-    (p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1),
-  );
-  const nullLang = withMaxVotes.filter((p) => p.iso_639_1 === null);
-  const candidates = enGroup.length
-    ? enGroup
-    : nullLang.length
-      ? nullLang
-      : withMaxVotes;
-
-  return (
-    [...candidates].sort((a, b) => {
-      const va = (b.vote_average || 0) - (a.vote_average || 0);
-      if (va !== 0) return va;
-      return (b.width || 0) - (a.width || 0);
-    })[0] || null
-  );
-}
-
-async function fetchBestPosterEN(type, id) {
-  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  if (!apiKey || !type || !id) return null;
+function readSessionCache(key, ttlMs) {
+  if (typeof window === "undefined") return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`;
-    const r = await fetch(url, { cache: "force-cache" });
-    if (!r.ok) return null;
-    const j = await r.json();
-    return pickBestPosterEN(j?.posters)?.file_path || null;
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const ts = Number(parsed?.ts || 0);
+    if (!ts || Date.now() - ts > ttlMs) {
+      window.sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed?.data ?? null;
   } catch {
     return null;
   }
 }
 
-async function getBestPosterCached(type, id) {
-  const key = `${type}:${id}`;
-  if (posterChoiceCache.has(key)) return posterChoiceCache.get(key);
-  if (posterInFlight.has(key)) return posterInFlight.get(key);
+function writeSessionCache(key, data) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      key,
+      JSON.stringify({ ts: Date.now(), data }),
+    );
+  } catch {}
+}
 
-  const p = (async () => {
-    const chosen = await fetchBestPosterEN(type, id);
-    posterChoiceCache.set(key, chosen || null);
-    posterInFlight.delete(key);
-    return chosen || null;
-  })();
-
-  posterInFlight.set(key, p);
-  return p;
+function clearSessionCache(key) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {}
 }
 
 // ----------------------------
@@ -239,65 +197,32 @@ async function getBestPosterCached(type, id) {
 function SmartPoster({ item, title }) {
   const type = "tv"; // In Progress is always TV
   const id = item.tmdbId;
-
-  const [src, setSrc] = useState(null);
-  const [ready, setReady] = useState(false);
+  const fallbackSrc = useMemo(
+    () => buildImg(item.poster_path || item.backdrop_path || null, "w500"),
+    [item.poster_path, item.backdrop_path],
+  );
+  const [src, setSrc] = useState(fallbackSrc);
 
   useEffect(() => {
-    let abort = false;
-
-    setSrc(null);
-    setReady(false);
-
-    const load = async () => {
-      const pref = getPosterPreference(type, id);
-      if (pref) {
-        const url = buildImg(pref, "w500");
-        await preloadImage(url);
-        if (!abort) {
-          setSrc(url);
-          setReady(true);
-        }
-        return;
-      }
-
-      const best = await getBestPosterCached(type, id);
-      const finalPath = best || item.poster_path || item.backdrop_path || null;
-      const url = finalPath ? buildImg(finalPath, "w500") : null;
-      if (url) await preloadImage(url);
-      if (!abort) {
-        setSrc(url);
-        setReady(!!url);
-      }
-    };
-
-    load();
-    return () => {
-      abort = true;
-    };
-  }, [type, id, item.poster_path, item.backdrop_path]);
+    const pref = getPosterPreference(type, id);
+    setSrc(buildImg(pref, "w500") || fallbackSrc);
+  }, [type, id, fallbackSrc]);
 
   return (
     <div className="relative w-full h-full">
-      <div
-        className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 transition-opacity duration-300 ${
-          ready && src ? "opacity-0" : "opacity-100"
-        }`}
-      >
-        <Film className="w-8 h-8 text-neutral-700" />
-      </div>
-
       {src ? (
         <img
           src={src}
           alt={title}
           loading="lazy"
           decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            ready ? "opacity-100" : "opacity-0"
-          }`}
+          className="absolute inset-0 w-full h-full object-cover"
         />
-      ) : null}
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-neutral-900">
+          <Film className="w-8 h-8 text-neutral-700" />
+        </div>
+      )}
     </div>
   );
 }
@@ -1068,26 +993,37 @@ export default function InProgressClient() {
     return () => mq.removeEventListener?.("change", apply);
   }, []);
 
-  const loadAuth = useCallback(async () => {
-    try {
-      const st = await traktAuthStatus();
-      setAuth({ loading: false, connected: !!st?.connected });
-    } catch {
-      setAuth({ loading: false, connected: false });
-    }
-  }, []);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async ({ background = false } = {}) => {
+    if (!background) setLoading(true);
     try {
       const json = await traktGetInProgress();
-      setItems(json?.items || []);
-      setStats(json?.stats || null);
+      const connected = json?.connected !== false;
+
+      setAuth({ loading: false, connected });
+
+      if (!connected) {
+        clearSessionCache(IN_PROGRESS_CACHE_KEY);
+        setItems([]);
+        setStats(null);
+        setDataLoaded(true);
+        return;
+      }
+
+      const nextItems = json?.items || [];
+      const nextStats = json?.stats || null;
+
+      setItems(nextItems);
+      setStats(nextStats);
+      setDataLoaded(true);
+      writeSessionCache(IN_PROGRESS_CACHE_KEY, {
+        items: nextItems,
+        stats: nextStats,
+      });
     } catch (e) {
       console.error("Error loading in-progress:", e);
+      setAuth((prev) => ({ ...prev, loading: false }));
     } finally {
-      setLoading(false);
-      setDataLoaded(true);
+      if (!background) setLoading(false);
     }
   }, []);
 
@@ -1106,12 +1042,22 @@ export default function InProgressClient() {
   }, []);
 
   useEffect(() => {
-    loadAuth();
-  }, [loadAuth]);
+    const cached = readSessionCache(
+      IN_PROGRESS_CACHE_KEY,
+      IN_PROGRESS_CACHE_TTL,
+    );
 
-  useEffect(() => {
-    if (auth.connected) loadData();
-  }, [auth.connected, loadData]);
+    if (cached?.items || cached?.stats) {
+      setItems(Array.isArray(cached?.items) ? cached.items : []);
+      setStats(cached?.stats || null);
+      setDataLoaded(true);
+      setAuth({ loading: false, connected: true });
+      void loadData({ background: true });
+      return;
+    }
+
+    void loadData();
+  }, [loadData]);
 
   // Lazy load completed data when tab is switched
   useEffect(() => {
@@ -1354,6 +1300,7 @@ export default function InProgressClient() {
   const handleDisconnect = async () => {
     try {
       await traktDisconnect();
+      clearSessionCache(IN_PROGRESS_CACHE_KEY);
       setAuth({ loading: false, connected: false });
       setItems([]);
       setStats(null);
