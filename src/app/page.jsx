@@ -11,11 +11,6 @@ import {
   discoverMovies,
   fetchMediaByGenre,
 } from "@/lib/api/tmdb";
-import {
-  getTraktMoviesAnticipated,
-  getTraktShowsAnticipated,
-  removeDuplicates,
-} from "@/lib/api/traktHelpers";
 
 export const revalidate = 3600; // 1 hora — reduce cold starts en Vercel
 export const maxDuration = 60; // Vercel Pro = 60s; Hobby = 10s (máximo posible)
@@ -67,41 +62,26 @@ function curateList(
 /* ======== Carga de datos en el SERVIDOR ======== */
 async function getDashboardData(sessionId = null) {
   try {
-    // SSR: secciones above-the-fold resueltas desde servidor para evitar
-    // reordenaciones visuales bajo el hero. El resto de Trakt sigue lazy.
-    const [
-      topRatedMovies,
-      topRatedTV,
-      awarded,
-      dramaTV,
-      trending,
-      popular,
-      traktMoviesAnticipated,
-      traktShowsAnticipated,
-    ] = await Promise.all([
-      fetchTopRatedMovies(2000),
-      fetchTopRatedTV(1000),
-      discoverMovies({
-        "vote_average.gte": 7.5,
-        "vote_count.gte": 2000,
-        sort_by: "vote_average.desc",
-        page: 1,
-      }),
-      fetchMediaByGenre({
-        type: "tv",
-        genreId: 18,
-        minVotes: 800,
-        language: "es-ES",
-      }),
-      fetchTrendingMovies(),
-      fetchPopularMovies(),
-      getTraktMoviesAnticipated(30)
-        .then((items) => removeDuplicates(items) || [])
-        .catch(() => []),
-      getTraktShowsAnticipated(30)
-        .then((items) => removeDuplicates(items) || [])
-        .catch(() => []),
-    ]);
+    // Solo TMDb — rápido y cacheable. Trakt se carga lazy en el cliente.
+    const [topRatedMovies, topRatedTV, awarded, dramaTV, trending, popular] =
+      await Promise.all([
+        fetchTopRatedMovies(2000),
+        fetchTopRatedTV(1000),
+        discoverMovies({
+          "vote_average.gte": 7.5,
+          "vote_count.gte": 2000,
+          sort_by: "vote_average.desc",
+          page: 1,
+        }),
+        fetchMediaByGenre({
+          type: "tv",
+          genreId: 18,
+          minVotes: 800,
+          language: "es-ES",
+        }),
+        fetchTrendingMovies(),
+        fetchPopularMovies(),
+      ]);
 
     const recommended = sessionId
       ? await fetchRecommendedMovies(sessionId)
@@ -138,14 +118,12 @@ async function getDashboardData(sessionId = null) {
       popular,
       recommended,
 
-      // Above-the-fold: "Más esperadas" ya llega resuelta desde SSR.
-      traktMoviesAnticipated,
-      traktShowsAnticipated,
-
-      // El resto de secciones Trakt se cargan en el cliente (lazy)
+      // Todas las secciones Trakt se cargan en el cliente (lazy)
       traktTrending: [],
       traktPopular: [],
       traktAnticipated: [],
+      traktMoviesAnticipated: [],
+      traktShowsAnticipated: [],
       traktRecommended: [],
       traktPlayedWeekly: [],
       traktPlayedMonthly: [],
