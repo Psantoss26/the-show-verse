@@ -6,15 +6,46 @@ const TRAKT_BASE = "https://api.trakt.tv";
 // Cache en memoria con TTL
 const cache = new Map();
 const pendingRequests = new Map(); // Deduplicación de peticiones en vuelo
+const errorCache = new Map(); // Cache corta para errores esperables repetitivos
 let globalRateLimit = null; // Bloqueo GLOBAL cuando Trakt devuelve 429
 
 // Configuración
 const CACHE_TTL = 60 * 60 * 1000; // 1 hora (Trakt data cambia lentamente)
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY = 1000; // 1 segundo
+const ERROR_CACHE_TTL = 5 * 60 * 1000; // 5 min para 403/404/405 repetitivos
 
 function isExpectedUpstreamStatus(status) {
   return [403, 404, 405, 429].includes(Number(status));
+}
+
+function getErrorFromCache(cacheKey) {
+  const cached = errorCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (Date.now() > cached.expiresAt) {
+    errorCache.delete(cacheKey);
+    return null;
+  }
+
+  const err = new Error(cached.message);
+  err.status = cached.status;
+  err.path = cached.path;
+  err.isForbidden = cached.status === 403;
+  err.isCached = true;
+  return err;
+}
+
+function saveErrorToCache(cacheKey, err, ttl = ERROR_CACHE_TTL) {
+  const status = Number(err?.status || 0);
+  if (![403, 404, 405].includes(status)) return;
+
+  errorCache.set(cacheKey, {
+    status,
+    path: err?.path || "",
+    message: err?.message || `Trakt HTTP ${status}`,
+    expiresAt: Date.now() + ttl,
+  });
 }
 
 function traktHeaders() {
@@ -312,6 +343,11 @@ export async function fetchTrakt(path, options = {}) {
     if (cached !== null) {
       return cached;
     }
+
+    const cachedError = getErrorFromCache(cacheKey);
+    if (cachedError) {
+      throw cachedError;
+    }
   }
 
   // 2. Deduplicación: si ya hay una petición en vuelo para esta ruta, esperarla
@@ -344,6 +380,10 @@ export async function fetchTrakt(path, options = {}) {
           return staleData;
         }
       }
+
+      if (useCache) {
+        saveErrorToCache(cacheKey, err);
+      }
       throw err;
     })
     .finally(() => {
@@ -373,6 +413,7 @@ export async function fetchTraktMaybe(path, options = {}) {
 export function clearCache() {
   cache.clear();
   pendingRequests.clear();
+  errorCache.clear();
   globalRateLimit = null;
 }
 

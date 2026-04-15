@@ -278,6 +278,8 @@ export default function DetailsClient({
   watchLink,
   reviews,
   initialScoreboard,
+  initialTraktStatus,
+  initialShowWatched,
 }) {
   const router = useRouter();
 
@@ -1759,6 +1761,62 @@ export default function DetailsClient({
   // Tipo de contenido para la API de Trakt ("show" para series, "movie" para peliculas)
   const traktType = endpointType === "tv" ? "show" : "movie";
 
+  const hasInitialTraktStatus = useMemo(
+    () => !!initialTraktStatus && typeof initialTraktStatus.connected === "boolean",
+    [initialTraktStatus],
+  );
+
+  const initialWatchedBySeason = useMemo(() => {
+    if (endpointType !== "tv") return {};
+    return initialShowWatched?.watchedBySeason || {};
+  }, [endpointType, initialShowWatched]);
+
+  const hasInitialShowWatched = useMemo(
+    () => endpointType === "tv" && !!initialShowWatched,
+    [endpointType, initialShowWatched],
+  );
+
+  const initialAnyEpisodeWatched = useMemo(
+    () =>
+      Object.values(initialWatchedBySeason).some(
+        (episodes) => Array.isArray(episodes) && episodes.length > 0,
+      ),
+    [initialWatchedBySeason],
+  );
+
+  const buildInitialTraktState = useCallback(
+    () => ({
+      loading: !hasInitialTraktStatus,
+      connected: !!initialTraktStatus?.connected,
+      found: !!initialTraktStatus?.found,
+      traktId: initialTraktStatus?.traktId ?? null,
+      traktUrl: initialTraktStatus?.traktUrl || null,
+      watched:
+        endpointType === "tv" && hasInitialShowWatched
+          ? initialAnyEpisodeWatched
+          : !!initialTraktStatus?.watched,
+      plays: Number(initialTraktStatus?.plays || 0),
+      lastWatchedAt: initialTraktStatus?.lastWatchedAt || null,
+      rating:
+        typeof initialTraktStatus?.rating === "number"
+          ? initialTraktStatus.rating
+          : null,
+      inWatchlist: !!initialTraktStatus?.inWatchlist,
+      progress: initialTraktStatus?.progress || null,
+      history: Array.isArray(initialTraktStatus?.history)
+        ? initialTraktStatus.history
+        : [],
+      error: initialTraktStatus?.error || "",
+    }),
+    [
+      endpointType,
+      hasInitialShowWatched,
+      hasInitialTraktStatus,
+      initialAnyEpisodeWatched,
+      initialTraktStatus,
+    ],
+  );
+
   // =====================================================================
   // INTEGRACION CON TRAKT
   // Estado completo de la conexion con Trakt: visto, historial, rating,
@@ -1766,21 +1824,7 @@ export default function DetailsClient({
   // =====================================================================
 
   // Estado principal de Trakt para este contenido
-  const [trakt, setTrakt] = useState({
-    loading: true,
-    connected: false,
-    found: false,
-    traktId: null,
-    traktUrl: null,
-    watched: false,
-    plays: 0,
-    lastWatchedAt: null,
-    rating: null,
-    inWatchlist: false,
-    progress: null,
-    history: [],
-    error: "",
-  });
+  const [trakt, setTrakt] = useState(buildInitialTraktState);
 
   const [traktBusy, setTraktBusy] = useState(""); // Accion en curso: 'watched' | 'watchlist' | 'history' | ''
   const [traktWatchedOpen, setTraktWatchedOpen] = useState(false); // Modal de historial de visionados abierto
@@ -1793,8 +1837,10 @@ export default function DetailsClient({
   }, []);
 
   // -- Episodios vistos por temporada (solo TV) --
-  const [watchedBySeason, setWatchedBySeason] = useState({}); // { seasonNumber: [episodeNumber, ...] }
-  const [watchedBySeasonLoaded, setWatchedBySeasonLoaded] = useState(false); // true cuando se cargo el estado
+  const [watchedBySeason, setWatchedBySeason] = useState(initialWatchedBySeason); // { seasonNumber: [episodeNumber, ...] }
+  const [watchedBySeasonLoaded, setWatchedBySeasonLoaded] = useState(
+    hasInitialShowWatched,
+  ); // true cuando se cargo el estado
   const [episodeBusyKey, setEpisodeBusyKey] = useState(""); // Episodio en proceso: "S1E3"
 
   // -- Historial de completados y rewatch --
@@ -1947,6 +1993,57 @@ export default function DetailsClient({
 
   const hasNumericScoreboardStats = (stats) =>
     Object.values(stats || {}).some((v) => typeof v === "number");
+
+  const hasScoreboardCommunityData = (scoreboard) =>
+    typeof scoreboard?.rating === "number" ||
+    typeof scoreboard?.votes === "number";
+
+  const hasScoreboardExternalData = (external) =>
+    Object.values(external || {}).some((v) => typeof v === "number");
+
+  const hasUsefulScoreboardData = (scoreboard) =>
+    hasNumericScoreboardStats(scoreboard?.stats) ||
+    hasScoreboardCommunityData(scoreboard) ||
+    hasScoreboardExternalData(scoreboard?.external);
+
+  const mergeScoreboardState = (current, incoming) => {
+    if (!incoming) return current || defaultScoreboard;
+    if (!current) return incoming;
+
+    const currentHasStats = hasNumericScoreboardStats(current?.stats);
+    const incomingHasStats = hasNumericScoreboardStats(incoming?.stats);
+    const currentHasCommunity = hasScoreboardCommunityData(current);
+    const incomingHasCommunity = hasScoreboardCommunityData(incoming);
+    const currentHasExternal = hasScoreboardExternalData(current?.external);
+    const incomingHasExternal = hasScoreboardExternalData(incoming?.external);
+    const shouldPreserveUsefulData =
+      hasUsefulScoreboardData(current) && !hasUsefulScoreboardData(incoming);
+
+    return {
+      ...current,
+      ...incoming,
+      found: incoming?.found || shouldPreserveUsefulData,
+      rating: incomingHasCommunity
+        ? incoming.rating
+        : currentHasCommunity
+          ? current.rating
+          : incoming.rating,
+      votes: incomingHasCommunity
+        ? incoming.votes
+        : currentHasCommunity
+          ? current.votes
+          : incoming.votes,
+      stats: incomingHasStats
+        ? { ...(current?.stats || {}), ...(incoming?.stats || {}) }
+        : current.stats,
+      external: incomingHasExternal
+        ? { ...(current?.external || {}), ...(incoming?.external || {}) }
+        : currentHasExternal
+          ? current.external
+          : incoming.external,
+      error: shouldPreserveUsefulData ? "" : incoming?.error || "",
+    };
+  };
 
   const initialParsedScoreboard = useMemo(
     () => parseScoreboardData(initialScoreboard),
@@ -2373,7 +2470,7 @@ export default function DetailsClient({
       // Si ya tenemos datos completos del prefetch, guardar en cache y no bloquear
       const prefetched = parseScoreboardData(initialScoreboard);
       if (prefetched?.found && hasNumericStats(prefetched.stats)) {
-        setTScoreboard(prefetched);
+        setTScoreboard((prev) => mergeScoreboardState(prev, prefetched));
         setTraktDeferredReady(true);
         // Guardar prefetch en localStorage para futuras visitas
         try {
@@ -2390,7 +2487,13 @@ export default function DetailsClient({
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed?.found && hasNumericStats(parsed?.stats)) {
-            setTScoreboard({ ...parsed, loading: true, error: "" });
+            setTScoreboard((prev) =>
+              mergeScoreboardState(prev, {
+                ...parsed,
+                loading: true,
+                error: "",
+              }),
+            );
           } else {
             setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
           }
@@ -2417,7 +2520,7 @@ export default function DetailsClient({
           if (ignore) return;
 
           const result = parseScoreboardData(r) || defaultScoreboard;
-          setTScoreboard(result);
+          setTScoreboard((prev) => mergeScoreboardState(prev, result));
 
           // Si encontró el item y tiene stats numéricas, guardar en cache y salir
           if (result.found && hasNumericStats(result.stats)) {
@@ -2444,12 +2547,14 @@ export default function DetailsClient({
               isTimeout || isRateLimit
                 ? ""
                 : e?.message || "Error cargando scoreboard";
-            setTScoreboard((p) => ({
-              ...p,
-              loading: false,
-              found: false,
-              error: errorMsg,
-            }));
+            setTScoreboard((prev) =>
+              mergeScoreboardState(prev, {
+                ...defaultScoreboard,
+                loading: false,
+                found: false,
+                error: errorMsg,
+              }),
+            );
           }
           // En intentos anteriores, reintentar silenciosamente
         }
@@ -2464,15 +2569,21 @@ export default function DetailsClient({
 
   // Resetear estados de Trakt al cambiar de contenido
   useEffect(() => {
+    setTrakt(buildInitialTraktState());
     setTraktWatchedOpen(false);
     setTraktEpisodesOpen(false);
     setEpisodeBusyKey("");
     setTraktBusy("");
 
-    // Resetear episodios para evitar mostrar 0% mientras carga la nueva serie
-    setWatchedBySeason({});
-    setWatchedBySeasonLoaded(false);
-  }, [id, endpointType]);
+    setWatchedBySeason(initialWatchedBySeason);
+    setWatchedBySeasonLoaded(hasInitialShowWatched);
+  }, [
+    id,
+    endpointType,
+    buildInitialTraktState,
+    initialWatchedBySeason,
+    hasInitialShowWatched,
+  ]);
 
   // Recargar estado de Trakt al abrir el modal de historial
   useEffect(() => {
@@ -2484,8 +2595,8 @@ export default function DetailsClient({
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
     if (!traktDeferredReady) return;
-    void reloadTraktStatus();
-  }, [reloadTraktStatus, traktDeferredReady]);
+    void reloadTraktStatus({ background: hasInitialTraktStatus });
+  }, [reloadTraktStatus, traktDeferredReady, hasInitialTraktStatus]);
 
   useEffect(() => {
     if (!traktDeferredReady) return;
@@ -2571,8 +2682,9 @@ export default function DetailsClient({
   // Trigger para cargar episodios vistos cuando cambian las dependencias
   useEffect(() => {
     if (!traktDeferredReady) return;
+    if (hasInitialShowWatched) return;
     loadTraktShowWatched();
-  }, [loadTraktShowWatched, traktDeferredReady]);
+  }, [loadTraktShowWatched, traktDeferredReady, hasInitialShowWatched]);
 
   /**
    * Carga los plays (visionados completos) de la serie desde Trakt.
@@ -3848,10 +3960,12 @@ export default function DetailsClient({
     setOfficialSiteUrl(tmdbOfficialSiteUrl);
   }, [tmdbOfficialSiteUrl, id]);
 
+  const canLoadOfficialSite = endpointType !== "tv" || traktDeferredReady;
+
   // pedir official site a Trakt (si existe, pisa el de TMDb)
   useEffect(() => {
     if (!id) return;
-    if (endpointType === "tv" && !traktDeferredReady) return;
+    if (!canLoadOfficialSite) return;
 
     const ac = new AbortController();
 
@@ -3874,7 +3988,7 @@ export default function DetailsClient({
     })();
 
     return () => ac.abort();
-  }, [id, endpointType, traktDeferredReady]);
+  }, [id, endpointType, canLoadOfficialSite]);
 
   const justWatchUrl = title
     ? `https://www.justwatch.com/es/buscar?q=${encodeURIComponent(title)}`
@@ -3908,16 +4022,6 @@ export default function DetailsClient({
     () => `showverse:jw:${endpointType}:${id}:${(yearIso || "").trim()}`,
     [endpointType, id, yearIso],
   );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const cached = window.localStorage.getItem(jwCacheKey);
-      if (cached) {
-        setExtLinks((p) => ({ ...p, justwatch: cached || null }));
-      }
-    } catch {}
-  }, [jwCacheKey]);
 
   // 1) Hidratar desde cache para que el icono salga instantaneo en visitas posteriores
   useEffect(() => {
@@ -4253,51 +4357,6 @@ export default function DetailsClient({
           setMovieDirectorsCrew([]);
           setMovieDirector(null);
         }
-      }
-    })();
-
-    return () => ac.abort();
-  }, [type, id, data?.credits?.crew]);
-
-  useEffect(() => {
-    const isMovie = type === "movie";
-    if (!isMovie || !id) {
-      setMovieDirectorsCrew([]);
-      return;
-    }
-
-    // 1) Si ya vienen credits en "data", úsalo
-    const crew = data?.credits?.crew;
-    if (Array.isArray(crew) && crew.length) {
-      const dirsCrew = crew.filter(
-        (c) => c?.job === "Director" || c?.job === "Co-Director",
-      );
-      setMovieDirectorsCrew(dirsCrew);
-      return;
-    }
-
-    // 2) Si no vienen, pide credits a tu API route
-    const ac = new AbortController();
-
-    (async () => {
-      try {
-        const res = await fetch(`/api/tmdb/movies/${id}/credits`, {
-          signal: ac.signal,
-          cache: "no-store",
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setMovieDirectorsCrew([]);
-          return;
-        }
-
-        const dirsCrew = (json?.crew || []).filter(
-          (c) => c?.job === "Director" || c?.job === "Co-Director",
-        );
-
-        setMovieDirectorsCrew(dirsCrew);
-      } catch (e) {
-        if (e?.name !== "AbortError") setMovieDirectorsCrew([]);
       }
     })();
 
