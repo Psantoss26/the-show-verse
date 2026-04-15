@@ -31,13 +31,14 @@ export default function DetailsPageLoader(props) {
   } = props;
 
   const [deferredData, setDeferredData] = useState(EMPTY_DEFERRED);
+  const hasData = !!data;
 
   useEffect(() => {
     setDeferredData(EMPTY_DEFERRED);
   }, [type, id]);
 
   useEffect(() => {
-    if (!type || !id || !data || type === "person") return;
+    if (!type || !id || !hasData || type === "person") return;
 
     let cancelled = false;
 
@@ -95,7 +96,7 @@ export default function DetailsPageLoader(props) {
     return () => {
       cancelled = true;
     };
-  }, [type, id, data]);
+  }, [type, id, hasData]);
 
   return (
     <DetailsClient
