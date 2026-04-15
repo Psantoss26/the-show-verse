@@ -2330,15 +2330,31 @@ const AnticipatedSection = memo(function AnticipatedSection({
   overridesReady,
 }) {
   const [activeTab, setActiveTab] = useState("movies");
+  const hasMovieItems = Array.isArray(movieItems) && movieItems.length > 0;
+  const hasTvItems = Array.isArray(tvItems) && tvItems.length > 0;
 
   // null = aún cargando; [] = cargado y vacío → ocultar sección
   const loading = movieItems === null && tvItems === null;
-  const empty =
-    !loading &&
-    (!movieItems || movieItems.length === 0) &&
-    (!tvItems || tvItems.length === 0);
+  const empty = !loading && !hasMovieItems && !hasTvItems;
 
-  const items = activeTab === "movies" ? (movieItems ?? []) : (tvItems ?? []);
+  useEffect(() => {
+    if (activeTab === "movies" && !hasMovieItems && hasTvItems) {
+      setActiveTab("series");
+      return;
+    }
+    if (activeTab === "series" && !hasTvItems && hasMovieItems) {
+      setActiveTab("movies");
+    }
+  }, [activeTab, hasMovieItems, hasTvItems]);
+
+  const items =
+    activeTab === "movies"
+      ? hasMovieItems
+        ? movieItems
+        : (tvItems ?? [])
+      : hasTvItems
+        ? tvItems
+        : (movieItems ?? []);
 
   if (empty) return null;
 
@@ -2784,6 +2800,17 @@ export default function MainDashboardClient({ initialData }) {
   useEffect(() => setHydrated(true), []);
 
   const posterCacheRef = useRef(new Map());
+  const seededMoviesAnticipated = Array.isArray(
+    initialData?.traktMoviesAnticipated,
+  )
+    ? initialData.traktMoviesAnticipated
+    : null;
+  const seededShowsAnticipated = Array.isArray(initialData?.traktShowsAnticipated)
+    ? initialData.traktShowsAnticipated
+    : null;
+  const hasRenderableInitialAnticipatedData =
+    (seededMoviesAnticipated?.length || 0) > 0 ||
+    (seededShowsAnticipated?.length || 0) > 0;
 
   // ⚡ Estado para secciones lazy (se cargan progresivamente en el cliente)
   const [lazySections, setLazySections] = useState({
@@ -2791,8 +2818,12 @@ export default function MainDashboardClient({ initialData }) {
     traktTrending: [],
     traktPopular: [],
     // null = aún cargando (muestra skeleton); [] = cargado pero vacío (oculta sección)
-    traktMoviesAnticipated: null,
-    traktShowsAnticipated: null,
+    traktMoviesAnticipated: hasRenderableInitialAnticipatedData
+      ? (seededMoviesAnticipated ?? [])
+      : null,
+    traktShowsAnticipated: hasRenderableInitialAnticipatedData
+      ? (seededShowsAnticipated ?? [])
+      : null,
     traktRecommended: [],
     traktPlayedWeekly: [],
     traktPlayedMonthly: [],
@@ -2899,6 +2930,13 @@ export default function MainDashboardClient({ initialData }) {
   // ⚡ Carga anticipada: «Más esperadas» visible sin scroll — carga inmediata al montar
   useEffect(() => {
     let cancelled = false;
+
+    if (hasRenderableInitialAnticipatedData) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const loadAnticipated = async () => {
       try {
         const [moviesAnticipated, showsAnticipated] = await Promise.all([
@@ -2927,7 +2965,7 @@ export default function MainDashboardClient({ initialData }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hasRenderableInitialAnticipatedData]);
 
   // ⚡ Carga diferida: resto de secciones Trakt (below-the-fold)
   useEffect(() => {
@@ -3030,8 +3068,16 @@ export default function MainDashboardClient({ initialData }) {
       >
         {/* Trakt: Más esperadas con selector Películas/Series */}
         <AnticipatedSection
-          movieItems={dashboardData.traktMoviesAnticipated || EMPTY_ARRAY}
-          tvItems={dashboardData.traktShowsAnticipated || EMPTY_ARRAY}
+          movieItems={
+            dashboardData.traktMoviesAnticipated === null
+              ? null
+              : (dashboardData.traktMoviesAnticipated ?? EMPTY_ARRAY)
+          }
+          tvItems={
+            dashboardData.traktShowsAnticipated === null
+              ? null
+              : (dashboardData.traktShowsAnticipated ?? EMPTY_ARRAY)
+          }
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
