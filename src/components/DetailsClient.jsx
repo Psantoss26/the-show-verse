@@ -7403,21 +7403,25 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           recImdbRatings[rec.id] != null
                             ? recImdbRatings[rec.id]
                             : undefined;
-                        const recCardClass = supportsHover
+
+                        // En móvil, deshabilitar hover para mostrar solo las imágenes
+                        const enableHover = supportsHover && !isMobileViewport;
+
+                        const recCardClass = enableHover
                           ? "mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                           : "mt-3 block relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-white/5";
-                        const recImageClass = supportsHover
+                        const recImageClass = enableHover
                           ? "w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
                           : "w-full h-full object-cover";
-                        const recOverlayClass = supportsHover
+                        const recOverlayClass = enableHover
                           ? "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300"
-                          : "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75";
-                        const recHeaderInfoClass = supportsHover
+                          : "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0";
+                        const recHeaderInfoClass = enableHover
                           ? "absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                          : "absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2";
-                        const recFooterInfoClass = supportsHover
+                          : "hidden";
+                        const recFooterInfoClass = enableHover
                           ? "absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                          : "absolute bottom-0 left-0 right-0 p-2.5 sm:p-3";
+                          : "hidden";
 
                         return (
                           <SwiperSlide key={rec.id}>
@@ -7425,12 +7429,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               href={`/details/${rec.media_type || type}/${rec.id}`}
                               className={recCardClass}
                               onMouseEnter={
-                                supportsHover
+                                enableHover
                                   ? () => prefetchRecImdb(rec)
                                   : undefined
                               }
                               onFocus={
-                                supportsHover
+                                enableHover
                                   ? () => prefetchRecImdb(rec)
                                   : undefined
                               }
