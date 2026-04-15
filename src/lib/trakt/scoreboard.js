@@ -83,12 +83,15 @@ export async function getTraktScoreboardData({
     throw err;
   }
 
-  const fastTimeoutMs = process.env.NODE_ENV === "production" ? 5000 : 4000;
-  const statsTimeoutMs = process.env.NODE_ENV === "production" ? 12000 : 10000;
+  // Timeouts reducidos + sin reintentos: evita que backoff sleeps agoten el
+  // maxDuration de Vercel. El cliente ya reintenta hasta 3 veces si falla.
+  const fastTimeoutMs = process.env.NODE_ENV === "production" ? 4000 : 3000;
+  const statsTimeoutMs = process.env.NODE_ENV === "production" ? 4000 : 3000;
 
-  const ft = (path) => fetchTrakt(path, { timeoutMs: fastTimeoutMs });
+  const ft = (path) =>
+    fetchTrakt(path, { timeoutMs: fastTimeoutMs, maxRetries: 0 });
   const ftStats = (path) =>
-    fetchTraktMaybe(path, { timeoutMs: statsTimeoutMs });
+    fetchTraktMaybe(path, { timeoutMs: statsTimeoutMs, maxRetries: 0 });
 
   if (normalizedType === "movie" || normalizedType === "show") {
     const plural = normalizedType === "show" ? "shows" : "movies";
@@ -103,12 +106,12 @@ export async function getTraktScoreboardData({
     if (!ids?.trakt) return { found: false };
 
     const traktId = ids.trakt;
-    const summary = await ft(`/${plural}/${traktId}`);
-    const stats = await fetchOptionalStats(
-      [`/${plural}/${traktId}/stats`],
-      ftStats,
-      1500,
-    );
+
+    // Ejecutar en paralelo: summary necesita traktId pero es independiente de stats
+    const [summary, stats] = await Promise.all([
+      ft(`/${plural}/${traktId}`).catch(() => null),
+      fetchOptionalStats([`/${plural}/${traktId}/stats`], ftStats, 3000),
+    ]);
 
     const slug = summary?.ids?.slug || ids?.slug || traktId;
     const traktUrl =
@@ -159,7 +162,16 @@ export async function getTraktScoreboardData({
   const showSlug = showIds?.slug || traktShowId;
 
   if (normalizedType === "season") {
-    const seasons = await ft(`/shows/${traktShowId}/seasons?extended=full`);
+    // Ejecutar en paralelo: la lista de temporadas (con rating) y las stats
+    // usando el path por show/season que no requiere el seasonId de Trakt
+    const [seasons, stats] = await Promise.all([
+      ft(`/shows/${traktShowId}/seasons?extended=full`),
+      fetchOptionalStats(
+        [`/shows/${traktShowId}/seasons/${seasonNumber}/stats`],
+        ftStats,
+        3000,
+      ),
+    ]);
     const seasonObj = Array.isArray(seasons)
       ? seasons.find((s) => Number(s?.number) === Number(seasonNumber))
       : null;
@@ -168,15 +180,6 @@ export async function getTraktScoreboardData({
 
     const seasonIds = seasonObj.ids;
     const traktUrl = `https://trakt.tv/shows/${showSlug}/seasons/${seasonNumber}`;
-
-    const stats = await fetchOptionalStats(
-      [
-        `/seasons/${seasonIds.trakt}/stats`,
-        `/shows/${traktShowId}/seasons/${seasonNumber}/stats`,
-      ],
-      ftStats,
-      1500,
-    );
 
     return {
       found: true,
@@ -196,21 +199,24 @@ export async function getTraktScoreboardData({
     };
   }
 
-  const ep = await ft(
-    `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
-  );
+  // EPISODE: ejecutar en paralelo usando paths basados en show/season/episode
+  // que no requieren el epId de Trakt
+  const [ep, stats] = await Promise.all([
+    ft(
+      `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
+    ),
+    fetchOptionalStats(
+      [
+        `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
+      ],
+      ftStats,
+      3000,
+    ),
+  ]);
   const epIds = ep?.ids;
   if (!epIds?.trakt) return { found: false };
 
   const traktUrl = `https://trakt.tv/shows/${showSlug}/seasons/${seasonNumber}/episodes/${episodeNumber}`;
-  const stats = await fetchOptionalStats(
-    [
-      `/episodes/${epIds.trakt}/stats`,
-      `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
-    ],
-    ftStats,
-    1500,
-  );
 
   return {
     found: true,

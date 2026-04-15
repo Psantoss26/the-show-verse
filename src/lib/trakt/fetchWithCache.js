@@ -144,6 +144,9 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
     timeoutMs = defaultTimeout,
     signal,
     headers: customHeaders,
+    // maxRetries: permite a los llamadores limitar reintentos (ej. 0 para scoreboard)
+    // para evitar sleeps de backoff que excedan el maxDuration de Vercel
+    maxRetries = MAX_RETRIES,
   } = options;
 
   const controller = new AbortController();
@@ -235,10 +238,10 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
       }
 
       // Para otros endpoints, reintentar con backoff
-      if (retryCount < MAX_RETRIES) {
+      if (retryCount < maxRetries) {
         const waitTime = BASE_RETRY_DELAY * Math.pow(2, retryCount);
         console.warn(
-          `⚠️ Trakt server error (${res.status}) on ${path}, retrying in ${waitTime}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`,
+          `⚠️ Trakt server error (${res.status}) on ${path}, retrying in ${waitTime}ms (attempt ${retryCount + 1}/${maxRetries})`,
         );
         await sleep(waitTime);
         return fetchTraktWithRetry(path, options, retryCount + 1);
@@ -247,19 +250,21 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
 
     if (!res.ok) {
       // Construir mensaje de error con texto capturado si no hay JSON
-      const msg = 
-        json?.error || 
-        json?.message || 
+      const msg =
+        json?.error ||
+        json?.message ||
         (errorText && errorText.length < 100 ? errorText : null) ||
         `Trakt HTTP ${res.status}`;
-      
+
       logUnexpected(`❌ Trakt error ${res.status} on ${path}: ${msg}`);
-      
+
       // 403 puede ser auth expirado o rate limiting disfrazado
       if (res.status === 403) {
-        console.warn(`⚠️ Trakt 403 Forbidden - posible token inválido o rate limit`);
+        console.warn(
+          `⚠️ Trakt 403 Forbidden - posible token inválido o rate limit`,
+        );
       }
-      
+
       const err = new Error(msg);
       err.status = res.status;
       err.path = path;
@@ -281,7 +286,7 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
 
     // Si el error es de red y tenemos reintentos, reintentar
     if (
-      retryCount < MAX_RETRIES &&
+      retryCount < maxRetries &&
       (err.message.includes("fetch failed") ||
         err.message.includes("network") ||
         err.message.includes("ECONNREFUSED") ||
@@ -289,7 +294,7 @@ async function fetchTraktWithRetry(path, options = {}, retryCount = 0) {
     ) {
       const waitTime = BASE_RETRY_DELAY * Math.pow(2, retryCount);
       console.warn(
-        `⚠️ Network error on ${path}, retrying in ${waitTime}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`,
+        `⚠️ Network error on ${path}, retrying in ${waitTime}ms (attempt ${retryCount + 1}/${maxRetries})`,
       );
       await sleep(waitTime);
       return fetchTraktWithRetry(path, options, retryCount + 1);

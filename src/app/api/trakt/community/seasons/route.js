@@ -48,12 +48,22 @@ export async function GET(req) {
 
     return NextResponse.json({ items: Array.isArray(json) ? json : [] });
   } catch (e) {
-    // Si es timeout, devolver error 504
+    // Timeout
     if (e?.name === "AbortError") {
       return NextResponse.json(
         { error: "Trakt request timeout" },
         { status: 504 },
       );
+    }
+    // 403 (rate limit / Cloudflare), 404 (no encontrado en Trakt) → vacío gracioso
+    const isGraceful =
+      e?.status === 403 ||
+      e?.status === 404 ||
+      e?.status === 405 ||
+      e?.isTimeout ||
+      /no se encontró|not found/i.test(e?.message || "");
+    if (isGraceful) {
+      return NextResponse.json({ items: [] });
     }
     return NextResponse.json({ error: e?.message || "Error" }, { status: 500 });
   }

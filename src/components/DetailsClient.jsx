@@ -125,6 +125,7 @@ import {
   traktGetLists,
   traktGetShowSeasons,
   traktGetScoreboard,
+  traktGetStats,
   traktSetRating,
   traktGetShowPlays,
   traktAddShowPlay,
@@ -2669,9 +2670,33 @@ export default function DetailsClient({
             return;
           }
 
-          // Si found=true pero sin stats, reintentar (cold start probable)
-          if (result.found && attempt < delays.length - 1) continue;
-          // Último intento o found=false: aceptar resultado
+          // Si found=true pero sin stats: el scoreboard puede estar sirviendo
+          // un resultado cacheado (unstable_cache 30min) con stats nulas.
+          // Fallback directo a /api/trakt/stats que NO usa unstable_cache
+          // y realiza petición fresca a Trakt.
+          if (result.found) {
+            try {
+              const statsR = await withTimeout(
+                traktGetStats({ type: traktType, tmdbId: id }),
+                10000,
+              );
+              if (!ignore && statsR?.found && statsR?.stats) {
+                const withStats = { ...result, stats: statsR.stats };
+                setTScoreboard((prev) => mergeScoreboardState(prev, withStats));
+                if (hasNumericStats(withStats.stats)) {
+                  try {
+                    const cacheKey = `tsb_${traktType}_${id}`;
+                    localStorage.setItem(cacheKey, JSON.stringify(withStats));
+                  } catch {}
+                  return;
+                }
+              }
+            } catch {}
+            // Sin stats tras fallback: aceptar el resultado actual
+            return;
+          }
+          // found=false: reintentar si quedan intentos disponibles
+          if (attempt < delays.length - 1) continue;
           return;
         } catch (e) {
           if (ignore) return;
