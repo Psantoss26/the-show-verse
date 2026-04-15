@@ -1,4 +1,10 @@
 import { NextResponse } from 'next/server'
+import {
+    clearTraktCookies,
+    getValidTraktToken,
+    setTraktCookies,
+    traktApi,
+} from '@/lib/trakt/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -114,7 +120,7 @@ function normalizeList(item) {
 
     // ✅ IMPORTANTÍSIMO: el user puede venir en el wrapper
     const user = item?.user || l?.user || null
-    const username = user?.username || null
+    const username = user?.username || user?.ids?.slug || null
 
     const ids = l.ids || {}
     const traktId = ids.trakt ?? l.id ?? null
@@ -263,6 +269,10 @@ export async function GET(req) {
             }
         }
 
+        let traktConnected = mode !== 'user'
+        let requiresAuth = false
+        let traktUser = null
+
         // 1) Fuente principal según modo
         if (mode === 'trending') {
             const r = await traktGet('/lists/trending', { page, limit, extended: 'full' })
@@ -272,6 +282,126 @@ export async function GET(req) {
             const r = await traktGet('/lists/popular', { page, limit, extended: 'full' })
             if (!r.ok) return NextResponse.json({ error: r.error || 'Trakt lists failed', details: r.json }, { status: r.status })
             pushMany(Array.isArray(r.json) ? r.json : [])
+        } else if (mode === 'user') {
+            const { token, refreshedTokens, shouldClear } = await getValidTraktToken(
+                req.cookies
+            )
+
+            if (!token) {
+                const res = NextResponse.json({
+                    mode,
+                    page,
+                    limit,
+                    preview,
+                    connected: false,
+                    requiresAuth: true,
+                    user: null,
+                    lists: [],
+                })
+                if (shouldClear) clearTraktCookies(res)
+                return res
+            }
+
+            const settings = await traktApi('/users/settings', {
+                token,
+                timeoutMs: 7000,
+                retries: 1,
+            })
+
+            if (!settings.ok) {
+                const disconnected = Number(settings.status) === 401
+                const res = NextResponse.json(
+                    {
+                        mode,
+                        page,
+                        limit,
+                        preview,
+                        connected: !disconnected,
+                        requiresAuth: disconnected,
+                        user: null,
+                        lists: [],
+                        error: disconnected
+                            ? ''
+                            : settings.json?.error ||
+                              settings.json?.message ||
+                              'Trakt user lists failed',
+                    },
+                    { status: 200 }
+                )
+                if (disconnected) clearTraktCookies(res)
+                else if (refreshedTokens) setTraktCookies(res, refreshedTokens)
+                return res
+            }
+
+            traktConnected = true
+            traktUser = settings.json?.user || null
+
+            const userLists = await traktApi(
+                `/users/me/lists?page=${encodeURIComponent(String(page))}&limit=${encodeURIComponent(String(limit))}`,
+                {
+                token,
+                timeoutMs: 7000,
+                retries: 1,
+                }
+            )
+
+            if (!userLists.ok) {
+                const res = NextResponse.json(
+                    {
+                        mode,
+                        page,
+                        limit,
+                        preview,
+                        connected: true,
+                        requiresAuth: false,
+                        user: traktUser,
+                        lists: [],
+                        error:
+                            userLists.json?.error ||
+                            userLists.json?.message ||
+                            'Trakt user lists failed',
+                    },
+                    { status: 200 }
+                )
+                if (refreshedTokens) setTraktCookies(res, refreshedTokens)
+                return res
+            }
+
+            const rawLists = Array.isArray(userLists.json) ? userLists.json : []
+            const stampedLists = rawLists.map((list) => ({
+                ...list,
+                user: list?.user || traktUser || null,
+            }))
+            pushMany(stampedLists)
+
+            // 2) Enriquecemos con internalUrl + previewPosters (con concurrencia limitada)
+            const sliced = out.slice(0, limit)
+            const enriched = await mapLimit(sliced, 4, async (l) => {
+                const internalUrl = buildInternalUrl(l)
+                const previewPosters = preview > 0 ? await fetchPreviewPostersForList(l, preview) : []
+                return {
+                    ...l,
+                    internalUrl,
+                    isOfficial: false,
+                    previewPosters,
+                }
+            })
+
+            const res = NextResponse.json(
+                {
+                    mode,
+                    page,
+                    limit,
+                    preview,
+                    connected: traktConnected,
+                    requiresAuth,
+                    user: traktUser,
+                    lists: enriched,
+                },
+                { status: 200 }
+            )
+            if (refreshedTokens) setTraktCookies(res, refreshedTokens)
+            return res
         } else {
             // ✅ OFFICIAL real (si Trakt lo soporta)
             const o = await traktGet('/lists/official', { page, limit, extended: 'full' })
@@ -321,6 +451,9 @@ export async function GET(req) {
                 page,
                 limit,
                 preview,
+                connected: traktConnected,
+                requiresAuth,
+                user: traktUser,
                 lists: enriched,
             },
             { status: 200 }
