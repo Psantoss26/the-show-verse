@@ -26,6 +26,103 @@ const IMG = "https://image.tmdb.org/t/p";
 const REGION = "ES";
 const LANG = "es-ES";
 
+// SessionStorage keys
+const SESSION_KEYS = {
+  CONTENT: "discover_content",
+  SORT: "discover_sort",
+  PROVIDERS: "discover_providers",
+  SEEN_MODE: "discover_seen_mode",
+  DATE_FROM: "discover_date_from",
+  DATE_TO: "discover_date_to",
+  GENRES: "discover_genres",
+  CERTS: "discover_certs",
+  LANG: "discover_lang",
+  SCORE_RANGE: "discover_score_range",
+  MIN_VOTES: "discover_min_votes",
+  RUNTIME_RANGE: "discover_runtime_range",
+  KEYWORDS: "discover_keywords",
+};
+
+// Helper para cargar filtros desde sessionStorage
+function loadFiltersFromSession() {
+  if (typeof window === "undefined") return {};
+  try {
+    return {
+      content: sessionStorage.getItem(SESSION_KEYS.CONTENT) || "movie",
+      sortPreset: sessionStorage.getItem(SESSION_KEYS.SORT) || "pop_desc",
+      selectedProviders: JSON.parse(
+        sessionStorage.getItem(SESSION_KEYS.PROVIDERS) || "[]",
+      ),
+      seenMode: sessionStorage.getItem(SESSION_KEYS.SEEN_MODE) || "all",
+      dateFrom: sessionStorage.getItem(SESSION_KEYS.DATE_FROM) || "",
+      dateTo: sessionStorage.getItem(SESSION_KEYS.DATE_TO) || "",
+      selectedGenres: JSON.parse(
+        sessionStorage.getItem(SESSION_KEYS.GENRES) || "[]",
+      ),
+      selectedCerts: JSON.parse(
+        sessionStorage.getItem(SESSION_KEYS.CERTS) || "[]",
+      ),
+      lang: sessionStorage.getItem(SESSION_KEYS.LANG) || "",
+      scoreRange: JSON.parse(
+        sessionStorage.getItem(SESSION_KEYS.SCORE_RANGE) || "[0, 10]",
+      ),
+      minVotes: Number(sessionStorage.getItem(SESSION_KEYS.MIN_VOTES) || "0"),
+      runtimeRange: JSON.parse(
+        sessionStorage.getItem(SESSION_KEYS.RUNTIME_RANGE) || "[0, 360]",
+      ),
+      selectedKeywords: JSON.parse(
+        sessionStorage.getItem(SESSION_KEYS.KEYWORDS) || "[]",
+      ),
+    };
+  } catch (e) {
+    console.error("Error al cargar filtros desde sessionStorage:", e);
+    return {};
+  }
+}
+
+// Helper para guardar filtros en sessionStorage
+function saveFiltersToSession(filters) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(SESSION_KEYS.CONTENT, filters.content || "movie");
+    sessionStorage.setItem(SESSION_KEYS.SORT, filters.sortPreset || "pop_desc");
+    sessionStorage.setItem(
+      SESSION_KEYS.PROVIDERS,
+      JSON.stringify(filters.selectedProviders || []),
+    );
+    sessionStorage.setItem(SESSION_KEYS.SEEN_MODE, filters.seenMode || "all");
+    sessionStorage.setItem(SESSION_KEYS.DATE_FROM, filters.dateFrom || "");
+    sessionStorage.setItem(SESSION_KEYS.DATE_TO, filters.dateTo || "");
+    sessionStorage.setItem(
+      SESSION_KEYS.GENRES,
+      JSON.stringify(filters.selectedGenres || []),
+    );
+    sessionStorage.setItem(
+      SESSION_KEYS.CERTS,
+      JSON.stringify(filters.selectedCerts || []),
+    );
+    sessionStorage.setItem(SESSION_KEYS.LANG, filters.lang || "");
+    sessionStorage.setItem(
+      SESSION_KEYS.SCORE_RANGE,
+      JSON.stringify(filters.scoreRange || [0, 10]),
+    );
+    sessionStorage.setItem(
+      SESSION_KEYS.MIN_VOTES,
+      String(filters.minVotes || 0),
+    );
+    sessionStorage.setItem(
+      SESSION_KEYS.RUNTIME_RANGE,
+      JSON.stringify(filters.runtimeRange || [0, 360]),
+    );
+    sessionStorage.setItem(
+      SESSION_KEYS.KEYWORDS,
+      JSON.stringify(filters.selectedKeywords || []),
+    );
+  } catch (e) {
+    console.error("Error al guardar filtros en sessionStorage:", e);
+  }
+}
+
 // Hook Debounce para evitar llamadas excesivas
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -104,7 +201,9 @@ function Section({
       onToggle={(e) => setOpen(e.currentTarget.open)}
       className={[
         "group border-b border-white/5 last:border-0",
-        overflowVisible ? "overflow-visible" : "overflow-hidden",
+        overflowVisible
+          ? "overflow-visible relative z-[150]"
+          : "overflow-hidden",
       ].join(" ")}
     >
       <summary className="cursor-pointer select-none py-4 flex items-center justify-between hover:text-white transition-colors text-zinc-300">
@@ -212,16 +311,16 @@ function DualRange({
         </span>
       </div>
 
-      <div className="relative h-5 w-full">
+      <div className="relative h-8 w-full px-2 py-1.5 overflow-visible">
         {/* Track Fondo */}
-        <div className="absolute top-1/2 left-0 w-full h-1 bg-zinc-800 rounded-full -translate-y-1/2" />
+        <div className="absolute top-1/2 left-2 right-2 h-1 bg-zinc-800 rounded-full -translate-y-1/2" />
 
         {/* Track Activo */}
         <div
           className="absolute top-1/2 h-1 bg-orange-500 rounded-full -translate-y-1/2 transition-all duration-75"
           style={{
-            left: `${minPercent}%`,
-            width: `${maxPercent - minPercent}%`,
+            left: `calc(${minPercent}% + 8px)`,
+            width: `calc(${maxPercent - minPercent}% - 0px)`,
           }}
         />
 
@@ -268,11 +367,11 @@ function SingleRange({ min, max, value, onChange, step = 1, label }) {
         <span>{label}</span>
         <span className="font-mono text-orange-500 font-bold">{value}</span>
       </div>
-      <div className="relative h-5 w-full flex items-center">
-        <div className="absolute inset-x-0 h-1 bg-zinc-800 rounded-full"></div>
+      <div className="relative h-8 w-full px-2 py-1.5 overflow-visible">
+        <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2 h-1 bg-zinc-800 rounded-full"></div>
         <div
-          className="absolute h-1 bg-orange-500 rounded-full left-0"
-          style={{ width: `${percent}%` }}
+          className="absolute h-1 bg-orange-500 rounded-full top-1/2 -translate-y-1/2 transition-all duration-75"
+          style={{ left: "8px", width: `calc(${percent}% - 8px)` }}
         ></div>
         <input
           type="range"
@@ -281,11 +380,8 @@ function SingleRange({ min, max, value, onChange, step = 1, label }) {
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-        />
-        <div
-          className="absolute h-3 w-3 bg-orange-500 rounded-full pointer-events-none shadow-lg transition-all duration-75 group-hover:scale-125"
-          style={{ left: `${percent}%`, transform: "translateX(-50%)" }}
+          className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none z-20 range-thumb-interactive cursor-pointer"
+          style={{ pointerEvents: "auto" }}
         />
       </div>
     </div>
@@ -326,7 +422,7 @@ function SortMenu({ value, onChange }) {
   }, []);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative z-[200]" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -338,7 +434,7 @@ function SortMenu({ value, onChange }) {
         />
       </button>
       {open && (
-        <div className="absolute z-[80] mt-1 w-full rounded-lg border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden py-1">
+        <div className="absolute z-[250] mt-1 w-full rounded-lg border-2 border-zinc-700 bg-[#0a0a0a] shadow-[0_10px_40px_rgba(0,0,0,0.95)] overflow-hidden py-1">
           {SORT_OPTIONS.map((opt) => {
             const active = opt.id === value;
             return (
@@ -350,7 +446,7 @@ function SortMenu({ value, onChange }) {
                   setOpen(false);
                 }}
                 className={`w-full text-left px-3 py-2 transition flex items-center justify-between gap-3
-                                    ${active ? "bg-zinc-800 text-orange-500" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"}`}
+                                    ${active ? "bg-zinc-800/90 text-orange-500" : "text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-200"}`}
               >
                 <span className="text-sm">{opt.label}</span>
                 {active && <Check className="w-3.5 h-3.5" />}
@@ -500,7 +596,7 @@ function ProviderIcon({ provider, active, onToggle }) {
 export default function DiscoverClient() {
   const { session, account, hydrated } = useAuth();
 
-  // --- State Filters ---
+  // --- State Filters (inicializados con valores por defecto para evitar hydration error) ---
   const [content, setContent] = useState("movie");
   const [sortPreset, setSortPreset] = useState("pop_desc");
   const [providersAll, setProvidersAll] = useState([]);
@@ -537,6 +633,61 @@ export default function DiscoverClient() {
   const [error, setError] = useState(null);
 
   const hasSession = hydrated && !!session && !!account?.id;
+
+  // Cargar filtros desde sessionStorage solo en el cliente (después del primer render)
+  useEffect(() => {
+    const savedFilters = loadFiltersFromSession();
+    if (savedFilters.content) setContent(savedFilters.content);
+    if (savedFilters.sortPreset) setSortPreset(savedFilters.sortPreset);
+    if (savedFilters.selectedProviders)
+      setSelectedProviders(savedFilters.selectedProviders);
+    if (savedFilters.seenMode) setSeenMode(savedFilters.seenMode);
+    if (savedFilters.dateFrom) setDateFrom(savedFilters.dateFrom);
+    if (savedFilters.dateTo) setDateTo(savedFilters.dateTo);
+    if (savedFilters.selectedGenres)
+      setSelectedGenres(savedFilters.selectedGenres);
+    if (savedFilters.selectedCerts)
+      setSelectedCerts(savedFilters.selectedCerts);
+    if (savedFilters.lang) setLang(savedFilters.lang);
+    if (savedFilters.scoreRange) setScoreRange(savedFilters.scoreRange);
+    if (savedFilters.minVotes !== undefined) setMinVotes(savedFilters.minVotes);
+    if (savedFilters.runtimeRange) setRuntimeRange(savedFilters.runtimeRange);
+    if (savedFilters.selectedKeywords)
+      setSelectedKeywords(savedFilters.selectedKeywords);
+  }, []); // Solo ejecutar una vez al montar
+
+  // Guardar filtros en sessionStorage cuando cambien
+  useEffect(() => {
+    saveFiltersToSession({
+      content,
+      sortPreset,
+      selectedProviders,
+      seenMode,
+      dateFrom,
+      dateTo,
+      selectedGenres,
+      selectedCerts,
+      lang,
+      scoreRange,
+      minVotes,
+      runtimeRange,
+      selectedKeywords,
+    });
+  }, [
+    content,
+    sortPreset,
+    selectedProviders,
+    seenMode,
+    dateFrom,
+    dateTo,
+    selectedGenres,
+    selectedCerts,
+    lang,
+    scoreRange,
+    minVotes,
+    runtimeRange,
+    selectedKeywords,
+  ]);
 
   function resetFilters() {
     setSortPreset("pop_desc");
@@ -926,7 +1077,7 @@ export default function DiscoverClient() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8">
           {/* --- Sidebar --- */}
-          <aside className="space-y-6">
+          <aside className="space-y-6 relative">
             {/* Contenido / Reset */}
             <div className="bg-[#121212] border border-zinc-800 rounded-xl p-4 shadow-sm">
               <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">
@@ -961,7 +1112,7 @@ export default function DiscoverClient() {
             </div>
 
             {/* Filtros Accordions */}
-            <div className="bg-[#121212] border border-zinc-800 rounded-xl p-4 shadow-sm space-y-1">
+            <div className="bg-[#121212] border border-zinc-800 rounded-xl p-4 shadow-sm space-y-1 overflow-visible">
               <Section
                 title="Ordenar"
                 defaultOpen
@@ -1182,8 +1333,8 @@ export default function DiscoverClient() {
                   <SingleRange
                     label="Mínimo de votos"
                     min={0}
-                    max={500}
-                    step={10}
+                    max={5000}
+                    step={50}
                     value={minVotes}
                     onChange={setMinVotes}
                   />
@@ -1349,23 +1500,23 @@ export default function DiscoverClient() {
 
         .range-thumb-interactive::-webkit-slider-thumb {
           pointer-events: auto;
-          width: 14px;
-          height: 14px;
-          background: #eab308;
+          width: 12px;
+          height: 12px;
+          background: #f97316;
           border-radius: 50%;
           cursor: pointer;
           -webkit-appearance: none;
-          box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+          box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
         }
         .range-thumb-interactive::-moz-range-thumb {
           pointer-events: auto;
-          width: 14px;
-          height: 14px;
-          background: #eab308;
+          width: 12px;
+          height: 12px;
+          background: #f97316;
           border: none;
           border-radius: 50%;
           cursor: pointer;
-          box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+          box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
         }
       `}</style>
     </div>
