@@ -344,6 +344,8 @@ export default function DetailsClient({
   // Claves para multiples rewatches (runs) y vista activa del modal de episodios
   const rewatchRunsStorageKey = `showverse:trakt:rewatchRuns:${id}`;
   const episodesViewStorageKey = `showverse:trakt:episodesView:${id}`;
+  const traktStatusStorageKey = `showverse:trakt:status:${endpointType}:${id}`;
+  const traktShowWatchedStorageKey = `showverse:trakt:showWatched:${id}`;
 
   // Lista de runs de rewatch: [{ id, startedAt, label }]
   const [rewatchRuns, setRewatchRuns] = useState([]);
@@ -800,7 +802,10 @@ export default function DetailsClient({
   // =====================================================================
 
   const [videos, setVideos] = useState([]); // Lista de videos disponibles
-  const [videosLoading, setVideosLoading] = useState(false);
+  const [videosLoading, setVideosLoading] = useState(() => !!TMDB_API_KEY);
+  const [videosResolved, setVideosResolved] = useState(
+    () => !TMDB_API_KEY,
+  );
   const [videosError, setVideosError] = useState("");
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); // Video seleccionado para el modal
@@ -827,6 +832,21 @@ export default function DetailsClient({
     setActiveVideo(null);
   }, [id, endpointType]);
 
+  useLayoutEffect(() => {
+    if (!TMDB_API_KEY || !id) {
+      setVideos([]);
+      setVideosError("");
+      setVideosLoading(false);
+      setVideosResolved(true);
+      return;
+    }
+
+    setVideos([]);
+    setVideosError("");
+    setVideosLoading(true);
+    setVideosResolved(false);
+  }, [id, endpointType]);
+
   // Carga los videos de TMDb en espanol e ingles, los fusiona eliminando
   // duplicados, filtra los reproducibles y los ordena por relevancia.
   useEffect(() => {
@@ -851,6 +871,7 @@ export default function DetailsClient({
         setVideos([]);
         setVideosError("");
         setVideosLoading(false);
+        setVideosResolved(true);
         return;
       }
 
@@ -874,7 +895,10 @@ export default function DetailsClient({
       } catch (e) {
         if (!ignore) setVideosError(e?.message || "Error cargando vídeos");
       } finally {
-        if (!ignore) setVideosLoading(false);
+        if (!ignore) {
+          setVideosLoading(false);
+          setVideosResolved(true);
+        }
       }
     };
 
@@ -1783,6 +1807,8 @@ export default function DetailsClient({
     () => endpointType === "tv" && !!initialShowWatched,
     [endpointType, initialShowWatched],
   );
+  const [hasCachedTraktStatus, setHasCachedTraktStatus] = useState(false);
+  const [hasCachedShowWatched, setHasCachedShowWatched] = useState(false);
 
   const initialAnyEpisodeWatched = useMemo(
     () =>
@@ -2575,22 +2601,150 @@ export default function DetailsClient({
     };
   }, [id, traktType]);
 
-  // Resetear estados de Trakt al cambiar de contenido
-  useEffect(() => {
-    setTrakt(buildInitialTraktState());
+  // Resetear estados de Trakt al cambiar de contenido e hidratar caché local
+  useLayoutEffect(() => {
+    const nextTrakt = buildInitialTraktState();
+    let nextWatchedBySeason = initialWatchedBySeason;
+    let nextWatchedBySeasonLoaded = hasInitialShowWatched;
+    let hydratedStatus = false;
+    let hydratedShowWatched = false;
+
+    if (typeof window !== "undefined") {
+      if (!hasInitialTraktStatus) {
+        try {
+          const cachedStatusRaw =
+            window.localStorage.getItem(traktStatusStorageKey);
+          const cachedStatus = cachedStatusRaw
+            ? JSON.parse(cachedStatusRaw)
+            : null;
+
+          if (cachedStatus && typeof cachedStatus.connected === "boolean") {
+            nextTrakt.loading = false;
+            nextTrakt.connected = !!cachedStatus.connected;
+            nextTrakt.found = !!cachedStatus.found;
+            nextTrakt.traktId = cachedStatus.traktId ?? null;
+            nextTrakt.traktUrl = cachedStatus.traktUrl || null;
+            nextTrakt.watched = !!cachedStatus.watched;
+            nextTrakt.plays = Number(cachedStatus.plays || 0);
+            nextTrakt.lastWatchedAt = cachedStatus.lastWatchedAt || null;
+            nextTrakt.rating =
+              typeof cachedStatus.rating === "number"
+                ? cachedStatus.rating
+                : null;
+            nextTrakt.inWatchlist = !!cachedStatus.inWatchlist;
+            nextTrakt.progress = cachedStatus.progress || null;
+            nextTrakt.history = Array.isArray(cachedStatus.history)
+              ? cachedStatus.history
+              : [];
+            nextTrakt.error = "";
+            hydratedStatus = true;
+          }
+        } catch {}
+      }
+
+      if (endpointType === "tv" && !hasInitialShowWatched) {
+        try {
+          const cachedWatchedRaw = window.localStorage.getItem(
+            traktShowWatchedStorageKey,
+          );
+          const cachedWatched = cachedWatchedRaw
+            ? JSON.parse(cachedWatchedRaw)
+            : null;
+          const watchedBySeasonCached = cachedWatched?.watchedBySeason;
+
+          if (
+            watchedBySeasonCached &&
+            typeof watchedBySeasonCached === "object" &&
+            !Array.isArray(watchedBySeasonCached)
+          ) {
+            nextWatchedBySeason = watchedBySeasonCached;
+            nextWatchedBySeasonLoaded = true;
+            hydratedShowWatched = true;
+
+            const hasAnyWatchedEpisode = Object.values(
+              watchedBySeasonCached,
+            ).some(
+              (episodes) => Array.isArray(episodes) && episodes.length > 0,
+            );
+
+            nextTrakt.watched = hasAnyWatchedEpisode;
+          }
+        } catch {}
+      }
+    }
+
+    setTrakt(nextTrakt);
     setTraktWatchedOpen(false);
     setTraktEpisodesOpen(false);
     setEpisodeBusyKey("");
     setTraktBusy("");
 
-    setWatchedBySeason(initialWatchedBySeason);
-    setWatchedBySeasonLoaded(hasInitialShowWatched);
+    setWatchedBySeason(nextWatchedBySeason);
+    setWatchedBySeasonLoaded(nextWatchedBySeasonLoaded);
+    setHasCachedTraktStatus(hydratedStatus);
+    setHasCachedShowWatched(hydratedShowWatched);
   }, [
     id,
     endpointType,
     buildInitialTraktState,
     initialWatchedBySeason,
     hasInitialShowWatched,
+    hasInitialTraktStatus,
+    traktStatusStorageKey,
+    traktShowWatchedStorageKey,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      if (trakt?.connected) {
+        window.localStorage.setItem(
+          traktStatusStorageKey,
+          JSON.stringify({
+            connected: !!trakt.connected,
+            found: !!trakt.found,
+            traktId: trakt.traktId ?? null,
+            traktUrl: trakt.traktUrl || null,
+            watched: !!trakt.watched,
+            plays: Number(trakt.plays || 0),
+            lastWatchedAt: trakt.lastWatchedAt || null,
+            rating: typeof trakt.rating === "number" ? trakt.rating : null,
+            inWatchlist: !!trakt.inWatchlist,
+            progress: trakt.progress || null,
+            history: Array.isArray(trakt.history) ? trakt.history : [],
+          }),
+        );
+      } else if (trakt?.loading === false) {
+        window.localStorage.removeItem(traktStatusStorageKey);
+      }
+    } catch {}
+  }, [trakt, traktStatusStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || endpointType !== "tv") return;
+
+    try {
+      if (watchedBySeasonLoaded && trakt?.connected) {
+        window.localStorage.setItem(
+          traktShowWatchedStorageKey,
+          JSON.stringify({
+            watchedBySeason:
+              watchedBySeason && typeof watchedBySeason === "object"
+                ? watchedBySeason
+                : {},
+          }),
+        );
+      } else if (watchedBySeasonLoaded && !trakt?.connected) {
+        window.localStorage.removeItem(traktShowWatchedStorageKey);
+      }
+    } catch {}
+  }, [
+    endpointType,
+    watchedBySeason,
+    watchedBySeasonLoaded,
+    trakt?.connected,
+    traktShowWatchedStorageKey,
   ]);
 
   // Recargar estado de Trakt al abrir el modal de historial
@@ -2602,13 +2756,12 @@ export default function DetailsClient({
   // Carga inicial del estado de Trakt para el contenido actual
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
-    if (!traktDeferredReady) return;
-    void reloadTraktStatus({ background: hasInitialTraktStatus });
-  }, [reloadTraktStatus, traktDeferredReady, hasInitialTraktStatus]);
+    void reloadTraktStatus({
+      background: hasInitialTraktStatus || hasCachedTraktStatus,
+    });
+  }, [reloadTraktStatus, hasInitialTraktStatus, hasCachedTraktStatus]);
 
   useEffect(() => {
-    if (!traktDeferredReady) return;
-
     let cancelled = false;
     const timers = [];
 
@@ -2653,7 +2806,6 @@ export default function DetailsClient({
     trakt.loading,
     trakt.connected,
     trakt.error,
-    traktDeferredReady,
   ]);
 
   const handleOpenTraktWatched = useCallback(async () => {
@@ -2689,10 +2841,17 @@ export default function DetailsClient({
 
   // Trigger para cargar episodios vistos cuando cambian las dependencias
   useEffect(() => {
-    if (!traktDeferredReady) return;
+    if (endpointType !== "tv") return;
+    if (!trakt.connected) return;
     if (hasInitialShowWatched) return;
     loadTraktShowWatched();
-  }, [loadTraktShowWatched, traktDeferredReady, hasInitialShowWatched]);
+  }, [
+    endpointType,
+    loadTraktShowWatched,
+    trakt.connected,
+    hasInitialShowWatched,
+    hasCachedShowWatched,
+  ]);
 
   /**
    * Carga los plays (visionados completos) de la serie desde Trakt.
@@ -6906,9 +7065,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 SECCIÓN: MEDIA (Portadas y Fondos)
                ================================================================= */}
             <section id="section-media" ref={registerSection("media")}>
-              {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
-              {(type === "movie" || type === "tv") && (
-                <section className="mb-16" ref={artworkControlsWrapRef}>
+              <AnimatedSection delay={0.04}>
+                {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
+                {(type === "movie" || type === "tv") && (
+                  <section className="mb-16" ref={artworkControlsWrapRef}>
                   {/* ========== Header de la Sección de Media ========== */}
                   {/* Incluye título y controles (tabs y filtros) */}
                   <div className="mb-6 flex items-center justify-between gap-3">
@@ -7296,6 +7456,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       activePath,
                     } = artworkSelection;
 
+                    if (
+                      (!ordered || ordered.length === 0) &&
+                      (imagesLoading || !artworkInitialized)
+                    ) {
+                      return null;
+                    }
+
                     if (!ordered || ordered.length === 0) {
                       return (
                         <div className="text-sm text-zinc-400">
@@ -7325,21 +7492,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                     return (
                       <div className="relative overflow-x-hidden overflow-y-visible">
-                        {/* Skeleton mientras se precargan las primeras N */}
+                        {/* Loading visual: una fila de 7 tarjetas placeholder */}
                         {!artworkRowReady && (
                           <div
-                            className="grid pb-8 pt-3"
-                            style={{
-                              gridTemplateColumns: `repeat(${Math.min(artworkPreloadCount, isPoster ? 7 : 4)}, 1fr)`,
-                              gap: isPoster ? "18px" : "20px",
-                            }}
+                            className="grid grid-cols-7 gap-[18px] pb-8 pt-3"
+                            aria-hidden="true"
                           >
-                            {Array.from({
-                              length: Math.min(
-                                artworkPreloadCount,
-                                isPoster ? 7 : 4,
-                              ),
-                            }).map((_, i) => (
+                            {Array.from({ length: 7 }).map((_, i) => (
                               <div
                                 key={i}
                                 className={`rounded-2xl bg-white/5 animate-pulse ${aspect}`}
@@ -7349,12 +7508,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         )}
 
                         {/* Carrusel: aparece "de golpe" cuando ya están cargadas */}
-                        <div
-                          style={{
-                            opacity: artworkRowReady ? 1 : 0,
-                            pointerEvents: artworkRowReady ? "auto" : "none",
-                          }}
-                        >
+                        {artworkRowReady && (
                           <Swiper
                             key={activeImagesTab}
                             spaceBetween={12}
@@ -7483,155 +7637,186 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               );
                             })}
                           </Swiper>
-                        </div>
+                        )}
                       </div>
                     );
                   })()}
-                </section>
-              )}
+                  </section>
+                )}
 
-              {/* =================================================================
-                  SECCIÓN: TRÁILER Y VÍDEOS
-                 ================================================================= */}
-              {/* Carrusel de vídeos (tráilers, teasers, clips, etc.) del contenido */}
-              {/* Solo se muestra si hay una API key de TMDb configurada */}
-              {TMDB_API_KEY && (
-                <section className="mt-6">
-                  <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} />
+                {/* =================================================================
+                    SECCIÓN: TRÁILER Y VÍDEOS
+                   ================================================================= */}
+                {/* Carrusel de vídeos (tráilers, teasers, clips, etc.) del contenido */}
+                {/* Solo se muestra si hay una API key de TMDb configurada */}
+                {TMDB_API_KEY && (
+                  <section className="mt-6">
+                    <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} />
 
-                  <div className="rounded-2xl p-0 mb-10">
-                    {videosLoading && (
-                      <div className="text-sm text-zinc-400 inline-flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" /> Cargando
-                        vídeos…
-                      </div>
-                    )}
+                    <div className="rounded-2xl p-0 mb-10">
+                      {videosLoading && (
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                          {Array.from({ length: 4 }).map((_, index) => (
+                            <div
+                              key={index}
+                              className="rounded-2xl overflow-hidden border border-white/10 bg-black/25 animate-pulse"
+                              aria-hidden="true"
+                            >
+                              <div className="relative aspect-video bg-white/5">
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-14 h-14 rounded-full bg-white/10 border border-white/10" />
+                                </div>
+                              </div>
 
-                    {!!videosError && (
-                      <div className="text-sm text-red-400">{videosError}</div>
-                    )}
+                              <div className="p-4">
+                                <div className="h-4 w-3/4 rounded bg-white/10" />
+                                <div className="mt-3 flex gap-2">
+                                  <div className="h-5 w-16 rounded-full bg-white/10" />
+                                  <div className="h-5 w-14 rounded-full bg-white/10" />
+                                  <div className="h-5 w-10 rounded-full bg-white/10" />
+                                </div>
+                                <div className="mt-4 flex items-center gap-2">
+                                  <div className="h-3 w-14 rounded bg-white/10" />
+                                  <div className="h-3 w-1 rounded-full bg-white/10" />
+                                  <div className="h-3 w-20 rounded bg-white/10" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-                    {!videosLoading && !videosError && videos.length === 0 && (
+                      {!!videosError && (
+                        <div className="text-sm text-red-400">{videosError}</div>
+                      )}
+
+                      {videosResolved &&
+                        !videosLoading &&
+                        !videosError &&
+                        videos.length === 0 && (
                       <div className="text-sm text-zinc-400">
                         No hay tráileres o vídeos disponibles en TMDb para este
                         título.
                       </div>
-                    )}
+                      )}
 
-                    {videos.length > 0 && (
-                      <Swiper
-                        spaceBetween={12}
-                        slidesPerView={2}
-                        breakpoints={{
-                          640: { slidesPerView: 2, spaceBetween: 16 },
-                          768: { slidesPerView: 3, spaceBetween: 16 },
-                          1024: { slidesPerView: 4, spaceBetween: 16 },
-                          1280: { slidesPerView: 4, spaceBetween: 16 },
-                        }}
-                        className="pb-2"
-                      >
-                        {videos.slice(0, 20).map((v) => {
-                          const thumb = videoThumbUrl(v);
-                          const fallbackPath =
-                            displayBackdropPath || displayPosterPath;
-                          const fallback = fallbackPath
-                            ? `https://image.tmdb.org/t/p/w780${fallbackPath}`
-                            : "/placeholder.png";
+                      {videos.length > 0 && (
+                        <Swiper
+                          spaceBetween={12}
+                          slidesPerView={2}
+                          breakpoints={{
+                            640: { slidesPerView: 2, spaceBetween: 16 },
+                            768: { slidesPerView: 3, spaceBetween: 16 },
+                            1024: { slidesPerView: 4, spaceBetween: 16 },
+                            1280: { slidesPerView: 4, spaceBetween: 16 },
+                          }}
+                          className="pb-2"
+                        >
+                          {videos.slice(0, 20).map((v) => {
+                            const thumb = videoThumbUrl(v);
+                            const fallbackPath =
+                              displayBackdropPath || displayPosterPath;
+                            const fallback = fallbackPath
+                              ? `https://image.tmdb.org/t/p/w780${fallbackPath}`
+                              : "/placeholder.png";
 
-                          return (
-                            <SwiperSlide
-                              key={`${v.site}:${v.key}`}
-                              className="h-full"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => openVideo(v)}
-                                title={v.name || "Ver vídeo"}
-                                className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
-                            border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
+                            return (
+                              <SwiperSlide
+                                key={`${v.site}:${v.key}`}
+                                className="h-full"
                               >
-                                <div className="relative aspect-video overflow-hidden">
-                                  <img
-                                    src={thumb || fallback}
-                                    alt={v.name || "Video"}
-                                    className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
-                                  />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-14 h-14 rounded-full bg-black/55 border border-white/15 flex items-center justify-center transition-transform hover:scale-105">
-                                      <Play className="w-7 h-7 text-yellow-300 translate-x-[1px]" />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-col flex-1 p-4 items-start">
-                                  {/* Titulo arriba (1 linea siempre) */}
-                                  <div className="w-full min-h-[22px]">
-                                    <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
-                                      {v.name || "Vídeo"}
-                                    </div>
-                                  </div>
-
-                                  {/* Propiedades debajo, alineadas a la izquierda */}
-                                  <div className="mt-3 flex items-center gap-1.5 w-full overflow-hidden">
-                                    <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar">
-                                      {/* Label de Oficial - Agregado shrink-0 */}
-                                      {v.official && (
-                                        <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200 flex items-center gap-0.5">
-                                          <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
-                                          OFFICIAL
-                                        </span>
-                                      )}
-
-                                      {/* Label de Tipo (Trailer, Teaser, etc) - Agregado shrink-0 */}
-                                      {v.type && (
-                                        <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-zinc-300">
-                                          {v.type}
-                                        </span>
-                                      )}
-
-                                      {/* Label de Idioma - Agregado shrink-0 */}
-                                      {v.iso_639_1 && (
-                                        <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300">
-                                          {v.iso_639_1}
-                                        </span>
-                                      )}
+                                <button
+                                  type="button"
+                                  onClick={() => openVideo(v)}
+                                  title={v.name || "Ver vídeo"}
+                                  className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
+                            border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
+                                >
+                                  <div className="relative aspect-video overflow-hidden">
+                                    <img
+                                      src={thumb || fallback}
+                                      alt={v.name || "Video"}
+                                      className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <div className="w-14 h-14 rounded-full bg-black/55 border border-white/15 flex items-center justify-center transition-transform hover:scale-105">
+                                        <Play className="w-7 h-7 text-yellow-300 translate-x-[1px]" />
+                                      </div>
                                     </div>
                                   </div>
 
-                                  {/* Fuente y fecha abajo, mismo margen izquierdo */}
-                                  <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
-                                    <span className="font-semibold text-zinc-200">
-                                      {v.site || "—"}
-                                    </span>
-                                    {v.published_at && (
-                                      <>
-                                        <span className="text-zinc-600">·</span>
-                                        <span className="shrink-0">
-                                          {new Date(
-                                            v.published_at,
-                                          ).toLocaleDateString("es-ES")}
-                                        </span>
-                                      </>
-                                    )}
+                                  <div className="flex flex-col flex-1 p-4 items-start">
+                                    {/* Titulo arriba (1 linea siempre) */}
+                                    <div className="w-full min-h-[22px]">
+                                      <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
+                                        {v.name || "Vídeo"}
+                                      </div>
+                                    </div>
+
+                                    {/* Propiedades debajo, alineadas a la izquierda */}
+                                    <div className="mt-3 flex items-center gap-1.5 w-full overflow-hidden">
+                                      <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar">
+                                        {/* Label de Oficial - Agregado shrink-0 */}
+                                        {v.official && (
+                                          <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200 flex items-center gap-0.5">
+                                            <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+                                            OFFICIAL
+                                          </span>
+                                        )}
+
+                                        {/* Label de Tipo (Trailer, Teaser, etc) - Agregado shrink-0 */}
+                                        {v.type && (
+                                          <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-zinc-300">
+                                            {v.type}
+                                          </span>
+                                        )}
+
+                                        {/* Label de Idioma - Agregado shrink-0 */}
+                                        {v.iso_639_1 && (
+                                          <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300">
+                                            {v.iso_639_1}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Fuente y fecha abajo, mismo margen izquierdo */}
+                                    <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
+                                      <span className="font-semibold text-zinc-200">
+                                        {v.site || "—"}
+                                      </span>
+                                      {v.published_at && (
+                                        <>
+                                          <span className="text-zinc-600">·</span>
+                                          <span className="shrink-0">
+                                            {new Date(
+                                              v.published_at,
+                                            ).toLocaleDateString("es-ES")}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              </button>
-                            </SwiperSlide>
-                          );
-                        })}
-                      </Swiper>
-                    )}
-                  </div>
-                </section>
-              )}
+                                </button>
+                              </SwiperSlide>
+                            );
+                          })}
+                        </Swiper>
+                      )}
+                    </div>
+                  </section>
+                )}
+              </AnimatedSection>
             </section>
 
             <section id="section-sentiment" ref={registerSection("sentiment")}>
-              {/* ===================================================== */}
-              {/* Trakt: sentimientos (AI summary) - Solo mostrar si no hay error */}
-              {!tSentiment.error && (
-                <section className="mb-12">
+              <AnimatedSection delay={0.04}>
+                {/* ===================================================== */}
+                {/* Trakt: sentimientos (AI summary) - Solo mostrar si no hay error */}
+                {!tSentiment.error && (
+                  <section className="mb-12">
                   <SectionTitle
                     title="Análisis de Sentimientos"
                     icon={Sparkles}
@@ -7728,8 +7913,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       </div>
                     </div>
                   </div>
-                </section>
-              )}
+                  </section>
+                )}
+              </AnimatedSection>
             </section>
 
             {/* =================================================================
@@ -7738,7 +7924,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Muestra las temporadas disponibles de la serie con información resumida */}
             {type === "tv" && (
               <section id="section-seasons" ref={registerSection("seasons")}>
-                <section className="mb-12">
+                <AnimatedSection delay={0.04}>
+                  <section className="mb-12">
                   <SectionTitle title="Temporadas" icon={Layers} />
 
                   <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -7871,7 +8058,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         );
                       })}
                   </div>
-                </section>
+                  </section>
+                </AnimatedSection>
               </section>
             )}
 
@@ -7881,9 +8069,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Gráfico de valoraciones por episodio mostrando la evolución de ratings */}
             {type === "tv" && (
               <section id="section-episodes" ref={registerSection("episodes")}>
-                {/* Subsección: Episodios y sus valoraciones */}
-                {type === "tv" ? (
-                  <section className="mb-10">
+                <AnimatedSection delay={0.04}>
+                  {/* Subsección: Episodios y sus valoraciones */}
+                  {type === "tv" ? (
+                    <section className="mb-10">
                     <SectionTitle
                       title="Valoración de Episodios"
                       icon={TrendingUp}
@@ -7913,19 +8102,21 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         />
                       )}
                     </div>
-                  </section>
-                ) : (
-                  <div className="text-sm text-zinc-400">
-                    Esta sección solo aplica a series.
-                  </div>
-                )}
+                    </section>
+                  ) : (
+                    <div className="text-sm text-zinc-400">
+                      Esta sección solo aplica a series.
+                    </div>
+                  )}
+                </AnimatedSection>
               </section>
             )}
 
             <section id="section-comments" ref={registerSection("comments")}>
-              {/* CRÍTICAS */}
-              {reviews && reviews.length > 0 && (
-                <section className="mb-10">
+              <AnimatedSection delay={0.04}>
+                {/* CRÍTICAS */}
+                {reviews && reviews.length > 0 && (
+                  <section className="mb-10">
                   <div className="flex items-center justify-between mb-2">
                     <SectionTitle
                       title="Críticas de Usuarios"
@@ -7993,11 +8184,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       );
                     })}
                   </div>
-                </section>
-              )}
-              {/* ===================================================== */}
-              {/* Trakt: comentarios */}
-              <section className="mb-10">
+                  </section>
+                )}
+                {/* ===================================================== */}
+                {/* Trakt: comentarios */}
+                <section className="mb-10">
                 <div className="mb-2 flex items-center justify-between gap-4">
                   {/* Mantiene SectionTitle (mismo tamano), pero sin mb interno aqui */}
                   <SectionTitle
@@ -8178,14 +8369,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     )}
                   </div>
                 </div>
-              </section>
+                </section>
+              </AnimatedSection>
             </section>
 
             <section id="section-lists" ref={registerSection("lists")}>
-              {/* ===================================================== */}
-              {/* Trakt: listas - Solo mostrar si no hay error */}
-              {!tLists.error && (
-                <section className="mb-12">
+              <AnimatedSection delay={0.04}>
+                {/* ===================================================== */}
+                {/* Trakt: listas - Solo mostrar si no hay error */}
+                {!tLists.error && (
+                  <section className="mb-12">
                   <div className="mb-6 flex items-center justify-between">
                     <SectionTitle title="Listas Populares" icon={ListVideo} />
 
@@ -8355,8 +8548,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       </button>
                     </div>
                   )}
-                </section>
-              )}
+                  </section>
+                )}
+              </AnimatedSection>
             </section>
 
             {collectionId && (
@@ -8364,8 +8558,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 id="section-collection"
                 ref={registerSection("collection")}
               >
-                {/* --- COLECCIÓN --- */}
-                <section className="mb-10">
+                <AnimatedSection delay={0.04}>
+                  {/* --- COLECCIÓN --- */}
+                  <section className="mb-10">
                   <SectionTitle title="Colección" icon={Layers} />
 
                   {collectionLoading ? (
@@ -8427,14 +8622,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       No hay datos de colección.
                     </div>
                   )}
-                </section>
+                  </section>
+                </AnimatedSection>
               </section>
             )}
 
             <section id="section-cast" ref={registerSection("cast")}>
-              {/* === REPARTO PRINCIPAL (Cast) === */}
-              {castDataForUI && castDataForUI.length > 0 && (
-                <section className="mb-16">
+              <AnimatedSection delay={0.04}>
+                {/* === REPARTO PRINCIPAL (Cast) === */}
+                {castDataForUI && castDataForUI.length > 0 && (
+                  <section className="mb-16">
                   <SectionTitle title="Reparto Principal" icon={Users} />
                   <Swiper
                     spaceBetween={12}
@@ -8481,14 +8678,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       </SwiperSlide>
                     ))}
                   </Swiper>
-                </section>
-              )}
+                  </section>
+                )}
+              </AnimatedSection>
             </section>
 
             <section id="section-recs" ref={registerSection("recs")}>
-              {/* === RECOMENDACIONES === */}
-              {recommendations && recommendations.length > 0 && (
-                <section className="mb-16">
+              <AnimatedSection delay={0.04}>
+                {/* === RECOMENDACIONES === */}
+                {recommendations && recommendations.length > 0 && (
+                  <section className="mb-16">
                   <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
 
                   <Swiper
@@ -8604,8 +8803,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       );
                     })}
                   </Swiper>
-                </section>
-              )}
+                  </section>
+                )}
+              </AnimatedSection>
             </section>
           </div>
         </div>
