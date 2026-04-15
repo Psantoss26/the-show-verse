@@ -3,8 +3,7 @@ import { cookies } from "next/headers";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails, getWatchProviders } from "@/lib/api/tmdb";
 import {
-  getTraktItemStatusFromCookieStore,
-  getTraktShowWatchedFromCookieStore,
+  getTraktDetailsBootstrapFromCookieStore,
 } from "@/lib/trakt/server";
 import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
@@ -30,31 +29,22 @@ export default async function DetailsPage({ params }) {
 
   const cookieStore = await cookies();
   const traktType = type === "tv" ? "show" : "movie";
+  const traktBootstrapTimeoutMs = type === "tv" ? 1400 : 900;
   const [
     data,
-    initialTraktStatus,
-    initialShowWatched,
+    traktBootstrap,
     wpResult,
     initialScoreboard,
   ] = await Promise.all([
     getDetails(type, id),
     resolveWithin(
-      getTraktItemStatusFromCookieStore(cookieStore, {
+      getTraktDetailsBootstrapFromCookieStore(cookieStore, {
         type: traktType,
         tmdbId: id,
       }).catch(() => null),
-      type === "tv" ? 900 : 750,
+      traktBootstrapTimeoutMs,
       null,
     ),
-    type === "tv"
-      ? resolveWithin(
-          getTraktShowWatchedFromCookieStore(cookieStore, {
-            tmdbId: id,
-          }).catch(() => null),
-          950,
-          null,
-        )
-      : Promise.resolve(null),
     resolveWithin(
       getWatchProviders(type, id, "ES").catch(() => ({
         providers: [],
@@ -87,6 +77,9 @@ export default async function DetailsPage({ params }) {
     : [];
   const initialProviders = wpResult?.providers ?? [];
   const initialWatchLink = wpResult?.link ?? null;
+  const initialTraktStatus = traktBootstrap?.status ?? null;
+  const initialShowWatched =
+    type === "tv" ? traktBootstrap?.showWatched ?? null : null;
 
   return (
     <DetailsPageLoader

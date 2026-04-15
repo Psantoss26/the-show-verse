@@ -1865,12 +1865,44 @@ export default function DetailsClient({
     [initialWatchedBySeason],
   );
 
+  const initialTraktConnected = useMemo(() => {
+    const fromStatus =
+      typeof initialTraktStatus?.connected === "boolean"
+        ? initialTraktStatus.connected
+        : false;
+    const fromShowWatched =
+      endpointType === "tv" &&
+      typeof initialShowWatched?.connected === "boolean"
+        ? initialShowWatched.connected
+        : false;
+    return fromStatus || fromShowWatched;
+  }, [endpointType, initialTraktStatus, initialShowWatched]);
+
+  const initialTraktFound = useMemo(() => {
+    const fromStatus =
+      typeof initialTraktStatus?.found === "boolean"
+        ? initialTraktStatus.found
+        : false;
+    const fromShowWatched =
+      endpointType === "tv" && typeof initialShowWatched?.found === "boolean"
+        ? initialShowWatched.found
+        : false;
+    return fromStatus || fromShowWatched;
+  }, [endpointType, initialTraktStatus, initialShowWatched]);
+
+  const initialTraktId = useMemo(
+    () => initialTraktStatus?.traktId ?? initialShowWatched?.traktId ?? null,
+    [initialTraktStatus, initialShowWatched],
+  );
+
   const buildInitialTraktState = useCallback(
     () => ({
-      loading: !hasInitialTraktStatus,
-      connected: !!initialTraktStatus?.connected,
-      found: !!initialTraktStatus?.found,
-      traktId: initialTraktStatus?.traktId ?? null,
+      loading:
+        !hasInitialTraktStatus &&
+        !(endpointType === "tv" && hasInitialShowWatched),
+      connected: initialTraktConnected,
+      found: initialTraktFound,
+      traktId: initialTraktId,
       traktUrl: initialTraktStatus?.traktUrl || null,
       watched:
         endpointType === "tv" && hasInitialShowWatched
@@ -1894,6 +1926,9 @@ export default function DetailsClient({
       hasInitialShowWatched,
       hasInitialTraktStatus,
       initialAnyEpisodeWatched,
+      initialTraktConnected,
+      initialTraktFound,
+      initialTraktId,
       initialTraktStatus,
     ],
   );
@@ -2787,9 +2822,22 @@ export default function DetailsClient({
             typeof watchedBySeasonCached === "object" &&
             !Array.isArray(watchedBySeasonCached)
           ) {
+            const cachedConnected =
+              typeof cachedWatched?.connected === "boolean"
+                ? cachedWatched.connected
+                : true;
+            const cachedFound =
+              typeof cachedWatched?.found === "boolean"
+                ? cachedWatched.found
+                : true;
+
             nextWatchedBySeason = watchedBySeasonCached;
             nextWatchedBySeasonLoaded = true;
             hydratedShowWatched = true;
+            nextTrakt.loading = false;
+            nextTrakt.connected = cachedConnected;
+            nextTrakt.found = cachedFound;
+            nextTrakt.traktId = cachedWatched?.traktId ?? nextTrakt.traktId;
 
             const hasAnyWatchedEpisode = Object.values(
               watchedBySeasonCached,
@@ -2859,6 +2907,9 @@ export default function DetailsClient({
         window.localStorage.setItem(
           traktShowWatchedStorageKey,
           JSON.stringify({
+            connected: !!trakt.connected,
+            found: !!trakt.found,
+            traktId: trakt.traktId ?? null,
             watchedBySeason:
               watchedBySeason && typeof watchedBySeason === "object"
                 ? watchedBySeason
@@ -2886,10 +2937,23 @@ export default function DetailsClient({
   // Carga inicial del estado de Trakt para el contenido actual
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
+    const hasTraktBootstrapData =
+      hasInitialTraktStatus ||
+      hasCachedTraktStatus ||
+      (endpointType === "tv" &&
+        (hasInitialShowWatched || hasCachedShowWatched));
+
     void reloadTraktStatus({
-      background: hasInitialTraktStatus || hasCachedTraktStatus,
+      background: hasTraktBootstrapData,
     });
-  }, [reloadTraktStatus, hasInitialTraktStatus, hasCachedTraktStatus]);
+  }, [
+    reloadTraktStatus,
+    endpointType,
+    hasInitialTraktStatus,
+    hasCachedTraktStatus,
+    hasInitialShowWatched,
+    hasCachedShowWatched,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
