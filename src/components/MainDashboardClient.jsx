@@ -2466,18 +2466,14 @@ function TopRatedHero({
               return [id, userBackdrop];
             }
 
-            let chosen = movie?.backdrop_path || movie?.poster_path || null;
-            if (chosen) {
-              return [id, chosen];
-            }
-
+            // Siempre buscar el mejor backdrop EN (nunca usar backdrop_path directamente)
             const mediaType =
               movie.media_type === "tv" ||
               (movie.name && !movie.title) ||
               movie.first_air_date
                 ? "tv"
                 : "movie";
-            chosen = await fetchBestBackdrop(id, mediaType);
+            let chosen = await fetchBestBackdrop(id, mediaType);
             if (!chosen)
               chosen = movie?.backdrop_path || movie?.poster_path || null;
             if (chosen) await preloadImage(buildImg(chosen, "w780"));
@@ -2768,6 +2764,11 @@ export default function MainDashboardClient({ initialData }) {
 
   // ⚡ Estado para secciones lazy (se cargan progresivamente en el cliente)
   const [lazySections, setLazySections] = useState({
+    // Secciones Trakt (todas lazy — no bloquean SSR)
+    traktTrending: [],
+    traktPopular: [],
+    traktMoviesAnticipated: [],
+    traktShowsAnticipated: [],
     traktRecommended: [],
     traktPlayedWeekly: [],
     traktPlayedMonthly: [],
@@ -2871,17 +2872,48 @@ export default function MainDashboardClient({ initialData }) {
     };
   }, [allMovieIds]);
 
-  // ⚡ Carga progresiva de secciones secundarias (lazy loading)
+  // ⚡ Carga anticipada: «Más esperadas» visible sin scroll — carga inmediata al montar
+  useEffect(() => {
+    let cancelled = false;
+    const loadAnticipated = async () => {
+      try {
+        const [moviesAnticipated, showsAnticipated] = await Promise.all([
+          fetch("/api/trakt/dashboard/movies-anticipated")
+            .then((r) => r.json())
+            .catch(() => []),
+          fetch("/api/trakt/dashboard/shows-anticipated")
+            .then((r) => r.json())
+            .catch(() => []),
+        ]);
+        if (cancelled) return;
+        setLazySections((prev) => ({
+          ...prev,
+          traktMoviesAnticipated: Array.isArray(moviesAnticipated)
+            ? moviesAnticipated
+            : [],
+          traktShowsAnticipated: Array.isArray(showsAnticipated)
+            ? showsAnticipated
+            : [],
+        }));
+      } catch (err) {
+        console.error("❌ Error cargando anticipated:", err);
+      }
+    };
+    loadAnticipated();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ⚡ Carga diferida: resto de secciones Trakt (below-the-fold)
   useEffect(() => {
     let cancelled = false;
     const loadLazySections = async () => {
       if (cancelled) return;
-
       try {
-        console.log("⏱️ [Dashboard] Cargando secciones secundarias (lazy)...");
-
-        // Cargar todas las secciones lazy en paralelo
         const [
+          trending,
+          popular,
           recommended,
           playedWeekly,
           playedMonthly,
@@ -2890,6 +2922,12 @@ export default function MainDashboardClient({ initialData }) {
           collectedWeekly,
           collectedMonthly,
         ] = await Promise.all([
+          fetch("/api/trakt/dashboard/trending")
+            .then((r) => r.json())
+            .catch(() => []),
+          fetch("/api/trakt/dashboard/popular")
+            .then((r) => r.json())
+            .catch(() => []),
           fetch("/api/trakt/dashboard/recommended")
             .then((r) => r.json())
             .catch(() => []),
@@ -2912,10 +2950,11 @@ export default function MainDashboardClient({ initialData }) {
             .then((r) => r.json())
             .catch(() => []),
         ]);
-
         if (cancelled) return;
-
-        setLazySections({
+        setLazySections((prev) => ({
+          ...prev,
+          traktTrending: Array.isArray(trending) ? trending : [],
+          traktPopular: Array.isArray(popular) ? popular : [],
           traktRecommended: Array.isArray(recommended) ? recommended : [],
           traktPlayedWeekly: Array.isArray(playedWeekly) ? playedWeekly : [],
           traktPlayedMonthly: Array.isArray(playedMonthly) ? playedMonthly : [],
@@ -2929,27 +2968,16 @@ export default function MainDashboardClient({ initialData }) {
           traktCollectedMonthly: Array.isArray(collectedMonthly)
             ? collectedMonthly
             : [],
-        });
-
-        console.log("✅ [Dashboard] Secciones secundarias cargadas:", {
-          recommended: recommended.length,
-          playedWeekly: playedWeekly.length,
-          playedMonthly: playedMonthly.length,
-          watchedWeekly: watchedWeekly.length,
-          watchedMonthly: watchedMonthly.length,
-          collectedWeekly: collectedWeekly.length,
-          collectedMonthly: collectedMonthly.length,
-        });
+        }));
       } catch (err) {
         console.error("❌ Error cargando secciones lazy:", err);
       }
     };
 
     const cancelIdle = runWhenBrowserIdle(loadLazySections, {
-      timeout: 2500,
-      delay: 800,
+      timeout: 3000,
+      delay: 1000,
     });
-
     return () => {
       cancelled = true;
       cancelIdle();
