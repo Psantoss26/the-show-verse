@@ -491,6 +491,255 @@ export async function getTraktItemStatusFromCookieStore(
   }
 }
 
+function hasAnyWatchedEpisodes(watchedBySeason = {}) {
+  return Object.values(watchedBySeason).some(
+    (episodes) => Array.isArray(episodes) && episodes.length > 0,
+  );
+}
+
+function emptyBootstrapStatus(overrides = {}) {
+  return {
+    connected: false,
+    found: false,
+    traktId: null,
+    traktUrl: null,
+    watched: false,
+    plays: 0,
+    lastWatchedAt: null,
+    history: [],
+    progress: null,
+    error: "",
+    ...overrides,
+  };
+}
+
+function emptyBootstrapShowWatched(overrides = {}) {
+  return {
+    connected: false,
+    found: false,
+    traktId: null,
+    watchedBySeason: {},
+    error: "",
+    ...overrides,
+  };
+}
+
+export async function getTraktDetailsBootstrapFromCookieStore(
+  cookieStore,
+  { type, tmdbId },
+) {
+  const emptyStatus = emptyBootstrapStatus();
+  const emptyShowWatched =
+    type === "show" ? emptyBootstrapShowWatched() : null;
+
+  if (type !== "movie" && type !== "show") {
+    return {
+      status: emptyBootstrapStatus({
+        connected: false,
+        error: "Invalid type. Use movie|show.",
+      }),
+      showWatched: emptyShowWatched,
+    };
+  }
+
+  if (!tmdbId) {
+    return {
+      status: emptyBootstrapStatus({
+        connected: false,
+        error: "Missing tmdbId",
+      }),
+      showWatched: emptyShowWatched,
+    };
+  }
+
+  let authVerified = false;
+
+  try {
+    const { token } = await getValidTraktToken(cookieStore);
+
+    if (!token) {
+      return {
+        status: emptyStatus,
+        showWatched: emptyShowWatched,
+      };
+    }
+
+    const auth = await traktApi("/users/settings", { token });
+    if (!auth.ok) {
+      return {
+        status: emptyStatus,
+        showWatched: emptyShowWatched,
+      };
+    }
+    authVerified = true;
+
+    let hit = null;
+    try {
+      hit = await traktSearchByTmdb(token, { type, tmdbId });
+    } catch (searchErr) {
+      const isTransient =
+        searchErr?.status === 403 ||
+        searchErr?.status === 429 ||
+        /timeout|tempor|aborted|fetch/i.test(searchErr?.message || "");
+
+      if (isTransient) {
+        return {
+          status: emptyBootstrapStatus({
+            connected: true,
+            error: searchErr?.message || "Trakt lookup failed",
+          }),
+          showWatched:
+            type === "show"
+              ? emptyBootstrapShowWatched({
+                  connected: true,
+                  error: searchErr?.message || "Trakt lookup failed",
+                })
+              : null,
+        };
+      }
+
+      throw searchErr;
+    }
+
+    if (!hit) {
+      return {
+        status: emptyBootstrapStatus({ connected: true }),
+        showWatched:
+          type === "show"
+            ? emptyBootstrapShowWatched({ connected: true })
+            : null,
+      };
+    }
+
+    const obj = type === "movie" ? hit.movie : hit.show;
+    const traktId = obj?.ids?.trakt || null;
+    const slug = obj?.ids?.slug || null;
+    const traktUrl = slug
+      ? `https://trakt.tv/${type === "movie" ? "movies" : "shows"}/${slug}`
+      : null;
+
+    if (!traktId) {
+      return {
+        status: emptyBootstrapStatus({
+          connected: true,
+          found: true,
+          traktUrl,
+        }),
+        showWatched:
+          type === "show"
+            ? emptyBootstrapShowWatched({
+                connected: true,
+                found: true,
+              })
+            : null,
+      };
+    }
+
+    if (type === "movie") {
+      const historyResult = await Promise.allSettled([
+        traktGetHistoryForItem(token, {
+          type,
+          traktId,
+          limit: 10,
+        }),
+      ]);
+
+      const history =
+        historyResult[0]?.status === "fulfilled" ? historyResult[0].value : [];
+      const summary = computeHistorySummary({ searchHit: hit, history, type });
+
+      return {
+        status: emptyBootstrapStatus({
+          connected: true,
+          ...summary,
+          traktId,
+          traktUrl,
+          history: mapHistoryEntries(history),
+        }),
+        showWatched: null,
+      };
+    }
+
+    const [historyResult, progressResult] = await Promise.allSettled([
+      traktGetHistoryForItem(token, {
+        type,
+        traktId,
+        limit: 10,
+      }),
+      traktGetProgressWatchedForShow(token, { traktId }),
+    ]);
+
+    const history =
+      historyResult.status === "fulfilled" ? historyResult.value : [];
+    const summary = computeHistorySummary({ searchHit: hit, history, type });
+
+    const progressPayload =
+      progressResult.status === "fulfilled" ? progressResult.value : null;
+    const watchedBySeason = progressPayload
+      ? mapProgressWatchedBySeason(progressPayload)
+      : {};
+    const anyEpisodeWatched = hasAnyWatchedEpisodes(watchedBySeason);
+    const aired = Math.max(0, Number(progressPayload?.aired || 0));
+    const completed = Math.max(0, Number(progressPayload?.completed || 0));
+    const progress =
+      aired > 0
+        ? {
+            aired,
+            completed,
+            pct: Math.min(100, Math.max(0, Math.round((completed / aired) * 100))),
+          }
+        : null;
+
+    return {
+      status: emptyBootstrapStatus({
+        connected: true,
+        ...summary,
+        traktId,
+        traktUrl,
+        watched: summary.watched || anyEpisodeWatched,
+        history: mapHistoryEntries(history),
+        progress,
+      }),
+      showWatched: emptyBootstrapShowWatched({
+        connected: true,
+        found: true,
+        traktId,
+        watchedBySeason,
+      }),
+    };
+  } catch (e) {
+    const transientAfterAuth =
+      authVerified &&
+      (e?.status === 403 ||
+        e?.status === 429 ||
+        /timeout|tempor|aborted|fetch/i.test(e?.message || ""));
+
+    return {
+      status: transientAfterAuth
+        ? emptyBootstrapStatus({
+            connected: true,
+            error: e?.message || "Trakt bootstrap failed",
+          })
+        : emptyBootstrapStatus({
+            connected: false,
+            error: e?.message || "Trakt bootstrap failed",
+          }),
+      showWatched:
+        type === "show"
+          ? transientAfterAuth
+            ? emptyBootstrapShowWatched({
+                connected: true,
+                error: e?.message || "Trakt show watched failed",
+              })
+            : emptyBootstrapShowWatched({
+                connected: false,
+                error: e?.message || "Trakt show watched failed",
+              })
+          : null,
+    };
+  }
+}
+
 /* ===========================
    ✅ FECHAS: arregla el bug
    - Acepta "YYYY-MM-DD"
