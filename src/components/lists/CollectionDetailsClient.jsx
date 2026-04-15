@@ -231,6 +231,11 @@ export default function CollectionDetailsClient({ collectionId }) {
         setMounted(true)
     }, [])
 
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    }, [collectionId])
+
     // Fetch IMDb ratings for movies
     useEffect(() => {
         if (!state.parts.length) return

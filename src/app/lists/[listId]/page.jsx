@@ -228,6 +228,11 @@ export default function ListDetailsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [listId])
 
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    }, [listId])
+
     // Search debounce
     useEffect(() => {
         if (tab !== 'add' || addMode !== 'search') return

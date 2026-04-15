@@ -35,8 +35,23 @@ function keyForItem(it, fallbackIdx) {
     const p = it?.person?.ids?.trakt
     const e = it?.episode?.ids?.trakt
     const se = it?.season?.ids?.trakt
-    const id = m || s || p || e || se || fallbackIdx
-    return `${t}-${id}`
+    const showRef = it?.show?.ids?.trakt || it?.show?.ids?.slug || null
+    const seasonNumber = it?.season?.number ?? it?.episode?.season ?? null
+    const episodeNumber = it?.episode?.number ?? null
+    const listedAt = it?.listed_at || null
+    const id = m || s || p || e || se || 'item'
+
+    return [
+        t,
+        id,
+        showRef,
+        seasonNumber,
+        episodeNumber,
+        listedAt,
+        fallbackIdx,
+    ]
+        .filter((value) => value !== null && value !== undefined && value !== '')
+        .join('-')
 }
 
 export default function TraktListDetailsClient({ username, listId }) {
@@ -55,6 +70,11 @@ export default function TraktListDetailsClient({ username, listId }) {
     const baseApiUrl = useMemo(() => {
         if (!username || !listId) return null
         return `/api/trakt/lists/${encodeURIComponent(username)}/${encodeURIComponent(listId)}`
+    }, [username, listId])
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     }, [username, listId])
 
     const fetchPage = useCallback(
