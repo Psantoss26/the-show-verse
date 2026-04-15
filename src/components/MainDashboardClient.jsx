@@ -2342,8 +2342,8 @@ const AnticipatedSection = memo(function AnticipatedSection({
 
   if (empty) return null;
 
-  // Número de skeletons para que el placeholder tenga la misma altura aprox.
-  const SKELETON_COUNT = isMobile ? 2 : 6;
+  // Número de skeletons — suficientes para cubrir el ancho visible sin importar la pantalla
+  const SKELETON_COUNT = isMobile ? 3 : 10;
 
   return (
     <motion.div
@@ -2396,17 +2396,17 @@ const AnticipatedSection = memo(function AnticipatedSection({
         )}
       </div>
 
-      {/* Skeleton mientras carga */}
+      {/* Skeleton mientras carga — mismas dimensiones exactas que las tarjetas reales */}
       {loading ? (
         <div className="flex gap-3 overflow-hidden">
           {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
             <div
               key={i}
-              className="flex-shrink-0 rounded-xl bg-neutral-900 animate-pulse"
-              style={{
-                width: isMobile ? "calc(50% - 6px)" : "calc(16.666% - 10px)",
-                aspectRatio: "2/3",
-              }}
+              className={`flex-shrink-0 rounded-xl bg-neutral-900 animate-pulse ${
+                isMobile
+                  ? "w-[140px] aspect-[2/3]"
+                  : "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]"
+              }`}
             />
           ))}
         </div>
@@ -2784,6 +2784,16 @@ export default function MainDashboardClient({ initialData }) {
   useEffect(() => setHydrated(true), []);
 
   const posterCacheRef = useRef(new Map());
+  const initialMoviesAnticipated = Array.isArray(
+    initialData?.traktMoviesAnticipated,
+  )
+    ? initialData.traktMoviesAnticipated
+    : null;
+  const initialShowsAnticipated = Array.isArray(
+    initialData?.traktShowsAnticipated,
+  )
+    ? initialData.traktShowsAnticipated
+    : null;
 
   // ⚡ Estado para secciones lazy (se cargan progresivamente en el cliente)
   const [lazySections, setLazySections] = useState({
@@ -2791,8 +2801,8 @@ export default function MainDashboardClient({ initialData }) {
     traktTrending: [],
     traktPopular: [],
     // null = aún cargando (muestra skeleton); [] = cargado pero vacío (oculta sección)
-    traktMoviesAnticipated: null,
-    traktShowsAnticipated: null,
+    traktMoviesAnticipated: initialMoviesAnticipated,
+    traktShowsAnticipated: initialShowsAnticipated,
     traktRecommended: [],
     traktPlayedWeekly: [],
     traktPlayedMonthly: [],
@@ -2898,28 +2908,52 @@ export default function MainDashboardClient({ initialData }) {
 
   // ⚡ Carga anticipada: «Más esperadas» visible sin scroll — carga inmediata al montar
   useEffect(() => {
+    if (initialMoviesAnticipated !== null && initialShowsAnticipated !== null) {
+      return;
+    }
+
     let cancelled = false;
     const loadAnticipated = async () => {
       try {
-        const [moviesAnticipated, showsAnticipated] = await Promise.all([
-          fetch("/api/trakt/dashboard/movies-anticipated")
-            .then((r) => r.json())
-            .catch(() => []),
-          fetch("/api/trakt/dashboard/shows-anticipated")
-            .then((r) => r.json())
-            .catch(() => []),
+        const [moviesResult, showsResult] = await Promise.allSettled([
+          initialMoviesAnticipated !== null
+            ? Promise.resolve(initialMoviesAnticipated)
+            : fetch("/api/trakt/dashboard/movies-anticipated").then((r) =>
+                r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+              ),
+          initialShowsAnticipated !== null
+            ? Promise.resolve(initialShowsAnticipated)
+            : fetch("/api/trakt/dashboard/shows-anticipated").then((r) =>
+                r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+              ),
         ]);
         if (cancelled) return;
+
+        // Solo actualizar la sección si al menos una petición tuvo éxito.
+        // Si ambas fallan (403, cold start, etc.) mantenemos null → skeleton
+        // permanece visible en lugar de colapsar el layout (→ Tendencias salta).
+        const movies =
+          moviesResult.status === "fulfilled" &&
+          Array.isArray(moviesResult.value)
+            ? moviesResult.value
+            : null;
+        const shows =
+          showsResult.status === "fulfilled" && Array.isArray(showsResult.value)
+            ? showsResult.value
+            : null;
+
+        if (movies === null && shows === null) {
+          // Ambas fallaron: no colapsar el layout, dejar el skeleton
+          return;
+        }
+
         setLazySections((prev) => ({
           ...prev,
-          traktMoviesAnticipated: Array.isArray(moviesAnticipated)
-            ? moviesAnticipated
-            : [],
-          traktShowsAnticipated: Array.isArray(showsAnticipated)
-            ? showsAnticipated
-            : [],
+          traktMoviesAnticipated: movies ?? [],
+          traktShowsAnticipated: shows ?? [],
         }));
       } catch (err) {
+        // Error inesperado: no tocar el estado, el skeleton sigue visible
         console.error("❌ Error cargando anticipated:", err);
       }
     };
@@ -2927,7 +2961,10 @@ export default function MainDashboardClient({ initialData }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [
+    initialMoviesAnticipated,
+    initialShowsAnticipated,
+  ]);
 
   // ⚡ Carga diferida: resto de secciones Trakt (below-the-fold)
   useEffect(() => {
@@ -3030,8 +3067,8 @@ export default function MainDashboardClient({ initialData }) {
       >
         {/* Trakt: Más esperadas con selector Películas/Series */}
         <AnticipatedSection
-          movieItems={dashboardData.traktMoviesAnticipated || EMPTY_ARRAY}
-          tvItems={dashboardData.traktShowsAnticipated || EMPTY_ARRAY}
+          movieItems={dashboardData.traktMoviesAnticipated}
+          tvItems={dashboardData.traktShowsAnticipated}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
