@@ -2177,9 +2177,17 @@ export default function DetailsClient({
     () => parseScoreboardData(initialScoreboard),
     [initialScoreboard],
   );
+  const initialScoreboardState = useMemo(() => {
+    if (!initialParsedScoreboard?.found) return defaultScoreboard;
+    return {
+      ...initialParsedScoreboard,
+      loading: !hasNumericScoreboardStats(initialParsedScoreboard?.stats),
+      error: "",
+    };
+  }, [initialParsedScoreboard]);
 
   const [tScoreboard, setTScoreboard] = useState(
-    () => initialParsedScoreboard || defaultScoreboard,
+    () => initialScoreboardState,
   );
   const [traktDeferredReady, setTraktDeferredReady] = useState(
     () =>
@@ -2235,14 +2243,14 @@ export default function DetailsClient({
   });
 
   useEffect(() => {
-    setTScoreboard(initialParsedScoreboard || defaultScoreboard);
+    setTScoreboard(initialScoreboardState);
 
     const hasPrefetchedScoreboard =
       !!initialParsedScoreboard?.found &&
       hasNumericScoreboardStats(initialParsedScoreboard?.stats);
 
     setTraktDeferredReady(hasPrefetchedScoreboard);
-  }, [id, initialParsedScoreboard]);
+  }, [id, initialParsedScoreboard, initialScoreboardState]);
 
   useEffect(() => {
     if (traktDeferredReady || tScoreboard.loading) return;
@@ -2647,137 +2655,161 @@ export default function DetailsClient({
   );
 
   // Carga el scoreboard de Trakt (rating de la comunidad y estadisticas de uso)
-  // Si ya tenemos datos prefetched con stats numéricas, solo refrescar en background
-  // Incluye retry: si found=true pero stats vienen vacías (cold start), reintenta
+  // La nota/votos se cargan primero; las stats llegan despues sin bloquear el badge.
   useEffect(() => {
     let ignore = false;
 
     const hasNumericStats = hasNumericScoreboardStats;
+    const cacheKey = `tsb_${traktType}_${id}`;
+
+    const persistScoreboardCache = (payload) => {
+      if (!payload?.found || !hasUsefulScoreboardData(payload)) return;
+      try {
+        localStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            ...payload,
+            loading: false,
+            error: "",
+          }),
+        );
+      } catch {}
+    };
 
     const load = async () => {
-      // Si ya tenemos datos completos del prefetch, guardar en cache y no bloquear
       const prefetched = parseScoreboardData(initialScoreboard);
-      if (prefetched?.found && hasNumericStats(prefetched.stats)) {
-        setTScoreboard((prev) => mergeScoreboardState(prev, prefetched));
-        setTraktDeferredReady(true);
-        // Guardar prefetch en localStorage para futuras visitas
-        try {
-          const cacheKey = `tsb_${traktType}_${id}`;
-          localStorage.setItem(cacheKey, JSON.stringify(prefetched));
-        } catch {}
-        return; // Ya tenemos datos válidos, no necesitamos fetch adicional
+      let workingScoreboard = prefetched?.found ? prefetched : null;
+
+      if (workingScoreboard) {
+        setTScoreboard((prev) => mergeScoreboardState(prev, workingScoreboard));
       }
 
-      // Sin prefetch válido: restaurar datos de localStorage como cache stale
+      // Si ya tenemos datos completos del prefetch, guardar en cache y salir.
+      if (workingScoreboard?.found && hasNumericStats(workingScoreboard.stats)) {
+        setTraktDeferredReady(true);
+        persistScoreboardCache(workingScoreboard);
+        return;
+      }
+
+      // Restaurar cache local aunque solo traiga rating/votos.
       try {
-        const cacheKey = `tsb_${traktType}_${id}`;
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed?.found && hasNumericStats(parsed?.stats)) {
-            setTScoreboard((prev) =>
-              mergeScoreboardState(prev, {
-                ...parsed,
-                loading: true,
-                error: "",
-              }),
+          if (parsed?.found && hasUsefulScoreboardData(parsed)) {
+            const hydrated = {
+              ...parsed,
+              loading: true,
+              error: "",
+            };
+            workingScoreboard = mergeScoreboardState(
+              workingScoreboard || defaultScoreboard,
+              hydrated,
             );
+            setTScoreboard((prev) => mergeScoreboardState(prev, hydrated));
           } else {
             setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
           }
-        } else {
+        } else if (!workingScoreboard) {
           setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
         }
       } catch {
-        setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
+        if (!workingScoreboard) {
+          setTScoreboard((p) => ({ ...p, loading: true, error: "" }));
+        }
       }
 
-      // Retry: hasta 3 intentos si found=true pero stats vacías (cold start en Vercel)
-      const delays = [0, 1500, 3000];
-      for (let attempt = 0; attempt < delays.length; attempt++) {
-        if (ignore) return;
-        if (attempt > 0) {
-          await new Promise((r) => setTimeout(r, delays[attempt]));
-          if (ignore) return;
-        }
+      // 1) Cargar primero la parte rápida: rating + votos.
+      const hasCommunityAlready = hasScoreboardCommunityData(workingScoreboard);
+      if (!hasCommunityAlready) {
         try {
-          const r = await withTimeout(
+          const quick = await withTimeout(
             traktGetScoreboard({
               type: traktType,
               tmdbId: id,
               traktId: scoreboardLookupTraktId || undefined,
+              includeStats: false,
             }),
-            14000,
+            5000,
           );
           if (ignore) return;
 
-          const result = parseScoreboardData(r) || defaultScoreboard;
-          setTScoreboard((prev) => mergeScoreboardState(prev, result));
+          const quickResult = parseScoreboardData(quick) || defaultScoreboard;
+          const hydratedQuick = {
+            ...quickResult,
+            loading: true,
+            error: "",
+          };
 
-          // Si encontró el item y tiene stats numéricas, guardar en cache y salir
-          if (result.found && hasNumericStats(result.stats)) {
-            try {
-              const cacheKey = `tsb_${traktType}_${id}`;
-              localStorage.setItem(cacheKey, JSON.stringify(result));
-            } catch {}
-            return;
-          }
+          workingScoreboard = mergeScoreboardState(
+            workingScoreboard || defaultScoreboard,
+            hydratedQuick,
+          );
+          setTScoreboard((prev) => mergeScoreboardState(prev, hydratedQuick));
+          persistScoreboardCache(workingScoreboard);
+        } catch {}
+      }
 
-          // Si found=true pero sin stats: el scoreboard puede estar sirviendo
-          // un resultado cacheado (unstable_cache 30min) con stats nulas.
-          // Fallback directo a /api/trakt/stats que NO usa unstable_cache
-          // y realiza petición fresca a Trakt.
-          if (result.found) {
-            try {
-              const statsR = await withTimeout(
-                traktGetStats({
-                  type: traktType,
-                  tmdbId: id,
-                  traktId: scoreboardLookupTraktId || undefined,
-                }),
-                10000,
-              );
-              if (!ignore && statsR?.found && statsR?.stats) {
-                const withStats = { ...result, stats: statsR.stats };
-                setTScoreboard((prev) => mergeScoreboardState(prev, withStats));
-                if (hasNumericStats(withStats.stats)) {
-                  try {
-                    const cacheKey = `tsb_${traktType}_${id}`;
-                    localStorage.setItem(cacheKey, JSON.stringify(withStats));
-                  } catch {}
-                  return;
-                }
-              }
-            } catch {}
-            // Sin stats tras fallback: aceptar el resultado actual
-            return;
-          }
-          // found=false: reintentar si quedan intentos disponibles
-          if (attempt < delays.length - 1) continue;
-          return;
-        } catch (e) {
+      // 2) Si ya tenemos stats numéricas, no hace falta pedirlas otra vez.
+      if (hasNumericStats(workingScoreboard?.stats)) {
+        setTraktDeferredReady(true);
+        persistScoreboardCache(workingScoreboard);
+        setTScoreboard((prev) => ({
+          ...mergeScoreboardState(prev, workingScoreboard),
+          loading: false,
+          error: "",
+        }));
+        return;
+      }
+
+      // 3) Cargar stats después, con un reintento corto para cold starts en Vercel.
+      const statDelays = [0, 1200];
+      for (let attempt = 0; attempt < statDelays.length; attempt++) {
+        if (ignore) return;
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, statDelays[attempt]));
           if (ignore) return;
-          // En último intento, mostrar error
-          if (attempt === delays.length - 1) {
-            const isTimeout = e?.message === "Timeout";
-            const isRateLimit = /rate limit|temporalmente no disponible/i.test(
-              e?.message || "",
-            );
-            const errorMsg =
-              isTimeout || isRateLimit
-                ? ""
-                : e?.message || "Error cargando scoreboard";
-            setTScoreboard((prev) =>
-              mergeScoreboardState(prev, {
-                ...defaultScoreboard,
-                loading: false,
-                found: false,
-                error: errorMsg,
-              }),
-            );
-          }
-          // En intentos anteriores, reintentar silenciosamente
         }
+        try {
+          const statsR = await withTimeout(
+            traktGetStats({
+              type: traktType,
+              tmdbId: id,
+              traktId: scoreboardLookupTraktId || undefined,
+            }),
+            9000,
+          );
+          if (ignore) return;
+
+          if (statsR?.found && statsR?.stats) {
+            const withStats = {
+              ...(workingScoreboard || defaultScoreboard),
+              found: true,
+              stats: statsR.stats,
+              loading: false,
+              error: "",
+            };
+            workingScoreboard = withStats;
+            setTScoreboard((prev) => mergeScoreboardState(prev, withStats));
+            if (hasNumericStats(withStats.stats)) {
+              setTraktDeferredReady(true);
+              persistScoreboardCache(withStats);
+              return;
+            }
+          }
+        } catch {}
+      }
+
+      // Si las stats no llegan, al menos dejamos rating/votos sin bloquear el resto.
+      if (!ignore) {
+        setTScoreboard((prev) => ({
+          ...mergeScoreboardState(
+            prev,
+            workingScoreboard || { ...defaultScoreboard, found: false },
+          ),
+          loading: false,
+          error: "",
+        }));
       }
     };
 

@@ -39,10 +39,12 @@ export default async function TvDetailsPage({ params }) {
     ),
     // Scoreboard de Trakt: rating comunidad + estadísticas (watchers, plays, etc.)
     resolveWithin(
-      getCachedTraktScoreboardData({ type: "show", tmdbId: id }).catch(
-        () => null,
-      ),
-      600,
+      getCachedTraktScoreboardData({
+        type: "show",
+        tmdbId: id,
+        includeStats: false,
+      }).catch(() => null),
+      500,
       null,
     ),
   ]);

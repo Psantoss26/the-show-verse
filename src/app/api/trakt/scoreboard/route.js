@@ -3,16 +3,22 @@ import { normalizeType } from "@/lib/trakt/fetchWithCache";
 import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 export const maxDuration = 12;
 
-const cacheHeaders = {
-  "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=3600",
-};
+function getCacheHeaders(includeStats) {
+  return {
+    "Cache-Control": includeStats
+      ? "public, s-maxage=120, stale-while-revalidate=900"
+      : "public, s-maxage=1800, stale-while-revalidate=3600",
+  };
+}
 
 export async function GET(req) {
+  const { searchParams } = new URL(req.url);
+  const includeStats = searchParams.get("includeStats") !== "0";
+  const cacheHeaders = getCacheHeaders(includeStats);
+
   try {
-    const { searchParams } = new URL(req.url);
     const type = normalizeType(searchParams.get("type"));
     const tmdbId = searchParams.get("tmdbId");
     const traktId = searchParams.get("traktId");
@@ -30,6 +36,7 @@ export async function GET(req) {
       type,
       tmdbId,
       traktId,
+      includeStats,
       season: season ?? undefined,
       episode: episode ?? undefined,
     });

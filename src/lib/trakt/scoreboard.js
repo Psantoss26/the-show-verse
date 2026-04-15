@@ -73,6 +73,7 @@ export async function getTraktScoreboardData({
   type,
   tmdbId,
   traktId,
+  includeStats = true,
   season,
   episode,
 } = {}) {
@@ -110,15 +111,16 @@ export async function getTraktScoreboardData({
 
     if (!resolvedTraktId) return { found: false };
 
-    // Ejecutar en paralelo: summary necesita traktId pero es independiente de stats
-    const [summary, stats] = await Promise.all([
-      ft(`/${plural}/${resolvedTraktId}`).catch(() => null),
-      fetchOptionalStats(
-        [`/${plural}/${resolvedTraktId}/stats`],
-        ftStats,
-        process.env.NODE_ENV === "production" ? 5000 : 3000,
-      ),
-    ]);
+    const [summary, stats] = includeStats
+      ? await Promise.all([
+          ft(`/${plural}/${resolvedTraktId}`).catch(() => null),
+          fetchOptionalStats(
+            [`/${plural}/${resolvedTraktId}/stats`],
+            ftStats,
+            process.env.NODE_ENV === "production" ? 5000 : 3000,
+          ),
+        ])
+      : [await ft(`/${plural}/${resolvedTraktId}`).catch(() => null), null];
 
     const slug = summary?.ids?.slug || resolved?.slug || ids?.slug || resolvedTraktId;
     const traktUrl =
@@ -168,16 +170,16 @@ export async function getTraktScoreboardData({
   if (!traktShowId) return { found: false };
 
   if (normalizedType === "season") {
-    // Ejecutar en paralelo: la lista de temporadas (con rating) y las stats
-    // usando el path por show/season que no requiere el seasonId de Trakt
-    const [seasons, stats] = await Promise.all([
-      ft(`/shows/${traktShowId}/seasons?extended=full`),
-      fetchOptionalStats(
-        [`/shows/${traktShowId}/seasons/${seasonNumber}/stats`],
-        ftStats,
-        process.env.NODE_ENV === "production" ? 5000 : 3000,
-      ),
-    ]);
+    const [seasons, stats] = includeStats
+      ? await Promise.all([
+          ft(`/shows/${traktShowId}/seasons?extended=full`),
+          fetchOptionalStats(
+            [`/shows/${traktShowId}/seasons/${seasonNumber}/stats`],
+            ftStats,
+            process.env.NODE_ENV === "production" ? 5000 : 3000,
+          ),
+        ])
+      : [await ft(`/shows/${traktShowId}/seasons?extended=full`), null];
     const seasonObj = Array.isArray(seasons)
       ? seasons.find((s) => Number(s?.number) === Number(seasonNumber))
       : null;
@@ -205,20 +207,25 @@ export async function getTraktScoreboardData({
     };
   }
 
-  // EPISODE: ejecutar en paralelo usando paths basados en show/season/episode
-  // que no requieren el epId de Trakt
-  const [ep, stats] = await Promise.all([
-    ft(
-      `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
-    ),
-    fetchOptionalStats(
-      [
-        `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
-      ],
-      ftStats,
-      process.env.NODE_ENV === "production" ? 5000 : 3000,
-    ),
-  ]);
+  const [ep, stats] = includeStats
+    ? await Promise.all([
+        ft(
+          `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
+        ),
+        fetchOptionalStats(
+          [
+            `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/stats`,
+          ],
+          ftStats,
+          process.env.NODE_ENV === "production" ? 5000 : 3000,
+        ),
+      ])
+    : [
+        await ft(
+          `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
+        ),
+        null,
+      ];
   const epIds = ep?.ids;
   if (!epIds?.trakt) return { found: false };
 

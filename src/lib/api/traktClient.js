@@ -346,31 +346,30 @@ export async function traktGetShowSeasons({ tmdbId, extended = "full" }) {
   return json;
 }
 
-export async function traktGetScoreboard({ type, tmdbId, traktId } = {}) {
+export async function traktGetScoreboard({
+  type,
+  tmdbId,
+  traktId,
+  includeStats = true,
+} = {}) {
   const qs = new URLSearchParams({ type: String(type) });
   if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
   if (traktId != null) qs.set("traktId", String(traktId));
-  const res = await fetch(`/api/trakt/scoreboard?${qs.toString()}`, {
-    method: "GET",
+  if (!includeStats) qs.set("includeStats", "0");
+  return fetchGetJsonDeduped(`/api/trakt/scoreboard?${qs.toString()}`, {
     credentials: "include",
+    cache: "no-store",
   });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.error || "Error cargando scoreboard");
-  return json;
 }
 
 export async function traktGetStats({ type, tmdbId, traktId } = {}) {
   const qs = new URLSearchParams({ type: String(type) });
   if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
   if (traktId != null) qs.set("traktId", String(traktId));
-
-  const res = await fetch(`/api/trakt/stats?${qs.toString()}`, {
+  return fetchGetJsonDeduped(`/api/trakt/stats?${qs.toString()}`, {
+    credentials: "include",
     cache: "no-store",
   });
-
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.error || "Error cargando stats de Trakt");
-  return json;
 }
 
 export async function traktSetRating({
