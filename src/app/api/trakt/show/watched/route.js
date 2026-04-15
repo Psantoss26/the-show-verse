@@ -16,8 +16,12 @@ export const maxDuration = 10;
 
 export async function GET(request) {
   const tmdbId = request.nextUrl.searchParams.get("tmdbId");
-  if (!tmdbId) {
-    return NextResponse.json({ error: "Missing tmdbId" }, { status: 400 });
+  const traktIdParam = request.nextUrl.searchParams.get("traktId");
+  if (!tmdbId && !traktIdParam) {
+    return NextResponse.json(
+      { error: "Missing tmdbId or traktId" },
+      { status: 400 },
+    );
   }
 
   const cookieStore = request.cookies;
@@ -62,8 +66,10 @@ export async function GET(request) {
     }
     authVerified = true;
 
-    const hit = await traktSearchByTmdb(token, { type: "show", tmdbId });
-    const traktId = hit?.show?.ids?.trakt || null;
+    const traktId = traktIdParam
+      ? String(traktIdParam)
+      : (await traktSearchByTmdb(token, { type: "show", tmdbId }))?.show?.ids
+          ?.trakt || null;
 
     if (!traktId) {
       const res = NextResponse.json({

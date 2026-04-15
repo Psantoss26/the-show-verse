@@ -3,8 +3,7 @@ import { cookies } from "next/headers";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
 import {
-  getTraktItemStatusFromCookieStore,
-  getTraktShowWatchedFromCookieStore,
+  getTraktDetailsBootstrapFromCookieStore,
 } from "@/lib/trakt/server";
 import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
@@ -28,37 +27,32 @@ export default async function TvDetailsPage({ params }) {
   }
 
   const cookieStore = await cookies();
-  const [data, initialTraktStatus, initialShowWatched, initialScoreboard] =
-    await Promise.all([
-      getDetails("tv", id),
-      resolveWithin(
-        getTraktItemStatusFromCookieStore(cookieStore, {
-          type: "show",
-          tmdbId: id,
-        }).catch(() => null),
-        900,
-        null,
+  const [data, traktBootstrap, initialScoreboard] = await Promise.all([
+    getDetails("tv", id, { appendToResponse: "external_ids" }),
+    resolveWithin(
+      getTraktDetailsBootstrapFromCookieStore(cookieStore, {
+        type: "show",
+        tmdbId: id,
+      }).catch(() => null),
+      900,
+      null,
+    ),
+    // Scoreboard de Trakt: rating comunidad + estadísticas (watchers, plays, etc.)
+    resolveWithin(
+      getCachedTraktScoreboardData({ type: "show", tmdbId: id }).catch(
+        () => null,
       ),
-      resolveWithin(
-        getTraktShowWatchedFromCookieStore(cookieStore, {
-          tmdbId: id,
-        }).catch(() => null),
-        950,
-        null,
-      ),
-      // Scoreboard de Trakt: rating comunidad + estadísticas (watchers, plays, etc.)
-      resolveWithin(
-        getCachedTraktScoreboardData({ type: "show", tmdbId: id }).catch(
-          () => null,
-        ),
-        4000,
-        null,
-      ),
-    ]);
+      600,
+      null,
+    ),
+  ]);
 
   if (!data) {
     notFound();
   }
+
+  const initialTraktStatus = traktBootstrap?.status ?? null;
+  const initialShowWatched = traktBootstrap?.showWatched ?? null;
 
   return (
     <DetailsPageLoader

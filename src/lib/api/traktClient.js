@@ -10,6 +10,30 @@ async function safeJson(res) {
 let traktAuthBootstrapPromise = null;
 let traktAuthBootstrapAt = 0;
 let traktAuthBootstrapValue = null;
+const inFlightGetRequests = new Map();
+
+async function fetchGetJsonDeduped(
+  url,
+  { credentials = "include", cache = "no-store" } = {},
+) {
+  if (inFlightGetRequests.has(url)) {
+    return inFlightGetRequests.get(url);
+  }
+
+  const promise = (async () => {
+    const res = await fetch(url, { cache, credentials });
+    const json = await safeJson(res);
+    if (!res.ok) {
+      throw new Error(json?.error || `HTTP ${res.status}`);
+    }
+    return json;
+  })().finally(() => {
+    inFlightGetRequests.delete(url);
+  });
+
+  inFlightGetRequests.set(url, promise);
+  return promise;
+}
 
 async function ensureTraktAuthReady({ force = false } = {}) {
   if (typeof window === "undefined") return { connected: false };
@@ -126,16 +150,14 @@ export async function traktDisconnect() {
   return json;
 }
 
-export async function traktGetItemStatus({ type, tmdbId }) {
+export async function traktGetItemStatus({ type, tmdbId, traktId } = {}) {
   const auth = await ensureTraktAuthReady();
   if (!auth?.connected) return { connected: false };
 
-  const url = `/api/trakt/item/status?type=${encodeURIComponent(type)}&tmdbId=${encodeURIComponent(tmdbId)}`;
-  const res = await fetch(url, { cache: "no-store", credentials: "include" });
-  const json = await safeJson(res);
-  if (!res.ok)
-    throw new Error(json?.error || `Trakt status HTTP ${res.status}`);
-  return json;
+  const qs = new URLSearchParams({ type: String(type) });
+  if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
+  if (traktId != null) qs.set("traktId", String(traktId));
+  return fetchGetJsonDeduped(`/api/trakt/item/status?${qs.toString()}`);
 }
 
 export async function traktSetWatched({ type, tmdbId, watched, watchedAt }) {
@@ -229,21 +251,14 @@ export async function traktGetHistory({
 }
 
 /** ✅ NUEVO/CLAVE: carga episodios vistos por show (SIN especiales) */
-export async function traktGetShowWatched({ tmdbId }) {
+export async function traktGetShowWatched({ tmdbId, traktId } = {}) {
   const auth = await ensureTraktAuthReady();
   if (!auth?.connected) return { connected: false, found: false, watchedBySeason: {} };
 
-  const res = await fetch(
-    `/api/trakt/show/watched?tmdbId=${encodeURIComponent(tmdbId)}`,
-    {
-      cache: "no-store",
-      credentials: "include",
-    },
-  );
-  const json = await safeJson(res);
-  if (!res.ok)
-    throw new Error(json?.error || `Trakt show watched HTTP ${res.status}`);
-  return json; // { watchedBySeason }
+  const qs = new URLSearchParams();
+  if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
+  if (traktId != null) qs.set("traktId", String(traktId));
+  return fetchGetJsonDeduped(`/api/trakt/show/watched?${qs.toString()}`); // { watchedBySeason }
 }
 
 /** ✅ Toggle episodio + devuelve watchedBySeason actualizado */
@@ -331,8 +346,10 @@ export async function traktGetShowSeasons({ tmdbId, extended = "full" }) {
   return json;
 }
 
-export async function traktGetScoreboard({ type, tmdbId }) {
-  const qs = new URLSearchParams({ type, tmdbId: String(tmdbId) });
+export async function traktGetScoreboard({ type, tmdbId, traktId } = {}) {
+  const qs = new URLSearchParams({ type: String(type) });
+  if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
+  if (traktId != null) qs.set("traktId", String(traktId));
   const res = await fetch(`/api/trakt/scoreboard?${qs.toString()}`, {
     method: "GET",
     credentials: "include",
@@ -342,11 +359,10 @@ export async function traktGetScoreboard({ type, tmdbId }) {
   return json;
 }
 
-export async function traktGetStats({ type, tmdbId }) {
-  const qs = new URLSearchParams({
-    type: String(type),
-    tmdbId: String(tmdbId),
-  });
+export async function traktGetStats({ type, tmdbId, traktId } = {}) {
+  const qs = new URLSearchParams({ type: String(type) });
+  if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
+  if (traktId != null) qs.set("traktId", String(traktId));
 
   const res = await fetch(`/api/trakt/stats?${qs.toString()}`, {
     cache: "no-store",

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
 
 const TRAKT_API = "https://api.trakt.tv";
 const TRAKT_AUTHORIZE = "https://trakt.tv/oauth/authorize";
@@ -409,9 +410,9 @@ export async function getTraktItemStatusFromCookieStore(
     }
     authVerified = true;
 
-    let hit = null;
+    let resolved = null;
     try {
-      hit = await traktSearchByTmdb(token, { type, tmdbId });
+      resolved = await resolveTraktEntityFromTmdb({ type, tmdbId });
     } catch (searchErr) {
       const isTransient =
         searchErr?.status === 403 ||
@@ -435,7 +436,7 @@ export async function getTraktItemStatusFromCookieStore(
       throw searchErr;
     }
 
-    if (!hit) {
+    if (!resolved?.traktId) {
       return {
         connected: true,
         found: false,
@@ -448,8 +449,11 @@ export async function getTraktItemStatusFromCookieStore(
       };
     }
 
-    const obj = type === "movie" ? hit.movie : hit.show;
-    const traktId = obj?.ids?.trakt;
+    const traktId = resolved.traktId;
+    const hit =
+      type === "movie"
+        ? { movie: { ids: resolved.ids } }
+        : { show: { ids: resolved.ids } };
 
     let history = [];
     if (traktId) {
@@ -573,9 +577,9 @@ export async function getTraktDetailsBootstrapFromCookieStore(
     }
     authVerified = true;
 
-    let hit = null;
+    let resolved = null;
     try {
-      hit = await traktSearchByTmdb(token, { type, tmdbId });
+      resolved = await resolveTraktEntityFromTmdb({ type, tmdbId });
     } catch (searchErr) {
       const isTransient =
         searchErr?.status === 403 ||
@@ -601,7 +605,7 @@ export async function getTraktDetailsBootstrapFromCookieStore(
       throw searchErr;
     }
 
-    if (!hit) {
+    if (!resolved?.traktId) {
       return {
         status: emptyBootstrapStatus({ connected: true }),
         showWatched:
@@ -611,12 +615,15 @@ export async function getTraktDetailsBootstrapFromCookieStore(
       };
     }
 
-    const obj = type === "movie" ? hit.movie : hit.show;
-    const traktId = obj?.ids?.trakt || null;
-    const slug = obj?.ids?.slug || null;
+    const traktId = resolved.traktId || null;
+    const slug = resolved.slug || null;
     const traktUrl = slug
       ? `https://trakt.tv/${type === "movie" ? "movies" : "shows"}/${slug}`
       : null;
+    const hit =
+      type === "movie"
+        ? { movie: { ids: resolved.ids } }
+        : { show: { ids: resolved.ids } };
 
     if (!traktId) {
       return {
@@ -1055,8 +1062,8 @@ export async function getTraktShowWatchedFromCookieStore(
     }
     authVerified = true;
 
-    const hit = await traktSearchByTmdb(token, { type: "show", tmdbId });
-    const traktId = hit?.show?.ids?.trakt || null;
+    const resolved = await resolveTraktEntityFromTmdb({ type: "show", tmdbId });
+    const traktId = resolved?.traktId || null;
 
     if (!traktId) {
       return {

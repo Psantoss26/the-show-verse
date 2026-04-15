@@ -18,6 +18,7 @@ export const maxDuration = 10; // Límite máximo Vercel Hobby (s)
 export async function GET(request) {
   const type = request.nextUrl.searchParams.get("type"); // movie | show
   const tmdbId = request.nextUrl.searchParams.get("tmdbId");
+  const traktIdParam = request.nextUrl.searchParams.get("traktId");
 
   if (type !== "movie" && type !== "show") {
     return NextResponse.json(
@@ -25,8 +26,11 @@ export async function GET(request) {
       { status: 400 },
     );
   }
-  if (!tmdbId) {
-    return NextResponse.json({ error: "Missing tmdbId" }, { status: 400 });
+  if (!tmdbId && !traktIdParam) {
+    return NextResponse.json(
+      { error: "Missing tmdbId or traktId" },
+      { status: 400 },
+    );
   }
 
   const cookieStore = request.cookies;
@@ -58,7 +62,14 @@ export async function GET(request) {
 
     let hit = null;
     try {
-      hit = await traktSearchByTmdb(token, { type, tmdbId });
+      if (traktIdParam) {
+        hit =
+          type === "movie"
+            ? { movie: { ids: { trakt: String(traktIdParam) } } }
+            : { show: { ids: { trakt: String(traktIdParam) } } };
+      } else {
+        hit = await traktSearchByTmdb(token, { type, tmdbId });
+      }
     } catch (searchErr) {
       const isTransient =
         searchErr?.status === 403 ||

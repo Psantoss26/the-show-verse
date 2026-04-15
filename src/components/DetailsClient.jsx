@@ -1941,6 +1941,13 @@ export default function DetailsClient({
 
   // Estado principal de Trakt para este contenido
   const [trakt, setTrakt] = useState(buildInitialTraktState);
+  const scoreboardLookupTraktId = trakt?.traktId ?? initialTraktId ?? null;
+  const traktBackgroundSyncAtRef = useRef(0);
+  const traktResolvedIdRef = useRef(initialTraktId ?? null);
+
+  useEffect(() => {
+    traktResolvedIdRef.current = trakt?.traktId ?? initialTraktId ?? null;
+  }, [trakt?.traktId, initialTraktId]);
 
   const [traktBusy, setTraktBusy] = useState(""); // Accion en curso: 'watched' | 'watchlist' | 'history' | ''
   const [traktWatchedOpen, setTraktWatchedOpen] = useState(false); // Modal de historial de visionados abierto
@@ -2046,7 +2053,10 @@ export default function DetailsClient({
 
     try {
       const r = await withTimeout(
-        traktGetShowWatched({ tmdbId: Number(id) }),
+        traktGetShowWatched({
+          tmdbId: Number(id),
+          traktId: traktResolvedIdRef.current ?? undefined,
+        }),
         25000,
       );
       setWatchedBySeason(r?.watchedBySeason || {});
@@ -2572,7 +2582,11 @@ export default function DetailsClient({
 
       try {
         const json = await withTimeout(
-          traktGetItemStatus({ type: traktType, tmdbId: id }),
+          traktGetItemStatus({
+            type: traktType,
+            tmdbId: id,
+            traktId: traktResolvedIdRef.current ?? undefined,
+          }),
           25000,
         );
 
@@ -2587,7 +2601,7 @@ export default function DetailsClient({
             connected: !!json.connected,
             found: !!json.found,
             traktId: json.traktId ?? null,
-            traktUrl: json.traktUrl || null,
+            traktUrl: json.traktUrl || prev.traktUrl || null,
             watched: preserveTvWatched ? prev.watched : !!json.watched,
             plays: Number(json.plays || 0),
             lastWatchedAt: json.lastWatchedAt || null,
@@ -2688,7 +2702,11 @@ export default function DetailsClient({
         }
         try {
           const r = await withTimeout(
-            traktGetScoreboard({ type: traktType, tmdbId: id }),
+            traktGetScoreboard({
+              type: traktType,
+              tmdbId: id,
+              traktId: scoreboardLookupTraktId || undefined,
+            }),
             14000,
           );
           if (ignore) return;
@@ -2712,7 +2730,11 @@ export default function DetailsClient({
           if (result.found) {
             try {
               const statsR = await withTimeout(
-                traktGetStats({ type: traktType, tmdbId: id }),
+                traktGetStats({
+                  type: traktType,
+                  tmdbId: id,
+                  traktId: scoreboardLookupTraktId || undefined,
+                }),
                 10000,
               );
               if (!ignore && statsR?.found && statsR?.stats) {
@@ -2763,7 +2785,7 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, traktType]);
+  }, [id, traktType, scoreboardLookupTraktId, initialScoreboard]);
 
   // Resetear estados de Trakt al cambiar de contenido e hidratar caché local
   useLayoutEffect(() => {
@@ -2943,9 +2965,17 @@ export default function DetailsClient({
       (endpointType === "tv" &&
         (hasInitialShowWatched || hasCachedShowWatched));
 
-    void reloadTraktStatus({
-      background: hasTraktBootstrapData,
-    });
+    if (hasTraktBootstrapData) {
+      const timer = window.setTimeout(() => {
+        traktBackgroundSyncAtRef.current = Date.now();
+        void reloadTraktStatus({ background: true });
+      }, 2500);
+
+      return () => window.clearTimeout(timer);
+    }
+
+    traktBackgroundSyncAtRef.current = Date.now();
+    void reloadTraktStatus({ background: false });
   }, [
     reloadTraktStatus,
     endpointType,
@@ -2958,8 +2988,21 @@ export default function DetailsClient({
   useEffect(() => {
     let cancelled = false;
     const timers = [];
+    let ignoreFirstPageShow = true;
+    const syncNotBefore =
+      Date.now() +
+      (hasInitialTraktStatus ||
+      hasCachedTraktStatus ||
+      (endpointType === "tv" && (hasInitialShowWatched || hasCachedShowWatched))
+        ? 2500
+        : 0);
 
-    const syncTraktState = async () => {
+    const syncTraktState = async ({ force = false } = {}) => {
+      const now = Date.now();
+      if (!force && now < syncNotBefore) return;
+      if (!force && now - traktBackgroundSyncAtRef.current < 2500) return;
+      traktBackgroundSyncAtRef.current = now;
+
       const latest = await reloadTraktStatus({ background: true });
       if (cancelled || !latest?.connected || type !== "tv") return;
       await loadTraktShowWatched();
@@ -2970,9 +3013,16 @@ export default function DetailsClient({
         void syncTraktState();
       }
     };
+    const handlePageShow = () => {
+      if (ignoreFirstPageShow) {
+        ignoreFirstPageShow = false;
+        return;
+      }
+      void syncTraktState();
+    };
 
     window.addEventListener("focus", syncTraktState);
-    window.addEventListener("pageshow", syncTraktState);
+    window.addEventListener("pageshow", handlePageShow);
     document.addEventListener("visibilitychange", handleVisibility);
 
     // Si el primer intento llegó antes de que Trakt refrescara la sesión,
@@ -2980,7 +3030,7 @@ export default function DetailsClient({
     if (trakt.loading || (!trakt.connected && !trakt.error)) {
       [900, 2200].forEach((delay) => {
         const timer = window.setTimeout(() => {
-          void syncTraktState();
+          void syncTraktState({ force: true });
         }, delay);
         timers.push(timer);
       });
@@ -2990,16 +3040,21 @@ export default function DetailsClient({
       cancelled = true;
       timers.forEach((timer) => window.clearTimeout(timer));
       window.removeEventListener("focus", syncTraktState);
-      window.removeEventListener("pageshow", syncTraktState);
+      window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [
     reloadTraktStatus,
     loadTraktShowWatched,
     type,
+    endpointType,
     trakt.loading,
     trakt.connected,
     trakt.error,
+    hasInitialTraktStatus,
+    hasCachedTraktStatus,
+    hasInitialShowWatched,
+    hasCachedShowWatched,
   ]);
 
   const handleOpenTraktWatched = useCallback(async () => {
@@ -3037,7 +3092,7 @@ export default function DetailsClient({
   useEffect(() => {
     if (endpointType !== "tv") return;
     if (!trakt.connected) return;
-    if (hasInitialShowWatched) return;
+    if (hasInitialShowWatched || hasCachedShowWatched) return;
     loadTraktShowWatched();
   }, [
     endpointType,
