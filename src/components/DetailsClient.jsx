@@ -5127,6 +5127,7 @@ export default function DetailsClient({
     (rec) => {
       if (!rec?.id) return;
       if (typeof window === "undefined") return;
+      if (!supportsHover) return;
 
       const rid = rec.id;
       // si ya está (aunque sea null) no vuelvas a pedir
@@ -5188,7 +5189,7 @@ export default function DetailsClient({
         }
       }, 180);
     },
-    [type],
+    [type, supportsHover],
   );
 
   // Cargar providers desde JustWatch con caché en sessionStorage
@@ -7209,16 +7210,39 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           recImdbRatings[rec.id] != null
                             ? recImdbRatings[rec.id]
                             : undefined;
+                        const recCardClass = supportsHover
+                          ? "mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                          : "mt-3 block relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-white/5";
+                        const recImageClass = supportsHover
+                          ? "w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
+                          : "w-full h-full object-cover";
+                        const recOverlayClass = supportsHover
+                          ? "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300"
+                          : "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75";
+                        const recHeaderInfoClass = supportsHover
+                          ? "absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                          : "absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2";
+                        const recFooterInfoClass = supportsHover
+                          ? "absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                          : "absolute bottom-0 left-0 right-0 p-2.5 sm:p-3";
 
                         return (
                           <SwiperSlide key={rec.id}>
                             <Link
                               href={`/details/${rec.media_type || type}/${rec.id}`}
-                              className="block group"
-                              onMouseEnter={() => prefetchRecImdb(rec)}
-                              onFocus={() => prefetchRecImdb(rec)}
+                              className={recCardClass}
+                              onMouseEnter={
+                                supportsHover
+                                  ? () => prefetchRecImdb(rec)
+                                  : undefined
+                              }
+                              onFocus={
+                                supportsHover
+                                  ? () => prefetchRecImdb(rec)
+                                  : undefined
+                              }
                             >
-                              <div className="mt-3 relative rounded-xl overflow-hidden shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] bg-neutral-900 aspect-[2/3]">
+                              <div className="aspect-[2/3] overflow-hidden relative">
                                 <img
                                   src={
                                     rec.poster_path
@@ -7226,11 +7250,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       : "/placeholder.png"
                                   }
                                   alt={recTitle}
-                                  className="absolute inset-0 w-full h-full object-cover"
+                                  loading="lazy"
+                                  decoding="async"
+                                  sizes="(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 180px"
+                                  className={recImageClass}
                                 />
 
-                                <div className="absolute inset-0 transition-opacity duration-300 flex flex-col justify-between opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
-                                  <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
+                                <div className={recHeaderInfoClass}>
+                                  <div>
                                     <span
                                       className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
                                         isMovie
@@ -7240,7 +7267,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     >
                                       {isMovie ? "PELÍCULA" : "SERIE"}
                                     </span>
+                                  </div>
 
+                                  {(tmdbScore || imdbScore != null) && (
                                     <div className="flex flex-col items-end gap-1">
                                       {tmdbScore && (
                                         <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
@@ -7251,6 +7280,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             src="/logo-TMDb.png"
                                             alt=""
                                             className="w-auto h-2.5 opacity-100"
+                                            loading="lazy"
+                                            decoding="async"
                                           />
                                         </div>
                                       )}
@@ -7263,26 +7294,26 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             src="/logo-IMDb.png"
                                             alt=""
                                             className="w-auto h-3 opacity-100"
+                                            loading="lazy"
+                                            decoding="async"
                                           />
                                         </div>
                                       )}
                                     </div>
-                                  </div>
+                                  )}
+                                </div>
 
-                                  <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 transition-transform duration-300">
-                                    <div className="flex items-end justify-between gap-3">
-                                      <div className="min-w-0 text-left">
-                                        <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">
-                                          {recTitle}
-                                        </h3>
-                                        {recYear && (
-                                          <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
-                                            {recYear}
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
+                                <div className={recOverlayClass} />
+
+                                <div className={recFooterInfoClass}>
+                                  <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-2">
+                                    {recTitle}
+                                  </p>
+                                  {recYear && (
+                                    <p className="text-yellow-500 text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">
+                                      {recYear}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             </Link>
@@ -7301,8 +7332,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 ref={registerSection("collection")}
               >
                 <AnimatedSection
+                  key={`${id}-collection-${collectionLoading ? "loading" : "ready"}-${collectionData?.items?.length || 0}`}
                   delay={0.04}
-                  margin={"0px 0px -24% 0px"}
                 >
                   {/* --- COLECCIÓN --- */}
                   <section className="mb-10">
@@ -7377,8 +7408,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                ================================================================= */}
             <section id="section-media" ref={registerSection("media")}>
               <AnimatedSection
+                key={`${id}-artwork-${artworkInitialized ? "ready" : "loading"}`}
                 delay={0.04}
-                margin={"0px 0px -24% 0px"}
               >
                 {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
                 {(type === "movie" || type === "tv") && (
@@ -7959,7 +7990,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
               </AnimatedSection>
 
-              <AnimatedSection delay={0.04}>
+              <AnimatedSection
+                key={`${id}-videos-${videosResolved ? "ready" : "loading"}-${videos.length}`}
+                delay={0.04}
+              >
                 {/* =================================================================
                     SECCIÓN: TRÁILER Y VÍDEOS
                    ================================================================= */}
@@ -8502,6 +8536,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </div>
                   </section>
                 )}
+              </AnimatedSection>
+
+              <AnimatedSection delay={0.04}>
                 {/* ===================================================== */}
                 {/* Trakt: comentarios */}
                 <section className="mb-10">
