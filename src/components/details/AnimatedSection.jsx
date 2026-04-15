@@ -21,7 +21,7 @@ export function AnimatedSection({
   children,
   className = "",
   delay = 0,
-  margin = "0px 0px 18% 0px",
+  margin = "-100px",
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin });
