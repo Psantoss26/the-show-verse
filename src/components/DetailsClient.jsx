@@ -5381,6 +5381,12 @@ export default function DetailsClient({
   const currentLoadTokenRef =
     posterViewMode === "preview" ? backdropLoadTokenRef : posterLoadTokenRef;
 
+  // En la primera entrada no queremos ocultar la portada correcta y revelarla
+  // un frame después, porque rompe la animación del hero y produce microparpadeo.
+  // Solo mantenemos la nueva imagen oculta cuando hay un swap real con crossfade.
+  const shouldRevealCurrentPosterImmediately =
+    !!currentImagePath && (!posterTransitioning || !prevPosterPath);
+
   // Limpiar transicion suavemente solo despues de cargar (evita destellos en internet lento)
   useEffect(() => {
     if (currentLowLoaded && prevPosterPath) {
@@ -5740,7 +5746,7 @@ export default function DetailsClient({
                             }
                           }}
                           className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500 ease-out will-change-[opacity,transform]
-${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-0"}`}
+${currentHighLoaded ? "opacity-0" : shouldRevealCurrentPosterImmediately || currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
                             transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
                           }}
