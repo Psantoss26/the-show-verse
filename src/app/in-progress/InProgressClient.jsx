@@ -148,6 +148,150 @@ const buildImg = (path, size = "w500") => {
   return `https://image.tmdb.org/t/p/${size}${path}`;
 };
 
+const posterChoiceCache = new Map();
+const posterInFlight = new Map();
+
+const backdropChoiceCache = new Map();
+const backdropInFlight = new Map();
+
+function preloadImage(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(false);
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = src;
+  });
+}
+
+function pickBestPosterEN(posters) {
+  if (!Array.isArray(posters) || posters.length === 0) return null;
+
+  const maxVotes = posters.reduce(
+    (max, p) => ((p.vote_count || 0) > max ? p.vote_count || 0 : max),
+    0,
+  );
+  const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes);
+  if (!withMaxVotes.length) return null;
+
+  const preferredLangs = new Set(["en", "en-US"]);
+  const enGroup = withMaxVotes.filter(
+    (p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1),
+  );
+  const nullLang = withMaxVotes.filter((p) => p.iso_639_1 === null);
+  const candidates = enGroup.length
+    ? enGroup
+    : nullLang.length
+      ? nullLang
+      : withMaxVotes;
+
+  return (
+    [...candidates].sort((a, b) => {
+      const va = (b.vote_average || 0) - (a.vote_average || 0);
+      if (va !== 0) return va;
+      return (b.width || 0) - (a.width || 0);
+    })[0] || null
+  );
+}
+
+async function fetchBestPosterEN(type, id) {
+  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+  if (!apiKey || !type || !id) return null;
+  try {
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`;
+    const r = await fetch(url, { cache: "force-cache" });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return pickBestPosterEN(j?.posters)?.file_path || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getBestPosterCached(type, id) {
+  const key = `${type}:${id}`;
+  if (posterChoiceCache.has(key)) return posterChoiceCache.get(key);
+  if (posterInFlight.has(key)) return posterInFlight.get(key);
+
+  const p = (async () => {
+    const chosen = await fetchBestPosterEN(type, id);
+    posterChoiceCache.set(key, chosen || null);
+    posterInFlight.delete(key);
+    return chosen || null;
+  })();
+
+  posterInFlight.set(key, p);
+  return p;
+}
+
+function pickBestBackdropByLangResVotes(list, opts = {}) {
+  const { preferLangs = ["en", "en-US"], minWidth = 1200 } = opts;
+  if (!Array.isArray(list) || list.length === 0) return null;
+
+  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
+  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
+  const isPreferredLang = (img) => {
+    if (img?.iso_639_1 === null || img?.iso_639_1 === undefined) return false;
+    return preferSet.has(norm(img?.iso_639_1));
+  };
+
+  const pool0 =
+    minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
+  const pool = pool0.length ? pool0 : list;
+
+  const top3en = [];
+  for (const b of pool) {
+    if (isPreferredLang(b)) top3en.push(b);
+    if (top3en.length === 3) break;
+  }
+  if (!top3en.length) return null;
+
+  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
+  const b1080 = top3en.find((b) => isRes(b, 1920, 1080));
+  if (b1080) return b1080;
+  const b1440 = top3en.find((b) => isRes(b, 2560, 1440));
+  if (b1440) return b1440;
+  const b4k = top3en.find((b) => isRes(b, 3840, 2160));
+  if (b4k) return b4k;
+  const b720 = top3en.find((b) => isRes(b, 1280, 720));
+  if (b720) return b720;
+  return top3en[0];
+}
+
+async function fetchBestBackdropEN(type, id) {
+  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+  if (!apiKey || !type || !id) return null;
+  try {
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`;
+    const r = await fetch(url, { cache: "force-cache" });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const best = pickBestBackdropByLangResVotes(j?.backdrops, {
+      preferLangs: ["en", "en-US"],
+      minWidth: 1200,
+    });
+    return best?.file_path || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getBestBackdropCached(type, id) {
+  const key = `${type}:${id}`;
+  if (backdropChoiceCache.has(key)) return backdropChoiceCache.get(key);
+  if (backdropInFlight.has(key)) return backdropInFlight.get(key);
+
+  const p = (async () => {
+    const chosen = await fetchBestBackdropEN(type, id);
+    backdropChoiceCache.set(key, chosen || null);
+    backdropInFlight.delete(key);
+    return chosen || null;
+  })();
+
+  backdropInFlight.set(key, p);
+  return p;
+}
+
 const getPosterPreference = (type, id) => {
   if (typeof window === "undefined") return null;
   const key =
@@ -197,31 +341,122 @@ function clearSessionCache(key) {
 function SmartPoster({ item, title }) {
   const type = "tv"; // In Progress is always TV
   const id = item.tmdbId;
-  const fallbackSrc = useMemo(
-    () => buildImg(item.poster_path || item.backdrop_path || null, "w500"),
-    [item.poster_path, item.backdrop_path],
-  );
-  const [src, setSrc] = useState(fallbackSrc);
+
+  const [src, setSrc] = useState(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const pref = getPosterPreference(type, id);
-    setSrc(buildImg(pref, "w500") || fallbackSrc);
-  }, [type, id, fallbackSrc]);
+    let abort = false;
+
+    setSrc(null);
+    setReady(false);
+
+    const load = async () => {
+      const pref = getPosterPreference(type, id);
+      if (pref) {
+        const url = buildImg(pref, "w500");
+        await preloadImage(url);
+        if (!abort) {
+          setSrc(url);
+          setReady(true);
+        }
+        return;
+      }
+
+      const best = await getBestPosterCached(type, id);
+      const finalPath = best || item.poster_path || item.backdrop_path || null;
+      const url = finalPath ? buildImg(finalPath, "w500") : null;
+      if (url) await preloadImage(url);
+      if (!abort) {
+        setSrc(url);
+        setReady(!!url);
+      }
+    };
+
+    load();
+    return () => {
+      abort = true;
+    };
+  }, [type, id, item.poster_path, item.backdrop_path]);
 
   return (
     <div className="relative w-full h-full">
-      {src ? (
+      <div
+        className={`absolute inset-0 flex items-center justify-center bg-neutral-900 transition-opacity duration-300 ${
+          ready && src ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        <Film className="w-8 h-8 text-neutral-700" />
+      </div>
+      {src && (
         <img
           src={src}
           alt={title}
           loading="lazy"
           decoding="async"
-          className="absolute inset-0 w-full h-full object-cover"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            ready ? "opacity-100" : "opacity-0"
+          }`}
         />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-neutral-900">
-          <Film className="w-8 h-8 text-neutral-700" />
-        </div>
+      )}
+    </div>
+  );
+}
+
+// ----------------------------
+// SMART BACKDROP COMPONENT
+// ----------------------------
+function SmartBackdrop({ item, title, imgClassName = "" }) {
+  const type = "tv";
+  const id = item.tmdbId;
+
+  const [src, setSrc] = useState(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let abort = false;
+
+    setSrc(null);
+    setReady(false);
+
+    const load = async () => {
+      const best = await getBestBackdropCached(type, id);
+      const finalPath = best || item.backdrop_path || item.poster_path || null;
+      const url = finalPath
+        ? buildImg(finalPath, best || item.backdrop_path ? "w1280" : "w500")
+        : null;
+      if (url) await preloadImage(url);
+      if (!abort) {
+        setSrc(url);
+        setReady(!!url);
+      }
+    };
+
+    load();
+    return () => {
+      abort = true;
+    };
+  }, [type, id, item.backdrop_path, item.poster_path]);
+
+  return (
+    <div className="relative w-full h-full">
+      <div
+        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
+          ready && src ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        <Tv className="w-8 h-8 text-zinc-700" />
+      </div>
+      {src && (
+        <img
+          src={src}
+          alt={title}
+          loading="lazy"
+          decoding="async"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            ready ? "opacity-100" : "opacity-0"
+          } ${imgClassName}`}
+        />
       )}
     </div>
   );
@@ -438,12 +673,6 @@ const InProgressCard = memo(function InProgressCard({
 }) {
   const title = item.title_es || item.title || "Sin título";
   const href = item.detailsHref || `/details/tv/${item.tmdbId}`;
-  const posterSrc = item.poster_path
-    ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
-    : null;
-  const backdropSrc = item.backdrop_path
-    ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}`
-    : null;
   const colors = getProgressColor(item.pct);
   const nextEpCode = item.nextEpisode
     ? formatEpCode(item.nextEpisode.season, item.nextEpisode.number)
@@ -471,25 +700,7 @@ const InProgressCard = memo(function InProgressCard({
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
             {/* Backdrop image - same size as History list view */}
             <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
-              {backdropSrc ? (
-                <img
-                  src={backdropSrc}
-                  alt={title}
-                  className="block w-full h-full object-cover"
-                  loading="lazy"
-                />
-              ) : posterSrc ? (
-                <img
-                  src={posterSrc}
-                  alt={title}
-                  className="block w-full h-full object-cover blur-sm opacity-60"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-zinc-800">
-                  <Tv className="w-8 h-8 text-zinc-700" />
-                </div>
-              )}
+              <SmartBackdrop item={item} title={title} />
             </div>
 
             {/* Info - right side */}
@@ -711,25 +922,11 @@ const InProgressCard = memo(function InProgressCard({
         >
           {/* Backdrop hero */}
           <div className="relative aspect-video overflow-hidden">
-            {backdropSrc ? (
-              <img
-                src={backdropSrc}
-                alt={title}
-                className="block w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                loading="lazy"
-              />
-            ) : posterSrc ? (
-              <img
-                src={posterSrc}
-                alt={title}
-                className="block w-full h-full object-cover blur-sm opacity-50 transition-transform duration-500 group-hover:scale-105"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center">
-                <Tv className="w-12 h-12 text-zinc-700" />
-              </div>
-            )}
+            <SmartBackdrop
+              item={item}
+              title={title}
+              imgClassName="transition-transform duration-500 group-hover:scale-105"
+            />
 
             {/* Gradient overlay - stronger at top for badge readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/30" />
@@ -1318,17 +1515,8 @@ export default function InProgressClient() {
   // RENDER
   // ----------------------------
 
-  // Loading auth
-  if (auth.loading) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-      </div>
-    );
-  }
-
   // Not connected state
-  if (!auth.connected) {
+  if (!auth.loading && !auth.connected) {
     return (
       <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -1431,29 +1619,37 @@ export default function InProgressClient() {
                     onClick={() =>
                       activeTab === "completed" ? loadCompleted() : loadData()
                     }
-                    disabled={currentLoading}
+                    disabled={currentLoading || auth.loading}
                     className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.3 }}
-                    whileHover={{ scale: currentLoading ? 1 : 1.05 }}
-                    whileTap={{ scale: currentLoading ? 1 : 0.95 }}
+                    whileHover={{
+                      scale: currentLoading || auth.loading ? 1 : 1.05,
+                    }}
+                    whileTap={{
+                      scale: currentLoading || auth.loading ? 1 : 0.95,
+                    }}
                     title="Sincronizar"
                   >
                     <RotateCcw
-                      className={`w-5 h-5 text-white ${currentLoading ? "animate-spin" : ""}`}
+                      className={`w-5 h-5 text-white ${currentLoading || auth.loading ? "animate-spin" : ""}`}
                     />
                   </motion.button>
 
                   <motion.button
                     onClick={() => setShowDisconnectModal(true)}
-                    disabled={currentLoading}
+                    disabled={currentLoading || auth.loading}
                     className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.4 }}
-                    whileHover={{ scale: currentLoading ? 1 : 1.05 }}
-                    whileTap={{ scale: currentLoading ? 1 : 0.95 }}
+                    whileHover={{
+                      scale: currentLoading || auth.loading ? 1 : 1.05,
+                    }}
+                    whileTap={{
+                      scale: currentLoading || auth.loading ? 1 : 0.95,
+                    }}
                     title="Desconectar"
                   >
                     <LogOut className="w-5 h-5 text-red-400" />
@@ -1880,7 +2076,7 @@ export default function InProgressClient() {
                     ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                     : "text-zinc-500 hover:text-white hover:bg-zinc-800"
                 }`}
-                title="Compacto"
+                title="Lista"
               >
                 <LayoutList className="w-4 h-4" />
               </button>
@@ -1891,7 +2087,7 @@ export default function InProgressClient() {
         {/* ========== CONTENT ========== */}
 
         {/* Loading state */}
-        {currentLoading && (
+        {(currentLoading || auth.loading) && (
           <div
             className={
               viewMode === "cards"
@@ -1908,7 +2104,7 @@ export default function InProgressClient() {
         )}
 
         {/* Empty state */}
-        {!currentLoading && filtered.length === 0 && (
+        {!currentLoading && !auth.loading && filtered.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1939,7 +2135,7 @@ export default function InProgressClient() {
         )}
 
         {/* Items */}
-        {!currentLoading && filtered.length > 0 && (
+        {!currentLoading && !auth.loading && filtered.length > 0 && (
           <AnimatePresence mode="popLayout">
             {grouped && grouped.length > 0 ? (
               // Grouped view
