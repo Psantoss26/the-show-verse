@@ -2,14 +2,14 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {3.1}{\ignorespaces Estrategia de caché por tipo de dato}}{22}{table.caption.3}%
+\contentsline {table}{\numberline {3.1}{\ignorespaces Estrategia de caché por tipo de dato}}{21}{table.caption.3}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {4.1}{\ignorespaces Rutas principales de la aplicación}}{27}{table.caption.4}%
-\contentsline {table}{\numberline {4.2}{\ignorespaces Principales funciones del cliente TMDb y sus \textit {endpoints}}}{29}{table.caption.5}%
-\contentsline {table}{\numberline {4.3}{\ignorespaces Principales \textit {endpoints} de Trakt utilizados}}{30}{table.caption.6}%
-\contentsline {table}{\numberline {4.4}{\ignorespaces Secciones del dashboard y sus fuentes de datos}}{40}{table.caption.7}%
-\contentsline {table}{\numberline {4.5}{\ignorespaces Métricas Lighthouse en producción}}{75}{table.caption.32}%
-\contentsline {table}{\numberline {4.6}{\ignorespaces Breakpoints responsive}}{84}{table.caption.33}%
+\contentsline {table}{\numberline {4.1}{\ignorespaces Rutas principales de la aplicación}}{26}{table.caption.4}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Principales funciones del cliente TMDb y sus \textit {endpoints}}}{28}{table.caption.5}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Principales \textit {endpoints} de Trakt utilizados}}{29}{table.caption.6}%
+\contentsline {table}{\numberline {4.4}{\ignorespaces Secciones del dashboard y sus fuentes de datos}}{39}{table.caption.7}%
+\contentsline {table}{\numberline {4.5}{\ignorespaces Métricas Lighthouse en producción}}{74}{table.caption.32}%
+\contentsline {table}{\numberline {4.6}{\ignorespaces Breakpoints responsive}}{83}{table.caption.33}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {5.2}{\ignorespaces Variables de entorno del proyecto}}{95}{table.caption.37}%
-\contentsline {table}{\numberline {5.3}{\ignorespaces Sistema de caché multicapa}}{96}{table.caption.38}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Variables de entorno del proyecto}}{94}{table.caption.37}%
+\contentsline {table}{\numberline {5.3}{\ignorespaces Sistema de caché multicapa}}{95}{table.caption.38}%

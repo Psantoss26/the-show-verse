@@ -79,38 +79,6 @@
       \verb https://www.framer.com/motion/
       \endverb
     \endentry
-    \entry{Google:2024b}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=6bc28252c14133d21331dc54856c1797}{%
-           family={{Google Developers}},
-           familyi={G\bibinitperiod}}}%
-      }
-      \strng{namehash}{6bc28252c14133d21331dc54856c1797}
-      \strng{fullhash}{6bc28252c14133d21331dc54856c1797}
-      \strng{fullhashraw}{6bc28252c14133d21331dc54856c1797}
-      \strng{bibnamehash}{6bc28252c14133d21331dc54856c1797}
-      \strng{authorbibnamehash}{6bc28252c14133d21331dc54856c1797}
-      \strng{authornamehash}{6bc28252c14133d21331dc54856c1797}
-      \strng{authorfullhash}{6bc28252c14133d21331dc54856c1797}
-      \strng{authorfullhashraw}{6bc28252c14133d21331dc54856c1797}
-      \field{extraname}{1}
-      \field{sortinit}{G}
-      \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
-      \field{extradate}{1}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{Core Web Vitals report}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://support.google.com/webmasters/answer/9205520
-      \endverb
-      \verb{url}
-      \verb https://support.google.com/webmasters/answer/9205520
-      \endverb
-    \endentry
     \entry{Google:2024a}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=6bc28252c14133d21331dc54856c1797}{%
@@ -125,10 +93,8 @@
       \strng{authornamehash}{6bc28252c14133d21331dc54856c1797}
       \strng{authorfullhash}{6bc28252c14133d21331dc54856c1797}
       \strng{authorfullhashraw}{6bc28252c14133d21331dc54856c1797}
-      \field{extraname}{2}
       \field{sortinit}{G}
       \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
-      \field{extradate}{2}
       \field{extradatescope}{labelyear}
       \field{labeldatesource}{}
       \true{uniqueprimaryauthor}
@@ -327,66 +293,6 @@
       \endverb
       \verb{url}
       \verb https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
-      \endverb
-    \endentry
-    \entry{TMDb:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=82f6b680b94fc4299b971a83a7f74c2d}{%
-           family={{The Movie Database}},
-           familyi={T\bibinitperiod}}}%
-      }
-      \strng{namehash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{fullhash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{fullhashraw}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{bibnamehash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{authorbibnamehash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{authornamehash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{authorfullhash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{authorfullhashraw}{82f6b680b94fc4299b971a83a7f74c2d}
-      \field{sortinit}{T}
-      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{TMDb API Documentation v3}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://developer.themoviedb.org/docs/getting-started
-      \endverb
-      \verb{url}
-      \verb https://developer.themoviedb.org/docs/getting-started
-      \endverb
-    \endentry
-    \entry{Trakt:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=a5570c8009900fc3ddb40cfdc44d42f4}{%
-           family={{Trakt}},
-           familyi={T\bibinitperiod}}}%
-      }
-      \strng{namehash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{fullhash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{fullhashraw}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{bibnamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{authorbibnamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{authornamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{authorfullhash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{authorfullhashraw}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \field{sortinit}{T}
-      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{Trakt API Documentation v2}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://trakt.docs.apiary.io/
-      \endverb
-      \verb{url}
-      \verb https://trakt.docs.apiary.io/
       \endverb
     \endentry
     \entry{Vercel:2024a}{online}{}{}
@@ -481,38 +387,6 @@
       \verb https://www.framer.com/motion/
       \endverb
     \endentry
-    \entry{Google:2024b}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=6bc28252c14133d21331dc54856c1797}{%
-           family={{Google Developers}},
-           familyi={G\bibinitperiod}}}%
-      }
-      \strng{namehash}{6bc28252c14133d21331dc54856c1797}
-      \strng{fullhash}{6bc28252c14133d21331dc54856c1797}
-      \strng{fullhashraw}{6bc28252c14133d21331dc54856c1797}
-      \strng{bibnamehash}{6bc28252c14133d21331dc54856c1797}
-      \strng{authorbibnamehash}{6bc28252c14133d21331dc54856c1797}
-      \strng{authornamehash}{6bc28252c14133d21331dc54856c1797}
-      \strng{authorfullhash}{6bc28252c14133d21331dc54856c1797}
-      \strng{authorfullhashraw}{6bc28252c14133d21331dc54856c1797}
-      \field{extraname}{1}
-      \field{sortinit}{G}
-      \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
-      \field{extradate}{1}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{Core Web Vitals report}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://support.google.com/webmasters/answer/9205520
-      \endverb
-      \verb{url}
-      \verb https://support.google.com/webmasters/answer/9205520
-      \endverb
-    \endentry
     \entry{Google:2024a}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=6bc28252c14133d21331dc54856c1797}{%
@@ -527,10 +401,8 @@
       \strng{authornamehash}{6bc28252c14133d21331dc54856c1797}
       \strng{authorfullhash}{6bc28252c14133d21331dc54856c1797}
       \strng{authorfullhashraw}{6bc28252c14133d21331dc54856c1797}
-      \field{extraname}{2}
       \field{sortinit}{G}
       \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
-      \field{extradate}{2}
       \field{extradatescope}{labelyear}
       \field{labeldatesource}{}
       \true{uniqueprimaryauthor}
@@ -729,66 +601,6 @@
       \endverb
       \verb{url}
       \verb https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
-      \endverb
-    \endentry
-    \entry{TMDb:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=82f6b680b94fc4299b971a83a7f74c2d}{%
-           family={{The Movie Database}},
-           familyi={T\bibinitperiod}}}%
-      }
-      \strng{namehash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{fullhash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{fullhashraw}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{bibnamehash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{authorbibnamehash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{authornamehash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{authorfullhash}{82f6b680b94fc4299b971a83a7f74c2d}
-      \strng{authorfullhashraw}{82f6b680b94fc4299b971a83a7f74c2d}
-      \field{sortinit}{T}
-      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{TMDb API Documentation v3}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://developer.themoviedb.org/docs/getting-started
-      \endverb
-      \verb{url}
-      \verb https://developer.themoviedb.org/docs/getting-started
-      \endverb
-    \endentry
-    \entry{Trakt:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=a5570c8009900fc3ddb40cfdc44d42f4}{%
-           family={{Trakt}},
-           familyi={T\bibinitperiod}}}%
-      }
-      \strng{namehash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{fullhash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{fullhashraw}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{bibnamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{authorbibnamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{authornamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{authorfullhash}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \strng{authorfullhashraw}{a5570c8009900fc3ddb40cfdc44d42f4}
-      \field{sortinit}{T}
-      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{Trakt API Documentation v2}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://trakt.docs.apiary.io/
-      \endverb
-      \verb{url}
-      \verb https://trakt.docs.apiary.io/
       \endverb
     \endentry
     \entry{Vercel:2024a}{online}{}{}

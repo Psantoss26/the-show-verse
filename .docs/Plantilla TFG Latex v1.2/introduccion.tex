@@ -6,15 +6,15 @@ Esto provoca situaciones como perder el seguimiento de una serie que se dejó a 
 
 \textit{The Show Verse} nace como respuesta a esa necesidad ofreciendo una plataforma web que centraliza gran parte de la gestión del contenido audiovisual, integrando los datos de múltiples fuentes mediante APIs externas y ofreciendo al usuario una experiencia completa y funcional.
 
-Desde el punto de vista técnico, el proyecto aborda varios retos propios del desarrollo web actual como la integración de APIs REST de terceros con distintos esquemas de autenticación y formatos de datos, la implementación de la autenticación para el acceso con TMDb y Trakt.tv, el diseño de una estrategia de caché en varios niveles para optimizar el rendimiento, y la construcción de una interfaz responsiva con un diseño propio y cómodo para el usuario.
+Desde el punto de vista técnico, el proyecto aborda varios retos propios del desarrollo web como la integración de APIs REST de terceros con distintos esquemas de autenticación y formatos de datos, la implementación de la autenticación para el acceso con TMDb y Trakt.tv, el diseño de una estrategia de caché en varios niveles para optimizar el rendimiento, y la construcción de una interfaz \textit{responsive} con un diseño propio y cómodo para el usuario.
 
 \subsection{Motivación}
 
-El interés por el desarrollo de este proyecto surge de la experiencia personal como consumidor habitual de películas y series a través de diversas plataformas de \textit{streaming}. La dispersión del contenido disponible entre los diferentes servicios dificulta tanto el acceso a la información como la gestión del propio consumo.
+El interés por el desarrollo de este proyecto surge de la experiencia personal como consumidor habitual de películas y series a través de diversas plataformas de \textit{streaming} y la dificultad que hay para gestionar el consumo personal del contenido a través de los diferentes servicios disponibles.
 
-Es por ello que resulta complicado recordar qué contenido se ha visualizado, cuáles han sido las valoraciones asignadas o qué títulos quedan pendientes por ver y cuales están en progreso. A esta problemática se suma la necesidad de consultar información adicional (como críticas, puntuaciones o detalles técnicos) en diferentes páginas o \textit{webs} independientes, lo que genera una experiencia fragmentada y poco eficiente si habitualmente tienes que estar consultando diferentes sitios para un mismo propósito.
+Es por ello que resulta complicado recordar qué títulos se han visualizado, cuáles han sido las valoraciones asignadas o qué contenido queda pendiente por ver y cuáles están en progreso. A esta problemática se suma la necesidad de consultar información adicional (como críticas, puntuaciones o detalles técnicos) en diferentes páginas o \textit{webs} independientes, lo que genera una experiencia fragmentada y poco eficiente si habitualmente tienes que estar consultando diferentes sitios para un mismo propósito.
 
-Las aplicaciones existentes en el mercado (Letterboxd, Trakt.tv, Simkl) ofrecen soluciones parciales, pero ninguna combina todos los datos y funcionalidades realmente necesarios a la hora de gestionar este tipo de contenido. Algunas destacan por su capacidad de seguimiento del contenido, mientras que otras priorizan el diseño visual o la experiencia de usuario, pero no logran combinar de manera equilibrada todas las funcionalidades necesarias para una gestión completa del consumo audiovisual.
+Las aplicaciones existentes en el mercado (Letterboxd, Trakt.tv, Simkl) ofrecen soluciones parciales, pero ninguna combina todos los datos y funcionalidades realmente necesarios a la hora de gestionar este tipo de contenido. Algunas destacan por su capacidad de seguimiento, mientras que otras priorizan el diseño visual o la experiencia de usuario, pero no logran combinar de manera equilibrada todas las funcionalidades necesarias para una gestión completa del consumo audiovisual.
 
 \section{Planteamiento del problema}
 
@@ -39,12 +39,12 @@ El objetivo principal es diseñar e implementar una aplicación web completa y f
 \item Desarrollar un sistema de autenticación OAuth 2.0 completo con Trakt.tv, incluyendo almacenamiento seguro de tokens en cookies \texttt{httpOnly}, actualización automática mediante \textit{refresh tokens} y revocación.
 \item Construir un módulo de gestión personal (favoritos, pendientes, historial de visionado, series en progreso y puntuaciones de usuario) con sincronización bidireccional con Trakt y TMDb.
 \item Implementar un sistema de seguimiento de episodios completo para series, incluyendo marcado individual por episodio, marcado completo por temporada, visualización de progreso y tabla de puntuaciones por episodio y temporada.
-\item Diseñar una interfaz de usuario responsiva y accesible que ofrezca múltiples modos de visualización (Grid, List, Compact) con transiciones fluidas mediante Framer Motion y compatibilidad con dispositivos móviles mediante navegación adaptativa.
+\item Diseñar una interfaz de usuario responsiva y accesible que ofrezca múltiples modos de visualización (Grid, List, Compact) con transiciones fluidas mediante Framer Motion y compatibilidad con dispositivos móviles.
 \item Optimizar el rendimiento de la aplicación mediante un sistema de caché multinivel (ISR en servidor, memoria de proceso Node.js, sessionStorage, localStorage) con deduplicación en vuelo para reducir el tráfico API.
-\item Implementar un \textit{middleware} Edge para optimización SEO con detección de bots, generación de metadatos Open Graph y reescritura de URLs para garantizar indexación correcta.
-\item Integrar Plex Media Server para acceso a biblioteca local del usuario, incluyendo autenticación JWT, enlaces directos multiplataforma y búsqueda unificada.
+\item Implementar un \textit{middleware} Edge para optimización SEO, generación de metadatos Open Graph y reescritura de URLs para garantizar una indexación correcta.
+\item Integrar Plex Media Server para el acceso a la biblioteca local del usuario, incluyendo autenticación JWT, enlaces directos multiplataforma y búsqueda unificada.
 \item Desarrollar componentes interactivos avanzados con efectos visuales y sistema de actualización optimista para todas las acciones de usuario.
-\item Implementar gestión de errores con \textit{graceful degradation} y \textit{skeleton loaders} para garantizar funcionalidad parcial aunque fallen APIs externas.
+\item Implementar una gestión de errores con \textit{graceful degradation} y \textit{skeleton loaders} para garantizar la funcionalidad parcial aunque fallen APIs externas.
 \item Desplegar la aplicación en un entorno de producción (Vercel).
 \end{enumerate}
 

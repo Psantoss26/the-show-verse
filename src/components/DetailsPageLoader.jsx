@@ -44,8 +44,14 @@ export default function DetailsPageLoader(props) {
 
     const loadPriorityDeferredData = async () => {
       try {
+        // Si el servidor ya proporcionó el cast, no repetir la petición
+        const skipCast =
+          Array.isArray(initialCastData) && initialCastData.length > 0;
+
         const [credits, related] = await Promise.all([
-          getCredits(type, id).catch(() => ({ cast: [] })),
+          skipCast
+            ? Promise.resolve(null)
+            : getCredits(type, id).catch(() => ({ cast: [] })),
           getTraktRelated({ type, tmdbId: id }).catch(() => ({ results: [] })),
         ]);
 
@@ -53,34 +59,56 @@ export default function DetailsPageLoader(props) {
 
         setDeferredData((prev) => ({
           ...prev,
-          castData: Array.isArray(credits?.cast) ? credits.cast : EMPTY_ARRAY,
+          ...(credits != null
+            ? {
+                castData: Array.isArray(credits?.cast)
+                  ? credits.cast
+                  : EMPTY_ARRAY,
+              }
+            : {}),
           recommendations: related?.results || EMPTY_ARRAY,
         }));
       } catch (error) {
-        console.error(
-          "Error cargando datos prioritarios del detalle:",
-          error,
-        );
+        console.error("Error cargando datos prioritarios del detalle:", error);
       }
     };
 
     const loadSecondaryDeferredData = async () => {
       try {
+        // Si el servidor ya proporcionó reviews/providers, no repetir las peticiones
+        const skipReviews =
+          Array.isArray(initialReviews) && initialReviews.length > 0;
+        const skipProviders =
+          Array.isArray(initialProviders) && initialProviders.length > 0;
+
+        // Si ambos están cubiertos por el servidor, no hay nada que hacer
+        if (skipReviews && skipProviders) return;
+
         const [reviews, watchProviders] = await Promise.all([
-          getReviews(type, id).catch(() => ({ results: [] })),
-          getWatchProviders(type, id, "ES").catch(() => ({
-            providers: [],
-            link: null,
-          })),
+          skipReviews
+            ? Promise.resolve(null)
+            : getReviews(type, id).catch(() => ({ results: [] })),
+          skipProviders
+            ? Promise.resolve(null)
+            : getWatchProviders(type, id, "ES").catch(() => ({
+                providers: [],
+                link: null,
+              })),
         ]);
 
         if (cancelled) return;
 
         setDeferredData((prev) => ({
           ...prev,
-          reviews: reviews?.results || EMPTY_ARRAY,
-          providers: watchProviders?.providers || EMPTY_ARRAY,
-          watchLink: watchProviders?.link || null,
+          ...(reviews != null
+            ? { reviews: reviews?.results || EMPTY_ARRAY }
+            : {}),
+          ...(watchProviders != null
+            ? {
+                providers: watchProviders?.providers || EMPTY_ARRAY,
+                watchLink: watchProviders?.link || null,
+              }
+            : {}),
         }));
       } catch (error) {
         console.error(
