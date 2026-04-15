@@ -282,6 +282,14 @@ export default function DetailsClient({
   initialShowWatched,
 }) {
   const router = useRouter();
+  const prefetchSeasonDetails = useCallback(
+    (seasonNumber) => {
+      const sn = Number(seasonNumber);
+      if (!Number.isFinite(sn)) return;
+      router.prefetch(`/details/tv/${id}/season/${sn}`);
+    },
+    [router, id],
+  );
 
   // -- Datos basicos derivados de las props --
   const title = data.title || data.name; // Peliculas usan "title", series usan "name"
@@ -7767,6 +7775,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             onClick={() =>
                               router.push(`/details/tv/${id}/season/${sn}`)
                             }
+                            onMouseEnter={() => prefetchSeasonDetails(sn)}
+                            onFocus={() => prefetchSeasonDetails(sn)}
+                            onTouchStart={() => prefetchSeasonDetails(sn)}
                             className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5
                              transition-all hover:-translate-y-1 hover:border-white/20 hover:bg-white/10 hover:shadow-xl
                              text-left w-full"
