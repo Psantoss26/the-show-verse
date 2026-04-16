@@ -403,11 +403,6 @@ export async function getTraktItemStatusFromCookieStore(
     if (!token) {
       return { connected: false };
     }
-
-    const auth = await traktApi("/users/settings", { token });
-    if (!auth.ok) {
-      return { connected: false };
-    }
     authVerified = true;
 
     let resolved = null;
@@ -473,6 +468,10 @@ export async function getTraktItemStatusFromCookieStore(
       history: mapHistoryEntries(history),
     };
   } catch (e) {
+    if (e?.status === 401) {
+      return { connected: false };
+    }
+
     const transientAfterAuth =
       authVerified &&
       (e?.status === 403 ||
@@ -562,14 +561,6 @@ export async function getTraktDetailsBootstrapFromCookieStore(
     const { token } = await getValidTraktToken(cookieStore);
 
     if (!token) {
-      return {
-        status: emptyStatus,
-        showWatched: emptyShowWatched,
-      };
-    }
-
-    const auth = await traktApi("/users/settings", { token });
-    if (!auth.ok) {
       return {
         status: emptyStatus,
         showWatched: emptyShowWatched,
@@ -715,6 +706,22 @@ export async function getTraktDetailsBootstrapFromCookieStore(
       }),
     };
   } catch (e) {
+    if (e?.status === 401) {
+      return {
+        status: emptyBootstrapStatus({
+          connected: false,
+          error: e?.message || "Trakt bootstrap failed",
+        }),
+        showWatched:
+          type === "show"
+            ? emptyBootstrapShowWatched({
+                connected: false,
+                error: e?.message || "Trakt show watched failed",
+              })
+            : null,
+      };
+    }
+
     const transientAfterAuth =
       authVerified &&
       (e?.status === 403 ||
@@ -1044,22 +1051,6 @@ export async function getTraktShowWatchedFromCookieStore(
     if (!token) {
       return { connected: false, found: false, watchedBySeason: {} };
     }
-
-    const auth = await traktApi("/users/settings", { token });
-    if (!auth.ok) {
-      if (auth.status === 401) {
-        return { connected: false, found: false, watchedBySeason: {} };
-      }
-
-      return {
-        connected: true,
-        found: false,
-        watchedBySeason: {},
-        degraded: true,
-        upstreamStatus: auth.status,
-        error: "Trakt upstream check failed",
-      };
-    }
     authVerified = true;
 
     const resolved = await resolveTraktEntityFromTmdb({ type: "show", tmdbId });
@@ -1084,6 +1075,10 @@ export async function getTraktShowWatchedFromCookieStore(
       watchedBySeason,
     };
   } catch (e) {
+    if (e?.status === 401) {
+      return { connected: false, found: false, watchedBySeason: {} };
+    }
+
     const transientAfterAuth =
       authVerified &&
       (e?.status === 403 ||
