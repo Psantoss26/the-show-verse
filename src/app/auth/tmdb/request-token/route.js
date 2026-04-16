@@ -1,10 +1,39 @@
 // src/app/auth/tmdb/request-token/route.js
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 
 export const dynamic = 'force-dynamic'        // evita cacheo en build
 export const revalidate = 0                   // idem
 
-export async function GET() {
+function cleanOrigin(s) {
+  return String(s || '').replace(/\/+$/, '')
+}
+
+async function resolveOrigin(req) {
+  const forced =
+    process.env.TMDB_APP_ORIGIN ||
+    process.env.NEXT_PUBLIC_APP_ORIGIN ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL
+
+  if (forced) return cleanOrigin(forced)
+
+  const nextOrigin = req?.nextUrl?.origin
+  if (nextOrigin && nextOrigin !== 'null') return cleanOrigin(nextOrigin)
+
+  const h = await headers()
+  const proto = (h.get('x-forwarded-proto') || 'http').split(',')[0].trim()
+  const host = (h.get('x-forwarded-host') || h.get('host') || '')
+    .split(',')[0]
+    .trim()
+
+  if (host) return `${proto}://${host}`
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+
+  return 'http://localhost:3000'
+}
+
+export async function GET(req) {
   const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
   if (!API_KEY) {
     return NextResponse.json(
@@ -32,11 +61,7 @@ export async function GET() {
     }
 
     // opcional: devolver también una URL de autenticación lista
-    const origin =
-      process.env.NEXT_PUBLIC_APP_ORIGIN ||
-      process.env.VERCEL_URL?.startsWith('http')
-        ? process.env.VERCEL_URL
-        : `https://${process.env.VERCEL_URL || 'localhost:3000'}`
+    const origin = await resolveOrigin(req)
 
     const redirect_to = `${origin}/auth/callback?request_token=${data.request_token}`
 
