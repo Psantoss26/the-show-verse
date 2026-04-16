@@ -8204,12 +8204,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <section className="mb-16" ref={artworkControlsWrapRef}>
                     {/* ========== Header de la Sección de Media ========== */}
                     {/* Incluye título y controles (tabs y filtros) */}
-                    <div className="mb-4 sm:mb-6 flex items-center justify-between gap-3">
+                    <div className="mb-3 sm:mb-5 md:mb-6 flex items-center justify-between gap-3">
                       {/* Título de la sección - Alineado a la izquierda */}
                       <SectionTitle
                         title="Portadas y fondos"
                         icon={ImageIcon}
-                        className="mb-0 mt-0 sm:mt-4"
+                        className="mb-0"
                       />
 
                       {/* ========== Controles de Filtrado ========== */}
