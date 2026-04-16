@@ -2029,7 +2029,7 @@ export default function DetailsClient({
         setTrakt((prev) =>
           prev?.watched === hasAnyWatchedEpisode
             ? prev
-            : { ...prev, watched: hasAnyWatchedEpisode }
+            : { ...prev, watched: hasAnyWatchedEpisode },
         );
       }
 
@@ -2055,61 +2055,60 @@ export default function DetailsClient({
     rewatchStartAtRef.current = rewatchStartAt || null;
   }, [rewatchStartAt]);
 
-  const resolveRewatchWindow = useCallback(
-    (viewId, runsOverride) => {
-      const resolvedViewId = viewId || "global";
-      if (resolvedViewId === "global") {
-        return { viewId: "global", startAt: null, endBefore: null };
-      }
+  const resolveRewatchWindow = useCallback((viewId, runsOverride) => {
+    const resolvedViewId = viewId || "global";
+    if (resolvedViewId === "global") {
+      return { viewId: "global", startAt: null, endBefore: null };
+    }
 
-      const baseRuns = Array.isArray(runsOverride)
-        ? runsOverride
-        : rewatchRunsRef.current;
-      const sortedRuns = [...baseRuns]
-        .map((run) => {
-          const startedAt = String(run?.startedAt || run?.id || "");
-          if (!startedAt) return null;
-          return {
-            id: String(run?.id || startedAt),
-            startedAt,
-            ts: new Date(startedAt).getTime(),
-          };
-        })
-        .filter((run) => Number.isFinite(run?.ts))
-        .sort((a, b) => b.ts - a.ts);
-
-      const exactIdx = sortedRuns.findIndex(
-        (run) => run.id === resolvedViewId || run.startedAt === resolvedViewId,
-      );
-
-      if (exactIdx >= 0) {
+    const baseRuns = Array.isArray(runsOverride)
+      ? runsOverride
+      : rewatchRunsRef.current;
+    const sortedRuns = [...baseRuns]
+      .map((run) => {
+        const startedAt = String(run?.startedAt || run?.id || "");
+        if (!startedAt) return null;
         return {
-          viewId: resolvedViewId,
-          startAt: sortedRuns[exactIdx].startedAt,
-          endBefore: exactIdx > 0 ? sortedRuns[exactIdx - 1].startedAt : null,
+          id: String(run?.id || startedAt),
+          startedAt,
+          ts: new Date(startedAt).getTime(),
         };
-      }
+      })
+      .filter((run) => Number.isFinite(run?.ts))
+      .sort((a, b) => b.ts - a.ts);
 
-      const fallbackStartAt = String(resolvedViewId);
-      const fallbackTs = new Date(fallbackStartAt).getTime();
-      const newerRun = Number.isFinite(fallbackTs)
-        ? sortedRuns
-            .filter((run) => run.ts > fallbackTs)
-            .sort((a, b) => a.ts - b.ts)[0] || null
-        : null;
+    const exactIdx = sortedRuns.findIndex(
+      (run) => run.id === resolvedViewId || run.startedAt === resolvedViewId,
+    );
 
+    if (exactIdx >= 0) {
       return {
         viewId: resolvedViewId,
-        startAt: fallbackStartAt,
-        endBefore: newerRun?.startedAt || null,
+        startAt: sortedRuns[exactIdx].startedAt,
+        endBefore: exactIdx > 0 ? sortedRuns[exactIdx - 1].startedAt : null,
       };
-    },
-    [],
-  );
+    }
+
+    const fallbackStartAt = String(resolvedViewId);
+    const fallbackTs = new Date(fallbackStartAt).getTime();
+    const newerRun = Number.isFinite(fallbackTs)
+      ? sortedRuns
+          .filter((run) => run.ts > fallbackTs)
+          .sort((a, b) => a.ts - b.ts)[0] || null
+      : null;
+
+    return {
+      viewId: resolvedViewId,
+      startAt: fallbackStartAt,
+      endBefore: newerRun?.startedAt || null,
+    };
+  }, []);
 
   const buildRewatchViewCacheKey = useCallback(
     (startAtIso = null, endBeforeIso = null) =>
-      startAtIso ? `${String(startAtIso)}::${String(endBeforeIso || "")}` : "global",
+      startAtIso
+        ? `${String(startAtIso)}::${String(endBeforeIso || "")}`
+        : "global",
     [],
   );
 
@@ -2187,8 +2186,9 @@ export default function DetailsClient({
       completed:
         typeof overlayRun?.completed === "boolean"
           ? overlayRun.completed
-          : baseRun?.completed ?? null,
-      progressCount: overlayRun?.progressCount ?? baseRun?.progressCount ?? null,
+          : (baseRun?.completed ?? null),
+      progressCount:
+        overlayRun?.progressCount ?? baseRun?.progressCount ?? null,
     });
 
     const normalizedCurrent = (Array.isArray(currentRuns) ? currentRuns : [])
@@ -2491,9 +2491,7 @@ export default function DetailsClient({
     };
   }, [initialParsedScoreboard]);
 
-  const [tScoreboard, setTScoreboard] = useState(
-    () => initialScoreboardState,
-  );
+  const [tScoreboard, setTScoreboard] = useState(() => initialScoreboardState);
   const [traktDeferredReady, setTraktDeferredReady] = useState(
     () =>
       !!initialParsedScoreboard?.found &&
@@ -2837,7 +2835,11 @@ export default function DetailsClient({
           );
           const isTransient = !!r?.transient;
 
-          if (!hasItemsArray && isTransient && attempt < retryDelays.length - 1) {
+          if (
+            !hasItemsArray &&
+            isTransient &&
+            attempt < retryDelays.length - 1
+          ) {
             continue;
           }
 
@@ -2856,9 +2858,7 @@ export default function DetailsClient({
           const isTimeout = e?.message === "Timeout";
           const isTransient =
             isTimeout ||
-            /aborted|abort|fetch|network|server error/i.test(
-              e?.message || "",
-            );
+            /aborted|abort|fetch|network|server error/i.test(e?.message || "");
 
           if (isTransient && attempt < retryDelays.length - 1) {
             continue;
@@ -3060,7 +3060,10 @@ export default function DetailsClient({
       }
 
       // Si ya tenemos datos completos del prefetch, guardar en cache y salir.
-      if (workingScoreboard?.found && hasNumericStats(workingScoreboard.stats)) {
+      if (
+        workingScoreboard?.found &&
+        hasNumericStats(workingScoreboard.stats)
+      ) {
         setTraktDeferredReady(true);
         persistScoreboardCache(workingScoreboard);
         return;
@@ -3564,7 +3567,8 @@ export default function DetailsClient({
 
         if (startAtIso) {
           const nextWatchedBySeason =
-            r?.watchedBySeasonSince && typeof r.watchedBySeasonSince === "object"
+            r?.watchedBySeasonSince &&
+            typeof r.watchedBySeasonSince === "object"
               ? r.watchedBySeasonSince
               : {};
           const nextHistoryIds =
@@ -3900,10 +3904,7 @@ export default function DetailsClient({
         }
 
         // Refrescar estado del run activo de rewatch
-        await loadTraktShowPlays(
-          targetStartAt,
-          windowState.endBefore || null,
-        );
+        await loadTraktShowPlays(targetStartAt, windowState.endBefore || null);
 
         // Mantener el estado global actualizado tambien
         const fresh = await traktGetShowWatched({ tmdbId: id });
@@ -4473,14 +4474,8 @@ export default function DetailsClient({
       const startAt = windowState.startAt || v;
 
       setRewatchStartAt(startAt);
-      restoreRewatchViewStateFromCache(
-        startAt,
-        windowState.endBefore || null,
-      );
-      await loadTraktShowPlays(
-        startAt,
-        windowState.endBefore || null,
-      ); // Refrescar al cambiar de run
+      restoreRewatchViewStateFromCache(startAt, windowState.endBefore || null);
+      await loadTraktShowPlays(startAt, windowState.endBefore || null); // Refrescar al cambiar de run
     },
     [
       episodesViewStorageKey,
@@ -4502,8 +4497,10 @@ export default function DetailsClient({
       };
       const nextRuns = [
         run,
-        ...(Array.isArray(rewatchRunsRef.current) ? rewatchRunsRef.current : [])
-          .filter((r) => r?.id !== run.id),
+        ...(Array.isArray(rewatchRunsRef.current)
+          ? rewatchRunsRef.current
+          : []
+        ).filter((r) => r?.id !== run.id),
       ];
 
       setRewatchRuns(nextRuns);
@@ -8131,7 +8128,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     <SectionTitle title="Colección" icon={Layers} />
 
                     {collectionLoading ? (
-                      <div className="mt-4 text-sm text-zinc-400">
+                      <div className="mt-3 sm:mt-4 text-sm text-zinc-400">
                         Cargando colección…
                       </div>
                     ) : collectionData?.items?.length ? (
@@ -8185,7 +8182,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         ))}
                       </Swiper>
                     ) : (
-                      <div className="mt-4 text-sm text-zinc-400">
+                      <div className="mt-3 sm:mt-4 text-sm text-zinc-400">
                         No hay datos de colección.
                       </div>
                     )}
@@ -8207,12 +8204,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <section className="mb-16" ref={artworkControlsWrapRef}>
                     {/* ========== Header de la Sección de Media ========== */}
                     {/* Incluye título y controles (tabs y filtros) */}
-                    <div className="mb-6 flex items-center justify-between gap-3">
+                    <div className="mb-4 sm:mb-6 flex items-center justify-between gap-3">
                       {/* Título de la sección - Alineado a la izquierda */}
                       <SectionTitle
                         title="Portadas y fondos"
                         icon={ImageIcon}
-                        className="mb-0 mt-4"
+                        className="mb-0 mt-0 sm:mt-4"
                       />
 
                       {/* ========== Controles de Filtrado ========== */}
@@ -8992,7 +8989,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       icon={Sparkles}
                     />
 
-                    <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
+                    <div className="mt-3 sm:mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
                       {/* Header del bloque */}
                       <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
                         <div className="flex items-center gap-4">
@@ -9098,7 +9095,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <section className="mb-12">
                     <SectionTitle title="Temporadas" icon={Layers} />
 
-                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="mt-3 sm:mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {tSeasons.loading && (
                         <div className="col-span-full py-10 flex justify-center">
                           <Loader2 className="animate-spin text-white/50" />
