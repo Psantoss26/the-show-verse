@@ -104,8 +104,9 @@ export default function TraktEpisodesWatchedModal({
   // aliases legacy desde DetailsClient
   activeEpisodesView,
   onChangeEpisodesView,
+  rewatchStartAt = null,
   rewatchWatchedBySeason,
-  onToggleEpisodeRewatch, // (viewId, seasonNumber, episodeNumber) o (season, episode, viewId)
+  onToggleEpisodeRewatch, // (seasonNumber, episodeNumber, { viewId, watchedAt })
   onCreateRewatchRun, // (startedAtIso) => Promise  (opcional, si quieres crear la vista rewatch en backend)
   onDeleteRewatchRun,
 
@@ -133,12 +134,17 @@ export default function TraktEpisodesWatchedModal({
 
   // Modales extra
   const [addPlayOpen, setAddPlayOpen] = useState(false);
+  const [addPlayMode, setAddPlayMode] = useState("play"); // play | rewatch
   const [addPlayPreset, setAddPlayPreset] = useState("just_finished"); // just_finished | release_date | unknown | other_date
   const [addPlayOtherValue, setAddPlayOtherValue] = useState(
     toLocalDatetimeInput(new Date().toISOString()),
   );
   const [addPlayBusy, setAddPlayBusy] = useState(false);
   const [addPlayError, setAddPlayError] = useState("");
+  const [rewatchMarkPreset, setRewatchMarkPreset] = useState("today"); // today | other_date
+  const [rewatchMarkOtherValue, setRewatchMarkOtherValue] = useState(
+    toLocalDatetimeInput(new Date().toISOString()),
+  );
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyQuery, setHistoryQuery] = useState("");
@@ -162,6 +168,7 @@ export default function TraktEpisodesWatchedModal({
 
   const hasShowHandler = typeof onToggleShowWatched === "function";
   const hasAddPlayHandler = typeof onAddShowPlay === "function";
+  const hasCreateRewatchHandler = typeof onCreateRewatchRun === "function";
 
   const resolvedActiveView =
     typeof activeView === "string" && activeView
@@ -283,6 +290,15 @@ export default function TraktEpisodesWatchedModal({
     );
   }, [effectiveViewId, rewatchItems]);
 
+  const currentRewatchStartedAt = useMemo(() => {
+    if (effectiveViewId === "global") return null;
+    return (
+      rewatchItems.find((item) => item.id === effectiveViewId)?.startedAt ||
+      rewatchStartAt ||
+      effectiveViewId
+    );
+  }, [effectiveViewId, rewatchItems, rewatchStartAt]);
+
   const viewMenuItems = useMemo(
     () => [
       { id: "global", label: "Global (Trakt)", kind: "global" },
@@ -348,6 +364,17 @@ export default function TraktEpisodesWatchedModal({
   const tmdbImg = (path, size = "w300") =>
     path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
 
+  const openAddPlayDialog = useCallback(
+    (mode = "play") => {
+      setAddPlayError("");
+      setAddPlayMode(mode);
+      setAddPlayPreset("just_finished");
+      setAddPlayOtherValue(toLocalDatetimeInput(new Date().toISOString()));
+      setAddPlayOpen(true);
+    },
+    [],
+  );
+
   // Init
   useEffect(() => {
     if (!open) return;
@@ -355,10 +382,13 @@ export default function TraktEpisodesWatchedModal({
     setAddPlayError("");
     setAddPlayBusy(false);
     setAddPlayOpen(false);
+    setAddPlayMode("play");
     setHistoryOpen(false);
     setHistoryQuery("");
     setHistoryLimit(60);
     setViewMenuOpen(false);
+    setRewatchMarkPreset("today");
+    setRewatchMarkOtherValue(toLocalDatetimeInput(new Date().toISOString()));
 
     if (typeof resolvedOnChangeView !== "function") setLocalView("global");
 
@@ -525,6 +555,18 @@ export default function TraktEpisodesWatchedModal({
     return new Date().toISOString();
   };
 
+  const resolveRewatchStartDate = () => {
+    if (addPlayPreset === "other_date")
+      return fromLocalDatetimeInput(addPlayOtherValue);
+    return new Date().toISOString();
+  };
+
+  const resolveEpisodeMarkDate = () => {
+    if (rewatchMarkPreset === "other_date")
+      return fromLocalDatetimeInput(rewatchMarkOtherValue);
+    return new Date().toISOString();
+  };
+
   const onConfirmAddPlay = async () => {
     setAddPlayError("");
     setShowError("");
@@ -533,24 +575,39 @@ export default function TraktEpisodesWatchedModal({
       setAddPlayError("Conecta Trakt para añadir visionados.");
       return;
     }
-    if (!hasAddPlayHandler) {
+    if (addPlayMode === "play" && !hasAddPlayHandler) {
       setAddPlayError("Falta pasar onAddShowPlay desde DetailsClient.jsx");
       return;
     }
+    if (addPlayMode === "rewatch" && !hasCreateRewatchHandler) {
+      setAddPlayError("Falta pasar onCreateRewatchRun desde DetailsClient.jsx");
+      return;
+    }
 
-    const watchedAt = resolvePlayDate();
+    const watchedAt =
+      addPlayMode === "rewatch" ? resolveRewatchStartDate() : resolvePlayDate();
 
     if (addPlayPreset === "other_date" && !watchedAt) {
       setAddPlayError("Elige una fecha válida.");
       return;
     }
-    if (addPlayPreset === "release_date" && !showReleaseDate) {
+    if (
+      addPlayMode === "play" &&
+      addPlayPreset === "release_date" &&
+      !showReleaseDate
+    ) {
       setAddPlayError("No tengo la fecha de estreno de la serie.");
       return;
     }
 
     setAddPlayBusy(true);
     try {
+      if (addPlayMode === "rewatch") {
+        await onCreateRewatchRun(watchedAt);
+        setAddPlayOpen(false);
+        return;
+      }
+
       await onAddShowPlay(watchedAt, { preset: addPlayPreset });
 
       // Si hay fecha, la usamos como “id” del rewatch y cambiamos a esa vista
@@ -639,13 +696,30 @@ export default function TraktEpisodesWatchedModal({
         );
       }
 
-      // soporta ambas firmas comunes:
-      // (viewId, sn, en)  OR  (sn, en, viewId)
-      if (onToggleEpisodeRewatch.length >= 3) {
-        await onToggleEpisodeRewatch(effectiveViewId, sn, en);
-      } else {
-        await onToggleEpisodeRewatch(sn, en, effectiveViewId);
+      const watchedAt = next ? resolveEpisodeMarkDate() : null;
+      if (next && rewatchMarkPreset === "other_date" && !watchedAt) {
+        throw new Error("Elige una fecha válida para marcar el episodio.");
       }
+
+      const runStartMs = currentRewatchStartedAt
+        ? new Date(currentRewatchStartedAt).getTime()
+        : Number.NaN;
+      const watchedAtMs = watchedAt ? new Date(watchedAt).getTime() : Number.NaN;
+      if (
+        next &&
+        Number.isFinite(runStartMs) &&
+        Number.isFinite(watchedAtMs) &&
+        watchedAtMs < runStartMs
+      ) {
+        throw new Error(
+          "La fecha del episodio no puede ser anterior al inicio del rewatch activo.",
+        );
+      }
+
+      await onToggleEpisodeRewatch(sn, en, {
+        viewId: effectiveViewId,
+        watchedAt,
+      });
     } catch (e) {
       setShowError(e?.message || "Error al actualizar el episodio");
     }
@@ -1004,32 +1078,25 @@ export default function TraktEpisodesWatchedModal({
                     <button
                       type="button"
                       disabled={!isConnected}
-                      onClick={() => {
-                        setAddPlayError("");
-                        setAddPlayPreset("just_finished");
-                        setAddPlayOtherValue(
-                          toLocalDatetimeInput(new Date().toISOString()),
-                        );
-                        setAddPlayOpen(true);
-                      }}
+                      onClick={() => openAddPlayDialog("play")}
                       className={`flex-1 h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap ${
                         !isConnected
                           ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
                           : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
                       }`}
                     >
-                      <Plus className="w-4 h-4" /> Añadir visionado
+                      <Plus className="w-4 h-4" /> Añadir / Rewatch
                     </button>
                     <button
                       type="button"
-                      disabled={!isConnected || normalizedPlays.length === 0}
+                      disabled={!isConnected || rewatchItems.length === 0}
                       onClick={() => {
                         setHistoryQuery("");
                         setHistoryLimit(60);
                         setHistoryOpen(true);
                       }}
                       className={`flex-1 h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap ${
-                        !isConnected || normalizedPlays.length === 0
+                        !isConnected || rewatchItems.length === 0
                           ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
                           : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
                       }`}
@@ -1207,37 +1274,34 @@ export default function TraktEpisodesWatchedModal({
             <button
               type="button"
               disabled={!isConnected}
-              onClick={() => {
-                setAddPlayError("");
-                setAddPlayPreset("just_finished");
-                setAddPlayOtherValue(
-                  toLocalDatetimeInput(new Date().toISOString()),
-                );
-                setAddPlayOpen(true);
-              }}
+              onClick={() => openAddPlayDialog("play")}
               className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl border text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 !isConnected
                   ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
                   : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
               }`}
-              title={!isConnected ? "Conecta Trakt" : "Añadir un visionado"}
+              title={
+                !isConnected
+                  ? "Conecta Trakt"
+                  : "Añadir un play completo o crear un rewatch vacío"
+              }
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden xl:inline">Añadir visionado</span>
+              <span className="hidden xl:inline">Añadir / Rewatch</span>
               <span className="xl:hidden">Añadir</span>
             </button>
 
             {/* Historial */}
             <button
               type="button"
-              disabled={!isConnected || normalizedPlays.length === 0}
+              disabled={!isConnected || rewatchItems.length === 0}
               onClick={() => {
                 setHistoryQuery("");
                 setHistoryLimit(60);
                 setHistoryOpen(true);
               }}
               className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl border text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
-                !isConnected || normalizedPlays.length === 0
+                !isConnected || rewatchItems.length === 0
                   ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
                   : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
               }`}
@@ -1292,6 +1356,55 @@ export default function TraktEpisodesWatchedModal({
 
           {!!showError && (
             <div className="text-xs text-red-300 font-medium">{showError}</div>
+          )}
+
+          {isConnected && isRewatchView && (
+            <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 px-3.5 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-wider text-purple-200">
+                  Fecha al marcar episodios
+                </div>
+                <div className="text-xs text-zinc-400 mt-1">
+                  Usa hoy o una fecha concreta para el episodio.
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRewatchMarkPreset("today")}
+                    className={`px-3 py-2 rounded-xl border text-xs font-black transition ${
+                      rewatchMarkPreset === "today"
+                        ? "bg-purple-500/15 border-purple-500/30 text-purple-100"
+                        : "bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                    }`}
+                  >
+                    Hoy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRewatchMarkPreset("other_date")}
+                    className={`px-3 py-2 rounded-xl border text-xs font-black whitespace-nowrap transition ${
+                      rewatchMarkPreset === "other_date"
+                        ? "bg-purple-500/15 border-purple-500/30 text-purple-100"
+                        : "bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                    }`}
+                  >
+                    Otra fecha
+                  </button>
+                </div>
+
+                {rewatchMarkPreset === "other_date" && (
+                  <input
+                    type="datetime-local"
+                    value={rewatchMarkOtherValue}
+                    onChange={(e) => setRewatchMarkOtherValue(e.target.value)}
+                    className="w-full sm:w-[230px] bg-zinc-900/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-purple-500/50 outline-none transition"
+                  />
+                )}
+              </div>
+            </div>
           )}
         </div>
 
@@ -1640,11 +1753,14 @@ export default function TraktEpisodesWatchedModal({
                 <div className="p-5 border-b border-white/10 flex items-start justify-between gap-4">
                   <div>
                     <h3 className="text-lg font-black text-white">
-                      Añadir visionado
+                      {addPlayMode === "rewatch"
+                        ? "Crear rewatch"
+                        : "Añadir visionado"}
                     </h3>
                     <p className="text-xs text-zinc-400 mt-1">
-                      Añade un play. Si tiene fecha, podrás seleccionar ese
-                      rewatch y marcar episodios de forma independiente.
+                      {addPlayMode === "rewatch"
+                        ? "Crea un rewatch vacío. No marcará la serie completa y después podrás ir episodio a episodio."
+                        : "Añade un play completo. Si tiene fecha, también podrás usarlo como vista de rewatch."}
                     </p>
                   </div>
                   <button
@@ -1658,21 +1774,76 @@ export default function TraktEpisodesWatchedModal({
                 </div>
 
                 <div className="p-5 space-y-4">
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-black text-zinc-400 uppercase tracking-wider">
+                      Tipo
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={addPlayBusy}
+                        onClick={() => {
+                          setAddPlayMode("play");
+                          setAddPlayPreset("just_finished");
+                        }}
+                        className={`px-3 py-3 rounded-2xl border text-sm font-black transition text-left ${
+                          addPlayMode === "play"
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                            : "bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                        }`}
+                      >
+                        <div>Play completo</div>
+                        <div className="text-[11px] font-medium text-zinc-500 mt-1">
+                          Registra la serie como visionado completo.
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={addPlayBusy || !hasCreateRewatchHandler}
+                        onClick={() => {
+                          setAddPlayMode("rewatch");
+                          setAddPlayPreset("just_finished");
+                        }}
+                        className={`px-3 py-3 rounded-2xl border text-sm font-black transition text-left ${
+                          addPlayMode === "rewatch"
+                            ? "bg-purple-500/10 border-purple-500/30 text-purple-200"
+                            : "bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                        } ${!hasCreateRewatchHandler ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        <div>Rewatch vacío</div>
+                        <div className="text-[11px] font-medium text-zinc-500 mt-1">
+                          Empieza un rewatch sin completar episodios por
+                          defecto.
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="text-[11px] font-black text-zinc-400 uppercase tracking-wider">
-                    Fecha del play
+                    {addPlayMode === "rewatch"
+                      ? "Inicio del rewatch"
+                      : "Fecha del play"}
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: "just_finished", label: "Just finished" },
-                      {
-                        id: "release_date",
-                        label: "Release date",
-                        disabled: !showReleaseDate,
-                      },
-                      { id: "unknown", label: "Unknown date" },
-                      { id: "other_date", label: "Other date" },
-                    ].map((opt) => (
+                    {(
+                      addPlayMode === "rewatch"
+                        ? [
+                            { id: "just_finished", label: "Hoy" },
+                            { id: "other_date", label: "Otra fecha" },
+                          ]
+                        : [
+                            { id: "just_finished", label: "Just finished" },
+                            {
+                              id: "release_date",
+                              label: "Release date",
+                              disabled: !showReleaseDate,
+                            },
+                            { id: "unknown", label: "Unknown date" },
+                            { id: "other_date", label: "Other date" },
+                          ]
+                    ).map((opt) => (
                       <button
                         key={opt.id}
                         type="button"
@@ -1729,7 +1900,10 @@ export default function TraktEpisodesWatchedModal({
 
                     <button
                       type="button"
-                      disabled={addPlayBusy}
+                      disabled={
+                        addPlayBusy ||
+                        (addPlayMode === "rewatch" && !hasCreateRewatchHandler)
+                      }
                       onClick={onConfirmAddPlay}
                       className="py-3 rounded-2xl font-black text-sm transition flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
                     >
@@ -1738,14 +1912,17 @@ export default function TraktEpisodesWatchedModal({
                       ) : (
                         <Plus className="w-4 h-4" />
                       )}
-                      Añadir
+                      {addPlayMode === "rewatch"
+                        ? "Crear rewatch"
+                        : "Añadir play"}
                     </button>
                   </div>
 
                   <div className="text-[11px] text-zinc-500 leading-relaxed">
-                    <span className="text-zinc-300 font-semibold">Tip:</span> Si
-                    añades una fecha, aparecerá como “Rewatch · fecha” en el
-                    selector de vista.
+                    <span className="text-zinc-300 font-semibold">Tip:</span>{" "}
+                    {addPlayMode === "rewatch"
+                      ? "Crea el rewatch con la fecha más antigua que vayas a usar para sus episodios."
+                      : "Si añades una fecha, aparecerá también como “Rewatch · fecha” en el selector de vista."}
                   </div>
                 </div>
               </motion.div>
