@@ -7,7 +7,7 @@ import {
 } from "@/lib/trakt/server";
 import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
-export const revalidate = 600;
+export const dynamic = "force-dynamic";
 
 function resolveWithin(promise, timeoutMs, fallback = null) {
   return Promise.race([
@@ -29,7 +29,9 @@ export default async function DetailsPage({ params }) {
 
   const cookieStore = await cookies();
   const traktType = type === "tv" ? "show" : "movie";
-  const traktBootstrapTimeoutMs = type === "tv" ? 900 : 700;
+  // En Vercel los cold starts y refreshes de token pueden necesitar algo más
+  // de margen para que el botón de visionado llegue correctamente al primer render.
+  const traktBootstrapTimeoutMs = type === "tv" ? 1800 : 1400;
   const [data, traktBootstrap, initialScoreboard] = await Promise.all([
     getDetails(type, id, { appendToResponse: "external_ids" }),
     resolveWithin(

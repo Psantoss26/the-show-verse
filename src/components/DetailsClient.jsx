@@ -252,6 +252,35 @@ function withTimeout(promise, timeoutMs) {
   ]);
 }
 
+function hasResolvedTraktBootstrap(value) {
+  if (!value || typeof value.connected !== "boolean") return false;
+  if (value.connected === false) return true;
+  return !value.error;
+}
+
+function hasMeaningfulTraktSnapshot(value) {
+  if (!value || typeof value !== "object") return false;
+
+  return (
+    !!value.found ||
+    !!value.watched ||
+    Number(value.plays || 0) > 0 ||
+    !!value.lastWatchedAt ||
+    (Array.isArray(value.history) && value.history.length > 0)
+  );
+}
+
+function isDegradedTraktPayload(value) {
+  if (!value || typeof value !== "object") return false;
+  return value.degraded === true || (!!value.error && value.found !== true);
+}
+
+function shouldPreservePreviousTraktStatus(nextValue, prevValue) {
+  if (!isDegradedTraktPayload(nextValue)) return false;
+  if (nextValue.connected === false) return false;
+  return hasMeaningfulTraktSnapshot(prevValue);
+}
+
 // =====================================================================
 // COMPONENTE PRINCIPAL: DetailsClient
 // =====================================================================
@@ -1843,8 +1872,7 @@ export default function DetailsClient({
   const traktType = endpointType === "tv" ? "show" : "movie";
 
   const hasInitialTraktStatus = useMemo(
-    () =>
-      !!initialTraktStatus && typeof initialTraktStatus.connected === "boolean",
+    () => hasResolvedTraktBootstrap(initialTraktStatus),
     [initialTraktStatus],
   );
 
@@ -1854,7 +1882,7 @@ export default function DetailsClient({
   }, [endpointType, initialShowWatched]);
 
   const hasInitialShowWatched = useMemo(
-    () => endpointType === "tv" && !!initialShowWatched,
+    () => endpointType === "tv" && hasResolvedTraktBootstrap(initialShowWatched),
     [endpointType, initialShowWatched],
   );
   const [hasCachedTraktStatus, setHasCachedTraktStatus] = useState(false);
@@ -2351,9 +2379,29 @@ export default function DetailsClient({
         };
       }
 
+      if (r?.connected === false) {
+        setWatchedBySeason({});
+        setWatchedBySeasonLoaded(false);
+        return {
+          ok: false,
+          connected: false,
+          found: false,
+          watchedBySeason: {},
+        };
+      }
+
+      if (isDegradedTraktPayload(r) && watchedBySeasonLoadedRef.current) {
+        return {
+          ok: false,
+          connected: true,
+          found: true,
+          watchedBySeason: watchedBySeasonRef.current,
+        };
+      }
+
       const nextWatchedBySeason = applyWatchedBySeasonState(
         r?.watchedBySeason || {},
-        { loaded: true },
+        { loaded: r?.connected !== false },
       );
       return {
         ok: true,
@@ -2942,7 +2990,23 @@ export default function DetailsClient({
         let nextState = null;
         setTrakt((prev) => {
           const preserveTvWatched =
-            endpointType === "tv" && watchedBySeasonLoaded;
+            endpointType === "tv" && watchedBySeasonLoadedRef.current;
+          const preservePreviousState = shouldPreservePreviousTraktStatus(
+            json,
+            prev,
+          );
+
+          if (preservePreviousState) {
+            nextState = {
+              ...prev,
+              loading: false,
+              connected: true,
+              traktId: json.traktId ?? prev.traktId ?? null,
+              traktUrl: json.traktUrl || prev.traktUrl || null,
+              error: "",
+            };
+            return nextState;
+          }
 
           nextState = {
             ...prev,

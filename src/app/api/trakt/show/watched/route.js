@@ -106,6 +106,7 @@ export async function GET(request) {
             connected: true,
             found: false,
             watchedBySeason: {},
+            degraded: true,
             error: e?.message || "Trakt show watched failed",
           }
         : {
