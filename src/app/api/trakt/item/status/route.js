@@ -4,7 +4,6 @@ import {
   getValidTraktToken,
   setTraktCookies,
   clearTraktCookies,
-  traktApi,
   traktSearchByTmdb,
   traktGetHistoryForItem,
   traktGetProgressWatchedForShow,
@@ -49,14 +48,6 @@ export async function GET(request) {
     if (!token) {
       const res = NextResponse.json({ connected: false });
       if (shouldClear) clearTraktCookies(res);
-      return res;
-    }
-
-    // ✅ auth check: si 401/403 => desconectado + limpiar cookies
-    const auth = await traktApi("/users/settings", { token });
-    if (!auth.ok) {
-      const res = NextResponse.json({ connected: false });
-      clearTraktCookies(res);
       return res;
     }
     authVerified = true;
@@ -159,6 +150,13 @@ export async function GET(request) {
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
     return res;
   } catch (e) {
+    if (e?.status === 401) {
+      const res = NextResponse.json({ connected: false }, { status: 401 });
+      clearTraktCookies(res);
+      if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+      return res;
+    }
+
     const transientAfterAuth =
       authVerified &&
       (e?.status === 403 ||

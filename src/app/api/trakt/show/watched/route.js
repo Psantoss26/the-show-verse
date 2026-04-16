@@ -4,7 +4,6 @@ import {
   getValidTraktToken,
   setTraktCookies,
   clearTraktCookies,
-  traktApi,
   traktSearchByTmdb,
   traktGetProgressWatchedForShow,
   mapProgressWatchedBySeason,
@@ -41,29 +40,6 @@ export async function GET(request) {
       if (shouldClear) clearTraktCookies(res);
       return res;
     }
-
-    const auth = await traktApi("/users/settings", { token });
-    if (!auth.ok) {
-      if (auth.status === 401) {
-        const res = NextResponse.json({ connected: false, found: false, watchedBySeason: {} });
-        clearTraktCookies(res);
-        return res;
-      }
-
-      const res = NextResponse.json(
-        {
-          connected: true,
-          found: false,
-          watchedBySeason: {},
-          degraded: true,
-          upstreamStatus: auth.status,
-          error: "Trakt upstream check failed",
-        },
-        { status: 200 },
-      );
-      if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-      return res;
-    }
     authVerified = true;
 
     const traktId = traktIdParam
@@ -94,6 +70,16 @@ export async function GET(request) {
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
     return res;
   } catch (e) {
+    if (e?.status === 401) {
+      const res = NextResponse.json(
+        { connected: false, found: false, watchedBySeason: {} },
+        { status: 401 },
+      );
+      clearTraktCookies(res);
+      if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+      return res;
+    }
+
     const transientAfterAuth =
       authVerified &&
       (e?.status === 403 ||
