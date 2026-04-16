@@ -355,6 +355,9 @@ export default function DetailsClient({
 
   // Mapa de historial por episodio en rewatch para poder desmarcar: { "S1E2": historyId }
   const [rewatchHistoryByEpisode, setRewatchHistoryByEpisode] = useState({});
+  const rewatchRunsRef = useRef([]);
+  const activeEpisodesViewRef = useRef("global");
+  const rewatchStartAtRef = useRef(null);
 
   // -- Rutas de imagen seleccionadas por el usuario --
   const [selectedPosterPath, setSelectedPosterPath] = useState(null);
@@ -2037,6 +2040,70 @@ export default function DetailsClient({
   const [rewatchStartAt, setRewatchStartAt] = useState(null); // Fecha ISO de inicio del rewatch actual
   const [rewatchWatchedBySeason, setRewatchWatchedBySeason] = useState(null); // Episodios vistos en el rewatch actual
 
+  useEffect(() => {
+    rewatchRunsRef.current = Array.isArray(rewatchRuns) ? rewatchRuns : [];
+  }, [rewatchRuns]);
+
+  useEffect(() => {
+    activeEpisodesViewRef.current = activeEpisodesView || "global";
+  }, [activeEpisodesView]);
+
+  useEffect(() => {
+    rewatchStartAtRef.current = rewatchStartAt || null;
+  }, [rewatchStartAt]);
+
+  const resolveRewatchWindow = useCallback(
+    (viewId, runsOverride) => {
+      const resolvedViewId = viewId || "global";
+      if (resolvedViewId === "global") {
+        return { viewId: "global", startAt: null, endBefore: null };
+      }
+
+      const baseRuns = Array.isArray(runsOverride)
+        ? runsOverride
+        : rewatchRunsRef.current;
+      const sortedRuns = [...baseRuns]
+        .map((run) => {
+          const startedAt = String(run?.startedAt || run?.id || "");
+          if (!startedAt) return null;
+          return {
+            id: String(run?.id || startedAt),
+            startedAt,
+            ts: new Date(startedAt).getTime(),
+          };
+        })
+        .filter((run) => Number.isFinite(run?.ts))
+        .sort((a, b) => b.ts - a.ts);
+
+      const exactIdx = sortedRuns.findIndex(
+        (run) => run.id === resolvedViewId || run.startedAt === resolvedViewId,
+      );
+
+      if (exactIdx >= 0) {
+        return {
+          viewId: resolvedViewId,
+          startAt: sortedRuns[exactIdx].startedAt,
+          endBefore: exactIdx > 0 ? sortedRuns[exactIdx - 1].startedAt : null,
+        };
+      }
+
+      const fallbackStartAt = String(resolvedViewId);
+      const fallbackTs = new Date(fallbackStartAt).getTime();
+      const newerRun = Number.isFinite(fallbackTs)
+        ? sortedRuns
+            .filter((run) => run.ts > fallbackTs)
+            .sort((a, b) => a.ts - b.ts)[0] || null
+        : null;
+
+      return {
+        viewId: resolvedViewId,
+        startAt: fallbackStartAt,
+        endBefore: newerRun?.startedAt || null,
+      };
+    },
+    [],
+  );
+
   // Badge de progreso para el boton "visto" en series: calcula el % de episodios vistos
   // (excluyendo especiales, solo temporadas regulares)
   const tvProgressBadge = useMemo(() => {
@@ -3255,7 +3322,7 @@ export default function DetailsClient({
    * Tambien carga los episodios vistos en el rewatch actual.
    */
   const loadTraktShowPlays = useCallback(
-    async (startAtIso = null) => {
+    async (startAtIso = null, endBeforeIso = null) => {
       if (type !== "tv") return;
       if (!trakt?.connected) {
         setShowPlays([]);
@@ -3268,6 +3335,7 @@ export default function DetailsClient({
         const r = await traktGetShowPlays({
           tmdbId: id,
           startAt: startAtIso || undefined,
+          endBefore: endBeforeIso || undefined,
         });
 
         setShowPlays(
@@ -3311,7 +3379,14 @@ export default function DetailsClient({
         await loadTraktShowWatched();
         if (ignore) return;
 
-        await loadTraktShowPlays(rewatchStartAt || null);
+        const windowState = resolveRewatchWindow(
+          activeEpisodesViewRef.current,
+          rewatchRunsRef.current,
+        );
+        await loadTraktShowPlays(
+          windowState.startAt || null,
+          windowState.endBefore || null,
+        );
       } catch {
         // no machacamos UI si falla
       }
@@ -3325,9 +3400,9 @@ export default function DetailsClient({
     traktEpisodesOpen,
     type,
     trakt?.connected,
-    rewatchStartAt,
     loadTraktShowWatched,
     loadTraktShowPlays,
+    resolveRewatchWindow,
   ]);
 
   // Alterna el estado de "visto" del contenido completo en Trakt
@@ -3485,8 +3560,18 @@ export default function DetailsClient({
     async (seasonNumber, episodeNumber, options = {}) => {
       if (type !== "tv") return;
       if (!trakt?.connected) return;
-      if (!rewatchStartAt) return;
       if (episodeBusyKey) return;
+
+      const targetViewId =
+        options && typeof options === "object" && !Array.isArray(options)
+          ? options.viewId || activeEpisodesViewRef.current
+          : activeEpisodesViewRef.current;
+      const windowState = resolveRewatchWindow(
+        targetViewId,
+        rewatchRunsRef.current,
+      );
+      const targetStartAt = windowState.startAt || rewatchStartAtRef.current;
+      if (!targetStartAt) return;
 
       const key = `S${seasonNumber}E${episodeNumber}`;
       setEpisodeBusyKey(key);
@@ -3512,7 +3597,7 @@ export default function DetailsClient({
         if (next) {
           const watchedAtIso = watchedAtOverride || new Date().toISOString();
           const watchedAtMs = new Date(watchedAtIso).getTime();
-          const rewatchStartMs = new Date(rewatchStartAt).getTime();
+          const rewatchStartMs = new Date(targetStartAt).getTime();
 
           if (
             Number.isFinite(watchedAtMs) &&
@@ -3552,7 +3637,10 @@ export default function DetailsClient({
         }
 
         // Refrescar estado del run activo de rewatch
-        await loadTraktShowPlays(rewatchStartAt);
+        await loadTraktShowPlays(
+          targetStartAt,
+          windowState.endBefore || null,
+        );
 
         // Mantener el estado global actualizado tambien
         const fresh = await traktGetShowWatched({ tmdbId: id });
@@ -3578,12 +3666,12 @@ export default function DetailsClient({
     [
       type,
       trakt?.connected,
-      rewatchStartAt,
       episodeBusyKey,
       rewatchWatchedBySeason,
       rewatchHistoryByEpisode,
       id,
       loadTraktShowPlays,
+      resolveRewatchWindow,
     ],
   );
 
@@ -3694,7 +3782,14 @@ export default function DetailsClient({
         loaded: true,
       });
 
-      await loadTraktShowPlays(rewatchStartAt || null);
+      const windowState = resolveRewatchWindow(
+        activeEpisodesViewRef.current,
+        rewatchRunsRef.current,
+      );
+      await loadTraktShowPlays(
+        windowState.startAt || null,
+        windowState.endBefore || null,
+      );
     } finally {
       setEpisodeBusyKey("");
     }
@@ -3713,7 +3808,11 @@ export default function DetailsClient({
       window.localStorage.setItem(rewatchStorageKey, startIso);
     } catch {}
 
-    await loadTraktShowPlays(startIso);
+    const windowState = resolveRewatchWindow(startIso, rewatchRunsRef.current);
+    await loadTraktShowPlays(
+      windowState.startAt || startIso,
+      windowState.endBefore || null,
+    );
   };
 
   // Agrega un play individual de un episodio en un rewatch
@@ -3735,7 +3834,14 @@ export default function DetailsClient({
       });
 
       // Refrescar progreso del run activo
-      await loadTraktShowPlays(rewatchStartAt);
+      const windowState = resolveRewatchWindow(
+        activeEpisodesViewRef.current,
+        rewatchRunsRef.current,
+      );
+      await loadTraktShowPlays(
+        windowState.startAt || rewatchStartAt,
+        windowState.endBefore || null,
+      );
 
       // Mantener watchedBySeason global coherente
       const fresh = await traktGetShowWatched({ tmdbId: id });
@@ -4091,13 +4197,21 @@ export default function DetailsClient({
         return;
       }
 
-      const run = (rewatchRuns || []).find((r) => r?.id === v);
-      const startAt = run?.startedAt || v;
+      const windowState = resolveRewatchWindow(v, rewatchRuns);
+      const startAt = windowState.startAt || v;
 
       setRewatchStartAt(startAt);
-      await loadTraktShowPlays(startAt); // Refrescar al cambiar de run
+      await loadTraktShowPlays(
+        startAt,
+        windowState.endBefore || null,
+      ); // Refrescar al cambiar de run
     },
-    [episodesViewStorageKey, rewatchRuns, loadTraktShowPlays],
+    [
+      episodesViewStorageKey,
+      rewatchRuns,
+      loadTraktShowPlays,
+      resolveRewatchWindow,
+    ],
   );
 
   // Crea un nuevo run de rewatch con fecha de inicio y lo establece como vista activa
@@ -4109,13 +4223,14 @@ export default function DetailsClient({
         startedAt,
         label: `Rewatch · ${startedAt.slice(0, 10)}`,
       };
+      const nextRuns = [
+        run,
+        ...(Array.isArray(rewatchRunsRef.current) ? rewatchRunsRef.current : [])
+          .filter((r) => r?.id !== run.id),
+      ];
 
-      setRewatchRuns((prev) => {
-        const base = Array.isArray(prev) ? prev : [];
-        const next = [run, ...base.filter((r) => r?.id !== run.id)];
-        persistRuns(next);
-        return next;
-      });
+      setRewatchRuns(nextRuns);
+      persistRuns(nextRuns);
 
       setActiveEpisodesView(run.id);
       try {
@@ -4123,9 +4238,18 @@ export default function DetailsClient({
       } catch {}
       setRewatchStartAt(run.startedAt);
 
-      await loadTraktShowPlays(run.startedAt); // Cargar datos del run
+      const windowState = resolveRewatchWindow(run.id, nextRuns);
+      await loadTraktShowPlays(
+        windowState.startAt,
+        windowState.endBefore || null,
+      ); // Cargar datos del run
     },
-    [episodesViewStorageKey, persistRuns, loadTraktShowPlays],
+    [
+      episodesViewStorageKey,
+      persistRuns,
+      loadTraktShowPlays,
+      resolveRewatchWindow,
+    ],
   );
 
   // Elimina un run de rewatch y vuelve a vista global si era el activo
@@ -4201,7 +4325,18 @@ export default function DetailsClient({
         } catch {}
 
         try {
-          await loadTraktShowPlays(wasActive ? null : rewatchStartAt || null);
+          if (wasActive) {
+            await loadTraktShowPlays(null);
+          } else {
+            const windowState = resolveRewatchWindow(
+              activeEpisodesViewRef.current,
+              rewatchRunsRef.current,
+            );
+            await loadTraktShowPlays(
+              windowState.startAt || null,
+              windowState.endBefore || null,
+            );
+          }
         } catch {}
       }
     },
@@ -4215,6 +4350,7 @@ export default function DetailsClient({
       episodesViewStorageKey,
       persistRuns,
       loadTraktShowPlays,
+      resolveRewatchWindow,
     ],
   );
 
