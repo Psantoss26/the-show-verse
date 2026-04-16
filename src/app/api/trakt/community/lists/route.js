@@ -9,6 +9,52 @@ import {
 
 export const dynamic = "force-dynamic";
 
+function isAbortLikeError(error) {
+  return (
+    error?.name === "AbortError" ||
+    /aborted|abort|timeout/i.test(error?.message || "")
+  );
+}
+
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function fetchListsPageWithRetry(url, headers) {
+  const timeouts = [4500, 6500];
+  let lastError = null;
+
+  for (let i = 0; i < timeouts.length; i++) {
+    try {
+      return await fetchWithTimeout(
+        url,
+        {
+          headers,
+          cache: "no-store",
+        },
+        timeouts[i],
+      );
+    } catch (error) {
+      lastError = error;
+      if (!isAbortLikeError(error) || i === timeouts.length - 1) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error("Trakt lists request failed");
+}
+
 async function mapLimit(arr, limit, fn) {
   const out = new Array(arr.length);
   let i = 0;
@@ -93,16 +139,7 @@ export async function GET(req) {
     const base = type === "movie" ? "movies" : "shows";
     const url = `https://api.trakt.tv/${base}/${traktId}/lists/${tab}?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`;
 
-    // ✅ Timeout de 4s para el fetch inicial (deja 6s para previews)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-    const res = await fetch(url, {
-      headers,
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
+    const res = await fetchListsPageWithRetry(url, headers);
 
     const { json, text } = await safeTraktBody(res);
 
@@ -214,11 +251,13 @@ export async function GET(req) {
       e?.status === 403 ||
       e?.status === 404 ||
       e?.status === 429 ||
+      isAbortLikeError(e) ||
       /rate limit|timeout|no se encontr|forbidden/i.test(e?.message || "");
     if (!isExpected) console.warn("Trakt lists error:", e?.message);
     return NextResponse.json({
-      items: [],
+      items: null,
       pagination: { itemCount: 0, pageCount: 0, page: 1, limit: 10 },
+      transient: isAbortLikeError(e),
     });
   }
 }
