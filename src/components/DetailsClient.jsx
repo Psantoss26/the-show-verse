@@ -8204,7 +8204,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <section className="mb-16" ref={artworkControlsWrapRef}>
                     {/* ========== Header de la Sección de Media ========== */}
                     {/* Incluye título y controles (tabs y filtros) */}
-                    <div className="mb-3 sm:mb-5 md:mb-6 flex items-center justify-between gap-3">
+                    <div className="mb-3 sm:mb-5 md:mb-6 flex items-start justify-between gap-3">
                       {/* Título de la sección - Alineado a la izquierda */}
                       <SectionTitle
                         title="Portadas y fondos"
@@ -8214,7 +8214,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                       {/* ========== Controles de Filtrado ========== */}
                       {/* Desktop: Tabs + Filtros en línea | Móvil: Botón que abre modal */}
-                      <div className="flex items-center gap-2 sm:gap-3 h-10 md:h-11">
+                      <div className="self-start flex items-center gap-2 sm:gap-3 h-10 md:h-11">
                         {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                         <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
                           {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
@@ -8644,7 +8644,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           {/* Loading visual: una fila de 7 tarjetas placeholder */}
                           {!artworkRowReady && (
                             <div
-                              className="grid grid-cols-7 gap-[18px] pb-8 pt-3"
+                              className="grid grid-cols-7 gap-[18px] pb-8"
                               aria-hidden="true"
                             >
                               {Array.from({ length: 7 }).map((_, i) => (
@@ -8689,7 +8689,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 return (
                                   <SwiperSlide
                                     key={filePath}
-                                    className="h-full pt-3 pb-3"
+                                    className="h-full pb-3"
                                   >
                                     <div
                                       role="button"
