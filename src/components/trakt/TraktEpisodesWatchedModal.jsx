@@ -157,6 +157,7 @@ export default function TraktEpisodesWatchedModal({
   const [optimisticPlays, setOptimisticPlays] = useState([]); // array de ISO strings
 
   const panelRef = useRef(null);
+  const wasOpenRef = useRef(false);
 
   const isMovie = mediaType === "movie";
   const isConnected =
@@ -377,7 +378,13 @@ export default function TraktEpisodesWatchedModal({
 
   // Init
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      wasOpenRef.current = false;
+      return;
+    }
+    if (wasOpenRef.current) return;
+    wasOpenRef.current = true;
+
     setShowError("");
     setAddPlayError("");
     setAddPlayBusy(false);
