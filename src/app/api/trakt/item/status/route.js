@@ -7,6 +7,7 @@ import {
   traktApi,
   traktSearchByTmdb,
   traktGetHistoryForItem,
+  traktGetProgressWatchedForShow,
   computeHistorySummary,
   mapHistoryEntries,
 } from "@/lib/trakt/server";
@@ -117,12 +118,29 @@ export async function GET(request) {
     const traktId = obj?.ids?.trakt;
 
     let history = [];
+    let progress = null;
+    let completed = 0;
+    let aired = 0;
+
     if (traktId) {
-      history = await traktGetHistoryForItem(token, {
-        type,
-        traktId,
-        limit: 10,
-      });
+      if (type === "show") {
+        const [historyRes, progressRes] = await Promise.allSettled([
+          traktGetHistoryForItem(token, { type, traktId, limit: 10 }),
+          traktGetProgressWatchedForShow(token, { traktId }),
+        ]);
+        history = historyRes.status === "fulfilled" ? historyRes.value : [];
+        if (progressRes.status === "fulfilled" && progressRes.value) {
+          completed = Math.max(0, Number(progressRes.value.completed || 0));
+          aired = Math.max(0, Number(progressRes.value.aired || 0));
+          progress = aired > 0 ? Math.round((completed / aired) * 100) : 0;
+        }
+      } else {
+        history = await traktGetHistoryForItem(token, {
+          type,
+          traktId,
+          limit: 10,
+        });
+      }
     }
 
     const summary = computeHistorySummary({ searchHit: hit, history, type });
@@ -130,6 +148,9 @@ export async function GET(request) {
     const res = NextResponse.json({
       connected: true,
       ...summary,
+      progress,
+      completed,
+      aired,
       traktId: traktId || null,
       history: mapHistoryEntries(history),
     });

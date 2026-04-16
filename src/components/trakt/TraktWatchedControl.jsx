@@ -16,26 +16,35 @@ export default function TraktWatchedControl({
   // Deshabilitar mientras se está resolviendo el estado o hay una operación en curso
   const disabled = !!loading || !!busy;
 
-  const badgeText =
-    typeof badge === "string" && badge.trim().length > 0
-      ? badge.trim()
-      : Number(plays || 0) > 0
-        ? String(plays)
-        : null;
+  const badgeStr = typeof badge === "string" ? badge.trim() : "";
+  const isSeries = badgeStr.includes("%");
 
-  // Ajustar el padding en función de la longitud: "1" -> más cuadrado, "100%" -> más alargado
-  const chars = badgeText ? badgeText.length : 0;
-  const paddingX = chars >= 3 ? "px-1.5" : "px-0.5";
+  let labelHighlight = null;
+  let labelSub = null;
+
+  if (watched) {
+    if (isSeries && badgeStr) {
+      labelHighlight = badgeStr;
+      labelSub = "VISTO";
+    } else {
+      const p = Number(plays || 0);
+      if (p > 0) {
+        labelHighlight = String(p);
+        labelSub = p === 1 ? "VEZ" : "VECES";
+      } else {
+        labelSub = "VISTO";
+      }
+    }
+  }
 
   return (
-    <div className="relative">
+    <div className="relative flex-shrink-0">
       <LiquidButton
         onClick={() => onOpen?.()}
         disabled={disabled}
         active={watched}
         activeColor="green"
         groupId="details-actions"
-        className="flex-shrink-0"
         title={
           loading
             ? "Cargando estado de Trakt..."
@@ -49,15 +58,23 @@ export default function TraktWatchedControl({
         {watched ? <Eye className="w-6 h-6" /> : <EyeOff className="w-6 h-6" />}
       </LiquidButton>
 
-      {badgeText && (
+      {(labelHighlight || labelSub) && (
         <span
-          className={`absolute -bottom-1 -right-1.5 min-w-[18px] h-[18px] ${paddingX} 
-            rounded-full text-[10px] font-bold tracking-tight leading-none
-            bg-zinc-800/90 backdrop-blur-md text-white flex items-center justify-center 
-            z-10 pointer-events-none shadow-md`}
-          aria-label={`Progreso: ${badgeText}`}
+          className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap 
+            bg-[#0d1f16]/95 border border-emerald-500/50 rounded-[5px] 
+            px-1 py-[2px] flex items-center justify-center gap-1
+            shadow-[0_2px_8px_rgba(16,185,129,0.3)] pointer-events-none z-20 backdrop-blur-md"
         >
-          {badgeText}
+          {labelHighlight && (
+            <span className="text-[10px] font-black text-white leading-none">
+              {labelHighlight}
+            </span>
+          )}
+          {labelSub && (
+            <span className="text-[8px] font-bold tracking-tight text-emerald-400 uppercase leading-none opacity-95">
+              {labelSub}
+            </span>
+          )}
         </span>
       )}
     </div>
