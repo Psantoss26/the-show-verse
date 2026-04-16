@@ -1973,6 +1973,9 @@ export default function DetailsClient({
   const [episodeBusyKey, setEpisodeBusyKey] = useState(""); // Episodio en proceso: "S1E3"
   const watchedBySeasonRef = useRef(initialWatchedBySeason);
   const watchedBySeasonLoadedRef = useRef(hasInitialShowWatched);
+  const watchedBySeasonRequestIdRef = useRef(0);
+  const showPlaysRequestIdRef = useRef(0);
+  const rewatchViewCacheRef = useRef(new Map());
 
   useEffect(() => {
     watchedBySeasonRef.current =
@@ -2104,6 +2107,58 @@ export default function DetailsClient({
     [],
   );
 
+  const buildRewatchViewCacheKey = useCallback(
+    (startAtIso = null, endBeforeIso = null) =>
+      startAtIso ? `${String(startAtIso)}::${String(endBeforeIso || "")}` : "global",
+    [],
+  );
+
+  const cacheRewatchViewState = useCallback(
+    ({
+      startAtIso = null,
+      endBeforeIso = null,
+      watchedBySeason: nextWatchedBySeason = {},
+      historyIdsByEpisode: nextHistoryIdsByEpisode = {},
+    } = {}) => {
+      if (!startAtIso) return;
+      const cacheKey = buildRewatchViewCacheKey(startAtIso, endBeforeIso);
+      rewatchViewCacheRef.current.set(cacheKey, {
+        watchedBySeason:
+          nextWatchedBySeason && typeof nextWatchedBySeason === "object"
+            ? nextWatchedBySeason
+            : {},
+        historyIdsByEpisode:
+          nextHistoryIdsByEpisode && typeof nextHistoryIdsByEpisode === "object"
+            ? nextHistoryIdsByEpisode
+            : {},
+      });
+    },
+    [buildRewatchViewCacheKey],
+  );
+
+  const restoreRewatchViewStateFromCache = useCallback(
+    (startAtIso = null, endBeforeIso = null) => {
+      if (!startAtIso) return false;
+      const cacheKey = buildRewatchViewCacheKey(startAtIso, endBeforeIso);
+      const cached = rewatchViewCacheRef.current.get(cacheKey);
+      if (!cached) return false;
+
+      setRewatchWatchedBySeason(
+        cached?.watchedBySeason && typeof cached.watchedBySeason === "object"
+          ? cached.watchedBySeason
+          : {},
+      );
+      setRewatchHistoryByEpisode(
+        cached?.historyIdsByEpisode &&
+          typeof cached.historyIdsByEpisode === "object"
+          ? cached.historyIdsByEpisode
+          : {},
+      );
+      return true;
+    },
+    [buildRewatchViewCacheKey],
+  );
+
   const mergeRewatchRuns = useCallback((currentRuns, incomingRuns) => {
     const normalizeRun = (run) => {
       const startedAt = String(run?.startedAt || run?.id || "");
@@ -2119,29 +2174,78 @@ export default function DetailsClient({
       };
     };
 
+    const mergeRunData = (baseRun, overlayRun) => ({
+      ...(baseRun || {}),
+      ...(overlayRun || {}),
+      id: String(baseRun?.id || overlayRun?.id || ""),
+      startedAt: String(baseRun?.startedAt || overlayRun?.startedAt || ""),
+      label:
+        baseRun?.label ||
+        overlayRun?.label ||
+        `Rewatch · ${String(baseRun?.startedAt || overlayRun?.startedAt || "").slice(0, 10)}`,
+      completedAt: overlayRun?.completedAt ?? baseRun?.completedAt ?? null,
+      completed:
+        typeof overlayRun?.completed === "boolean"
+          ? overlayRun.completed
+          : baseRun?.completed ?? null,
+      progressCount: overlayRun?.progressCount ?? baseRun?.progressCount ?? null,
+    });
+
+    const normalizedCurrent = (Array.isArray(currentRuns) ? currentRuns : [])
+      .map(normalizeRun)
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      );
+    const normalizedIncoming = (Array.isArray(incomingRuns) ? incomingRuns : [])
+      .map(normalizeRun)
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      );
+
     const mergedById = new Map();
 
-    for (const rawRun of Array.isArray(incomingRuns) ? incomingRuns : []) {
-      const run = normalizeRun(rawRun);
-      if (!run) continue;
+    for (const run of normalizedCurrent) {
       mergedById.set(run.id, run);
     }
 
-    for (const rawRun of Array.isArray(currentRuns) ? currentRuns : []) {
-      const run = normalizeRun(rawRun);
-      if (!run) continue;
+    for (const incomingRun of normalizedIncoming) {
+      const exact = mergedById.get(incomingRun.id);
+      if (exact) {
+        mergedById.set(incomingRun.id, mergeRunData(exact, incomingRun));
+        continue;
+      }
 
-      const existing = mergedById.get(run.id);
-      mergedById.set(run.id, {
-        ...(existing || {}),
-        ...run,
-        completedAt: run.completedAt ?? existing?.completedAt ?? null,
-        completed:
-          typeof run.completed === "boolean"
-            ? run.completed
-            : existing?.completed ?? null,
-        progressCount: run.progressCount ?? existing?.progressCount ?? null,
+      const incomingTs = new Date(incomingRun.startedAt).getTime();
+      const candidateLocal = normalizedCurrent.find((localRun, index) => {
+        const localTs = new Date(localRun.startedAt).getTime();
+        const newerLocalTs =
+          index > 0
+            ? new Date(normalizedCurrent[index - 1].startedAt).getTime()
+            : Number.NaN;
+
+        if (!Number.isFinite(incomingTs) || !Number.isFinite(localTs)) {
+          return false;
+        }
+        if (incomingTs < localTs) return false;
+        if (Number.isFinite(newerLocalTs) && incomingTs >= newerLocalTs) {
+          return false;
+        }
+        return true;
       });
+
+      if (candidateLocal) {
+        mergedById.set(
+          candidateLocal.id,
+          mergeRunData(candidateLocal, incomingRun),
+        );
+        continue;
+      }
+
+      mergedById.set(incomingRun.id, incomingRun);
     }
 
     return Array.from(mergedById.values()).sort(
@@ -2220,6 +2324,8 @@ export default function DetailsClient({
   // Carga los episodios vistos de una serie desde la API de Trakt
   const loadTraktShowWatched = useCallback(async () => {
     if (type !== "tv") return;
+    const requestId = watchedBySeasonRequestIdRef.current + 1;
+    watchedBySeasonRequestIdRef.current = requestId;
 
     if (!trakt?.connected) {
       setWatchedBySeason({});
@@ -2235,6 +2341,15 @@ export default function DetailsClient({
         }),
         25000,
       );
+
+      if (requestId !== watchedBySeasonRequestIdRef.current) {
+        return {
+          ok: false,
+          connected: !!trakt?.connected,
+          found: watchedBySeasonLoadedRef.current,
+          watchedBySeason: watchedBySeasonRef.current,
+        };
+      }
 
       const nextWatchedBySeason = applyWatchedBySeasonState(
         r?.watchedBySeason || {},
@@ -3406,6 +3521,8 @@ export default function DetailsClient({
   const loadTraktShowPlays = useCallback(
     async (startAtIso = null, endBeforeIso = null) => {
       if (type !== "tv") return;
+      const requestId = showPlaysRequestIdRef.current + 1;
+      showPlaysRequestIdRef.current = requestId;
       if (!trakt?.connected) {
         setShowPlays([]);
         setRewatchWatchedBySeason(null);
@@ -3419,6 +3536,10 @@ export default function DetailsClient({
           startAt: startAtIso || undefined,
           endBefore: endBeforeIso || undefined,
         });
+
+        if (requestId !== showPlaysRequestIdRef.current) {
+          return;
+        }
 
         if (Array.isArray(r?.rewatchRuns) && r.rewatchRuns.length > 0) {
           setRewatchRuns((prev) => {
@@ -3442,22 +3563,53 @@ export default function DetailsClient({
         );
 
         if (startAtIso) {
-          setRewatchWatchedBySeason(r?.watchedBySeasonSince || {});
+          const nextWatchedBySeason =
+            r?.watchedBySeasonSince && typeof r.watchedBySeasonSince === "object"
+              ? r.watchedBySeasonSince
+              : {};
+          const nextHistoryIds =
+            r?.historyIdsByEpisodeSince &&
+            typeof r.historyIdsByEpisodeSince === "object"
+              ? r.historyIdsByEpisodeSince
+              : {};
+
+          cacheRewatchViewState({
+            startAtIso,
+            endBeforeIso,
+            watchedBySeason: nextWatchedBySeason,
+            historyIdsByEpisode: nextHistoryIds,
+          });
+
+          setRewatchWatchedBySeason(nextWatchedBySeason);
           // Guardar los historyIds para poder desmarcar episodios en rewatch
-          setRewatchHistoryByEpisode(r?.historyIdsByEpisodeSince || {});
+          setRewatchHistoryByEpisode(nextHistoryIds);
         } else {
           setRewatchWatchedBySeason(null);
           setRewatchHistoryByEpisode({});
         }
       } catch (e) {
-        setShowPlays([]);
+        if (requestId !== showPlaysRequestIdRef.current) return;
         if (startAtIso) {
-          setRewatchWatchedBySeason({});
-          setRewatchHistoryByEpisode({});
+          const restored = restoreRewatchViewStateFromCache(
+            startAtIso,
+            endBeforeIso,
+          );
+          if (!restored) {
+            setRewatchWatchedBySeason({});
+            setRewatchHistoryByEpisode({});
+          }
         }
       }
     },
-    [id, type, trakt?.connected, mergeRewatchRuns, rewatchRunsStorageKey],
+    [
+      id,
+      type,
+      trakt?.connected,
+      mergeRewatchRuns,
+      rewatchRunsStorageKey,
+      cacheRewatchViewState,
+      restoreRewatchViewStateFromCache,
+    ],
   );
 
   // Refrescar episodios vistos y plays al abrir el modal de episodios
@@ -3477,6 +3629,10 @@ export default function DetailsClient({
         const windowState = resolveRewatchWindow(
           activeEpisodesViewRef.current,
           rewatchRunsRef.current,
+        );
+        restoreRewatchViewStateFromCache(
+          windowState.startAt || null,
+          windowState.endBefore || null,
         );
         await loadTraktShowPlays(
           windowState.startAt || null,
@@ -3498,6 +3654,7 @@ export default function DetailsClient({
     loadTraktShowWatched,
     loadTraktShowPlays,
     resolveRewatchWindow,
+    restoreRewatchViewStateFromCache,
   ]);
 
   // Alterna el estado de "visto" del contenido completo en Trakt
@@ -3680,12 +3837,23 @@ export default function DetailsClient({
           : null;
 
       // Actualizacion optimista del estado de rewatch
+      let optimisticWatchedBySeason = null;
       setRewatchWatchedBySeason((prev) => {
         const p = prev && typeof prev === "object" ? prev : {};
         const cur = new Set(p?.[seasonNumber] || []);
         if (next) cur.add(episodeNumber);
         else cur.delete(episodeNumber);
-        return { ...p, [seasonNumber]: Array.from(cur).sort((a, b) => a - b) };
+        optimisticWatchedBySeason = {
+          ...p,
+          [seasonNumber]: Array.from(cur).sort((a, b) => a - b),
+        };
+        return optimisticWatchedBySeason;
+      });
+      cacheRewatchViewState({
+        startAtIso: targetStartAt,
+        endBeforeIso: windowState.endBefore || null,
+        watchedBySeason: optimisticWatchedBySeason || {},
+        historyIdsByEpisode: rewatchHistoryByEpisode || {},
       });
 
       try {
@@ -3744,15 +3912,23 @@ export default function DetailsClient({
         });
       } catch (e) {
         // Rollback del estado optimista
+        let rollbackWatchedBySeason = null;
         setRewatchWatchedBySeason((prev) => {
           const p = prev && typeof prev === "object" ? prev : {};
           const cur = new Set(p?.[seasonNumber] || []);
           if (!next) cur.add(episodeNumber);
           else cur.delete(episodeNumber);
-          return {
+          rollbackWatchedBySeason = {
             ...p,
             [seasonNumber]: Array.from(cur).sort((a, b) => a - b),
           };
+          return rollbackWatchedBySeason;
+        });
+        cacheRewatchViewState({
+          startAtIso: targetStartAt,
+          endBeforeIso: windowState.endBefore || null,
+          watchedBySeason: rollbackWatchedBySeason || {},
+          historyIdsByEpisode: rewatchHistoryByEpisode || {},
         });
       } finally {
         setEpisodeBusyKey("");
@@ -3767,6 +3943,7 @@ export default function DetailsClient({
       id,
       loadTraktShowPlays,
       resolveRewatchWindow,
+      cacheRewatchViewState,
     ],
   );
 
@@ -4296,6 +4473,10 @@ export default function DetailsClient({
       const startAt = windowState.startAt || v;
 
       setRewatchStartAt(startAt);
+      restoreRewatchViewStateFromCache(
+        startAt,
+        windowState.endBefore || null,
+      );
       await loadTraktShowPlays(
         startAt,
         windowState.endBefore || null,
@@ -4306,6 +4487,7 @@ export default function DetailsClient({
       rewatchRuns,
       loadTraktShowPlays,
       resolveRewatchWindow,
+      restoreRewatchViewStateFromCache,
     ],
   );
 
