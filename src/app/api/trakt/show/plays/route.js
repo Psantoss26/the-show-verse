@@ -170,6 +170,67 @@ function computeShowCompletions(historyItems, episodeKeySet) {
   return { showPlays: completionsAsc.slice().reverse(), minPlays: minCount };
 }
 
+function computeRewatchRuns(historyItems, episodeKeySet) {
+  const totalEpisodes = episodeKeySet.size;
+  if (!totalEpisodes) return [];
+
+  const counts = Object.create(null);
+  const startedAtByLayer = new Map();
+  const reachedByLayer = new Map();
+  const completedAtByLayer = new Map();
+
+  const itemsAsc = (Array.isArray(historyItems) ? historyItems : [])
+    .filter(
+      (it) =>
+        it?.watched_at && it?.episode?.season > 0 && it?.episode?.number > 0,
+    )
+    .sort(
+      (a, b) =>
+        new Date(a.watched_at).getTime() - new Date(b.watched_at).getTime(),
+    );
+
+  for (const it of itemsAsc) {
+    const sn = Number(it?.episode?.season);
+    const en = Number(it?.episode?.number);
+    const key = buildEpisodeKey(sn, en);
+    if (!episodeKeySet.has(key)) continue;
+
+    const before = counts[key] ?? 0;
+    const nextCount = before + 1;
+    counts[key] = nextCount;
+
+    if (!startedAtByLayer.has(nextCount)) {
+      startedAtByLayer.set(nextCount, it.watched_at);
+    }
+
+    const reachedCount = (reachedByLayer.get(nextCount) || 0) + 1;
+    reachedByLayer.set(nextCount, reachedCount);
+
+    if (reachedCount >= totalEpisodes && !completedAtByLayer.has(nextCount)) {
+      completedAtByLayer.set(nextCount, it.watched_at);
+    }
+  }
+
+  return Array.from(startedAtByLayer.entries())
+    .map(([layer, startedAt]) => {
+      const completedAt = completedAtByLayer.get(layer) || null;
+      const reachedCount = reachedByLayer.get(layer) || 0;
+      return {
+        id: startedAt,
+        startedAt,
+        completedAt,
+        completed: !!completedAt,
+        progressCount: reachedCount,
+        label: `Rewatch · ${String(startedAt).slice(0, 10)}`,
+      };
+    })
+    .filter((run) => !!run?.startedAt)
+    .sort(
+      (a, b) =>
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+    );
+}
+
 /**
  * Progreso "desde" startAtIso (rewatch). Nota: esto no separa runs por sí solo;
  * sirve para "progreso del rewatch actual" si tu app persiste startAt.
@@ -294,6 +355,7 @@ export async function GET(request) {
       historyAll,
       episodeKeySet,
     );
+    const rewatchRuns = computeRewatchRuns(historyAll, episodeKeySet);
 
     const startAtIso = normalizeWatchedAtIso(startAt);
     const endBeforeIso = normalizeWatchedAtIso(endBefore);
@@ -315,6 +377,7 @@ export async function GET(request) {
       completedPlays: showPlays.length,
       showPlays,
       plays: showPlays, // alias
+      rewatchRuns,
       watchedBySeasonSince: sinceData?.watchedBySeason || null,
       historyIdsByEpisodeSince: sinceData?.historyIdsByEpisode || {},
       historyIdsSince: sinceData?.historyIds || [],

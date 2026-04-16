@@ -2104,6 +2104,52 @@ export default function DetailsClient({
     [],
   );
 
+  const mergeRewatchRuns = useCallback((currentRuns, incomingRuns) => {
+    const normalizeRun = (run) => {
+      const startedAt = String(run?.startedAt || run?.id || "");
+      if (!startedAt) return null;
+      return {
+        id: String(run?.id || startedAt),
+        startedAt,
+        label: run?.label || `Rewatch · ${startedAt.slice(0, 10)}`,
+        completedAt: run?.completedAt || null,
+        completed: typeof run?.completed === "boolean" ? run.completed : null,
+        progressCount:
+          typeof run?.progressCount === "number" ? run.progressCount : null,
+      };
+    };
+
+    const mergedById = new Map();
+
+    for (const rawRun of Array.isArray(incomingRuns) ? incomingRuns : []) {
+      const run = normalizeRun(rawRun);
+      if (!run) continue;
+      mergedById.set(run.id, run);
+    }
+
+    for (const rawRun of Array.isArray(currentRuns) ? currentRuns : []) {
+      const run = normalizeRun(rawRun);
+      if (!run) continue;
+
+      const existing = mergedById.get(run.id);
+      mergedById.set(run.id, {
+        ...(existing || {}),
+        ...run,
+        completedAt: run.completedAt ?? existing?.completedAt ?? null,
+        completed:
+          typeof run.completed === "boolean"
+            ? run.completed
+            : existing?.completed ?? null,
+        progressCount: run.progressCount ?? existing?.progressCount ?? null,
+      });
+    }
+
+    return Array.from(mergedById.values()).sort(
+      (a, b) =>
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+    );
+  }, []);
+
   // Badge de progreso para el boton "visto" en series: calcula el % de episodios vistos
   // (excluyendo especiales, solo temporadas regulares)
   const tvProgressBadge = useMemo(() => {
@@ -3374,6 +3420,19 @@ export default function DetailsClient({
           endBefore: endBeforeIso || undefined,
         });
 
+        if (Array.isArray(r?.rewatchRuns) && r.rewatchRuns.length > 0) {
+          setRewatchRuns((prev) => {
+            const mergedRuns = mergeRewatchRuns(prev, r.rewatchRuns);
+            try {
+              window.localStorage.setItem(
+                rewatchRunsStorageKey,
+                JSON.stringify(mergedRuns),
+              );
+            } catch {}
+            return mergedRuns;
+          });
+        }
+
         setShowPlays(
           Array.isArray(r?.showPlays)
             ? r.showPlays
@@ -3398,7 +3457,7 @@ export default function DetailsClient({
         }
       }
     },
-    [id, type, trakt?.connected],
+    [id, type, trakt?.connected, mergeRewatchRuns, rewatchRunsStorageKey],
   );
 
   // Refrescar episodios vistos y plays al abrir el modal de episodios
