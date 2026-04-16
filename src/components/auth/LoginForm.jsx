@@ -34,15 +34,18 @@ export default function LoginForm() {
         throw new Error(json?.error || "No se pudo iniciar el login");
 
       const token = json?.request_token;
-      if (!token) throw new Error("Token inválido");
+      const authenticateUrl = json?.authenticate_url;
+      if (!token || !authenticateUrl) throw new Error("Token inválido");
 
-      // Usar URL fija para evitar problemas con puertos dinámicos
-      const baseUrl = "http://localhost:3000";
-      const redirectUrl = `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`;
+      const finalUrl = new URL(authenticateUrl);
+      const redirectTo = finalUrl.searchParams.get("redirect_to");
+      if (redirectTo) {
+        const redirectUrl = new URL(redirectTo);
+        redirectUrl.searchParams.set("next", next);
+        finalUrl.searchParams.set("redirect_to", redirectUrl.toString());
+      }
 
-      window.location.href =
-        `https://www.themoviedb.org/authenticate/${token}` +
-        `?redirect_to=${encodeURIComponent(redirectUrl)}`;
+      window.location.href = finalUrl.toString();
     } catch (e) {
       setErr(e?.message || "Error iniciando login TMDb");
       setLoading(false);

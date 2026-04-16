@@ -1,18 +1,17 @@
 "use client";
 
-import { createRequestToken } from "@/lib/api/auth";
-
 export default function LoginButton() {
   const handleLogin = async () => {
     try {
-      const token = await createRequestToken();
-      // Usar URL fija para evitar problemas con puertos dinámicos
-      const baseUrl = "http://localhost:3000";
-      const redirectUrl = `${baseUrl}/auth/callback`;
+      const res = await fetch("/api/tmdb/auth/request-token", {
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.authenticate_url) {
+        throw new Error(json?.error || "No se pudo iniciar el login");
+      }
 
-      window.location.href =
-        `https://www.themoviedb.org/authenticate/${token}` +
-        `?redirect_to=${encodeURIComponent(redirectUrl)}`;
+      window.location.href = json.authenticate_url;
     } catch (e) {
       console.error("Error iniciando login TMDb", e);
       alert("No se pudo iniciar el inicio de sesión con TMDb");
