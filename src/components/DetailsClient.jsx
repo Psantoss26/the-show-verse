@@ -8169,7 +8169,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 )}
 
                                 <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
-                                <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
+                                <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 transition-all duration-300 lg:translate-y-2 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100">
                                   <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
                                     {m.title}
                                   </p>
