@@ -1952,6 +1952,7 @@ export default function DetailsClient({
   const [traktBusy, setTraktBusy] = useState(""); // Accion en curso: 'watched' | 'watchlist' | 'history' | ''
   const [traktWatchedOpen, setTraktWatchedOpen] = useState(false); // Modal de historial de visionados abierto
   const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false); // Modal de episodios vistos abierto
+  const traktEpisodesWasOpenRef = useRef(false);
 
   // Cierra el modal de episodios limpiando estados transitorios
   const closeTraktEpisodesModal = useCallback(() => {
@@ -1967,6 +1968,69 @@ export default function DetailsClient({
     hasInitialShowWatched,
   ); // true cuando se cargo el estado
   const [episodeBusyKey, setEpisodeBusyKey] = useState(""); // Episodio en proceso: "S1E3"
+  const watchedBySeasonRef = useRef(initialWatchedBySeason);
+  const watchedBySeasonLoadedRef = useRef(hasInitialShowWatched);
+
+  useEffect(() => {
+    watchedBySeasonRef.current =
+      watchedBySeason && typeof watchedBySeason === "object"
+        ? watchedBySeason
+        : {};
+  }, [watchedBySeason]);
+
+  useEffect(() => {
+    watchedBySeasonLoadedRef.current = watchedBySeasonLoaded;
+  }, [watchedBySeasonLoaded]);
+
+  const normalizeWatchedBySeasonMap = useCallback((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+    return Object.entries(value).reduce((acc, [seasonKey, episodes]) => {
+      const seasonNumber = Number(seasonKey);
+      if (!Number.isFinite(seasonNumber)) return acc;
+
+      const normalizedEpisodes = Array.isArray(episodes)
+        ? Array.from(
+            new Set(
+              episodes
+                .map((episode) => Number(episode))
+                .filter((episode) => Number.isFinite(episode) && episode > 0),
+            ),
+          ).sort((a, b) => a - b)
+        : [];
+
+      acc[seasonNumber] = normalizedEpisodes;
+      return acc;
+    }, {});
+  }, []);
+
+  const hasAnyWatchedEpisodeInMap = useCallback(
+    (value) =>
+      Object.values(normalizeWatchedBySeasonMap(value)).some(
+        (episodes) => Array.isArray(episodes) && episodes.length > 0,
+      ),
+    [normalizeWatchedBySeasonMap],
+  );
+
+  const applyWatchedBySeasonState = useCallback(
+    (nextValue, { loaded = true } = {}) => {
+      const normalized = normalizeWatchedBySeasonMap(nextValue);
+      setWatchedBySeason(normalized);
+      setWatchedBySeasonLoaded(loaded);
+
+      if (endpointType === "tv") {
+        const hasAnyWatchedEpisode = hasAnyWatchedEpisodeInMap(normalized);
+        setTrakt((prev) =>
+          prev?.watched === hasAnyWatchedEpisode
+            ? prev
+            : { ...prev, watched: hasAnyWatchedEpisode }
+        );
+      }
+
+      return normalized;
+    },
+    [endpointType, hasAnyWatchedEpisodeInMap, normalizeWatchedBySeasonMap],
+  );
 
   // -- Historial de completados y rewatch --
   const [showPlays, setShowPlays] = useState([]); // Fechas ISO de cada visionado completo
@@ -2022,9 +2086,7 @@ export default function DetailsClient({
     if (!watchedBySeasonLoaded) return;
 
     // Comprobar si hay algun episodio visto en cualquier temporada
-    const hasAnyWatchedEpisode = Object.values(watchedBySeason).some(
-      (episodes) => Array.isArray(episodes) && episodes.length > 0,
-    );
+    const hasAnyWatchedEpisode = hasAnyWatchedEpisodeInMap(watchedBySeason);
 
     // Actualizar el estado de trakt.watched si no coincide con la realidad
     if (hasAnyWatchedEpisode !== trakt.watched) {
@@ -2039,6 +2101,7 @@ export default function DetailsClient({
     trakt.watched,
     watchedBySeasonLoaded,
     watchedBySeason,
+    hasAnyWatchedEpisodeInMap,
   ]);
 
   // Carga los episodios vistos de una serie desde la API de Trakt
@@ -2048,7 +2111,7 @@ export default function DetailsClient({
     if (!trakt?.connected) {
       setWatchedBySeason({});
       setWatchedBySeasonLoaded(false);
-      return;
+      return { ok: false, connected: false };
     }
 
     try {
@@ -2059,14 +2122,28 @@ export default function DetailsClient({
         }),
         25000,
       );
-      setWatchedBySeason(r?.watchedBySeason || {});
+
+      const nextWatchedBySeason = applyWatchedBySeasonState(
+        r?.watchedBySeason || {},
+        { loaded: true },
+      );
+      return {
+        ok: true,
+        connected: r?.connected !== false,
+        found: !!r?.found,
+        watchedBySeason: nextWatchedBySeason,
+      };
     } catch {
-      setWatchedBySeason({});
-    } finally {
-      // Marcar como cargado (aunque sea 0%) para que el badge de progreso se muestre
-      setWatchedBySeasonLoaded(true);
+      // En errores transitorios preservamos el estado previo para no convertir
+      // una serie vista en "no vista" por un fallo temporal de Trakt.
+      return {
+        ok: false,
+        connected: !!trakt?.connected,
+        found: watchedBySeasonLoadedRef.current,
+        watchedBySeason: watchedBySeasonRef.current,
+      };
     }
-  }, [type, id, trakt?.connected]);
+  }, [type, id, trakt?.connected, applyWatchedBySeasonState]);
 
   // -- Scoreboard de la comunidad (puntuaciones agregadas de multiples fuentes) --
   // Si hay datos prefetched desde page.jsx, usarlos como estado inicial
@@ -2654,6 +2731,40 @@ export default function DetailsClient({
     [traktType, id, endpointType, watchedBySeasonLoaded],
   );
 
+  useEffect(() => {
+    let ignore = false;
+
+    const refreshOnClose = async () => {
+      if (traktEpisodesOpen) {
+        traktEpisodesWasOpenRef.current = true;
+        return;
+      }
+      if (!traktEpisodesWasOpenRef.current) return;
+      traktEpisodesWasOpenRef.current = false;
+      if (type !== "tv") return;
+      if (!trakt?.connected) return;
+
+      try {
+        await loadTraktShowWatched();
+        if (ignore) return;
+        await reloadTraktStatus({ background: true });
+      } catch {
+        // Preservamos el estado actual si el refresco falla.
+      }
+    };
+
+    refreshOnClose();
+    return () => {
+      ignore = true;
+    };
+  }, [
+    traktEpisodesOpen,
+    type,
+    trakt?.connected,
+    loadTraktShowWatched,
+    reloadTraktStatus,
+  ]);
+
   // Carga el scoreboard de Trakt (rating de la comunidad y estadisticas de uso)
   // La nota/votos se cargan primero; las stats llegan despues sin bloquear el badge.
   useEffect(() => {
@@ -3106,6 +3217,9 @@ export default function DetailsClient({
     }
 
     if (endpointType === "tv") {
+      if (!watchedBySeasonLoadedRef.current) {
+        await loadTraktShowWatched();
+      }
       setTraktEpisodesOpen(true);
     } else {
       setTraktWatchedOpen(true);
@@ -3115,6 +3229,7 @@ export default function DetailsClient({
     traktBusy,
     trakt.connected,
     reloadTraktStatus,
+    loadTraktShowWatched,
     type,
     id,
     endpointType,
@@ -3337,11 +3452,13 @@ export default function DetailsClient({
 
       // Si el endpoint devuelve el estado actualizado directamente, usarlo
       if (r?.watchedBySeason) {
-        setWatchedBySeason(r.watchedBySeason);
+        applyWatchedBySeasonState(r.watchedBySeason, { loaded: true });
       } else {
         // Fallback: recargar el estado completo desde Trakt
         const fresh = await traktGetShowWatched({ tmdbId: id });
-        setWatchedBySeason(fresh?.watchedBySeason || {});
+        applyWatchedBySeasonState(fresh?.watchedBySeason || {}, {
+          loaded: true,
+        });
       }
     } catch {
       // Rollback: revertir cambio optimista si falla la peticion
@@ -3422,7 +3539,9 @@ export default function DetailsClient({
 
         // Mantener el estado global actualizado tambien
         const fresh = await traktGetShowWatched({ tmdbId: id });
-        setWatchedBySeason(fresh?.watchedBySeason || {});
+        applyWatchedBySeasonState(fresh?.watchedBySeason || {}, {
+          loaded: true,
+        });
       } catch (e) {
         // Rollback del estado optimista
         setRewatchWatchedBySeason((prev) => {
@@ -3532,7 +3651,9 @@ export default function DetailsClient({
       // Refrescar el estado real desde Trakt (por si difiere del optimista)
       await reloadTraktStatus();
       const fresh = await traktGetShowWatched({ tmdbId: tmdbIdNum });
-      setWatchedBySeason(fresh?.watchedBySeason || {});
+      applyWatchedBySeasonState(fresh?.watchedBySeason || {}, {
+        loaded: true,
+      });
     } catch (e) {
       console.error("[DetailsClient] onToggleShowWatched error:", e);
     } finally {
@@ -3552,7 +3673,9 @@ export default function DetailsClient({
       await reloadTraktStatus();
 
       const fresh = await traktGetShowWatched({ tmdbId: id });
-      setWatchedBySeason(fresh?.watchedBySeason || {});
+      applyWatchedBySeasonState(fresh?.watchedBySeason || {}, {
+        loaded: true,
+      });
 
       await loadTraktShowPlays(rewatchStartAt || null);
     } finally {
@@ -3599,7 +3722,9 @@ export default function DetailsClient({
 
       // Mantener watchedBySeason global coherente
       const fresh = await traktGetShowWatched({ tmdbId: id });
-      setWatchedBySeason(fresh?.watchedBySeason || {});
+      applyWatchedBySeasonState(fresh?.watchedBySeason || {}, {
+        loaded: true,
+      });
     } finally {
       setEpisodeBusyKey("");
     }
@@ -4053,7 +4178,9 @@ export default function DetailsClient({
       if (trakt?.connected && type === "tv") {
         try {
           const fresh = await traktGetShowWatched({ tmdbId: Number(id) });
-          setWatchedBySeason(fresh?.watchedBySeason || {});
+          applyWatchedBySeasonState(fresh?.watchedBySeason || {}, {
+            loaded: true,
+          });
         } catch {}
 
         try {
@@ -6488,7 +6615,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   plays={endpointType === "tv" ? 0 : trakt.plays}
                   badge={endpointType === "tv" ? tvProgressBadge : null}
                   busy={!!traktBusy}
-                  loading={trakt.loading}
+                  loading={
+                    trakt.loading ||
+                    (endpointType === "tv" &&
+                      !!trakt.connected &&
+                      !watchedBySeasonLoaded)
+                  }
                   onOpen={handleOpenTraktWatched}
                 />
 
