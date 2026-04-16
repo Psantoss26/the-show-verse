@@ -913,7 +913,7 @@ const InProgressCard = memo(function InProgressCard({
           className="relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900/60 hover:bg-zinc-900/80 transition-all duration-300"
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = `rgba(${colors.accent}, 0.3)`;
-            e.currentTarget.style.boxShadow = `0 20px 25px -5px rgba(${colors.accent}, 0.15), 0 8px 10px -6px rgba(${colors.accent}, 0.1)`;
+            e.currentTarget.style.boxShadow = `0 14px 18px -6px rgba(${colors.accent}, 0.1), 0 6px 8px -6px rgba(${colors.accent}, 0.07)`;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.borderColor = "";
@@ -928,12 +928,12 @@ const InProgressCard = memo(function InProgressCard({
               imgClassName="transition-transform duration-500 group-hover:scale-105"
             />
 
-            {/* Gradient overlay - stronger at top for badge readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/30" />
-            <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black/60 to-transparent" />
+            {/* Gradient overlay softened to reduce cover darkening */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
+            <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black/35 to-transparent" />
 
-            {/* Progress circular gauge badge / User rating badge - solid dark bg for readability */}
-            <div className="absolute bottom-1 right-1">
+            {/* Progress circular gauge badge / User rating badge - top-right with consistent border margins */}
+            <div className="absolute top-3 right-3">
               <div
                 className="rounded-full"
                 style={{
