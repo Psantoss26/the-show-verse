@@ -2642,46 +2642,82 @@ export default function DetailsClient({
 
     const load = async () => {
       setTLists((p) => ({ ...p, loading: true, error: "" }));
-      try {
-        // Cargar 6 listas con todos sus detalles
-        const r = await withTimeout(
-          traktGetLists({
-            type: traktType,
-            tmdbId: id,
-            tab: tListsTab,
-            page: tLists.page,
-            limit: 6,
-            countOnly: false, // Siempre cargar listas completas con previews
-          }),
-          20000,
-        );
-        if (ignore) return;
+      const retryDelays = [0, 1400];
 
-        const items = Array.isArray(r?.items) ? r.items : [];
-        const total = Number(r?.pagination?.itemCount || 0);
-        const hasMore = !!(
-          r?.pagination?.pageCount &&
-          r?.pagination?.page < r?.pagination?.pageCount
-        );
+      for (let attempt = 0; attempt < retryDelays.length; attempt++) {
+        if (attempt > 0) {
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, retryDelays[attempt]),
+          );
+          if (ignore) return;
+        }
 
+        try {
+          // Cargar 6 listas con todos sus detalles
+          const r = await withTimeout(
+            traktGetLists({
+              type: traktType,
+              tmdbId: id,
+              tab: tListsTab,
+              page: tLists.page,
+              limit: 6,
+              countOnly: false, // Siempre cargar listas completas con previews
+            }),
+            20000,
+          );
+          if (ignore) return;
+
+          const hasItemsArray = Array.isArray(r?.items);
+          const items = hasItemsArray ? r.items : [];
+          const total = Number(r?.pagination?.itemCount || 0);
+          const hasMore = !!(
+            r?.pagination?.pageCount &&
+            r?.pagination?.page < r?.pagination?.pageCount
+          );
+          const isTransient = !!r?.transient;
+
+          if (!hasItemsArray && isTransient && attempt < retryDelays.length - 1) {
+            continue;
+          }
+
+          setTLists((p) => ({
+            ...p,
+            loading: false,
+            error: "",
+            items: p.page > 1 ? [...(p.items || []), ...items] : items,
+            hasMore,
+            total,
+          }));
+          return;
+        } catch (e) {
+          if (ignore) return;
+
+          const isTimeout = e?.message === "Timeout";
+          const isTransient =
+            isTimeout ||
+            /aborted|abort|fetch|network|server error/i.test(
+              e?.message || "",
+            );
+
+          if (isTransient && attempt < retryDelays.length - 1) {
+            continue;
+          }
+
+          setTLists((p) => ({
+            ...p,
+            loading: false,
+            error: isTransient ? "" : e?.message || "Error",
+          }));
+          return;
+        }
+      }
+
+      if (!ignore) {
         setTLists((p) => ({
           ...p,
           loading: false,
           error: "",
-          items: p.page > 1 ? [...(p.items || []), ...items] : items,
-          hasMore,
-          total,
         }));
-      } catch (e) {
-        if (!ignore) {
-          // Si es timeout, no mostrar error al usuario (carga silenciosa)
-          const isTimeout = e?.message === "Timeout";
-          setTLists((p) => ({
-            ...p,
-            loading: false,
-            error: isTimeout ? "" : e?.message || "Error",
-          }));
-        }
       }
     };
 
