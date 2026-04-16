@@ -76,8 +76,8 @@ async function getDashboardData(sessionId = null) {
       traktMoviesAnticipated,
       traktShowsAnticipated,
     ] = await Promise.all([
-      fetchTopRatedMovies(2000),
-      fetchTopRatedTV(1000),
+      fetchTopRatedMovies(5000),
+      fetchTopRatedTV(5000),
       discoverMovies({
         "vote_average.gte": 7.5,
         "vote_count.gte": 2000,
