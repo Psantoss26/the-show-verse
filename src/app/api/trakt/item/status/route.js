@@ -90,6 +90,7 @@ export async function GET(request) {
           plays: 0,
           lastWatchedAt: null,
           history: [],
+          degraded: true,
           error: searchErr?.message || "Trakt lookup failed",
         });
         if (refreshedTokens) setTraktCookies(res, refreshedTokens);
@@ -175,6 +176,7 @@ export async function GET(request) {
             plays: 0,
             lastWatchedAt: null,
             history: [],
+            degraded: true,
             error: e?.message || "Trakt status failed",
           }
         : { connected: false, error: e?.message || "Trakt status failed" },
