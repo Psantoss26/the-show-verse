@@ -3482,7 +3482,7 @@ export default function DetailsClient({
    * y asocia el historyId para poder desmarcarlo despues.
    */
   const toggleEpisodeRewatch = useCallback(
-    async (seasonNumber, episodeNumber) => {
+    async (seasonNumber, episodeNumber, options = {}) => {
       if (type !== "tv") return;
       if (!trakt?.connected) return;
       if (!rewatchStartAt) return;
@@ -3494,6 +3494,10 @@ export default function DetailsClient({
       const currentlyWatched =
         !!rewatchWatchedBySeason?.[seasonNumber]?.includes(episodeNumber);
       const next = !currentlyWatched;
+      const watchedAtOverride =
+        options && typeof options === "object" && !Array.isArray(options)
+          ? options.watchedAt || null
+          : null;
 
       // Actualizacion optimista del estado de rewatch
       setRewatchWatchedBySeason((prev) => {
@@ -3506,13 +3510,26 @@ export default function DetailsClient({
 
       try {
         if (next) {
+          const watchedAtIso = watchedAtOverride || new Date().toISOString();
+          const watchedAtMs = new Date(watchedAtIso).getTime();
+          const rewatchStartMs = new Date(rewatchStartAt).getTime();
+
+          if (
+            Number.isFinite(watchedAtMs) &&
+            Number.isFinite(rewatchStartMs) &&
+            watchedAtMs < rewatchStartMs
+          ) {
+            throw new Error(
+              "La fecha del episodio no puede ser anterior al inicio del rewatch activo.",
+            );
+          }
+
           // Agregar play de rewatch: el endpoint devuelve el historyId
           const r = await traktAddEpisodePlay({
             tmdbId: id,
             season: seasonNumber,
             episode: episodeNumber,
-            watchedAt: new Date().toISOString(),
-            startedAt: rewatchStartAt,
+            watchedAt: watchedAtIso,
           });
           const hid = r?.historyId || r?.id || null;
           if (hid)
