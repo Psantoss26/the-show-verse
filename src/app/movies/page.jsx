@@ -16,7 +16,8 @@ export const revalidate = 1800; // 30 minutos
 
 /* ========= Utilidad para obtener la URL base en servidor ========= */
 function getBaseUrl() {
-  // Pon aquí la que uses en tu proyecto (por ejemplo NEXT_PUBLIC_SITE_URL)
+  if (process.env.NEXT_PUBLIC_APP_URL)
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
   if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
@@ -30,10 +31,19 @@ async function fetchTopRatedImdbServer() {
 
   const url = `${baseUrl}/api/imdb/top-rated?type=movie&pages=3&limit=80&minVotes=15000`;
 
-  const res = await fetch(url, {
-    // Opcional, para que Next cachee también esta llamada
-    next: { revalidate },
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      // Opcional, para que Next cachee también esta llamada
+      next: { revalidate },
+    });
+  } catch (networkErr) {
+    console.error(
+      "Error de red al llamar a /api/imdb/top-rated:",
+      networkErr?.message,
+    );
+    return [];
+  }
 
   if (!res.ok) {
     console.error("Error al llamar a /api/imdb/top-rated:", res.status);
