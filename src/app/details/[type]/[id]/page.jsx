@@ -1,8 +1,20 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
+import { getTraktDetailsBootstrapFromCookieStore } from "@/lib/trakt/server";
+import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 
-export const revalidate = 600;
+export const dynamic = "force-dynamic";
+
+function resolveWithin(promise, timeoutMs, fallback = null) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(fallback), timeoutMs);
+    }),
+  ]);
+}
 
 export default async function DetailsPage({ params }) {
   const p = await params;
@@ -13,7 +25,32 @@ export default async function DetailsPage({ params }) {
     notFound();
   }
 
-  const data = await getDetails(type, id);
+  const cookieStore = await cookies();
+  const traktType = type === "tv" ? "show" : "movie";
+  const traktBootstrapTimeoutMs = type === "tv" ? 1800 : 1400;
+
+  const [data, traktBootstrap, initialScoreboard] = await Promise.all([
+    getDetails(type, id, {
+      appendToResponse: "credits,reviews,external_ids",
+    }),
+    resolveWithin(
+      getTraktDetailsBootstrapFromCookieStore(cookieStore, {
+        type: traktType,
+        tmdbId: id,
+      }).catch(() => null),
+      traktBootstrapTimeoutMs,
+      null,
+    ),
+    resolveWithin(
+      getCachedTraktScoreboardData({
+        type: traktType,
+        tmdbId: id,
+        includeStats: false,
+      }).catch(() => null),
+      500,
+      null,
+    ),
+  ]);
 
   if (!data) {
     notFound();
@@ -25,6 +62,9 @@ export default async function DetailsPage({ params }) {
   const initialReviews = Array.isArray(data?.reviews?.results)
     ? data.reviews.results
     : [];
+  const initialTraktStatus = traktBootstrap?.status ?? null;
+  const initialShowWatched =
+    type === "tv" ? traktBootstrap?.showWatched ?? null : null;
 
   return (
     <DetailsPageLoader
@@ -33,6 +73,9 @@ export default async function DetailsPage({ params }) {
       data={data}
       initialCastData={initialCastData}
       initialReviews={initialReviews}
+      initialTraktStatus={initialTraktStatus}
+      initialShowWatched={initialShowWatched}
+      initialScoreboard={initialScoreboard}
     />
   );
 }
