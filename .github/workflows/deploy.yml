@@ -29,7 +29,8 @@ jobs:
 
       - name: Build imagen Docker
         run: |
-          docker compose -f /nas-deploy/docker-compose.yml build \
+          docker compose -f /nas-deploy/docker-compose.yml \
+            --project-name the-show-verse build \
             --build-arg NEXT_PUBLIC_APP_URL=https://theshowverse.com \
             --build-arg NEXT_PUBLIC_TMDB_API_KEY=934b1e031967a214521ca1a5426baa2b \
             --build-arg NEXT_PUBLIC_TRAKT_CLIENT_ID=ea0db95eaadde224ab6e87c24ace932cdb0e8ffd9d7882ccc995a47584caaafe \
@@ -38,5 +39,6 @@ jobs:
 
       - name: Reiniciar contenedor
         run: |
-          docker compose -f /nas-deploy/docker-compose.yml up -d app
+          docker compose -f /nas-deploy/docker-compose.yml \
+            --project-name the-show-verse up -d app
           echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"

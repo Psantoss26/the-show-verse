@@ -43,14 +43,6 @@ import {
   StaggerItem,
 } from "@/components/details/AnimatedSection";
 
-// Skeletons de carga para cada tipo de seccion (poster, tarjeta, marcador, grid)
-import {
-  PosterSkeleton,
-  CardSkeleton,
-  ScoreboardSkeleton,
-  GridSkeleton,
-} from "@/components/details/LoadingSkeleton";
-
 // -- Iconos de Lucide React usados en todo el componente --
 import {
   CalendarIcon,
@@ -6936,13 +6928,6 @@ export default function DetailsClient({
       return () => clearTimeout(timer);
     }
   }, [currentLowLoaded, prevPosterPath]);
-
-  // Skeleton mientras:
-  // - no hemos “resuelto” si hay poster
-  // - o existe poster pero aún no ha cargado el low
-  const showPosterSkeleton =
-    !currentResolved ||
-    (currentImagePath && !currentLowLoaded && !currentImgError);
 
   // Icono NO IMAGE solo si ya hemos resuelto, NO hay imagen (o falló) y NO estamos esperando carga inicial en modo preview
   const showNoPoster =
