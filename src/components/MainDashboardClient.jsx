@@ -7,6 +7,7 @@ import { Navigation, Autoplay, FreeMode } from "swiper";
 import { AnimatePresence, motion, useInView } from "framer-motion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Anton } from "next/font/google";
 import {
   Heart,
@@ -578,6 +579,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
  * ==================================================================== */
 function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
   const { session, account } = useAuth();
+  const router = useRouter();
 
   const [extras, setExtras] = useState({
     runtime: null,
@@ -790,6 +792,14 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       : "movie";
   const href = `/details/${mediaType}/${movie.id}`;
 
+  const prefetchHref = () => {
+    router.prefetch(href);
+  };
+
+  const navigateToDetails = () => {
+    router.push(href);
+  };
+
   const requireLogin = () => {
     if (!session || !account?.id) {
       window.location.href = "/login";
@@ -910,9 +920,10 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className={`rounded-lg overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-950 to-black text-white shadow-2xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer ring-1 ring-white/5 hover:ring-white/10 transition-all duration-300`}
-      onClick={() => {
-        window.location.href = href;
-      }}
+      onClick={navigateToDetails}
+      onMouseEnter={prefetchHref}
+      onFocus={prefetchHref}
+      onTouchStart={prefetchHref}
     >
       <div className="relative w-full h-full bg-black">
         {!showTrailer && !backdropReady && (
@@ -1120,6 +1131,7 @@ function InlinePreviewCardAnticipated({
   backdropOverride,
 }) {
   const { session, account } = useAuth();
+  const router = useRouter();
 
   const [extras, setExtras] = useState({
     runtime: null,
@@ -1305,6 +1317,14 @@ function InlinePreviewCardAnticipated({
       : "movie";
   const href = `/details/${mediaType}/${movie.id}`;
 
+  const prefetchHref = () => {
+    router.prefetch(href);
+  };
+
+  const navigateToDetails = () => {
+    router.push(href);
+  };
+
   const requireLogin = () => {
     if (!session || !account?.id) {
       window.location.href = "/login";
@@ -1415,9 +1435,10 @@ function InlinePreviewCardAnticipated({
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className={`rounded-lg overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-950 to-black text-white shadow-2xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer ring-1 ring-white/5 hover:ring-white/10 transition-all duration-300`}
-      onClick={() => {
-        window.location.href = href;
-      }}
+      onClick={navigateToDetails}
+      onMouseEnter={prefetchHref}
+      onFocus={prefetchHref}
+      onTouchStart={prefetchHref}
     >
       <div className="relative w-full h-full bg-black">
         {!showTrailer && !backdropReady && (

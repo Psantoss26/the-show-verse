@@ -1,6 +1,6 @@
-PWD e:\ASNPORTS\PELICULAS\the-show-verse\.docs\Plantilla TFG Latex v1.2
+PWD E:\ASNPORTS\PELICULAS\the-show-verse\.docs\Plantilla TFG Latex v1.2
 INPUT C:\Users\pablo\AppData\Local\MiKTeX\miktex\data\le\pdftex\pdflatex.fmt
-INPUT e:\ASNPORTS\PELICULAS\the-show-verse\.docs\Plantilla TFG Latex v1.2\Plantilla TFG v1.2.tex
+INPUT Plantilla TFG v1.2.tex
 OUTPUT Plantilla TFG v1.2.log
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\base\book.cls
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\base\book.cls
@@ -380,15 +380,39 @@ INPUT .\estado.tex
 INPUT .\estado.tex
 INPUT .\estado.tex
 INPUT estado.tex
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmbi8t.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmbi8t.vf
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmbi8r.tfm
+INPUT ..\notes\.images\letterboxd.jpg
+INPUT ..\notes\.images\letterboxd.jpg
+INPUT ..\notes\.images\letterboxd.jpg
+INPUT ..\notes\.images\letterboxd.jpg
+INPUT ..\notes\.images\letterboxd.jpg
+INPUT ..\notes\.images\letterboxd.jpg
+INPUT ..\notes\.images\letterboxd.jpg
+INPUT ..\notes\.images\trakt.jpg
+INPUT ..\notes\.images\trakt.jpg
+INPUT ..\notes\.images\trakt.jpg
+INPUT ..\notes\.images\trakt.jpg
+INPUT ..\notes\.images\trakt.jpg
+INPUT ..\notes\.images\trakt.jpg
+INPUT ..\notes\.images\trakt.jpg
+INPUT ..\notes\.images\simkl.jpg
+INPUT ..\notes\.images\simkl.jpg
+INPUT ..\notes\.images\simkl.jpg
+INPUT ..\notes\.images\simkl.jpg
+INPUT ..\notes\.images\simkl.jpg
+INPUT ..\notes\.images\simkl.jpg
+INPUT ..\notes\.images\simkl.jpg
+INPUT ..\notes\.images\justwatch.jpg
+INPUT ..\notes\.images\justwatch.jpg
+INPUT ..\notes\.images\justwatch.jpg
+INPUT ..\notes\.images\justwatch.jpg
+INPUT ..\notes\.images\justwatch.jpg
+INPUT ..\notes\.images\justwatch.jpg
+INPUT ..\notes\.images\justwatch.jpg
 INPUT .\aspectos.tex
 INPUT .\aspectos.tex
 INPUT .\aspectos.tex
 INPUT .\aspectos.tex
 INPUT aspectos.tex
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\jknappen\ec\tcrm1200.tfm
 INPUT .\desarrollo.tex
 INPUT .\desarrollo.tex
 INPUT .\desarrollo.tex
@@ -428,6 +452,7 @@ INPUT ..\notes\.images\portadas.jpg
 INPUT ..\notes\.images\portadas.jpg
 INPUT ..\notes\.images\portadas.jpg
 INPUT ..\notes\.images\portadas.jpg
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\jknappen\ec\tcrm1200.tfm
 INPUT ..\notes\.images\favoritos.jpg
 INPUT ..\notes\.images\favoritos.jpg
 INPUT ..\notes\.images\favoritos.jpg
