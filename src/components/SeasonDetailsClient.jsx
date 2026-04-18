@@ -37,6 +37,8 @@ import {
 
 const seasonScoreboardCache = new Map();
 const seasonScoreboardInflight = new Map();
+const seasonStatsCache = new Map();
+const seasonStatsInflight = new Map();
 const seasonImdbCache = new Map();
 const seasonImdbInflight = new Map();
 
@@ -116,6 +118,45 @@ async function fetchSeasonScoreboardCached({ showId, seasonNumber, signal }) {
     });
 
   seasonScoreboardInflight.set(key, promise);
+  return promise;
+}
+
+async function fetchSeasonStatsCached({ showId, seasonNumber, signal }) {
+  const key = `${showId}:${seasonNumber}`;
+  if (seasonStatsCache.has(key)) {
+    return seasonStatsCache.get(key);
+  }
+  if (seasonStatsInflight.has(key)) {
+    return seasonStatsInflight.get(key);
+  }
+
+  const promise = fetch(
+    `/api/trakt/stats?type=season&tmdbId=${encodeURIComponent(showId)}&season=${encodeURIComponent(seasonNumber)}`,
+    {
+      cache: "force-cache",
+      signal,
+    },
+  )
+    .then(async (res) => {
+      const json = await res.json().catch(() => null);
+      const hasNumericStats = Object.values(json?.stats || {}).some(
+        (value) => typeof value === "number",
+      );
+      const value = res.ok && json?.found && hasNumericStats ? json : null;
+      if (value) {
+        seasonStatsCache.set(key, value);
+      }
+      return value;
+    })
+    .catch((error) => {
+      if (error?.name === "AbortError") throw error;
+      return null;
+    })
+    .finally(() => {
+      seasonStatsInflight.delete(key);
+    });
+
+  seasonStatsInflight.set(key, promise);
   return promise;
 }
 
@@ -247,6 +288,11 @@ export default function SeasonDetailsClient({
     };
   }, []);
 
+  const hasNumericScoreboardStats = useCallback(
+    (stats) => Object.values(stats || {}).some((value) => typeof value === "number"),
+    [],
+  );
+
   const defaultScoreboard = useMemo(
     () => ({
       loading: false,
@@ -261,6 +307,10 @@ export default function SeasonDetailsClient({
   const parsedInitialScoreboard = useMemo(
     () => parseScoreboardData(initialScoreboard),
     [initialScoreboard, parseScoreboardData],
+  );
+  const initialScoreboardHasStats = useMemo(
+    () => hasNumericScoreboardStats(parsedInitialScoreboard?.stats),
+    [parsedInitialScoreboard, hasNumericScoreboardStats],
   );
 
   // Scroll al inicio al montar
@@ -308,10 +358,16 @@ export default function SeasonDetailsClient({
 
   useEffect(() => {
     const key = `${showId}:${seasonNumber}`;
-    if (parsedInitialScoreboard) {
+    if (parsedInitialScoreboard && initialScoreboardHasStats) {
       seasonScoreboardCache.set(key, initialScoreboard);
     }
-  }, [showId, seasonNumber, parsedInitialScoreboard, initialScoreboard]);
+  }, [
+    showId,
+    seasonNumber,
+    parsedInitialScoreboard,
+    initialScoreboard,
+    initialScoreboardHasStats,
+  ]);
 
   useEffect(() => {
     setImdbData(imdb || null);
@@ -531,14 +587,14 @@ export default function SeasonDetailsClient({
   }, [tScoreboard.rating]);
 
   useEffect(() => {
-    if (parsedInitialScoreboard) return;
+    if (initialScoreboardHasStats) return;
 
     let alive = true;
     const controller = new AbortController();
     const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
         setTScoreboard((s) => ({ ...s, loading: true }));
-        const json = await fetchSeasonScoreboardCached({
+        let json = await fetchSeasonScoreboardCached({
           showId,
           seasonNumber,
           signal: controller.signal,
@@ -546,7 +602,28 @@ export default function SeasonDetailsClient({
         if (!alive) return;
 
         const parsed = parseScoreboardData(json);
-        setTScoreboard(parsed || defaultScoreboard);
+        const hasStats = hasNumericScoreboardStats(parsed?.stats);
+
+        if (!hasStats) {
+          const statsOnly = await fetchSeasonStatsCached({
+            showId,
+            seasonNumber,
+            signal: controller.signal,
+          });
+          if (!alive) return;
+
+          if (statsOnly?.found && hasNumericScoreboardStats(statsOnly?.stats)) {
+            json = {
+              ...(json || {}),
+              found: true,
+              traktUrl: json?.traktUrl || statsOnly?.traktUrl || null,
+              community: json?.community || null,
+              stats: statsOnly.stats,
+            };
+          }
+        }
+
+        setTScoreboard(parseScoreboardData(json) || defaultScoreboard);
       } catch (error) {
         if (!alive || error?.name === "AbortError") return;
         setTScoreboard(defaultScoreboard);
@@ -561,8 +638,9 @@ export default function SeasonDetailsClient({
   }, [
     showId,
     seasonNumber,
-    parsedInitialScoreboard,
+    initialScoreboardHasStats,
     parseScoreboardData,
+    hasNumericScoreboardStats,
     defaultScoreboard,
   ]);
 
@@ -1013,7 +1091,8 @@ export default function SeasonDetailsClient({
               </div>
 
               {/* Footer stats */}
-              {!tScoreboard.loading && tScoreboard?.stats && (
+              {!tScoreboard.loading &&
+                hasNumericScoreboardStats(tScoreboard?.stats) && (
                 <div className="border-t border-white/5 bg-black/10">
                   <div
                     className="

@@ -39,6 +39,8 @@ import {
 
 const episodeScoreboardCache = new Map();
 const episodeScoreboardInflight = new Map();
+const episodeStatsCache = new Map();
+const episodeStatsInflight = new Map();
 const episodeImdbCache = new Map();
 const episodeImdbInflight = new Map();
 
@@ -123,6 +125,50 @@ async function fetchEpisodeScoreboardCached({
     });
 
   episodeScoreboardInflight.set(key, promise);
+  return promise;
+}
+
+async function fetchEpisodeStatsCached({
+  showId,
+  seasonNumber,
+  episodeNumber,
+  signal,
+}) {
+  const key = `${showId}:${seasonNumber}:${episodeNumber}`;
+  if (episodeStatsCache.has(key)) {
+    return episodeStatsCache.get(key);
+  }
+  if (episodeStatsInflight.has(key)) {
+    return episodeStatsInflight.get(key);
+  }
+
+  const promise = fetch(
+    `/api/trakt/stats?type=episode&tmdbId=${encodeURIComponent(showId)}&season=${encodeURIComponent(seasonNumber)}&episode=${encodeURIComponent(episodeNumber)}`,
+    {
+      cache: "force-cache",
+      signal,
+    },
+  )
+    .then(async (res) => {
+      const json = await res.json().catch(() => null);
+      const hasNumericStats = Object.values(json?.stats || {}).some(
+        (value) => typeof value === "number",
+      );
+      const value = res.ok && json?.found && hasNumericStats ? json : null;
+      if (value) {
+        episodeStatsCache.set(key, value);
+      }
+      return value;
+    })
+    .catch((error) => {
+      if (error?.name === "AbortError") throw error;
+      return null;
+    })
+    .finally(() => {
+      episodeStatsInflight.delete(key);
+    });
+
+  episodeStatsInflight.set(key, promise);
   return promise;
 }
 
@@ -254,6 +300,11 @@ export default function EpisodeDetailsClient({
     };
   }, []);
 
+  const hasNumericScoreboardStats = useCallback(
+    (stats) => Object.values(stats || {}).some((value) => typeof value === "number"),
+    [],
+  );
+
   const defaultScoreboard = useMemo(
     () => ({
       loading: false,
@@ -265,9 +316,18 @@ export default function EpisodeDetailsClient({
     [],
   );
 
+  const parsedInitialScoreboard = useMemo(
+    () => parseScoreboardData(initialScoreboard),
+    [initialScoreboard, parseScoreboardData],
+  );
+  const initialScoreboardHasStats = useMemo(
+    () => hasNumericScoreboardStats(parsedInitialScoreboard?.stats),
+    [parsedInitialScoreboard, hasNumericScoreboardStats],
+  );
+
   // Trakt scoreboard
   const [tScoreboard, setTScoreboard] = useState(
-    () => parseScoreboardData(initialScoreboard) || defaultScoreboard,
+    () => parsedInitialScoreboard || defaultScoreboard,
   );
   const [imdbData, setImdbData] = useState(() => imdb || null);
   const [watchedBySeason, setWatchedBySeason] = useState(
@@ -286,7 +346,7 @@ export default function EpisodeDetailsClient({
 
   useEffect(() => {
     const key = `${showId}:${seasonNumber}:${episodeNumber}`;
-    if (initialScoreboard && parseScoreboardData(initialScoreboard)) {
+    if (initialScoreboard && initialScoreboardHasStats) {
       episodeScoreboardCache.set(key, initialScoreboard);
     }
   }, [
@@ -294,28 +354,51 @@ export default function EpisodeDetailsClient({
     seasonNumber,
     episodeNumber,
     initialScoreboard,
-    parseScoreboardData,
+    initialScoreboardHasStats,
   ]);
 
   useEffect(() => {
-    setTScoreboard(parseScoreboardData(initialScoreboard) || defaultScoreboard);
-  }, [initialScoreboard, parseScoreboardData, defaultScoreboard]);
+    setTScoreboard(parsedInitialScoreboard || defaultScoreboard);
+  }, [parsedInitialScoreboard, defaultScoreboard]);
 
   useEffect(() => {
-    if (parseScoreboardData(initialScoreboard)) return;
+    if (initialScoreboardHasStats) return;
 
     let alive = true;
     const controller = new AbortController();
     const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
         setTScoreboard((s) => ({ ...s, loading: true }));
-        const json = await fetchEpisodeScoreboardCached({
+        let json = await fetchEpisodeScoreboardCached({
           showId,
           seasonNumber,
           episodeNumber,
           signal: controller.signal,
         });
         if (!alive) return;
+
+        const parsed = parseScoreboardData(json);
+        const hasStats = hasNumericScoreboardStats(parsed?.stats);
+
+        if (!hasStats) {
+          const statsOnly = await fetchEpisodeStatsCached({
+            showId,
+            seasonNumber,
+            episodeNumber,
+            signal: controller.signal,
+          });
+          if (!alive) return;
+
+          if (statsOnly?.found && hasNumericScoreboardStats(statsOnly?.stats)) {
+            json = {
+              ...(json || {}),
+              found: true,
+              traktUrl: json?.traktUrl || statsOnly?.traktUrl || null,
+              community: json?.community || null,
+              stats: statsOnly.stats,
+            };
+          }
+        }
 
         setTScoreboard(parseScoreboardData(json) || defaultScoreboard);
       } catch (error) {
@@ -333,8 +416,9 @@ export default function EpisodeDetailsClient({
     showId,
     seasonNumber,
     episodeNumber,
-    initialScoreboard,
+    initialScoreboardHasStats,
     parseScoreboardData,
+    hasNumericScoreboardStats,
     defaultScoreboard,
   ]);
 
@@ -1000,7 +1084,8 @@ export default function EpisodeDetailsClient({
                 </div>
               </div>
 
-              {!tScoreboard.loading && tScoreboard?.stats && (
+              {!tScoreboard.loading &&
+                hasNumericScoreboardStats(tScoreboard?.stats) && (
                 <div className="border-t border-white/5 bg-black/10">
                   <div
                     className="
