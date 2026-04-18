@@ -43,6 +43,14 @@ import {
   StaggerItem,
 } from "@/components/details/AnimatedSection";
 
+// Skeletons de carga para cada tipo de seccion (poster, tarjeta, marcador, grid)
+import {
+  PosterSkeleton,
+  CardSkeleton,
+  ScoreboardSkeleton,
+  GridSkeleton,
+} from "@/components/details/LoadingSkeleton";
+
 // -- Iconos de Lucide React usados en todo el componente --
 import {
   CalendarIcon,
@@ -261,52 +269,6 @@ function hasMeaningfulTraktSnapshot(value) {
     !!value.lastWatchedAt ||
     (Array.isArray(value.history) && value.history.length > 0)
   );
-}
-
-const TRAKT_CACHE_MAX_AGE_MS = 2 * 60 * 1000;
-
-function getCacheUpdatedAt(value) {
-  const ts = Number(value?.updatedAt || value?.cachedAt || 0);
-  return Number.isFinite(ts) && ts > 0 ? ts : 0;
-}
-
-function isFreshTraktCache(value, maxAgeMs = TRAKT_CACHE_MAX_AGE_MS) {
-  const updatedAt = getCacheUpdatedAt(value);
-  if (!updatedAt) return false;
-  return Date.now() - updatedAt <= maxAgeMs;
-}
-
-function hasWatchedEpisodesSnapshot(value) {
-  const watchedBySeason = value?.watchedBySeason;
-  if (
-    !watchedBySeason ||
-    typeof watchedBySeason !== "object" ||
-    Array.isArray(watchedBySeason)
-  ) {
-    return false;
-  }
-
-  return Object.values(watchedBySeason).some(
-    (episodes) => Array.isArray(episodes) && episodes.length > 0,
-  );
-}
-
-function shouldUseCachedTraktStatus(value, endpointType = "movie") {
-  if (!value || typeof value.connected !== "boolean") return false;
-  if (value.connected === false) return false;
-  if (endpointType === "movie") {
-    return hasMeaningfulTraktSnapshot(value);
-  }
-  return hasMeaningfulTraktSnapshot(value) || isFreshTraktCache(value);
-}
-
-function shouldUseCachedShowWatched(value) {
-  if (!value || typeof value !== "object") return false;
-  if (typeof value.connected === "boolean" && value.connected === false) {
-    return false;
-  }
-
-  return hasWatchedEpisodesSnapshot(value) || isFreshTraktCache(value);
 }
 
 function isDegradedTraktPayload(value) {
@@ -3079,7 +3041,7 @@ export default function DetailsClient({
 
   // Recarga el estado de Trakt (visto, rating, historial, watchlist) para el contenido actual
   const reloadTraktStatus = useCallback(
-    async ({ background = false } = {}) => {
+    async ({ background = false, force = false } = {}) => {
       const requestId = traktStatusRequestIdRef.current + 1;
       traktStatusRequestIdRef.current = requestId;
 
@@ -3093,6 +3055,7 @@ export default function DetailsClient({
             type: traktType,
             tmdbId: id,
             traktId: traktResolvedIdRef.current ?? undefined,
+            force,
           }),
           25000,
         );
@@ -3107,13 +3070,15 @@ export default function DetailsClient({
 
           const preserveTvWatched =
             endpointType === "tv" && watchedBySeasonLoadedRef.current;
+          // Si force=true, no preservar estado anterior para obtener datos frescos
           const preservePreviousState =
-            shouldPreservePreviousTraktStatus(normalizedJson, prev) ||
-            isPossiblyStaleEmptyMovieTraktStatus(
-              normalizedJson,
-              prev,
-              endpointType,
-            );
+            !force &&
+            (shouldPreservePreviousTraktStatus(normalizedJson, prev) ||
+              isPossiblyStaleEmptyMovieTraktStatus(
+                normalizedJson,
+                prev,
+                endpointType,
+              ));
 
           if (preservePreviousState) {
             nextState = {
@@ -3196,9 +3161,10 @@ export default function DetailsClient({
       expectedWatched = null,
       minHistoryEntries = null,
       expectedHistoryEntries = null,
+      force = false,
     } = {}) => {
       if (endpointType !== "movie") {
-        return reloadTraktStatus();
+        return reloadTraktStatus({ force });
       }
 
       const retryDelays = [0, 800, 1800, 3200];
@@ -3211,7 +3177,11 @@ export default function DetailsClient({
           );
         }
 
-        latest = await reloadTraktStatus({ background: attempt > 0 });
+        // En el primer intento, usar force si fue solicitado
+        latest = await reloadTraktStatus({
+          background: attempt > 0,
+          force: force && attempt === 0,
+        });
         const latestHistory = normalizeTraktHistoryEntries(latest?.history);
         const latestWatched =
           !!latest?.watched ||
@@ -3223,18 +3193,9 @@ export default function DetailsClient({
             : minHistoryEntries == null
               ? true
               : latestHistory.length >= minHistoryEntries;
-        const isMeaningfulMovieSnapshot =
-          !!latest?.watched ||
-          latestHistory.length > 0 ||
-          Number(latest?.plays || 0) > 0 ||
-          !!latest?.lastWatchedAt ||
-          latest?.found === false ||
-          latest?.connected === false;
 
         if (expectedWatched == null) {
-          if (hasExpectedHistory && isMeaningfulMovieSnapshot) {
-            return latest;
-          }
+          if (hasExpectedHistory) return latest;
           continue;
         }
 
@@ -3468,7 +3429,7 @@ export default function DetailsClient({
             ? JSON.parse(cachedStatusRaw)
             : null;
 
-          if (shouldUseCachedTraktStatus(cachedStatus, endpointType)) {
+          if (cachedStatus && typeof cachedStatus.connected === "boolean") {
             const normalizedCachedStatus = buildTraktStateFromHistory({
               watched: !!cachedStatus.watched,
               plays: Number(cachedStatus.plays || 0),
@@ -3510,7 +3471,6 @@ export default function DetailsClient({
           const watchedBySeasonCached = cachedWatched?.watchedBySeason;
 
           if (
-            shouldUseCachedShowWatched(cachedWatched) &&
             watchedBySeasonCached &&
             typeof watchedBySeasonCached === "object" &&
             !Array.isArray(watchedBySeasonCached)
@@ -3577,7 +3537,6 @@ export default function DetailsClient({
             found: !!trakt.found,
             traktId: trakt.traktId ?? null,
             traktUrl: trakt.traktUrl || null,
-            updatedAt: Date.now(),
             watched: !!trakt.watched,
             plays: Number(trakt.plays || 0),
             lastWatchedAt: trakt.lastWatchedAt || null,
@@ -3604,7 +3563,6 @@ export default function DetailsClient({
             connected: !!trakt.connected,
             found: !!trakt.found,
             traktId: trakt.traktId ?? null,
-            updatedAt: Date.now(),
             watchedBySeason:
               watchedBySeason && typeof watchedBySeason === "object"
                 ? watchedBySeason
@@ -3623,23 +3581,16 @@ export default function DetailsClient({
     traktShowWatchedStorageKey,
   ]);
 
-  // Recargar estado de Trakt al abrir el modal de historial
+  // Recargar estado de Trakt al abrir el modal de historial con datos frescos
   useEffect(() => {
     if (!traktWatchedOpen) return;
-    void reloadTraktStatus();
+    // Forzar recarga para obtener datos actualizados, evitando caché obsoleto
+    void reloadTraktStatus({ force: true });
   }, [traktWatchedOpen, reloadTraktStatus]);
 
   // Carga inicial del estado de Trakt para el contenido actual
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
-    if (endpointType === "movie") {
-      traktBackgroundSyncAtRef.current = Date.now();
-      void reloadTraktStatus({
-        background: hasInitialTraktStatus || hasCachedTraktStatus,
-      });
-      return;
-    }
-
     const hasTraktBootstrapData =
       hasInitialTraktStatus ||
       hasCachedTraktStatus ||
@@ -3670,13 +3621,6 @@ export default function DetailsClient({
     let cancelled = false;
     const timers = [];
     let ignoreFirstPageShow = true;
-    const shouldConfirmEmptyMovie =
-      endpointType === "movie" &&
-      trakt.connected &&
-      !trakt.watched &&
-      Number(trakt.plays || 0) === 0 &&
-      (!Array.isArray(trakt.history) || trakt.history.length === 0) &&
-      !trakt.lastWatchedAt;
     const syncNotBefore =
       Date.now() +
       (hasInitialTraktStatus ||
@@ -3691,14 +3635,16 @@ export default function DetailsClient({
       if (!force && now - traktBackgroundSyncAtRef.current < 2500) return;
       traktBackgroundSyncAtRef.current = now;
 
-      const latest = await reloadTraktStatus({ background: true });
+      // Cuando force=true, bypass caché para obtener datos frescos
+      const latest = await reloadTraktStatus({ background: true, force });
       if (cancelled || !latest?.connected || type !== "tv") return;
       await loadTraktShowWatched();
     };
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        void syncTraktState();
+        // Forzar recarga cuando el usuario vuelve a la pestaña
+        void syncTraktState({ force: true });
       }
     };
     const handlePageShow = () => {
@@ -3706,23 +3652,29 @@ export default function DetailsClient({
         ignoreFirstPageShow = false;
         return;
       }
-      void syncTraktState();
+      // Forzar recarga cuando el usuario navega de vuelta
+      void syncTraktState({ force: true });
     };
 
-    window.addEventListener("focus", syncTraktState);
+    const handleFocus = () => {
+      // Forzar recarga cuando el usuario enfoca la ventana
+      void syncTraktState({ force: true });
+    };
+
+    window.addEventListener("focus", handleFocus);
     window.addEventListener("pageshow", handlePageShow);
     document.addEventListener("visibilitychange", handleVisibility);
 
     // Si el primer intento llegó antes de que Trakt refrescara la sesión,
     // reintentamos una o dos veces sin exigir recarga manual.
-    if (shouldConfirmEmptyMovie) {
-      const timer = window.setTimeout(() => {
-        void confirmMovieTraktStatus();
-      }, 900);
-      timers.push(timer);
-    } else if (
+    if (
       trakt.loading ||
       (!trakt.connected && !trakt.error) ||
+      (endpointType === "movie" &&
+        trakt.connected &&
+        !trakt.watched &&
+        Number(trakt.plays || 0) === 0 &&
+        (!Array.isArray(trakt.history) || trakt.history.length === 0)) ||
       (endpointType === "tv" && trakt.connected && !watchedBySeasonLoaded)
     ) {
       [900, 2200].forEach((delay) => {
@@ -3736,7 +3688,7 @@ export default function DetailsClient({
     return () => {
       cancelled = true;
       timers.forEach((timer) => window.clearTimeout(timer));
-      window.removeEventListener("focus", syncTraktState);
+      window.removeEventListener("focus", handleFocus);
       window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
@@ -3752,12 +3704,10 @@ export default function DetailsClient({
     trakt.watched,
     trakt.plays,
     trakt.history,
-    trakt.lastWatchedAt,
     hasInitialTraktStatus,
     hasCachedTraktStatus,
     hasInitialShowWatched,
     hasCachedShowWatched,
-    confirmMovieTraktStatus,
   ]);
 
   const canOpenMovieTraktModalInstantly = useMemo(() => {
@@ -3778,7 +3728,7 @@ export default function DetailsClient({
 
     let connected = !!trakt.connected;
     if (!connected) {
-      const latest = await reloadTraktStatus();
+      const latest = await reloadTraktStatus({ force: true });
       connected = !!latest?.connected;
     }
 
@@ -3791,7 +3741,8 @@ export default function DetailsClient({
 
     if (endpointType === "movie") {
       setTraktWatchedOpen(true);
-      void confirmMovieTraktStatus();
+      // Forzar recarga completa para obtener datos frescos, evitando preservación de estado antiguo
+      void confirmMovieTraktStatus({ force: true });
       return;
     }
 
@@ -6823,6 +6774,13 @@ export default function DetailsClient({
       return () => clearTimeout(timer);
     }
   }, [currentLowLoaded, prevPosterPath]);
+
+  // Skeleton mientras:
+  // - no hemos “resuelto” si hay poster
+  // - o existe poster pero aún no ha cargado el low
+  const showPosterSkeleton =
+    !currentResolved ||
+    (currentImagePath && !currentLowLoaded && !currentImgError);
 
   // Icono NO IMAGE solo si ya hemos resuelto, NO hay imagen (o falló) y NO estamos esperando carga inicial en modo preview
   const showNoPoster =
