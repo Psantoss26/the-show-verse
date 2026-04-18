@@ -13,23 +13,45 @@ import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0; // No cachear nunca
 export const maxDuration = 10; // Límite máximo Vercel Hobby (s)
+
+// Helper para agregar headers de no-cache a las respuestas
+function addNoCacheHeaders(response) {
+  response.headers.set(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, max-age=0",
+  );
+  response.headers.set("Pragma", "no-cache");
+  response.headers.set("Expires", "0");
+  return response;
+}
 
 export async function GET(request) {
   const type = request.nextUrl.searchParams.get("type"); // movie | show
   const tmdbId = request.nextUrl.searchParams.get("tmdbId");
   const traktIdParam = request.nextUrl.searchParams.get("traktId");
+  const timestamp = request.nextUrl.searchParams.get("_t");
+
+  // Log para debugging en Vercel
+  console.log(
+    `[Trakt Status API] Request: type=${type}, tmdbId=${tmdbId}, _t=${timestamp}`,
+  );
 
   if (type !== "movie" && type !== "show") {
-    return NextResponse.json(
-      { error: "Invalid type. Use movie|show." },
-      { status: 400 },
+    return addNoCacheHeaders(
+      NextResponse.json(
+        { error: "Invalid type. Use movie|show." },
+        { status: 400 },
+      ),
     );
   }
   if (!tmdbId && !traktIdParam) {
-    return NextResponse.json(
-      { error: "Missing tmdbId or traktId" },
-      { status: 400 },
+    return addNoCacheHeaders(
+      NextResponse.json(
+        { error: "Missing tmdbId or traktId" },
+        { status: 400 },
+      ),
     );
   }
 
@@ -48,7 +70,7 @@ export async function GET(request) {
     if (!token) {
       const res = NextResponse.json({ connected: false });
       if (shouldClear) clearTraktCookies(res);
-      return res;
+      return addNoCacheHeaders(res);
     }
     authVerified = true;
 
@@ -67,10 +89,7 @@ export async function GET(request) {
             trakt: resolved.traktId,
             slug: resolved.slug || resolved.ids?.slug || null,
           };
-          hit =
-            type === "movie"
-              ? { movie: { ids } }
-              : { show: { ids } };
+          hit = type === "movie" ? { movie: { ids } } : { show: { ids } };
         }
       }
     } catch (searchErr) {
@@ -96,7 +115,7 @@ export async function GET(request) {
           error: searchErr?.message || "Trakt lookup failed",
         });
         if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-        return res;
+        return addNoCacheHeaders(res);
       }
 
       throw searchErr;
@@ -114,7 +133,7 @@ export async function GET(request) {
         history: [],
       });
       if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-      return res;
+      return addNoCacheHeaders(res);
     }
 
     const obj = type === "movie" ? hit.movie : hit.show;
@@ -164,13 +183,13 @@ export async function GET(request) {
     });
 
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-    return res;
+    return addNoCacheHeaders(res);
   } catch (e) {
     if (e?.status === 401) {
       const res = NextResponse.json({ connected: false }, { status: 401 });
       clearTraktCookies(res);
       if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-      return res;
+      return addNoCacheHeaders(res);
     }
 
     const transientAfterAuth =
@@ -201,6 +220,6 @@ export async function GET(request) {
     );
     // si refrescó antes de fallar, guardamos cookies igualmente
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-    return res;
+    return addNoCacheHeaders(res);
   }
 }
