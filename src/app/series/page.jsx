@@ -12,6 +12,8 @@ export const revalidate = 1800; // 30 min
 
 /* ========= Utilidad para obtener la URL base en servidor ========= */
 function getBaseUrl() {
+  if (process.env.NEXT_PUBLIC_APP_URL)
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
   if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
@@ -24,9 +26,18 @@ async function fetchTopRatedImdbTvServer() {
 
   const url = `${baseUrl}/api/imdb/top-rated?type=tv&pages=3&limit=80&minVotes=5000`;
 
-  const res = await fetch(url, {
-    next: { revalidate },
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      next: { revalidate },
+    });
+  } catch (networkErr) {
+    console.error(
+      "Error de red al llamar a /api/imdb/top-rated (tv):",
+      networkErr?.message,
+    );
+    return [];
+  }
 
   if (!res.ok) {
     console.error("Error al llamar a /api/imdb/top-rated (tv):", res.status);
