@@ -1,0 +1,48 @@
+# docker-compose.yml — The Show Verse · NAS UGREEN 192.168.1.126
+# Uso:
+#   1. Copia .env.production a .env en esta misma carpeta y rellena los valores
+#   2. docker compose up -d
+#
+# Para actualizar la app:
+#   docker compose pull app && docker compose up -d app
+
+services:
+
+  # ── Aplicación Next.js ────────────────────────────────────────────────────
+  app:
+    image: tu-usuario/the-show-verse:latest   # <-- cambia "tu-usuario" por tu usuario de Docker Hub
+    container_name: the-show-verse
+    restart: unless-stopped
+    ports:
+      - "3000:3000"          # puerto LAN: http://192.168.1.126:3000
+    env_file:
+      - .env                 # archivo con todos los secretos (no subir a Git)
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      # La URL pública que verá la app (ajusta al subdominio de Cloudflare)
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://192.168.1.126:3000}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ── Cloudflare Tunnel (acceso HTTPS desde internet sin abrir puertos) ──────
+  # Descomenta este bloque cuando tengas el token del túnel de Cloudflare
+  #
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: cloudflare-tunnel
+  #   restart: unless-stopped
+  #   command: tunnel --no-autoupdate run
+  #   environment:
+  #     TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}   # pégalo en el .env
+  #   depends_on:
+  #     app:
+  #       condition: service_healthy
+
+networks:
+  default:
+    name: showverse-net
