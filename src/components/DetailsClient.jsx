@@ -291,9 +291,12 @@ function hasWatchedEpisodesSnapshot(value) {
   );
 }
 
-function shouldUseCachedTraktStatus(value) {
+function shouldUseCachedTraktStatus(value, endpointType = "movie") {
   if (!value || typeof value.connected !== "boolean") return false;
   if (value.connected === false) return false;
+  if (endpointType === "movie") {
+    return hasMeaningfulTraktSnapshot(value);
+  }
   return hasMeaningfulTraktSnapshot(value) || isFreshTraktCache(value);
 }
 
@@ -3465,7 +3468,7 @@ export default function DetailsClient({
             ? JSON.parse(cachedStatusRaw)
             : null;
 
-          if (shouldUseCachedTraktStatus(cachedStatus)) {
+          if (shouldUseCachedTraktStatus(cachedStatus, endpointType)) {
             const normalizedCachedStatus = buildTraktStateFromHistory({
               watched: !!cachedStatus.watched,
               plays: Number(cachedStatus.plays || 0),
@@ -3629,6 +3632,14 @@ export default function DetailsClient({
   // Carga inicial del estado de Trakt para el contenido actual
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
+    if (endpointType === "movie") {
+      traktBackgroundSyncAtRef.current = Date.now();
+      void reloadTraktStatus({
+        background: hasInitialTraktStatus || hasCachedTraktStatus,
+      });
+      return;
+    }
+
     const hasTraktBootstrapData =
       hasInitialTraktStatus ||
       hasCachedTraktStatus ||
