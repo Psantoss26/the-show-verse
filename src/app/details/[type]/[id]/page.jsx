@@ -5,7 +5,7 @@ import { getDetails } from "@/lib/api/tmdb";
 import { getTraktDetailsBootstrapFromCookieStore } from "@/lib/trakt/server";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 600;
+export const revalidate = 0; // Sin caché: siempre datos frescos de Trakt
 
 function resolveWithin(promise, timeoutMs, fallback = null) {
   return Promise.race([

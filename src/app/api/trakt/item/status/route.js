@@ -13,7 +13,19 @@ import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0; // Nunca cachear
 export const maxDuration = 10; // Límite máximo Vercel Hobby (s)
+
+// Añade headers de no-cache a todas las respuestas para prevenir caché en CDN/Vercel
+function noCacheHeaders(response) {
+  response.headers.set(
+    "Cache-Control",
+    "private, no-store, no-cache, must-revalidate, max-age=0",
+  );
+  response.headers.set("Pragma", "no-cache");
+  response.headers.set("Expires", "0");
+  return response;
+}
 
 export async function GET(request) {
   const type = request.nextUrl.searchParams.get("type"); // movie | show
@@ -48,7 +60,7 @@ export async function GET(request) {
     if (!token) {
       const res = NextResponse.json({ connected: false });
       if (shouldClear) clearTraktCookies(res);
-      return res;
+      return noCacheHeaders(res);
     }
     authVerified = true;
 
@@ -67,10 +79,7 @@ export async function GET(request) {
             trakt: resolved.traktId,
             slug: resolved.slug || resolved.ids?.slug || null,
           };
-          hit =
-            type === "movie"
-              ? { movie: { ids } }
-              : { show: { ids } };
+          hit = type === "movie" ? { movie: { ids } } : { show: { ids } };
         }
       }
     } catch (searchErr) {
@@ -96,7 +105,7 @@ export async function GET(request) {
           error: searchErr?.message || "Trakt lookup failed",
         });
         if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-        return res;
+        return noCacheHeaders(res);
       }
 
       throw searchErr;
@@ -114,7 +123,7 @@ export async function GET(request) {
         history: [],
       });
       if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-      return res;
+      return noCacheHeaders(res);
     }
 
     const obj = type === "movie" ? hit.movie : hit.show;
@@ -164,13 +173,13 @@ export async function GET(request) {
     });
 
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-    return res;
+    return noCacheHeaders(res);
   } catch (e) {
     if (e?.status === 401) {
       const res = NextResponse.json({ connected: false }, { status: 401 });
       clearTraktCookies(res);
       if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-      return res;
+      return noCacheHeaders(res);
     }
 
     const transientAfterAuth =
@@ -201,6 +210,6 @@ export async function GET(request) {
     );
     // si refrescó antes de fallar, guardamos cookies igualmente
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-    return res;
+    return noCacheHeaders(res);
   }
 }

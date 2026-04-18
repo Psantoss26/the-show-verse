@@ -3600,14 +3600,16 @@ export default function DetailsClient({
     if (hasTraktBootstrapData) {
       const timer = window.setTimeout(() => {
         traktBackgroundSyncAtRef.current = Date.now();
-        void reloadTraktStatus({ background: true });
+        // force:true para ignorar caché y preservación de estado obsoleto
+        void reloadTraktStatus({ background: true, force: true });
       }, 2500);
 
       return () => window.clearTimeout(timer);
     }
 
     traktBackgroundSyncAtRef.current = Date.now();
-    void reloadTraktStatus({ background: false });
+    // force:true para obtener siempre datos frescos de Trakt en la carga inicial
+    void reloadTraktStatus({ background: false, force: true });
   }, [
     reloadTraktStatus,
     endpointType,
