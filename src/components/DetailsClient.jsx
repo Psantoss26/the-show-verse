@@ -310,14 +310,21 @@ function buildTraktStateFromHistory(value) {
   const historyCount = history.length;
   const hasHistory = historyCount > 0;
   const basePlays = Math.max(0, Number(value?.plays || 0));
+  const nextPlays = hasHistory ? Math.max(basePlays, historyCount) : basePlays;
+  const nextLastWatchedAt =
+    hasHistory
+      ? history[0]?.watched_at || null
+      : nextPlays > 0
+        ? value?.lastWatchedAt || null
+        : null;
+  const nextWatched = hasHistory || nextPlays > 0;
 
   return {
     ...value,
     history,
-    watched: hasHistory ? true : !!value?.watched,
-    plays: hasHistory ? Math.max(basePlays, historyCount) : basePlays,
-    lastWatchedAt:
-      (hasHistory ? history[0]?.watched_at : null) || value?.lastWatchedAt || null,
+    watched: nextWatched,
+    plays: nextPlays,
+    lastWatchedAt: nextLastWatchedAt,
   };
 }
 
@@ -3142,12 +3149,16 @@ export default function DetailsClient({
   );
 
   const confirmMovieTraktStatus = useCallback(
-    async ({ expectedWatched = null, minHistoryEntries = null } = {}) => {
+    async ({
+      expectedWatched = null,
+      minHistoryEntries = null,
+      expectedHistoryEntries = null,
+    } = {}) => {
       if (endpointType !== "movie") {
         return reloadTraktStatus();
       }
 
-      const retryDelays = [0, 800, 1800];
+      const retryDelays = [0, 800, 1800, 3200];
       let latest = null;
 
       for (let attempt = 0; attempt < retryDelays.length; attempt++) {
@@ -3164,7 +3175,11 @@ export default function DetailsClient({
           latestHistory.length > 0 ||
           Number(latest?.plays || 0) > 0;
         const hasExpectedHistory =
-          minHistoryEntries == null || latestHistory.length >= minHistoryEntries;
+          expectedHistoryEntries != null
+            ? latestHistory.length === expectedHistoryEntries
+            : minHistoryEntries == null
+              ? true
+              : latestHistory.length >= minHistoryEntries;
 
         if (expectedWatched == null) {
           if (hasExpectedHistory) return latest;
@@ -3919,13 +3934,13 @@ export default function DetailsClient({
           ...prev,
           watched: next,
           lastWatchedAt: next ? new Date().toISOString() : null,
-          plays: next ? Math.max(1, prev.plays || 0) : 0,
+          plays: next ? optimisticHistory.length : 0,
           history: optimisticHistory,
         });
       });
       await confirmMovieTraktStatus({
         expectedWatched: next,
-        minHistoryEntries: next ? 1 : 0,
+        expectedHistoryEntries: next ? 1 : 0,
       });
     } finally {
       setTraktBusy("");
@@ -3952,7 +3967,7 @@ export default function DetailsClient({
         buildTraktStateFromHistory({
           ...prev,
           watched: true,
-          plays: Math.max(1, Number(prev.plays || 0) + 1),
+          plays: prevHistoryLength + 1,
           lastWatchedAt: optimisticIso,
           history: [
             {
@@ -3965,7 +3980,7 @@ export default function DetailsClient({
       );
       await confirmMovieTraktStatus({
         expectedWatched: true,
-        minHistoryEntries: prevHistoryLength + 1,
+        expectedHistoryEntries: prevHistoryLength + 1,
       });
     } finally {
       setTraktBusy("");
@@ -3978,6 +3993,7 @@ export default function DetailsClient({
     setTraktBusy("history");
     try {
       const optimisticIso = `${yyyyMmDd}T12:00:00.000Z`;
+      const prevHistoryLength = normalizeTraktHistoryEntries(trakt.history).length;
       await traktUpdateWatchPlay({
         type: traktType,
         tmdbId: id,
@@ -3991,6 +4007,7 @@ export default function DetailsClient({
       setTrakt((prev) =>
         buildTraktStateFromHistory({
           ...prev,
+          plays: prevHistoryLength,
           history: normalizeTraktHistoryEntries(prev.history).map((entry) =>
             String(entry.id) === String(historyId)
               ? {
@@ -4004,10 +4021,7 @@ export default function DetailsClient({
       );
       await confirmMovieTraktStatus({
         expectedWatched: true,
-        minHistoryEntries: Math.max(
-          1,
-          normalizeTraktHistoryEntries(trakt.history).length,
-        ),
+        expectedHistoryEntries: Math.max(1, prevHistoryLength),
       });
     } finally {
       setTraktBusy("");
@@ -4020,6 +4034,7 @@ export default function DetailsClient({
     setTraktBusy("history");
     try {
       const prevHistoryLength = normalizeTraktHistoryEntries(trakt.history).length;
+      const expectedHistoryLength = Math.max(0, prevHistoryLength - 1);
       await traktRemoveWatchPlay({ historyId });
       invalidateTraktGetCache({
         tmdbId: id,
@@ -4028,15 +4043,15 @@ export default function DetailsClient({
       setTrakt((prev) =>
         buildTraktStateFromHistory({
           ...prev,
+          plays: expectedHistoryLength,
           history: normalizeTraktHistoryEntries(prev.history).filter(
             (entry) => String(entry.id) !== String(historyId),
           ),
         }),
       );
-      const expectedHistoryLength = Math.max(0, prevHistoryLength - 1);
       await confirmMovieTraktStatus({
         expectedWatched: expectedHistoryLength > 0,
-        minHistoryEntries: expectedHistoryLength,
+        expectedHistoryEntries: expectedHistoryLength,
       });
     } finally {
       setTraktBusy("");
