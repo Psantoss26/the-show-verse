@@ -12,6 +12,43 @@ let traktAuthBootstrapAt = 0;
 let traktAuthBootstrapValue = null;
 const inFlightGetRequests = new Map();
 
+function matchQueryValue(urlString, key, expected) {
+  if (expected == null) return false;
+  try {
+    const url = new URL(urlString, "http://localhost");
+    return url.searchParams.get(key) === String(expected);
+  } catch {
+    return false;
+  }
+}
+
+export function invalidateTraktGetCache({
+  tmdbId,
+  traktId,
+  includeAuth = false,
+} = {}) {
+  for (const key of Array.from(inFlightGetRequests.keys())) {
+    const matchesItemStatus =
+      key.startsWith("/api/trakt/item/status?") &&
+      (matchQueryValue(key, "tmdbId", tmdbId) ||
+        matchQueryValue(key, "traktId", traktId));
+    const matchesShowWatched =
+      key.startsWith("/api/trakt/show/watched?") &&
+      (matchQueryValue(key, "tmdbId", tmdbId) ||
+        matchQueryValue(key, "traktId", traktId));
+
+    if (matchesItemStatus || matchesShowWatched) {
+      inFlightGetRequests.delete(key);
+    }
+  }
+
+  if (includeAuth) {
+    traktAuthBootstrapPromise = null;
+    traktAuthBootstrapAt = 0;
+    traktAuthBootstrapValue = null;
+  }
+}
+
 async function fetchGetJsonDeduped(
   url,
   { credentials = "include", cache = "no-store" } = {},
@@ -314,6 +351,29 @@ export async function traktSetEpisodeWatched({
   if (!res.ok)
     throw new Error(json?.error || `Trakt episode watched HTTP ${res.status}`);
   return json; // { watchedBySeason }
+}
+
+export async function traktSetSeasonWatched({
+  tmdbId,
+  season,
+  watched,
+  watchedAt,
+}) {
+  const watchedAtYmd = normalizeWatchedAtForApi(watchedAt);
+
+  const payload = { tmdbId, season, watched };
+  if (watchedAtYmd) payload.watchedAt = watchedAtYmd;
+
+  const res = await fetch("/api/trakt/season/watched", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await safeJson(res);
+  if (!res.ok)
+    throw new Error(json?.error || `Trakt season watched HTTP ${res.status}`);
+  return json;
 }
 
 // ✅ COMMUNITY: comentarios, listas, temporadas

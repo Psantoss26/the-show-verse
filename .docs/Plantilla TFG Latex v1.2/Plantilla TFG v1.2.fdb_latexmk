@@ -1,12 +1,12 @@
 # Fdb version 4
-["biber Plantilla TFG v1.2"] 1776502343.38856 "Plantilla TFG v1.2.bcf" "Plantilla TFG v1.2.bbl" "Plantilla TFG v1.2" 1776502357.41128 0
-  "Plantilla TFG v1.2.bcf" 1776502356 134336 d00308eeb3e6ca8ed0738830cbc4ab19 "pdflatex"
+["biber Plantilla TFG v1.2"] 1776502343.38856 "Plantilla TFG v1.2.bcf" "Plantilla TFG v1.2.bbl" "Plantilla TFG v1.2" 1776503278.3457 0
+  "Plantilla TFG v1.2.bcf" 1776503277 134336 d00308eeb3e6ca8ed0738830cbc4ab19 "pdflatex"
   "biblio.bib" 1776500569 4205 450d5386d6eb204b7cc4635ac8c425a4 ""
   (generated)
   "Plantilla TFG v1.2.bbl"
   "Plantilla TFG v1.2.blg"
   (rewritten before read)
-["pdflatex"] 1776502353.73756 "Plantilla TFG v1.2.tex" "Plantilla TFG v1.2.pdf" "Plantilla TFG v1.2" 1776502357.41208 0
+["pdflatex"] 1776503274.47598 "Plantilla TFG v1.2.tex" "Plantilla TFG v1.2.pdf" "Plantilla TFG v1.2" 1776503278.34681 0
   "../notes/.images/biblioteca.jpg" 1776500569 477571 1d8e4eb83ff73ed3e7aba1a8805e3679 ""
   "../notes/.images/botonesaccion.jpg" 1776500569 8661 998c4e65a91301be02bda172d93a1b62 ""
   "../notes/.images/calendario.jpg" 1776500569 503174 fc2f8c8d087a6884801dc2696f9e464d ""
@@ -211,20 +211,20 @@
   "C:/Users/pablo/AppData/Local/Programs/MiKTeX/tex/latex/wasysym/wasysym.sty" 1579693002 11252 7fbfbe7bbcbe1f73acbe32ae2f10c666 ""
   "C:/Users/pablo/AppData/Local/Programs/MiKTeX/tex/latex/xstring/xstring.sty" 1693735632 123 a302f2c651a95033260db60e51527ae8 ""
   "LogoUCJC.png" 1776500569 40164 b272e52b7ad6d11519399042b799e411 ""
-  "Plantilla TFG v1.2.aux" 1776502356 31623 3ac1ebba89b0f27fb6beb218914ba598 "pdflatex"
+  "Plantilla TFG v1.2.aux" 1776503277 31623 3ac1ebba89b0f27fb6beb218914ba598 "pdflatex"
   "Plantilla TFG v1.2.bbl" 1776502345 16463 99215d3e587a7b3e157c46d061461c5c "biber Plantilla TFG v1.2"
-  "Plantilla TFG v1.2.lof" 1776502356 3711 646854877ff873bcb1fdf35b07863161 "pdflatex"
-  "Plantilla TFG v1.2.lot" 1776502356 1197 8bdbf9b9798581069e9b1818fea3bf40 "pdflatex"
-  "Plantilla TFG v1.2.out" 1776502356 29858 989342627a1a0b77ca2533a8afd4ff80 "pdflatex"
-  "Plantilla TFG v1.2.run.xml" 1776502356 2467 f2452d2e94df24f61cdcdf3707e00b79 "pdflatex"
+  "Plantilla TFG v1.2.lof" 1776503277 3711 646854877ff873bcb1fdf35b07863161 "pdflatex"
+  "Plantilla TFG v1.2.lot" 1776503277 1197 8bdbf9b9798581069e9b1818fea3bf40 "pdflatex"
+  "Plantilla TFG v1.2.out" 1776503277 29858 989342627a1a0b77ca2533a8afd4ff80 "pdflatex"
+  "Plantilla TFG v1.2.run.xml" 1776503277 2467 f2452d2e94df24f61cdcdf3707e00b79 "pdflatex"
   "Plantilla TFG v1.2.tex" 1776500569 7078 03da6c6ab3c9ea397bc549550d9c6135 ""
-  "Plantilla TFG v1.2.toc" 1776502356 13853 51badde6f9698d703e6a795e66faa47e "pdflatex"
+  "Plantilla TFG v1.2.toc" 1776503277 13853 51badde6f9698d703e6a795e66faa47e "pdflatex"
   "U-tad-logo-azul.pdf" 1776500569 78222 713fd0be62da9454a6ffe104592e6a47 ""
   "abstract.tex" 1776500569 2142 f9101f78404adf8c2165f5029aec562b ""
   "anexo.tex" 1776500569 2344 cc7cc480df995678db476617a52f132f ""
   "aspectos.tex" 1776500569 11746 102c1e9e074b9d38314fe5f654800207 ""
   "conclusiones.tex" 1776500569 13607 f9dd3dddce479fde6916371686f62612 ""
-  "desarrollo.tex" 1776502352 128349 8f6c38a4eaa3e5f4cd935cf81920f30a ""
+  "desarrollo.tex" 1776503238 128349 8f6c38a4eaa3e5f4cd935cf81920f30a ""
   "estado.tex" 1776500569 10225 1d9c4ceb37a1bdd7f15cc9890e261624 ""
   "glosario.tex" 1776500569 2065 7c723e3b91d3e6a99e7ab5438d3cfc40 ""
   "introduccion.tex" 1776500569 11925 3a02c9e40daadfe428315285f89ed24a ""

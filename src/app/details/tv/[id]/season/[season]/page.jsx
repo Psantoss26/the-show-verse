@@ -1,5 +1,9 @@
 // src/app/details/tv/[id]/season/[season]/page.jsx
+import { cookies } from "next/headers";
 import SeasonDetailsClient from "@/components/SeasonDetailsClient";
+import { getCachedSeasonImdbData } from "@/lib/api/ratingsCached";
+import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
+import { getTraktShowWatchedFromCookieStore } from "@/lib/trakt/server";
 
 export const revalidate = 3600; // 1h
 
@@ -13,6 +17,15 @@ async function tmdbFetch(path) {
   if (!res.ok)
     throw new Error(json?.status_message || `TMDb error ${res.status}`);
   return json;
+}
+
+function resolveWithin(promise, timeoutMs, fallback = null) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(fallback), timeoutMs);
+    }),
+  ]);
 }
 
 export default async function SeasonPage({ params }) {
@@ -37,6 +50,38 @@ export default async function SeasonPage({ params }) {
   const [show, season] = await Promise.all([showPromise, seasonPromise]);
 
   const showImdbId = show?.external_ids?.imdb_id || null;
+  const cookieStore = await cookies();
+  const [initialScoreboard, initialShowWatched, initialImdb] =
+    await Promise.all([
+      resolveWithin(
+        getCachedTraktScoreboardData({
+          type: "season",
+          tmdbId: showId,
+          season: seasonNumber,
+          includeStats: false,
+        }).catch(() => null),
+        1200,
+        null,
+      ),
+      resolveWithin(
+        getTraktShowWatchedFromCookieStore(cookieStore, {
+          tmdbId: showId,
+        }).catch(() => null),
+        950,
+        null,
+      ),
+      showImdbId
+        ? resolveWithin(
+            getCachedSeasonImdbData({
+              showId,
+              imdbId: showImdbId,
+              seasonNumber,
+            }).catch(() => null),
+            1200,
+            null,
+          )
+        : Promise.resolve(null),
+    ]);
 
   const imdbUrl = showImdbId
     ? `https://www.imdb.com/title/${showImdbId}/episodes?season=${seasonNumber}`
@@ -49,8 +94,9 @@ export default async function SeasonPage({ params }) {
       show={show}
       season={season}
       showImdbId={showImdbId}
-      initialScoreboard={null}
-      imdb={null}
+      initialScoreboard={initialScoreboard}
+      initialShowWatched={initialShowWatched}
+      imdb={initialImdb}
       imdbUrl={imdbUrl}
     />
   );
