@@ -14,6 +14,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
 
+function resolveWithin(promise, timeoutMs, fallback = null) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(fallback), timeoutMs);
+    }),
+  ]);
+}
+
 export async function GET(request) {
   const tmdbId = request.nextUrl.searchParams.get("tmdbId");
   const traktIdParam = request.nextUrl.searchParams.get("traktId");
@@ -31,7 +40,22 @@ export async function GET(request) {
   let authVerified = false;
 
   try {
-    const t = await getValidTraktToken(cookieStore);
+    const [tokenResult, resolvedResult] = await Promise.all([
+      getValidTraktToken(cookieStore),
+      traktIdParam
+        ? Promise.resolve({
+            traktId: String(traktIdParam),
+            ids: { trakt: String(traktIdParam) },
+            slug: null,
+          })
+        : resolveWithin(
+            resolveTraktEntityFromTmdb({ type: "movie", tmdbId }),
+            2500,
+            "TRAKT_RESOLVE_TIMEOUT",
+          ),
+    ]);
+
+    const t = tokenResult;
     token = t.token;
     refreshedTokens = t.refreshedTokens;
     shouldClear = t.shouldClear;
@@ -51,15 +75,23 @@ export async function GET(request) {
     authVerified = true;
 
     let resolved = null;
-    if (traktIdParam) {
-      resolved = {
-        traktId: String(traktIdParam),
-        ids: { trakt: String(traktIdParam) },
-        slug: null,
-      };
-    } else {
-      resolved = await resolveTraktEntityFromTmdb({ type: "movie", tmdbId });
+    if (resolvedResult === "TRAKT_RESOLVE_TIMEOUT") {
+      const res = NextResponse.json({
+        connected: true,
+        found: false,
+        traktId: null,
+        traktUrl: null,
+        watched: false,
+        plays: 0,
+        lastWatchedAt: null,
+        history: [],
+        degraded: true,
+        error: "Trakt movie resolve timeout",
+      });
+      if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+      return res;
     }
+    resolved = resolvedResult;
 
     const traktId = resolved?.traktId || null;
     if (!traktId) {
@@ -91,7 +123,7 @@ export async function GET(request) {
       type: "movie",
       traktId,
       limit: 10,
-      timeoutMs: 7000,
+      timeoutMs: 3500,
     });
     const summary = computeHistorySummary({
       searchHit: hit,

@@ -3726,13 +3726,13 @@ export default function DetailsClient({
       traktBackgroundSyncAtRef.current = Date.now();
       void loadTraktMovieWatched({
         background: hasMovieBootstrapData,
-        force: true,
+        force: false,
       });
 
       const fallbackTimer = window.setTimeout(() => {
         void loadTraktMovieWatched({
           background: true,
-          force: true,
+          force: false,
         });
       }, 1400);
 
@@ -3831,16 +3831,11 @@ export default function DetailsClient({
     if (
       trakt.loading ||
       (!trakt.connected && !trakt.error) ||
-      (endpointType === "movie" &&
-        trakt.connected &&
-        !trakt.watched &&
-        Number(trakt.plays || 0) === 0 &&
-        (!Array.isArray(trakt.history) || trakt.history.length === 0)) ||
       (endpointType === "tv" && trakt.connected && !watchedBySeasonLoaded)
     ) {
       [900, 2200].forEach((delay) => {
         const timer = window.setTimeout(() => {
-          void syncTraktState({ force: true });
+          void syncTraktState({ force: endpointType !== "movie" });
         }, delay);
         timers.push(timer);
       });
