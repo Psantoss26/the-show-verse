@@ -1,0 +1,42 @@
+name: Deploy to NAS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # permite disparar manualmente desde GitHub UI
+
+jobs:
+  deploy:
+    # Corre en el runner self-hosted que vive en el NAS
+    runs-on: [self-hosted, nas-showverse]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Sincronizar archivos al directorio de la app
+        run: |
+          which rsync || apt-get install -y rsync -qq
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='.env*' \
+            --exclude='*.log' \
+            "$GITHUB_WORKSPACE/" /nas-deploy/app/
+          echo "✓ Archivos sincronizados"
+
+      - name: Build imagen Docker
+        run: |
+          docker compose -f /nas-deploy/docker-compose.yml build \
+            --build-arg NEXT_PUBLIC_APP_URL=https://theshowverse.com \
+            --build-arg NEXT_PUBLIC_TMDB_API_KEY=934b1e031967a214521ca1a5426baa2b \
+            --build-arg NEXT_PUBLIC_TRAKT_CLIENT_ID=ea0db95eaadde224ab6e87c24ace932cdb0e8ffd9d7882ccc995a47584caaafe \
+            2>&1
+          echo "✓ Build completado"
+
+      - name: Reiniciar contenedor
+        run: |
+          docker compose -f /nas-deploy/docker-compose.yml up -d app
+          echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"
