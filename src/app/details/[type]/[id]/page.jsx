@@ -2,10 +2,10 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
-import { getTraktDetailsBootstrapFromCookieStore } from "@/lib/trakt/server";
+import { getTraktMovieWatchedFromCookieStore } from "@/lib/trakt/server";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0; // Sin caché: siempre datos frescos de Trakt
+export const revalidate = 600;
 
 function resolveWithin(promise, timeoutMs, fallback = null) {
   return Promise.race([
@@ -30,11 +30,10 @@ export default async function DetailsPage({ params }) {
       ? (async () => {
           const cookieStore = await cookies();
           return resolveWithin(
-            getTraktDetailsBootstrapFromCookieStore(cookieStore, {
-              type: "movie",
+            getTraktMovieWatchedFromCookieStore(cookieStore, {
               tmdbId: id,
             }).catch(() => null),
-            950,
+            1400,
             null,
           );
         })()
@@ -63,7 +62,7 @@ export default async function DetailsPage({ params }) {
       type={type}
       id={id}
       data={data}
-      initialTraktStatus={traktBootstrap?.status ?? null}
+      initialTraktStatus={traktBootstrap ?? null}
       initialCastData={initialCastData}
       initialReviews={initialReviews}
     />

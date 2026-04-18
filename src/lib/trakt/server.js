@@ -766,6 +766,119 @@ export async function getTraktDetailsBootstrapFromCookieStore(
   }
 }
 
+export async function getTraktMovieWatchedFromCookieStore(
+  cookieStore,
+  { tmdbId },
+) {
+  if (!tmdbId) {
+    return emptyBootstrapStatus({
+      connected: false,
+      error: "Missing tmdbId",
+    });
+  }
+
+  let authVerified = false;
+
+  const [tokenResult, resolvedResult] = await Promise.allSettled([
+    getValidTraktToken(cookieStore),
+    resolveTraktEntityFromTmdb({ type: "movie", tmdbId }),
+  ]);
+
+  try {
+    if (tokenResult.status !== "fulfilled") {
+      throw tokenResult.reason;
+    }
+
+    const { token } = tokenResult.value;
+    if (!token) {
+      return emptyBootstrapStatus();
+    }
+    authVerified = true;
+
+    let resolved = null;
+    if (resolvedResult.status === "fulfilled") {
+      resolved = resolvedResult.value;
+    } else {
+      const searchErr = resolvedResult.reason;
+      const isTransient =
+        searchErr?.status === 403 ||
+        searchErr?.status === 429 ||
+        (typeof searchErr?.status === "number" && searchErr.status >= 500) ||
+        /timeout|tempor|aborted|fetch/i.test(searchErr?.message || "");
+
+      if (isTransient) {
+        return emptyBootstrapStatus({
+          connected: true,
+          error: searchErr?.message || "Trakt movie lookup failed",
+        });
+      }
+
+      throw searchErr;
+    }
+
+    if (!resolved?.traktId) {
+      return emptyBootstrapStatus({ connected: true });
+    }
+
+    const traktId = resolved.traktId || null;
+    const slug = resolved.slug || null;
+    const traktUrl = slug ? `https://trakt.tv/movies/${slug}` : null;
+    const hit = {
+      movie: {
+        ids: {
+          ...(resolved.ids || {}),
+          trakt: traktId,
+          slug: slug || resolved.ids?.slug || null,
+        },
+      },
+    };
+
+    const history = await traktGetHistoryForItem(token, {
+      type: "movie",
+      traktId,
+      limit: 10,
+      timeoutMs: 6500,
+    });
+    const summary = computeHistorySummary({
+      searchHit: hit,
+      history,
+      type: "movie",
+    });
+
+    return emptyBootstrapStatus({
+      connected: true,
+      ...summary,
+      traktId,
+      traktUrl,
+      history: mapHistoryEntries(history),
+    });
+  } catch (e) {
+    if (e?.status === 401) {
+      return emptyBootstrapStatus({
+        connected: false,
+        error: e?.message || "Trakt movie watched failed",
+      });
+    }
+
+    const transientAfterAuth =
+      authVerified &&
+      (e?.status === 403 ||
+        e?.status === 429 ||
+        (typeof e?.status === "number" && e.status >= 500) ||
+        /timeout|tempor|aborted|fetch/i.test(e?.message || ""));
+
+    return transientAfterAuth
+      ? emptyBootstrapStatus({
+          connected: true,
+          error: e?.message || "Trakt movie watched failed",
+        })
+      : emptyBootstrapStatus({
+          connected: false,
+          error: e?.message || "Trakt movie watched failed",
+        });
+  }
+}
+
 /* ===========================
    ✅ FECHAS: arregla el bug
    - Acepta "YYYY-MM-DD"

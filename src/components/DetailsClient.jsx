@@ -3720,15 +3720,31 @@ export default function DetailsClient({
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
     if (endpointType === "movie") {
+      const hasMovieBootstrapData =
+        hasInitialTraktStatus || hasCachedTraktStatus;
+
+      if (hasMovieBootstrapData) {
+        const timer = window.setTimeout(() => {
+          traktBackgroundSyncAtRef.current = Date.now();
+          void loadTraktMovieWatched({
+            background: true,
+            force: true,
+          });
+          void reloadTraktStatus({ background: true });
+        }, 1200);
+
+        return () => window.clearTimeout(timer);
+      }
+
       traktBackgroundSyncAtRef.current = Date.now();
       void loadTraktMovieWatched({
-        background: hasInitialTraktStatus || hasCachedTraktStatus,
+        background: false,
         force: true,
       });
 
       const timer = window.setTimeout(() => {
         void reloadTraktStatus({ background: true });
-      }, 300);
+      }, 250);
 
       return () => window.clearTimeout(timer);
     }
