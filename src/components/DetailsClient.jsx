@@ -3723,30 +3723,27 @@ export default function DetailsClient({
       const hasMovieBootstrapData =
         hasInitialTraktStatus || hasCachedTraktStatus;
 
-      if (hasMovieBootstrapData) {
-        const timer = window.setTimeout(() => {
-          traktBackgroundSyncAtRef.current = Date.now();
-          void loadTraktMovieWatched({
-            background: true,
-            force: true,
-          });
-          void reloadTraktStatus({ background: true });
-        }, 1200);
-
-        return () => window.clearTimeout(timer);
-      }
-
       traktBackgroundSyncAtRef.current = Date.now();
       void loadTraktMovieWatched({
-        background: false,
+        background: hasMovieBootstrapData,
         force: true,
       });
 
-      const timer = window.setTimeout(() => {
-        void reloadTraktStatus({ background: true });
-      }, 250);
+      const fallbackTimer = window.setTimeout(() => {
+        void loadTraktMovieWatched({
+          background: true,
+          force: true,
+        });
+      }, 1400);
 
-      return () => window.clearTimeout(timer);
+      const statusTimer = window.setTimeout(() => {
+        void reloadTraktStatus({ background: true });
+      }, 1800);
+
+      return () => {
+        window.clearTimeout(fallbackTimer);
+        window.clearTimeout(statusTimer);
+      };
     }
 
     const hasTraktBootstrapData =
