@@ -28,32 +28,67 @@ Las APIs utilizadas en este proyecto siguen el estilo REST con las siguientes es
 
 \subsection{Rendimiento web}
 
-El rendimiento de \textit{The Show Verse} se basa en una estrategia aplicada en código en tres niveles. Primero, en la capa de renderizado, las rutas de detalle de temporada y episodio usan \textit{Incremental Static Regeneration} con \texttt{revalidate=3600}, lo que permite servir contenido inicial rápido desde infraestructura de Vercel sin renunciar a la actualización periódica de datos. Segundo, en la capa de datos, los \textit{endpoints} de \textit{scoreboard} incorporan caché de servidor con \texttt{unstable\_cache} (30 minutos) y cabeceras \texttt{Cache-Control} con \texttt{s-maxage} y \texttt{stale-while-revalidate}, reduciendo peticiones repetidas a Trakt y estabilizando la latencia cuando hay picos de tráfico o límites de cuota.
+El rendimiento de \textit{The Show Verse} se plantea de forma global, no solo para una vista concreta. La aplicación combina páginas con alta densidad de información, por lo que la estrategia prioriza mantener tiempos de respuesta estables cuando aumentan simultáneamente el número de elementos en pantalla y el volumen de llamadas a APIs.
 
-Tercero, en cliente se implementan cachés en memoria y deduplicación de peticiones en vuelo (\texttt{Map} de resultados e \textit{inflight requests}) para evitar recálculos y llamadas duplicadas al navegar entre vistas. Además, se combinan \texttt{AbortController}, \textit{timeouts} y carga diferida tras primer render para que las consultas secundarias no bloqueen la interacción principal ni degraden la percepción de fluidez. Este enfoque se alinea con las métricas monitorizadas en Vercel (\textit{Core Web Vitals}) y con los resultados de producción ya obtenidos en Lighthouse: \textit{Performance} 92/100, LCP de 1,8 s, CLS de 0,05 y FID de 45 ms, valores dentro de los umbrales recomendados para una experiencia web rápida y estable.
+En la capa de renderizado se adopta un enfoque híbrido de SSR/ISR según la criticidad y frecuencia de cambio de los datos. Las vistas principales se sirven con el contenido inicial desde el servidor y revalidación periódica, mientras que los bloques secundarios se cargan de forma diferida en el cliente para no penalizar el primer renderizado. En paralelo, la agregación de datos se resuelve con \texttt{Promise.all} y límites de tiempo acotados, evitando que una dependencia externa lenta bloquee la página completa.
+
+Este criterio se aplica tanto en los dashboards y la página de detalle como en las pantallas con listados extensos del usuario. En módulos como Historial, Favoritos, Pendientes y En progreso, la interfaz mantiene la fluidez mediante la combinación de filtrado y ordenación en cliente con cálculos memorizados, cachés de apoyo para puntuaciones e imágenes y reutilización de resultados cuando el usuario cambia entre modos de vista o vuelve a una sección ya consultada. Así se reduce trabajo repetido de renderizado y se evita recargar información ya resuelta.
+
+Como criterio general, el proyecto guarda temporalmente información en varios niveles (servidor, API y navegador) para evitar repetir la misma consulta muchas veces en poco tiempo. Además, cuando varios componentes piden el mismo dato a la vez, la aplicación intenta resolverlo con una sola petición y reutilizar el resultado. En la práctica, esto reduce carga innecesaria sobre servicios externos con límites de uso, mejora la estabilidad cuando hay más tráfico y mantiene una navegación fluida en páginas con muchos elementos.
 
 \subsection{Diseño de interfaz}
 
-El diseño de \textit{The Show Verse} se basa en el uso de los \textit{backdrops} y \textit{posters} obtenidos de TMDb y el desarrollo de componentes visuales propios como elementos principales de la interfaz.
+El diseño de interfaz de \textit{The Show Verse} utiliza un tema oscuro general para destacar los carteles (\textit{posters}) y fondos (\textit{backdrops}) del contenido teniendo como referencia las plataformas de \textit{streaming} actuales.
 
-\textbf{Modo oscuro y backdrops de fondo.} El color de base de la aplicación es el negro (\texttt{\#000000}) y las páginas de detalle cuentan con las imágenes de fondo que se despliegan a pantalla completa con un gradiente en los bordes y los elementos superpuestos utilizan un fondo semi-transparente con desenfoque.
+\textbf{Vistas personalizadas.} 
+Las principales secciones de la aplicación ofrecen múltiples modos de visualización: cuadrícula (\textit{grid}), lista (\textit{list}) o vista compacta (\textit{compact}). La elección del usuario se almacena en el navegador mediante \textit{localStorage} para mantener la preferencia en futuras visitas. Además, el Historial incluye una vista específica de calendario y la sección En progreso incorpora una vista de tarjetas con barras de porcentaje para mostrar el avance de las series.
 
-\textbf{Sistemas de visualización y densidad de información.} La interfaz incorpora diferentes tipos de vista: \textit{Grid} para exploración visual rápida basada en portadas, \textit{List} para consulta equilibrada de metadatos y \textit{Compact} para navegación intensiva con mayor densidad de elementos por pantalla. Esta diferenciación permite que el usuario elija entre contexto visual, detalle informativo o eficiencia de escaneo, según el momento de uso.
+\textbf{Diseño responsive.} 
+La interfaz se adapta al dispositivo del usuario. En la versión de escritorio, se utilizan efectos de animación al pasar el cursor (\textit{hover}) por las tarjetas para desplegar menús e información. En dispositivos móviles, estos efectos se desactivan y se sustituyen por toques directos en botones adaptados a pantallas táctiles evitando problemas de navegación.
 
-\textbf{Interacciones de \textit{hover} y realimentación visual.} En dispositivos con puntero, los estados \textit{hover} se utilizan para comunicar interactividad sin sobrecargar la interfaz: elevación suave de tarjetas, cambios controlados de contraste, resaltado de acciones primarias y aparición progresiva de controles secundarios (por ejemplo, acceso a detalle o acciones rápidas). Estas microinteracciones reducen ambigüedad, mejoran la descubribilidad de funciones y aportan sensación de respuesta inmediata.
+\textbf{Componentes propios.} 
+Para evitar depender de librerías genéricas y mantener una identidad visual coherente, se han desarrollado componentes personalizados:
+\begin{itemize}
+    \item \texttt{LiquidButton}: Botones de acción principales con diseño fluido y animado.
+    \item \texttt{StarRating}: Sistema de valoración para el usuario.
+    \item \texttt{DetailsSectionMenu}: Menú dinámico para organizar y navegar por las secciones dentro de la página de detalles de una película o serie.
+    \item \texttt{ScoreboardBar}: Componente unificado que muestra las puntuaciones de las distintas plataformas externas así como los enlaces externos y una serie de estadísticas adicionales.
+    \item \texttt{TraktWatchedModal} y \texttt{TraktEpisodesWatchedModal}: Ventanas emergentes propias para registrar directamente el visionado de películas y episodios de series en Trakt para cada usuario.
+\end{itemize}
 
-\textbf{Animaciones de entrada y transiciones.} Las animaciones se gestionan mediante Framer Motion \parencite{Framer:2024}, usando \texttt{AnimatePresence} para la entrada y salida de componentes. Se priorizan transiciones cortas y consistentes para reforzar la continuidad entre vistas, evitando efectos decorativos que penalicen legibilidad o rendimiento. Para listas largas (más de 30 elementos), el retraso entre tarjetas se reduce automáticamente para mantener una percepción de fluidez homogénea.
-
-\textbf{Adaptación \textit{responsive} y consistencia entre dispositivos.} El diseño mantiene una jerarquía visual estable entre escritorio y móvil: en pantallas amplias se favorece la comparación simultánea de bloques, mientras que en móvil se prioriza la lectura secuencial y la accesibilidad táctil. De este modo, los mismos patrones de navegación, feedback visual y organización de contenido se preservan en distintos tamaños de pantalla, reduciendo la curva de aprendizaje de la aplicación.
+\textbf{Transiciones.} 
+Se emplea la librería \textit{Framer Motion} para animar la interfaz al aplicar filtros, cambiar de vista o desplegar información lo que evita cambios de pantalla bruscos y mejora la experiencia de usuario.
 
 \section{Trabajos relacionados}
 
-\textbf{Letterboxd} \parencite{Letterboxd:2024} (fundado en 2011, Auckland, Nueva Zelanda) es la plataforma de referencia para el registro y la crítica cinematográfica personal. Con más de 20 millones de usuarios registrados en 2024, su principal fortaleza es la componente social y el sistema de reseñas. Su limitación más significativa para los propósitos de este trabajo es la ausencia de soporte para el seguimiento de series de televisión por episodio.
+\textbf{Letterboxd} (fundado en 2011, Auckland, Nueva Zelanda) es la plataforma de referencia para el registro y la crítica cinematográfica personal. Con más de 20 millones de usuarios registrados en 2024, su principal fortaleza es la componente social y el sistema de reseñas. Su limitación más significativa para los propósitos de este trabajo es la ausencia de soporte para el seguimiento de series de televisión por episodio.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\textwidth]{../notes/.images/letterboxd.jpg}
+    \caption{Interfaz principal de Letterboxd.}
+\end{figure}
 
 \textbf{Trakt.tv} (fundado en 2010) es la plataforma más completa en cuanto a funcionalidades de \textit{tracking}, con soporte completo para películas y series a nivel de episodio. Su característica diferencial es la API pública v2, documentada y con límites de uso generosos para desarrolladores registrados. Sin embargo, su interfaz de usuario presenta un diseño anticuado que no ha evolucionado significativamente en la última década.
 
-\textbf{Simkl} (fundado en 2012) ofrece funcionalidades similares a Trakt con una interfaz algo más moderna, pero con un ecosistema de API menos estable y una comunidad de usuarios significativamente menor.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{../notes/.images/trakt.jpg}
+    \caption{Interfaz principal de Trakt.tv.}
+\end{figure}
+
+\textbf{Simkl} (fundado en 2012) ofrece funcionalidades similares a Trakt con una interfaz algo menos moderna y con un ecosistema de API menos estable y una comunidad de usuarios significativamente menor.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{../notes/.images/simkl.jpg}
+    \caption{Interfaz principal de Simkl.}
+\end{figure}
 
 \textbf{JustWatch} (fundado en 2014) se especializa en la localización de contenido entre plataformas de \textit{streaming}, pero carece de funcionalidades de \textit{tracking} personal.
 
-La comparación entre estas plataformas pone de manifiesto una oportunidad en el mercado: ninguna combina la funcionalidad de Trakt (seguimiento por episodio, sincronización, valoraciones) con una interfaz de usuario moderna y responsiva comparable a las propias plataformas de \textit{streaming}. \textit{The Show Verse} se posiciona precisamente en este punto.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{../notes/.images/justwatch.jpg}
+    \caption{Interfaz principal de JustWatch.}
+\end{figure}

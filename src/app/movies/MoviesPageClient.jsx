@@ -7,6 +7,7 @@ import { Navigation, FreeMode } from "swiper";
 import { AnimatePresence, motion, useInView } from "framer-motion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Anton } from "next/font/google";
 import {
   Heart,
@@ -596,6 +597,7 @@ function Top10MobileBackdropCard({ movie, rank }) {
 // ✅ DISEÑO NUEVO: rounded-lg
 function InlinePreviewCard({ movie, heightClass }) {
   const { session, account } = useAuth();
+  const router = useRouter();
 
   const [extras, setExtras] = useState({
     runtime: null,
@@ -768,6 +770,14 @@ function InlinePreviewCard({ movie, heightClass }) {
 
   const href = `/details/movie/${movie.id}`;
 
+  const prefetchHref = () => {
+    router.prefetch(href);
+  };
+
+  const navigateToDetails = () => {
+    router.push(href);
+  };
+
   const requireLogin = () => {
     if (!session || !account?.id) {
       window.location.href = "/login";
@@ -879,9 +889,10 @@ function InlinePreviewCard({ movie, heightClass }) {
     <div
       // CAMBIO: rounded-3xl -> rounded-lg
       className={`rounded-lg overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
-      onClick={() => {
-        window.location.href = href;
-      }}
+      onClick={navigateToDetails}
+      onMouseEnter={prefetchHref}
+      onFocus={prefetchHref}
+      onTouchStart={prefetchHref}
     >
       <div className="relative w-full h-full bg-black">
         {!showTrailer && !backdropReady && (

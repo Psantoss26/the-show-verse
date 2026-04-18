@@ -8,22 +8,20 @@ En este capítulo se describe el desarrollo completo de \textit{The Show Verse},
 
 El sistema se estructura en tres capas diferenciadas, implementadas en una única base de código Next.js:
 
-\textbf{Capa de presentación (Client Components).} Componentes React que se ejecutan y se hidratan en el navegador. Gestionan el estado local de la interfaz, las interacciones del usuario y las peticiones a la capa intermedia. Los componentes de mayor complejidad son \texttt{MainDashboardClient.jsx} (gestión del dashboard completo), \texttt{DetailsClient.jsx} (página de detalle de película y serie) y \texttt{DiscoverClient.jsx} (módulo de búsqueda).
+\textbf{Capa de presentación (Client Components).} Componentes React que se ejecutan y se hidratan en el navegador. Gestionan el estado local de la interfaz, las interacciones del usuario y las peticiones a la capa intermedia. Los componentes de mayor complejidad son los encargados de la gestión del panel de control principal, la vista dinámica de detalles de películas o series y los módulos de contenido del usuario.
 
-\textbf{Capa de servidor (Server Components + API Routes).} Los Server Components de Next.js realizan la búsqueda inicial de datos directamente en el servidor, sin coste de JavaScript para el cliente. Las API Routes actúan como \textit{proxy} hacia las APIs externas, añadiendo los tokens de autenticación en el servidor y transformando los datos al formato que utiliza el \textit{frontend}.
+\textbf{Capa de servidor (Server Components + API Routes).} Los Server Components de Next.js realizan la búsqueda inicial de datos directamente en el servidor, sin coste de JavaScript para el cliente. Las rutas de la API interna actúan como \textit{proxy} hacia los servicios externos, asegurando que los tokens de autenticación permanezcan privados en el servidor y transformando los datos al formato que requiere la interfaz para su renderizado.
 
-\textbf{Capa de datos (APIs externas).} TMDb, Trakt.tv, OMDb, JustWatch y Plex como fuentes para los datos de catálogo y del usuario respectivamente.
-
-La separación entre estas capas se hace explícita en la convención de nombres del proyecto: los archivos terminados en \texttt{Client.jsx} son siempre Client Components (marcados con \texttt{``use client''}), mientras que los archivos \texttt{page.jsx} y los de la carpeta \texttt{api/} son siempre Server Components o API Routes.
+\textbf{Capa de datos (APIs externas).} TMDb, Trakt.tv, OMDb, JustWatch y Plex son las fuentes de los datos principales del catálogo y la información del perfil del usuario.
 
 \subsection{Estructura de carpetas}
 
-El proyecto sigue la convención del App Router de Next.js 13+. La estructura principal se organiza en cuatro directorios bajo \texttt{src/}:
+La estructura principal se organiza en cuatro directorios bajo \texttt{src/}:
 
 \begin{itemize}
 \item \texttt{src/app/} --- Rutas, páginas y API Routes. Cada subdirectorio corresponde a una ruta de la aplicación.
-\item \texttt{src/components/} --- Componentes React reutilizables. Los de mayor complejidad son \texttt{DetailsClient.jsx} y \texttt{MainDashboardClient.jsx}.
-\item \texttt{src/lib/} --- Código reutilizable para conectar con APIs externas y funciones auxiliares comunes. Incluye los módulos \texttt{tmdb.js}, \texttt{traktClient.js}, \texttt{justwatch.js} y \texttt{plex/auth.js}.
+\item \texttt{src/components/} --- Componentes React reutilizables para el diseño de la interfaz y los módulos.
+\item \texttt{src/lib/} --- Código reutilizable para conectar con APIs externas y funciones auxiliares comunes.
 \item \texttt{src/context/} --- Contextos globales de React para el estado compartido entre componentes.
 \end{itemize}
 
@@ -54,7 +52,7 @@ Las rutas principales de la aplicación son:
 \hline
 \texttt{/discover} & Búsqueda y filtrado avanzado de contenido \\
 \hline
-\texttt{/biblioteca} & Librería personal unificada \\
+\texttt{/biblioteca} & Librería de contenido (servidor Plex) \\
 \hline
 \texttt{/lists} & Listas de TMDb, colecciones y listas de Trakt \\
 \hline
@@ -74,17 +72,19 @@ Las rutas principales de la aplicación son:
 \section{Implementación del sistema de autenticación OAuth 2.0}
 % -----------------------------------------------------------------------
 
-La implementación del flujo OAuth 2.0 con Trakt.tv es el núcleo técnico más delicado del proyecto. El flujo se articula en cuatro API Routes de Next.js:
+La autenticación con Trakt se ha implementado con OAuth 2.0 \textit{Authorization Code} y una arquitectura híbrida cliente-servidor, de forma que la parte sensible del proceso queda en el backend y el frontend solo gestiona el estado de conexión.
 
-\textbf{Inicio del flujo (\texttt{/api/trakt/oauth}):} construye la URL de autorización de Trakt con los parámetros \texttt{client\_id}, \texttt{redirect\_uri} y \texttt{response\_type=code}, y redirige al usuario. Este \textit{endpoint} se invoca al pulsar el botón «Conectar con Trakt» de la Navbar.
+\textbf{1) Inicio del flujo de autorización.} Cuando el usuario pulsa «Conectar con Trakt», la aplicación llama a una ruta interna de inicio que calcula el \texttt{origin} activo (local o producción), construye el \texttt{redirect\_uri} correcto y genera un \texttt{state} con \textit{nonce} y ruta de retorno. Después redirige al usuario a la URL oficial de autorización de Trakt. Antes de redirigir, guarda en cookies \texttt{httpOnly} temporales el \texttt{state}, la ruta a la que debe volver el usuario y el \texttt{redirect\_uri} exacto usado en la solicitud.
 
-\textbf{Callback (\texttt{/api/trakt/auth/callback}):} recibe el \texttt{authorization\_code} de Trakt, lo intercambia por \texttt{access\_token} y \texttt{refresh\_token} mediante una petición POST servidor-a-servidor a \texttt{https://api.trakt.tv/oauth/token}, y almacena ambos tokens en cookies \texttt{httpOnly}. A continuación redirige al usuario a la página de inicio.
+\textbf{2) Retorno desde Trakt e intercambio del código por sesión.} Tras autorizar en Trakt, el proveedor redirige al callback interno de la aplicación con \texttt{code} y \texttt{state}. En esta fase el servidor valida el estado recibido frente al almacenado y si es correcto intercambia el código por \texttt{access\_token} y \texttt{refresh\_token} mediante una llamada servidor-a-servidor a \texttt{https://api.trakt.tv/oauth/token}. Con los tokens recibidos, el backend crea cookies \texttt{httpOnly} (token de acceso, token de refresco y fecha de expiración) y limpia las cookies temporales del flujo OAuth.
 
-\textbf{Estado (\texttt{/api/trakt/auth/status}):} lee las cookies de sesión y, si existe \texttt{access\_token} válido, hace una petición a \texttt{/users/me} de Trakt para obtener el perfil del usuario. Si el token está expirado, intenta refrescarlo usando el \texttt{refresh\_token} antes de declarar al usuario como no autenticado.
+\textbf{3) Verificación de sesión.} Para saber si el usuario está conectado, el frontend consulta un endpoint de estado. Ese endpoint lee las cookies, comprueba si el token sigue vigente y valida la sesión contra Trakt con una petición de comprobación de usuario. Si detecta token inválido o revocado, limpia la sesión local de forma controlada.
 
-\textbf{Desconexión (\texttt{/api/trakt/auth/disconnect}):} revoca el token en Trakt mediante la API \texttt{/oauth/revoke} y elimina las cookies de sesión.
+\textbf{4) Renovación automática de tokens.} Además del endpoint de estado, el proyecto incluye un endpoint específico de refresco y un \textit{hook} de cliente que mantiene los tokens sincronizados. El hook calcula caducidad con margen de seguridad, solicita renovación cuando corresponde y actualiza su persistencia local para que la experiencia de uso no se interrumpa durante la navegación.
 
-Este diseño garantiza que ni el \texttt{client\_secret} de Trakt ni los \texttt{access\_token} del usuario sean accesibles desde el JavaScript del navegador en ningún momento del flujo.
+\textbf{5) Desconexión.} Al cerrar sesión de Trakt, la aplicación elimina las cookies de autenticación del lado servidor y limpia el estado de conexión del cliente.
+
+Con este diseño, la gestión real del intercambio OAuth permanece en el servidor y el navegador nunca accede directamente a credenciales privadas y solo consume un estado de autenticación ya procesado por el backend.
 
 % -----------------------------------------------------------------------
 \section{Integración con las APIs externas}
@@ -97,8 +97,8 @@ El cliente de TMDb (\texttt{lib/api/tmdb.js}) encapsula toda la lógica de acces
 \begin{itemize}
 \item Un \textbf{constructor de URL unificado} que añade automáticamente la API Key y el idioma por defecto (\texttt{es-ES}).
 \item Un \textbf{mecanismo de timeout} mediante \texttt{AbortController} (8 segundos por defecto) para evitar que peticiones lentas bloqueen la interfaz.
-\item \textbf{Comportamiento de caché diferenciado}: \texttt{force-cache} con revalidación ISR en servidor, \texttt{no-store} en cliente.
-\item \textbf{Gestión granular de errores}: los errores 404 retornan \texttt{null} silenciosamente; otros errores se loguean y también retornan \texttt{null}.
+\item \textbf{Estrategia de caché}: en servidor se usa \texttt{force-cache} con revalidación ISR para reutilizar respuestas y reducir llamadas repetidas, mientras que en cliente se emplea \texttt{no-store} para evitar datos obsoletos en interacciones en tiempo real.
+\item \textbf{Gestión granular de errores}: cuando la API devuelve un 404, la función interpreta que el recurso no existe y retorna \texttt{null} sin registrar un error. En el resto de casos, el fallo sí se registra en logs para diagnóstico y la función retorna igualmente \texttt{null} para no bloquear la interfaz.
 \end{itemize}
 
 Sobre esta función base se construyen más de 40 funciones nombradas por dominio (\texttt{fetchTopRatedMovies}, \texttt{getDetails}, \texttt{getCredits}, \texttt{getWatchProviders}, \texttt{getActorDetails}, etc.) que constituyen la API pública del módulo.

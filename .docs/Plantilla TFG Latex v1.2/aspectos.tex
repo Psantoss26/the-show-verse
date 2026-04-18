@@ -1,4 +1,4 @@
-El desarrollo de \textit{The Show Verse} se ha abordado mediante una metodología iterativa basada en el ciclo de vida ágil, adaptada a un proyecto individual. La elección de este enfoque frente a las metodologías en cascada se justifica por la naturaleza exploratoria del proyecto ya que la integración con APIs de terceros implica incertidumbres técnicas que no siempre se pueden anticipar en una fase de análisis, y la prioridad entre funcionalidades puede variar a medida que se comprende mejor el problema.
+El desarrollo de \textit{The Show Verse} se ha abordado mediante una metodología iterativa basada en el ciclo de vida ágil, adaptada a un proyecto individual. La elección de este enfoque frente a las metodologías en cascada se justifica por la naturaleza exploratoria del proyecto ya que la integración con APIs de terceros implica incertidumbres técnicas que no siempre se pueden anticipar en una fase de análisis y la prioridad entre funcionalidades puede variar a medida que se comprende mejor el problema.
 
 El proceso de desarrollo se realiza en iteraciones de aproximadamente una semana de duración. Al inicio de cada iteración se seleccionan del \textit{backlog} las funcionalidades a abordar, priorizadas según tres criterios:
 
@@ -15,9 +15,9 @@ El proceso de desarrollo se realiza en iteraciones de aproximadamente una semana
 La selección de las APIs externas ha seguido los siguientes criterios:
 
 \begin{itemize}
-\item \textbf{Datos completos:} TMDb fue seleccionada frente a otras alternativas (The Open Movie Database, Wikidata) por ofrecer la mayor cobertura de contenido, soporte en diferentes idiomas, galería de imágenes y datos de \textit{streaming}, además de disponer de la documentación más completa y una comunidad de desarrolladores activa.
-\item \textbf{Capacidad de tracking:} Trakt.tv fue seleccionada como plataforma de sincronización por su API pública v2 bien documentada, su soporte completo de series a nivel de episodio y por ser la plataforma de \textit{tracking} más referenciada por la comunidad de desarrolladores independientes.
-\item \textbf{Complementariedad:} OMDb fue seleccionada únicamente para los datos de \textit{rating} de IMDb y Rotten Tomatoes, que TMDb no proporciona directamente.
+\item TMDb fue seleccionada frente a otras alternativas por ofrecer la mayor cobertura de contenido, soporte en diferentes idiomas, galería de imágenes y datos de \textit{streaming}, además de disponer de la documentación más completa y una comunidad de desarrolladores activa.
+\item Trakt.tv fue seleccionada como plataforma de sincronización por su API pública v2 bien documentada, su soporte completo de series a nivel de episodio y por ser la plataforma de \textit{tracking} más referenciada por la comunidad de desarrolladores independientes.
+\item OMDb fue seleccionada únicamente para los datos de \textit{rating} de IMDb y Rotten Tomatoes, que TMDb no proporciona directamente.
 \end{itemize}
 
 \subsection{Criterios de decisión para la autenticación}
@@ -84,13 +84,13 @@ Esta diferenciación permite reducir el número de llamadas a APIs externas en u
 
 \section{Tecnologías empleadas}
 
-\textbf{Next.js 16 (Framework principal).} Seleccionado frente a otras alternativas (Remix, SvelteKit, Nuxt 3) por ser el framework React con mayor adopción industrial (>40\% de cuota entre frameworks React según npm trends 2024), la mejor integración con Vercel y la documentación más extensa. El App Router de Next.js 13+ es la única opción que implementa React Server Components de forma estable y con soporte oficial \parencite{Vercel:2024a}.
+\textbf{Next.js 16 (Framework principal).} Seleccionado frente a otras alternativas (Remix, SvelteKit, Nuxt 3) por ser el framework React con mayor adopción industrial (>40\% de cuota entre frameworks React según npm trends 2024), la mejor integración con Vercel y la documentación más extensa. El App Router de Next.js 13+ es la única opción que implementa React Server Components de forma estable y con soporte oficial.
 
-\textbf{React 19.} La elección de React como biblioteca de UI es consecuencia directa de la elección de Next.js. React 19 introduce mejoras en el manejo de acciones de servidor y la promesa nativa en componentes de cliente \parencite{Meta:2024}.
+\textbf{React 19.} La elección de React como biblioteca de UI es consecuencia directa de la elección de Next.js. React 19 introduce mejoras en el manejo de acciones de servidor y la promesa nativa en componentes de cliente.
 
 \textbf{Tailwind CSS 4.} Seleccionado frente a CSS Modules, Styled Components o Emotion por el paradigma \textit{utility-first} que acelera el desarrollo sin sacrificar la personalización. La versión 4, basada en PostCSS con motor Rust nativo, elimina el PurgeCSS separado e incorpora mejoras sustanciales de rendimiento en el tiempo de compilación.
 
-\textbf{Framer Motion 12.} La elección de Framer Motion frente a otras librerías de animación (React Spring, CSS Animations puras) se basa en su modelo declarativo basado en variantes, su soporte nativo para animaciones de \textit{layout} y su integración con el ciclo de vida de los componentes React mediante \texttt{AnimatePresence} \parencite{Framer:2024}.
+\textbf{Framer Motion 12.} La elección de Framer Motion frente a otras librerías de animación (React Spring, CSS Animations puras) se basa en su modelo declarativo basado en variantes, su soporte nativo para animaciones de \textit{layout} y su integración con el ciclo de vida de los componentes React mediante \texttt{AnimatePresence}.
 
 \section{Gestión del desarrollo y control de versiones}
 
@@ -114,27 +114,25 @@ El proyecto se despliega en Vercel, la plataforma de hosting optimizada para Nex
 \item \textbf{Integración native con Next.js:} Las características de Next.js como Image Optimization, ISR y Edge Functions se soportan de forma nativa sin configuración adicional.
 \item \textbf{API serverless:} Las API Routes se auto-escalan sin gestionar servidores o contenedores.
 \item \textbf{Edge computing:} Los Edge Functions ejecutan código más cerca del usuario, reduciendo latencia para SPA middleware.
-\item \textbf{Previe deployments automáticos:} Cada pull request genera un URL único de vista previa con el código del branch.
+\item \textbf{Deployments automáticos:} Cada pull request genera un URL único de vista previa con el código del branch.
 \item \textbf{Git-based deploys:} El despliegue se dispara automáticamente al hacer push o merge a una rama configurada.
-\item \textbf{CDN global:} Las assets estáticas se distribuyen mediante una CDN global de Vercel (Vercelnets), con 250+ puntos de presencia.
 \item \textbf{Monitoreo integrado:} Web Analytics, Performance Monitoring y Error Tracking nativos.
 \end{itemize}
 
-\subsection{Variables de entorno y secretos}
+\subsection{Variables de entorno y credenciales}
 
-Se utiliza el sistema de secretos de GitHub y Vercel para gestionar variables sensibles:
+Para garantizar la seguridad de la aplicación y evitar exponer información confidencial en el código fuente, todas las claves y contraseñas de las APIs se centralizan mediante el administrador de variables de entorno cifradas que integran de forma nativa las plataformas de GitHub y Vercel:
 
 \begin{itemize}
-\item \texttt{NEXT\_PUBLIC\_TMDB\_API\_KEY:} API Key de TMDb (pública, pero limitada a origin permitido).
-\item \texttt{TRAKT\_CLIENT\_ID:} ID de cliente de Trakt (público).
-\item \texttt{TRAKT\_CLIENT\_SECRET:} Secreto de cliente de Trakt (privado, solo servidor).
-\item \texttt{OMDB\_API\_KEY:} API Key de OMDb (privado, solo servidor).
-\item \texttt{JUSTWATCH\_GRAPHQL\_URL:} URL de GraphQL de JustWatch (pública pero sujeta a cambios).
-\item \texttt{PLEX\_JWT\_PRIVATE\_KEY:} Clave privada RSA para autenticación JWT con Plex (privado).
-\item \texttt{DATABASE\_URL:} (no actualmente en uso, pero reservado para evolución futura).
+\item \texttt{NEXT\_PUBLIC\_TMDB\_API\_KEY}: Clave de la API de TMDb, accesible desde el cliente y servidor.
+\item \texttt{OMDB\_API\_KEY}: Clave privada de acceso a la base de datos de OMDb.
+\item \texttt{TRAKT\_CLIENT\_ID} y \texttt{TRAKT\_CLIENT\_SECRET}: Credenciales principal y secreta para autenticar la aplicación como cliente de Trakt.tv.
+\item \texttt{TRAKT\_REDIRECT\_URI}: Dirección web de retorno requerida en el flujo de autenticación OAuth de Trakt.
+\item \texttt{PLEX\_URL} y \texttt{PLEX\_TOKEN}: Dirección de red (local o externa) y token personal del servidor multimedia de Plex.
+\item \texttt{PLEX\_CLIENT\_IDENTIFIER}: Identificador único de aplicación para Plex.
+\item \texttt{PLEX\_JWT\_SCOPE} y \texttt{PLEX\_JWT\_KID}: Conjunto de permisos y nombre de clave asociados a la generación de JWT para Plex.
+\item \texttt{PLEX\_JWT\_PRIVATE\_KEY}: Clave privada empleada en el servidor para la comunicación segura con Plex.
 \end{itemize}
-
-En Vercel, estas variables se configuran en el Dashboard → Settings → Environment Variables, con opciones de aplicación selectiva (preview, production, development).
 
 \subsection{Proceso de deployment}
 

@@ -49,36 +49,6 @@
       \verb https://www.cnmc.es/
       \endverb
     \endentry
-    \entry{Framer:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=0df10fc145be1e5c3fe6535066b7d7f8}{%
-           family={{Framer}},
-           familyi={F\bibinitperiod}}}%
-      }
-      \strng{namehash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{fullhash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{fullhashraw}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{bibnamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{authorbibnamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{authornamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{authorfullhash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{authorfullhashraw}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \field{sortinit}{F}
-      \field{sortinithash}{2638baaa20439f1b5a8f80c6c08a13b4}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{Framer Motion Documentation}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://www.framer.com/motion/
-      \endverb
-      \verb{url}
-      \verb https://www.framer.com/motion/
-      \endverb
-    \endentry
     \entry{Google:2024a}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=6bc28252c14133d21331dc54856c1797}{%
@@ -143,66 +113,6 @@
       \endverb
       \verb{url}
       \verb https://www.rfc-editor.org/rfc/rfc6749
-      \endverb
-    \endentry
-    \entry{Letterboxd:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=7d49d19c5ded2bc5cd780592fda81431}{%
-           family={{Letterboxd}},
-           familyi={L\bibinitperiod}}}%
-      }
-      \strng{namehash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{fullhash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{fullhashraw}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{bibnamehash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{authorbibnamehash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{authornamehash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{authorfullhash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{authorfullhashraw}{7d49d19c5ded2bc5cd780592fda81431}
-      \field{sortinit}{L}
-      \field{sortinithash}{7c47d417cecb1f4bd38d1825c427a61a}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{About Letterboxd}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://letterboxd.com/about/
-      \endverb
-      \verb{url}
-      \verb https://letterboxd.com/about/
-      \endverb
-    \endentry
-    \entry{Meta:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=6c56f762d9ebe73063cd2d157e97351f}{%
-           family={{Meta Open Source}},
-           familyi={M\bibinitperiod}}}%
-      }
-      \strng{namehash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{fullhash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{fullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{bibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{authorbibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{authornamehash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{authorfullhash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{authorfullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
-      \field{sortinit}{M}
-      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{React Documentation --- React Server Components}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://react.dev/reference/rsc/server-components
-      \endverb
-      \verb{url}
-      \verb https://react.dev/reference/rsc/server-components
       \endverb
     \endentry
     \entry{OWASP:2024}{online}{}{}
@@ -293,36 +203,6 @@
       \endverb
       \verb{url}
       \verb https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
-      \endverb
-    \endentry
-    \entry{Vercel:2024a}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
-           family={{Vercel}},
-           familyi={V\bibinitperiod}}}%
-      }
-      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
-      \field{sortinit}{V}
-      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{Next.js Documentation --- App Router}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://nextjs.org/docs/app
-      \endverb
-      \verb{url}
-      \verb https://nextjs.org/docs/app
       \endverb
     \endentry
   \enddatalist
@@ -357,36 +237,6 @@
       \verb https://www.cnmc.es/
       \endverb
     \endentry
-    \entry{Framer:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=0df10fc145be1e5c3fe6535066b7d7f8}{%
-           family={{Framer}},
-           familyi={F\bibinitperiod}}}%
-      }
-      \strng{namehash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{fullhash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{fullhashraw}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{bibnamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{authorbibnamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{authornamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{authorfullhash}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \strng{authorfullhashraw}{0df10fc145be1e5c3fe6535066b7d7f8}
-      \field{sortinit}{F}
-      \field{sortinithash}{2638baaa20439f1b5a8f80c6c08a13b4}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{Framer Motion Documentation}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://www.framer.com/motion/
-      \endverb
-      \verb{url}
-      \verb https://www.framer.com/motion/
-      \endverb
-    \endentry
     \entry{Google:2024a}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=6bc28252c14133d21331dc54856c1797}{%
@@ -451,66 +301,6 @@
       \endverb
       \verb{url}
       \verb https://www.rfc-editor.org/rfc/rfc6749
-      \endverb
-    \endentry
-    \entry{Letterboxd:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=7d49d19c5ded2bc5cd780592fda81431}{%
-           family={{Letterboxd}},
-           familyi={L\bibinitperiod}}}%
-      }
-      \strng{namehash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{fullhash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{fullhashraw}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{bibnamehash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{authorbibnamehash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{authornamehash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{authorfullhash}{7d49d19c5ded2bc5cd780592fda81431}
-      \strng{authorfullhashraw}{7d49d19c5ded2bc5cd780592fda81431}
-      \field{sortinit}{L}
-      \field{sortinithash}{7c47d417cecb1f4bd38d1825c427a61a}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{About Letterboxd}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://letterboxd.com/about/
-      \endverb
-      \verb{url}
-      \verb https://letterboxd.com/about/
-      \endverb
-    \endentry
-    \entry{Meta:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=6c56f762d9ebe73063cd2d157e97351f}{%
-           family={{Meta Open Source}},
-           familyi={M\bibinitperiod}}}%
-      }
-      \strng{namehash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{fullhash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{fullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{bibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{authorbibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{authornamehash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{authorfullhash}{6c56f762d9ebe73063cd2d157e97351f}
-      \strng{authorfullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
-      \field{sortinit}{M}
-      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{React Documentation --- React Server Components}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://react.dev/reference/rsc/server-components
-      \endverb
-      \verb{url}
-      \verb https://react.dev/reference/rsc/server-components
       \endverb
     \endentry
     \entry{OWASP:2024}{online}{}{}
@@ -601,36 +391,6 @@
       \endverb
       \verb{url}
       \verb https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
-      \endverb
-    \endentry
-    \entry{Vercel:2024a}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
-           family={{Vercel}},
-           familyi={V\bibinitperiod}}}%
-      }
-      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
-      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
-      \field{sortinit}{V}
-      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{Next.js Documentation --- App Router}}
-      \field{year}{2024}
-      \verb{urlraw}
-      \verb https://nextjs.org/docs/app
-      \endverb
-      \verb{url}
-      \verb https://nextjs.org/docs/app
       \endverb
     \endentry
   \enddatalist
