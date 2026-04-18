@@ -15,6 +15,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 10; // Límite máximo Vercel Hobby (s)
 
+async function wait(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function GET(request) {
   const type = request.nextUrl.searchParams.get("type"); // movie | show
   const tmdbId = request.nextUrl.searchParams.get("tmdbId");
@@ -127,11 +131,22 @@ export async function GET(request) {
           progress = aired > 0 ? Math.round((completed / aired) * 100) : 0;
         }
       } else {
-        history = await traktGetHistoryForItem(token, {
-          type,
-          traktId,
-          limit: 10,
-        });
+        const historyRetryDelays = [0, 450, 1100];
+        for (let attempt = 0; attempt < historyRetryDelays.length; attempt++) {
+          if (attempt > 0) {
+            await wait(historyRetryDelays[attempt]);
+          }
+
+          history = await traktGetHistoryForItem(token, {
+            type,
+            traktId,
+            limit: 10,
+          });
+
+          if (Array.isArray(history) && history.length > 0) {
+            break;
+          }
+        }
       }
     }
 
