@@ -3177,10 +3177,10 @@ export default function DetailsClient({
           );
         }
 
-        // Usar force en todos los intentos si fue solicitado, no solo en el primero
+        // En el primer intento, usar force si fue solicitado
         latest = await reloadTraktStatus({
           background: attempt > 0,
-          force,
+          force: force && attempt === 0,
         });
         const latestHistory = normalizeTraktHistoryEntries(latest?.history);
         const latestWatched =
@@ -3582,14 +3582,8 @@ export default function DetailsClient({
   ]);
 
   // Recargar estado de Trakt al abrir el modal de historial con datos frescos
-  // NOTA: handleOpenTraktWatched ya recarga antes de abrir, pero este useEffect
-  // maneja casos edge donde el modal se abre por otros medios
   useEffect(() => {
     if (!traktWatchedOpen) return;
-    // Verificar si ya se hizo una recarga reciente (menos de 1 segundo)
-    const now = Date.now();
-    const timeSinceLastSync = now - (traktBackgroundSyncAtRef.current || 0);
-    if (timeSinceLastSync < 1000) return; // Skip si ya recargamos hace poco
     // Forzar recarga para obtener datos actualizados, evitando caché obsoleto
     void reloadTraktStatus({ force: true });
   }, [traktWatchedOpen, reloadTraktStatus]);
@@ -3606,16 +3600,14 @@ export default function DetailsClient({
     if (hasTraktBootstrapData) {
       const timer = window.setTimeout(() => {
         traktBackgroundSyncAtRef.current = Date.now();
-        // Usar force=true para asegurar datos frescos incluso con bootstrap
-        void reloadTraktStatus({ background: true, force: true });
+        void reloadTraktStatus({ background: true });
       }, 2500);
 
       return () => window.clearTimeout(timer);
     }
 
     traktBackgroundSyncAtRef.current = Date.now();
-    // Usar force=true en la carga inicial para obtener siempre datos actualizados
-    void reloadTraktStatus({ background: false, force: true });
+    void reloadTraktStatus({ background: false });
   }, [
     reloadTraktStatus,
     endpointType,
@@ -3748,9 +3740,9 @@ export default function DetailsClient({
     }
 
     if (endpointType === "movie") {
-      // PRIMERO recargar datos frescos, LUEGO abrir el modal
-      await confirmMovieTraktStatus({ force: true });
       setTraktWatchedOpen(true);
+      // Forzar recarga completa para obtener datos frescos, evitando preservación de estado antiguo
+      void confirmMovieTraktStatus({ force: true });
       return;
     }
 
