@@ -42,6 +42,12 @@ const episodeScoreboardInflight = new Map();
 const episodeImdbCache = new Map();
 const episodeImdbInflight = new Map();
 
+function hasNumericStats(stats) {
+  if (!stats || typeof stats !== "object") return false;
+  return ["watchers", "plays", "collectors", "comments", "lists", "favorited"]
+    .some((key) => typeof stats?.[key] === "number");
+}
+
 function normalizeWatchedBySeason(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value;
@@ -249,7 +255,7 @@ export default function EpisodeDetailsClient({
       rating:
         typeof r?.community?.rating === "number" ? r.community.rating : null,
       votes: typeof r?.community?.votes === "number" ? r.community.votes : null,
-      stats: r?.stats || null,
+      stats: hasNumericStats(r?.stats) ? r.stats : null,
       traktUrl: r?.traktUrl || null,
     };
   }, []);
@@ -269,6 +275,14 @@ export default function EpisodeDetailsClient({
   const [tScoreboard, setTScoreboard] = useState(
     () => parseScoreboardData(initialScoreboard) || defaultScoreboard,
   );
+  const parsedInitialScoreboard = useMemo(
+    () => parseScoreboardData(initialScoreboard),
+    [initialScoreboard, parseScoreboardData],
+  );
+  const initialScoreboardHasStats = useMemo(
+    () => hasNumericStats(parsedInitialScoreboard?.stats),
+    [parsedInitialScoreboard],
+  );
   const [imdbData, setImdbData] = useState(() => imdb || null);
   const [watchedBySeason, setWatchedBySeason] = useState(
     () => initialWatchedBySeason || {},
@@ -286,7 +300,7 @@ export default function EpisodeDetailsClient({
 
   useEffect(() => {
     const key = `${showId}:${seasonNumber}:${episodeNumber}`;
-    if (initialScoreboard && parseScoreboardData(initialScoreboard)) {
+    if (parsedInitialScoreboard && initialScoreboardHasStats) {
       episodeScoreboardCache.set(key, initialScoreboard);
     }
   }, [
@@ -294,15 +308,16 @@ export default function EpisodeDetailsClient({
     seasonNumber,
     episodeNumber,
     initialScoreboard,
-    parseScoreboardData,
+    parsedInitialScoreboard,
+    initialScoreboardHasStats,
   ]);
 
   useEffect(() => {
-    setTScoreboard(parseScoreboardData(initialScoreboard) || defaultScoreboard);
-  }, [initialScoreboard, parseScoreboardData, defaultScoreboard]);
+    setTScoreboard(parsedInitialScoreboard || defaultScoreboard);
+  }, [parsedInitialScoreboard, defaultScoreboard]);
 
   useEffect(() => {
-    if (parseScoreboardData(initialScoreboard)) return;
+    if (initialScoreboardHasStats) return;
 
     let alive = true;
     const controller = new AbortController();
@@ -317,10 +332,15 @@ export default function EpisodeDetailsClient({
         });
         if (!alive) return;
 
-        setTScoreboard(parseScoreboardData(json) || defaultScoreboard);
+        const parsed = parseScoreboardData(json);
+        setTScoreboard((prev) => ({
+          ...prev,
+          ...(parsed || defaultScoreboard),
+          loading: false,
+        }));
       } catch (error) {
         if (!alive || error?.name === "AbortError") return;
-        setTScoreboard(defaultScoreboard);
+        setTScoreboard((prev) => ({ ...prev, loading: false }));
       }
     }, 80);
 
@@ -333,7 +353,7 @@ export default function EpisodeDetailsClient({
     showId,
     seasonNumber,
     episodeNumber,
-    initialScoreboard,
+    initialScoreboardHasStats,
     parseScoreboardData,
     defaultScoreboard,
   ]);
