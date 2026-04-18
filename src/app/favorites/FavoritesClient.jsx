@@ -1026,7 +1026,9 @@ function FavoriteCard({
                   {imdbScore && (
                     <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
                       <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                        {imdbScore}
+                        {typeof imdbScore === "number"
+                          ? imdbScore.toFixed(1)
+                          : imdbScore}
                       </span>
                       <img
                         src="/logo-IMDb.png"
@@ -1155,7 +1157,9 @@ function FavoriteCard({
                 {imdbScore && (
                   <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
                     <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                      {imdbScore}
+                      {typeof imdbScore === "number"
+                        ? imdbScore.toFixed(1)
+                        : imdbScore}
                     </span>
                     <img
                       src="/logo-IMDb.png"
