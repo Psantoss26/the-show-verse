@@ -40,12 +40,6 @@ const seasonScoreboardInflight = new Map();
 const seasonImdbCache = new Map();
 const seasonImdbInflight = new Map();
 
-function hasNumericStats(stats) {
-  if (!stats || typeof stats !== "object") return false;
-  return ["watchers", "plays", "collectors", "comments", "lists", "favorited"]
-    .some((key) => typeof stats?.[key] === "number");
-}
-
 function normalizeWatchedBySeason(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value;
@@ -248,7 +242,7 @@ export default function SeasonDetailsClient({
       rating:
         typeof r?.community?.rating === "number" ? r.community.rating : null,
       votes: typeof r?.community?.votes === "number" ? r.community.votes : null,
-      stats: hasNumericStats(r?.stats) ? r.stats : null,
+      stats: r?.stats || null,
       traktUrl: r?.traktUrl || null,
     };
   }, []);
@@ -267,10 +261,6 @@ export default function SeasonDetailsClient({
   const parsedInitialScoreboard = useMemo(
     () => parseScoreboardData(initialScoreboard),
     [initialScoreboard, parseScoreboardData],
-  );
-  const initialScoreboardHasStats = useMemo(
-    () => hasNumericStats(parsedInitialScoreboard?.stats),
-    [parsedInitialScoreboard],
   );
 
   // Scroll al inicio al montar
@@ -318,16 +308,10 @@ export default function SeasonDetailsClient({
 
   useEffect(() => {
     const key = `${showId}:${seasonNumber}`;
-    if (parsedInitialScoreboard && initialScoreboardHasStats) {
+    if (parsedInitialScoreboard) {
       seasonScoreboardCache.set(key, initialScoreboard);
     }
-  }, [
-    showId,
-    seasonNumber,
-    parsedInitialScoreboard,
-    initialScoreboard,
-    initialScoreboardHasStats,
-  ]);
+  }, [showId, seasonNumber, parsedInitialScoreboard, initialScoreboard]);
 
   useEffect(() => {
     setImdbData(imdb || null);
@@ -547,7 +531,7 @@ export default function SeasonDetailsClient({
   }, [tScoreboard.rating]);
 
   useEffect(() => {
-    if (initialScoreboardHasStats) return;
+    if (parsedInitialScoreboard) return;
 
     let alive = true;
     const controller = new AbortController();
@@ -562,14 +546,10 @@ export default function SeasonDetailsClient({
         if (!alive) return;
 
         const parsed = parseScoreboardData(json);
-        setTScoreboard((prev) => ({
-          ...prev,
-          ...(parsed || defaultScoreboard),
-          loading: false,
-        }));
+        setTScoreboard(parsed || defaultScoreboard);
       } catch (error) {
         if (!alive || error?.name === "AbortError") return;
-        setTScoreboard((prev) => ({ ...prev, loading: false }));
+        setTScoreboard(defaultScoreboard);
       }
     }, 80);
 
@@ -581,7 +561,7 @@ export default function SeasonDetailsClient({
   }, [
     showId,
     seasonNumber,
-    initialScoreboardHasStats,
+    parsedInitialScoreboard,
     parseScoreboardData,
     defaultScoreboard,
   ]);
