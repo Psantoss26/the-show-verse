@@ -1,7 +1,20 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
+import { getTraktDetailsBootstrapFromCookieStore } from "@/lib/trakt/server";
+
+export const dynamic = "force-dynamic";
 export const revalidate = 600;
+
+function resolveWithin(promise, timeoutMs, fallback = null) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(fallback), timeoutMs);
+    }),
+  ]);
+}
 
 export default async function DetailsPage({ params }) {
   const p = await params;
@@ -12,9 +25,27 @@ export default async function DetailsPage({ params }) {
     notFound();
   }
 
-  const data = await getDetails(type, id, {
-    appendToResponse: "external_ids",
-  });
+  const traktBootstrapPromise =
+    type === "movie"
+      ? (async () => {
+          const cookieStore = await cookies();
+          return resolveWithin(
+            getTraktDetailsBootstrapFromCookieStore(cookieStore, {
+              type: "movie",
+              tmdbId: id,
+            }).catch(() => null),
+            950,
+            null,
+          );
+        })()
+      : Promise.resolve(null);
+
+  const [data, traktBootstrap] = await Promise.all([
+    getDetails(type, id, {
+      appendToResponse: "external_ids",
+    }),
+    traktBootstrapPromise,
+  ]);
 
   if (!data) {
     notFound();
@@ -32,6 +63,7 @@ export default async function DetailsPage({ params }) {
       type={type}
       id={id}
       data={data}
+      initialTraktStatus={traktBootstrap?.status ?? null}
       initialCastData={initialCastData}
       initialReviews={initialReviews}
     />
