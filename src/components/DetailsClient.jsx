@@ -3228,9 +3228,18 @@ export default function DetailsClient({
             : minHistoryEntries == null
               ? true
               : latestHistory.length >= minHistoryEntries;
+        const isMeaningfulMovieSnapshot =
+          !!latest?.watched ||
+          latestHistory.length > 0 ||
+          Number(latest?.plays || 0) > 0 ||
+          !!latest?.lastWatchedAt ||
+          latest?.found === false ||
+          latest?.connected === false;
 
         if (expectedWatched == null) {
-          if (hasExpectedHistory) return latest;
+          if (hasExpectedHistory && isMeaningfulMovieSnapshot) {
+            return latest;
+          }
           continue;
         }
 
@@ -3658,6 +3667,13 @@ export default function DetailsClient({
     let cancelled = false;
     const timers = [];
     let ignoreFirstPageShow = true;
+    const shouldConfirmEmptyMovie =
+      endpointType === "movie" &&
+      trakt.connected &&
+      !trakt.watched &&
+      Number(trakt.plays || 0) === 0 &&
+      (!Array.isArray(trakt.history) || trakt.history.length === 0) &&
+      !trakt.lastWatchedAt;
     const syncNotBefore =
       Date.now() +
       (hasInitialTraktStatus ||
@@ -3696,14 +3712,14 @@ export default function DetailsClient({
 
     // Si el primer intento llegó antes de que Trakt refrescara la sesión,
     // reintentamos una o dos veces sin exigir recarga manual.
-    if (
+    if (shouldConfirmEmptyMovie) {
+      const timer = window.setTimeout(() => {
+        void confirmMovieTraktStatus();
+      }, 900);
+      timers.push(timer);
+    } else if (
       trakt.loading ||
       (!trakt.connected && !trakt.error) ||
-      (endpointType === "movie" &&
-        trakt.connected &&
-        !trakt.watched &&
-        Number(trakt.plays || 0) === 0 &&
-        (!Array.isArray(trakt.history) || trakt.history.length === 0)) ||
       (endpointType === "tv" && trakt.connected && !watchedBySeasonLoaded)
     ) {
       [900, 2200].forEach((delay) => {
@@ -3733,10 +3749,12 @@ export default function DetailsClient({
     trakt.watched,
     trakt.plays,
     trakt.history,
+    trakt.lastWatchedAt,
     hasInitialTraktStatus,
     hasCachedTraktStatus,
     hasInitialShowWatched,
     hasCachedShowWatched,
+    confirmMovieTraktStatus,
   ]);
 
   const canOpenMovieTraktModalInstantly = useMemo(() => {

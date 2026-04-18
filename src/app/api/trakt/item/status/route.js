@@ -4,12 +4,12 @@ import {
   getValidTraktToken,
   setTraktCookies,
   clearTraktCookies,
-  traktSearchByTmdb,
   traktGetHistoryForItem,
   traktGetProgressWatchedForShow,
   computeHistorySummary,
   mapHistoryEntries,
 } from "@/lib/trakt/server";
+import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,7 +60,18 @@ export async function GET(request) {
             ? { movie: { ids: { trakt: String(traktIdParam) } } }
             : { show: { ids: { trakt: String(traktIdParam) } } };
       } else {
-        hit = await traktSearchByTmdb(token, { type, tmdbId });
+        const resolved = await resolveTraktEntityFromTmdb({ type, tmdbId });
+        if (resolved?.traktId) {
+          const ids = {
+            ...(resolved.ids || {}),
+            trakt: resolved.traktId,
+            slug: resolved.slug || resolved.ids?.slug || null,
+          };
+          hit =
+            type === "movie"
+              ? { movie: { ids } }
+              : { show: { ids } };
+        }
       }
     } catch (searchErr) {
       const isTransient =
