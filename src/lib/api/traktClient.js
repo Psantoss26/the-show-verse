@@ -36,8 +36,12 @@ export function invalidateTraktGetCache({
       key.startsWith("/api/trakt/show/watched?") &&
       (matchQueryValue(key, "tmdbId", tmdbId) ||
         matchQueryValue(key, "traktId", traktId));
+    const matchesMovieWatched =
+      key.startsWith("/api/trakt/movie/watched?") &&
+      (matchQueryValue(key, "tmdbId", tmdbId) ||
+        matchQueryValue(key, "traktId", traktId));
 
-    if (matchesItemStatus || matchesShowWatched) {
+    if (matchesItemStatus || matchesShowWatched || matchesMovieWatched) {
       inFlightGetRequests.delete(key);
     }
   }
@@ -332,6 +336,45 @@ export async function traktGetShowWatched({ tmdbId, traktId } = {}) {
     }));
     if (!auth?.connected) {
       return { connected: false, found: false, watchedBySeason: {} };
+    }
+    throw error;
+  }
+}
+
+export async function traktGetMovieWatched({
+  tmdbId,
+  traktId,
+  force = false,
+} = {}) {
+  const qs = new URLSearchParams();
+  if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
+  if (traktId != null) qs.set("traktId", String(traktId));
+
+  try {
+    const json = await fetchGetJsonDeduped(
+      `/api/trakt/movie/watched?${qs.toString()}`,
+      { force },
+    );
+    if (json?.degraded) {
+      const error = new Error(json?.error || "Trakt transient movie watched");
+      error.code = "TRAKT_TRANSIENT";
+      error.status = 503;
+      throw error;
+    }
+    return json;
+  } catch (error) {
+    const auth = await ensureTraktAuthReady().catch(() => ({
+      connected: false,
+    }));
+    if (!auth?.connected) {
+      return {
+        connected: false,
+        found: false,
+        watched: false,
+        plays: 0,
+        lastWatchedAt: null,
+        history: [],
+      };
     }
     throw error;
   }

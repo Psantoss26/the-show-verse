@@ -115,6 +115,7 @@ import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedMo
 // -- API client de Trakt: estado, visionados, ratings, comentarios, listas, temporadas --
 import {
   traktGetItemStatus,
+  traktGetMovieWatched,
   traktSetWatched,
   traktAddWatchPlay,
   traktUpdateWatchPlay,
@@ -2044,6 +2045,7 @@ export default function DetailsClient({
   const traktBackgroundSyncAtRef = useRef(0);
   const traktResolvedIdRef = useRef(initialTraktId ?? null);
   const traktStatusRequestIdRef = useRef(0);
+  const movieWatchedRequestIdRef = useRef(0);
 
   useEffect(() => {
     traktResolvedIdRef.current = trakt?.traktId ?? initialTraktId ?? null;
@@ -3156,6 +3158,116 @@ export default function DetailsClient({
     [traktType, id, endpointType, watchedBySeasonLoaded],
   );
 
+  const loadTraktMovieWatched = useCallback(
+    async ({ background = false, force = false } = {}) => {
+      if (endpointType !== "movie") {
+        return reloadTraktStatus({ background, force });
+      }
+
+      const requestId = movieWatchedRequestIdRef.current + 1;
+      movieWatchedRequestIdRef.current = requestId;
+
+      if (!background) {
+        setTrakt((prev) => ({ ...prev, loading: true, error: "" }));
+      }
+
+      try {
+        const payload = await withTimeout(
+          traktGetMovieWatched({
+            tmdbId: Number(id),
+            traktId: traktResolvedIdRef.current ?? undefined,
+            force,
+          }),
+          25000,
+        );
+        const normalizedPayload = buildTraktStateFromHistory(payload || {});
+
+        let nextState = null;
+        setTrakt((prev) => {
+          if (requestId !== movieWatchedRequestIdRef.current) {
+            nextState = prev;
+            return prev;
+          }
+
+          const preservePreviousState =
+            !force &&
+            (shouldPreservePreviousTraktStatus(normalizedPayload, prev) ||
+              isPossiblyStaleEmptyMovieTraktStatus(
+                normalizedPayload,
+                prev,
+                endpointType,
+              ));
+
+          if (preservePreviousState) {
+            nextState = {
+              ...prev,
+              loading: false,
+              connected: true,
+              traktId: normalizedPayload.traktId ?? prev.traktId ?? null,
+              traktUrl: normalizedPayload.traktUrl || prev.traktUrl || null,
+              error: "",
+            };
+            return nextState;
+          }
+
+          nextState = {
+            ...prev,
+            loading: false,
+            connected: normalizedPayload?.connected !== false,
+            found: !!normalizedPayload?.found,
+            traktId: normalizedPayload?.traktId ?? prev.traktId ?? null,
+            traktUrl: normalizedPayload?.traktUrl || prev.traktUrl || null,
+            watched: !!normalizedPayload?.watched,
+            plays: Number(normalizedPayload?.plays || 0),
+            lastWatchedAt: normalizedPayload?.lastWatchedAt || null,
+            history: Array.isArray(normalizedPayload?.history)
+              ? normalizedPayload.history
+              : [],
+            error: "",
+          };
+          return nextState;
+        });
+
+        return nextState;
+      } catch (e) {
+        const isTimeout = e?.message === "Timeout";
+        const isRateLimit = /rate limit|temporalmente no disponible/i.test(
+          e?.message || "",
+        );
+        const isTransient =
+          e?.code === "TRAKT_TRANSIENT" ||
+          isTimeout ||
+          isRateLimit ||
+          (typeof e?.status === "number" && e.status >= 500) ||
+          /aborted|fetch|network|server error|HTTP 5/i.test(e?.message || "");
+
+        let nextState = null;
+        setTrakt((prev) => {
+          if (requestId !== movieWatchedRequestIdRef.current) {
+            nextState = prev;
+            return prev;
+          }
+
+          nextState = {
+            ...prev,
+            loading: false,
+            connected: isTransient ? prev.connected : false,
+            error: background
+              ? prev.error
+              : isTransient
+                ? ""
+                : isRateLimit
+                  ? "Trakt: límite de peticiones alcanzado"
+                  : e?.message || "Error recargando Trakt",
+          };
+          return nextState;
+        });
+        return nextState;
+      }
+    },
+    [endpointType, id, reloadTraktStatus],
+  );
+
   const confirmMovieTraktStatus = useCallback(
     async ({
       expectedWatched = null,
@@ -3177,8 +3289,7 @@ export default function DetailsClient({
           );
         }
 
-        // En el primer intento, usar force si fue solicitado
-        latest = await reloadTraktStatus({
+        latest = await loadTraktMovieWatched({
           background: attempt > 0,
           force: force && attempt === 0,
         });
@@ -3193,9 +3304,16 @@ export default function DetailsClient({
             : minHistoryEntries == null
               ? true
               : latestHistory.length >= minHistoryEntries;
+        const isMeaningfulMovieSnapshot =
+          !!latest?.watched ||
+          latestHistory.length > 0 ||
+          Number(latest?.plays || 0) > 0 ||
+          !!latest?.lastWatchedAt ||
+          latest?.found === false ||
+          latest?.connected === false;
 
         if (expectedWatched == null) {
-          if (hasExpectedHistory) return latest;
+          if (hasExpectedHistory && isMeaningfulMovieSnapshot) return latest;
           continue;
         }
 
@@ -3206,7 +3324,7 @@ export default function DetailsClient({
 
       return latest;
     },
-    [endpointType, reloadTraktStatus],
+    [endpointType, loadTraktMovieWatched, reloadTraktStatus],
   );
 
   useEffect(() => {
@@ -3537,6 +3655,7 @@ export default function DetailsClient({
             found: !!trakt.found,
             traktId: trakt.traktId ?? null,
             traktUrl: trakt.traktUrl || null,
+            updatedAt: Date.now(),
             watched: !!trakt.watched,
             plays: Number(trakt.plays || 0),
             lastWatchedAt: trakt.lastWatchedAt || null,
@@ -3563,6 +3682,7 @@ export default function DetailsClient({
             connected: !!trakt.connected,
             found: !!trakt.found,
             traktId: trakt.traktId ?? null,
+            updatedAt: Date.now(),
             watchedBySeason:
               watchedBySeason && typeof watchedBySeason === "object"
                 ? watchedBySeason
@@ -3584,13 +3704,35 @@ export default function DetailsClient({
   // Recargar estado de Trakt al abrir el modal de historial con datos frescos
   useEffect(() => {
     if (!traktWatchedOpen) return;
-    // Forzar recarga para obtener datos actualizados, evitando caché obsoleto
+    if (endpointType === "movie") {
+      void loadTraktMovieWatched({ force: true });
+      return;
+    }
     void reloadTraktStatus({ force: true });
-  }, [traktWatchedOpen, reloadTraktStatus]);
+  }, [
+    traktWatchedOpen,
+    endpointType,
+    loadTraktMovieWatched,
+    reloadTraktStatus,
+  ]);
 
   // Carga inicial del estado de Trakt para el contenido actual
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
+    if (endpointType === "movie") {
+      traktBackgroundSyncAtRef.current = Date.now();
+      void loadTraktMovieWatched({
+        background: hasInitialTraktStatus || hasCachedTraktStatus,
+        force: true,
+      });
+
+      const timer = window.setTimeout(() => {
+        void reloadTraktStatus({ background: true });
+      }, 300);
+
+      return () => window.clearTimeout(timer);
+    }
+
     const hasTraktBootstrapData =
       hasInitialTraktStatus ||
       hasCachedTraktStatus ||
@@ -3611,6 +3753,7 @@ export default function DetailsClient({
     // force:true para obtener siempre datos frescos de Trakt en la carga inicial
     void reloadTraktStatus({ background: false, force: true });
   }, [
+    loadTraktMovieWatched,
     reloadTraktStatus,
     endpointType,
     hasInitialTraktStatus,
@@ -3637,7 +3780,10 @@ export default function DetailsClient({
       if (!force && now - traktBackgroundSyncAtRef.current < 2500) return;
       traktBackgroundSyncAtRef.current = now;
 
-      // Cuando force=true, bypass caché para obtener datos frescos
+      if (endpointType === "movie") {
+        return loadTraktMovieWatched({ background: true, force });
+      }
+
       const latest = await reloadTraktStatus({ background: true, force });
       if (cancelled || !latest?.connected || type !== "tv") return;
       await loadTraktShowWatched();
@@ -3695,6 +3841,7 @@ export default function DetailsClient({
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [
+    loadTraktMovieWatched,
     reloadTraktStatus,
     loadTraktShowWatched,
     type,
@@ -3730,7 +3877,10 @@ export default function DetailsClient({
 
     let connected = !!trakt.connected;
     if (!connected) {
-      const latest = await reloadTraktStatus({ force: true });
+      const latest =
+        endpointType === "movie"
+          ? await loadTraktMovieWatched({ force: true })
+          : await reloadTraktStatus({ force: true });
       connected = !!latest?.connected;
     }
 
@@ -3760,6 +3910,7 @@ export default function DetailsClient({
     trakt.loading,
     traktBusy,
     trakt.connected,
+    loadTraktMovieWatched,
     reloadTraktStatus,
     confirmMovieTraktStatus,
     canOpenMovieTraktModalInstantly,
