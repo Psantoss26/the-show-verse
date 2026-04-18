@@ -43,6 +43,9 @@ export default function DetailsPageLoader(props) {
     let cancelled = false;
     let priorityTimer = null;
     let secondaryTimer = null;
+    const isMovie = type === "movie";
+    const priorityDelayMs = isMovie ? 1100 : 350;
+    const secondaryDelayMs = isMovie ? 1800 : 1200;
 
     const loadPriorityDeferredData = async () => {
       try {
@@ -122,11 +125,11 @@ export default function DetailsPageLoader(props) {
 
     priorityTimer = window.setTimeout(() => {
       void loadPriorityDeferredData();
-    }, 350);
+    }, priorityDelayMs);
 
     secondaryTimer = window.setTimeout(() => {
       void loadSecondaryDeferredData();
-    }, 1200);
+    }, secondaryDelayMs);
 
     return () => {
       cancelled = true;
