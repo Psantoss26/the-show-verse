@@ -307,17 +307,26 @@ function normalizeTraktHistoryEntries(history = []) {
 
 function buildTraktStateFromHistory(value) {
   const history = normalizeTraktHistoryEntries(value?.history);
+  const hasExplicitHistory = Array.isArray(value?.history);
   const historyCount = history.length;
   const hasHistory = historyCount > 0;
   const basePlays = Math.max(0, Number(value?.plays || 0));
-  const nextPlays = hasHistory ? Math.max(basePlays, historyCount) : basePlays;
+  const nextPlays = hasExplicitHistory
+    ? historyCount
+    : hasHistory
+      ? Math.max(basePlays, historyCount)
+      : basePlays;
   const nextLastWatchedAt =
-    hasHistory
+    hasExplicitHistory
+      ? hasHistory
+        ? history[0]?.watched_at || null
+        : null
+      : hasHistory
       ? history[0]?.watched_at || null
       : nextPlays > 0
         ? value?.lastWatchedAt || null
         : null;
-  const nextWatched = hasHistory || nextPlays > 0;
+  const nextWatched = hasExplicitHistory ? hasHistory : hasHistory || nextPlays > 0;
 
   return {
     ...value,
@@ -335,7 +344,10 @@ function isPossiblyStaleEmptyMovieTraktStatus(nextValue, prevValue, endpointType
   if (nextValue.watched || Number(nextValue.plays || 0) > 0) return false;
   if (Array.isArray(nextValue.history) && nextValue.history.length > 0) return false;
   if (nextValue.lastWatchedAt) return false;
-  return hasMeaningfulTraktSnapshot(prevValue);
+  return (
+    normalizeTraktHistoryEntries(prevValue.history).length > 0 ||
+    !!prevValue.lastWatchedAt
+  );
 }
 
 // =====================================================================
@@ -2042,6 +2054,16 @@ export default function DetailsClient({
   const traktBackgroundSyncAtRef = useRef(0);
   const traktResolvedIdRef = useRef(initialTraktId ?? null);
   const traktStatusRequestIdRef = useRef(0);
+  const movieHistoryEntries = useMemo(
+    () =>
+      endpointType === "movie" ? normalizeTraktHistoryEntries(trakt?.history) : [],
+    [endpointType, trakt?.history],
+  );
+  const movieHistoryCount = movieHistoryEntries.length;
+  const movieTraktWatched = endpointType === "movie" ? movieHistoryCount > 0 : false;
+  const movieLastWatchedAt = movieTraktWatched
+    ? movieHistoryEntries[0]?.watched_at || null
+    : null;
 
   useEffect(() => {
     traktResolvedIdRef.current = trakt?.traktId ?? initialTraktId ?? null;
@@ -7396,8 +7418,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
                 <TraktWatchedControl
                   connected={trakt.connected}
-                  watched={trakt.watched}
-                  plays={endpointType === "tv" ? 0 : trakt.plays}
+                  watched={
+                    endpointType === "movie" ? movieTraktWatched : trakt.watched
+                  }
+                  plays={endpointType === "tv" ? 0 : movieHistoryCount}
                   badge={endpointType === "tv" ? tvProgressBadge : null}
                   busy={!!traktBusy}
                   loading={
@@ -10116,10 +10140,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         connected={trakt.connected}
         found={trakt.found}
         traktUrl={trakt.traktUrl}
-        watched={trakt.watched}
-        plays={trakt.plays}
-        lastWatchedAt={trakt.lastWatchedAt}
-        history={trakt.history}
+        watched={endpointType === "movie" ? movieTraktWatched : trakt.watched}
+        plays={endpointType === "movie" ? movieHistoryCount : trakt.plays}
+        lastWatchedAt={
+          endpointType === "movie" ? movieLastWatchedAt : trakt.lastWatchedAt
+        }
+        history={endpointType === "movie" ? movieHistoryEntries : trakt.history}
         busyKey={traktBusy}
         onToggleWatched={toggleTraktWatched}
         onAddPlay={handleTraktAddPlay}
