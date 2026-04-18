@@ -115,7 +115,6 @@ import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedMo
 // -- API client de Trakt: estado, visionados, ratings, comentarios, listas, temporadas --
 import {
   traktGetItemStatus,
-  traktGetMovieWatched,
   traktSetWatched,
   traktAddWatchPlay,
   traktUpdateWatchPlay,
@@ -3059,7 +3058,7 @@ export default function DetailsClient({
             traktId: traktResolvedIdRef.current ?? undefined,
             force,
           }),
-          25000,
+          endpointType === "movie" ? 9000 : 25000,
         );
         const normalizedJson = buildTraktStateFromHistory(json || {});
 
@@ -3173,12 +3172,13 @@ export default function DetailsClient({
 
       try {
         const payload = await withTimeout(
-          traktGetMovieWatched({
+          traktGetItemStatus({
+            type: traktType,
             tmdbId: Number(id),
             traktId: traktResolvedIdRef.current ?? undefined,
             force,
           }),
-          25000,
+          8000,
         );
         const normalizedPayload = buildTraktStateFromHistory(payload || {});
 
@@ -3265,7 +3265,7 @@ export default function DetailsClient({
         return nextState;
       }
     },
-    [endpointType, id, reloadTraktStatus],
+    [endpointType, id, reloadTraktStatus, traktType],
   );
 
   const confirmMovieTraktStatus = useCallback(
@@ -3734,11 +3734,11 @@ export default function DetailsClient({
           background: true,
           force: false,
         });
-      }, 1400);
+      }, 900);
 
       const statusTimer = window.setTimeout(() => {
         void reloadTraktStatus({ background: true });
-      }, 1800);
+      }, 2800);
 
       return () => {
         window.clearTimeout(fallbackTimer);
@@ -3829,13 +3829,14 @@ export default function DetailsClient({
     // Si el primer intento llegó antes de que Trakt refrescara la sesión,
     // reintentamos una o dos veces sin exigir recarga manual.
     if (
-      trakt.loading ||
-      (!trakt.connected && !trakt.error) ||
-      (endpointType === "tv" && trakt.connected && !watchedBySeasonLoaded)
+      endpointType === "tv" &&
+      (trakt.loading ||
+        (!trakt.connected && !trakt.error) ||
+        (trakt.connected && !watchedBySeasonLoaded))
     ) {
       [900, 2200].forEach((delay) => {
         const timer = window.setTimeout(() => {
-          void syncTraktState({ force: endpointType !== "movie" });
+          void syncTraktState({ force: true });
         }, delay);
         timers.push(timer);
       });
