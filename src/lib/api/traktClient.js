@@ -151,13 +151,27 @@ export async function traktDisconnect() {
 }
 
 export async function traktGetItemStatus({ type, tmdbId, traktId } = {}) {
-  const auth = await ensureTraktAuthReady();
-  if (!auth?.connected) return { connected: false };
-
   const qs = new URLSearchParams({ type: String(type) });
   if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
   if (traktId != null) qs.set("traktId", String(traktId));
-  return fetchGetJsonDeduped(`/api/trakt/item/status?${qs.toString()}`);
+  try {
+    const json = await fetchGetJsonDeduped(
+      `/api/trakt/item/status?${qs.toString()}`,
+    );
+    if (json?.degraded) {
+      const error = new Error(json?.error || "Trakt transient status");
+      error.code = "TRAKT_TRANSIENT";
+      error.status = 503;
+      throw error;
+    }
+    return json;
+  } catch (error) {
+    const auth = await ensureTraktAuthReady().catch(() => ({
+      connected: false,
+    }));
+    if (!auth?.connected) return { connected: false };
+    throw error;
+  }
 }
 
 export async function traktSetWatched({ type, tmdbId, watched, watchedAt }) {
@@ -252,13 +266,29 @@ export async function traktGetHistory({
 
 /** ✅ NUEVO/CLAVE: carga episodios vistos por show (SIN especiales) */
 export async function traktGetShowWatched({ tmdbId, traktId } = {}) {
-  const auth = await ensureTraktAuthReady();
-  if (!auth?.connected) return { connected: false, found: false, watchedBySeason: {} };
-
   const qs = new URLSearchParams();
   if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
   if (traktId != null) qs.set("traktId", String(traktId));
-  return fetchGetJsonDeduped(`/api/trakt/show/watched?${qs.toString()}`); // { watchedBySeason }
+  try {
+    const json = await fetchGetJsonDeduped(
+      `/api/trakt/show/watched?${qs.toString()}`,
+    );
+    if (json?.degraded) {
+      const error = new Error(json?.error || "Trakt transient show watched");
+      error.code = "TRAKT_TRANSIENT";
+      error.status = 503;
+      throw error;
+    }
+    return json; // { watchedBySeason }
+  } catch (error) {
+    const auth = await ensureTraktAuthReady().catch(() => ({
+      connected: false,
+    }));
+    if (!auth?.connected) {
+      return { connected: false, found: false, watchedBySeason: {} };
+    }
+    throw error;
+  }
 }
 
 /** ✅ Toggle episodio + devuelve watchedBySeason actualizado */

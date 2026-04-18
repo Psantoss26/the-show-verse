@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
   SlidersHorizontal,
@@ -556,18 +557,25 @@ function RatingBadge({ percent }) {
 }
 
 function DiscoverCard({ item }) {
+  const router = useRouter();
   const isMovie = item.media_type === "movie";
   const title = isMovie ? item.title : item.name;
   const rawDate = isMovie ? item.release_date : item.first_air_date;
   const year = rawDate ? rawDate.split("-")[0] : "";
   const percent = (item.vote_average || 0) * 10;
   const href = `/details/${item.media_type}/${item.id}`;
+  const handlePrefetch = () => {
+    router.prefetch(href);
+  };
 
   return (
     <Link
       href={href}
       className="group relative flex flex-col w-full h-full"
       title={title}
+      onMouseEnter={handlePrefetch}
+      onFocus={handlePrefetch}
+      onTouchStart={handlePrefetch}
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md ring-1 ring-white/5 transition-all duration-300 group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] group-hover:ring-white/20 group-hover:scale-[1.03] z-0 group-hover:z-10">
         <img

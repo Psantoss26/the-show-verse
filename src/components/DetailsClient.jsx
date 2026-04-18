@@ -3033,6 +3033,7 @@ export default function DetailsClient({
           e?.message || "",
         );
         const isTransient =
+          e?.code === "TRAKT_TRANSIENT" ||
           isTimeout ||
           isRateLimit ||
           /aborted|fetch|network|server error/i.test(e?.message || "");
@@ -3045,7 +3046,7 @@ export default function DetailsClient({
             connected: isTransient ? p.connected : false,
             error: background
               ? p.error
-              : isTimeout
+              : isTransient
                 ? ""
                 : isRateLimit
                   ? "Trakt: límite de peticiones alcanzado"
@@ -3501,7 +3502,11 @@ export default function DetailsClient({
 
     // Si el primer intento llegó antes de que Trakt refrescara la sesión,
     // reintentamos una o dos veces sin exigir recarga manual.
-    if (trakt.loading || (!trakt.connected && !trakt.error)) {
+    if (
+      trakt.loading ||
+      (!trakt.connected && !trakt.error) ||
+      (endpointType === "tv" && trakt.connected && !watchedBySeasonLoaded)
+    ) {
       [900, 2200].forEach((delay) => {
         const timer = window.setTimeout(() => {
           void syncTraktState({ force: true });
@@ -3525,6 +3530,7 @@ export default function DetailsClient({
     trakt.loading,
     trakt.connected,
     trakt.error,
+    watchedBySeasonLoaded,
     hasInitialTraktStatus,
     hasCachedTraktStatus,
     hasInitialShowWatched,

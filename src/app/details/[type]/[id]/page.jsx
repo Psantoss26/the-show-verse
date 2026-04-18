@@ -19,7 +19,6 @@ export default async function DetailsPage({ params }) {
     notFound();
   }
 
-  // Extraer datos iniciales del response enriquecido (append_to_response)
   const initialCastData = Array.isArray(data?.credits?.cast)
     ? data.credits.cast
     : [];
