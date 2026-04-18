@@ -343,15 +343,19 @@ function sortHistoryDesc(history = []) {
 
 export async function traktGetHistoryForItem(
   token,
-  { type, traktId, limit = 10 },
+  { type, traktId, limit = 10, timeoutMs = 5000 },
 ) {
   // endpoint usa plural: movies / shows
   const plural = type === "movie" ? "movies" : "shows";
   const r = await traktFetch(
     `/sync/history/${plural}/${encodeURIComponent(traktId)}?limit=${limit}`,
-    { token },
+    { token, timeoutMs },
   );
-  if (!r.ok) throw new Error("Trakt history failed");
+  if (!r.ok) {
+    const err = new Error(`Trakt history failed (${r.status})`);
+    err.status = r.status;
+    throw err;
+  }
   const arr = Array.isArray(r.json) ? r.json : [];
   return sortHistoryDesc(arr);
 }
@@ -476,6 +480,7 @@ export async function getTraktItemStatusFromCookieStore(
       authVerified &&
       (e?.status === 403 ||
         e?.status === 429 ||
+        (typeof e?.status === "number" && e.status >= 500) ||
         /timeout|tempor|aborted|fetch/i.test(e?.message || ""));
 
     return transientAfterAuth
@@ -726,6 +731,7 @@ export async function getTraktDetailsBootstrapFromCookieStore(
       authVerified &&
       (e?.status === 403 ||
         e?.status === 429 ||
+        (typeof e?.status === "number" && e.status >= 500) ||
         /timeout|tempor|aborted|fetch/i.test(e?.message || ""));
 
     return {
@@ -1083,6 +1089,7 @@ export async function getTraktShowWatchedFromCookieStore(
       authVerified &&
       (e?.status === 403 ||
         e?.status === 429 ||
+        (typeof e?.status === "number" && e.status >= 500) ||
         /timeout|tempor|aborted|fetch/i.test(e?.message || ""));
 
     return transientAfterAuth

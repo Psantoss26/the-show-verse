@@ -61,7 +61,9 @@ async function fetchGetJsonDeduped(
     const res = await fetch(url, { cache, credentials });
     const json = await safeJson(res);
     if (!res.ok) {
-      throw new Error(json?.error || `HTTP ${res.status}`);
+      const err = new Error(json?.error || `HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
     }
     return json;
   })().finally(() => {

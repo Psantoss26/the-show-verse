@@ -3119,7 +3119,9 @@ export default function DetailsClient({
           e?.code === "TRAKT_TRANSIENT" ||
           isTimeout ||
           isRateLimit ||
-          /aborted|fetch|network|server error/i.test(e?.message || "");
+          // HTTP 5xx from Vercel (gateway timeout, cold-start failures, etc.)
+          (typeof e?.status === "number" && e.status >= 500) ||
+          /aborted|fetch|network|server error|HTTP 5/i.test(e?.message || "");
 
         let nextState = null;
         setTrakt((p) => {
