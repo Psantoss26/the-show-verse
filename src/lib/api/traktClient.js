@@ -51,14 +51,19 @@ export function invalidateTraktGetCache({
 
 async function fetchGetJsonDeduped(
   url,
-  { credentials = "include", cache = "no-store" } = {},
+  { credentials = "include", cache = "no-store", force = false } = {},
 ) {
-  if (inFlightGetRequests.has(url)) {
-    return inFlightGetRequests.get(url);
+  // Si force=true, añadir timestamp para evitar deduplicación y caché
+  const fetchUrl = force
+    ? `${url}${url.includes("?") ? "&" : "?"}_t=${Date.now()}`
+    : url;
+
+  if (!force && inFlightGetRequests.has(fetchUrl)) {
+    return inFlightGetRequests.get(fetchUrl);
   }
 
   const promise = (async () => {
-    const res = await fetch(url, { cache, credentials });
+    const res = await fetch(fetchUrl, { cache, credentials });
     const json = await safeJson(res);
     if (!res.ok) {
       const err = new Error(json?.error || `HTTP ${res.status}`);
@@ -67,10 +72,10 @@ async function fetchGetJsonDeduped(
     }
     return json;
   })().finally(() => {
-    inFlightGetRequests.delete(url);
+    inFlightGetRequests.delete(fetchUrl);
   });
 
-  inFlightGetRequests.set(url, promise);
+  inFlightGetRequests.set(fetchUrl, promise);
   return promise;
 }
 
@@ -185,13 +190,19 @@ export async function traktDisconnect() {
   return json;
 }
 
-export async function traktGetItemStatus({ type, tmdbId, traktId } = {}) {
+export async function traktGetItemStatus({
+  type,
+  tmdbId,
+  traktId,
+  force = false,
+} = {}) {
   const qs = new URLSearchParams({ type: String(type) });
   if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
   if (traktId != null) qs.set("traktId", String(traktId));
   try {
     const json = await fetchGetJsonDeduped(
       `/api/trakt/item/status?${qs.toString()}`,
+      { force },
     );
     if (json?.degraded) {
       const error = new Error(json?.error || "Trakt transient status");
