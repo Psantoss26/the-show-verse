@@ -311,12 +311,11 @@ function buildTraktStateFromHistory(value) {
   const hasHistory = historyCount > 0;
   const basePlays = Math.max(0, Number(value?.plays || 0));
   const nextPlays = hasHistory ? Math.max(basePlays, historyCount) : basePlays;
-  const nextLastWatchedAt =
-    hasHistory
-      ? history[0]?.watched_at || null
-      : nextPlays > 0
-        ? value?.lastWatchedAt || null
-        : null;
+  const nextLastWatchedAt = hasHistory
+    ? history[0]?.watched_at || null
+    : nextPlays > 0
+      ? value?.lastWatchedAt || null
+      : null;
   const nextWatched = hasHistory || nextPlays > 0;
 
   return {
@@ -328,12 +327,17 @@ function buildTraktStateFromHistory(value) {
   };
 }
 
-function isPossiblyStaleEmptyMovieTraktStatus(nextValue, prevValue, endpointType) {
+function isPossiblyStaleEmptyMovieTraktStatus(
+  nextValue,
+  prevValue,
+  endpointType,
+) {
   if (endpointType !== "movie") return false;
   if (!nextValue || !prevValue) return false;
   if (!nextValue.connected || !nextValue.found) return false;
   if (nextValue.watched || Number(nextValue.plays || 0) > 0) return false;
-  if (Array.isArray(nextValue.history) && nextValue.history.length > 0) return false;
+  if (Array.isArray(nextValue.history) && nextValue.history.length > 0)
+    return false;
   if (nextValue.lastWatchedAt) return false;
   return hasMeaningfulTraktSnapshot(prevValue);
 }
@@ -1939,7 +1943,8 @@ export default function DetailsClient({
   }, [endpointType, initialShowWatched]);
 
   const hasInitialShowWatched = useMemo(
-    () => endpointType === "tv" && hasResolvedTraktBootstrap(initialShowWatched),
+    () =>
+      endpointType === "tv" && hasResolvedTraktBootstrap(initialShowWatched),
     [endpointType, initialShowWatched],
   );
   const [hasCachedTraktStatus, setHasCachedTraktStatus] = useState(false);
@@ -1983,52 +1988,49 @@ export default function DetailsClient({
     [initialTraktStatus, initialShowWatched],
   );
 
-  const buildInitialTraktState = useCallback(
-    () => {
-      const normalizedInitialStatus = buildTraktStateFromHistory({
-        watched: !!initialTraktStatus?.watched,
-        plays: Number(initialTraktStatus?.plays || 0),
-        lastWatchedAt: initialTraktStatus?.lastWatchedAt || null,
-        history: Array.isArray(initialTraktStatus?.history)
-          ? initialTraktStatus.history
-          : [],
-      });
+  const buildInitialTraktState = useCallback(() => {
+    const normalizedInitialStatus = buildTraktStateFromHistory({
+      watched: !!initialTraktStatus?.watched,
+      plays: Number(initialTraktStatus?.plays || 0),
+      lastWatchedAt: initialTraktStatus?.lastWatchedAt || null,
+      history: Array.isArray(initialTraktStatus?.history)
+        ? initialTraktStatus.history
+        : [],
+    });
 
-      return {
-        loading:
-          !hasInitialTraktStatus &&
-          !(endpointType === "tv" && hasInitialShowWatched),
-        connected: initialTraktConnected,
-        found: initialTraktFound,
-        traktId: initialTraktId,
-        traktUrl: initialTraktStatus?.traktUrl || null,
-        watched:
-          endpointType === "tv" && hasInitialShowWatched
-            ? initialAnyEpisodeWatched
-            : !!normalizedInitialStatus.watched,
-        plays: Number(normalizedInitialStatus.plays || 0),
-        lastWatchedAt: normalizedInitialStatus.lastWatchedAt || null,
-        rating:
-          typeof initialTraktStatus?.rating === "number"
-            ? initialTraktStatus.rating
-            : null,
-        inWatchlist: !!initialTraktStatus?.inWatchlist,
-        progress: initialTraktStatus?.progress || null,
-        history: normalizedInitialStatus.history,
-        error: initialTraktStatus?.error || "",
-      };
-    },
-    [
-      endpointType,
-      hasInitialShowWatched,
-      hasInitialTraktStatus,
-      initialAnyEpisodeWatched,
-      initialTraktConnected,
-      initialTraktFound,
-      initialTraktId,
-      initialTraktStatus,
-    ],
-  );
+    return {
+      loading:
+        !hasInitialTraktStatus &&
+        !(endpointType === "tv" && hasInitialShowWatched),
+      connected: initialTraktConnected,
+      found: initialTraktFound,
+      traktId: initialTraktId,
+      traktUrl: initialTraktStatus?.traktUrl || null,
+      watched:
+        endpointType === "tv" && hasInitialShowWatched
+          ? initialAnyEpisodeWatched
+          : !!normalizedInitialStatus.watched,
+      plays: Number(normalizedInitialStatus.plays || 0),
+      lastWatchedAt: normalizedInitialStatus.lastWatchedAt || null,
+      rating:
+        typeof initialTraktStatus?.rating === "number"
+          ? initialTraktStatus.rating
+          : null,
+      inWatchlist: !!initialTraktStatus?.inWatchlist,
+      progress: initialTraktStatus?.progress || null,
+      history: normalizedInitialStatus.history,
+      error: initialTraktStatus?.error || "",
+    };
+  }, [
+    endpointType,
+    hasInitialShowWatched,
+    hasInitialTraktStatus,
+    initialAnyEpisodeWatched,
+    initialTraktConnected,
+    initialTraktFound,
+    initialTraktId,
+    initialTraktStatus,
+  ]);
 
   // =====================================================================
   // INTEGRACION CON TRAKT
@@ -3067,14 +3069,13 @@ export default function DetailsClient({
 
           const preserveTvWatched =
             endpointType === "tv" && watchedBySeasonLoadedRef.current;
-          const preservePreviousState = shouldPreservePreviousTraktStatus(
-            normalizedJson,
-            prev,
-          ) || isPossiblyStaleEmptyMovieTraktStatus(
-            normalizedJson,
-            prev,
-            endpointType,
-          );
+          const preservePreviousState =
+            shouldPreservePreviousTraktStatus(normalizedJson, prev) ||
+            isPossiblyStaleEmptyMovieTraktStatus(
+              normalizedJson,
+              prev,
+              endpointType,
+            );
 
           if (preservePreviousState) {
             nextState = {
@@ -3095,7 +3096,9 @@ export default function DetailsClient({
             found: !!normalizedJson.found,
             traktId: normalizedJson.traktId ?? null,
             traktUrl: normalizedJson.traktUrl || prev.traktUrl || null,
-            watched: preserveTvWatched ? prev.watched : !!normalizedJson.watched,
+            watched: preserveTvWatched
+              ? prev.watched
+              : !!normalizedJson.watched,
             plays: Number(normalizedJson.plays || 0),
             lastWatchedAt: normalizedJson.lastWatchedAt || null,
             rating:
@@ -3698,12 +3701,7 @@ export default function DetailsClient({
       hasCachedTraktStatus ||
       hasMeaningfulTraktSnapshot(trakt)
     );
-  }, [
-    endpointType,
-    trakt,
-    hasInitialTraktStatus,
-    hasCachedTraktStatus,
-  ]);
+  }, [endpointType, trakt, hasInitialTraktStatus, hasCachedTraktStatus]);
 
   const handleOpenTraktWatched = useCallback(async () => {
     if (traktBusy) return;
@@ -3955,7 +3953,9 @@ export default function DetailsClient({
     setTraktBusy("history");
     try {
       const optimisticIso = `${yyyyMmDd}T12:00:00.000Z`;
-      const prevHistoryLength = normalizeTraktHistoryEntries(trakt.history).length;
+      const prevHistoryLength = normalizeTraktHistoryEntries(
+        trakt.history,
+      ).length;
       await traktAddWatchPlay({
         type: traktType,
         tmdbId: id,
@@ -3995,7 +3995,9 @@ export default function DetailsClient({
     setTraktBusy("history");
     try {
       const optimisticIso = `${yyyyMmDd}T12:00:00.000Z`;
-      const prevHistoryLength = normalizeTraktHistoryEntries(trakt.history).length;
+      const prevHistoryLength = normalizeTraktHistoryEntries(
+        trakt.history,
+      ).length;
       await traktUpdateWatchPlay({
         type: traktType,
         tmdbId: id,
@@ -4035,7 +4037,9 @@ export default function DetailsClient({
     if (!trakt.connected || traktBusy) return;
     setTraktBusy("history");
     try {
-      const prevHistoryLength = normalizeTraktHistoryEntries(trakt.history).length;
+      const prevHistoryLength = normalizeTraktHistoryEntries(
+        trakt.history,
+      ).length;
       const expectedHistoryLength = Math.max(0, prevHistoryLength - 1);
       await traktRemoveWatchPlay({ historyId });
       invalidateTraktGetCache({
