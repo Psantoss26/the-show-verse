@@ -1,0 +1,39 @@
+# Dependencias instaladas localmente (se reinstalan dentro del contenedor)
+node_modules
+npm-debug.log*
+
+# Artefactos de build local
+.next
+out
+dist
+build
+
+# Variables de entorno con secretos — NUNCA dentro de la imagen
+.env
+.env.local
+.env.*.local
+
+# Control de versiones
+.git
+.gitignore
+
+# Documentación y archivos auxiliares
+.docs
+README.md
+TRAKT_CACHE_SYSTEM.md
+apiary.apib
+dredd.yml
+
+# Tests y herramientas de desarrollo
+__tests__
+*.test.*
+*.spec.*
+coverage
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
