@@ -1,20 +1,7 @@
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
-import { getTraktDetailsBootstrapFromCookieStore } from "@/lib/trakt/server";
-import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
-
-export const dynamic = "force-dynamic";
-
-function resolveWithin(promise, timeoutMs, fallback = null) {
-  return Promise.race([
-    promise,
-    new Promise((resolve) => {
-      setTimeout(() => resolve(fallback), timeoutMs);
-    }),
-  ]);
-}
+export const revalidate = 600;
 
 export default async function TvDetailsPage({ params }) {
   const p = await params;
@@ -24,29 +11,9 @@ export default async function TvDetailsPage({ params }) {
     notFound();
   }
 
-  const cookieStore = await cookies();
-  const [data, traktBootstrap, initialScoreboard] = await Promise.all([
-    getDetails("tv", id, {
-      appendToResponse: "external_ids",
-    }),
-    resolveWithin(
-      getTraktDetailsBootstrapFromCookieStore(cookieStore, {
-        type: "show",
-        tmdbId: id,
-      }).catch(() => null),
-      1400,
-      null,
-    ),
-    resolveWithin(
-      getCachedTraktScoreboardData({
-        type: "show",
-        tmdbId: id,
-        includeStats: false,
-      }).catch(() => null),
-      500,
-      null,
-    ),
-  ]);
+  const data = await getDetails("tv", id, {
+    appendToResponse: "external_ids",
+  });
 
   if (!data) {
     notFound();
@@ -58,8 +25,6 @@ export default async function TvDetailsPage({ params }) {
   const initialReviews = Array.isArray(data?.reviews?.results)
     ? data.reviews.results
     : [];
-  const initialTraktStatus = traktBootstrap?.status ?? null;
-  const initialShowWatched = traktBootstrap?.showWatched ?? null;
 
   return (
     <DetailsPageLoader
@@ -68,9 +33,6 @@ export default async function TvDetailsPage({ params }) {
       data={data}
       initialCastData={initialCastData}
       initialReviews={initialReviews}
-      initialTraktStatus={initialTraktStatus}
-      initialShowWatched={initialShowWatched}
-      initialScoreboard={initialScoreboard}
     />
   );
 }
