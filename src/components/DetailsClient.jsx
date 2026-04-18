@@ -3673,8 +3673,26 @@ export default function DetailsClient({
     hasCachedShowWatched,
   ]);
 
+  const canOpenMovieTraktModalInstantly = useMemo(() => {
+    if (endpointType !== "movie") return false;
+    if (!trakt?.connected) return false;
+    return (
+      hasInitialTraktStatus ||
+      hasCachedTraktStatus ||
+      hasMeaningfulTraktSnapshot(trakt)
+    );
+  }, [
+    endpointType,
+    trakt,
+    hasInitialTraktStatus,
+    hasCachedTraktStatus,
+  ]);
+
   const handleOpenTraktWatched = useCallback(async () => {
-    if (trakt.loading || traktBusy) return;
+    if (traktBusy) return;
+    const canOpenWhileLoading =
+      endpointType === "movie" && canOpenMovieTraktModalInstantly;
+    if (trakt.loading && !canOpenWhileLoading) return;
 
     let connected = !!trakt.connected;
     if (!connected) {
@@ -3690,7 +3708,9 @@ export default function DetailsClient({
     }
 
     if (endpointType === "movie") {
-      await confirmMovieTraktStatus();
+      setTraktWatchedOpen(true);
+      void confirmMovieTraktStatus();
+      return;
     }
 
     if (endpointType === "tv") {
@@ -3707,6 +3727,7 @@ export default function DetailsClient({
     trakt.connected,
     reloadTraktStatus,
     confirmMovieTraktStatus,
+    canOpenMovieTraktModalInstantly,
     loadTraktShowWatched,
     type,
     id,
@@ -7365,7 +7386,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   badge={endpointType === "tv" ? tvProgressBadge : null}
                   busy={!!traktBusy}
                   loading={
-                    trakt.loading ||
+                    (endpointType === "movie"
+                      ? trakt.loading && !canOpenMovieTraktModalInstantly
+                      : trakt.loading) ||
                     (endpointType === "tv" &&
                       !!trakt.connected &&
                       !watchedBySeasonLoaded)
