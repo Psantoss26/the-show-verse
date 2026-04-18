@@ -41,7 +41,7 @@
 \contentsline {subsection}{\numberline {4.3.1}The Movie Database (TMDb) API v3}{29}{subsection.4.3.1}%
 \contentsline {subsection}{\numberline {4.3.2}OMDb API (Open Movie Database)}{31}{subsection.4.3.2}%
 \contentsline {subsection}{\numberline {4.3.3}Proxy de Trakt y transformación de datos}{31}{subsection.4.3.3}%
-\contentsline {subsection}{\numberline {4.3.4}JustWatch (API GraphQL no oficial)}{31}{subsection.4.3.4}%
+\contentsline {subsection}{\numberline {4.3.4}JustWatch (API GraphQL no oficial)}{32}{subsection.4.3.4}%
 \contentsline {subsection}{\numberline {4.3.5}Plex Media Server}{32}{subsection.4.3.5}%
 \contentsline {section}{\numberline {4.4}Arquitectura de API Routes propias}{33}{section.4.4}%
 \contentsline {subsection}{\numberline {4.4.1}Funciones principales de las API Routes}{33}{subsection.4.4.1}%

@@ -27,7 +27,7 @@ La estructura principal se organiza en cuatro directorios bajo \texttt{src/}:
 
 Las rutas principales de la aplicación son:
 
-\begin{table}[!htbp]
+\begin{table}[H]
 \begin{center}
 \begin{tabular}{| l | l |}
 \hline
@@ -98,7 +98,7 @@ El cliente de TMDb (\texttt{lib/api/tmdb.js}) encapsula toda la lógica de acces
 \item Un \textbf{constructor de URL unificado} que añade automáticamente la API Key y el idioma por defecto (\texttt{es-ES}).
 \item Un \textbf{mecanismo de timeout} mediante \texttt{AbortController} (8 segundos por defecto) para evitar que peticiones lentas bloqueen la interfaz.
 \item \textbf{Estrategia de caché}: en servidor se usa \texttt{force-cache} con revalidación ISR para reutilizar respuestas y reducir llamadas repetidas, mientras que en cliente se emplea \texttt{no-store} para evitar datos obsoletos en interacciones en tiempo real.
-\item \textbf{Gestión granular de errores}: cuando la API devuelve un 404, la función interpreta que el recurso no existe y retorna \texttt{null} sin registrar un error. En el resto de casos, el fallo sí se registra en logs para diagnóstico y la función retorna igualmente \texttt{null} para no bloquear la interfaz.
+\item \textbf{Gestión de errores}: cuando la API devuelve un 404, la función interpreta que el recurso no existe y retorna \texttt{null} sin registrar un error. En el resto de casos, el fallo sí se registra en logs para diagnóstico y la función retorna igualmente \texttt{null} para no bloquear la interfaz.
 \end{itemize}
 
 Sobre esta función base se construyen más de 40 funciones nombradas por dominio (\texttt{fetchTopRatedMovies}, \texttt{getDetails}, \texttt{getCredits}, \texttt{getWatchProviders}, \texttt{getActorDetails}, etc.) que constituyen la API pública del módulo.
@@ -146,7 +146,7 @@ La Tabla~\ref{tab:tmdb-endpoints} recoge los \textit{endpoints} principales util
 
 OMDb es la única fuente pública que permite obtener el \textit{rating} de IMDb, el número de votos y las puntuaciones de Rotten Tomatoes y Metacritic por \texttt{imdbId}. Para proteger la API Key, todas las peticiones a OMDb pasan por la API Route interna \texttt{/api/omdb}.
 
-El \textit{proxy} implementa un \textbf{sistema de deduplicación} (\texttt{inflight Map} global): si múltiples tarjetas solicitan simultáneamente el mismo \texttt{imdbId}, solo se realiza una petición real a OMDb. Las respuestas exitosas se cachean 24 horas en el proceso de Node.js; las fallidas, 60 segundos para reintentar pronto.
+El \textit{proxy} incorpora dos medidas para reducir carga y mejorar tiempos de respuesta. La primera es la deduplicación de peticiones en curso (\texttt{inflight Map} global): si varias tarjetas piden a la vez el mismo \texttt{imdbId}, todas comparten una única consulta a OMDb en lugar de lanzar peticiones duplicadas. La segunda es una caché en memoria por tipo de resultado, las respuestas correctas se guardan durante 24 horas y se reutilizan en solicitudes posteriores, mientras que los errores temporales se almacenan solo 60 segundos para evitar insistir de forma inmediata y permitir un nuevo intento poco después.
 
 \subsection{Proxy de Trakt y transformación de datos}
 
@@ -154,11 +154,12 @@ Las API Routes de Trakt actúan como intermediario que resuelve dos problemas es
 
 \textbf{Problema de identificadores.} El \textit{frontend} trabaja exclusivamente con \texttt{tmdbId}, mientras que muchos \textit{endpoints} de Trakt requieren sus propios identificadores (\texttt{traktId}, \texttt{slug}). Las API Routes realizan internamente la traducción mediante el \textit{endpoint} de búsqueda por ID externo de Trakt (\texttt{/search/tmdb/\{id\}?type=movie|show}).
 
-\textbf{Problema de enriquecimiento de datos.} Las respuestas de Trakt incluyen datos de \textit{tracking} pero no imágenes. Las API Routes que devuelven listas de contenido (historial, favoritos, pendientes) realizan peticiones paralelas a TMDb para obtener las URLs de \textit{poster} y \textit{backdrop}, enriqueciendo la respuesta antes de enviarla al cliente.
+\textbf{Problema de datos incompletos.} Las respuestas de Trakt incluyen datos de \textit{tracking} pero no imágenes. Las API Routes que devuelven listas de contenido (historial, favoritos, pendientes) realizan peticiones paralelas a TMDb para obtener las URLs de \textit{poster} y \textit{backdrop}, completando la respuesta antes de enviarla al cliente.
 
 La tabla~\ref{tab:trakt-endpoints} recoge los \textit{endpoints} de Trakt utilizados por módulo funcional.
 
-\begin{table}[!htbp]
+\clearpage
+\begin{table}[!t]
 \begin{center}
 \begin{tabular}{| l | l |}
 \hline
@@ -204,30 +205,19 @@ La función principal \texttt{getStreamingProviders(title, type, year)} filtra l
 
 \subsection{Plex Media Server}
 
-La integración con Plex permite a los usuarios que tienen una biblioteca local abrir directamente cualquier película o serie desde \textit{The Show Verse} en su servidor Plex, sin tener que buscar el contenido manualmente.
+La integración con Plex se diseñó para conectar el catálogo de la plataforma con la biblioteca personal del usuario. El objetivo es que, si un título existe en su servidor Plex, pueda abrirlo directamente desde la ficha de la aplicación sin búsquedas manuales.
 
-\textbf{Autenticación.} El módulo \texttt{lib/plex/auth.js} implementa dos modos:
-\begin{itemize}
-\item \textbf{Modo simple:} se configura \texttt{PLEX\_TOKEN} en variables de entorno y se usa directamente en cada petición.
-\item \textbf{Modo JWT:} se configura una clave privada RSA o Ed25519 (\texttt{PLEX\_JWT\_PRIVATE\_KEY}). La aplicación firma JWTs con la clave privada, los intercambia por tokens de acceso en la API de Plex y los renueva automáticamente antes de su expiración. La deduplicación de refrescos concurrentes se gestiona mediante un \texttt{Promise} compartido (\texttt{state.refreshPromise}).
-\end{itemize}
+\textbf{Funcionamiento general.} Cuando el usuario pulsa la opción de abrir en Plex, el frontend llama a una ruta interna del servidor con los metadatos del título (nombre, tipo, año e identificadores externos). Esa ruta busca la equivalencia del contenido en Plex, prepara el enlace más adecuado según el dispositivo y devuelve una respuesta unificada para que la interfaz solo tenga que mostrar el botón de acceso.
 
-\textbf{API Route interna (\texttt{GET /api/plex}).} Recibe \texttt{title}, \texttt{type}, \texttt{year}, \texttt{imdbId} y \texttt{tmdbId} como parámetros y devuelve varios formatos de URL para el acceso al contenido desde diferentes plataformas:
+\textbf{Gestión de acceso y seguridad.} La comunicación con Plex se realiza siempre desde el backend, usando credenciales guardadas en variables de entorno. El sistema admite una configuración simple basada en token y otra más robusta con generación y renovación automática de credenciales temporales. En ambos casos, la aplicación evita exponer claves sensibles en el navegador.
 
-\begin{itemize}
-\item \texttt{plexWebUrl}: URL para la interfaz web de Plex en escritorio.
-\item \texttt{plexUniversalUrl}: \texttt{https://watch.plex.tv/\{type\}/\{slug\}}, un enlace universal que abre la app nativa en iOS y Android.
-\item \texttt{plexSlugUrl}: \texttt{plex://\{type\}/\{slug\}}, \textit{deep link} nativo de la aplicación.
-\item \texttt{plexAndroidSlugIntentUrl}: formato \texttt{intent://} para Chrome en Android.
-\end{itemize}
-
-El slug para las URLs universales se resuelve consultando \texttt{https://metadata.provider.plex.tv/library/metadata/matches?guid=imdb://\{imdbId\}}.
+\textbf{Experiencia de uso.} Para el usuario final, el proceso es transparente: desde la misma pantalla de detalle puede saltar al contenido en Plex con un clic, tanto en escritorio como en móvil.
 
 % -----------------------------------------------------------------------
 \section{Arquitectura de API Routes propias}
 % -----------------------------------------------------------------------
 
-Next.js permite definir API Routes como funciones serverless que se ejecutan en el servidor, proporcionando endpoints HTTP personalizados. El proyecto implementa 74 API Routes organizadas en el directorio \texttt{src/app/api/}, que actúan como capa intermedia entre el cliente y las APIs externas, implementando lógica de negocio, transformación de datos, caché y seguridad.
+Next.js permite definir API Routes como funciones serverless que se ejecutan en el servidor, proporcionando endpoints HTTP personalizados. El proyecto implementa API Routes organizadas en el directorio \texttt{src/app/api/}, que actúan como capa intermedia entre el cliente y las APIs externas, implementando lógica de negocio, transformación de datos, caché y seguridad.
 
 \subsection{Funciones principales de las API Routes}
 
