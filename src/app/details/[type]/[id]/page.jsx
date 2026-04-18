@@ -64,7 +64,7 @@ export default async function DetailsPage({ params }) {
     : [];
   const initialTraktStatus = traktBootstrap?.status ?? null;
   const initialShowWatched =
-    type === "tv" ? traktBootstrap?.showWatched ?? null : null;
+    type === "tv" ? (traktBootstrap?.showWatched ?? null) : null;
 
   return (
     <DetailsPageLoader

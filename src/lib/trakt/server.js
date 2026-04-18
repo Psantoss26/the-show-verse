@@ -323,7 +323,11 @@ export async function traktSearchByTmdb(token, { type, tmdbId }) {
     { token },
   );
   if (!r.ok) {
-    const err = new Error(r.json?.error || r.json?.message || `Trakt search failed (HTTP ${r.status})`);
+    const err = new Error(
+      r.json?.error ||
+        r.json?.message ||
+        `Trakt search failed (HTTP ${r.status})`,
+    );
     err.status = r.status;
     err.isForbidden = r.status === 403;
     throw err;
@@ -537,8 +541,7 @@ export async function getTraktDetailsBootstrapFromCookieStore(
   { type, tmdbId },
 ) {
   const emptyStatus = emptyBootstrapStatus();
-  const emptyShowWatched =
-    type === "show" ? emptyBootstrapShowWatched() : null;
+  const emptyShowWatched = type === "show" ? emptyBootstrapShowWatched() : null;
 
   if (type !== "movie" && type !== "show") {
     return {
@@ -689,7 +692,10 @@ export async function getTraktDetailsBootstrapFromCookieStore(
         ? {
             aired,
             completed,
-            pct: Math.min(100, Math.max(0, Math.round((completed / aired) * 100))),
+            pct: Math.min(
+              100,
+              Math.max(0, Math.round((completed / aired) * 100)),
+            ),
           }
         : null;
 

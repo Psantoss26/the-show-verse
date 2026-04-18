@@ -78,11 +78,7 @@ async function ensureTraktAuthReady({ force = false } = {}) {
   if (typeof window === "undefined") return { connected: false };
 
   const now = Date.now();
-  if (
-    !force &&
-    traktAuthBootstrapValue &&
-    now - traktAuthBootstrapAt < 5000
-  ) {
+  if (!force && traktAuthBootstrapValue && now - traktAuthBootstrapAt < 5000) {
     return traktAuthBootstrapValue;
   }
 
