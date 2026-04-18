@@ -27,7 +27,7 @@ export default async function DetailsPage({ params }) {
 
   const cookieStore = await cookies();
   const traktType = type === "tv" ? "show" : "movie";
-  const traktBootstrapTimeoutMs = type === "tv" ? 1800 : 1400;
+  const traktBootstrapTimeoutMs = type === "tv" ? 3500 : 3000;
 
   const [data, traktBootstrap, initialScoreboard] = await Promise.all([
     getDetails(type, id, {
