@@ -27,14 +27,14 @@ export default async function TvDetailsPage({ params }) {
   const cookieStore = await cookies();
   const [data, traktBootstrap, initialScoreboard] = await Promise.all([
     getDetails("tv", id, {
-      appendToResponse: "credits,reviews,external_ids",
+      appendToResponse: "external_ids",
     }),
     resolveWithin(
       getTraktDetailsBootstrapFromCookieStore(cookieStore, {
         type: "show",
         tmdbId: id,
       }).catch(() => null),
-      1800,
+      1400,
       null,
     ),
     resolveWithin(

@@ -271,6 +271,49 @@ function hasMeaningfulTraktSnapshot(value) {
   );
 }
 
+const TRAKT_CACHE_MAX_AGE_MS = 2 * 60 * 1000;
+
+function getCacheUpdatedAt(value) {
+  const ts = Number(value?.updatedAt || value?.cachedAt || 0);
+  return Number.isFinite(ts) && ts > 0 ? ts : 0;
+}
+
+function isFreshTraktCache(value, maxAgeMs = TRAKT_CACHE_MAX_AGE_MS) {
+  const updatedAt = getCacheUpdatedAt(value);
+  if (!updatedAt) return false;
+  return Date.now() - updatedAt <= maxAgeMs;
+}
+
+function hasWatchedEpisodesSnapshot(value) {
+  const watchedBySeason = value?.watchedBySeason;
+  if (
+    !watchedBySeason ||
+    typeof watchedBySeason !== "object" ||
+    Array.isArray(watchedBySeason)
+  ) {
+    return false;
+  }
+
+  return Object.values(watchedBySeason).some(
+    (episodes) => Array.isArray(episodes) && episodes.length > 0,
+  );
+}
+
+function shouldUseCachedTraktStatus(value) {
+  if (!value || typeof value.connected !== "boolean") return false;
+  if (value.connected === false) return false;
+  return hasMeaningfulTraktSnapshot(value) || isFreshTraktCache(value);
+}
+
+function shouldUseCachedShowWatched(value) {
+  if (!value || typeof value !== "object") return false;
+  if (typeof value.connected === "boolean" && value.connected === false) {
+    return false;
+  }
+
+  return hasWatchedEpisodesSnapshot(value) || isFreshTraktCache(value);
+}
+
 function isDegradedTraktPayload(value) {
   if (!value || typeof value !== "object") return false;
   return value.degraded === true || (!!value.error && value.found !== true);
@@ -3421,7 +3464,7 @@ export default function DetailsClient({
             ? JSON.parse(cachedStatusRaw)
             : null;
 
-          if (cachedStatus && typeof cachedStatus.connected === "boolean") {
+          if (shouldUseCachedTraktStatus(cachedStatus)) {
             const normalizedCachedStatus = buildTraktStateFromHistory({
               watched: !!cachedStatus.watched,
               plays: Number(cachedStatus.plays || 0),
@@ -3463,6 +3506,7 @@ export default function DetailsClient({
           const watchedBySeasonCached = cachedWatched?.watchedBySeason;
 
           if (
+            shouldUseCachedShowWatched(cachedWatched) &&
             watchedBySeasonCached &&
             typeof watchedBySeasonCached === "object" &&
             !Array.isArray(watchedBySeasonCached)
@@ -3529,6 +3573,7 @@ export default function DetailsClient({
             found: !!trakt.found,
             traktId: trakt.traktId ?? null,
             traktUrl: trakt.traktUrl || null,
+            updatedAt: Date.now(),
             watched: !!trakt.watched,
             plays: Number(trakt.plays || 0),
             lastWatchedAt: trakt.lastWatchedAt || null,
@@ -3555,6 +3600,7 @@ export default function DetailsClient({
             connected: !!trakt.connected,
             found: !!trakt.found,
             traktId: trakt.traktId ?? null,
+            updatedAt: Date.now(),
             watchedBySeason:
               watchedBySeason && typeof watchedBySeason === "object"
                 ? watchedBySeason
