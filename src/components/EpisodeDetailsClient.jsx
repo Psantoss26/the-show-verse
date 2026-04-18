@@ -1,7 +1,7 @@
 // /src/components/EpisodeDetailsClient.jsx
 "use client";
 
-import { useMemo, useEffect, useState, useCallback } from "react";
+import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -19,29 +19,162 @@ import {
   Eye,
   Play as PlayIcon,
   List as ListIcon,
-  Heart as HeartIcon,
 } from "lucide-react";
 
 import { SectionTitle, VisualMetaCard } from "@/components/details/DetailAtoms";
-import {
-  CompactBadge,
-  ExternalLinkButton,
-  MiniStat,
-  UnifiedRateButton,
-} from "@/components/details/DetailHeaderBits";
+import { CompactBadge, MiniStat } from "@/components/details/DetailHeaderBits";
 import {
   formatDateEs,
-  stripHtml,
   formatVoteCount,
   formatCountShort,
 } from "@/lib/details/formatters";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import {
+  invalidateTraktGetCache,
   traktGetItemStatus,
   traktGetShowWatched,
   traktSetEpisodeWatched,
 } from "@/lib/api/traktClient";
+
+const episodeScoreboardCache = new Map();
+const episodeScoreboardInflight = new Map();
+const episodeImdbCache = new Map();
+const episodeImdbInflight = new Map();
+
+function normalizeWatchedBySeason(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value;
+}
+
+function getWatchedSeasonEpisodes(watchedBySeason, seasonNumber) {
+  if (!watchedBySeason || typeof watchedBySeason !== "object") return [];
+  const value =
+    watchedBySeason?.[Number(seasonNumber)] ??
+    watchedBySeason?.[String(Number(seasonNumber))];
+  return Array.isArray(value) ? value : [];
+}
+
+function scheduleAfterFirstPaint(task, delay = 0) {
+  if (typeof window === "undefined") return () => {};
+
+  let cancelled = false;
+  let idleId = null;
+  const timerId = window.setTimeout(() => {
+    if (cancelled) return;
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(
+        () => {
+          if (!cancelled) task();
+        },
+        { timeout: 1200 },
+      );
+      return;
+    }
+
+    task();
+  }, delay);
+
+  return () => {
+    cancelled = true;
+    window.clearTimeout(timerId);
+    if (idleId != null && typeof window.cancelIdleCallback === "function") {
+      window.cancelIdleCallback(idleId);
+    }
+  };
+}
+
+async function fetchEpisodeScoreboardCached({
+  showId,
+  seasonNumber,
+  episodeNumber,
+  signal,
+}) {
+  const key = `${showId}:${seasonNumber}:${episodeNumber}`;
+  if (episodeScoreboardCache.has(key)) {
+    return episodeScoreboardCache.get(key);
+  }
+  if (episodeScoreboardInflight.has(key)) {
+    return episodeScoreboardInflight.get(key);
+  }
+
+  const promise = fetch(
+    `/api/scoreboard/public?type=episode&id=${encodeURIComponent(showId)}&season=${encodeURIComponent(seasonNumber)}&episode=${encodeURIComponent(episodeNumber)}`,
+    {
+      cache: "force-cache",
+      signal,
+    },
+  )
+    .then(async (res) => {
+      const json = await res.json().catch(() => null);
+      const value = res.ok && json?.found ? json : null;
+      if (value) {
+        episodeScoreboardCache.set(key, value);
+      }
+      return value;
+    })
+    .catch((error) => {
+      if (error?.name === "AbortError") throw error;
+      return null;
+    })
+    .finally(() => {
+      episodeScoreboardInflight.delete(key);
+    });
+
+  episodeScoreboardInflight.set(key, promise);
+  return promise;
+}
+
+async function fetchEpisodeImdbCached({
+  showId,
+  seasonNumber,
+  episodeNumber,
+  imdbId,
+  signal,
+}) {
+  const key = `${showId}:${imdbId}:${seasonNumber}:${episodeNumber}`;
+  if (episodeImdbCache.has(key)) {
+    return episodeImdbCache.get(key);
+  }
+  if (episodeImdbInflight.has(key)) {
+    return episodeImdbInflight.get(key);
+  }
+
+  const qs = new URLSearchParams({
+    season: String(seasonNumber),
+    episode: String(episodeNumber),
+    imdbId: String(imdbId),
+  });
+
+  const promise = fetch(`/api/tv/${showId}/episode-imdb?${qs}`, {
+    cache: "force-cache",
+    signal,
+  })
+    .then(async (res) => {
+      const json = await res.json().catch(() => null);
+      const value =
+        res.ok &&
+        (typeof json?.imdb?.rating === "number" ||
+          typeof json?.imdb?.votes === "number")
+          ? json.imdb
+          : null;
+      if (value) {
+        episodeImdbCache.set(key, value);
+      }
+      return value;
+    })
+    .catch((error) => {
+      if (error?.name === "AbortError") throw error;
+      return null;
+    })
+    .finally(() => {
+      episodeImdbInflight.delete(key);
+    });
+
+  episodeImdbInflight.set(key, promise);
+  return promise;
+}
 
 export default function EpisodeDetailsClient({
   showId,
@@ -50,14 +183,17 @@ export default function EpisodeDetailsClient({
   show,
   episode,
   initialScoreboard,
+  initialShowWatched,
   imdb,
   imdbId,
   imdbUrl,
 }) {
   const router = useRouter();
+  const traktRequestIdRef = useRef(0);
 
   const showName = show?.name || "Serie";
   const epName = episode?.name || `Episodio ${episodeNumber}`;
+  const traktShowWatchedStorageKey = `showverse:trakt:showWatched:${showId}`;
 
   const stillPath = episode?.still_path || null;
   const heroBgPath =
@@ -78,6 +214,11 @@ export default function EpisodeDetailsClient({
   const guestStars = Array.isArray(episode?.credits?.guest_stars)
     ? episode.credits.guest_stars
     : [];
+  const initialWatchedBySeason = useMemo(
+    () => normalizeWatchedBySeason(initialShowWatched?.watchedBySeason),
+    [initialShowWatched],
+  );
+  const hasInitialShowWatched = !!initialWatchedBySeason;
 
   const tmdbEpisodeUrl = `https://www.themoviedb.org/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
 
@@ -128,7 +269,13 @@ export default function EpisodeDetailsClient({
   const [tScoreboard, setTScoreboard] = useState(
     () => parseScoreboardData(initialScoreboard) || defaultScoreboard,
   );
-  const [imdbData, setImdbData] = useState(imdb || null);
+  const [imdbData, setImdbData] = useState(() => imdb || null);
+  const [watchedBySeason, setWatchedBySeason] = useState(
+    () => initialWatchedBySeason || {},
+  );
+  const [watchedBySeasonLoaded, setWatchedBySeasonLoaded] = useState(
+    hasInitialShowWatched,
+  );
 
   const traktDecimal = useMemo(() => {
     if (tScoreboard.rating == null) return null;
@@ -138,57 +285,10 @@ export default function EpisodeDetailsClient({
   }, [tScoreboard.rating]);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const prefetched = parseScoreboardData(initialScoreboard);
-        if (prefetched) return;
-
-        setTScoreboard((s) => ({ ...s, loading: true }));
-        const res = await fetch(
-          `/api/trakt/scoreboard?type=episode&tmdbId=${showId}&season=${seasonNumber}&episode=${episodeNumber}`,
-          { cache: "no-store" },
-        );
-        const json = await res.json().catch(() => null);
-        if (!alive) return;
-
-        if (res.ok && json?.found) {
-          setTScoreboard({
-            loading: false,
-            rating:
-              typeof json?.community?.rating === "number"
-                ? json.community.rating
-                : null,
-            votes:
-              typeof json?.community?.votes === "number"
-                ? json.community.votes
-                : null,
-            stats: json?.stats || null,
-            traktUrl: json?.traktUrl || null,
-          });
-        } else {
-          setTScoreboard({
-            loading: false,
-            rating: null,
-            votes: null,
-            stats: null,
-            traktUrl: null,
-          });
-        }
-      } catch {
-        if (alive)
-          setTScoreboard({
-            loading: false,
-            rating: null,
-            votes: null,
-            stats: null,
-            traktUrl: null,
-          });
-      }
-    })();
-    return () => {
-      alive = false;
-    };
+    const key = `${showId}:${seasonNumber}:${episodeNumber}`;
+    if (initialScoreboard && parseScoreboardData(initialScoreboard)) {
+      episodeScoreboardCache.set(key, initialScoreboard);
+    }
   }, [
     showId,
     seasonNumber,
@@ -198,34 +298,84 @@ export default function EpisodeDetailsClient({
   ]);
 
   useEffect(() => {
+    setTScoreboard(parseScoreboardData(initialScoreboard) || defaultScoreboard);
+  }, [initialScoreboard, parseScoreboardData, defaultScoreboard]);
+
+  useEffect(() => {
+    if (parseScoreboardData(initialScoreboard)) return;
+
+    let alive = true;
+    const controller = new AbortController();
+    const cancelSchedule = scheduleAfterFirstPaint(async () => {
+      try {
+        setTScoreboard((s) => ({ ...s, loading: true }));
+        const json = await fetchEpisodeScoreboardCached({
+          showId,
+          seasonNumber,
+          episodeNumber,
+          signal: controller.signal,
+        });
+        if (!alive) return;
+
+        setTScoreboard(parseScoreboardData(json) || defaultScoreboard);
+      } catch (error) {
+        if (!alive || error?.name === "AbortError") return;
+        setTScoreboard(defaultScoreboard);
+      }
+    }, 80);
+
+    return () => {
+      alive = false;
+      controller.abort();
+      cancelSchedule();
+    };
+  }, [
+    showId,
+    seasonNumber,
+    episodeNumber,
+    initialScoreboard,
+    parseScoreboardData,
+    defaultScoreboard,
+  ]);
+
+  useEffect(() => {
     setImdbData(imdb || null);
-  }, [imdb]);
+  }, [imdb, showId, seasonNumber, episodeNumber]);
+
+  useEffect(() => {
+    const key = `${showId}:${imdbId}:${seasonNumber}:${episodeNumber}`;
+    if (imdb && imdbId) {
+      episodeImdbCache.set(key, imdb);
+    }
+  }, [showId, imdbId, seasonNumber, episodeNumber, imdb]);
 
   useEffect(() => {
     if (imdb?.rating != null || !imdbId) return;
 
     let alive = true;
-
-    (async () => {
+    const controller = new AbortController();
+    const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
-        const qs = new URLSearchParams({
-          season: String(seasonNumber),
-          episode: String(episodeNumber),
-          imdbId: String(imdbId),
+        const nextImdb = await fetchEpisodeImdbCached({
+          showId,
+          seasonNumber,
+          episodeNumber,
+          imdbId,
+          signal: controller.signal,
         });
-        const res = await fetch(`/api/tv/${showId}/episode-imdb?${qs}`, {
-          cache: "force-cache",
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!alive) return;
-        setImdbData(json?.imdb || null);
-      } catch {
-        if (alive) setImdbData(null);
+        if (alive) {
+          setImdbData(nextImdb);
+        }
+      } catch (error) {
+        if (!alive || error?.name === "AbortError") return;
+        setImdbData(null);
       }
-    })();
+    }, 120);
 
     return () => {
       alive = false;
+      controller.abort();
+      cancelSchedule();
     };
   }, [showId, seasonNumber, episodeNumber, imdbId, imdb]);
 
@@ -234,17 +384,21 @@ export default function EpisodeDetailsClient({
   // =========================
   const [isRatingOpen, setIsRatingOpen] = useState(false);
   const [userRating, setUserRating] = useState(null);
-  const [userRatingLoading, setUserRatingLoading] = useState(true);
   const [ratingLoading, setRatingLoading] = useState(false);
   const [traktConnected, setTraktConnected] = useState(true);
 
   // Estado de Trakt para watched
   const [trakt, setTrakt] = useState({
-    loading: true,
-    connected: false,
-    found: false,
-    watched: false,
+    loading: !hasInitialShowWatched,
+    connected: hasInitialShowWatched
+      ? initialShowWatched?.connected !== false
+      : false,
+    found: hasInitialShowWatched ? initialShowWatched?.found !== false : false,
+    watched: getWatchedSeasonEpisodes(initialWatchedBySeason, seasonNumber)
+      .map((value) => Number(value))
+      .includes(Number(episodeNumber)),
     error: "",
+    traktId: initialShowWatched?.traktId ?? null,
   });
   const [watchedBusy, setWatchedBusy] = useState(false);
 
@@ -253,7 +407,6 @@ export default function EpisodeDetailsClient({
     let alive = true;
     (async () => {
       try {
-        setUserRatingLoading(true);
         const res = await fetch(
           `/api/trakt/ratings?type=episode&tmdbId=${Number(showId)}&season=${Number(seasonNumber)}&episode=${Number(
             episodeNumber,
@@ -279,8 +432,6 @@ export default function EpisodeDetailsClient({
           setUserRating(null);
           setTraktConnected(false);
         }
-      } finally {
-        if (alive) setUserRatingLoading(false);
       }
     })();
 
@@ -328,89 +479,225 @@ export default function EpisodeDetailsClient({
   );
 
   // Trigger (mismo hueco visual que antes)
-  const openRating = useCallback(() => {
-    if (!traktConnected) {
-      window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
-      return;
+  useEffect(() => {
+    let nextWatchedBySeason = initialWatchedBySeason;
+    let nextLoaded = hasInitialShowWatched;
+    let nextTrakt = {
+      loading: !hasInitialShowWatched,
+      connected: hasInitialShowWatched
+        ? initialShowWatched?.connected !== false
+        : false,
+      found: hasInitialShowWatched ? initialShowWatched?.found !== false : false,
+      watched: false,
+      error: "",
+      traktId: initialShowWatched?.traktId ?? null,
+    };
+
+    if (typeof window !== "undefined" && !hasInitialShowWatched) {
+      try {
+        const cachedRaw = window.localStorage.getItem(traktShowWatchedStorageKey);
+        const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
+        const cachedWatched = normalizeWatchedBySeason(cached?.watchedBySeason);
+        if (cachedWatched) {
+          nextWatchedBySeason = cachedWatched;
+          nextLoaded = true;
+          nextTrakt = {
+            loading: false,
+            connected:
+              typeof cached?.connected === "boolean" ? cached.connected : true,
+            found: typeof cached?.found === "boolean" ? cached.found : true,
+            watched: false,
+            error: "",
+            traktId: cached?.traktId ?? null,
+          };
+        }
+      } catch {}
     }
-    setIsRatingOpen(true);
-  }, [traktConnected]);
 
-  const reloadEpisodeTraktState = useCallback(async () => {
-    setTrakt((p) => ({ ...p, loading: true, error: "" }));
-    try {
-      const statusRes = await traktGetItemStatus({
-        type: "show",
-        tmdbId: Number(showId),
-      });
+    const seasonEpisodes = getWatchedSeasonEpisodes(
+      nextWatchedBySeason,
+      seasonNumber,
+    );
+    const isWatched = seasonEpisodes
+      .map((value) => Number(value))
+      .includes(Number(episodeNumber));
 
-      if (!statusRes?.connected) {
-        const nextState = {
-          loading: false,
-          connected: false,
-          found: false,
-          watched: false,
-          error: "",
-        };
-        setTrakt(nextState);
-        setTraktConnected(false);
-        return nextState;
-      }
+    traktRequestIdRef.current += 1;
+    setWatchedBySeason(nextWatchedBySeason || {});
+    setWatchedBySeasonLoaded(nextLoaded);
+    setTrakt({
+      ...nextTrakt,
+      watched: isWatched,
+    });
+  }, [
+    showId,
+    seasonNumber,
+    episodeNumber,
+    initialShowWatched,
+    initialWatchedBySeason,
+    hasInitialShowWatched,
+    traktShowWatchedStorageKey,
+  ]);
 
-      setTraktConnected(true);
+  const applyShowWatchedPayload = useCallback(
+    (payload) => {
+      const nextWatchedBySeason =
+        normalizeWatchedBySeason(payload?.watchedBySeason) || {};
+      const seasonEpisodes = getWatchedSeasonEpisodes(
+        nextWatchedBySeason,
+        seasonNumber,
+      );
+      const isWatched = seasonEpisodes
+        .map((value) => Number(value))
+        .includes(Number(episodeNumber));
 
-      const watchedRes = await traktGetShowWatched({ tmdbId: Number(showId) });
-      const watchedBySeason = watchedRes?.watchedBySeason || {};
-      const seasonEps =
-        watchedBySeason?.[Number(seasonNumber)] ||
-        watchedBySeason?.[String(Number(seasonNumber))] ||
-        [];
-      const isWatched =
-        Array.isArray(seasonEps) && seasonEps.includes(Number(episodeNumber));
-
-      const nextState = {
+      setWatchedBySeason(nextWatchedBySeason);
+      setWatchedBySeasonLoaded(true);
+      setTrakt((prev) => ({
+        ...prev,
         loading: false,
-        connected: true,
-        found: watchedRes?.found !== false,
+        connected:
+          typeof payload?.connected === "boolean"
+            ? payload.connected
+            : prev.connected,
+        found: payload?.found !== false,
         watched: isWatched,
         error: "",
-      };
+        traktId: payload?.traktId ?? prev.traktId ?? null,
+      }));
 
-      setTrakt(nextState);
-      return nextState;
-    } catch (e) {
-      console.error("Error cargando estado Trakt:", e);
-      const isTransient =
-        /timeout|rate limit|tempor|aborted|fetch|network/i.test(
-          e?.message || "",
-        );
+      return isWatched;
+    },
+    [seasonNumber, episodeNumber],
+  );
 
-      let nextState = null;
-      setTrakt((prev) => {
-        nextState = {
-          ...prev,
-          loading: false,
-          connected: isTransient ? prev.connected : false,
-          error: isTransient ? "" : e?.message || "Error",
-        };
+  const reloadEpisodeTraktState = useCallback(
+    async ({ background = false } = {}) => {
+      const requestId = traktRequestIdRef.current + 1;
+      traktRequestIdRef.current = requestId;
+
+      setTrakt((prev) => ({
+        ...prev,
+        loading: background ? prev.loading : true,
+        error: "",
+      }));
+
+      try {
+        const statusRes = await traktGetItemStatus({
+          type: "show",
+          tmdbId: Number(showId),
+        });
+
+        if (requestId !== traktRequestIdRef.current) return null;
+
+        if (!statusRes?.connected) {
+          const nextState = {
+            loading: false,
+            connected: false,
+            found: watchedBySeasonLoaded,
+            watched: trakt.watched,
+            error: "",
+            traktId: null,
+          };
+          setTrakt(nextState);
+          setTraktConnected(false);
+          return nextState;
+        }
+
+        setTraktConnected(true);
+
+        const watchedRes = await traktGetShowWatched({ tmdbId: Number(showId) });
+        if (requestId !== traktRequestIdRef.current) return null;
+
+        applyShowWatchedPayload({
+          connected: true,
+          found: watchedRes?.found !== false,
+          traktId: watchedRes?.traktId ?? statusRes?.traktId ?? null,
+          watchedBySeason: watchedRes?.watchedBySeason,
+        });
+        return watchedRes;
+      } catch (e) {
+        console.error("Error cargando estado Trakt:", e);
+        if (requestId !== traktRequestIdRef.current) return null;
+
+        const isTransient =
+          e?.code === "TRAKT_TRANSIENT" ||
+          /timeout|rate limit|tempor|aborted|fetch|network/i.test(
+            e?.message || "",
+          );
+
+        let nextState = null;
+        setTrakt((prev) => {
+          nextState = {
+            ...prev,
+            loading: false,
+            connected: isTransient ? prev.connected : false,
+            error: isTransient ? "" : e?.message || "Error",
+          };
+          return nextState;
+        });
+
+        if (!isTransient) setTraktConnected(false);
         return nextState;
-      });
-
-      if (!isTransient) setTraktConnected(false);
-      return nextState;
-    }
-  }, [showId, seasonNumber, episodeNumber]);
+      }
+    },
+    [
+      showId,
+      watchedBySeasonLoaded,
+      trakt.watched,
+      applyShowWatchedPayload,
+    ],
+  );
 
   useEffect(() => {
-    void reloadEpisodeTraktState();
-  }, [reloadEpisodeTraktState]);
+    if (typeof window === "undefined") return;
+
+    try {
+      if (watchedBySeasonLoaded && trakt?.connected) {
+        window.localStorage.setItem(
+          traktShowWatchedStorageKey,
+          JSON.stringify({
+            connected: !!trakt.connected,
+            found: !!trakt.found,
+            traktId: trakt.traktId ?? null,
+            watchedBySeason:
+              watchedBySeason && typeof watchedBySeason === "object"
+                ? watchedBySeason
+                : {},
+          }),
+        );
+      } else if (watchedBySeasonLoaded && !trakt?.connected) {
+        window.localStorage.removeItem(traktShowWatchedStorageKey);
+      }
+    } catch {}
+  }, [
+    watchedBySeasonLoaded,
+    trakt?.connected,
+    trakt?.found,
+    trakt?.traktId,
+    watchedBySeason,
+    traktShowWatchedStorageKey,
+  ]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => {
+        void reloadEpisodeTraktState({ background: true });
+      },
+      hasInitialShowWatched ? 2500 : 0,
+    );
+
+    return () => window.clearTimeout(timer);
+  }, [reloadEpisodeTraktState, hasInitialShowWatched]);
 
   useEffect(() => {
     let cancelled = false;
     const timers = [];
+    let ignoreFirstPageShow = true;
 
-    const syncEpisodeTraktState = async () => {
-      const latest = await reloadEpisodeTraktState();
+    const syncEpisodeTraktState = async ({ force = false } = {}) => {
+      if (!force && watchedBusy) return;
+      const latest = await reloadEpisodeTraktState({ background: true });
       if (cancelled) return;
       if (latest?.connected) setTraktConnected(true);
     };
@@ -420,17 +707,22 @@ export default function EpisodeDetailsClient({
         void syncEpisodeTraktState();
       }
     };
+    const handlePageShow = () => {
+      if (ignoreFirstPageShow) {
+        ignoreFirstPageShow = false;
+        return;
+      }
+      void syncEpisodeTraktState();
+    };
 
     window.addEventListener("focus", syncEpisodeTraktState);
-    window.addEventListener("pageshow", syncEpisodeTraktState);
+    window.addEventListener("pageshow", handlePageShow);
     document.addEventListener("visibilitychange", handleVisibility);
 
-    // Reintentos suaves al cargar para cubrir el caso en que las cookies de
-    // Trakt se acaban de restaurar y el primer fetch llega demasiado pronto.
     if (trakt.loading || (!trakt.connected && !trakt.error)) {
       [900, 2200].forEach((delay) => {
         const timer = window.setTimeout(() => {
-          void syncEpisodeTraktState();
+          void syncEpisodeTraktState({ force: true });
         }, delay);
         timers.push(timer);
       });
@@ -440,10 +732,10 @@ export default function EpisodeDetailsClient({
       cancelled = true;
       timers.forEach((timer) => window.clearTimeout(timer));
       window.removeEventListener("focus", syncEpisodeTraktState);
-      window.removeEventListener("pageshow", syncEpisodeTraktState);
+      window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [reloadEpisodeTraktState, trakt.loading, trakt.connected, trakt.error]);
+  }, [reloadEpisodeTraktState, trakt.loading, trakt.connected, trakt.error, watchedBusy]);
 
   // Toggle watched para el episodio
   const toggleEpisodeWatched = useCallback(async () => {
@@ -471,22 +763,17 @@ export default function EpisodeDetailsClient({
         watched: newWatched,
       });
 
-      const watchedBySeason = res?.watchedBySeason || {};
-      const seasonEps =
-        watchedBySeason?.[Number(seasonNumber)] ||
-        watchedBySeason?.[String(Number(seasonNumber))] ||
-        [];
-      const isWatched =
-        Array.isArray(seasonEps) && seasonEps.includes(Number(episodeNumber));
-
-      setTrakt((p) => ({
-        ...p,
-        loading: false,
+      traktRequestIdRef.current += 1;
+      invalidateTraktGetCache({
+        tmdbId: Number(showId),
+        traktId: res?.traktId ?? trakt.traktId ?? undefined,
+      });
+      applyShowWatchedPayload({
         connected: true,
         found: res?.found !== false,
-        watched: Array.isArray(seasonEps) ? isWatched : newWatched,
-        error: "",
-      }));
+        traktId: res?.traktId ?? trakt.traktId ?? null,
+        watchedBySeason: res?.watchedBySeason,
+      });
     } catch (e) {
       console.error("Error al marcar episodio:", e);
       const needsReauth = /401|unauthorized/i.test(e?.message || "");
@@ -494,19 +781,21 @@ export default function EpisodeDetailsClient({
         window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
         return;
       }
-      await reloadEpisodeTraktState();
+      await reloadEpisodeTraktState({ background: true });
     } finally {
       setWatchedBusy(false);
     }
   }, [
     trakt.loading,
     trakt.connected,
+    trakt.traktId,
     trakt.watched,
     watchedBusy,
     reloadEpisodeTraktState,
     showId,
     seasonNumber,
     episodeNumber,
+    applyShowWatchedPayload,
   ]);
 
   return (
@@ -696,7 +985,7 @@ export default function EpisodeDetailsClient({
                     plays={null}
                     badge={null}
                     busy={watchedBusy}
-                    loading={trakt.loading}
+                    loading={trakt.loading && !watchedBySeasonLoaded}
                     onOpen={toggleEpisodeWatched}
                   />
 

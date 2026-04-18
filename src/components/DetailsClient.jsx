@@ -131,6 +131,7 @@ import {
   traktAddShowPlay,
   traktAddEpisodePlay,
   traktRemoveHistoryEntries,
+  invalidateTraktGetCache,
 } from "@/lib/api/traktClient";
 
 // Menu lateral/sticky de navegacion por secciones
@@ -1975,6 +1976,7 @@ export default function DetailsClient({
   const scoreboardLookupTraktId = trakt?.traktId ?? initialTraktId ?? null;
   const traktBackgroundSyncAtRef = useRef(0);
   const traktResolvedIdRef = useRef(initialTraktId ?? null);
+  const traktStatusRequestIdRef = useRef(0);
 
   useEffect(() => {
     traktResolvedIdRef.current = trakt?.traktId ?? initialTraktId ?? null;
@@ -2973,6 +2975,9 @@ export default function DetailsClient({
   // Recarga el estado de Trakt (visto, rating, historial, watchlist) para el contenido actual
   const reloadTraktStatus = useCallback(
     async ({ background = false } = {}) => {
+      const requestId = traktStatusRequestIdRef.current + 1;
+      traktStatusRequestIdRef.current = requestId;
+
       if (!background) {
         setTrakt((p) => ({ ...p, loading: true, error: "" }));
       }
@@ -2989,6 +2994,11 @@ export default function DetailsClient({
 
         let nextState = null;
         setTrakt((prev) => {
+          if (requestId !== traktStatusRequestIdRef.current) {
+            nextState = prev;
+            return prev;
+          }
+
           const preserveTvWatched =
             endpointType === "tv" && watchedBySeasonLoadedRef.current;
           const preservePreviousState = shouldPreservePreviousTraktStatus(
@@ -3040,6 +3050,11 @@ export default function DetailsClient({
 
         let nextState = null;
         setTrakt((p) => {
+          if (requestId !== traktStatusRequestIdRef.current) {
+            nextState = p;
+            return p;
+          }
+
           nextState = {
             ...p,
             loading: false,
@@ -3738,6 +3753,10 @@ export default function DetailsClient({
     try {
       const next = !trakt.watched;
       await traktSetWatched({ type: traktType, tmdbId: id, watched: next });
+      invalidateTraktGetCache({
+        tmdbId: id,
+        traktId: traktResolvedIdRef.current ?? undefined,
+      });
       setTrakt((p) => ({
         ...p,
         watched: next,
@@ -3759,6 +3778,10 @@ export default function DetailsClient({
         tmdbId: id,
         watchedAt: yyyyMmDd,
       });
+      invalidateTraktGetCache({
+        tmdbId: id,
+        traktId: traktResolvedIdRef.current ?? undefined,
+      });
       await reloadTraktStatus();
     } finally {
       setTraktBusy("");
@@ -3776,6 +3799,10 @@ export default function DetailsClient({
         historyId,
         watchedAt: yyyyMmDd,
       });
+      invalidateTraktGetCache({
+        tmdbId: id,
+        traktId: traktResolvedIdRef.current ?? undefined,
+      });
       await reloadTraktStatus();
     } finally {
       setTraktBusy("");
@@ -3788,6 +3815,10 @@ export default function DetailsClient({
     setTraktBusy("history");
     try {
       await traktRemoveWatchPlay({ historyId });
+      invalidateTraktGetCache({
+        tmdbId: id,
+        traktId: traktResolvedIdRef.current ?? undefined,
+      });
       await reloadTraktStatus();
     } finally {
       setTraktBusy("");
@@ -3849,6 +3880,10 @@ export default function DetailsClient({
         episode: episodeNumber,
         watched: next,
         watchedAt: null,
+      });
+      invalidateTraktGetCache({
+        tmdbId: id,
+        traktId: traktResolvedIdRef.current ?? undefined,
       });
 
       // Si el endpoint devuelve el estado actualizado directamente, usarlo
@@ -3953,6 +3988,10 @@ export default function DetailsClient({
             episode: episodeNumber,
             watchedAt: watchedAtIso,
           });
+          invalidateTraktGetCache({
+            tmdbId: id,
+            traktId: traktResolvedIdRef.current ?? undefined,
+          });
           const hid = r?.historyId || r?.id || null;
           if (hid)
             setRewatchHistoryByEpisode((p) => ({ ...(p || {}), [key]: hid }));
@@ -3966,6 +4005,10 @@ export default function DetailsClient({
             );
           }
           await traktRemoveWatchPlay({ historyId: hid });
+          invalidateTraktGetCache({
+            tmdbId: id,
+            traktId: traktResolvedIdRef.current ?? undefined,
+          });
           setRewatchHistoryByEpisode((p) => {
             const nextMap = { ...(p || {}) };
             delete nextMap[key];
@@ -4081,6 +4124,10 @@ export default function DetailsClient({
 
       if (!res.ok)
         throw new Error(json?.error || "Error marcando serie en Trakt");
+      invalidateTraktGetCache({
+        tmdbId: tmdbIdNum,
+        traktId: traktResolvedIdRef.current ?? undefined,
+      });
 
       // Actualizacion optimista: marcar todos los episodios segun episode_count
       setWatchedBySeason(() => {
@@ -4118,6 +4165,10 @@ export default function DetailsClient({
     setEpisodeBusyKey(SHOW_BUSY_KEY);
     try {
       await traktAddShowPlay({ tmdbId: id, watchedAt: watchedAtIsoOrNull });
+      invalidateTraktGetCache({
+        tmdbId: id,
+        traktId: traktResolvedIdRef.current ?? undefined,
+      });
       await reloadTraktStatus();
 
       const fresh = await traktGetShowWatched({ tmdbId: id });
@@ -4174,6 +4225,10 @@ export default function DetailsClient({
         season,
         episode,
         watchedAt: watchedAtIso || new Date().toISOString(),
+      });
+      invalidateTraktGetCache({
+        tmdbId: id,
+        traktId: traktResolvedIdRef.current ?? undefined,
       });
 
       // Refrescar progreso del run activo
