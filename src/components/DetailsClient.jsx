@@ -2675,6 +2675,19 @@ export default function DetailsClient({
     return () => window.clearTimeout(timer);
   }, [traktDeferredReady, tScoreboard.loading]);
 
+  // Red de seguridad: si el efecto del scoreboard se reinicia a media carga
+  // (porque scoreboardLookupTraktId cambia al cargar el estado de Trakt),
+  // tScoreboard.loading puede quedar atascado en true indefinidamente.
+  // Este efecto garantiza que traktDeferredReady se activa en ≤6s desde que
+  // cambia el contenido, para que comentarios/listas/sentimiento siempre carguen.
+  useEffect(() => {
+    if (traktDeferredReady) return;
+    const safetyTimer = window.setTimeout(() => {
+      setTraktDeferredReady(true);
+    }, 6000);
+    return () => window.clearTimeout(safetyTimer);
+  }, [id, traktType, traktDeferredReady]);
+
   // Resetear todos los datos de la comunidad de Trakt al cambiar de contenido
   useEffect(() => {
     setTSentiment({
@@ -3504,6 +3517,9 @@ export default function DetailsClient({
 
       // Si las stats no llegan, al menos dejamos rating/votos sin bloquear el resto.
       if (!ignore) {
+        // Desbloquear datos de comunidad (comentarios, listas, sentimiento)
+        // aunque las stats no hayan llegado — no deben depender de ellas.
+        setTraktDeferredReady(true);
         setTScoreboard((prev) => ({
           ...mergeScoreboardState(
             prev,
