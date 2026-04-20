@@ -269,29 +269,29 @@ El listado de biblioteca implementa paginación automática para colecciones ext
 
 \subsubsection{Enlaces externos y descubrimiento}
 
-\textbf{Generación inteligente de enlaces.} El sistema de enlaces externos implementa estrategias adaptativas según la disponibilidad de metadatos. Para servicios con soporte de identificadores únicos como Letterboxd, se utilizan URLs directas cuando existe IMDb ID, mientras que en su ausencia se realiza scraping de metadatos con caché de resultados. JustWatch requiere extracción de datos embebidos en páginas dinámicas con matching por año para desambiguar títulos homónimos y múltiples estrategias de fallback ante cambios estructurales.
+\textbf{Generación de enlaces externos.} El sistema construye enlaces a servicios externos mediante tres estrategias según la disponibilidad de datos. Los servicios con identificadores estables como TMDb, Trakt e IMDb generan URLs directas utilizando sus respectivos IDs sin validación adicional. Letterboxd utiliza el IMDb ID cuando está disponible, o en su ausencia genera un slug normalizado del título y año que valida mediante scraping de metadatos Open Graph con caché de 24 horas. JustWatch requiere validación activa: construye una URL con slug normalizado, ejecuta una petición para verificar su existencia y retorna URL de búsqueda como respaldo si falla. FilmAffinity construye URLs de búsqueda directa con el título normalizado. La web oficial se extrae del campo homepage de TMDb. SeriesGraph para series utiliza directamente el TMDb ID sin validación.
 
-\textbf{Descubrimiento y recomendaciones.} Los endpoints de recomendaciones consultan múltiples fuentes de Trakt en paralelo, intercalando resultados de películas y series para variedad. El enriquecimiento con datos de TMDb añade metadatos visuales y descriptivos localizados. El sistema de contenido relacionado traduce identificadores entre plataformas, obtiene sugerencias algorítmicas de Trakt y enriquece resultados con control de concurrencia, limitando respuestas para mantener tiempos de carga óptimos.
+\textbf{Descubrimiento y recomendaciones.} Los endpoints de recomendaciones consultan múltiples fuentes de Trakt en paralelo, intercalando resultados de películas y series para variedad. El enriquecimiento con datos de TMDb añade metadatos visuales y descriptivos y el sistema de contenido relacionado traduce identificadores entre plataformas, obtiene sugerencias algorítmicas de Trakt y las ordena por relevancia combinando popularidad, fecha de lanzamiento y similitud de género.
 
 \subsubsection{Listas y colecciones}
 
-\textbf{Listas personales de Trakt.} El sistema de listas personales obtiene todas las colecciones del usuario con sus metadatos completos incluyendo nombre, descripción, configuración de privacidad y estadísticas. Para cada lista se recuperan los primeros elementos enriquecidos con información visual de TMDb mediante peticiones paralelas. El sistema implementa manejo robusto de límites de tasa con reintentos automáticos y eliminación de duplicados.
+\textbf{Listas personales de TMDb.} El sistema gestiona listas personales mediante la API de cuentas de TMDb, permitiendo consultar todas las listas del usuario con sus metadatos completos, crear nuevas listas con nombre y descripción personalizados, actualizar listas existentes recreándolas y copiando sus elementos, y eliminarlas individualmente. Cada operación requiere autenticación mediante session\_id almacenado en cookies y utiliza el account\_id del usuario. El sistema implementa paginación automática, eliminación de duplicados y gestión de errores con mensajes descriptivos.
 
-\textbf{Listas comunitarias.} Los endpoints de listas públicas permiten descubrir colecciones creadas por la comunidad que incluyen un título específico. El sistema soporta múltiples criterios de ordenación incluyendo popularidad, tendencias y actividad reciente, traduciendo identificadores entre plataformas y retornando metadatos del creador junto con previsualizaciones visuales.
+\textbf{Listas comunitarias de Trakt.} Los endpoints de listas públicas de Trakt proporcionan acceso a dos categorías: listas en tendencia con mayor actividad reciente y listas más populares por número de seguidores. El sistema traduce identificadores entre Trakt y TMDb para enriquecer cada lista con vistas previas visuales mediante consultas paralelas limitadas que obtienen posters de los primeros elementos. Construye URLs internas y externas diferenciando entre listas globales y listas de usuarios específicos según los metadatos del creador.
 
-\textbf{Colecciones de TMDb.} Las colecciones proporcionan acceso a sagas y franquicias cinematográficas mediante búsqueda textual o acceso a colecciones destacadas curadas por popularidad. Los detalles completos incluyen todas las películas de la saga ordenadas cronológicamente con metadatos visuales y descriptivos.
+\textbf{Colecciones de TMDb.} Las colecciones proporcionan acceso a sagas y franquicias cinematográficas mediante búsqueda textual o acceso a colecciones destacadas por popularidad. Los detalles completos incluyen todas las películas de la saga ordenadas cronológicamente con metadatos visuales y descriptivos.
 
 \subsection{Patrones técnicos transversales}
 
 Todos los endpoints implementan patrones comunes de robustez y fiabilidad:
 
-\textbf{Manejo de errores estructurado.} Las respuestas de error siguen un formato JSON consistente con códigos HTTP semánticos: 400 para validación fallida, 401 para autenticación requerida, 404 para recursos inexistentes, 429 para límites de tasa excedidos, 500 para errores internos y 503 para servicios externos no disponibles. Cada error incluye descripción legible y opcionalmente código de error y detalles adicionales para debugging.
+\textbf{Manejo de errores estructurado.} Las respuestas de error siguen un formato JSON consistente con códigos HTTP: 400 para validación fallida, 401 para autenticación requerida, 404 para recursos inexistentes, 429 para límites de tasa excedidos, 500 para errores internos y 503 para servicios externos no disponibles. Cada error incluye descripción legible y opcionalmente código de error y detalles adicionales para debugging.
 
-\textbf{Validación y sanitización de entrada.} Los parámetros se validan exhaustivamente antes de procesamiento: identificadores numéricos deben ser enteros positivos, fechas deben cumplir ISO 8601, ratings se restringen a rangos específicos por plataforma y se rechazan payloads excesivamente grandes para prevenir ataques de denegación de servicio.
+\textbf{Validación de entrada.} Los parámetros se validan exhaustivamente antes de procesarlos. Los identificadores numéricos deben ser enteros positivos, las fechas deben cumplir ISO 8601, los ratings se restringen a rangos específicos por plataforma y se rechazan payloads excesivamente grandes para prevenir ataques de denegación de servicio.
 
-\textbf{Resiliencia y degradación.} Las peticiones a servicios externos incluyen timeouts adaptativos según el tipo de operación. Los servicios que fallan repetidamente activan degradación controlada retornando datos parciales, cacheados o fallbacks cuando están disponibles, evitando interrupciones completas del servicio.
+\textbf{Gestión de timeouts.} Las peticiones a servicios externos incluyen timeouts adaptativos según el tipo de operación. Los servicios que fallan repetidamente activan degradación controlada retornando datos parciales, cacheados o fallbacks cuando están disponibles, evitando interrupciones completas del servicio.
 
-\textbf{Observabilidad.} El sistema registra errores con contexto completo incluyendo endpoint, parámetros sanitizados, estado de autenticación y trazas de ejecución. Las operaciones lentas se marcan automáticamente como advertencias para identificación de cuellos de botella y optimización futura.
+\textbf{Observabilidad.} El sistema registra errores con contexto completo incluyendo endpoint, parámetros, estado de autenticación y trazas de ejecución. Las operaciones lentas se marcan automáticamente como advertencias para identificación de cuellos de botella y optimización futura.
 
 % -----------------------------------------------------------------------
 \section{Implementación de los módulos funcionales}
@@ -345,8 +345,14 @@ Favoritos (auth) & \texttt{/account/\{id\}/favorite/movies} & Favoritos personal
 \end{center}
 \end{table}
 
-\textbf{Selección de backdrops:} el carrusel principal utiliza \textit{backdrops} de TMDb y se aplica un criterio de selección a partir de la función \texttt{pickBestBackdropByLangResVotes(...)} que prioriza primero los backdrops en inglés (\texttt{en}, \texttt{en-US}) cuando existen, después filtra por resolución y por \texttt{vote\_count} y \texttt{vote\_average}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../notes/.images/dashboard.jpg}
+\caption{Dashboard principal de la aplicación}
+\label{fig:dashboard}
+\end{figure}
 
+\textbf{Selección de backdrops:} el carrusel principal utiliza \textit{backdrops} de TMDb y se aplica un criterio de selección a partir de la función \texttt{pickBestBackdropByLangResVotes(...)} que prioriza primero los backdrops en inglés (\texttt{en}, \texttt{en-US}) cuando existen, después filtra por resolución y por \texttt{vote\_count} y \texttt{vote\_average}.
 
 \subsection{Página de detalles (\texttt{/details/[type]/[id]})}
 
@@ -363,6 +369,13 @@ A partir de la API de Plex se detecta si el título está disponible en la bibli
 
 Los proveedores de \textit{streaming} se obtienen de dos fuentes distintas. Por un lado, TMDb proporciona información básica de la disponibilidad mediante \texttt{watch/providers}, indicando si el título está disponible para alquiler, compra o en plataformas de suscripción. Por otro lado, JustWatch (mediante la API no oficial en GraphQL) proporciona enlaces directos al contenido en cada plataforma. 
 Si la película pertenece a una colección (por ejemplo, la saga de \textit{El Señor de los Anillos}), se carga la información completa de la colección mediante \texttt{/api/tmdb/collection} y se muestra una nueva sección con un carrusel y todas las películas de la saga, ordenadas cronológicamente.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../notes/.images/detalles.jpg}
+\caption{Página de detalles de una película}
+\label{fig:detalles}
+\end{figure}
 
 \subsubsection{Menú de navegación por secciones}
 
@@ -401,6 +414,27 @@ El componente \texttt{EpisodeRatingsGrid.jsx} ubicado en una sección de la pág
 
 Para optimizar el rendimiento en series con cientos de episodios, las puntuaciones se cargan en paralelo mediante \texttt{Promise.all(seasons.map(s => getSeasonDetails(showId, s.season\_number)))} en lugar de secuencialmente. Esto reduce la latencia total de aproximadamente N segundos (donde N es el número de temporadas).
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/temporadas.jpg}
+  \caption{Vista de temporadas de una serie}
+  \label{fig:temporadas}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/temporada-detalles.jpg}
+  \caption{Detalles de episodios de una temporada}
+  \label{fig:temporada-detalles}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/episodio-detalles.jpg}
+  \caption{Página de detalles de un episodio}
+  \label{fig:episodio-detalles}
+\end{figure}
+
 \subsubsection{Enlaces externos y plataformas de streaming}
 
 En la página de detalles se integran dos tipos de enlaces que se muestran de forma distinta según el modo de visualización y el dispositivo. Las plataformas de streaming (Netflix, Amazon Prime Video, HBO Max, Disney+, etc.) se muestran directamente debajo de la imagen principal ya sea backdrop o poster. Cuando el contenido está disponible en el servidor Plex personal del usuario, aparece el logo de Plex con un indicador verde que señala la disponibilidad local. Los enlaces externos a servicios de bases de datos y redes sociales (web oficial, TMDb, Trakt, IMDb, FilmAffinity, JustWatch, Letterboxd, SeriesGraph) tienen una ubicación adaptada según varios factores.
@@ -428,6 +462,36 @@ Los administradores (específicamente el usuario \texttt{psantos26} hardcoded en
   \label{fig:portadas}
 \end{figure}
 
+\subsubsection{Trailers y vídeos}
+
+El sistema de trailers y vídeos obtiene contenido multimedia desde TMDb mediante el endpoint \texttt{GET /\{type\}/\{id\}/videos} que retorna un array de videos con metadatos completos: \texttt{key} (identificador de YouTube, Vimeo u otra plataforma), \texttt{site} (plataforma de origen), \texttt{type} (Trailer, Teaser, Clip, Featurette, Behind the Scenes), \texttt{name} (título del video), \texttt{official} (booleano que indica si es contenido oficial del estudio), \texttt{iso\_639\_1} (idioma del video) y \texttt{published\_at} (fecha de publicación).
+
+La función \texttt{pickPreferredVideo(videos)} implementa un algoritmo de selección automática que prioriza trailers oficiales en inglés mediante un sistema de scoring multinivel. Primero asigna puntuaciones según el tipo: Trailer (100 puntos), Teaser (80), Clip (40), Featurette (30), otros (20). Luego añade bonificaciones: +50 puntos si está marcado como oficial, +30 si el idioma es inglés (\texttt{iso\_639\_1 === ``en''}), +20 si el idioma es español. El video con mayor puntuación total se selecciona como preferido y se muestra destacado con un botón de reproducción prominente en el hero de la página de detalles.
+
+Los videos se presentan en un carrusel horizontal mediante Swiper con configuración responsive: 2 columnas en móvil, 3 en tablets, 4 en desktop. Cada tarjeta de video muestra la thumbnail de YouTube (construida mediante \texttt{videoThumbUrl(v)} que genera la URL \texttt{https://img.youtube.com/vi/\{key\}/maxresdefault.jpg}), el título del video, badges identificativos del tipo (TRAILER, TEASER, etc.), un badge OFFICIAL si corresponde, el idioma, la plataforma de origen y un icono de reproducción centrado. Al hacer clic en cualquier video se abre el componente \texttt{VideoModal} que renderiza un iframe incrustado del video usando \texttt{videoEmbedUrl(v, autoplay)} que construye URLs con parámetros optimizados: \texttt{?autoplay=1\&rel=0\&modestbranding=1} para YouTube. El modal incluye un botón de enlace externo que redirige a la URL original del video en YouTube o Vimeo mediante \texttt{videoExternalUrl(v)}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../notes/.images/trailer y videos.jpg}
+\caption{Sección de trailers y vídeos}
+\label{fig:trailers}
+\end{figure}
+
+\subsubsection{Colección}
+
+El sistema de colecciones gestiona sagas cinematográficas como el MCU, Star Wars, Fast \& Furious u otras franquicias. Cuando una película pertenece a una colección, TMDb incluye el objeto \texttt{belongs\_to\_collection} en la respuesta del endpoint \texttt{GET /movie/\{id\}} con los campos \texttt{id}, \texttt{name}, \texttt{poster\_path} y \texttt{backdrop\_path} de la colección.
+
+Si se detecta un \texttt{collectionId}, el componente ejecuta una petición a la API Route interna \texttt{GET /api/tmdb/collection?id=\{collectionId\}} que internamente consulta el endpoint de TMDb \texttt{GET /collection/\{id\}} y retorna el objeto completo de la colección que incluye \texttt{overview} (descripción de la saga), \texttt{parts} (array de todas las películas que componen la colección con sus metadatos completos: título, fecha de estreno, \texttt{poster\_path}, \texttt{vote\_average}, sinopsis) y artwork de la colección.
+
+La sección de colección se renderiza en un carrusel horizontal con configuración responsive: 3 columnas en móvil, 4 en tablets, 5 en desktop hasta 6 en pantallas ultra anchas. Cada película de la colección se presenta como una tarjeta con poster vertical en relación de aspecto 2:3, título, año de estreno extraído de \texttt{release\_date}, y efecto hover que eleva ligeramente la tarjeta y añade un borde amarillo. Las películas se ordenan cronológicamente según su fecha de estreno original. Al hacer clic en cualquier película de la colección, el usuario navega a la página de detalles de ese título (\texttt{/details/movie/\{id\}}), permitiendo explorar toda la saga de forma secuencial sin salir de la aplicación.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../notes/.images/coleccion.jpg}
+\caption{Sección de colección de sagas}
+\label{fig:coleccion}
+\end{figure}
+
 \subsubsection{Sección de reparto y ficha de personas}
 
 La sección de reparto unifica datos de múltiples fuentes. Los directores y creadores se extraen del array \texttt{credits.crew} filtrando por \texttt{job === ``Director''} o \texttt{department === ``Writing''} y se agregan al inicio del array de cast para darles prioridad. El array completo se ordena por el campo \texttt{order} que TMDb proporciona para indicar el orden de importancia de cada actor en la producción, de forma que los protagonistas aparecen primero. Cada tarjeta de actor muestra la foto del perfil en tamaño \texttt{w185}, el nombre real del actor, el nombre del personaje que interpreta, y un efecto de hover. Hacer clic en cualquier actor navega a la página de ficha de persona (\texttt{/details/person/\{id\}}) que carga mediante el componente \texttt{ActorDetails.jsx}.
@@ -442,10 +506,38 @@ La funcionalidad del análisis de sentimiento de Trakt se construye mediante la 
 
 La sección de listas muestra las listas públicas de Trakt que incluyen este título, organizadas en dos pestañas: Popular (ordenadas por número de likes) y Trending (ordenadas por actividad reciente). Cada lista se renderiza como una tarjeta que muestra el nombre de la lista, una descripción, el nombre del usuario que la creó, el número de items que contiene, el número de likes que ha recibido y el número de comentarios. Hacer clic en cualquier lista navega a la página completa de esa lista en Trakt.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../notes/.images/sentimientos.jpg}
+\caption{Análisis de sentimientos extraído de comentarios}
+\label{fig:sentimientos}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../notes/.images/comentarios.jpg}
+\caption{Sección de comentarios de TMDb y Trakt}
+\label{fig:comentarios}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../notes/.images/listas.jpg}
+\caption{Listas públicas de Trakt que incluyen el título}
+\label{fig:listas}
+\end{figure}
+
 \subsubsection{Recomendaciones y contenido similar}
 
 La sección de recomendaciones utiliza el algoritmo de Trakt para sugerir títulos relacionados mediante el endpoint \texttt{/\{type\}/\{slug\}/related?extended=full\&limit=15}, que analiza patrones de visionado de la comunidad, géneros compartidos, directores, actores y palabras clave para determinar similitud.
 El proceso de obtención tiene tres fases secuenciales que transforman IDs. Primero, la API Route \texttt{/api/trakt/related} recibe el TMDb ID del título actual y lo traduce al slug de Trakt mediante el endpoint de búsqueda \texttt{GET /search/tmdb/\{id\}?type=movie|show}, que devuelve el objeto completo del título incluyendo todos sus identificadores (\texttt{ids.slug}, \texttt{ids.trakt}, \texttt{ids.imdb}, \texttt{ids.tmdb}). Con el slug de Trakt obtenido, se ejecuta la petición de contenido relacionado que devuelve un array de hasta 15 títulos similares con metadatos básicos pero sin imágenes. Finalmente, cada resultado se completa individualmente con datos de TMDb mediante peticiones paralelas (\texttt{mapWithConcurrency}) obteniendo \texttt{poster\_path}, \texttt{backdrop\_path}, \texttt{vote\_average}, \texttt{overview} y fecha de estreno.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../notes/.images/recomendaciones.jpg}
+\caption{Sección de recomendaciones y contenido similar}
+\label{fig:recomendaciones}
+\end{figure}
 
 \subsection{Favoritos (\texttt{/favorites})}
 
@@ -461,15 +553,15 @@ El menú de filtros y controles incluye cuatro categorías funcionales. La secci
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{../notes/.images/favoritos.jpg}
+    \includegraphics[width=\textwidth]{../notes/.images/favoritos2.jpg}
     \caption{Interfaz de la sección de favoritos.}
     \label{fig:favoritos}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{../notes/.images/favoritos2.jpg}
-    \caption{Vista tipo lista de la sección de favoritos.}
+    \includegraphics[width=\textwidth]{../notes/.images/favoritos.jpg}
+    \caption{Vista con portadas backdrop de la sección de favoritos.}
     \label{fig:favoritos-2}
 \end{figure}
 
@@ -479,8 +571,15 @@ La página de watchlist muestra el contenido que el usuario tiene pendiente a pa
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{../notes/.images/pendientes.jpg}
+    \includegraphics[width=0.9\textwidth]{../notes/.images/pendientes.jpg}
     \caption{Interfaz de la sección de pendientes.}
+    \label{fig:pendientes}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../notes/.images/pendientes2.jpg}
+    \caption{Vista de lista de la sección de pendientes.}
     \label{fig:pendientes}
 \end{figure}
 
@@ -507,6 +606,13 @@ La página de series en progreso determina qué series se encuentran activas cua
   \centering
   \includegraphics[width=\textwidth]{../notes/.images/enprogreso.jpg}
   \caption{Interfaz de la sección de series en progreso.}
+  \label{fig:en-progreso}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{../notes/.images/enprogreso2.jpg}
+  \caption{Vista de tarjetas de la sección de series en progreso.}
   \label{fig:en-progreso}
 \end{figure}
 
