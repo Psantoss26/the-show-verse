@@ -18,6 +18,15 @@ function traktHeaders(token) {
   };
 }
 
+function normalizeRating(val) {
+  if (val === null || val === undefined) return null;
+  const n = Number(val);
+  if (!Number.isFinite(n)) return null;
+  const normalized =
+    Math.round((Math.min(10, Math.max(0.5, n)) + Number.EPSILON) * 2) / 2;
+  return normalized >= 0.5 && normalized <= 10 ? normalized : null;
+}
+
 export async function POST(req) {
   try {
     const token = await getTraktAccessTokenOrNull();
@@ -50,11 +59,7 @@ export async function POST(req) {
       return NextResponse.json({ ok: true, rating: null });
     }
 
-    // Trakt rating suele ser 1..10 entero
-    const r = Number(rating);
-    const safe = Number.isFinite(r)
-      ? Math.min(10, Math.max(1, Math.ceil(r)))
-      : null;
+    const safe = normalizeRating(rating);
     if (!safe)
       return NextResponse.json({ error: "Bad rating" }, { status: 400 });
 

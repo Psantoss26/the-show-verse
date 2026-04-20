@@ -44,9 +44,12 @@ function normalizeRating(val) {
   if (val === null || val === undefined) return null;
   const n = Number(val);
   if (!Number.isFinite(n)) return null;
-  const int = Math.ceil(n);
-  if (int < 1 || int > 10) throw new Error("Rating must be 1..10 or null");
-  return int;
+  const normalized =
+    Math.round((Math.min(10, Math.max(0.5, n)) + Number.EPSILON) * 2) / 2;
+  if (normalized < 0.5 || normalized > 10) {
+    throw new Error("Rating must be 0.5..10 in 0.5 steps or null");
+  }
+  return normalized;
 }
 
 function cookieOpts() {

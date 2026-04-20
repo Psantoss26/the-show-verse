@@ -154,7 +154,7 @@ Las API Routes de Trakt actúan como intermediario que resuelve dos problemas es
 
 \textbf{Problema de identificadores.} El \textit{frontend} trabaja exclusivamente con \texttt{tmdbId}, mientras que muchos \textit{endpoints} de Trakt requieren sus propios identificadores (\texttt{traktId}, \texttt{slug}). Las API Routes realizan internamente la traducción mediante el \textit{endpoint} de búsqueda por ID externo de Trakt (\texttt{/search/tmdb/\{id\}?type=movie|show}).
 
-\textbf{Problema de datos incompletos.} Las respuestas de Trakt incluyen datos de \textit{tracking} pero no imágenes. Las API Routes que devuelven listas de contenido (historial, favoritos, pendientes) realizan peticiones paralelas a TMDb para obtener las URLs de \textit{poster} y \textit{backdrop}, completando la respuesta antes de enviarla al cliente.
+\textbf{Problema de datos incompletos.} Las respuestas de Trakt incluyen datos de \textit{tracking} pero no imágenes. Las API Routes que devuelven listas de contenido realizan peticiones paralelas a TMDb para obtener las URLs de \textit{poster} y \textit{backdrop}, completando la respuesta antes de enviarla al cliente.
 
 La tabla~\ref{tab:trakt-endpoints} recoge los \textit{endpoints} de Trakt utilizados por módulo funcional.
 
@@ -173,8 +173,6 @@ La tabla~\ref{tab:trakt-endpoints} recoge los \textit{endpoints} de Trakt utiliz
 \texttt{DELETE /sync/history} & Desmarcar como visto \\
 \hline
 \texttt{GET /sync/watched/shows} & Estado de visionado de todas las series \\
-\hline
-\texttt{GET /sync/watchlist} & Lista de pendientes del usuario \\
 \hline
 \texttt{POST /sync/ratings} & Añadir valoración (1--10) \\
 \hline
@@ -205,19 +203,19 @@ La función principal \texttt{getStreamingProviders(title, type, year)} filtra l
 
 \subsection{Plex Media Server}
 
-La integración con Plex se diseñó para conectar el catálogo de la plataforma con la biblioteca personal del usuario. El objetivo es que, si un título existe en su servidor Plex, pueda abrirlo directamente desde la ficha de la aplicación sin búsquedas manuales.
+La integración con Plex se ha diseñado para conectar el catálogo de la biblioteca personal del usuario. El objetivo es que, si un título existe en el servidor Plex configurado, pueda abrirlo directamente desde la aplicación sin búsquedas manuales.
 
-\textbf{Funcionamiento general.} Cuando el usuario pulsa la opción de abrir en Plex, el frontend llama a una ruta interna del servidor con los metadatos del título (nombre, tipo, año e identificadores externos). Esa ruta busca la equivalencia del contenido en Plex, prepara el enlace más adecuado según el dispositivo y devuelve una respuesta unificada para que la interfaz solo tenga que mostrar el botón de acceso.
+\textbf{Funcionamiento general.} Cuando el usuario pulsa la opción de abrir en Plex, el frontend llama a una ruta interna del servidor con los metadatos del título (nombre, tipo, año e identificadores externos). Esa ruta busca la equivalencia del contenido en Plex, prepara el enlace más adecuado según el dispositivo y devuelve una respuesta unificada mostrando el botón de acceso.
 
 \textbf{Gestión de acceso y seguridad.} La comunicación con Plex se realiza siempre desde el backend, usando credenciales guardadas en variables de entorno. El sistema admite una configuración simple basada en token y otra más robusta con generación y renovación automática de credenciales temporales. En ambos casos, la aplicación evita exponer claves sensibles en el navegador.
 
-\textbf{Experiencia de uso.} Para el usuario final, el proceso es transparente: desde la misma pantalla de detalle puede saltar al contenido en Plex con un clic, tanto en escritorio como en móvil.
+\textbf{Experiencia de uso.} Para el usuario final, el proceso es transparente ya que desde la misma pantalla de detalle puede acceder al contenido en Plex, tanto en escritorio como en móvil.
 
 % -----------------------------------------------------------------------
 \section{Arquitectura de API Routes propias}
 % -----------------------------------------------------------------------
 
-Next.js permite definir API Routes como funciones serverless que se ejecutan en el servidor, proporcionando endpoints HTTP personalizados. El proyecto implementa API Routes organizadas en el directorio \texttt{src/app/api/}, que actúan como capa intermedia entre el cliente y las APIs externas, implementando lógica de negocio, transformación de datos, caché y seguridad.
+Next.js permite definir API Routes como funciones \textit{serverless}, proporcionando endpoints HTTP personalizados. El proyecto implementa API Routes organizadas en el directorio \texttt{src/app/api/}, que actúan como capa intermedia entre el cliente y las APIs externas, implementando la lógica, transformación de datos, caché y seguridad.
 
 \subsection{Funciones principales de las API Routes}
 
@@ -225,213 +223,75 @@ Las API Routes del proyecto cumplen seis funciones fundamentales:
 
 \textbf{1. Proxy seguro.} Protegen las claves API (API keys) de exposición al navegador. Todas las peticiones a TMDb, Trakt, OMDb, Plex y JustWatch pasan por endpoints intermedios que almacenan las credenciales en variables de entorno del servidor, garantizando que nunca se envíen al cliente.
 
-\textbf{2. Transformación y enriquecimiento de datos.} Las respuestas de las APIs externas se procesan antes de enviarlas al cliente: se traducen identificadores entre sistemas (TMDb ID, Trakt ID, IMDb ID), se combinan datos de múltiples fuentes en una única respuesta, y se añaden metadatos adicionales como títulos, posters y años de estreno desde TMDb.
+\textbf{2. Transformación y enriquecimiento de datos.} Las respuestas de las APIs externas se procesan antes de enviarlas al cliente: se traducen identificadores entre sistemas (TMDb ID, Trakt ID, IMDb ID), se combinan datos de múltiples fuentes en una única respuesta y se añaden metadatos adicionales como títulos, posters y años de estreno desde TMDb.
 
-\textbf{3. Caché y optimización.} Implementan caché en memoria para reducir llamadas redundantes a APIs externas con límites de tasa. Las respuestas exitosas se almacenan temporalmente (de 60 segundos a 24 horas según el tipo de dato) y se comparten entre peticiones concurrentes mediante deduplicación.
+\textbf{3. Caché y optimización.} Implementan caché en memoria para reducir llamadas redundantes a APIs externas con límite de peticiones.
 
 \textbf{4. Gestión de autenticación.} Manejan flujos OAuth 2.0 completos para Trakt y TMDb, almacenando tokens de sesión en cookies HTTP-only inaccesibles desde JavaScript. Implementan renovación automática de tokens caducados y validación de estado de conexión.
 
 \textbf{5. Agregación de datos.} Consultan múltiples APIs en paralelo y combinan los resultados. Por ejemplo, \texttt{/api/tv/[id]/ratings} obtiene puntuaciones de TMDb, Trakt e IMDb simultáneamente y las devuelve en un objeto unificado.
 
-\textbf{6. Validación y normalización.} Validan parámetros de entrada, normalizan formatos (ej: ratings de 1--10 de Trakt se redondean hacia arriba cuando provienen de TMDb que acepta decimales) y gestionan timeouts configurables para evitar bloqueos.
+\textbf{6. Validación y normalización.} Validan parámetros de entrada y normalizan formatos antes de procesarlos. Las fechas se convierten a formato ISO 8601 para Trakt, los TMDb IDs se validan como enteros positivos, los ratings se restringen a rangos válidos según cada plataforma y se gestionan timeouts configurables para evitar bloqueos en peticiones lentas.
 
 \subsection{Categorías funcionales de endpoints}
 
 \subsubsection{Autenticación y gestión de sesiones}
 
-\textbf{Flujo OAuth 2.0 con Trakt.} Se implementa mediante cuatro endpoints complementarios:
+\textbf{Flujo OAuth 2.0 con Trakt.} La autenticación con Trakt implementa el flujo estándar OAuth 2.0 Authorization Code mediante cuatro endpoints que gestionan el ciclo completo de sesión. El endpoint de inicio genera una URL de autorización con protección CSRF y redirecciona al usuario a Trakt para aprobar el acceso. El callback recibe el código de autorización, lo valida e intercambia por tokens de acceso y refresco que se almacenan en cookies HTTP-only seguras. El sistema incluye verificación automática del estado de sesión con renovación transparente de tokens caducados y un endpoint de desconexión que revoca credenciales tanto en el servidor como en Trakt.
 
-\begin{itemize}
-\item \texttt{GET /api/trakt/auth/start}: Inicia el flujo OAuth generando la URL de autorización de Trakt con los parámetros \texttt{client\_id}, \texttt{redirect\_uri} y \texttt{state} (token CSRF para prevenir ataques). Maneja dinámicamente la URL de redirección según el entorno (Vercel en producción o localhost en desarrollo).
-
-\item \texttt{GET /api/trakt/auth/callback}: Recibe el código de autorización tras la aprobación del usuario, valida el token CSRF, intercambia el código por \texttt{access\_token} y \texttt{refresh\_token} mediante petición servidor-a-servidor a Trakt, y almacena ambos tokens en cookies \texttt{httpOnly} con configuración \texttt{secure} y \texttt{sameSite}.
-
-\item \texttt{GET /api/trakt/auth/status}: Verifica el estado de conexión consultando el endpoint \texttt{/users/settings} de Trakt. Si el token ha caducado, intenta renovarlo automáticamente usando el \texttt{refresh\_token} antes de declarar al usuario como desconectado.
-
-\item \texttt{POST /api/trakt/auth/disconnect}: Revoca el token en Trakt haciendo uso de \texttt{/oauth/revoke} y elimina las cookies de sesión, completando el cierre de sesión.
-\end{itemize}
-
-\textbf{Autenticación TMDb.} El flujo es similar pero utiliza un sistema de request token:
-
-\begin{itemize}
-\item \texttt{GET /api/tmdb/auth/request-token}: Obtiene un token temporal que el usuario debe aprobar en la web de TMDb.
-
-\item \texttt{POST /api/tmdb/auth/session}: Tras la aprobación, crea un \texttt{session\_id} persistente y lo almacena en cookie. Implementa reintentos (hasta 4 intentos con backoff) para compensar la latencia de propagación de la aprobación en los servidores de TMDb.
-
-\item \texttt{GET /api/tmdb/auth/account}: Retorna los datos de la cuenta autenticada (username, avatar, configuración regional).
-\end{itemize}
+\textbf{Autenticación TMDb.} Se utiliza un sistema de request token que requiere aprobación manual del usuario en la web oficial. El proceso obtiene un token temporal, espera la aprobación del usuario y crea una sesión persistente almacenada en cookies.
 
 \subsubsection{Datos de usuario y actividad}
 
-\textbf{Historial de visualización.} \texttt{GET /api/trakt/history} es el endpoint principal que obtiene el historial completo de películas y episodios vistos por el usuario. Acepta parámetros de filtrado por tipo (\texttt{movies}, \texttt{shows}, \texttt{all}), rango de fechas (\texttt{from} y \texttt{to} en formato YYYY-MM-DD), y paginación (\texttt{page}, \texttt{limit}). 
+\textbf{Historial de visualización.} El sistema de historial combina datos de Trakt y TMDb para proporcionar una visión completa del contenido visto por el usuario. El endpoint principal acepta filtros por tipo de contenido, rangos de fechas y paginación, ejecutando peticiones paralelas a TMDb con control de concurrencia para enriquecer los datos básicos de Trakt con metadatos visuales y descriptivos. El sistema calcula automáticamente estadísticas agregadas como total de visualizaciones por título y fechas de primer y último visionado. Los endpoints complementarios permiten añadir visualizaciones con marcas de tiempo personalizadas, modificar fechas de entradas existentes y eliminar registros del historial.
 
-El proceso para obtener los datos se realiza primero consultando \texttt{/sync/history} de Trakt obteniendo identificadores y timestamps, luego se extraen todos los TMDb IDs únicos, y finalmente se ejecutan peticiones paralelas a TMDb (máximo 8 concurrentes) para obtener títulos, posters, años de estreno y sinopsis. Los resultados se agregan con estadísticas calculadas (total de visualizaciones por título, fecha de primer y último visionado).
+\textbf{Progreso y estado de series.} El seguimiento de series implementa un modelo estructurado que organiza episodios vistos por temporada, facilitando la visualización del progreso de visionado. El marcado masivo de episodios divide automáticamente las peticiones en bloques para respetar límites de la API, validando previamente contra TMDb para prevenir errores. El sistema proporciona resúmenes completos del estado de cualquier título, incluyendo número de reproducciones, última visualización e historial de fechas.
 
-Los endpoints complementarios permiten una gestión detallada del historial:
-\begin{itemize}
-\item \texttt{POST /api/trakt/history/add}: añade visualizaciones manuales con timestamp personalizado.
-\item \texttt{POST /api/trakt/history/update}: modifica la fecha de una entrada existente.
-\item \texttt{DELETE /api/trakt/history/remove}: elimina registros específicos mediante \texttt{historyId}.
-\end{itemize}
+\textbf{Estadísticas de usuario.} El módulo de estadísticas agrega datos de múltiples fuentes para generar análisis completos del historial de visualización del usuario. Calcula rankings de contenido más visto, identifica actores y directores frecuentes mediante análisis de créditos, agrupa géneros con distribución porcentual, suma tiempos totales de visionado y genera visualizaciones de actividad temporal por mes, día de la semana y hora del día.
 
-\textbf{Progreso y estado de series.} \texttt{GET /api/trakt/show/watched} retorna un objeto estructurado que representa el estado de visionado completo de una serie: \texttt{\{watchedBySeason: \{``1'': [1,2,3,5], ``2'': [1,2]\}\}} indica que en la temporada 1 se han visto los episodios 1, 2, 3 y 5, mientras que en la temporada 2 solo los episodios 1 y 2.
+\subsubsection{Valoraciones y puntuaciones}
 
-\texttt{POST /api/trakt/show/plays} implementa marcado masivo de episodios, aceptando arrays con cientos de entradas en el formato \texttt{\{season, number, watchedAt\}}. Para respetar los límites de la API de Trakt, divide automáticamente las peticiones en chunks de 350 episodios máximo por llamada, y valida los números de episodio contra los datos canónicos de TMDb para prevenir marcado de episodios inexistentes.
+\textbf{Gestión de puntuaciones personales.} El sistema de valoraciones permite consultar, crear, actualizar y eliminar puntuaciones del usuario con escala normalizada de 1 a 10. Tanto TMDb como Trakt soportan valoraciones con decimales y el sistema incluye renovación automática de tokens de autenticación cuando detecta sesiones caducadas.
 
-\texttt{GET /api/trakt/item/status} proporciona un resumen completo del estado de cualquier título: si ha sido visto, cuántas veces se ha reproducido (\texttt{plays}), cuándo fue la última visualización, y el historial completo de fechas. Además, resuelve y devuelve la URL canónica del título en Trakt para acceso directo.
-
-\textbf{Estadísticas de usuario.} \texttt{GET /api/trakt/user-stats} agrega datos de múltiples endpoints de Trakt (\texttt{/users/me/stats}, \texttt{/sync/history}, \texttt{/sync/watched}) y los enriquece con información de TMDb y créditos:
-
-\begin{itemize}
-\item Calcula el top de películas y series más vistas (por número de reproducciones).
-\item Identifica actores y directores más frecuentes en el historial analizando los créditos de cada título.
-\item Agrupa por géneros consumidos con distribución porcentual.
-\item Suma el tiempo total de visionado en minutos a partir de la duración de cada episodio y película.
-\item Genera gráficas de actividad mensual, distribución por día de la semana y hora del día.
-\end{itemize}
-
-\subsubsection{Valoraciones y ratings}
-
-\textbf{Gestión de ratings personales.} \texttt{GET/POST /api/trakt/ratings} implementa CRUD completo de valoraciones del usuario con las siguientes características:
-
-\begin{itemize}
-\item \textbf{GET con \texttt{?type=all}}: Retorna todas las valoraciones (películas y series) del usuario autenticado.
-\item \textbf{POST con \texttt{\{type, tmdbId, rating\}}}: Crea o actualiza una valoración. El rating se normaliza a escala 1--10 y se redondea hacia arriba si proviene de TMDb (que acepta decimales) para cumplir con las restricciones de Trakt (enteros únicamente).
-\item \textbf{POST con \texttt{rating: null}}: Elimina la valoración existente del título, equivalente a DELETE.
-\item Implementa auto-refresh de tokens: si detecta un token caducado, ejecuta el flujo de renovación automáticamente y reintenta la petición original.
-\end{itemize}
-
-El endpoint paralelo \texttt{POST /api/tmdb/movies/[id]/rating} gestiona valoraciones en TMDb con escala de 0.5 a 10 en incrementos de 0.5, permitiendo mayor granularidad que Trakt.
-
-\textbf{Ratings agregados de múltiples fuentes.} \texttt{GET /api/tv/[id]/ratings} es un endpoint de agregación especializado para series que combina datos de tres fuentes:
-
-\begin{enumerate}
-\item Obtiene el rating promedio de TMDb directamente desde \texttt{/tv/\{id\}}.
-\item Consulta el scoreboard de Trakt mediante \texttt{/search/tmdb/\{id\}} para obtener la valoración comunitaria.
-\item Extrae el IMDb ID de los identificadores externos de TMDb, y consulta OMDb para obtener el rating oficial de IMDb, el número de votos, y puntuaciones de Rotten Tomatoes y Metacritic.
-\end{enumerate}
-
-Las tres fuentes se consultan en paralelo mediante \texttt{Promise.allSettled()}, garantizando que un fallo en cualquiera de ellas no bloquee las demás. El resultado se estructura como \texttt{\{tmdb: \{rating, votes\}, trakt: \{rating, votes\}, imdb: \{rating, votes, rtScore, mcScore\}\}}.
+\textbf{Puntuaciones de múltiples fuentes.} Los endpoints de agregación combinan puntuaciones de TMDb, Trakt e IMDb consultando las tres fuentes en paralelo. El sistema extrae el rating promedio de TMDb, obtiene la valoración comunitaria de Trakt mediante búsqueda por identificador y consulta OMDb para ratings de IMDb, Rotten Tomatoes y Metacritic. La arquitectura garantiza que un error en cualquier fuente no bloquee las demás.
 
 \subsubsection{Proxy y caché de datos externos}
 
-\textbf{Proxy OMDb con caché optimizada.} \texttt{GET /api/omdb} implementa un sistema de caché completo con las siguientes capas:
+\textbf{Proxy OMDb con caché optimizada.} El proxy de OMDb implementa un sistema multinivel de caché en memoria que almacena respuestas exitosas durante 24 horas y errores temporalmente durante 60 segundos para permitir reintentos rápidos. La deduplicación de peticiones concurrentes garantiza que múltiples solicitudes simultáneas del mismo recurso compartan una única petición HTTP, reduciendo significativamente el tráfico durante cargas masivas. El sistema soporta timeouts configurables adaptados al contexto de uso y valida respuestas para descartar errores HTML.
 
-\begin{itemize}
-\item \textbf{Caché en memoria}: \texttt{Map} global que almacena respuestas exitosas durante 24 horas y respuestas fallidas (404, timeouts) durante 60 segundos. El TTL corto para fallos permite reintentos rápidos sin saturar la API.
-
-\item \textbf{Deduplicación de peticiones concurrentes}: Mantiene un \texttt{Map} de promesas en vuelo (\texttt{inflightRequests}). Si 10 tarjetas solicitan simultáneamente el mismo IMDb ID, solo se ejecuta una petición HTTP real y todas comparten el resultado, reduciendo el tráfico en un factor de 10x durante cargas iniciales de listas.
-
-\item \textbf{Timeout configurable}: Acepta parámetro \texttt{timeoutMs} (800--20000ms) para ajustar el tiempo máximo de espera según el contexto (búsquedas rápidas vs. cargas completas).
-
-\item \textbf{Validación de respuesta}: Verifica que la respuesta sea JSON válido antes de cachearla, descartando errores HTML de OMDb.
-\end{itemize}
-
-\textbf{Imágenes localizadas en batch.} \texttt{POST /api/tmdb/localized-images} optimiza la obtención de posters y backdrops para decenas de títulos simultáneamente:
-
-\begin{itemize}
-\item Acepta arrays de IDs en el body: \texttt{\{type: ``movie'', ids: [1,2,3,...], kind: ``poster''\}}.
-\item Ejecuta peticiones con pool de concurrencia limitado a 8 workers para respetar rate limits.
-\item Implementa selección inteligente de imágenes: prioriza backdrops $\geq$1280px de ancho y posters $\geq$500px, prefiere contenido en inglés o sin texto superpuesto (\texttt{iso\_639\_1 === null}), y ordena por número de votos.
-\item Retorna objeto indexado por ID: \texttt{\{``123'': \{poster\_path, backdrop\_path\}, ``456'': \{...\}\}}.
-\end{itemize}
+\textbf{Carga de imágenes.} Cuando la aplicación necesita obtener imágenes de portada y fondo para muchos títulos a la vez, el sistema realiza las peticiones en paralelo controlando el número máximo de consultas simultáneas para no saturar la API de TMDb. La selección automática de imágenes aplica varios criterios en función de la resolución, títulos, idiomas y votos de la comunidad.
 
 \subsubsection{Integración con Plex Media Server}
 
-\textbf{Búsqueda multi-servidor.} \texttt{GET /api/plex} implementa búsqueda resiliente en múltiples servidores Plex configurados:
+Los endpoints de Plex permiten buscar contenido en múltiples servidores configurados simultáneamente, probando conexiones HTTPS con respaldo a HTTP para entornos locales. La búsqueda implementa una estrategia de coincidencia en dos niveles: primero intenta emparejar por identificadores únicos de IMDb o TMDb y si no están disponibles, compara títulos normalizados con margen de tolerancia de un año. El sistema aplica timeouts individuales por servidor para evitar esperas prolongadas y retorna el primer resultado exitoso.
 
-\begin{itemize}
-\item Acepta parámetros de búsqueda: \texttt{title}, \texttt{type} (movie|tv), \texttt{year}, \texttt{imdbId}, \texttt{tmdbId}.
-\item Itera sobre todas las URLs de servidor configuradas en \texttt{PLEX\_URL} (separadas por coma), probando primero HTTPS y haciendo fallback a HTTP para localhost.
-\item Implementa timeout de 8 segundos por servidor para evitar bloqueos.
-\item Realiza matching multinivel: primero por IMDb ID o TMDb ID si están disponibles en los \texttt{Guid} de Plex, luego por coincidencia de título normalizado (case-insensitive, sin acentos) y año con tolerancia de ±1 año.
-\item Retorna el primer resultado encontrado con metadatos completos: \texttt{\{found: true, items: [...], server: ``url''\}}.
-\end{itemize}
-
-\textbf{Biblioteca completa.} \texttt{GET /api/plex/library} lista todo el contenido disponible:
-
-\begin{itemize}
-\item Implementa paginación interna (200 ítems por página) para manejar bibliotecas con miles de títulos.
-\item Extrae metadatos técnicos: resolución (4K, 1080p, 720p, SD), códec de vídeo (H.264, HEVC, AV1), contenedor (mkv, mp4), tamaño en disco, número de pistas de audio y subtítulos.
-\item Ordena por resolución descendente (8K $\rightarrow$ 4K $\rightarrow$ 1080p $\rightarrow$ SD) y elimina duplicados por título.
-\item Limita resultados a 10000 ítems máximo para prevenir sobrecarga de memoria.
-\end{itemize}
+El listado de biblioteca implementa paginación automática para colecciones extensas y ordena resultados por calidad de vídeo, eliminando duplicados cuando existen múltiples versiones del mismo título.
 
 \subsubsection{Enlaces externos y descubrimiento}
 
-\textbf{Generación inteligente de enlaces.} Los endpoints de enlace implementan estrategias de búsqueda y caché:
+\textbf{Generación inteligente de enlaces.} El sistema de enlaces externos implementa estrategias adaptativas según la disponibilidad de metadatos. Para servicios con soporte de identificadores únicos como Letterboxd, se utilizan URLs directas cuando existe IMDb ID, mientras que en su ausencia se realiza scraping de metadatos con caché de resultados. JustWatch requiere extracción de datos embebidos en páginas dinámicas con matching por año para desambiguar títulos homónimos y múltiples estrategias de fallback ante cambios estructurales.
 
-\texttt{GET /api/links/letterboxd} genera URLs a Letterboxd mediante dos métodos:
-\begin{enumerate}
-\item Si el título tiene IMDb ID disponible, redirige a \texttt{/imdb/tt1234567} (URL estable que Letterboxd resuelve automáticamente).
-\item Si solo tiene título y año, construye un slug normalizado (\texttt{inception-2010}), hace scraping de la página HTML de Letterboxd para extraer la URL final desde los metadatos Open Graph, y cachea el resultado 24 horas.
-\end{enumerate}
-
-\texttt{GET /api/links/justwatch} realiza búsqueda real en JustWatch.com:
-\begin{enumerate}
-\item Consulta la página de búsqueda de JustWatch con el título.
-\item Extrae el JSON embebido en \texttt{\_\_NEXT\_DATA\_\_} que contiene los resultados indexados.
-\item Hace matching por año (si está disponible) para desambiguar títulos homónimos.
-\item Fallback a extracción desde metadatos \texttt{og:url} o \texttt{<link rel=``canonical''>} si la estructura del JSON cambia.
-\item Retorna \texttt{\{url: ``https://www.justwatch.com/es/pelicula/inception''\}}.
-\end{enumerate}
-
-\textbf{Descubrimiento y recomendaciones.} \texttt{GET /api/trakt/discover/recommend} implementa recomendaciones públicas:
-
-\begin{itemize}
-\item Consulta \texttt{/movies/recommended} y \texttt{/shows/recommended} de Trakt en paralelo.
-\item Intercala resultados (película, serie, película, serie, ...) para variedad.
-\item Enriquece cada item con datos de TMDb (título localizado, poster, fecha de estreno, sinopsis).
-\item Limita a 24 items totales para mantener tiempos de respuesta bajo 2 segundos.
-\end{itemize}
-
-\texttt{GET /api/trakt/related} obtiene contenido similar a un título específico:
-\begin{enumerate}
-\item Traduce el TMDb ID al slug de Trakt mediante \texttt{/search/tmdb/\{id\}}.
-\item Consulta \texttt{/\{type\}/\{slug\}/related?extended=full\&limit=15}.
-\item Enriquece los resultados con posters y backdrops de TMDb usando \texttt{mapWithConcurrency} para limitar concurrencia.
-\item Retorna hasta 15 títulos relacionados ordenados por similitud según el algoritmo de Trakt.
-\end{enumerate}
+\textbf{Descubrimiento y recomendaciones.} Los endpoints de recomendaciones consultan múltiples fuentes de Trakt en paralelo, intercalando resultados de películas y series para variedad. El enriquecimiento con datos de TMDb añade metadatos visuales y descriptivos localizados. El sistema de contenido relacionado traduce identificadores entre plataformas, obtiene sugerencias algorítmicas de Trakt y enriquece resultados con control de concurrencia, limitando respuestas para mantener tiempos de carga óptimos.
 
 \subsubsection{Listas y colecciones}
 
-\textbf{Listas personales de Trakt.} \texttt{GET /api/trakt/lists} obtiene todas las listas del usuario autenticado:
+\textbf{Listas personales de Trakt.} El sistema de listas personales obtiene todas las colecciones del usuario con sus metadatos completos incluyendo nombre, descripción, configuración de privacidad y estadísticas. Para cada lista se recuperan los primeros elementos enriquecidos con información visual de TMDb mediante peticiones paralelas. El sistema implementa manejo robusto de límites de tasa con reintentos automáticos y eliminación de duplicados.
 
-\begin{itemize}
-\item Consulta \texttt{/users/me/lists} obteniendo metadatos (nombre, descripción, privacidad, número de ítems, fecha de creación).
-\item Para cada lista, consulta \texttt{/users/me/lists/\{id\}/items} obteniendo los primeros 48 ítems.
-\item Enriquece cada ítem con título, poster y año de TMDb mediante peticiones paralelas.
-\item Implementa manejo de rate limits: si detecta código 429, espera el tiempo indicado en \texttt{Retry-After} y reintenta.
-\item Elimina duplicados que puedan existir en las listas de Trakt.
-\end{itemize}
+\textbf{Listas comunitarias.} Los endpoints de listas públicas permiten descubrir colecciones creadas por la comunidad que incluyen un título específico. El sistema soporta múltiples criterios de ordenación incluyendo popularidad, tendencias y actividad reciente, traduciendo identificadores entre plataformas y retornando metadatos del creador junto con previsualizaciones visuales.
 
-\texttt{GET /api/trakt/community/lists} obtiene listas públicas que contienen un título específico:
-
-\begin{itemize}
-\item Acepta parámetros: \texttt{type}, \texttt{tmdbId}, \texttt{tab} (popular|trending|recent), \texttt{page}, \texttt{limit}.
-\item Traduce el TMDb ID al slug de Trakt y consulta \texttt{/\{type\}/\{slug\}/lists/\{tab\}}.
-\item Retorna listas con metadatos del creador, número de likes, número de comentarios, y muestra los primeros 4 posters de cada lista para preview.
-\end{itemize}
-
-\textbf{Colecciones de TMDb.} \texttt{GET /api/tmdb/collections/search} y \texttt{/api/tmdb/collections/featured} proporcionan acceso a sagas y franquicias:
-
-\begin{itemize}
-\item \texttt{search} acepta parámetro \texttt{query} y retorna colecciones con \texttt{item\_count} (número de películas en la saga).
-\item \texttt{featured} retorna colecciones curadas por popularidad (MCU, Star Wars, Harry Potter, etc.).
-\item \texttt{GET /api/tmdb/collection} con ID retorna detalles completos incluyendo todas las películas en orden cronológico.
-\end{itemize}
+\textbf{Colecciones de TMDb.} Las colecciones proporcionan acceso a sagas y franquicias cinematográficas mediante búsqueda textual o acceso a colecciones destacadas curadas por popularidad. Los detalles completos incluyen todas las películas de la saga ordenadas cronológicamente con metadatos visuales y descriptivos.
 
 \subsection{Patrones técnicos transversales}
 
-Todos los endpoints implementan patrones comunes de robustez:
+Todos los endpoints implementan patrones comunes de robustez y fiabilidad:
 
-\textbf{Manejo de errores estructurado.} Las respuestas de error siguen un formato consistente: \texttt{\{error: ``descripción'', code?: ``ERR\_CODE'', details?: \{...\}\}}. Los códigos HTTP se asignan semánticamente: 400 para parámetros inválidos, 401 para autenticación requerida, 404 para recursos no encontrados, 429 para rate limit, 500 para errores internos, 503 para APIs externas no disponibles.
+\textbf{Manejo de errores estructurado.} Las respuestas de error siguen un formato JSON consistente con códigos HTTP semánticos: 400 para validación fallida, 401 para autenticación requerida, 404 para recursos inexistentes, 429 para límites de tasa excedidos, 500 para errores internos y 503 para servicios externos no disponibles. Cada error incluye descripción legible y opcionalmente código de error y detalles adicionales para debugging.
 
-\textbf{Validación de entrada.} Los parámetros se validan antes de ejecutar lógica costosa: TMDb IDs deben ser numéricos positivos, fechas deben cumplir formato ISO 8601, ratings se restringen a rangos válidos (1--10), y se rechazan requests con tamaños excesivos (límite de 10000 IDs en batch queries).
+\textbf{Validación y sanitización de entrada.} Los parámetros se validan exhaustivamente antes de procesamiento: identificadores numéricos deben ser enteros positivos, fechas deben cumplir ISO 8601, ratings se restringen a rangos específicos por plataforma y se rechazan payloads excesivamente grandes para prevenir ataques de denegación de servicio.
 
-\textbf{Timeouts y circuit breakers.} Todas las peticiones a APIs externas incluyen timeouts configurables (valores típicos: 5s para datos críticos, 10s para búsquedas, 15s para operaciones batch). Si un servicio externo falla repetidamente, se activa degradación graceful retornando datos parciales o cacheados.
+\textbf{Resiliencia y degradación.} Las peticiones a servicios externos incluyen timeouts adaptativos según el tipo de operación. Los servicios que fallan repetidamente activan degradación controlada retornando datos parciales, cacheados o fallbacks cuando están disponibles, evitando interrupciones completas del servicio.
 
-\textbf{Logging y observabilidad.} Los errores se loguean con contexto completo (endpoint, parámetros, usuario si está autenticado, timestamp, stack trace) permitiendo debugging en producción. Las peticiones lentas ($>$3 segundos) se marcan como warnings para identificar cuellos de botella.
+\textbf{Observabilidad.} El sistema registra errores con contexto completo incluyendo endpoint, parámetros sanitizados, estado de autenticación y trazas de ejecución. Las operaciones lentas se marcan automáticamente como advertencias para identificación de cuellos de botella y optimización futura.
 
 % -----------------------------------------------------------------------
 \section{Implementación de los módulos funcionales}

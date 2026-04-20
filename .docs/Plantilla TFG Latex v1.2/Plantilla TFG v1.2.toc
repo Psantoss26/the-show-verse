@@ -28,10 +28,11 @@
 \contentsline {section}{\numberline {3.2}Tecnologías empleadas}{24}{section.3.2}%
 \contentsline {section}{\numberline {3.3}Gestión del desarrollo y control de versiones}{24}{section.3.3}%
 \contentsline {subsection}{\numberline {3.3.1}Flujo de trabajo con GitHub}{24}{subsection.3.3.1}%
-\contentsline {section}{\numberline {3.4}Proceso de despliegue en producción}{25}{section.3.4}%
-\contentsline {subsection}{\numberline {3.4.1}Plataforma de hosting (Vercel)}{25}{subsection.3.4.1}%
-\contentsline {subsection}{\numberline {3.4.2}Variables de entorno y credenciales}{25}{subsection.3.4.2}%
-\contentsline {subsection}{\numberline {3.4.3}Proceso de deployment}{26}{subsection.3.4.3}%
+\contentsline {section}{\numberline {3.4}Proceso de despliegue en producción}{24}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Fase inicial: plataforma Vercel}{25}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {3.4.2}Proceso de deployment en Vercel}{25}{subsection.3.4.2}%
+\contentsline {subsection}{\numberline {3.4.3}Despliegue actual: servidor NAS propio}{25}{subsection.3.4.3}%
+\contentsline {subsection}{\numberline {3.4.4}GitHub Actions}{26}{subsection.3.4.4}%
 \contentsline {chapter}{\numberline {4}Desarrollo del trabajo}{27}{chapter.4}%
 \contentsline {section}{\numberline {4.1}Arquitectura del sistema}{27}{section.4.1}%
 \contentsline {subsection}{\numberline {4.1.1}Estructura de capas}{27}{subsection.4.1.1}%
@@ -47,92 +48,92 @@
 \contentsline {subsection}{\numberline {4.4.1}Funciones principales de las API Routes}{33}{subsection.4.4.1}%
 \contentsline {subsection}{\numberline {4.4.2}Categorías funcionales de endpoints}{34}{subsection.4.4.2}%
 \contentsline {subsubsection}{\numberline {4.4.2.1}Autenticación y gestión de sesiones}{34}{subsubsection.4.4.2.1}%
-\contentsline {subsubsection}{\numberline {4.4.2.2}Datos de usuario y actividad}{35}{subsubsection.4.4.2.2}%
-\contentsline {subsubsection}{\numberline {4.4.2.3}Valoraciones y ratings}{36}{subsubsection.4.4.2.3}%
-\contentsline {subsubsection}{\numberline {4.4.2.4}Proxy y caché de datos externos}{37}{subsubsection.4.4.2.4}%
-\contentsline {subsubsection}{\numberline {4.4.2.5}Integración con Plex Media Server}{38}{subsubsection.4.4.2.5}%
-\contentsline {subsubsection}{\numberline {4.4.2.6}Enlaces externos y descubrimiento}{38}{subsubsection.4.4.2.6}%
-\contentsline {subsubsection}{\numberline {4.4.2.7}Listas y colecciones}{40}{subsubsection.4.4.2.7}%
-\contentsline {subsection}{\numberline {4.4.3}Patrones técnicos transversales}{41}{subsection.4.4.3}%
-\contentsline {section}{\numberline {4.5}Implementación de los módulos funcionales}{41}{section.4.5}%
-\contentsline {subsection}{\numberline {4.5.1}Dashboard principal (\texttt {/})}{41}{subsection.4.5.1}%
-\contentsline {subsection}{\numberline {4.5.2}Página de detalles (\texttt {/details/[type]/[id]})}{42}{subsection.4.5.2}%
-\contentsline {subsubsection}{\numberline {4.5.2.1}Arquitectura de datos}{42}{subsubsection.4.5.2.1}%
-\contentsline {subsubsection}{\numberline {4.5.2.2}Menú de navegación por secciones}{43}{subsubsection.4.5.2.2}%
-\contentsline {subsubsection}{\numberline {4.5.2.3}Sistema de puntuaciones}{44}{subsubsection.4.5.2.3}%
-\contentsline {subsubsection}{\numberline {4.5.2.4}Botones de acción}{44}{subsubsection.4.5.2.4}%
-\contentsline {subsubsection}{\numberline {4.5.2.5}Gestión avanzada de episodios para series}{45}{subsubsection.4.5.2.5}%
-\contentsline {subsubsection}{\numberline {4.5.2.6}Enlaces externos y plataformas de streaming}{46}{subsubsection.4.5.2.6}%
-\contentsline {subsubsection}{\numberline {4.5.2.7}Imágenes y posters}{47}{subsubsection.4.5.2.7}%
-\contentsline {subsubsection}{\numberline {4.5.2.8}Sección de reparto y ficha de personas}{48}{subsubsection.4.5.2.8}%
-\contentsline {subsubsection}{\numberline {4.5.2.9}Comentarios, análisis de sentimientos y listas de Trakt}{49}{subsubsection.4.5.2.9}%
-\contentsline {subsubsection}{\numberline {4.5.2.10}Recomendaciones y contenido similar}{49}{subsubsection.4.5.2.10}%
-\contentsline {subsection}{\numberline {4.5.3}Favoritos (\texttt {/favorites})}{50}{subsection.4.5.3}%
-\contentsline {subsection}{\numberline {4.5.4}Pendientes (\texttt {/watchlist})}{53}{subsection.4.5.4}%
-\contentsline {subsection}{\numberline {4.5.5}Historial de visionado (\texttt {/history})}{53}{subsection.4.5.5}%
-\contentsline {subsection}{\numberline {4.5.6}En Progreso (\texttt {/in-progress})}{54}{subsection.4.5.6}%
-\contentsline {subsection}{\numberline {4.5.7}Estadísticas del usuario (\texttt {/stats})}{55}{subsection.4.5.7}%
-\contentsline {subsection}{\numberline {4.5.8}Calendario de estrenos (\texttt {/calendar})}{57}{subsection.4.5.8}%
-\contentsline {subsection}{\numberline {4.5.9}Biblioteca Personal (\texttt {/biblioteca})}{57}{subsection.4.5.9}%
-\contentsline {subsection}{\numberline {4.5.10}Descubrir contenido (\texttt {/discover})}{59}{subsection.4.5.10}%
-\contentsline {subsection}{\numberline {4.5.11}Gestión de listas (\texttt {/lists})}{59}{subsection.4.5.11}%
-\contentsline {subsection}{\numberline {4.5.12}Películas y Series (\texttt {/movies}, \texttt {/series})}{61}{subsection.4.5.12}%
-\contentsline {subsection}{\numberline {4.5.13}Ficha de personas (\texttt {/details/person/[id]})}{63}{subsection.4.5.13}%
-\contentsline {subsection}{\numberline {4.5.14}Barra de navegación (Navbar)}{64}{subsection.4.5.14}%
-\contentsline {subsection}{\numberline {4.5.15}Patrones de optimización transversales}{66}{subsection.4.5.15}%
-\contentsline {section}{\numberline {4.6}Diseño de la interfaz}{66}{section.4.6}%
-\contentsline {subsection}{\numberline {4.6.1}Sistema de diseño global}{66}{subsection.4.6.1}%
-\contentsline {subsection}{\numberline {4.6.2}Componentes de Next.js utilizados}{67}{subsection.4.6.2}%
-\contentsline {subsection}{\numberline {4.6.3}Componentes propios: Navbar}{68}{subsection.4.6.3}%
-\contentsline {subsection}{\numberline {4.6.4}Componente propio: LiquidButton}{69}{subsection.4.6.4}%
-\contentsline {subsection}{\numberline {4.6.5}Componente propio: StarRating}{70}{subsection.4.6.5}%
-\contentsline {subsection}{\numberline {4.6.6}Componente propio: DetailsSectionMenu}{71}{subsection.4.6.6}%
-\contentsline {subsection}{\numberline {4.6.7}Componente propio: EpisodeRatingsGrid}{71}{subsection.4.6.7}%
-\contentsline {subsection}{\numberline {4.6.8}Componente propio: ScoreboardBar}{72}{subsection.4.6.8}%
-\contentsline {subsection}{\numberline {4.6.9}Componentes propios: control de visionado en Trakt}{73}{subsection.4.6.9}%
-\contentsline {subsection}{\numberline {4.6.10}Componentes propios: modales de apoyo en DetailsClient}{74}{subsection.4.6.10}%
-\contentsline {subsection}{\numberline {4.6.11}Sistema de animaciones con Framer Motion}{74}{subsection.4.6.11}%
-\contentsline {subsection}{\numberline {4.6.12}Sistema de estilos global (\texttt {globals.css})}{76}{subsection.4.6.12}%
-\contentsline {subsection}{\numberline {4.6.13}Sistema de tres vistas (Grid, List, Compact)}{76}{subsection.4.6.13}%
-\contentsline {section}{\numberline {4.7}Rendimiento en producción}{77}{section.4.7}%
-\contentsline {section}{\numberline {4.8}Sistema de caché multinivel}{77}{section.4.8}%
-\contentsline {subsection}{\numberline {4.8.1}Nivel 1: Incremental Static Regeneration (ISR)}{77}{subsection.4.8.1}%
-\contentsline {subsection}{\numberline {4.8.2}Nivel 2: Caché en memoria del proceso Node.js}{78}{subsection.4.8.2}%
-\contentsline {subsection}{\numberline {4.8.3}Nivel 3: Deduplicación de peticiones concurrentes}{78}{subsection.4.8.3}%
-\contentsline {subsection}{\numberline {4.8.4}Nivel 4: Caché en el navegador (sessionStorage)}{78}{subsection.4.8.4}%
-\contentsline {section}{\numberline {4.9}Middleware y optimización SEO}{79}{section.4.9}%
-\contentsline {subsection}{\numberline {4.9.1}Detección de bots y reescritura de rutas}{79}{subsection.4.9.1}%
-\contentsline {subsection}{\numberline {4.9.2}Generación de HTML optimizado para compartir}{79}{subsection.4.9.2}%
-\contentsline {subsection}{\numberline {4.9.3}Metadatos globales y por página}{80}{subsection.4.9.3}%
-\contentsline {subsection}{\numberline {4.9.4}Resumen de la arquitectura dual de rutas}{80}{subsection.4.9.4}%
-\contentsline {section}{\numberline {4.10}Sistema de artwork personalizado}{81}{section.4.10}%
-\contentsline {subsection}{\numberline {4.10.1}Motivación}{81}{subsection.4.10.1}%
-\contentsline {subsection}{\numberline {4.10.2}Funcionamiento general}{81}{subsection.4.10.2}%
-\contentsline {section}{\numberline {4.11}Integración con comunidad Trakt}{82}{section.4.11}%
-\contentsline {subsection}{\numberline {4.11.1}Sistema de comentarios}{82}{subsection.4.11.1}%
-\contentsline {subsection}{\numberline {4.11.2}Listas de la comunidad}{83}{subsection.4.11.2}%
-\contentsline {subsection}{\numberline {4.11.3}Estadísticas de temporada}{83}{subsection.4.11.3}%
-\contentsline {section}{\numberline {4.12}Integración con Letterboxd}{83}{section.4.12}%
-\contentsline {subsection}{\numberline {4.12.1}Búsqueda de películas en Letterboxd}{83}{subsection.4.12.1}%
-\contentsline {subsection}{\numberline {4.12.2}Botón de acceso rápido}{84}{subsection.4.12.2}%
-\contentsline {section}{\numberline {4.13}Manejo de errores y estados de carga}{84}{section.4.13}%
-\contentsline {subsection}{\numberline {4.13.1}Estrategia de \textit {graceful degradation}}{84}{subsection.4.13.1}%
-\contentsline {subsection}{\numberline {4.13.2}Skeleton loaders}{85}{subsection.4.13.2}%
-\contentsline {subsection}{\numberline {4.13.3}Mensajes de error contextuales}{85}{subsection.4.13.3}%
-\contentsline {subsection}{\numberline {4.13.4}Estados vacíos}{85}{subsection.4.13.4}%
-\contentsline {section}{\numberline {4.14}Diseño responsive y adaptación móvil}{86}{section.4.14}%
-\contentsline {subsection}{\numberline {4.14.1}Breakpoints y estrategia mobile-first}{86}{subsection.4.14.1}%
-\contentsline {subsection}{\numberline {4.14.2}Barra de navegación adaptativa}{86}{subsection.4.14.2}%
-\contentsline {subsection}{\numberline {4.14.3}Imágenes responsive}{87}{subsection.4.14.3}%
-\contentsline {section}{\numberline {4.15}Plan de calidad: estrategia de testing}{87}{section.4.15}%
-\contentsline {chapter}{\numberline {5}Conclusiones}{89}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Logros alcanzados}{90}{section.5.1}%
-\contentsline {section}{\numberline {5.2}Discusión}{91}{section.5.2}%
-\contentsline {section}{\numberline {5.3}Análisis de riesgos y estrategias de mitigación}{91}{section.5.3}%
-\contentsline {subsection}{\numberline {5.3.1}Riesgos técnicos}{92}{subsection.5.3.1}%
-\contentsline {subsection}{\numberline {5.3.2}Riesgos legales y de privacidad}{92}{subsection.5.3.2}%
-\contentsline {subsection}{\numberline {5.3.3}Riesgos de producto y adopción}{92}{subsection.5.3.3}%
-\contentsline {subsection}{\numberline {5.3.4}Síntesis operativa}{93}{subsection.5.3.4}%
-\contentsline {chapter}{\hbox to\@tempdima {\hfil }Referencias}{95}{subsection.5.3.4}%
-\contentsline {chapter}{\hbox to\@tempdima {\hfil }Glosario}{96}{chapter*.39}%
-\contentsline {chapter}{\hbox to\@tempdima {\hfil }Anexo}{97}{chapter*.40}%
+\contentsline {subsubsection}{\numberline {4.4.2.2}Datos de usuario y actividad}{34}{subsubsection.4.4.2.2}%
+\contentsline {subsubsection}{\numberline {4.4.2.3}Valoraciones y ratings}{35}{subsubsection.4.4.2.3}%
+\contentsline {subsubsection}{\numberline {4.4.2.4}Proxy y caché de datos externos}{35}{subsubsection.4.4.2.4}%
+\contentsline {subsubsection}{\numberline {4.4.2.5}Integración con Plex Media Server}{35}{subsubsection.4.4.2.5}%
+\contentsline {subsubsection}{\numberline {4.4.2.6}Enlaces externos y descubrimiento}{36}{subsubsection.4.4.2.6}%
+\contentsline {subsubsection}{\numberline {4.4.2.7}Listas y colecciones}{36}{subsubsection.4.4.2.7}%
+\contentsline {subsection}{\numberline {4.4.3}Patrones técnicos transversales}{37}{subsection.4.4.3}%
+\contentsline {section}{\numberline {4.5}Implementación de los módulos funcionales}{37}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Dashboard principal (\texttt {/})}{37}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}Página de detalles (\texttt {/details/[type]/[id]})}{38}{subsection.4.5.2}%
+\contentsline {subsubsection}{\numberline {4.5.2.1}Arquitectura de datos}{38}{subsubsection.4.5.2.1}%
+\contentsline {subsubsection}{\numberline {4.5.2.2}Menú de navegación por secciones}{39}{subsubsection.4.5.2.2}%
+\contentsline {subsubsection}{\numberline {4.5.2.3}Sistema de puntuaciones}{40}{subsubsection.4.5.2.3}%
+\contentsline {subsubsection}{\numberline {4.5.2.4}Botones de acción}{40}{subsubsection.4.5.2.4}%
+\contentsline {subsubsection}{\numberline {4.5.2.5}Gestión avanzada de episodios para series}{41}{subsubsection.4.5.2.5}%
+\contentsline {subsubsection}{\numberline {4.5.2.6}Enlaces externos y plataformas de streaming}{42}{subsubsection.4.5.2.6}%
+\contentsline {subsubsection}{\numberline {4.5.2.7}Imágenes y posters}{43}{subsubsection.4.5.2.7}%
+\contentsline {subsubsection}{\numberline {4.5.2.8}Sección de reparto y ficha de personas}{44}{subsubsection.4.5.2.8}%
+\contentsline {subsubsection}{\numberline {4.5.2.9}Comentarios, análisis de sentimientos y listas de Trakt}{45}{subsubsection.4.5.2.9}%
+\contentsline {subsubsection}{\numberline {4.5.2.10}Recomendaciones y contenido similar}{45}{subsubsection.4.5.2.10}%
+\contentsline {subsection}{\numberline {4.5.3}Favoritos (\texttt {/favorites})}{46}{subsection.4.5.3}%
+\contentsline {subsection}{\numberline {4.5.4}Pendientes (\texttt {/watchlist})}{49}{subsection.4.5.4}%
+\contentsline {subsection}{\numberline {4.5.5}Historial de visionado (\texttt {/history})}{49}{subsection.4.5.5}%
+\contentsline {subsection}{\numberline {4.5.6}En Progreso (\texttt {/in-progress})}{50}{subsection.4.5.6}%
+\contentsline {subsection}{\numberline {4.5.7}Estadísticas del usuario (\texttt {/stats})}{51}{subsection.4.5.7}%
+\contentsline {subsection}{\numberline {4.5.8}Calendario de estrenos (\texttt {/calendar})}{53}{subsection.4.5.8}%
+\contentsline {subsection}{\numberline {4.5.9}Biblioteca Personal (\texttt {/biblioteca})}{53}{subsection.4.5.9}%
+\contentsline {subsection}{\numberline {4.5.10}Descubrir contenido (\texttt {/discover})}{55}{subsection.4.5.10}%
+\contentsline {subsection}{\numberline {4.5.11}Gestión de listas (\texttt {/lists})}{55}{subsection.4.5.11}%
+\contentsline {subsection}{\numberline {4.5.12}Películas y Series (\texttt {/movies}, \texttt {/series})}{57}{subsection.4.5.12}%
+\contentsline {subsection}{\numberline {4.5.13}Ficha de personas (\texttt {/details/person/[id]})}{59}{subsection.4.5.13}%
+\contentsline {subsection}{\numberline {4.5.14}Barra de navegación (Navbar)}{60}{subsection.4.5.14}%
+\contentsline {subsection}{\numberline {4.5.15}Patrones de optimización transversales}{62}{subsection.4.5.15}%
+\contentsline {section}{\numberline {4.6}Diseño de la interfaz}{62}{section.4.6}%
+\contentsline {subsection}{\numberline {4.6.1}Sistema de diseño global}{62}{subsection.4.6.1}%
+\contentsline {subsection}{\numberline {4.6.2}Componentes de Next.js utilizados}{63}{subsection.4.6.2}%
+\contentsline {subsection}{\numberline {4.6.3}Componentes propios: Navbar}{64}{subsection.4.6.3}%
+\contentsline {subsection}{\numberline {4.6.4}Componente propio: LiquidButton}{65}{subsection.4.6.4}%
+\contentsline {subsection}{\numberline {4.6.5}Componente propio: StarRating}{66}{subsection.4.6.5}%
+\contentsline {subsection}{\numberline {4.6.6}Componente propio: DetailsSectionMenu}{67}{subsection.4.6.6}%
+\contentsline {subsection}{\numberline {4.6.7}Componente propio: EpisodeRatingsGrid}{67}{subsection.4.6.7}%
+\contentsline {subsection}{\numberline {4.6.8}Componente propio: ScoreboardBar}{68}{subsection.4.6.8}%
+\contentsline {subsection}{\numberline {4.6.9}Componentes propios: control de visionado en Trakt}{69}{subsection.4.6.9}%
+\contentsline {subsection}{\numberline {4.6.10}Componentes propios: modales de apoyo en DetailsClient}{70}{subsection.4.6.10}%
+\contentsline {subsection}{\numberline {4.6.11}Sistema de animaciones con Framer Motion}{70}{subsection.4.6.11}%
+\contentsline {subsection}{\numberline {4.6.12}Sistema de estilos global (\texttt {globals.css})}{72}{subsection.4.6.12}%
+\contentsline {subsection}{\numberline {4.6.13}Sistema de tres vistas (Grid, List, Compact)}{72}{subsection.4.6.13}%
+\contentsline {section}{\numberline {4.7}Rendimiento en producción}{73}{section.4.7}%
+\contentsline {section}{\numberline {4.8}Sistema de caché multinivel}{73}{section.4.8}%
+\contentsline {subsection}{\numberline {4.8.1}Nivel 1: Incremental Static Regeneration (ISR)}{73}{subsection.4.8.1}%
+\contentsline {subsection}{\numberline {4.8.2}Nivel 2: Caché en memoria del proceso Node.js}{74}{subsection.4.8.2}%
+\contentsline {subsection}{\numberline {4.8.3}Nivel 3: Deduplicación de peticiones concurrentes}{74}{subsection.4.8.3}%
+\contentsline {subsection}{\numberline {4.8.4}Nivel 4: Caché en el navegador (sessionStorage)}{74}{subsection.4.8.4}%
+\contentsline {section}{\numberline {4.9}Middleware y optimización SEO}{75}{section.4.9}%
+\contentsline {subsection}{\numberline {4.9.1}Detección de bots y reescritura de rutas}{75}{subsection.4.9.1}%
+\contentsline {subsection}{\numberline {4.9.2}Generación de HTML optimizado para compartir}{75}{subsection.4.9.2}%
+\contentsline {subsection}{\numberline {4.9.3}Metadatos globales y por página}{76}{subsection.4.9.3}%
+\contentsline {subsection}{\numberline {4.9.4}Resumen de la arquitectura dual de rutas}{76}{subsection.4.9.4}%
+\contentsline {section}{\numberline {4.10}Sistema de artwork personalizado}{77}{section.4.10}%
+\contentsline {subsection}{\numberline {4.10.1}Motivación}{77}{subsection.4.10.1}%
+\contentsline {subsection}{\numberline {4.10.2}Funcionamiento general}{77}{subsection.4.10.2}%
+\contentsline {section}{\numberline {4.11}Integración con comunidad Trakt}{78}{section.4.11}%
+\contentsline {subsection}{\numberline {4.11.1}Sistema de comentarios}{78}{subsection.4.11.1}%
+\contentsline {subsection}{\numberline {4.11.2}Listas de la comunidad}{79}{subsection.4.11.2}%
+\contentsline {subsection}{\numberline {4.11.3}Estadísticas de temporada}{79}{subsection.4.11.3}%
+\contentsline {section}{\numberline {4.12}Integración con Letterboxd}{79}{section.4.12}%
+\contentsline {subsection}{\numberline {4.12.1}Búsqueda de películas en Letterboxd}{79}{subsection.4.12.1}%
+\contentsline {subsection}{\numberline {4.12.2}Botón de acceso rápido}{80}{subsection.4.12.2}%
+\contentsline {section}{\numberline {4.13}Manejo de errores y estados de carga}{80}{section.4.13}%
+\contentsline {subsection}{\numberline {4.13.1}Estrategia de \textit {graceful degradation}}{80}{subsection.4.13.1}%
+\contentsline {subsection}{\numberline {4.13.2}Skeleton loaders}{81}{subsection.4.13.2}%
+\contentsline {subsection}{\numberline {4.13.3}Mensajes de error contextuales}{81}{subsection.4.13.3}%
+\contentsline {subsection}{\numberline {4.13.4}Estados vacíos}{81}{subsection.4.13.4}%
+\contentsline {section}{\numberline {4.14}Diseño responsive y adaptación móvil}{82}{section.4.14}%
+\contentsline {subsection}{\numberline {4.14.1}Breakpoints y estrategia mobile-first}{82}{subsection.4.14.1}%
+\contentsline {subsection}{\numberline {4.14.2}Barra de navegación adaptativa}{82}{subsection.4.14.2}%
+\contentsline {subsection}{\numberline {4.14.3}Imágenes responsive}{83}{subsection.4.14.3}%
+\contentsline {section}{\numberline {4.15}Plan de calidad: estrategia de testing}{83}{section.4.15}%
+\contentsline {chapter}{\numberline {5}Conclusiones}{85}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Logros alcanzados}{86}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Discusión}{87}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Análisis de riesgos y estrategias de mitigación}{87}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}Riesgos técnicos}{88}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}Riesgos legales y de privacidad}{88}{subsection.5.3.2}%
+\contentsline {subsection}{\numberline {5.3.3}Riesgos de producto y adopción}{88}{subsection.5.3.3}%
+\contentsline {subsection}{\numberline {5.3.4}Síntesis operativa}{89}{subsection.5.3.4}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Referencias}{91}{subsection.5.3.4}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Glosario}{92}{chapter*.39}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Anexo}{93}{chapter*.40}%

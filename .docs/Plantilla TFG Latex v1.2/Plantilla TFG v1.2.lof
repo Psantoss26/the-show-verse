@@ -7,28 +7,28 @@
 \contentsline {figure}{\numberline {2.4}{\ignorespaces Interfaz principal de JustWatch.}}{20}{figure.caption.6}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {4.1}{\ignorespaces Interfaz de gestión de portadas y fondos.}}{48}{figure.caption.12}%
-\contentsline {figure}{\numberline {4.2}{\ignorespaces Interfaz de la sección de favoritos.}}{52}{figure.caption.13}%
-\contentsline {figure}{\numberline {4.3}{\ignorespaces Vista tipo lista de la sección de favoritos.}}{52}{figure.caption.14}%
-\contentsline {figure}{\numberline {4.4}{\ignorespaces Interfaz de la sección de pendientes.}}{53}{figure.caption.15}%
-\contentsline {figure}{\numberline {4.5}{\ignorespaces Interfaz de la sección de historial de visionado.}}{54}{figure.caption.16}%
-\contentsline {figure}{\numberline {4.6}{\ignorespaces Interfaz de la sección de series en progreso.}}{55}{figure.caption.17}%
-\contentsline {figure}{\numberline {4.7}{\ignorespaces Interfaz de la sección de estadísticas del usuario (vista general y vista de patrones).}}{56}{figure.caption.18}%
-\contentsline {figure}{\numberline {4.8}{\ignorespaces Interfaz del calendario de estrenos de películas.}}{57}{figure.caption.19}%
-\contentsline {figure}{\numberline {4.9}{\ignorespaces Interfaz de la biblioteca personal integrada con Plex Media Server.}}{58}{figure.caption.20}%
-\contentsline {figure}{\numberline {4.10}{\ignorespaces Interfaz de la sección Descubrir contenido.}}{59}{figure.caption.21}%
-\contentsline {figure}{\numberline {4.11}{\ignorespaces Interfaz de las listas públicas de Trakt.}}{60}{figure.caption.22}%
-\contentsline {figure}{\numberline {4.12}{\ignorespaces Interfaz de la sección de colecciones.}}{61}{figure.caption.23}%
-\contentsline {figure}{\numberline {4.13}{\ignorespaces Interfaz de la sección de películas.}}{62}{figure.caption.24}%
-\contentsline {figure}{\numberline {4.14}{\ignorespaces Interfaz de la sección de series.}}{62}{figure.caption.25}%
-\contentsline {figure}{\numberline {4.15}{\ignorespaces Interfaz de la ficha de persona.}}{64}{figure.caption.26}%
-\contentsline {figure}{\numberline {4.16}{\ignorespaces Barra de navegación en escritorio.}}{65}{figure.caption.27}%
-\contentsline {figure}{\numberline {4.17}{\ignorespaces Barra de navegación en móvil.}}{65}{figure.caption.28}%
-\contentsline {figure}{\numberline {4.18}{\ignorespaces Botones de acción implementados con el componente LiquidButton.}}{70}{figure.caption.29}%
-\contentsline {figure}{\numberline {4.19}{\ignorespaces Interfaz del componente de valoración personal StarRating.}}{71}{figure.caption.30}%
-\contentsline {figure}{\numberline {4.20}{\ignorespaces Interfaz del componente DetailsSectionMenu.}}{71}{figure.caption.31}%
-\contentsline {figure}{\numberline {4.21}{\ignorespaces Interfaz del componente EpisodeRatingsGrid.}}{72}{figure.caption.32}%
-\contentsline {figure}{\numberline {4.22}{\ignorespaces Interfaz del componente ScoreboardBar.}}{73}{figure.caption.33}%
-\contentsline {figure}{\numberline {4.23}{\ignorespaces Interfaz del modal TraktEpisodesWatchedModal para gestionar episodios vistos.}}{73}{figure.caption.34}%
-\contentsline {figure}{\numberline {4.24}{\ignorespaces Interfaz del modal TraktWatchedModal con el historial de visionado.}}{74}{figure.caption.35}%
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Interfaz de gestión de portadas y fondos.}}{44}{figure.caption.12}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces Interfaz de la sección de favoritos.}}{48}{figure.caption.13}%
+\contentsline {figure}{\numberline {4.3}{\ignorespaces Vista tipo lista de la sección de favoritos.}}{48}{figure.caption.14}%
+\contentsline {figure}{\numberline {4.4}{\ignorespaces Interfaz de la sección de pendientes.}}{49}{figure.caption.15}%
+\contentsline {figure}{\numberline {4.5}{\ignorespaces Interfaz de la sección de historial de visionado.}}{50}{figure.caption.16}%
+\contentsline {figure}{\numberline {4.6}{\ignorespaces Interfaz de la sección de series en progreso.}}{51}{figure.caption.17}%
+\contentsline {figure}{\numberline {4.7}{\ignorespaces Interfaz de la sección de estadísticas del usuario (vista general y vista de patrones).}}{52}{figure.caption.18}%
+\contentsline {figure}{\numberline {4.8}{\ignorespaces Interfaz del calendario de estrenos de películas.}}{53}{figure.caption.19}%
+\contentsline {figure}{\numberline {4.9}{\ignorespaces Interfaz de la biblioteca personal integrada con Plex Media Server.}}{54}{figure.caption.20}%
+\contentsline {figure}{\numberline {4.10}{\ignorespaces Interfaz de la sección Descubrir contenido.}}{55}{figure.caption.21}%
+\contentsline {figure}{\numberline {4.11}{\ignorespaces Interfaz de las listas públicas de Trakt.}}{56}{figure.caption.22}%
+\contentsline {figure}{\numberline {4.12}{\ignorespaces Interfaz de la sección de colecciones.}}{57}{figure.caption.23}%
+\contentsline {figure}{\numberline {4.13}{\ignorespaces Interfaz de la sección de películas.}}{58}{figure.caption.24}%
+\contentsline {figure}{\numberline {4.14}{\ignorespaces Interfaz de la sección de series.}}{58}{figure.caption.25}%
+\contentsline {figure}{\numberline {4.15}{\ignorespaces Interfaz de la ficha de persona.}}{60}{figure.caption.26}%
+\contentsline {figure}{\numberline {4.16}{\ignorespaces Barra de navegación en escritorio.}}{61}{figure.caption.27}%
+\contentsline {figure}{\numberline {4.17}{\ignorespaces Barra de navegación en móvil.}}{61}{figure.caption.28}%
+\contentsline {figure}{\numberline {4.18}{\ignorespaces Botones de acción implementados con el componente LiquidButton.}}{66}{figure.caption.29}%
+\contentsline {figure}{\numberline {4.19}{\ignorespaces Interfaz del componente de valoración personal StarRating.}}{67}{figure.caption.30}%
+\contentsline {figure}{\numberline {4.20}{\ignorespaces Interfaz del componente DetailsSectionMenu.}}{67}{figure.caption.31}%
+\contentsline {figure}{\numberline {4.21}{\ignorespaces Interfaz del componente EpisodeRatingsGrid.}}{68}{figure.caption.32}%
+\contentsline {figure}{\numberline {4.22}{\ignorespaces Interfaz del componente ScoreboardBar.}}{69}{figure.caption.33}%
+\contentsline {figure}{\numberline {4.23}{\ignorespaces Interfaz del modal TraktEpisodesWatchedModal para gestionar episodios vistos.}}{69}{figure.caption.34}%
+\contentsline {figure}{\numberline {4.24}{\ignorespaces Interfaz del modal TraktWatchedModal con el historial de visionado.}}{70}{figure.caption.35}%
 \addvspace {10\p@ }

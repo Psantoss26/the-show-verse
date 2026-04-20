@@ -1855,9 +1855,9 @@ export default function DetailsClient({
       });
       if (!res.ok) throw new Error("Error al guardar puntuación en TMDb");
 
-      // Sincronizacion opcional hacia Trakt (skipSync evita bucle infinito)
+      // Sincronizacion opcional hacia Trakt conservando el mismo valor que TMDb.
       if (!skipSync && syncTrakt && trakt.connected) {
-        await setTraktRatingSafe(Math.ceil(value));
+        await setTraktRatingSafe(value);
       }
     } catch (err) {
       setRatingError(err?.message || "Error");
@@ -1899,8 +1899,7 @@ export default function DetailsClient({
       return;
     }
     try {
-      // Trakt acepta valores enteros de 1 a 10
-      await setTraktRatingSafe(value == null ? null : Math.ceil(value));
+      await setTraktRatingSafe(value);
     } catch (err) {
       if (err?.code === "TRAKT_REAUTH_REQUIRED" || err?.status === 401) {
         window.location.href = `/api/trakt/auth/start?next=/details/${type}/${id}`;
@@ -4269,7 +4268,7 @@ export default function DetailsClient({
       });
       setTrakt((p) => ({
         ...p,
-        rating: valueOrNull == null ? null : Math.round(valueOrNull),
+        rating: valueOrNull == null ? null : Number(valueOrNull),
       }));
     } finally {
       setTraktBusy("");

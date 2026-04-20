@@ -106,12 +106,14 @@ El proyecto está alojado en un repositorio de GitHub con la siguiente estructur
 
 \section{Proceso de despliegue en producción}
 
-\subsection{Plataforma de hosting (Vercel)}
+El proyecto ha pasado por dos fases de despliegue a lo largo de su desarrollo. En la fase inicial se utilizó Vercel como plataforma de hosting gestionada en la nube. Posteriormente, la aplicación se migró a una infraestructura propia basada en un servidor NAS con acceso público a través de Cloudflare Tunnel, que constituye la configuración actualmente en producción.
 
-El proyecto se despliega en Vercel, la plataforma de hosting optimizada para Next.js como autor del framework. Las razones de esta selección son:
+\subsection{Fase inicial: plataforma Vercel}
+
+Durante las primeras fases del desarrollo la aplicación se desplegó en Vercel, una plataforma de hosting optimizada para Next.js. Las razones de esta selección inicial son:
 
 \begin{itemize}
-\item \textbf{Integración native con Next.js:} Las características de Next.js como Image Optimization, ISR y Edge Functions se soportan de forma nativa sin configuración adicional.
+\item \textbf{Integración nativa con Next.js:} Las características de Next.js como Image Optimization, ISR y Edge Functions se soportan de forma nativa sin configuración adicional.
 \item \textbf{API serverless:} Las API Routes se auto-escalan sin gestionar servidores o contenedores.
 \item \textbf{Edge computing:} Los Edge Functions ejecutan código más cerca del usuario, reduciendo latencia para SPA middleware.
 \item \textbf{Deployments automáticos:} Cada pull request genera un URL único de vista previa con el código del branch.
@@ -119,33 +121,14 @@ El proyecto se despliega en Vercel, la plataforma de hosting optimizada para Nex
 \item \textbf{Monitoreo integrado:} Web Analytics, Performance Monitoring y Error Tracking nativos.
 \end{itemize}
 
-\subsection{Variables de entorno y credenciales}
+\subsection{Proceso de deployment en Vercel}
 
-Para garantizar la seguridad de la aplicación y evitar exponer información confidencial en el código fuente, todas las claves y contraseñas de las APIs se centralizan mediante el administrador de variables de entorno cifradas que integran de forma nativa las plataformas de GitHub y Vercel:
+El despliegue se ejecuta automáticamente cuando se hace merge a la rama \texttt{main} en GitHub. Vercel recibe la notificación, instala dependencias, ejecuta \texttt{next build} y valida que no haya errores de compilación. Si el build es exitoso, despliega la nueva versión y actualiza el dominio, en caso de fallo, realiza un rollback automático a la versión anterior.
 
-\begin{itemize}
-\item \texttt{NEXT\_PUBLIC\_TMDB\_API\_KEY}: Clave de la API de TMDb, accesible desde el cliente y servidor.
-\item \texttt{OMDB\_API\_KEY}: Clave privada de acceso a la base de datos de OMDb.
-\item \texttt{TRAKT\_CLIENT\_ID} y \texttt{TRAKT\_CLIENT\_SECRET}: Credenciales principal y secreta para autenticar la aplicación como cliente de Trakt.tv.
-\item \texttt{TRAKT\_REDIRECT\_URI}: Dirección web de retorno requerida en el flujo de autenticación OAuth de Trakt.
-\item \texttt{PLEX\_URL} y \texttt{PLEX\_TOKEN}: Dirección de red (local o externa) y token personal del servidor multimedia de Plex.
-\item \texttt{PLEX\_CLIENT\_IDENTIFIER}: Identificador único de aplicación para Plex.
-\item \texttt{PLEX\_JWT\_SCOPE} y \texttt{PLEX\_JWT\_KID}: Conjunto de permisos y nombre de clave asociados a la generación de JWT para Plex.
-\item \texttt{PLEX\_JWT\_PRIVATE\_KEY}: Clave privada empleada en el servidor para la comunicación segura con Plex.
-\end{itemize}
+\subsection{Despliegue actual: servidor NAS propio}
 
-\subsection{Proceso de deployment}
+La aplicación se despliega actualmente en un servidor propio bajo el dominio \texttt{theshowverse.com}, mediante tres componentes principales. La aplicación se empaqueta en un contenedor Docker construido con un \texttt{Dockerfile} multietapa que separa la fase de compilación de la de ejecución, reduciendo el tamaño final de la imagen. Las variables de entorno sensibles se inyectan en tiempo de ejecución mediante un archivo \texttt{.env} externo al repositorio. El acceso público se gestiona a través de Cloudflare Tunnel: un segundo contenedor ejecuta \textit{cloudflared}, que mantiene una conexión cifrada saliente hacia Cloudflare, enrutando el tráfico del dominio al puerto \texttt{3000} del servidor sin necesidad de exponer puertos en el router ni disponer de IP pública fija. Por último, existe una página de mantenimiento para cuando el servidor no está disponible mediante un Cloudflare Worker.
 
-Un despliegue típico a producción sigue estos pasos:
+\subsection{GitHub Actions}
 
-\begin{enumerate}
-\item Se realiza merge de PR a \texttt{main} desde GitHub.
-\item GitHub webhook notifica a Vercel del cambio.
-\item Vercel inicia el proceso de build: instala dependencias, ejecuta \texttt{next build}, genera artefactos de producción.
-\item Build check de Vercel valida que no hay errores de compilación.
-\item Si el build es exitoso, Vercel despliega a infraestructura de producción.
-\item Vercel ejecuta health checks (petición HTTP a raíz de dominio) para verificar que la aplicación responde.
-\item Dominio \texttt{the-show-verse.vercel.app} apunta automáticamente a la versión nueva.
-\item Si hay error, Vercel realiza rollback automático a la versión anterior.
-\item URL de deployment anterior permanece disponible como \texttt{previousUrl.vercel.app} para rollback manual.
-\end{enumerate}
+Los despliegues en producción se automatizan mediante un \textit{workflow} de GitHub Actions. Cuando se hace \textit{push} a la rama principal del repositorio, el \textit{workflow} se conecta por SSH al NAS, descarga la nueva versión del código, reconstruye la imagen Docker y reinicia el contenedor de la aplicación. De esta forma, cada cambio confirmado en el repositorio se refleja en producción sin intervención manual.
