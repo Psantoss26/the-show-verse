@@ -1,17 +1,17 @@
 [0] Config.pm:328> INFO - This is Biber 2.21
 [0] Config.pm:331> INFO - Logfile is 'Plantilla TFG v1.2.blg'
-[97] biber-MSWIN64:342> INFO - === 
-[131] Biber.pm:421> INFO - Reading 'Plantilla TFG v1.2.bcf'
-[246] Biber.pm:999> INFO - Using all citekeys in bib section 0
-[264] Biber.pm:4487> INFO - Processing section 0
-[274] Biber.pm:4678> INFO - Looking for bibtex file 'biblio.bib' for section 0
-[335] bibtex.pm:1713> INFO - LaTeX decoding ...
-[377] bibtex.pm:1519> INFO - Found BibTeX data source 'biblio.bib'
-[548] UCollate.pm:68> INFO - Overriding locale 'es-ES' defaults 'normalization = NFD' with 'normalization = prenormalized'
-[548] UCollate.pm:68> INFO - Overriding locale 'es-ES' defaults 'variable = shifted' with 'variable = non-ignorable'
-[548] Biber.pm:4307> INFO - Sorting list 'apa/apasortcite//global/global/global' of type 'entry' with template 'apa' and locale 'es-ES'
-[611] UCollate.pm:68> INFO - Overriding locale 'es-ES' defaults 'variable = shifted' with 'variable = non-ignorable'
-[611] UCollate.pm:68> INFO - Overriding locale 'es-ES' defaults 'normalization = NFD' with 'normalization = prenormalized'
-[611] Biber.pm:4307> INFO - Sorting list 'apa/global//global/global/global' of type 'entry' with template 'apa' and locale 'es-ES'
-[646] bbl.pm:676> INFO - Writing 'Plantilla TFG v1.2.bbl' with encoding 'UTF-8'
-[681] bbl.pm:779> INFO - Output to Plantilla TFG v1.2.bbl
+[94] biber-MSWIN64:342> INFO - === 
+[129] Biber.pm:421> INFO - Reading 'Plantilla TFG v1.2.bcf'
+[241] Biber.pm:999> INFO - Using all citekeys in bib section 0
+[260] Biber.pm:4487> INFO - Processing section 0
+[270] Biber.pm:4678> INFO - Looking for bibtex file 'biblio.bib' for section 0
+[351] bibtex.pm:1713> INFO - LaTeX decoding ...
+[393] bibtex.pm:1519> INFO - Found BibTeX data source 'biblio.bib'
+[575] UCollate.pm:68> INFO - Overriding locale 'es-ES' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[576] UCollate.pm:68> INFO - Overriding locale 'es-ES' defaults 'variable = shifted' with 'variable = non-ignorable'
+[576] Biber.pm:4307> INFO - Sorting list 'apa/apasortcite//global/global/global' of type 'entry' with template 'apa' and locale 'es-ES'
+[644] UCollate.pm:68> INFO - Overriding locale 'es-ES' defaults 'variable = shifted' with 'variable = non-ignorable'
+[644] UCollate.pm:68> INFO - Overriding locale 'es-ES' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[645] Biber.pm:4307> INFO - Sorting list 'apa/global//global/global/global' of type 'entry' with template 'apa' and locale 'es-ES'
+[678] bbl.pm:676> INFO - Writing 'Plantilla TFG v1.2.bbl' with encoding 'UTF-8'
+[712] bbl.pm:779> INFO - Output to Plantilla TFG v1.2.bbl

@@ -180,37 +180,6 @@
       \verb https://docs.docker.com/get-started/
       \endverb
     \endentry
-    \entry{Frain:2015}{book}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=45bffad3e1fe83813669fafe382d54ce}{%
-           family={Frain},
-           familyi={F\bibinitperiod},
-           given={Ben},
-           giveni={B\bibinitperiod},
-           givenun=0}}%
-      }
-      \list{publisher}{1}{%
-        {Packt Publishing}%
-      }
-      \strng{namehash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{fullhash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{fullhashraw}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{bibnamehash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{authorbibnamehash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{authornamehash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{authorfullhash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{authorfullhashraw}{45bffad3e1fe83813669fafe382d54ce}
-      \field{sortinit}{F}
-      \field{sortinithash}{2638baaa20439f1b5a8f80c6c08a13b4}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{Responsive Web Design with HTML5 and CSS3}
-      \field{year}{2015}
-      \true{nocite}
-    \endentry
     \entry{Framer:2024}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=0df10fc145be1e5c3fe6535066b7d7f8}{%
@@ -1658,37 +1627,6 @@
       \verb{url}
       \verb https://docs.docker.com/get-started/
       \endverb
-    \endentry
-    \entry{Frain:2015}{book}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=45bffad3e1fe83813669fafe382d54ce}{%
-           family={Frain},
-           familyi={F\bibinitperiod},
-           given={Ben},
-           giveni={B\bibinitperiod},
-           givenun=0}}%
-      }
-      \list{publisher}{1}{%
-        {Packt Publishing}%
-      }
-      \strng{namehash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{fullhash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{fullhashraw}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{bibnamehash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{authorbibnamehash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{authornamehash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{authorfullhash}{45bffad3e1fe83813669fafe382d54ce}
-      \strng{authorfullhashraw}{45bffad3e1fe83813669fafe382d54ce}
-      \field{sortinit}{F}
-      \field{sortinithash}{2638baaa20439f1b5a8f80c6c08a13b4}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{Responsive Web Design with HTML5 and CSS3}
-      \field{year}{2015}
-      \true{nocite}
     \endentry
     \entry{Framer:2024}{online}{}{}
       \name{author}{1}{}{%
