@@ -2,7 +2,7 @@ El trabajo ha demostrado que los objetivos planteados son alcanzables con las te
 
 En primer lugar, la arquitectura Next.js App Router con React Server Components ha demostrado ser particularmente adecuada para aplicaciones de este tipo, que combinan una gran cantidad de datos externos con la necesidad de interactividad en el cliente. La separación entre la obtención de datos (servidor) y la presentación interactiva (cliente) simplifica el flujo de datos y reduce las fuentes de error, de esta forma es posible obtener los datos en paralelo de múltiples APIs en el servidor sin coste para el cliente, lo que permite reducir de forma significativa el tiempo de carga inicial frente a enfoques donde casi todo el procesamiento se realiza en el navegador.
 
-En segundo lugar, la integración de OAuth 2.0 mediante API Routes de Next.js ha demostrado ser una estrategia robusta y segura sin necesidad de librerías de autenticación genéricas. La decisión de almacenar los tokens en cookies \texttt{httpOnly} y resolver la autenticación en servidor sigue las buenas prácticas descritas en OAuth 2.0 (RFC 6749) \parencite{Hardt:2012} y en las recomendaciones actuales de OWASP para este tipo de flujos \parencite{OWASP:2024}. Además, la implementación manual permitió gestionar con mayor precisión tanto la renovación de tokens como los errores específicos de la API de Trakt.tv.
+En segundo lugar, la integración de OAuth 2.0 mediante API Routes de Next.js ha demostrado ser una estrategia robusta y segura sin necesidad de librerías de autenticación genéricas. La decisión de almacenar los tokens en cookies \texttt{httpOnly} y resolver la autenticación en servidor sigue las buenas prácticas descritas en OAuth 2.0 (RFC 6749) y en las recomendaciones actuales de OWASP para este tipo de flujos. Además, la implementación manual permitió gestionar con mayor precisión tanto la renovación de tokens como los errores específicos de la API de Trakt.tv.
 
 En tercer lugar, la estrategia de caché diferenciada por tipo de dato ha demostrado ser eficaz en todas sus capas: ISR en servidor para el catálogo, \texttt{no-store} para los datos de usuario protegidos por autenticación y una caché en cliente de cuatro niveles (memoria del proceso, sessionStorage, localStorage y deduplicación en vuelo) para las puntuaciones externas de IMDb, Trakt y OMDb en las vistas de listas, reduciendo drásticamente el número de llamadas a APIs externas.
 
@@ -16,15 +16,15 @@ El proyecto ha cumplido todos los objetivos específicos planteados inicialmente
 
 \textbf{Objetivos iniciales cumplidos:}
 \begin{enumerate}
-\item \checkmark\ Integración completa con TMDb para metadatos de películas y series.
-\item \checkmark\ Sistema de autenticación OAuth 2.0 con Trakt.tv con refresh automático.
-\item \checkmark\ Módulo de gestión personal con sincronización bidireccional.
-\item \checkmark\ Sistema de seguimiento de episodios completo para series.
-\item \checkmark\ Listas personalizadas por usuario.
-\item \checkmark\ Historial de visionado y estadísticas de usuario.
-\item \checkmark\ Interfaz responsiva con múltiples modos de visualización.
-\item \checkmark\ Sistema de caché optimizado.
-\item \checkmark\ Despliegue en producción (Vercel).
+\item Integración completa con TMDb para metadatos de películas y series.
+\item Sistema de autenticación OAuth 2.0 con Trakt.tv con refresh automático.
+\item Módulo de gestión personal con sincronización bidireccional.
+\item Sistema de seguimiento de episodios completo para series.
+\item Listas personalizadas por usuario.
+\item Historial de visionado y estadísticas de usuario.
+\item Interfaz responsiva con múltiples modos de visualización.
+\item Sistema de caché optimizado.
+\item Despliegue en producción (Vercel).
 \end{enumerate}
 
 \textbf{Funcionalidades adicionales implementadas:}
@@ -46,49 +46,81 @@ El trabajo presenta algunas limitaciones que deben reconocerse.
 
 \textbf{Ausencia de tests automatizados.} El proyecto no incluyó una suite de tests unitarios ni de integración durante el desarrollo. La validación se realizó exclusivamente mediante pruebas manuales. Los componentes con lógica de negocio compleja (cálculo de progreso de episodios, normalización de fechas para Trakt, estrategia de selección de \textit{backdrops}, algoritmo de deduplicación en vuelo) serían candidatos prioritarios para la cobertura de tests unitarios y la integración de Jest y React Testing Library sería el siguiente paso natural del proyecto.
 
-\textbf{Dependencia de APIs de terceros.} La plataforma depende de la continuidad y estabilidad de cinco APIs externas (TMDb, Trakt.tv, OMDb, JustWatch y Plex), ninguna de las cuales está bajo el control del proyecto. Un cambio en los términos de servicio, límites de uso o estructura de datos de cualquiera de estas APIs podría afectar a la funcionalidad de la aplicación, por lo que es una limitación estructural de la arquitectura elegida, aceptada conscientemente por las ventajas que ofrece frente a la alternativa de construir una base de datos propia. El patrón de \textit{graceful degradation} implementado mitiga parcialmente este riesgo.
+\textbf{Dependencia de APIs de terceros.} La plataforma depende de la continuidad y estabilidad de cinco APIs externas (TMDb, Trakt.tv, OMDb, JustWatch y Plex), ninguna de las cuales está bajo el control del proyecto. Un cambio en los términos de servicio, límites de uso o estructura de datos de cualquiera de estas APIs podría afectar a la funcionalidad de la aplicación, por lo que es una limitación estructural de la arquitectura elegida, aceptada conscientemente por las ventajas que ofrece frente a la alternativa de construir una base de datos propia.
 
 \textbf{Escalabilidad del sistema de caché.} El uso de \texttt{localStorage} para puntuaciones tiene un límite práctico de ~5--10\,MB según el navegador y este límite podría alcanzarse para listas con un gran número de elementos. La implementación del algoritmo LRU mitiga el problema pero no lo elimina completamente. Por esta razón, una migración a IndexedDB (límite ~50\,GB) sería recomendable para una mejor escalabilidad a largo plazo.
 
 \section{Análisis de riesgos y estrategias de mitigación}
 
-El estado actual de \textit{The Show Verse} refleja un producto funcional y desplegado, pero con una exposición natural a riesgos técnicos, legales y de adopción. El enfoque seguido ha sido integrar la mitigación en la propia arquitectura y dejar identificadas las acciones pendientes para la siguiente fase.
+Todo proyecto de software enfrenta riesgos que pueden comprometer su funcionamiento, sostenibilidad o adopción. En esta sección se identifican los principales riesgos asociados a \textit{The Show Verse}, se evalúa su impacto potencial y se describen las estrategias de mitigación implementadas, así como las acciones pendientes para reducir la exposición residual.
 
-\subsection{Riesgos técnicos}
+\subsection{Dependencia de servicios externos}
 
-El principal punto de exposición técnica es la dependencia de servicios externos (TMDb, Trakt.tv, OMDb, JustWatch y Plex). Para reducir el impacto de cambios o caídas parciales, la aplicación encapsula las integraciones en módulos y rutas API propias, de modo que una variación en un proveedor no obliga a modificar toda la interfaz. Además, la estrategia de caché multinivel y el patrón de \textit{graceful degradation} ya implementados permiten mantener una experiencia usable cuando alguna fuente responde de forma lenta o incompleta.
+\textbf{Identificación del riesgo.} La aplicación depende de cinco APIs de terceros (TMDb, Trakt.tv, OMDb, JustWatch y Plex) para su funcionamiento. Cualquier cambio en los términos de servicio, modificación en la estructura de datos, degradación del rendimiento o interrupción del servicio puede afectar parcial o totalmente a la funcionalidad de la plataforma.
 
-También existe riesgo operativo en los flujos autenticados de Trakt, especialmente cuando un token expira o el usuario revoca permisos. Este escenario se mitiga con renovación de token desde el servidor y manejo explícito de errores de autorización, evitando estados incorrectos en el cliente y permitiendo la reconexión controlada.
+\textbf{Impacto potencial.} Un fallo en TMDb imposibilitaría la obtención de metadatos de contenido, dejando inaccesible el catálogo completo. Una caída de Trakt.tv impediría la sincronización del historial y las listas de usuario. La pérdida de acceso a OMDb o JustWatch eliminaría las puntuaciones externas y la información de disponibilidad en plataformas de streaming, respectivamente.
 
-En cuanto al rendimiento bajo carga, el proyecto parte con ventaja por el uso de Server Components, fetching paralelo e ISR en catálogo, que reducen llamadas repetidas. Como línea de refuerzo para crecimiento de usuarios, queda planificado endurecer políticas de reintento y observabilidad para anticipar límites de consumo antes de que afecten al servicio.
+\textbf{Estrategias de mitigación implementadas.} Para reducir el acoplamiento con proveedores externos, todas las integraciones se encapsulan en módulos independientes (\texttt{tmdbApi.js}, \texttt{traktApi.js}, \texttt{omdbApi.js}) y API Routes de Next.js que actúan como \textit{proxy}. Esta arquitectura de abstracción permite cambiar o sustituir un proveedor sin modificar la lógica de los componentes de interfaz.
 
-\subsection{Riesgos legales y de privacidad}
+Adicionalmente, se ha implementado un sistema de caché multinivel (servidor con ISR, cliente con memoria de proceso y \texttt{localStorage}) que permite servir datos previamente obtenidos incluso cuando la fuente original no responde. El patrón de \textit{graceful degradation} garantiza que, ante el fallo de una fuente secundaria (OMDb, JustWatch), la aplicación continúe funcionando con las fuentes principales disponibles.
 
-La aplicación trabaja con datos y recursos sujetos a condiciones de uso de terceros, por lo que la continuidad del proyecto depende de mantener conformidad con sus términos. En la práctica, esto implica conservar atribuciones visibles, evitar usos no permitidos de metadatos e imágenes, y revisar periódicamente cambios en políticas de API para adaptar el comportamiento cuando sea necesario.
+\textbf{Acciones pendientes.} Para reforzar la resiliencia ante fallos temporales, se considera necesario implementar políticas de reintento con \textit{exponential backoff} y un sistema de observabilidad que monitorice la disponibilidad de cada API, permitiendo detectar degradaciones antes de que afecten al usuario final.
 
-Desde el punto de vista de protección de datos, el proyecto ya aplica una medida clave: los tokens se gestionan en cookies \texttt{httpOnly} y la autenticación se resuelve en servidor, minimizando exposición en cliente. No obstante, para una explotación pública más amplia sigue siendo necesario completar el marco documental de privacidad (información al usuario, gestión de consentimiento y procedimientos de eliminación/exportación de datos) para asegurar cumplimiento sostenido en contexto RGPD.
+\subsection{Gestión de autenticación y tokens de acceso}
 
-\subsection{Riesgos de producto y adopción}
+\textbf{Identificación del riesgo.} El flujo de autenticación OAuth 2.0 con Trakt.tv requiere la gestión de tokens de acceso (\textit{access token}) y renovación (\textit{refresh token}). Un manejo incorrecto puede exponer los tokens en el cliente, provocar pérdidas de sesión inesperadas o generar estados de autenticación inconsistentes que impidan al usuario acceder a sus datos.
 
-En el plano de mercado, el riesgo no está en la viabilidad técnica inmediata, sino en la capacidad de diferenciarse de alternativas ya consolidadas. La mitigación realista consiste en reforzar aquello que ya aporta valor diferencial en el estado actual: integración transversal de fuentes, control de visionado por episodios, biblioteca unificada con Plex y una presentación visual más cuidada que la de herramientas tradicionales.
+\textbf{Impacto potencial.} La exposición de tokens en el cliente facilitaría el acceso no autorizado a la cuenta del usuario. La expiración de un token sin renovación automática obligaría al usuario a reautenticarse manualmente con frecuencia, degradando la experiencia de uso.
 
-Existe además un riesgo de abandono temprano si el usuario no percibe rápido esa propuesta de valor. Por ello, las acciones más efectivas a corto plazo son mejorar onboarding y comunicación de funcionalidades clave, además de mantener una evolución incremental centrada en utilidades concretas antes que en expansiones de gran alcance.
+\textbf{Estrategias de mitigación implementadas.} Los tokens se almacenan en cookies con la directiva \texttt{httpOnly}, impidiendo su acceso desde JavaScript del cliente. La renovación de tokens se realiza automáticamente en el servidor mediante API Routes, evitando exposición del \textit{refresh token}. Los errores de autorización (\texttt{401 Unauthorized}) se manejan explícitamente en cada llamada API, redirigiendo al usuario al flujo de reautenticación cuando el token ha sido revocado.
 
-\subsection{Síntesis operativa}
+\textbf{Acciones pendientes.} Para una implementación en producción con base de usuarios amplia, sería recomendable añadir un sistema de revocación de tokens desde la interfaz de usuario y un mecanismo de detección de sesiones simultáneas que alerte de posibles accesos no autorizados.
 
-Con la arquitectura actual, el riesgo residual es asumible para una fase MVP avanzada: la base técnica es sólida, las mitigaciones críticas ya están parcialmente incorporadas en diseño y queda como prioridad cerrar el bloque de cumplimiento legal y observabilidad operativa para escalar con mayor garantías.
+\subsection{Cumplimiento legal y protección de datos}
 
-A partir del trabajo realizado, se identifican las siguientes líneas de desarrollo futuro:
+El proyecto utiliza contenido multimedia y metadatos sujetos a derechos de autor y licencias de terceros. El uso indebido de estos recursos o el incumplimiento de las condiciones de las APIs podría resultar en la suspensión del acceso o reclamaciones legales.
 
-\textbf{Implementación de Progressive Web App (PWA).} La conversión de la aplicación en una PWA, mediante la adición de un \textit{Service Worker} y un \textit{manifest} web, permitiría la instalación en dispositivos móviles y habilitaría un modo de funcionamiento \textit{offline} básico. El \textit{Service Worker} podría cachear las imágenes de pósters y los datos de catálogo para consulta sin conexión. Next.js 13+ soporta PWA mediante el plugin \texttt{next-pwa}.
+Desde el punto de vista de protección de datos, la aplicación procesa información personal de usuarios (historial de visionado, preferencias, tokens de autenticación) que, en el contexto del RGPD, requiere transparencia en el tratamiento y garantías sobre los derechos del interesado.
+
+Una violación de los términos de servicio de TMDb o Trakt.tv podría resultar en el bloqueo permanente de las claves API, dejando la aplicación inoperativa. La ausencia de una política de privacidad y mecanismos de gestión de consentimiento constituye un incumplimiento del RGPD, exponiendo al proyecto a sanciones administrativas en caso de operar públicamente en territorio europeo.
+
+Para cumplir con el RGPD de forma integral, es necesario redactar una política de privacidad completa, implementar un sistema de gestión de consentimiento y añadir funcionalidades de exportación y eliminación de datos de usuario. Asimismo, debe establecerse un procedimiento de revisión periódica de los términos de servicio de las APIs externas para adaptar el comportamiento de la aplicación ante cambios normativos.
+
+\subsection{Escalabilidad y límites de uso}
+
+Las APIs externas imponen límites de uso (rate limits) que, en caso de superarse, resultan en bloqueos temporales o permanentes. TMDb permite 40 peticiones por segundo, Trakt.tv aplica límites más estrictos por ventana temporal y OMDb restringe el número total de llamadas según el plan de suscripción.
+
+Adicionalmente, el uso de \texttt{localStorage} para el almacenamiento de puntuaciones en cliente tiene un límite práctico de 5--10\,MB, que podría alcanzarse con listas de gran tamaño, resultando en pérdida de datos en caché.
+
+Para escalar a un volumen mayor de usuarios, sería recomendable migrar el almacenamiento de puntuaciones de \texttt{localStorage} a IndexedDB, que permite hasta 50\,GB de almacenamiento. Asimismo, implementar un sistema de monitorización de consumo de API permitiría detectar patrones de uso anómalos antes de alcanzar los límites establecidos.
+
+\subsection{Viabilidad de adopción y propuesta de valor}
+
+El ámbito de aplicaciones de seguimiento de contenido audiovisual cuenta con alternativas consolidadas (Trakt.tv, Letterboxd, TV Time, SeriesGuide) con bases de usuarios amplias, ecosistemas de plugins y conjuntos de características completos. El principal riesgo no es técnico, sino de adopción. La incapacidad de ofrecer una propuesta de valor diferencial clara puede resultar en tasas de retención bajas y abandono temprano por parte de los usuarios.
+
+El proyecto se diferencia por la integración completa de múltiples fuentes (TMDb, Trakt, OMDb, JustWatch, Plex) en una única interfaz, lo que constituye una propuesta de valor y diferenciación clara frente a la competencia.
+
+Para aumentar la retención de usuarios, es prioritario mejorar el flujo de \textit{onboarding}, explicando de forma clara las ventajas de la plataforma durante la primera interacción. Asimismo, mantener un ciclo de desarrollo incremental centrado en funcionalidades específicas (recomendaciones personalizadas, componente social, sincronización multiplataforma) permitirá construir valor de forma sostenida sin requerir rediseños de gran alcance.
+
+\subsection{Evaluación del riesgo residual}
+
+Con las estrategias de mitigación implementadas, el riesgo residual del proyecto es manejable en su fase actual de desarrollo. La arquitectura modular basada en encapsulación de APIs externas, el sistema de caché multinivel, la gestión segura de tokens mediante \texttt{httpOnly cookies} y el despliegue en infraestructura \textit{serverless} de Vercel constituyen una base técnica sólida que reduce la exposición a fallos críticos.
+
+Los principales puntos de mejora se concentran en tres áreas: cumplimiento normativo (documentación de privacidad y gestión de consentimiento RGPD), observabilidad operativa (monitorización de consumo de APIs y detección de anomalías) y optimización de la adopción (mejora del \textit{onboarding} y comunicación de valor diferencial). Estas acciones, aunque son necesarias para una explotación pública sostenida, no comprometen la funcionalidad ni la seguridad de la implementación actual.
+
+\section{Líneas futuras}
+
+A partir del trabajo realizado, se identifican las siguientes áreas de evolución que permitirían expandir las capacidades de la plataforma:
+
+\textbf{Implementación de Progressive Web App (PWA).} La conversión de la aplicación en una PWA, mediante la adición de un \textit{Service Worker} y un \textit{manifest} web, permitiría la instalación en dispositivos móviles y habilitaría un modo de funcionamiento \textit{offline} básico. El \textit{Service Worker} podría cachear las imágenes de pósters y los datos de catálogo para consultas sin conexión. Next.js 13+ soporta PWA mediante el plugin \texttt{next-pwa}.
 
 \textbf{Sistema de recomendaciones personalizado.} El historial de visionado acumulado por el usuario constituye un conjunto de datos con potencial para la implementación de algoritmos de recomendación colaborativa o basada en contenido. TensorFlow.js en el cliente o una función \textit{serverless} con Python + scikit-learn permitirían generar recomendaciones personalizadas complementarias a las de Trakt. La técnica de \textit{matrix factorization} (SVD) o redes neuronales de \textit{collaborative filtering} serían candidatas naturales.
 
 \textbf{Expansión de las funcionalidades sociales.} La comparación del historial entre usuarios, las recomendaciones de amigos y la visualización del perfil público de otros usuarios de Trakt son funcionalidades que la API de Trakt soporta pero no han sido implementadas en la versión actual. Un módulo de «Amigos» con feed de actividad reciente aumentaría significativamente el componente social de la plataforma.
 
-\textbf{Backend propio y base de datos local.} A largo plazo, la eliminación de la dependencia total de Trakt.tv como fuente de verdad requeriría la implementación de un \textit{backend} propio con base de datos (PostgreSQL o MySQL) que almacenara el historial y las preferencias localmente. Esto permitiría además implementar funcionalidades propias como sesiones de visionado grupal (\textit{watch parties}), sistemas de \textit{achievements} y estadísticas avanzadas no disponibles en Trakt.
+\textbf{Backend propio y base de datos local.} A largo plazo, la eliminación de la dependencia total de Trakt.tv como fuente principal requeriría la implementación de un \textit{backend} propio con base de datos (PostgreSQL o MySQL) que almacenara el historial y las preferencias localmente. Esto permitiría además implementar funcionalidades propias como sesiones de visionado grupal, sistemas de logros y estadísticas avanzadas no disponibles en Trakt.
 
-\textbf{Integración con más plataformas.} La arquitectura modular del sistema de integración API permitiría añadir fácilmente nuevas fuentes: MyAnimeList para anime, Goodreads para literatura adaptada, Metacritic para puntuaciones adicionales, o incluso Spotify/Apple Music para bandas sonoras. Cada integración seguiría el mismo patrón: API Route de \textit{proxy}, caché multinivel, \textit{graceful degradation}.
+\textbf{Integración con más plataformas.} La arquitectura modular del sistema de integración API permitiría añadir fácilmente nuevas fuentes: MyAnimeList para anime o incluso Spotify/Apple Music para bandas sonoras.
 
 \textbf{Sistema de notificaciones push.} Notificaciones web (\textit{Web Push API}) para alertar al usuario de:
 \begin{itemize}
@@ -98,10 +130,10 @@ A partir del trabajo realizado, se identifican las siguientes líneas de desarro
 \item Amigos que han visto contenido que el usuario tiene en pendientes.
 \end{itemize}
 
-\textbf{Análisis avanzado con IA.} Integración con modelos de lenguaje (GPT-4, Claude) para:
+\textbf{Análisis avanzado con IA.} Integración con modelos de lenguaje para:
 \begin{itemize}
-\item Generación de resúmenes personalizados de temporadas.
+\item Generación de resúmenes de temporadas.
 \item Respuestas a preguntas sobre la trama sin spoilers.
-\item Recomendaciones explicadas («Te recomiendo X porque...»).
+\item Recomendaciones personalizadas.
 \item Detección de contenido similar por temas y no solo por género.
 \end{itemize}

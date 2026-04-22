@@ -19,20 +19,88 @@
 
 \refsection{0}
   \datalist[entry]{apa/apasortcite//global/global/global}
-    \entry{CNMC:2024}{online}{}{}
+    \entry{Behance:2024}{online}{}{}
       \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=6d07a471d225b63c9b871719a3607a00}{%
-           family={{CNMC}},
+        {{un=0,uniquepart=base,hash=1e7844389953a82b4819736c35b13bd9}{%
+           family={{Adobe Behance}},
+           familyi={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{fullhash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{fullhashraw}{1e7844389953a82b4819736c35b13bd9}
+      \strng{bibnamehash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{authorbibnamehash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{authornamehash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{authorfullhash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{authorfullhashraw}{1e7844389953a82b4819736c35b13bd9}
+      \field{sortinit}{A}
+      \field{sortinithash}{2f401846e2029bad6b3ecc16d50031e2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Glassmorphism UI Design Projects}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.behance.net/search/projects/glassmorphism%20ui
+      \endverb
+      \verb{url}
+      \verb https://www.behance.net/search/projects/glassmorphism%20ui
+      \endverb
+    \endentry
+    \entry{Babich:2021}{book}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=9cac386feba4a607877226b8f91b3338}{%
+           family={Babich},
+           familyi={B\bibinitperiod},
+           given={Nick},
+           giveni={N\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{publisher}{1}{%
+        {UX Planet}%
+      }
+      \strng{namehash}{9cac386feba4a607877226b8f91b3338}
+      \strng{fullhash}{9cac386feba4a607877226b8f91b3338}
+      \strng{fullhashraw}{9cac386feba4a607877226b8f91b3338}
+      \strng{bibnamehash}{9cac386feba4a607877226b8f91b3338}
+      \strng{authorbibnamehash}{9cac386feba4a607877226b8f91b3338}
+      \strng{authornamehash}{9cac386feba4a607877226b8f91b3338}
+      \strng{authorfullhash}{9cac386feba4a607877226b8f91b3338}
+      \strng{authorfullhashraw}{9cac386feba4a607877226b8f91b3338}
+      \field{sortinit}{B}
+      \field{sortinithash}{d7095fff47cda75ca2589920aae98399}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Glassmorphism in User Interfaces}
+      \field{year}{2021}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
+      \endverb
+      \verb{url}
+      \verb https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
+      \endverb
+    \endentry
+    \entry{CanIUse:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=7d896b619c9ced1adc2dfee2647ae071}{%
+           family={{Can I use}},
            familyi={C\bibinitperiod}}}%
       }
-      \strng{namehash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{fullhash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{fullhashraw}{6d07a471d225b63c9b871719a3607a00}
-      \strng{bibnamehash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{authorbibnamehash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{authornamehash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{authorfullhash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{authorfullhashraw}{6d07a471d225b63c9b871719a3607a00}
+      \strng{namehash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{fullhash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{fullhashraw}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{bibnamehash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{authorbibnamehash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{authornamehash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{authorfullhash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{authorfullhashraw}{7d896b619c9ced1adc2dfee2647ae071}
       \field{sortinit}{C}
       \field{sortinithash}{4d103a86280481745c9c897c925753c0}
       \field{extradatescope}{labelyear}
@@ -40,13 +108,171 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{Informe sobre el consumo de vídeo en España}
+      \field{title}{{Browser Support Tables for Modern Web Technologies}}
       \field{year}{2024}
+      \true{nocite}
       \verb{urlraw}
-      \verb https://www.cnmc.es/
+      \verb https://caniuse.com/
       \endverb
       \verb{url}
-      \verb https://www.cnmc.es/
+      \verb https://caniuse.com/
+      \endverb
+    \endentry
+    \entry{Cloudflare:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=3f07179a07b2a7661e37a3fd0e652a07}{%
+           family={{Cloudflare}},
+           familyi={C\bibinitperiod}}}%
+      }
+      \strng{namehash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{fullhash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{fullhashraw}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{bibnamehash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{authorbibnamehash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{authornamehash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{authorfullhash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{authorfullhashraw}{3f07179a07b2a7661e37a3fd0e652a07}
+      \field{sortinit}{C}
+      \field{sortinithash}{4d103a86280481745c9c897c925753c0}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Cloudflare Tunnel Documentation}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
+      \endverb
+      \verb{url}
+      \verb https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
+      \endverb
+    \endentry
+    \entry{Docker:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=4bd3b392874c74fba4ed57a24eae0ac1}{%
+           family={{Docker Inc.}},
+           familyi={D\bibinitperiod}}}%
+      }
+      \strng{namehash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{fullhash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{fullhashraw}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{bibnamehash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{authorbibnamehash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{authornamehash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{authorfullhash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{authorfullhashraw}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \field{sortinit}{D}
+      \field{sortinithash}{6f385f66841fb5e82009dc833c761848}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Docker Documentation --- Get Started}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://docs.docker.com/get-started/
+      \endverb
+      \verb{url}
+      \verb https://docs.docker.com/get-started/
+      \endverb
+    \endentry
+    \entry{Frain:2015}{book}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=45bffad3e1fe83813669fafe382d54ce}{%
+           family={Frain},
+           familyi={F\bibinitperiod},
+           given={Ben},
+           giveni={B\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{publisher}{1}{%
+        {Packt Publishing}%
+      }
+      \strng{namehash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{fullhash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{fullhashraw}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{bibnamehash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{authorbibnamehash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{authornamehash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{authorfullhash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{authorfullhashraw}{45bffad3e1fe83813669fafe382d54ce}
+      \field{sortinit}{F}
+      \field{sortinithash}{2638baaa20439f1b5a8f80c6c08a13b4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Responsive Web Design with HTML5 and CSS3}
+      \field{year}{2015}
+      \true{nocite}
+    \endentry
+    \entry{Framer:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=0df10fc145be1e5c3fe6535066b7d7f8}{%
+           family={{Framer}},
+           familyi={F\bibinitperiod}}}%
+      }
+      \strng{namehash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{fullhash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{fullhashraw}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{bibnamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{authorbibnamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{authornamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{authorfullhash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{authorfullhashraw}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \field{sortinit}{F}
+      \field{sortinithash}{2638baaa20439f1b5a8f80c6c08a13b4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Framer Motion Documentation}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.framer.com/motion/
+      \endverb
+      \verb{url}
+      \verb https://www.framer.com/motion/
+      \endverb
+    \endentry
+    \entry{Google:2024b}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=6bc28252c14133d21331dc54856c1797}{%
+           family={{Google Developers}},
+           familyi={G\bibinitperiod}}}%
+      }
+      \strng{namehash}{6bc28252c14133d21331dc54856c1797}
+      \strng{fullhash}{6bc28252c14133d21331dc54856c1797}
+      \strng{fullhashraw}{6bc28252c14133d21331dc54856c1797}
+      \strng{bibnamehash}{6bc28252c14133d21331dc54856c1797}
+      \strng{authorbibnamehash}{6bc28252c14133d21331dc54856c1797}
+      \strng{authornamehash}{6bc28252c14133d21331dc54856c1797}
+      \strng{authorfullhash}{6bc28252c14133d21331dc54856c1797}
+      \strng{authorfullhashraw}{6bc28252c14133d21331dc54856c1797}
+      \field{extraname}{1}
+      \field{sortinit}{G}
+      \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
+      \field{extradate}{1}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Core Web Vitals report}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://support.google.com/webmasters/answer/9205520
+      \endverb
+      \verb{url}
+      \verb https://support.google.com/webmasters/answer/9205520
       \endverb
     \endentry
     \entry{Google:2024a}{online}{}{}
@@ -63,8 +289,10 @@
       \strng{authornamehash}{6bc28252c14133d21331dc54856c1797}
       \strng{authorfullhash}{6bc28252c14133d21331dc54856c1797}
       \strng{authorfullhashraw}{6bc28252c14133d21331dc54856c1797}
+      \field{extraname}{2}
       \field{sortinit}{G}
       \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
+      \field{extradate}{2}
       \field{extradatescope}{labelyear}
       \field{labeldatesource}{}
       \true{uniqueprimaryauthor}
@@ -72,6 +300,7 @@
       \field{labeltitlesource}{title}
       \field{title}{{Web Vitals --- Essential metrics for a healthy site}}
       \field{year}{2024}
+      \true{nocite}
       \verb{urlraw}
       \verb https://web.dev/vitals/
       \endverb
@@ -108,11 +337,591 @@
       \field{labeltitlesource}{title}
       \field{title}{{RFC 6749: The OAuth 2.0 Authorization Framework}}
       \field{year}{2012}
+      \true{nocite}
       \verb{urlraw}
       \verb https://www.rfc-editor.org/rfc/rfc6749
       \endverb
       \verb{url}
       \verb https://www.rfc-editor.org/rfc/rfc6749
+      \endverb
+    \endentry
+    \entry{RFC8693:2020}{manual}{}{}
+      \name{author}{5}{}{%
+        {{un=0,uniquepart=base,hash=3656094aa90ce6b5927293e625dedee3}{%
+           family={Jones},
+           familyi={J\bibinitperiod},
+           given={M.},
+           giveni={M\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=581216adc705ce04a8790cbf6fecd516}{%
+           family={Nadalin},
+           familyi={N\bibinitperiod},
+           given={A.},
+           giveni={A\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=7186d1868d3f045c9620cda709fbac9f}{%
+           family={Campbell},
+           familyi={C\bibinitperiod},
+           given={B.},
+           giveni={B\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=3ac7ec83304c92610359a406f07ad45a}{%
+           family={Bradley},
+           familyi={B\bibinitperiod},
+           given={J.},
+           giveni={J\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=53ed05574d78c1c5c5115fa112d0f73d}{%
+           family={Mortimore},
+           familyi={M\bibinitperiod},
+           given={C.},
+           giveni={C\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{organization}{1}{%
+        {IETF}%
+      }
+      \strng{namehash}{5683aecbbdfe106e64cf9e667351ba26}
+      \strng{fullhash}{e93a8c7e401d471dcafa2d44639eb398}
+      \strng{fullhashraw}{e93a8c7e401d471dcafa2d44639eb398}
+      \strng{bibnamehash}{e93a8c7e401d471dcafa2d44639eb398}
+      \strng{authorbibnamehash}{e93a8c7e401d471dcafa2d44639eb398}
+      \strng{authornamehash}{5683aecbbdfe106e64cf9e667351ba26}
+      \strng{authorfullhash}{e93a8c7e401d471dcafa2d44639eb398}
+      \strng{authorfullhashraw}{e93a8c7e401d471dcafa2d44639eb398}
+      \field{sortinit}{J}
+      \field{sortinithash}{b2f54a9081ace9966a7cb9413811edb4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{RFC 8693: OAuth 2.0 Token Exchange}}
+      \field{year}{2020}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.rfc-editor.org/rfc/rfc8693
+      \endverb
+      \verb{url}
+      \verb https://www.rfc-editor.org/rfc/rfc8693
+      \endverb
+    \endentry
+    \entry{JustWatch:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=b36fe4588becb17cf596e9ef41f7530d}{%
+           family={{JustWatch}},
+           familyi={J\bibinitperiod}}}%
+      }
+      \strng{namehash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{fullhash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{fullhashraw}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{bibnamehash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{authorbibnamehash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{authornamehash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{authorfullhash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{authorfullhashraw}{b36fe4588becb17cf596e9ef41f7530d}
+      \field{sortinit}{J}
+      \field{sortinithash}{b2f54a9081ace9966a7cb9413811edb4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{JustWatch --- The Streaming Guide}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.justwatch.com/
+      \endverb
+      \verb{url}
+      \verb https://www.justwatch.com/
+      \endverb
+    \endentry
+    \entry{Keith:2015}{book}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=367f03b02a55ce9e4f4bad25d3501b2c}{%
+           family={Keith},
+           familyi={K\bibinitperiod},
+           given={Jeremy},
+           giveni={J\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{fullhash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{fullhashraw}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{bibnamehash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{authorbibnamehash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{authornamehash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{authorfullhash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{authorfullhashraw}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \field{sortinit}{K}
+      \field{sortinithash}{c02bf6bff1c488450c352b40f5d853ab}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Resilient Web Design}
+      \field{year}{2015}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://resilientwebdesign.com/
+      \endverb
+      \verb{url}
+      \verb https://resilientwebdesign.com/
+      \endverb
+    \endentry
+    \entry{Letterboxd:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=7d49d19c5ded2bc5cd780592fda81431}{%
+           family={{Letterboxd}},
+           familyi={L\bibinitperiod}}}%
+      }
+      \strng{namehash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{fullhash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{fullhashraw}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{bibnamehash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{authorbibnamehash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{authornamehash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{authorfullhash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{authorfullhashraw}{7d49d19c5ded2bc5cd780592fda81431}
+      \field{sortinit}{L}
+      \field{sortinithash}{7c47d417cecb1f4bd38d1825c427a61a}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{About Letterboxd}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://letterboxd.com/about/
+      \endverb
+      \verb{url}
+      \verb https://letterboxd.com/about/
+      \endverb
+    \endentry
+    \entry{MDN:2024a}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=eace3534eb86e51f9a1db37427425ce9}{%
+           family={{MDN Web Docs}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{bibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorbibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authornamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \field{extraname}{1}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{1}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{HTTP Caching}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
+      \endverb
+      \verb{url}
+      \verb https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
+      \endverb
+    \endentry
+    \entry{MDN:2024b}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=eace3534eb86e51f9a1db37427425ce9}{%
+           family={{MDN Web Docs}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{bibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorbibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authornamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \field{extraname}{2}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{IndexedDB API}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
+      \endverb
+      \verb{url}
+      \verb https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
+      \endverb
+    \endentry
+    \entry{MDN:2024d}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=eace3534eb86e51f9a1db37427425ce9}{%
+           family={{MDN Web Docs}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{bibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorbibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authornamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \field{extraname}{3}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{3}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Responsive Design}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developer.mozilla.org/en-US/docs/Learn/CSS/CSS_layout/Responsive_Design
+      \endverb
+      \verb{url}
+      \verb https://developer.mozilla.org/en-US/docs/Learn/CSS/CSS_layout/Responsive_Design
+      \endverb
+    \endentry
+    \entry{MDN:2024c}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=eace3534eb86e51f9a1db37427425ce9}{%
+           family={{MDN Web Docs}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{bibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorbibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authornamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \field{extraname}{4}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Service Worker API}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
+      \endverb
+      \verb{url}
+      \verb https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
+      \endverb
+    \endentry
+    \entry{Meta:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=6c56f762d9ebe73063cd2d157e97351f}{%
+           family={{Meta Open Source}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{fullhash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{fullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{bibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorbibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authornamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorfullhash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorfullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
+      \field{extraname}{1}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{1}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{React Documentation --- React Server Components}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://react.dev/reference/rsc/server-components
+      \endverb
+      \verb{url}
+      \verb https://react.dev/reference/rsc/server-components
+      \endverb
+    \endentry
+    \entry{React:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=6c56f762d9ebe73063cd2d157e97351f}{%
+           family={{Meta Open Source}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{fullhash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{fullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{bibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorbibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authornamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorfullhash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorfullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
+      \field{extraname}{2}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{React Documentation --- Thinking in React}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://react.dev/learn/thinking-in-react
+      \endverb
+      \verb{url}
+      \verb https://react.dev/learn/thinking-in-react
+      \endverb
+    \endentry
+    \entry{TypeScript:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=140864078aeca1c7c35b4beb33c53c34}{%
+           family={{Microsoft}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{fullhash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{fullhashraw}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{bibnamehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authorbibnamehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authornamehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authorfullhash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authorfullhashraw}{140864078aeca1c7c35b4beb33c53c34}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{TypeScript Documentation}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.typescriptlang.org/docs/
+      \endverb
+      \verb{url}
+      \verb https://www.typescriptlang.org/docs/
+      \endverb
+    \endentry
+    \entry{Nielsen:2023}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=bc09318dce909d6ba1220cfcba7ef70d}{%
+           family={{Nielsen}},
+           familyi={N\bibinitperiod}}}%
+      }
+      \strng{namehash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{fullhash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{fullhashraw}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{bibnamehash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{authorbibnamehash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{authornamehash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{authorfullhash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{authorfullhashraw}{bc09318dce909d6ba1220cfcba7ef70d}
+      \field{sortinit}{N}
+      \field{sortinithash}{22369a73d5f88983a108b63f07f37084}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{The Nielsen Streaming Unwrapped: 2023 Mid-Year Report}}
+      \field{year}{2023}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.nielsen.com/insights/2023/streaming-unwrapped/
+      \endverb
+      \verb{url}
+      \verb https://www.nielsen.com/insights/2023/streaming-unwrapped/
+      \endverb
+    \endentry
+    \entry{Nielsen:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=2a8d7d50a7a2572cad7475ca3f3918fc}{%
+           family={{Nielsen Norman Group}},
+           familyi={N\bibinitperiod}}}%
+      }
+      \strng{namehash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{fullhash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{fullhashraw}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{bibnamehash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{authorbibnamehash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{authornamehash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{authorfullhash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{authorfullhashraw}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \field{sortinit}{N}
+      \field{sortinithash}{22369a73d5f88983a108b63f07f37084}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Glassmorphism --- Modern UI Trend}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.nngroup.com/articles/glassmorphism/
+      \endverb
+      \verb{url}
+      \verb https://www.nngroup.com/articles/glassmorphism/
+      \endverb
+    \endentry
+    \entry{Swiper:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=7c72aa47c164f50386448eda963ebaaa}{%
+           family={{nolimits4web}},
+           familyi={n\bibinitperiod}}}%
+      }
+      \strng{namehash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{fullhash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{fullhashraw}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{bibnamehash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{authorbibnamehash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{authornamehash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{authorfullhash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{authorfullhashraw}{7c72aa47c164f50386448eda963ebaaa}
+      \field{sortinit}{n}
+      \field{sortinithash}{22369a73d5f88983a108b63f07f37084}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Swiper --- The Most Modern Mobile Touch Slider}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://swiperjs.com/
+      \endverb
+      \verb{url}
+      \verb https://swiperjs.com/
+      \endverb
+    \endentry
+    \entry{OMDb:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=5ff557a45395b6dea9556def9b6c3c5b}{%
+           family={{OMDb API}},
+           familyi={O\bibinitperiod}}}%
+      }
+      \strng{namehash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{fullhash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{fullhashraw}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{bibnamehash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{authorbibnamehash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{authornamehash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{authorfullhash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{authorfullhashraw}{5ff557a45395b6dea9556def9b6c3c5b}
+      \field{sortinit}{O}
+      \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{The Open Movie Database API}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.omdbapi.com/
+      \endverb
+      \verb{url}
+      \verb https://www.omdbapi.com/
+      \endverb
+    \endentry
+    \entry{Osmani:2017}{book}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=d44fced3055604fd09c4e99476a58f00}{%
+           family={Osmani},
+           familyi={O\bibinitperiod},
+           given={Addy},
+           giveni={A\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{publisher}{1}{%
+        {O'Reilly Media}%
+      }
+      \strng{namehash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{fullhash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{fullhashraw}{d44fced3055604fd09c4e99476a58f00}
+      \strng{bibnamehash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{authorbibnamehash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{authornamehash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{authorfullhash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{authorfullhashraw}{d44fced3055604fd09c4e99476a58f00}
+      \field{sortinit}{O}
+      \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Learning JavaScript Design Patterns}
+      \field{year}{2017}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.patterns.dev/
+      \endverb
+      \verb{url}
+      \verb https://www.patterns.dev/
+      \endverb
+    \endentry
+    \entry{OWASP:2021}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=24b95a7fdad5a850196cd87546dcc70b}{%
+           family={{OWASP}},
+           familyi={O\bibinitperiod}}}%
+      }
+      \strng{namehash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{fullhash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{fullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{bibnamehash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{authorbibnamehash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{authornamehash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{authorfullhash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{authorfullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
+      \field{extraname}{1}
+      \field{sortinit}{O}
+      \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{OAuth 2.0 Security Best Current Practice}}
+      \field{year}{2021}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://oauth.net/2/oauth-best-practice/
+      \endverb
+      \verb{url}
+      \verb https://oauth.net/2/oauth-best-practice/
       \endverb
     \endentry
     \entry{OWASP:2024}{online}{}{}
@@ -129,6 +938,7 @@
       \strng{authornamehash}{24b95a7fdad5a850196cd87546dcc70b}
       \strng{authorfullhash}{24b95a7fdad5a850196cd87546dcc70b}
       \strng{authorfullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
+      \field{extraname}{2}
       \field{sortinit}{O}
       \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
       \field{extradatescope}{labelyear}
@@ -138,6 +948,7 @@
       \field{labeltitlesource}{title}
       \field{title}{{OWASP Top 10: Broken Authentication}}
       \field{year}{2024}
+      \true{nocite}
       \verb{urlraw}
       \verb https://owasp.org/www-project-top-ten/
       \endverb
@@ -145,26 +956,82 @@
       \verb https://owasp.org/www-project-top-ten/
       \endverb
     \endentry
-    \entry{Schwartz:2004}{book}{}{}
+    \entry{Plex:2024}{online}{}{}
       \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=5f22299c31ac35283104a867ea99f18a}{%
-           family={Schwartz},
-           familyi={S\bibinitperiod},
-           given={Barry},
-           giveni={B\bibinitperiod},
-           givenun=0}}%
+        {{un=0,uniquepart=base,hash=aaa7d3708cc65edd5c94f58e78ced4c7}{%
+           family={{Plex Inc.}},
+           familyi={P\bibinitperiod}}}%
       }
-      \list{publisher}{1}{%
-        {Ecco/HarperCollins}%
+      \strng{namehash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{fullhash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{fullhashraw}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{bibnamehash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{authorbibnamehash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{authornamehash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{authorfullhash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{authorfullhashraw}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \field{sortinit}{P}
+      \field{sortinithash}{ff3bcf24f47321b42cb156c2cc8a8422}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Plex Media Server API Documentation}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.plex.tv/
+      \endverb
+      \verb{url}
+      \verb https://www.plex.tv/
+      \endverb
+    \endentry
+    \entry{Recharts:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=afdd69d764ae467d31a97aa8e2f6db19}{%
+           family={{Recharts}},
+           familyi={R\bibinitperiod}}}%
       }
-      \strng{namehash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{fullhash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{fullhashraw}{5f22299c31ac35283104a867ea99f18a}
-      \strng{bibnamehash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{authorbibnamehash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{authornamehash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{authorfullhash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{authorfullhashraw}{5f22299c31ac35283104a867ea99f18a}
+      \strng{namehash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{fullhash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{fullhashraw}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{bibnamehash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{authorbibnamehash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{authornamehash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{authorfullhash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{authorfullhashraw}{afdd69d764ae467d31a97aa8e2f6db19}
+      \field{sortinit}{R}
+      \field{sortinithash}{5e1c39a9d46ffb6bebd8f801023a9486}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Recharts --- A composable charting library built on React components}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://recharts.org/
+      \endverb
+      \verb{url}
+      \verb https://recharts.org/
+      \endverb
+    \endentry
+    \entry{SeriesGraph:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=71017db360fdbcd066e898b8ce879bde}{%
+           family={{SeriesGraph}},
+           familyi={S\bibinitperiod}}}%
+      }
+      \strng{namehash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{fullhash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{fullhashraw}{71017db360fdbcd066e898b8ce879bde}
+      \strng{bibnamehash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{authorbibnamehash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{authornamehash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{authorfullhash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{authorfullhashraw}{71017db360fdbcd066e898b8ce879bde}
       \field{sortinit}{S}
       \field{sortinithash}{b164b07b29984b41daf1e85279fbc5ab}
       \field{extradatescope}{labelyear}
@@ -172,8 +1039,46 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{The Paradox of Choice: Why More Is Less}
-      \field{year}{2004}
+      \field{title}{{SeriesGraph --- Visualize Your TV Series Journey}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://seriesgraph.com/
+      \endverb
+      \verb{url}
+      \verb https://seriesgraph.com/
+      \endverb
+    \endentry
+    \entry{Simkl:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=e3fdec5d358db392fdefe441dd0298ee}{%
+           family={{Simkl}},
+           familyi={S\bibinitperiod}}}%
+      }
+      \strng{namehash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{fullhash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{fullhashraw}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{bibnamehash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{authorbibnamehash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{authornamehash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{authorfullhash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{authorfullhashraw}{e3fdec5d358db392fdefe441dd0298ee}
+      \field{sortinit}{S}
+      \field{sortinithash}{b164b07b29984b41daf1e85279fbc5ab}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Simkl --- TV Tracker, Movie and Anime Tracker}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://simkl.com/
+      \endverb
+      \verb{url}
+      \verb https://simkl.com/
+      \endverb
     \endentry
     \entry{Statista:2024}{online}{}{}
       \name{author}{1}{}{%
@@ -198,29 +1103,483 @@
       \field{labeltitlesource}{title}
       \field{title}{Number of Netflix subscribers worldwide from 1st quarter 2013 to 4th quarter 2023}
       \field{year}{2024}
+      \true{nocite}
       \verb{urlraw}
       \verb https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
       \endverb
       \verb{url}
       \verb https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
+      \endverb
+    \endentry
+    \entry{TailwindCSS:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=115eb058b42d5a622d39c9383748c476}{%
+           family={{Tailwind Labs}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{115eb058b42d5a622d39c9383748c476}
+      \strng{fullhash}{115eb058b42d5a622d39c9383748c476}
+      \strng{fullhashraw}{115eb058b42d5a622d39c9383748c476}
+      \strng{bibnamehash}{115eb058b42d5a622d39c9383748c476}
+      \strng{authorbibnamehash}{115eb058b42d5a622d39c9383748c476}
+      \strng{authornamehash}{115eb058b42d5a622d39c9383748c476}
+      \strng{authorfullhash}{115eb058b42d5a622d39c9383748c476}
+      \strng{authorfullhashraw}{115eb058b42d5a622d39c9383748c476}
+      \field{sortinit}{T}
+      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Tailwind CSS Documentation}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://tailwindcss.com/docs
+      \endverb
+      \verb{url}
+      \verb https://tailwindcss.com/docs
+      \endverb
+    \endentry
+    \entry{TMDb:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=82f6b680b94fc4299b971a83a7f74c2d}{%
+           family={{The Movie Database}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{fullhash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{fullhashraw}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{bibnamehash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{authorbibnamehash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{authornamehash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{authorfullhash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{authorfullhashraw}{82f6b680b94fc4299b971a83a7f74c2d}
+      \field{sortinit}{T}
+      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{TMDb API Documentation v3}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developer.themoviedb.org/docs/getting-started
+      \endverb
+      \verb{url}
+      \verb https://developer.themoviedb.org/docs/getting-started
+      \endverb
+    \endentry
+    \entry{Trakt:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=a5570c8009900fc3ddb40cfdc44d42f4}{%
+           family={{Trakt}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{fullhash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{fullhashraw}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{bibnamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{authorbibnamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{authornamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{authorfullhash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{authorfullhashraw}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \field{sortinit}{T}
+      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Trakt API Documentation v2}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://trakt.docs.apiary.io/
+      \endverb
+      \verb{url}
+      \verb https://trakt.docs.apiary.io/
+      \endverb
+    \endentry
+    \entry{TVTime:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=8bfc43547474912961bb8405e1fe275a}{%
+           family={{TV Time}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{fullhash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{fullhashraw}{8bfc43547474912961bb8405e1fe275a}
+      \strng{bibnamehash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{authorbibnamehash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{authornamehash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{authorfullhash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{authorfullhashraw}{8bfc43547474912961bb8405e1fe275a}
+      \field{sortinit}{T}
+      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{TV Time --- Track Shows \& Movies}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.tvtime.com/
+      \endverb
+      \verb{url}
+      \verb https://www.tvtime.com/
+      \endverb
+    \endentry
+    \entry{SeriesGuide:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=7aa4cc1b4a03df58b0567b252464f777}{%
+           family={{Uwe Trottmann}},
+           familyi={U\bibinitperiod}}}%
+      }
+      \strng{namehash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{fullhash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{fullhashraw}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{bibnamehash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{authorbibnamehash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{authornamehash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{authorfullhash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{authorfullhashraw}{7aa4cc1b4a03df58b0567b252464f777}
+      \field{sortinit}{U}
+      \field{sortinithash}{6901a00e45705986ee5e7ca9fd39adca}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{SeriesGuide --- Track Your Favorite TV Shows and Movies}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://seriesguide.tv/
+      \endverb
+      \verb{url}
+      \verb https://seriesguide.tv/
+      \endverb
+    \endentry
+    \entry{Vercel:2024a}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
+           family={{Vercel}},
+           familyi={V\bibinitperiod}}}%
+      }
+      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \field{extraname}{1}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{extradate}{1}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Next.js Documentation --- App Router}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://nextjs.org/docs/app
+      \endverb
+      \verb{url}
+      \verb https://nextjs.org/docs/app
+      \endverb
+    \endentry
+    \entry{Vercel:2024c}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
+           family={{Vercel}},
+           familyi={V\bibinitperiod}}}%
+      }
+      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \field{extraname}{2}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{extradate}{2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Next.js Documentation --- Incremental Static Regeneration}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
+      \endverb
+      \verb{url}
+      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
+      \endverb
+    \endentry
+    \entry{Vercel:2024b}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
+           family={{Vercel}},
+           familyi={V\bibinitperiod}}}%
+      }
+      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \field{extraname}{3}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{extradate}{3}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Vercel Documentation --- Edge Functions and Middleware}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://vercel.com/docs/functions
+      \endverb
+      \verb{url}
+      \verb https://vercel.com/docs/functions
+      \endverb
+    \endentry
+    \entry{Vercel:2024d}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
+           family={{Vercel}},
+           familyi={V\bibinitperiod}}}%
+      }
+      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \field{extraname}{4}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{extradate}{4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Vercel Speed Insights}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://vercel.com/docs/speed-insights
+      \endverb
+      \verb{url}
+      \verb https://vercel.com/docs/speed-insights
+      \endverb
+    \endentry
+    \entry{W3C:2023}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=446a1ae6601a5c59360c7d591c3992da}{%
+           family={{W3C}},
+           familyi={W\bibinitperiod}}}%
+      }
+      \strng{namehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{fullhash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{fullhashraw}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{bibnamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorbibnamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authornamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorfullhash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorfullhashraw}{446a1ae6601a5c59360c7d591c3992da}
+      \field{extraname}{1}
+      \field{sortinit}{W}
+      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Web Content Accessibility Guidelines (WCAG) 2.1}}
+      \field{year}{2023}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.w3.org/TR/WCAG21/
+      \endverb
+      \verb{url}
+      \verb https://www.w3.org/TR/WCAG21/
+      \endverb
+    \endentry
+    \entry{W3C:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=446a1ae6601a5c59360c7d591c3992da}{%
+           family={{W3C}},
+           familyi={W\bibinitperiod}}}%
+      }
+      \strng{namehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{fullhash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{fullhashraw}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{bibnamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorbibnamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authornamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorfullhash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorfullhashraw}{446a1ae6601a5c59360c7d591c3992da}
+      \field{extraname}{2}
+      \field{sortinit}{W}
+      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Progressive Web Apps (PWAs)}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.w3.org/TR/appmanifest/
+      \endverb
+      \verb{url}
+      \verb https://www.w3.org/TR/appmanifest/
+      \endverb
+    \endentry
+    \entry{Wieruch:2023}{book}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=243e85ae7a690c6e398cd334598b4873}{%
+           family={Wieruch},
+           familyi={W\bibinitperiod},
+           given={Robin},
+           giveni={R\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{fullhash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{fullhashraw}{243e85ae7a690c6e398cd334598b4873}
+      \strng{bibnamehash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{authorbibnamehash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{authornamehash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{authorfullhash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{authorfullhashraw}{243e85ae7a690c6e398cd334598b4873}
+      \field{sortinit}{W}
+      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{The Road to Next.js}
+      \field{year}{2023}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.roadtonextjs.com/
+      \endverb
+      \verb{url}
+      \verb https://www.roadtonextjs.com/
       \endverb
     \endentry
   \enddatalist
   \datalist[entry]{apa/global//global/global/global}
-    \entry{CNMC:2024}{online}{}{}
+    \entry{Behance:2024}{online}{}{}
       \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=6d07a471d225b63c9b871719a3607a00}{%
-           family={{CNMC}},
+        {{un=0,uniquepart=base,hash=1e7844389953a82b4819736c35b13bd9}{%
+           family={{Adobe Behance}},
+           familyi={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{fullhash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{fullhashraw}{1e7844389953a82b4819736c35b13bd9}
+      \strng{bibnamehash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{authorbibnamehash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{authornamehash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{authorfullhash}{1e7844389953a82b4819736c35b13bd9}
+      \strng{authorfullhashraw}{1e7844389953a82b4819736c35b13bd9}
+      \field{sortinit}{A}
+      \field{sortinithash}{2f401846e2029bad6b3ecc16d50031e2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Glassmorphism UI Design Projects}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.behance.net/search/projects/glassmorphism%20ui
+      \endverb
+      \verb{url}
+      \verb https://www.behance.net/search/projects/glassmorphism%20ui
+      \endverb
+    \endentry
+    \entry{Babich:2021}{book}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=9cac386feba4a607877226b8f91b3338}{%
+           family={Babich},
+           familyi={B\bibinitperiod},
+           given={Nick},
+           giveni={N\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{publisher}{1}{%
+        {UX Planet}%
+      }
+      \strng{namehash}{9cac386feba4a607877226b8f91b3338}
+      \strng{fullhash}{9cac386feba4a607877226b8f91b3338}
+      \strng{fullhashraw}{9cac386feba4a607877226b8f91b3338}
+      \strng{bibnamehash}{9cac386feba4a607877226b8f91b3338}
+      \strng{authorbibnamehash}{9cac386feba4a607877226b8f91b3338}
+      \strng{authornamehash}{9cac386feba4a607877226b8f91b3338}
+      \strng{authorfullhash}{9cac386feba4a607877226b8f91b3338}
+      \strng{authorfullhashraw}{9cac386feba4a607877226b8f91b3338}
+      \field{sortinit}{B}
+      \field{sortinithash}{d7095fff47cda75ca2589920aae98399}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Glassmorphism in User Interfaces}
+      \field{year}{2021}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
+      \endverb
+      \verb{url}
+      \verb https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
+      \endverb
+    \endentry
+    \entry{CanIUse:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=7d896b619c9ced1adc2dfee2647ae071}{%
+           family={{Can I use}},
            familyi={C\bibinitperiod}}}%
       }
-      \strng{namehash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{fullhash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{fullhashraw}{6d07a471d225b63c9b871719a3607a00}
-      \strng{bibnamehash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{authorbibnamehash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{authornamehash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{authorfullhash}{6d07a471d225b63c9b871719a3607a00}
-      \strng{authorfullhashraw}{6d07a471d225b63c9b871719a3607a00}
+      \strng{namehash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{fullhash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{fullhashraw}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{bibnamehash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{authorbibnamehash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{authornamehash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{authorfullhash}{7d896b619c9ced1adc2dfee2647ae071}
+      \strng{authorfullhashraw}{7d896b619c9ced1adc2dfee2647ae071}
       \field{sortinit}{C}
       \field{sortinithash}{4d103a86280481745c9c897c925753c0}
       \field{extradatescope}{labelyear}
@@ -228,13 +1587,171 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{Informe sobre el consumo de vídeo en España}
+      \field{title}{{Browser Support Tables for Modern Web Technologies}}
       \field{year}{2024}
+      \true{nocite}
       \verb{urlraw}
-      \verb https://www.cnmc.es/
+      \verb https://caniuse.com/
       \endverb
       \verb{url}
-      \verb https://www.cnmc.es/
+      \verb https://caniuse.com/
+      \endverb
+    \endentry
+    \entry{Cloudflare:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=3f07179a07b2a7661e37a3fd0e652a07}{%
+           family={{Cloudflare}},
+           familyi={C\bibinitperiod}}}%
+      }
+      \strng{namehash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{fullhash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{fullhashraw}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{bibnamehash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{authorbibnamehash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{authornamehash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{authorfullhash}{3f07179a07b2a7661e37a3fd0e652a07}
+      \strng{authorfullhashraw}{3f07179a07b2a7661e37a3fd0e652a07}
+      \field{sortinit}{C}
+      \field{sortinithash}{4d103a86280481745c9c897c925753c0}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Cloudflare Tunnel Documentation}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
+      \endverb
+      \verb{url}
+      \verb https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
+      \endverb
+    \endentry
+    \entry{Docker:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=4bd3b392874c74fba4ed57a24eae0ac1}{%
+           family={{Docker Inc.}},
+           familyi={D\bibinitperiod}}}%
+      }
+      \strng{namehash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{fullhash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{fullhashraw}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{bibnamehash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{authorbibnamehash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{authornamehash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{authorfullhash}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \strng{authorfullhashraw}{4bd3b392874c74fba4ed57a24eae0ac1}
+      \field{sortinit}{D}
+      \field{sortinithash}{6f385f66841fb5e82009dc833c761848}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Docker Documentation --- Get Started}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://docs.docker.com/get-started/
+      \endverb
+      \verb{url}
+      \verb https://docs.docker.com/get-started/
+      \endverb
+    \endentry
+    \entry{Frain:2015}{book}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=45bffad3e1fe83813669fafe382d54ce}{%
+           family={Frain},
+           familyi={F\bibinitperiod},
+           given={Ben},
+           giveni={B\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{publisher}{1}{%
+        {Packt Publishing}%
+      }
+      \strng{namehash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{fullhash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{fullhashraw}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{bibnamehash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{authorbibnamehash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{authornamehash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{authorfullhash}{45bffad3e1fe83813669fafe382d54ce}
+      \strng{authorfullhashraw}{45bffad3e1fe83813669fafe382d54ce}
+      \field{sortinit}{F}
+      \field{sortinithash}{2638baaa20439f1b5a8f80c6c08a13b4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Responsive Web Design with HTML5 and CSS3}
+      \field{year}{2015}
+      \true{nocite}
+    \endentry
+    \entry{Framer:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=0df10fc145be1e5c3fe6535066b7d7f8}{%
+           family={{Framer}},
+           familyi={F\bibinitperiod}}}%
+      }
+      \strng{namehash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{fullhash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{fullhashraw}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{bibnamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{authorbibnamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{authornamehash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{authorfullhash}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \strng{authorfullhashraw}{0df10fc145be1e5c3fe6535066b7d7f8}
+      \field{sortinit}{F}
+      \field{sortinithash}{2638baaa20439f1b5a8f80c6c08a13b4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Framer Motion Documentation}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.framer.com/motion/
+      \endverb
+      \verb{url}
+      \verb https://www.framer.com/motion/
+      \endverb
+    \endentry
+    \entry{Google:2024b}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=6bc28252c14133d21331dc54856c1797}{%
+           family={{Google Developers}},
+           familyi={G\bibinitperiod}}}%
+      }
+      \strng{namehash}{6bc28252c14133d21331dc54856c1797}
+      \strng{fullhash}{6bc28252c14133d21331dc54856c1797}
+      \strng{fullhashraw}{6bc28252c14133d21331dc54856c1797}
+      \strng{bibnamehash}{6bc28252c14133d21331dc54856c1797}
+      \strng{authorbibnamehash}{6bc28252c14133d21331dc54856c1797}
+      \strng{authornamehash}{6bc28252c14133d21331dc54856c1797}
+      \strng{authorfullhash}{6bc28252c14133d21331dc54856c1797}
+      \strng{authorfullhashraw}{6bc28252c14133d21331dc54856c1797}
+      \field{extraname}{1}
+      \field{sortinit}{G}
+      \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
+      \field{extradate}{1}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Core Web Vitals report}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://support.google.com/webmasters/answer/9205520
+      \endverb
+      \verb{url}
+      \verb https://support.google.com/webmasters/answer/9205520
       \endverb
     \endentry
     \entry{Google:2024a}{online}{}{}
@@ -251,8 +1768,10 @@
       \strng{authornamehash}{6bc28252c14133d21331dc54856c1797}
       \strng{authorfullhash}{6bc28252c14133d21331dc54856c1797}
       \strng{authorfullhashraw}{6bc28252c14133d21331dc54856c1797}
+      \field{extraname}{2}
       \field{sortinit}{G}
       \field{sortinithash}{32d67eca0634bf53703493fb1090a2e8}
+      \field{extradate}{2}
       \field{extradatescope}{labelyear}
       \field{labeldatesource}{}
       \true{uniqueprimaryauthor}
@@ -260,6 +1779,7 @@
       \field{labeltitlesource}{title}
       \field{title}{{Web Vitals --- Essential metrics for a healthy site}}
       \field{year}{2024}
+      \true{nocite}
       \verb{urlraw}
       \verb https://web.dev/vitals/
       \endverb
@@ -296,11 +1816,591 @@
       \field{labeltitlesource}{title}
       \field{title}{{RFC 6749: The OAuth 2.0 Authorization Framework}}
       \field{year}{2012}
+      \true{nocite}
       \verb{urlraw}
       \verb https://www.rfc-editor.org/rfc/rfc6749
       \endverb
       \verb{url}
       \verb https://www.rfc-editor.org/rfc/rfc6749
+      \endverb
+    \endentry
+    \entry{RFC8693:2020}{manual}{}{}
+      \name{author}{5}{}{%
+        {{un=0,uniquepart=base,hash=3656094aa90ce6b5927293e625dedee3}{%
+           family={Jones},
+           familyi={J\bibinitperiod},
+           given={M.},
+           giveni={M\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=581216adc705ce04a8790cbf6fecd516}{%
+           family={Nadalin},
+           familyi={N\bibinitperiod},
+           given={A.},
+           giveni={A\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=7186d1868d3f045c9620cda709fbac9f}{%
+           family={Campbell},
+           familyi={C\bibinitperiod},
+           given={B.},
+           giveni={B\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=3ac7ec83304c92610359a406f07ad45a}{%
+           family={Bradley},
+           familyi={B\bibinitperiod},
+           given={J.},
+           giveni={J\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=53ed05574d78c1c5c5115fa112d0f73d}{%
+           family={Mortimore},
+           familyi={M\bibinitperiod},
+           given={C.},
+           giveni={C\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{organization}{1}{%
+        {IETF}%
+      }
+      \strng{namehash}{5683aecbbdfe106e64cf9e667351ba26}
+      \strng{fullhash}{e93a8c7e401d471dcafa2d44639eb398}
+      \strng{fullhashraw}{e93a8c7e401d471dcafa2d44639eb398}
+      \strng{bibnamehash}{e93a8c7e401d471dcafa2d44639eb398}
+      \strng{authorbibnamehash}{e93a8c7e401d471dcafa2d44639eb398}
+      \strng{authornamehash}{5683aecbbdfe106e64cf9e667351ba26}
+      \strng{authorfullhash}{e93a8c7e401d471dcafa2d44639eb398}
+      \strng{authorfullhashraw}{e93a8c7e401d471dcafa2d44639eb398}
+      \field{sortinit}{J}
+      \field{sortinithash}{b2f54a9081ace9966a7cb9413811edb4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{RFC 8693: OAuth 2.0 Token Exchange}}
+      \field{year}{2020}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.rfc-editor.org/rfc/rfc8693
+      \endverb
+      \verb{url}
+      \verb https://www.rfc-editor.org/rfc/rfc8693
+      \endverb
+    \endentry
+    \entry{JustWatch:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=b36fe4588becb17cf596e9ef41f7530d}{%
+           family={{JustWatch}},
+           familyi={J\bibinitperiod}}}%
+      }
+      \strng{namehash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{fullhash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{fullhashraw}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{bibnamehash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{authorbibnamehash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{authornamehash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{authorfullhash}{b36fe4588becb17cf596e9ef41f7530d}
+      \strng{authorfullhashraw}{b36fe4588becb17cf596e9ef41f7530d}
+      \field{sortinit}{J}
+      \field{sortinithash}{b2f54a9081ace9966a7cb9413811edb4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{JustWatch --- The Streaming Guide}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.justwatch.com/
+      \endverb
+      \verb{url}
+      \verb https://www.justwatch.com/
+      \endverb
+    \endentry
+    \entry{Keith:2015}{book}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=367f03b02a55ce9e4f4bad25d3501b2c}{%
+           family={Keith},
+           familyi={K\bibinitperiod},
+           given={Jeremy},
+           giveni={J\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{fullhash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{fullhashraw}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{bibnamehash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{authorbibnamehash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{authornamehash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{authorfullhash}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \strng{authorfullhashraw}{367f03b02a55ce9e4f4bad25d3501b2c}
+      \field{sortinit}{K}
+      \field{sortinithash}{c02bf6bff1c488450c352b40f5d853ab}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Resilient Web Design}
+      \field{year}{2015}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://resilientwebdesign.com/
+      \endverb
+      \verb{url}
+      \verb https://resilientwebdesign.com/
+      \endverb
+    \endentry
+    \entry{Letterboxd:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=7d49d19c5ded2bc5cd780592fda81431}{%
+           family={{Letterboxd}},
+           familyi={L\bibinitperiod}}}%
+      }
+      \strng{namehash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{fullhash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{fullhashraw}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{bibnamehash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{authorbibnamehash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{authornamehash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{authorfullhash}{7d49d19c5ded2bc5cd780592fda81431}
+      \strng{authorfullhashraw}{7d49d19c5ded2bc5cd780592fda81431}
+      \field{sortinit}{L}
+      \field{sortinithash}{7c47d417cecb1f4bd38d1825c427a61a}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{About Letterboxd}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://letterboxd.com/about/
+      \endverb
+      \verb{url}
+      \verb https://letterboxd.com/about/
+      \endverb
+    \endentry
+    \entry{MDN:2024a}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=eace3534eb86e51f9a1db37427425ce9}{%
+           family={{MDN Web Docs}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{bibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorbibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authornamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \field{extraname}{1}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{1}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{HTTP Caching}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
+      \endverb
+      \verb{url}
+      \verb https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
+      \endverb
+    \endentry
+    \entry{MDN:2024b}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=eace3534eb86e51f9a1db37427425ce9}{%
+           family={{MDN Web Docs}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{bibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorbibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authornamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \field{extraname}{2}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{IndexedDB API}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
+      \endverb
+      \verb{url}
+      \verb https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
+      \endverb
+    \endentry
+    \entry{MDN:2024d}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=eace3534eb86e51f9a1db37427425ce9}{%
+           family={{MDN Web Docs}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{bibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorbibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authornamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \field{extraname}{3}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{3}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Responsive Design}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developer.mozilla.org/en-US/docs/Learn/CSS/CSS_layout/Responsive_Design
+      \endverb
+      \verb{url}
+      \verb https://developer.mozilla.org/en-US/docs/Learn/CSS/CSS_layout/Responsive_Design
+      \endverb
+    \endentry
+    \entry{MDN:2024c}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=eace3534eb86e51f9a1db37427425ce9}{%
+           family={{MDN Web Docs}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{fullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{bibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorbibnamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authornamehash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhash}{eace3534eb86e51f9a1db37427425ce9}
+      \strng{authorfullhashraw}{eace3534eb86e51f9a1db37427425ce9}
+      \field{extraname}{4}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Service Worker API}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
+      \endverb
+      \verb{url}
+      \verb https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
+      \endverb
+    \endentry
+    \entry{Meta:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=6c56f762d9ebe73063cd2d157e97351f}{%
+           family={{Meta Open Source}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{fullhash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{fullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{bibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorbibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authornamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorfullhash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorfullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
+      \field{extraname}{1}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{1}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{React Documentation --- React Server Components}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://react.dev/reference/rsc/server-components
+      \endverb
+      \verb{url}
+      \verb https://react.dev/reference/rsc/server-components
+      \endverb
+    \endentry
+    \entry{React:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=6c56f762d9ebe73063cd2d157e97351f}{%
+           family={{Meta Open Source}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{fullhash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{fullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{bibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorbibnamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authornamehash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorfullhash}{6c56f762d9ebe73063cd2d157e97351f}
+      \strng{authorfullhashraw}{6c56f762d9ebe73063cd2d157e97351f}
+      \field{extraname}{2}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradate}{2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{React Documentation --- Thinking in React}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://react.dev/learn/thinking-in-react
+      \endverb
+      \verb{url}
+      \verb https://react.dev/learn/thinking-in-react
+      \endverb
+    \endentry
+    \entry{TypeScript:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=140864078aeca1c7c35b4beb33c53c34}{%
+           family={{Microsoft}},
+           familyi={M\bibinitperiod}}}%
+      }
+      \strng{namehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{fullhash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{fullhashraw}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{bibnamehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authorbibnamehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authornamehash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authorfullhash}{140864078aeca1c7c35b4beb33c53c34}
+      \strng{authorfullhashraw}{140864078aeca1c7c35b4beb33c53c34}
+      \field{sortinit}{M}
+      \field{sortinithash}{4625c616857f13d17ce56f7d4f97d451}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{TypeScript Documentation}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.typescriptlang.org/docs/
+      \endverb
+      \verb{url}
+      \verb https://www.typescriptlang.org/docs/
+      \endverb
+    \endentry
+    \entry{Nielsen:2023}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=bc09318dce909d6ba1220cfcba7ef70d}{%
+           family={{Nielsen}},
+           familyi={N\bibinitperiod}}}%
+      }
+      \strng{namehash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{fullhash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{fullhashraw}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{bibnamehash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{authorbibnamehash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{authornamehash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{authorfullhash}{bc09318dce909d6ba1220cfcba7ef70d}
+      \strng{authorfullhashraw}{bc09318dce909d6ba1220cfcba7ef70d}
+      \field{sortinit}{N}
+      \field{sortinithash}{22369a73d5f88983a108b63f07f37084}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{The Nielsen Streaming Unwrapped: 2023 Mid-Year Report}}
+      \field{year}{2023}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.nielsen.com/insights/2023/streaming-unwrapped/
+      \endverb
+      \verb{url}
+      \verb https://www.nielsen.com/insights/2023/streaming-unwrapped/
+      \endverb
+    \endentry
+    \entry{Nielsen:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=2a8d7d50a7a2572cad7475ca3f3918fc}{%
+           family={{Nielsen Norman Group}},
+           familyi={N\bibinitperiod}}}%
+      }
+      \strng{namehash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{fullhash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{fullhashraw}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{bibnamehash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{authorbibnamehash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{authornamehash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{authorfullhash}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \strng{authorfullhashraw}{2a8d7d50a7a2572cad7475ca3f3918fc}
+      \field{sortinit}{N}
+      \field{sortinithash}{22369a73d5f88983a108b63f07f37084}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Glassmorphism --- Modern UI Trend}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.nngroup.com/articles/glassmorphism/
+      \endverb
+      \verb{url}
+      \verb https://www.nngroup.com/articles/glassmorphism/
+      \endverb
+    \endentry
+    \entry{Swiper:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=7c72aa47c164f50386448eda963ebaaa}{%
+           family={{nolimits4web}},
+           familyi={n\bibinitperiod}}}%
+      }
+      \strng{namehash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{fullhash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{fullhashraw}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{bibnamehash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{authorbibnamehash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{authornamehash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{authorfullhash}{7c72aa47c164f50386448eda963ebaaa}
+      \strng{authorfullhashraw}{7c72aa47c164f50386448eda963ebaaa}
+      \field{sortinit}{n}
+      \field{sortinithash}{22369a73d5f88983a108b63f07f37084}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Swiper --- The Most Modern Mobile Touch Slider}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://swiperjs.com/
+      \endverb
+      \verb{url}
+      \verb https://swiperjs.com/
+      \endverb
+    \endentry
+    \entry{OMDb:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=5ff557a45395b6dea9556def9b6c3c5b}{%
+           family={{OMDb API}},
+           familyi={O\bibinitperiod}}}%
+      }
+      \strng{namehash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{fullhash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{fullhashraw}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{bibnamehash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{authorbibnamehash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{authornamehash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{authorfullhash}{5ff557a45395b6dea9556def9b6c3c5b}
+      \strng{authorfullhashraw}{5ff557a45395b6dea9556def9b6c3c5b}
+      \field{sortinit}{O}
+      \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{The Open Movie Database API}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.omdbapi.com/
+      \endverb
+      \verb{url}
+      \verb https://www.omdbapi.com/
+      \endverb
+    \endentry
+    \entry{Osmani:2017}{book}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=d44fced3055604fd09c4e99476a58f00}{%
+           family={Osmani},
+           familyi={O\bibinitperiod},
+           given={Addy},
+           giveni={A\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{publisher}{1}{%
+        {O'Reilly Media}%
+      }
+      \strng{namehash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{fullhash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{fullhashraw}{d44fced3055604fd09c4e99476a58f00}
+      \strng{bibnamehash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{authorbibnamehash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{authornamehash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{authorfullhash}{d44fced3055604fd09c4e99476a58f00}
+      \strng{authorfullhashraw}{d44fced3055604fd09c4e99476a58f00}
+      \field{sortinit}{O}
+      \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Learning JavaScript Design Patterns}
+      \field{year}{2017}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.patterns.dev/
+      \endverb
+      \verb{url}
+      \verb https://www.patterns.dev/
+      \endverb
+    \endentry
+    \entry{OWASP:2021}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=24b95a7fdad5a850196cd87546dcc70b}{%
+           family={{OWASP}},
+           familyi={O\bibinitperiod}}}%
+      }
+      \strng{namehash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{fullhash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{fullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{bibnamehash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{authorbibnamehash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{authornamehash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{authorfullhash}{24b95a7fdad5a850196cd87546dcc70b}
+      \strng{authorfullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
+      \field{extraname}{1}
+      \field{sortinit}{O}
+      \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{OAuth 2.0 Security Best Current Practice}}
+      \field{year}{2021}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://oauth.net/2/oauth-best-practice/
+      \endverb
+      \verb{url}
+      \verb https://oauth.net/2/oauth-best-practice/
       \endverb
     \endentry
     \entry{OWASP:2024}{online}{}{}
@@ -317,6 +2417,7 @@
       \strng{authornamehash}{24b95a7fdad5a850196cd87546dcc70b}
       \strng{authorfullhash}{24b95a7fdad5a850196cd87546dcc70b}
       \strng{authorfullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
+      \field{extraname}{2}
       \field{sortinit}{O}
       \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
       \field{extradatescope}{labelyear}
@@ -326,6 +2427,7 @@
       \field{labeltitlesource}{title}
       \field{title}{{OWASP Top 10: Broken Authentication}}
       \field{year}{2024}
+      \true{nocite}
       \verb{urlraw}
       \verb https://owasp.org/www-project-top-ten/
       \endverb
@@ -333,26 +2435,82 @@
       \verb https://owasp.org/www-project-top-ten/
       \endverb
     \endentry
-    \entry{Schwartz:2004}{book}{}{}
+    \entry{Plex:2024}{online}{}{}
       \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=5f22299c31ac35283104a867ea99f18a}{%
-           family={Schwartz},
-           familyi={S\bibinitperiod},
-           given={Barry},
-           giveni={B\bibinitperiod},
-           givenun=0}}%
+        {{un=0,uniquepart=base,hash=aaa7d3708cc65edd5c94f58e78ced4c7}{%
+           family={{Plex Inc.}},
+           familyi={P\bibinitperiod}}}%
       }
-      \list{publisher}{1}{%
-        {Ecco/HarperCollins}%
+      \strng{namehash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{fullhash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{fullhashraw}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{bibnamehash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{authorbibnamehash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{authornamehash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{authorfullhash}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \strng{authorfullhashraw}{aaa7d3708cc65edd5c94f58e78ced4c7}
+      \field{sortinit}{P}
+      \field{sortinithash}{ff3bcf24f47321b42cb156c2cc8a8422}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Plex Media Server API Documentation}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.plex.tv/
+      \endverb
+      \verb{url}
+      \verb https://www.plex.tv/
+      \endverb
+    \endentry
+    \entry{Recharts:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=afdd69d764ae467d31a97aa8e2f6db19}{%
+           family={{Recharts}},
+           familyi={R\bibinitperiod}}}%
       }
-      \strng{namehash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{fullhash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{fullhashraw}{5f22299c31ac35283104a867ea99f18a}
-      \strng{bibnamehash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{authorbibnamehash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{authornamehash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{authorfullhash}{5f22299c31ac35283104a867ea99f18a}
-      \strng{authorfullhashraw}{5f22299c31ac35283104a867ea99f18a}
+      \strng{namehash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{fullhash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{fullhashraw}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{bibnamehash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{authorbibnamehash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{authornamehash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{authorfullhash}{afdd69d764ae467d31a97aa8e2f6db19}
+      \strng{authorfullhashraw}{afdd69d764ae467d31a97aa8e2f6db19}
+      \field{sortinit}{R}
+      \field{sortinithash}{5e1c39a9d46ffb6bebd8f801023a9486}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Recharts --- A composable charting library built on React components}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://recharts.org/
+      \endverb
+      \verb{url}
+      \verb https://recharts.org/
+      \endverb
+    \endentry
+    \entry{SeriesGraph:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=71017db360fdbcd066e898b8ce879bde}{%
+           family={{SeriesGraph}},
+           familyi={S\bibinitperiod}}}%
+      }
+      \strng{namehash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{fullhash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{fullhashraw}{71017db360fdbcd066e898b8ce879bde}
+      \strng{bibnamehash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{authorbibnamehash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{authornamehash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{authorfullhash}{71017db360fdbcd066e898b8ce879bde}
+      \strng{authorfullhashraw}{71017db360fdbcd066e898b8ce879bde}
       \field{sortinit}{S}
       \field{sortinithash}{b164b07b29984b41daf1e85279fbc5ab}
       \field{extradatescope}{labelyear}
@@ -360,8 +2518,46 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{The Paradox of Choice: Why More Is Less}
-      \field{year}{2004}
+      \field{title}{{SeriesGraph --- Visualize Your TV Series Journey}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://seriesgraph.com/
+      \endverb
+      \verb{url}
+      \verb https://seriesgraph.com/
+      \endverb
+    \endentry
+    \entry{Simkl:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=e3fdec5d358db392fdefe441dd0298ee}{%
+           family={{Simkl}},
+           familyi={S\bibinitperiod}}}%
+      }
+      \strng{namehash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{fullhash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{fullhashraw}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{bibnamehash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{authorbibnamehash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{authornamehash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{authorfullhash}{e3fdec5d358db392fdefe441dd0298ee}
+      \strng{authorfullhashraw}{e3fdec5d358db392fdefe441dd0298ee}
+      \field{sortinit}{S}
+      \field{sortinithash}{b164b07b29984b41daf1e85279fbc5ab}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Simkl --- TV Tracker, Movie and Anime Tracker}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://simkl.com/
+      \endverb
+      \verb{url}
+      \verb https://simkl.com/
+      \endverb
     \endentry
     \entry{Statista:2024}{online}{}{}
       \name{author}{1}{}{%
@@ -386,11 +2582,397 @@
       \field{labeltitlesource}{title}
       \field{title}{Number of Netflix subscribers worldwide from 1st quarter 2013 to 4th quarter 2023}
       \field{year}{2024}
+      \true{nocite}
       \verb{urlraw}
       \verb https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
       \endverb
       \verb{url}
       \verb https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
+      \endverb
+    \endentry
+    \entry{TailwindCSS:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=115eb058b42d5a622d39c9383748c476}{%
+           family={{Tailwind Labs}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{115eb058b42d5a622d39c9383748c476}
+      \strng{fullhash}{115eb058b42d5a622d39c9383748c476}
+      \strng{fullhashraw}{115eb058b42d5a622d39c9383748c476}
+      \strng{bibnamehash}{115eb058b42d5a622d39c9383748c476}
+      \strng{authorbibnamehash}{115eb058b42d5a622d39c9383748c476}
+      \strng{authornamehash}{115eb058b42d5a622d39c9383748c476}
+      \strng{authorfullhash}{115eb058b42d5a622d39c9383748c476}
+      \strng{authorfullhashraw}{115eb058b42d5a622d39c9383748c476}
+      \field{sortinit}{T}
+      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Tailwind CSS Documentation}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://tailwindcss.com/docs
+      \endverb
+      \verb{url}
+      \verb https://tailwindcss.com/docs
+      \endverb
+    \endentry
+    \entry{TMDb:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=82f6b680b94fc4299b971a83a7f74c2d}{%
+           family={{The Movie Database}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{fullhash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{fullhashraw}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{bibnamehash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{authorbibnamehash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{authornamehash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{authorfullhash}{82f6b680b94fc4299b971a83a7f74c2d}
+      \strng{authorfullhashraw}{82f6b680b94fc4299b971a83a7f74c2d}
+      \field{sortinit}{T}
+      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{TMDb API Documentation v3}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://developer.themoviedb.org/docs/getting-started
+      \endverb
+      \verb{url}
+      \verb https://developer.themoviedb.org/docs/getting-started
+      \endverb
+    \endentry
+    \entry{Trakt:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=a5570c8009900fc3ddb40cfdc44d42f4}{%
+           family={{Trakt}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{fullhash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{fullhashraw}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{bibnamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{authorbibnamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{authornamehash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{authorfullhash}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \strng{authorfullhashraw}{a5570c8009900fc3ddb40cfdc44d42f4}
+      \field{sortinit}{T}
+      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Trakt API Documentation v2}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://trakt.docs.apiary.io/
+      \endverb
+      \verb{url}
+      \verb https://trakt.docs.apiary.io/
+      \endverb
+    \endentry
+    \entry{TVTime:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=8bfc43547474912961bb8405e1fe275a}{%
+           family={{TV Time}},
+           familyi={T\bibinitperiod}}}%
+      }
+      \strng{namehash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{fullhash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{fullhashraw}{8bfc43547474912961bb8405e1fe275a}
+      \strng{bibnamehash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{authorbibnamehash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{authornamehash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{authorfullhash}{8bfc43547474912961bb8405e1fe275a}
+      \strng{authorfullhashraw}{8bfc43547474912961bb8405e1fe275a}
+      \field{sortinit}{T}
+      \field{sortinithash}{9af77f0292593c26bde9a56e688eaee9}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{TV Time --- Track Shows \& Movies}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.tvtime.com/
+      \endverb
+      \verb{url}
+      \verb https://www.tvtime.com/
+      \endverb
+    \endentry
+    \entry{SeriesGuide:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=7aa4cc1b4a03df58b0567b252464f777}{%
+           family={{Uwe Trottmann}},
+           familyi={U\bibinitperiod}}}%
+      }
+      \strng{namehash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{fullhash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{fullhashraw}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{bibnamehash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{authorbibnamehash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{authornamehash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{authorfullhash}{7aa4cc1b4a03df58b0567b252464f777}
+      \strng{authorfullhashraw}{7aa4cc1b4a03df58b0567b252464f777}
+      \field{sortinit}{U}
+      \field{sortinithash}{6901a00e45705986ee5e7ca9fd39adca}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{SeriesGuide --- Track Your Favorite TV Shows and Movies}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://seriesguide.tv/
+      \endverb
+      \verb{url}
+      \verb https://seriesguide.tv/
+      \endverb
+    \endentry
+    \entry{Vercel:2024a}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
+           family={{Vercel}},
+           familyi={V\bibinitperiod}}}%
+      }
+      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \field{extraname}{1}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{extradate}{1}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Next.js Documentation --- App Router}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://nextjs.org/docs/app
+      \endverb
+      \verb{url}
+      \verb https://nextjs.org/docs/app
+      \endverb
+    \endentry
+    \entry{Vercel:2024c}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
+           family={{Vercel}},
+           familyi={V\bibinitperiod}}}%
+      }
+      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \field{extraname}{2}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{extradate}{2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Next.js Documentation --- Incremental Static Regeneration}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
+      \endverb
+      \verb{url}
+      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
+      \endverb
+    \endentry
+    \entry{Vercel:2024b}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
+           family={{Vercel}},
+           familyi={V\bibinitperiod}}}%
+      }
+      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \field{extraname}{3}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{extradate}{3}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Vercel Documentation --- Edge Functions and Middleware}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://vercel.com/docs/functions
+      \endverb
+      \verb{url}
+      \verb https://vercel.com/docs/functions
+      \endverb
+    \endentry
+    \entry{Vercel:2024d}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
+           family={{Vercel}},
+           familyi={V\bibinitperiod}}}%
+      }
+      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \field{extraname}{4}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{extradate}{4}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Vercel Speed Insights}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://vercel.com/docs/speed-insights
+      \endverb
+      \verb{url}
+      \verb https://vercel.com/docs/speed-insights
+      \endverb
+    \endentry
+    \entry{W3C:2023}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=446a1ae6601a5c59360c7d591c3992da}{%
+           family={{W3C}},
+           familyi={W\bibinitperiod}}}%
+      }
+      \strng{namehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{fullhash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{fullhashraw}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{bibnamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorbibnamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authornamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorfullhash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorfullhashraw}{446a1ae6601a5c59360c7d591c3992da}
+      \field{extraname}{1}
+      \field{sortinit}{W}
+      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Web Content Accessibility Guidelines (WCAG) 2.1}}
+      \field{year}{2023}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.w3.org/TR/WCAG21/
+      \endverb
+      \verb{url}
+      \verb https://www.w3.org/TR/WCAG21/
+      \endverb
+    \endentry
+    \entry{W3C:2024}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=446a1ae6601a5c59360c7d591c3992da}{%
+           family={{W3C}},
+           familyi={W\bibinitperiod}}}%
+      }
+      \strng{namehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{fullhash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{fullhashraw}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{bibnamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorbibnamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authornamehash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorfullhash}{446a1ae6601a5c59360c7d591c3992da}
+      \strng{authorfullhashraw}{446a1ae6601a5c59360c7d591c3992da}
+      \field{extraname}{2}
+      \field{sortinit}{W}
+      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Progressive Web Apps (PWAs)}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.w3.org/TR/appmanifest/
+      \endverb
+      \verb{url}
+      \verb https://www.w3.org/TR/appmanifest/
+      \endverb
+    \endentry
+    \entry{Wieruch:2023}{book}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=243e85ae7a690c6e398cd334598b4873}{%
+           family={Wieruch},
+           familyi={W\bibinitperiod},
+           given={Robin},
+           giveni={R\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{fullhash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{fullhashraw}{243e85ae7a690c6e398cd334598b4873}
+      \strng{bibnamehash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{authorbibnamehash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{authornamehash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{authorfullhash}{243e85ae7a690c6e398cd334598b4873}
+      \strng{authorfullhashraw}{243e85ae7a690c6e398cd334598b4873}
+      \field{sortinit}{W}
+      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{The Road to Next.js}
+      \field{year}{2023}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.roadtonextjs.com/
+      \endverb
+      \verb{url}
+      \verb https://www.roadtonextjs.com/
       \endverb
     \endentry
   \enddatalist

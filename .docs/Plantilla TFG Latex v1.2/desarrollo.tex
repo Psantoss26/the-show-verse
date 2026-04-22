@@ -237,13 +237,13 @@ Las API Routes del proyecto cumplen seis funciones fundamentales:
 
 \subsubsection{Autenticación y gestión de sesiones}
 
-\textbf{Flujo OAuth 2.0 con Trakt.} La autenticación con Trakt implementa el flujo estándar OAuth 2.0 Authorization Code mediante cuatro endpoints que gestionan el ciclo completo de sesión. El endpoint de inicio genera una URL de autorización con protección CSRF y redirecciona al usuario a Trakt para aprobar el acceso. El callback recibe el código de autorización, lo valida e intercambia por tokens de acceso y refresco que se almacenan en cookies HTTP-only seguras. El sistema incluye verificación automática del estado de sesión con renovación transparente de tokens caducados y un endpoint de desconexión que revoca credenciales tanto en el servidor como en Trakt.
+\textbf{Flujo OAuth 2.0 con Trakt.} La autenticación con Trakt se implementa mediante cuatro endpoints que gestionan el ciclo completo de sesión. El endpoint de inicio genera una URL de autorización con protección CSRF y redirecciona al usuario a Trakt para aprobar el acceso. El callback recibe el código de autorización, lo valida e intercambia por tokens de acceso y refresco que se almacenan en cookies HTTP-only seguras. El sistema incluye verificación automática del estado de sesión con renovación de tokens caducados y un endpoint de desconexión que revoca credenciales tanto en el servidor como en Trakt.
 
 \textbf{Autenticación TMDb.} Se utiliza un sistema de request token que requiere aprobación manual del usuario en la web oficial. El proceso obtiene un token temporal, espera la aprobación del usuario y crea una sesión persistente almacenada en cookies.
 
 \subsubsection{Datos de usuario y actividad}
 
-\textbf{Historial de visualización.} El sistema de historial combina datos de Trakt y TMDb para proporcionar una visión completa del contenido visto por el usuario. El endpoint principal acepta filtros por tipo de contenido, rangos de fechas y paginación, ejecutando peticiones paralelas a TMDb con control de concurrencia para enriquecer los datos básicos de Trakt con metadatos visuales y descriptivos. El sistema calcula automáticamente estadísticas agregadas como total de visualizaciones por título y fechas de primer y último visionado. Los endpoints complementarios permiten añadir visualizaciones con marcas de tiempo personalizadas, modificar fechas de entradas existentes y eliminar registros del historial.
+\textbf{Historial de visualización.} El sistema de historial combina datos de Trakt y TMDb para proporcionar una visión completa del contenido visto por el usuario. El endpoint principal acepta filtros por tipo de contenido, rangos de fechas y paginación, ejecutando peticiones paralelas a TMDb con control de concurrencia para complementar los datos básicos de Trakt con metadatos visuales y descriptivos. El sistema calcula automáticamente estadísticas agregadas como total de visualizaciones por título y fechas de primer y último visionado. Los endpoints complementarios permiten añadir visualizaciones con marcas de tiempo personalizadas, modificar fechas de entradas existentes y eliminar registros del historial.
 
 \textbf{Progreso y estado de series.} El seguimiento de series implementa un modelo estructurado que organiza episodios vistos por temporada, facilitando la visualización del progreso de visionado. El marcado masivo de episodios divide automáticamente las peticiones en bloques para respetar límites de la API, validando previamente contra TMDb para prevenir errores. El sistema proporciona resúmenes completos del estado de cualquier título, incluyendo número de reproducciones, última visualización e historial de fechas.
 
@@ -251,7 +251,7 @@ Las API Routes del proyecto cumplen seis funciones fundamentales:
 
 \subsubsection{Valoraciones y puntuaciones}
 
-\textbf{Gestión de puntuaciones personales.} El sistema de valoraciones permite consultar, crear, actualizar y eliminar puntuaciones del usuario con escala normalizada de 1 a 10. Tanto TMDb como Trakt soportan valoraciones con decimales y el sistema incluye renovación automática de tokens de autenticación cuando detecta sesiones caducadas.
+\textbf{Gestión de puntuaciones personales.} El sistema de valoraciones permite consultar, crear, actualizar y eliminar puntuaciones del usuario con escala del 1 al 10. Tanto TMDb como Trakt soportan valoraciones con decimales y el sistema incluye renovación automática de tokens de autenticación cuando detecta sesiones caducadas.
 
 \textbf{Puntuaciones de múltiples fuentes.} Los endpoints de agregación combinan puntuaciones de TMDb, Trakt e IMDb consultando las tres fuentes en paralelo. El sistema extrae el rating promedio de TMDb, obtiene la valoración comunitaria de Trakt mediante búsqueda por identificador y consulta OMDb para ratings de IMDb, Rotten Tomatoes y Metacritic. La arquitectura garantiza que un error en cualquier fuente no bloquee las demás.
 
@@ -269,19 +269,19 @@ El listado de biblioteca implementa paginación automática para colecciones ext
 
 \subsubsection{Enlaces externos y descubrimiento}
 
-\textbf{Generación de enlaces externos.} El sistema construye enlaces a servicios externos mediante tres estrategias según la disponibilidad de datos. Los servicios con identificadores estables como TMDb, Trakt e IMDb generan URLs directas utilizando sus respectivos IDs sin validación adicional. Letterboxd utiliza el IMDb ID cuando está disponible, o en su ausencia genera un slug normalizado del título y año que valida mediante scraping de metadatos Open Graph con caché de 24 horas. JustWatch requiere validación activa: construye una URL con slug normalizado, ejecuta una petición para verificar su existencia y retorna URL de búsqueda como respaldo si falla. FilmAffinity construye URLs de búsqueda directa con el título normalizado. La web oficial se extrae del campo homepage de TMDb. SeriesGraph para series utiliza directamente el TMDb ID sin validación.
+\textbf{Generación de enlaces externos.} El sistema construye enlaces a servicios externos mediante tres estrategias según la disponibilidad de datos. Los servicios con identificadores estables como TMDb, Trakt e IMDb generan URLs directas utilizando sus respectivos IDs sin validación adicional. Letterboxd utiliza el IMDb ID cuando está disponible, o en su ausencia genera un slug normalizado del título y año que valida mediante scraping de metadatos Open Graph con caché de 24 horas. JustWatch requiere validación activa: construye una URL con slug normalizado, ejecuta una petición para verificar su existencia y retorna la URL de búsqueda como respaldo si falla. FilmAffinity construye URLs de búsqueda directa con el título normalizado. La web oficial se extrae del campo homepage de TMDb. SeriesGraph para series utiliza directamente el TMDb ID sin validación.
 
-\textbf{Descubrimiento y recomendaciones.} Los endpoints de recomendaciones consultan múltiples fuentes de Trakt en paralelo, intercalando resultados de películas y series para variedad. El enriquecimiento con datos de TMDb añade metadatos visuales y descriptivos y el sistema de contenido relacionado traduce identificadores entre plataformas, obtiene sugerencias algorítmicas de Trakt y las ordena por relevancia combinando popularidad, fecha de lanzamiento y similitud de género.
+\textbf{Descubrimiento y recomendaciones.} Los endpoints de recomendaciones consultan múltiples fuentes de Trakt en paralelo, intercalando resultados de películas y series para una mayor variedad. El contenido relacionado traduce identificadores entre plataformas, obtiene sugerencias a partir del algoritmo de Trakt y las ordena por relevancia combinando popularidad, fecha de lanzamiento y similitud de género.
 
 \subsubsection{Listas y colecciones}
 
-\textbf{Listas personales de TMDb.} El sistema gestiona listas personales mediante la API de cuentas de TMDb, permitiendo consultar todas las listas del usuario con sus metadatos completos, crear nuevas listas con nombre y descripción personalizados, actualizar listas existentes recreándolas y copiando sus elementos, y eliminarlas individualmente. Cada operación requiere autenticación mediante session\_id almacenado en cookies y utiliza el account\_id del usuario. El sistema implementa paginación automática, eliminación de duplicados y gestión de errores con mensajes descriptivos.
+\textbf{Listas personales de TMDb.} La aplicación gestiona listas personales mediante la API de cuentas de TMDb, permitiendo consultar todas las listas del usuario con sus metadatos completos, crear nuevas listas con nombre y descripción personalizados, actualizar listas existentes recreándolas y copiando sus elementos, y eliminarlas individualmente. Cada operación requiere autenticación completa del usuario. 
 
-\textbf{Listas comunitarias de Trakt.} Los endpoints de listas públicas de Trakt proporcionan acceso a dos categorías: listas en tendencia con mayor actividad reciente y listas más populares por número de seguidores. El sistema traduce identificadores entre Trakt y TMDb para enriquecer cada lista con vistas previas visuales mediante consultas paralelas limitadas que obtienen posters de los primeros elementos. Construye URLs internas y externas diferenciando entre listas globales y listas de usuarios específicos según los metadatos del creador.
+\textbf{Listas comunitarias de Trakt.} Los endpoints de listas públicas de Trakt proporcionan acceso a dos categorías: listas en tendencia con mayor actividad reciente y listas más populares por número de seguidores. Cada lista incluye su título, descripción, número de elementos, fecha de creación y actualización y un subconjunto de los primeros elementos. La consulta de una lista específica devuelve el contenido completo.
 
-\textbf{Colecciones de TMDb.} Las colecciones proporcionan acceso a sagas y franquicias cinematográficas mediante búsqueda textual o acceso a colecciones destacadas por popularidad. Los detalles completos incluyen todas las películas de la saga ordenadas cronológicamente con metadatos visuales y descriptivos.
+\textbf{Colecciones de TMDb.} Las colecciones proporcionan acceso a sagas y franquicias cinematográficas mediante búsqueda manual o acceso a colecciones destacadas por popularidad. Los detalles completos incluyen todas las películas de la saga ordenadas cronológicamente con metadatos visuales y descriptivos.
 
-\subsection{Patrones técnicos transversales}
+\subsection{Patrones técnicos}
 
 Todos los endpoints implementan patrones comunes de robustez y fiabilidad:
 
@@ -293,6 +293,10 @@ Todos los endpoints implementan patrones comunes de robustez y fiabilidad:
 
 \textbf{Observabilidad.} El sistema registra errores con contexto completo incluyendo endpoint, parámetros, estado de autenticación y trazas de ejecución. Las operaciones lentas se marcan automáticamente como advertencias para identificación de cuellos de botella y optimización futura.
 
+\textbf{Cancelación de peticiones obsoletas.} Los componentes de búsqueda y descubrimiento utilizan \texttt{AbortController} para cancelar peticiones HTTP cuando el usuario modifica filtros o cambia de página. En \texttt{DiscoverClient.jsx}, cada cambio en los filtros crea un nuevo controller y aborta el anterior mediante el cleanup function de \texttt{useEffect}, evitando race conditions donde respuestas antiguas sobrescriben resultados más recientes. El sistema distingue errores de abort de errores reales mediante la función auxiliar \texttt{isAbortError}.
+
+\textbf{Carga diferida con priorización.} \texttt{DetailsPageLoader.jsx} implementa una carga progresiva dividiendo los datos en tres franjas temporales. Los datos críticos (título, sinopsis, póster) se obtienen en el servidor vía SSR. Los datos prioritarios (reparto, recomendaciones) se cargan tras 350-1100ms según el tipo de contenido. Los datos secundarios (reviews, proveedores de streaming) se difieren 1200-1800ms.
+
 % -----------------------------------------------------------------------
 \section{Implementación de los módulos funcionales}
 % -----------------------------------------------------------------------
@@ -303,47 +307,51 @@ En esta sección se documentan en profundidad los módulos principales de la apl
 
 Es el punto de entrada de la aplicación y muestra un conjunto de secciones filtradas y organizadas por temas.
 
-La página de inicio (\texttt{src/app/page.jsx}) es un Server Component que ejecuta en paralelo todas las peticiones necesarias de TMDb mediante \texttt{Promise.all()} lo que permite reducir el tiempo total de carga a la latencia de la petición más lenta.
+La página de inicio (\texttt{src/app/page.jsx}) es un Server Component que ejecuta en paralelo todas las peticiones necesarias de TMDb mediante \texttt{Promise.all()} lo que permite reducir el tiempo total de carga a la latencia de la petición más lenta. Además, el cliente carga bajo demanda (lazy) secciones adicionales desde Trakt para enriquecer el dashboard con estadísticas de la comunidad.
 
-A continuación se muestran las secciones principales del dashboard, su respectivo endpoint de TMDb y el resultado obtenido:
+A continuación se muestran las secciones principales del dashboard, su respectivo endpoint y el resultado obtenido:
 
 \begin{table}[!htbp]
 \begin{center}
 \small
-\begin{tabular}{| l | l | l |}
+\begin{tabular}{| p{0.18\textwidth} | p{0.38\textwidth} | >{\raggedright\arraybackslash}p{0.34\textwidth} |}
 \hline
-\textbf{Sección} & \textbf{Endpoint TMDb} & \textbf{Descripción} \\
+\textbf{Sección} & \textbf{Endpoint} & \textbf{Descripción} \\
 \hline
 \hline
-Hero & \texttt{/trending/movie/week} & Carrusel de películas de este mes \\
+Top Películas & \parbox[t]{\linewidth}{\raggedright\strut\texttt{/discover/movie?}\\[2pt]\texttt{sort\_by=vote\_average.desc\&}\\[2pt]\texttt{vote\_count.gte=5000}\strut} & Películas mejor valoradas con filtro de votos mínimo \\
 \hline
-Top Películas & \texttt{/movie/top\_rated} & Películas mejor valoradas de todos los tiempos \\
+Top Series & \parbox[t]{\linewidth}{\raggedright\strut\texttt{/discover/tv?}\\[2pt]\texttt{sort\_by=vote\_average.desc\&}\\[2pt]\texttt{vote\_count.gte=5000}\strut} & Series mejor valoradas con filtro de votos mínimo \\
 \hline
-Tendencias & \texttt{/trending/movie/week} & Películas populares esta semana \\
+Premiadas & \parbox[t]{\linewidth}{\raggedright\strut\texttt{/discover/movie?}\\[2pt]\texttt{vote\_average.gte=7.5\&}\\[2pt]\texttt{vote\_count.gte=2000}\strut} & Películas mejor valoradas y con premios o nominaciones \\
 \hline
-Populares & \texttt{/movie/popular} & Contenido con mayor momentum \\
+Dramas (TV) & \parbox[t]{\linewidth}{\raggedright\strut\texttt{/discover/tv?}\\[2pt]\texttt{with\_genres=18\&}\\[2pt]\texttt{vote\_count.gte=800}\strut} & Series dramáticas filtradas por votos \\
 \hline
-Acción & \texttt{/discover/movie?with\_genres=28} & Películas de acción clásicas \\
+Tendencias (TMDb) & \texttt{/trending/movie/week} & Contenido en tendencia esta semana \\
 \hline
-Dramas & \texttt{/discover/movie?with\_genres=18} & Películas dramáticas imprescindibles \\
+Populares (TMDb) & \texttt{/movie/popular} & Contenido popular esta semana \\
 \hline
-Series Populares & \texttt{/tv/popular} & Series trending del momento \\
+Recomendadas & \texttt{/account/0/recommendations} & Recomendaciones personalizadas del usuario \\
 \hline
-Series Top Rated & \texttt{/tv/top\_rated} & Series clásicas mejor valoradas \\
+Más Esperadas & \parbox[t]{\linewidth}{\raggedright\strut\texttt{/movies/anticipated}\\[2pt]\texttt{/shows/anticipated}\strut} & Próximos estrenos \\
 \hline
-Series Trending & \texttt{/trending/tv/week} & Series en tendencia esta semana \\
+Tendencias (Trakt) & \parbox[t]{\linewidth}{\raggedright\strut\texttt{/movies/trending}\\[2pt]\texttt{/shows/trending}\strut} & Contenido en tendencia de Trakt \\
 \hline
-Emitiéndose Hoy & \texttt{/tv/airing\_today} & Episodios con emisión real-time \\
+Populares (Trakt) & \parbox[t]{\linewidth}{\raggedright\strut\texttt{/movies/popular}\\[2pt]\texttt{/shows/popular}\strut} & Lo más popular de Trakt \\
 \hline
-En Emisión & \texttt{/tv/on\_the\_air} & Series con temporada activa \\
+Más Reproducidas & \parbox[t]{\linewidth}{\raggedright\strut\texttt{/movies/played/\{period\}}\\[2pt]\texttt{/shows/played/\{period\}}\strut} & Contenido más reproducido (semanal/mensual) \\
 \hline
-Favoritos (auth) & \texttt{/account/\{id\}/favorite/movies} & Favoritos personales del usuario \\
+Más Vistas & \parbox[t]{\linewidth}{\raggedright\strut\texttt{/movies/watched/\{period\}}\\[2pt]\texttt{/shows/watched/\{period\}}\strut} & Contenido más visto (semanal/mensual) \\
+\hline
+Más Coleccionadas & \parbox[t]{\linewidth}{\raggedright\strut\texttt{/movies/collected/\{period\}}\\[2pt]\texttt{/shows/collected/\{period\}}\strut} & Contenido más coleccionado (semanal/mensual) \\
 \hline
 \end{tabular}
 \caption{Secciones del dashboard y sus fuentes de datos}
 \label{tab:dashboard-sections}
 \end{center}
 \end{table}
+
+Las primeras siete secciones (Top Películas hasta Recomendadas) se cargan en el servidor (SSR) durante el renderizado inicial. Las secciones de Trakt (Más Esperadas hasta Más Coleccionadas) se cargan de forma diferida en el cliente mediante \texttt{runWhenBrowserIdle()} para no bloquear la interactividad inicial. Cuando Trakt y TMDb ofrecen secciones equivalentes (Tendencias, Populares), la interfaz permite al usuario alternar entre ambas fuentes mediante un selector de pestañas.
 
 \begin{figure}[H]
 \centering
@@ -352,18 +360,18 @@ Favoritos (auth) & \texttt{/account/\{id\}/favorite/movies} & Favoritos personal
 \label{fig:dashboard}
 \end{figure}
 
-\textbf{Selección de backdrops:} el carrusel principal utiliza \textit{backdrops} de TMDb y se aplica un criterio de selección a partir de la función \texttt{pickBestBackdropByLangResVotes(...)} que prioriza primero los backdrops en inglés (\texttt{en}, \texttt{en-US}) cuando existen, después filtra por resolución y por \texttt{vote\_count} y \texttt{vote\_average}.
+\textbf{Selección de backdrops:} el carrusel principal utiliza \textit{backdrops} de TMDb y se aplica un criterio de selección a partir de la función \texttt{pickBestBackdropByLangResVotes} que prioriza primero los backdrops en inglés (\texttt{en}, \texttt{en-US}) cuando existen, después filtra por resolución y por votos.
 
 \subsection{Página de detalles (\texttt{/details/[type]/[id]})}
 
 La página de detalles es el componente más complejo de la aplicación. 
-Su funcionalidad es mostrar la información completa de la película o serie seleccionada a partir de los datos de TMDb, Trakt.tv, OMDb (IMDb), Plex Media Server, JustWatch, Letterboxd y servicios adicionales. Además, permite al usuario interactuar con el contenido (marcar como favorito, añadir a pendientes, valorar, compartir, etc.) y navegar por secciones relacionadas (reparto, recomendaciones, colecciones).
+Su funcionalidad es mostrar la información completa de la película o serie seleccionada a partir de los datos de TMDb, Trakt.tv, OMDb (IMDb), Plex Media Server, JustWatch, Letterboxd y servicios adicionales. Además, permite al usuario interactuar con el contenido (marcar como favorito, añadir a pendientes, valorar, compartir, etc.) y navegar por secciones relacionadas (reparto, recomendaciones, colecciones, etc).
 
 \subsubsection{Arquitectura de datos}
 
-Se hace uso de Server Component y Client Component que optimiza tanto el SEO como la interacción en la página web. El Server Component se encarga de obtener los datos críticos iniciales en tiempo de renderizado \textit{server-side}, incluyendo los metadatos completos del título, los logos oficiales, el reparto y equipo técnico completo, las recomendaciones de contenido similar, los proveedores de \textit{streaming} disponibles por país, los videos oficiales (trailers, teasers, clips) y las reseñas de la comunidad. Si el usuario está autenticado, también se obtiene el estado de la cuenta (si ha marcado el título como favorito, si está en su lista de pendientes, y su valoración personal).
+Se hace uso de Server Component y Client Component que optimiza tanto el SEO como la interacción en la página web. El Server Component se encarga de obtener los datos críticos iniciales en tiempo de renderizado \textit{server-side}, incluyendo los metadatos completos del título, los logos oficiales, el reparto y equipo técnico completo, las recomendaciones de contenido similar, los proveedores de \textit{streaming} disponibles por país, los videos oficiales (trailers, teasers, clips) y las reseñas de la comunidad. Si el usuario está autenticado, también se obtiene el estado de la cuenta (si ha marcado el título como favorito, si está en su lista de pendientes y su valoración personal).
 
-Una vez que el Client Component se ejecuta en el navegador, se empiezan a realizar peticiones paralelas para ir construyendo la interfaz. Primero se carga el scoreboard de Trakt mediante \texttt{/api/trakt/scoreboard} para obtener la puntuación, el número de usuarios que están viéndolo actualmente (\texttt{watchers}), el número total de reproducciones (\texttt{plays}), cuántos usuarios lo tienen en sus bibliotecas (\texttt{collectors}) y cuántas listas de Trakt lo incluyen. En paralelo, si el título tiene IMDb ID, se consulta OMDb mediante \texttt{/api/omdb} para obtener el rating de IMDb, el número de votos, las puntuaciones de Rotten Tomatoes y Metacritic, y los premios ganados. Todos estos datos se guardan en caché: OMDb en \texttt{sessionStorage} con TTL de 24 horas, y el scoreboard de Trakt en memoria con TTL de 5 minutos.
+Una vez que el Client Component se ejecuta en el navegador, se empiezan a realizar peticiones paralelas para ir construyendo la interfaz. Primero se carga el scoreboard de Trakt mediante \texttt{/api/trakt/scoreboard} para obtener la puntuación, el número de usuarios que están viéndolo actualmente, el número total de reproducciones, cuántos usuarios lo tienen en sus bibliotecas y cuántas listas de Trakt lo incluyen. En paralelo, si el título tiene IMDb ID, se consulta OMDb mediante \texttt{/api/omdb} para obtener el rating de IMDb, el número de votos, las puntuaciones de Rotten Tomatoes y Metacritic, y los premios ganados. Todos estos datos se guardan en caché: OMDb en \texttt{sessionStorage} con TTL de 24 horas y el scoreboard de Trakt en memoria con TTL de 5 minutos.
 
 A partir de la API de Plex se detecta si el título está disponible en la biblioteca personal y se guarda durante 7 días en \texttt{sessionStorage} y se generan múltiples URLs de reproducción: una para el navegador web (\texttt{plexUrl.web}) y otra para la aplicación móvil de Plex (\texttt{plexUrl.mobile}).
 
@@ -383,11 +391,11 @@ El componente \texttt{DetailsSectionMenu.jsx} implementa un menú de navegación
 
 \subsubsection{Sistema de puntuaciones}
 
-El componente \texttt{ScoreboardBar.jsx} centraliza las puntuaciones de todas las plataformas en una barra horizontal. Aquí se muestran las puntuaciones de TMDb, Trakt, IMDb (OMDb), Rotten Tomatoes (OMDb) y Metacritic (OMDb) si están disponibles y cada una de ellas se muestra dentro de un badge con el logo de la plataforma, el valor numérico, el número de votos y el enlace externo a la página del título correspondiente de cada plataforma.
+El componente \texttt{ScoreboardBar.jsx} centraliza las puntuaciones de todas las plataformas en una barra horizontal. Aquí se muestran las puntuaciones de TMDb, Trakt, IMDb (OMDb), Rotten Tomatoes (OMDb) y Metacritic (OMDb) si están disponibles y cada una de ellas se muestra dentro de un contenedor con el logo de la plataforma, el valor numérico, el número de votos y el enlace externo a la página del título correspondiente de cada plataforma.
 
-La puntuación de IMDb se obtiene de OMDb (\texttt{/api/omdb?imdb=\{imdbId\}}) y se muestra junto con el número de votos. Esta petición solo se realiza si el título tiene asociado un IMDb ID en los \texttt{external\_ids} de TMDb, y el resultado se cachea en \texttt{sessionStorage} con una clave específica \texttt{omdb:\{imdbId\}} y un TTL de 24 horas. OMDb también devuelve puntuaciones de Rotten Tomatoes y Metacritic (campos \texttt{RottenTomatoes} y \texttt{Metascore}).
+La puntuación de IMDb se obtiene de OMDb (\texttt{/api/omdb?imdb=\{imdbId\}}) y se muestra junto con el número de votos. Esta petición solo se realiza si el título tiene asociado un IMDb ID en los \texttt{external\_ids} de TMDb y el resultado se cachea en \texttt{sessionStorage} con una clave específica \texttt{omdb:\{imdbId\}} y un TTL de 24 horas. OMDb también devuelve puntuaciones de Rotten Tomatoes y Metacritic.
 
-Además de las puntuaciones, el scoreboard muestra estadísticas de Trakt mediante (\texttt{MiniStat}) que incluye iconos descriptivos: el número de usuarios que están viendo el título en este momento (\texttt{watchers}, icono Eye), el número total de reproducciones históricas (\texttt{plays}, icono Play), cuántos usuarios lo tienen en sus bibliotecas (\texttt{collectors}, icono LibraryBig), cuántos comentarios ha recibido (\texttt{comments}, icono MessageSquare) y en cuántas listas públicas de Trakt está incluido (\texttt{lists}, icono List). Estas estadísticas se cargan mediante \texttt{requestIdleCallback} para no bloquear el renderizado inicial del contenido mas relevante.
+Además de las puntuaciones, el scoreboard muestra estadísticas de Trakt mediante (\texttt{MiniStat}) que incluye iconos descriptivos: el número de usuarios que están viendo el título en este momento, el número total de reproducciones históricas, cuántos usuarios lo tienen en sus bibliotecas, cuántos comentarios ha recibido y en cuántas listas públicas de Trakt está incluido. Estas estadísticas se cargan mediante \texttt{requestIdleCallback} para no bloquear el renderizado inicial del contenido mas relevante.
 
 \subsubsection{Botones de acción}
 
@@ -395,24 +403,30 @@ La página de detalles incluye varios botones que permiten al usuario interactua
 
 \textbf{Botón de Favoritos.} Este botón permite marcar películas o series como favoritas en la cuenta de TMDb del usuario. Utiliza la función \texttt{markAsFavorite(\{accountId, sessionId, type, mediaId, favorite\})} que realiza una petición POST al endpoint de TMDb \texttt{/account/\{id\}/favorite}. Cuando el usuario hace clic en el botón, el icono cambia inmediatamente de un corazón vacío a un corazón relleno.
 
-\textbf{Botón de Pendientes.} Similar al botón de Favoritos, este botón añade o elimina contenido de la lista de pendientes (watchlist) del usuario en TMDb. Funciona mediante la misma API de TMDb pero utilizando el endpoint \texttt{/account/\{id\}/watchlist} con una petición POST. El icono alterna entre un marcador vacío y un marcador relleno según el estado actual y la lista sirve para que el usuario organice el contenido que desea ver próximamente.
+\textbf{Botón de Pendientes.} Similar al botón de Favoritos, este botón añade o elimina contenido de la lista de pendientes (watchlist) del usuario en TMDb. Funciona mediante la misma API de TMDb pero utilizando el endpoint \texttt{/account/\{id\}/watchlist} con una petición POST.
 
-\textbf{Botón de Valoración personal.} Este botón muestra una ventana emergente que permite al usuario poner una puntuación personal del 1 al 10 a la película o serie. La valoración se envía simultáneamente a TMDb y Trakt mediante peticiones POST, almacenándose en ambas plataformas. Cuando el usuario ya tiene una valoración previa guardada, ésta se muestra en la interfaz y aparece un botón de papelera que permite eliminarla mediante la función \texttt{clearTmdbRating()}, esto ejecuta peticiones DELETE tanto a TMDb como a Trakt para mantener ambas cuentas sincronizadas. El sistema implementa sincronización bidireccional: si el usuario modifica su puntuación en una plataforma, el cambio se aplica automáticamente a la otra mediante \texttt{sendTraktRating(value)}, garantizando que ambos perfiles reflejen siempre la misma valoración. TMDb acepta puntuaciones con decimales mientras que Trakt requiere valores enteros, por lo que el sistema redondea hacia arriba automáticamente cuando es necesario.
+\textbf{Botón de Valoración personal.} Este botón muestra una ventana emergente que permite al usuario poner una puntuación personal del 1 al 10 a la película o serie. La valoración se envía simultáneamente a TMDb y Trakt mediante peticiones POST, almacenándose en ambas plataformas. Cuando el usuario ya tiene una valoración previa guardada, ésta se muestra en la interfaz y aparece un botón de papelera que permite eliminarla mediante la función \texttt{clearTmdbRating()}, esto ejecuta peticiones DELETE tanto a TMDb como a Trakt para mantener ambas cuentas sincronizadas. El sistema implementa sincronización bidireccional: si el usuario modifica su puntuación en una plataforma, el cambio se aplica automáticamente a la otra mediante \texttt{sendTraktRating(value)}, garantizando que ambos perfiles reflejen siempre la misma valoración.
 
 \textbf{Botón de Listas personalizadas.} Exclusivo para películas, este botón abre el componente \texttt{AddToListModal} que permite gestionar las listas personales del usuario en TMDb. El modal carga todas las listas existentes consultando \texttt{GET /account/\{id\}/lists} y verifica en cuáles de ellas está incluida la película mediante peticiones a \texttt{GET /list/\{listId\}/item\_status?movie\_id=\{id\}}. El resultado se muestra como una lista vertical con casillas de verificación que indican si la película pertenece o no a cada lista y el usuario puede añadir o quitar la película de cualquiera de ellas. También existe la opción de crear una nueva lista directamente desde este modal rellenando un formulario con nombre y descripción.
 
-\textbf{Botón de Marcar como visto (series).} Exclusivo para series, este botón gestiona el seguimiento de episodios vistos haciendo uso de la API de Trakt. Cuando el usuario marca un episodio como visto, se ejecuta \texttt{toggleEpisodeWatched()} que envía una petición POST a \texttt{/api/trakt/episode/watched} incluyendo el identificador de la serie, número de temporada, número de episodio y la fecha/hora actual. Existen funcionalidades en este componente como el botón de marcar serie que envía todos los episodios no vistos en una única petición y marca la serie como completada en una acción.
+\textbf{Botón de Marcar como visto.} Exclusivo para series, este botón gestiona el seguimiento de episodios vistos haciendo uso de la API de Trakt. Cuando el usuario marca un episodio como visto, se ejecuta \texttt{toggleEpisodeWatched()} que envía una petición POST a \texttt{/api/trakt/episode/watched} incluyendo el identificador de la serie, número de temporada, número de episodio y la fecha/hora actual. Existen funcionalidades en este componente como el botón de marcar serie que envía todos los episodios no vistos en una única petición y marca la serie como completada en una acción.
 
 \textbf{Botón de Compartir.} Este botón permite compartir el enlace de la página de detalles actual mediante las opciones nativas del navegador o del sistema operativo. Utiliza la API Web Share cuando está disponible (principalmente en dispositivos móviles) o copia el enlace al portapapeles como alternativa en navegadores de escritorio que no soporten esta funcionalidad.
 
 \subsubsection{Gestión avanzada de episodios para series}
 
-El seguimiento de episodios de una serie es una parte importante del proyecto. El estado de visionado se representa mediante un componente anidado \texttt{watchedBySeason} con la estructura \texttt{\{``seasonNumber'': \{``episodeNumber'': true/false\}\}}, que se construye a partir de la respuesta de Trakt \texttt{GET /sync/watched/shows} y se transforma por la API Route \texttt{/api/trakt/show/watched}. El componente \texttt{SeasonDetailsClient.jsx} renderiza cada temporada como una sección expandible que, al abrirse, carga los detalles de todos los episodios de esa temporada mediante \texttt{getSeasonDetails(showId, seasonNumber)} y los muestra en formato grid o lista según la preferencia del usuario (guardada en \texttt{localStorage}). Cada episodio se renderiza con su número, nombre, fecha de emisión, puntuación de TMDb, puntuación de Trakt (si está disponible), y un checkbox interactivo que permite marcar/desmarcar el episodio como visto de forma individual.
-Cuando el usuario marca un episodio como visto, se ejecuta la función \texttt{toggleEpisodeWatched(seasonNumber, episodeNumber)} que realiza una actualización del checkbox y envía una petición POST a \texttt{/api/trakt/episode/watched} con el payload \texttt{\{showId, season, episode, watchedAt: new Date().toISOString()\}} y si tiene éxito, se recarga el estado completo de la serie mediante \texttt{GET /sync/watched/shows/\{id\}} para sincronizar con cualquier cambio que haya podido ocurrir en Trakt desde otros dispositivos o aplicaciones.
+El seguimiento de episodios de una serie es una parte importante del proyecto. El estado de visionado se representa mediante un componente anidado \texttt{watchedBySeason} con la estructura \texttt{\{``seasonNumber'': \{``episodeNumber'': true/false\}\}}, que se construye a partir de la respuesta de Trakt \texttt{GET /sync/watched/shows} y se transforma por la API Route \texttt{/api/trakt/show/watched}. El componente \texttt{SeasonDetailsClient.jsx} renderiza cada temporada como una sección expandible que, al abrirse, carga los detalles de todos los episodios de esa temporada mediante \texttt{getSeasonDetails(showId, seasonNumber)} y los muestra en formato grid o lista según la preferencia del usuario. Cada episodio se renderiza con su número, nombre, fecha de emisión, puntuación de TMDb, puntuación de Trakt (si está disponible), puntuación de IMDb y un checkbox interactivo que permite marcar/desmarcar el episodio como visto de forma individual y añadir una puntuación personal.
 
-El componente \texttt{EpisodeRatingsGrid.jsx} ubicado en una sección de la página de detalles ofrece otro tipo de vista de todos los episodios de la serie. Cada celda del grid representa un episodio y tiene un color en función de la puntuación, es completamente interactivo y se puede hacer clic en cualquier celca para acceder a la página de detalles del episodio en cuestión (\texttt{/details/tv/\{showId\}/season/\{season\}/episode/\{number\}}).
+El componente \texttt{EpisodeRatingsGrid.jsx} ubicado en una sección de la página de detalles ofrece otro tipo de vista de todos los episodios de la serie. Cada celda del grid representa un episodio y tiene un color en función de la puntuación, es completamente interactivo y se puede hacer clic en cualquier celda para acceder a la página de detalles del episodio en cuestión (\texttt{/details/tv/\{showId\}/season/\{season\}/episode/\{number\}}).
 
-Para optimizar el rendimiento en series con cientos de episodios, las puntuaciones se cargan en paralelo mediante \texttt{Promise.all(seasons.map(s => getSeasonDetails(showId, s.season\_number)))} en lugar de secuencialmente. Esto reduce la latencia total de aproximadamente N segundos (donde N es el número de temporadas).
+Para optimizar el rendimiento en series con cientos de episodios, las puntuaciones se cargan en paralelo mediante \texttt{Promise.all(seasons.map(s => getSeasonDetails(showId, s.season\_number)))} en lugar de secuencialmente, reduciendo el tiempo total de carga a la latencia de la petición más lenta en lugar de la suma de todas las peticiones.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1\textwidth]{../notes/.images/episodiosvistos2.jpg}
+  \caption{Interfaz del modal TraktEpisodesWatchedModal para gestionar episodios vistos.}
+  \label{fig:episodiosvistos-detalle}
+\end{figure}
 
 \begin{figure}[H]
   \centering
@@ -424,7 +438,7 @@ Para optimizar el rendimiento en series con cientos de episodios, las puntuacion
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{../notes/.images/temporada-detalles.jpg}
-  \caption{Detalles de episodios de una temporada}
+  \caption{Página de detalles de una temporada}
   \label{fig:temporada-detalles}
 \end{figure}
 
@@ -441,19 +455,19 @@ En la página de detalles se integran dos tipos de enlaces que se muestran de fo
 
 En la vista por defecto con poster vertical, los enlaces externos se integran en la barra de puntuaciones que aparece debajo de los botones de acción. En pantallas de escritorio, los iconos de cada servicio se muestran en línea con sus logos, alineados a la derecha de las puntuaciones de TMDb, Trakt e IMDb. En dispositivos móviles, debido al espacio horizontal limitado, se ocultan los iconos individuales y en su lugar se muestra un botón que abre el componente \texttt{ExternalLinksModal}. En el modo de vista previa con backdrop horizontal, los enlaces externos cambian completamente de ubicación y se muestran junto a las plataformas de streaming debajo de la imagen principal, formando una única fila con un separador vertical.
 
-El sistema de resolución de enlaces implementa tres niveles de complejidad según la plataforma. Los enlaces directos a TMDb, Trakt e IMDb se construyen mediante el ID correspondiente sin necesidad de peticiones adicionales: TMDb utiliza el ID numérico junto con un slug del título (por ejemplo, \texttt{/movie/550-fight-club}), Trakt usa el ID obtenido durante la carga del scoreboard (campo \texttt{trakt.traktUrl}), e IMDb emplea el IMDb ID en formato \texttt{tt1234567}. El enlace a la web oficial del título se extrae directamente del campo \texttt{homepage} de TMDb o, si no está disponible, mediante una petición a la API interna \texttt{/api/trakt/official-site}. FilmAffinity, que carece de API pública, se resuelve mediante una URL de búsqueda construida dinámicamente con el título normalizado.
+El sistema de resolución de enlaces implementa tres niveles de complejidad según la plataforma. Los enlaces directos a TMDb, Trakt e IMDb se construyen mediante el ID correspondiente sin necesidad de peticiones adicionales: TMDb utiliza el ID numérico junto con un slug del título (por ejemplo, \texttt{/movie/550-fight-club}), Trakt usa el ID obtenido durante la carga del scoreboard (campo \texttt{trakt.traktUrl}) e IMDb emplea el IMDb ID en formato \texttt{tt1234567}. El enlace a la web oficial del título se extrae directamente del campo \texttt{homepage} de TMDb o, si no está disponible, mediante una petición a la API interna \texttt{/api/trakt/official-site}. FilmAffinity, que carece de API pública, se resuelve mediante una URL de búsqueda construida dinámicamente con el título normalizado.
 
-Los enlaces a JustWatch y Letterboxd requieren un proceso de validación. Para JustWatch, la API interna \texttt{/api/links/justwatch} recibe el título y el año, genera un slug normalizado eliminando caracteres especiales y convirtiendo espacios en guiones, construye la URL final \texttt{https://www.justwatch.com/es/pelicula/\{slug\}}, ejecuta una petición HEAD para verificar que el recurso existe (código HTTP 200), y cachea el resultado en \texttt{localStorage} de forma indefinida para evitar validaciones repetidas pero si la validación falla, devuelve una URL de búsqueda genérica como fallback. Para Letterboxd (exclusivo de películas), si el título tiene IMDb ID se construye directamente la URL \texttt{https://letterboxd.com/imdb/\{imdbId\}} y en caso contrario, se genera un slug basado en el título y año, se valida su existencia mediante petición HEAD, y se cachea el resultado. Por último, el enlace de SeriesGraph (exclusivo de series) utiliza directamente el TMDb ID sin validación, construyendo la URL \texttt{https://seriesgraph.com/show/\{tmdbId\}}.
+Los enlaces a JustWatch y Letterboxd requieren un proceso de validación. Para JustWatch, la API interna \texttt{/api/links/justwatch} recibe el título y el año, genera un slug normalizado eliminando caracteres especiales y convirtiendo espacios en guiones, construye la URL final \texttt{https://www.justwatch.com/es/pelicula/\{slug\}}, ejecuta una petición HEAD para verificar que el recurso existe (código HTTP 200) y cachea el resultado en \texttt{localStorage} de forma indefinida para evitar validaciones repetidas pero si la validación falla, devuelve una URL de búsqueda genérica como fallback. Para Letterboxd (exclusivo de películas), si el título tiene IMDb ID se construye directamente la URL \texttt{https://letterboxd.com/imdb/\{imdbId\}} y en caso contrario, se genera un slug basado en el título y año, se valida su existencia y se cachea el resultado. Por último, el enlace de SeriesGraph (exclusivo de series) utiliza directamente el TMDb ID sin validación, construyendo la URL \texttt{https://seriesgraph.com/show/\{tmdbId\}}.
 
 \subsubsection{Imágenes y posters}
 
-El sistema de gestión de imágenes implementa tres modos de visualización distintos y permite a los administradores seleccionar manualmente qué versión de poster o backdrop se muestra. Para series de televisión, el sistema carga automáticamente las imágenes de todas las temporadas mediante \texttt{fetchTVImages(\{showId, apiKey\})} que itera por cada temporada, obtiene sus imágenes mediante \texttt{GET /tv/\{id\}/season/\{seasonNumber\}/images}, y fusiona todos los resultados en un único array eliminando duplicados por \texttt{file\_path}.
+El sistema de gestión de imágenes implementa tres modos de visualización distintos y permite seleccionar manualmente qué versión de poster o backdrop se muestra. Para series de televisión, el sistema carga automáticamente las imágenes de todas las temporadas mediante \texttt{fetchTVImages(\{showId, apiKey\})} que itera por cada temporada, obtiene sus imágenes mediante \texttt{GET /tv/\{id\}/season/\{seasonNumber\}/images} y fusiona todos los resultados en un único array eliminando duplicados por \texttt{file\_path}.
 
 El sistema distingue tres tipos de imágenes según su función visual. Los posters son imágenes verticales con aspect ratio 2:3 que se muestran en el hero de la página de detalle y se optimizan en dos calidades: \texttt{w342} para la carga inicial rápida y \texttt{w780} para la carga final de alta calidad. Los backdrops de preview son imágenes horizontales con aspect ratio 16:9, optimizadas en tamaños \texttt{w780} y \texttt{w1280}.
 
-La selección automática de la mejor imagen se realiza mediante funciones. Para posters, \texttt{pickBestPosterTV(posters, languages)} ordena por resolución (preferencia por imágenes 4K y 2K) y número de votos, priorizando posters en español o inglés si están disponibles. Para backdrops, \texttt{pickBestBackdropTVNeutralFirst(backdrops, languages)} prioriza específicamente las imágenes con \texttt{iso\_639\_1 === null} (sin texto superpuesto) para el background de móvil, y luego ordena por resolución y votos para el resto.
+La selección automática de la mejor imagen se realiza mediante funciones. Para posters, \texttt{pickBestPosterTV(posters, languages)} ordena por resolución (preferencia por imágenes 4K y 2K) y número de votos, priorizando posters en español o inglés si están disponibles. Para backdrops, \texttt{pickBestBackdropTVNeutralFirst(backdrops, languages)} prioriza específicamente las imágenes con idioma en inglés y ordena por resolución y votos.
 
-Los administradores (específicamente el usuario \texttt{psantos26} hardcoded en el componente) tienen acceso a una galería administrable con tres pestañas: Posters, Backdrops (para modo preview) y Backgrounds (para fondo móvil). Cada pestaña incluye filtros de resolución (Todos, 720p, 1080p, 2K, 4K calculados a partir del \texttt{width} de cada imagen) y checkboxes de idioma (ES, EN). Las imágenes se muestran en un carrusel horizontal y al hacer clic en cualquier imagen se establece como activa, guardando la selección en \texttt{localStorage} con claves específicas por tipo e ID (por ejemplo, \texttt{showverse:movie:550:poster}, \texttt{showverse:tv:1399:backdrop}).
+Una de las secciones de la página de detalles proporciona acceso a una galería con tres pestañas: Posters, Backdrops para la vista previa y Backdrops para el fondo de pantalla. Cada pestaña incluye filtros de resolución (Todos, 720p, 1080p, 2K, 4K) y filtro de idioma (ES, EN). Las imágenes se muestran en un carrusel horizontal y al hacer clic en cualquier imagen se establece como activa, guardando la selección en \texttt{localStorage} con claves específicas por tipo e ID.
 
 \begin{figure}[H]
   \centering
@@ -466,9 +480,7 @@ Los administradores (específicamente el usuario \texttt{psantos26} hardcoded en
 
 El sistema de trailers y vídeos obtiene contenido multimedia desde TMDb mediante el endpoint \texttt{GET /\{type\}/\{id\}/videos} que retorna un array de videos con metadatos completos: \texttt{key} (identificador de YouTube, Vimeo u otra plataforma), \texttt{site} (plataforma de origen), \texttt{type} (Trailer, Teaser, Clip, Featurette, Behind the Scenes), \texttt{name} (título del video), \texttt{official} (booleano que indica si es contenido oficial del estudio), \texttt{iso\_639\_1} (idioma del video) y \texttt{published\_at} (fecha de publicación).
 
-La función \texttt{pickPreferredVideo(videos)} implementa un algoritmo de selección automática que prioriza trailers oficiales en inglés mediante un sistema de scoring multinivel. Primero asigna puntuaciones según el tipo: Trailer (100 puntos), Teaser (80), Clip (40), Featurette (30), otros (20). Luego añade bonificaciones: +50 puntos si está marcado como oficial, +30 si el idioma es inglés (\texttt{iso\_639\_1 === ``en''}), +20 si el idioma es español. El video con mayor puntuación total se selecciona como preferido y se muestra destacado con un botón de reproducción prominente en el hero de la página de detalles.
-
-Los videos se presentan en un carrusel horizontal mediante Swiper con configuración responsive: 2 columnas en móvil, 3 en tablets, 4 en desktop. Cada tarjeta de video muestra la thumbnail de YouTube (construida mediante \texttt{videoThumbUrl(v)} que genera la URL \texttt{https://img.youtube.com/vi/\{key\}/maxresdefault.jpg}), el título del video, badges identificativos del tipo (TRAILER, TEASER, etc.), un badge OFFICIAL si corresponde, el idioma, la plataforma de origen y un icono de reproducción centrado. Al hacer clic en cualquier video se abre el componente \texttt{VideoModal} que renderiza un iframe incrustado del video usando \texttt{videoEmbedUrl(v, autoplay)} que construye URLs con parámetros optimizados: \texttt{?autoplay=1\&rel=0\&modestbranding=1} para YouTube. El modal incluye un botón de enlace externo que redirige a la URL original del video en YouTube o Vimeo mediante \texttt{videoExternalUrl(v)}.
+La función \texttt{pickPreferredVideo(videos)} implementa un algoritmo de selección automática que prioriza trailers oficiales en inglés y mediante un sistema de puntuación ordena los videos disponibles para mostrar los más relevantes. Al hacer clic en cualquier vídeo se abre el componente \texttt{VideoModal} que renderiza un iframe añadido del video. El modal incluye un botón de enlace externo que redirige a la URL original del video.
 
 \begin{figure}[H]
 \centering
@@ -479,11 +491,7 @@ Los videos se presentan en un carrusel horizontal mediante Swiper con configurac
 
 \subsubsection{Colección}
 
-El sistema de colecciones gestiona sagas cinematográficas como el MCU, Star Wars, Fast \& Furious u otras franquicias. Cuando una película pertenece a una colección, TMDb incluye el objeto \texttt{belongs\_to\_collection} en la respuesta del endpoint \texttt{GET /movie/\{id\}} con los campos \texttt{id}, \texttt{name}, \texttt{poster\_path} y \texttt{backdrop\_path} de la colección.
-
-Si se detecta un \texttt{collectionId}, el componente ejecuta una petición a la API Route interna \texttt{GET /api/tmdb/collection?id=\{collectionId\}} que internamente consulta el endpoint de TMDb \texttt{GET /collection/\{id\}} y retorna el objeto completo de la colección que incluye \texttt{overview} (descripción de la saga), \texttt{parts} (array de todas las películas que componen la colección con sus metadatos completos: título, fecha de estreno, \texttt{poster\_path}, \texttt{vote\_average}, sinopsis) y artwork de la colección.
-
-La sección de colección se renderiza en un carrusel horizontal con configuración responsive: 3 columnas en móvil, 4 en tablets, 5 en desktop hasta 6 en pantallas ultra anchas. Cada película de la colección se presenta como una tarjeta con poster vertical en relación de aspecto 2:3, título, año de estreno extraído de \texttt{release\_date}, y efecto hover que eleva ligeramente la tarjeta y añade un borde amarillo. Las películas se ordenan cronológicamente según su fecha de estreno original. Al hacer clic en cualquier película de la colección, el usuario navega a la página de detalles de ese título (\texttt{/details/movie/\{id\}}), permitiendo explorar toda la saga de forma secuencial sin salir de la aplicación.
+El sistema de colecciones gestiona sagas cinematográficas. Cuando una película pertenece a una colección, TMDb incluye el objeto \texttt{belongs\_to\_collection} en la respuesta del endpoint \texttt{GET /movie/\{id\}} con los campos \texttt{id}, \texttt{name}, \texttt{poster\_path} y \texttt{backdrop\_path} de la colección. Para mostrar la sección de colección, se realiza una petición adicional a \texttt{GET /collection/\{collectionId\}} que devuelve un array con todas las películas que forman parte de la saga, incluyendo sus metadatos completos.
 
 \begin{figure}[H]
 \centering
@@ -494,9 +502,9 @@ La sección de colección se renderiza en un carrusel horizontal con configuraci
 
 \subsubsection{Sección de reparto y ficha de personas}
 
-La sección de reparto unifica datos de múltiples fuentes. Los directores y creadores se extraen del array \texttt{credits.crew} filtrando por \texttt{job === ``Director''} o \texttt{department === ``Writing''} y se agregan al inicio del array de cast para darles prioridad. El array completo se ordena por el campo \texttt{order} que TMDb proporciona para indicar el orden de importancia de cada actor en la producción, de forma que los protagonistas aparecen primero. Cada tarjeta de actor muestra la foto del perfil en tamaño \texttt{w185}, el nombre real del actor, el nombre del personaje que interpreta, y un efecto de hover. Hacer clic en cualquier actor navega a la página de ficha de persona (\texttt{/details/person/\{id\}}) que carga mediante el componente \texttt{ActorDetails.jsx}.
+La sección de reparto unifica datos de múltiples fuentes. Los directores y creadores se extraen del array \texttt{credits.crew} filtrando por \texttt{job === ``Director''} o \texttt{department === ``Writing''} y se agregan al inicio del array de cast para darles prioridad. El array completo se ordena por el campo \texttt{order} que TMDb proporciona para indicar el orden de importancia de cada actor en la producción, de forma que los protagonistas aparecen primero. Cada tarjeta de actor muestra la foto del perfil en tamaño \texttt{w185}, el nombre real del actor, el nombre del personaje que interpreta y un efecto de hover. Hacer clic en cualquier actor redirige a la página de ficha de persona (\texttt{/details/person/\{id\}}) que carga mediante el componente \texttt{ActorDetails.jsx}.
 
-La ficha de persona muestra la biografía completa del actor (campo \texttt{biography} de TMDb), su foto de perfil, fecha y lugar de nacimiento, y una filmografía completa dividida en dos pestañas: películas y series de televisión. La filmografía se ordena cronológicamente por \texttt{release\_date} o \texttt{first\_air\_date} en orden descendente (trabajos más recientes primero), y cada entrada muestra el poster del título, el año, el nombre del personaje o rol, y el rating de TMDb. La página también incluye enlaces externos a IMDb (si el actor tiene \texttt{imdb\_id}), Instagram, Twitter, Facebook y sitio web oficial, construidos a partir del objeto \texttt{external\_ids} de TMDb.
+La página de detalles de la persona muestra la biografía completa del actor (campo \texttt{biography} de TMDb), su foto de perfil, fecha y lugar de nacimiento y una filmografía completa dividida en dos pestañas: películas y series de televisión. La filmografía se ordena cronológicamente por \texttt{release\_date} o \texttt{first\_air\_date} en orden descendente (trabajos más recientes primero), y cada entrada muestra el poster del título, el año, el nombre del personaje o rol y la puntuación de TMDb. La página también incluye enlaces externos a IMDb (si el actor tiene \texttt{imdb\_id}), Instagram, Twitter, Facebook y sitio web oficial, construidos a partir del objeto \texttt{external\_ids} de TMDb.
 
 \subsubsection{Comentarios, análisis de sentimientos y listas de Trakt}
 
@@ -530,7 +538,7 @@ La sección de listas muestra las listas públicas de Trakt que incluyen este t�
 \subsubsection{Recomendaciones y contenido similar}
 
 La sección de recomendaciones utiliza el algoritmo de Trakt para sugerir títulos relacionados mediante el endpoint \texttt{/\{type\}/\{slug\}/related?extended=full\&limit=15}, que analiza patrones de visionado de la comunidad, géneros compartidos, directores, actores y palabras clave para determinar similitud.
-El proceso de obtención tiene tres fases secuenciales que transforman IDs. Primero, la API Route \texttt{/api/trakt/related} recibe el TMDb ID del título actual y lo traduce al slug de Trakt mediante el endpoint de búsqueda \texttt{GET /search/tmdb/\{id\}?type=movie|show}, que devuelve el objeto completo del título incluyendo todos sus identificadores (\texttt{ids.slug}, \texttt{ids.trakt}, \texttt{ids.imdb}, \texttt{ids.tmdb}). Con el slug de Trakt obtenido, se ejecuta la petición de contenido relacionado que devuelve un array de hasta 15 títulos similares con metadatos básicos pero sin imágenes. Finalmente, cada resultado se completa individualmente con datos de TMDb mediante peticiones paralelas (\texttt{mapWithConcurrency}) obteniendo \texttt{poster\_path}, \texttt{backdrop\_path}, \texttt{vote\_average}, \texttt{overview} y fecha de estreno.
+El proceso de obtención tiene tres fases secuenciales que transforman IDs. Primero, la API Route \texttt{/api/trakt/related} recibe el TMDb ID del título actual y lo traduce al slug de Trakt mediante el endpoint de búsqueda \texttt{GET /search/tmdb/\{id\}?type=movie|show}, que devuelve el objeto completo del título incluyendo todos sus identificadores. Con el slug de Trakt obtenido, se ejecuta la petición de contenido relacionado que devuelve un array de hasta 15 títulos similares con metadatos básicos pero sin imágenes. Finalmente, cada resultado se completa individualmente con datos de TMDb mediante peticiones paralelas (\texttt{mapWithConcurrency}) obteniendo \texttt{poster\_path}, \texttt{backdrop\_path}, \texttt{vote\_average}, \texttt{overview} y fecha de estreno.
 
 \begin{figure}[H]
 \centering
@@ -541,15 +549,15 @@ El proceso de obtención tiene tres fases secuenciales que transforman IDs. Prim
 
 \subsection{Favoritos (\texttt{/favorites})}
 
-La página de favoritos muestra la colección de películas y series del usuario a partir de la API TMDb. El componente \texttt{FavoritesClient.jsx} obtiene los datos mediante dos peticiones paralelas a los \textit{endpoints} \texttt{GET /account/\{id\}/favorite/movies} y \texttt{GET /account/\{id\}/favorite/tv}, cada uno en bloques de 20 elementos. La función \texttt{fetchFavoritesForUser()} implementa un patrón de carga paralela: primero ejecuta una petición inicial para obtener el número total de páginas disponibles (\texttt{total\_pages}), y posteriormente lanza todas las páginas restantes mediante \texttt{Promise.all()}, procesándolas en lotes de 5 peticiones concurrentes para respetar los límites de la API de TMDb. Los resultados de películas y series se combinan en un único array marcando cada elemento con \texttt{media\_type: ``movie''} o \texttt{media\_type: ``tv''}.
+La página de favoritos muestra la colección de películas y series del usuario a partir de la API TMDb. El componente \texttt{FavoritesClient.jsx} obtiene los datos mediante dos peticiones paralelas a los \textit{endpoints} \texttt{GET /account/\{id\}/favorite/movies} y \texttt{GET /account/\{id\}/favorite/tv}, cada uno en bloques de 20 elementos. La función \texttt{fetchFavoritesForUser()} implementa un patrón de carga paralela: primero ejecuta una petición inicial para obtener el número total de páginas disponibles y posteriormente lanza todas las páginas restantes mediante \texttt{Promise.all()}, procesándolas en lotes de 5 peticiones concurrentes para respetar los límites de la API de TMDb. Los resultados de películas y series se combinan en un único array marcando cada elemento con \texttt{media\_type: ``movie''} o \texttt{media\_type: ``tv''}.
 
 El componente implementa además un sistema de caché para evitar peticiones redundantes. Las puntuaciones de OMDb (ratings de IMDb, Rotten Tomatoes y Metacritic) se almacenan en \texttt{sessionStorage} con clave \texttt{omdb:\{imdbId\}} y un TTL de 24 horas, permitiendo que los datos persistan durante la sesión de navegación actual sin necesidad de nuevas peticiones. Las puntuaciones de Trakt se guardan en \texttt{localStorage} con TTL de 24 horas y marcas de tiempo en formato epoch, garantizando persistencia entre sesiones. La carga de puntuaciones externas no se realiza hasta que el usuario activa el hover sobre una tarjeta, evitando decenas de peticiones durante el montaje inicial del componente.
 
-La interfaz proporciona tres modos de visualización como botones en la barra de herramientas. El modo \textit{Grid} organiza los elementos en una cuadrícula responsive (6 columnas en escritorio) mostrando posters verticales en relación de aspecto 2:3, título y valoración de TMDb. El modo \textit{List} presenta filas horizontales con imagen backdrop en relación de aspecto 16:9 de resolución 1920$\times$1080 píxeles, título, año de estreno y puntuación TMDb y el modo \textit{Compact} muestra más elementos por fila (8 columnas en escritorio) y cada tarjeta con menor tamaño que en Grid.
+La interfaz proporciona tres modos de visualización como botones en la barra de herramientas. El modo \textit{Grid} organiza los elementos en una cuadrícula responsive (6 columnas en escritorio) mostrando posters verticales en relación de aspecto 2:3. El modo \textit{List} presenta filas horizontales con imagen backdrop en relación de aspecto 16:9 de resolución 1920$\times$1080 píxeles, título, año de estreno y puntuación TMDb y el modo \textit{Compact} muestra más elementos por fila (8 columnas en escritorio) y cada tarjeta con menor tamaño que en Grid.
 
 El sistema permite alternar entre dos tipos de imagen de portada: \textit{Poster} (vertical, relación 2:3) o \textit{Backdrop} (horizontal, relación 16:9), controlado mediante el estado \texttt{imageMode}. La lógica implementada en \texttt{effectiveImageMode = viewMode === ``list'' ? ``backdrop'' : imageMode} fuerza el uso de backdrop cuando el modo de visualización es \textit{List}, independientemente de la preferencia del usuario, ya que este modo requiere imágenes horizontales para su diseño de filas. En los modos \textit{Grid} y \textit{Compact}, el usuario puede alternar libremente entre poster y backdrop mediante un botón específico en la barra de herramientas y la selección de imágenes prioriza contenido en inglés con mayor número de votos mediante \texttt{pickBestPosterEN()} para posters y \texttt{pickBestBackdropByLangResVotes()} para backdrops, con \textit{fallback} al \texttt{poster\_path} o \texttt{backdrop\_path} original de TMDb si la selección automática falla.
 
-El menú de filtros y controles incluye cuatro categorías funcionales. La sección \textbf{Tipo} filtra el contenido mostrado mediante tres opciones: «Todo» (películas y series), «Películas» (\texttt{typeFilter = ``movies''}), o «Series» (\texttt{typeFilter = ``shows''}). La sección \textbf{Agrupar} organiza los elementos en grupos con cabeceras separadoras: «Sin agrupar» (predeterminado), «Por año» (usando \texttt{release\_date} o \texttt{first\_air\_date}), «Por década» (agrupando años en bloques de 10), «Género» (utilizando el primer género del array \texttt{genre\_ids}), y agrupación por valoración («TMDb», «IMDb», «Trakt», «Mis puntuaciones»). La sección \textbf{Orden} controla la ordenación de los elementos mediante ocho opciones: «Título A--Z» (\texttt{sortBy = ``title-asc''}), «Título Z--A» (\texttt{sortBy = ``title-desc''}), «Valoración ↓» y «Valoración ↑» (ordenación por \texttt{vote\_average} de TMDb), «Añadido reciente» y «Añadido antiguo» (ordenación por timestamp de inserción en favoritos de TMDb), y «Vista reciente» y «Vista antigua» (ordenación por fecha de último visionado obtenida de Trakt mediante \texttt{GET /sync/history}).
+El menú de filtros y controles incluye cuatro categorías funcionales. La sección \textbf{Tipo} filtra el contenido mostrado mediante tres opciones: «Todo» (películas y series), «Películas» o «Series». La sección \textbf{Agrupar} organiza los elementos en grupos con cabeceras separadoras: «Sin agrupar» (predeterminado), «Por año», «Por década» (agrupando años en bloques de 10), «Género» (utilizando el primer género del array \texttt{genre\_ids}) y agrupación por valoración («TMDb», «IMDb», «Trakt», «Mis puntuaciones»). La sección \textbf{Orden} controla la ordenación de los elementos mediante ocho opciones: «Título A--Z» (\texttt{sortBy = ``title-asc''}), «Título Z--A» (\texttt{sortBy = ``title-desc''}), «Valoración descendente» y «Valoración ascendente» (ordenación por \texttt{vote\_average} de TMDb), «Añadido reciente» y «Añadido antiguo» (ordenación por timestamp de inserción en favoritos de TMDb) y «Vista reciente» y «Vista antigua» (ordenación por fecha de último visionado obtenida de Trakt mediante \texttt{GET /sync/history}).
 
 \begin{figure}[H]
     \centering
@@ -585,7 +593,7 @@ La página de watchlist muestra el contenido que el usuario tiene pendiente a pa
 
 \subsection{Historial de visionado (\texttt{/history})}
 
-La página de historial muestra el registro completo de contenido visto por el usuario, obtenido desde Trakt mediante \texttt{GET /sync/history}. Trakt registra el timestamp exacto de cada visionado en formato ISO 8601, incluyendo la fecha, hora y episodio específico para series. Mediante la API Route interna \texttt{/api/trakt/history} se ajustan los datos de Trakt antes de enviarlos al cliente: traduce el identificador interno de Trakt a TMDb ID mediante \texttt{/search/tmdb/\{traktId\}?type=movie|show}, y ejecuta peticiones paralelas a TMDb para obtener \texttt{poster\_path}, \texttt{backdrop\_path} y sinopsis de cada título.
+La página de historial muestra el registro completo de contenido visto por el usuario, obtenido desde Trakt mediante \texttt{GET /sync/history}. Trakt registra el timestamp exacto de cada visionado en formato ISO 8601, incluyendo la fecha, hora y episodio específico para series. Mediante la API Route interna \texttt{/api/trakt/history} se ajustan los datos de Trakt antes de enviarlos al cliente: traduce el identificador interno de Trakt a TMDb ID mediante \texttt{/search/tmdb/\{traktId\}?type=movie|show} y ejecuta peticiones paralelas a TMDb para obtener \texttt{poster\_path}, \texttt{backdrop\_path} de cada título.
 
 El componente \texttt{HistoryClient.jsx} organiza el historial mediante agrupación por día, mes y año. Cada grupo incluye cabeceras separadoras con la fecha correspondiente. Para series, la función \texttt{collapseConsecutive()} detecta episodios consecutivos de la misma serie vistos en la misma sesión y los agrupa en una entrada única. Cada tarjeta cuenta con un diseño hover como en la mayoría de secciones que muestra el número de episodio , fecha de visionado y título.
 
@@ -600,7 +608,7 @@ A parte del menú de herramientas que mantiene una estética unificada y permite
 
 \subsection{En Progreso (\texttt{/in-progress})}
 
-La página de series en progreso determina qué series se encuentran activas cuando al menos un episodio ha sido marcado como visto pero no todos los episodios disponibles han sido completados. \texttt{InProgressClient.jsx} combina la respuesta de \texttt{GET /sync/watched/shows} de Trakt, que contiene el número de episodios vistos por temporada, con los datos de TMDb que informan del número total de episodios emitidos hasta la fecha. Además, el componente cuenta con otra sección para las series completadas, que agrupa los títulos en los que todos los episodios disponibles han sido marcados como vistos mediante Trakt.
+La página de series en progreso determina qué series se encuentran activas cuando al menos un episodio ha sido marcado como visto pero no todos los episodios disponibles han sido completados. \texttt{InProgressClient.jsx} combina la respuesta de \texttt{GET /sync/watched/shows} de Trakt, que contiene el número de episodios vistos por temporada, con los datos de TMDb que informan del número total de episodios emitidos hasta la fecha. Además, el componente cuenta con otra sección para las series completadas, que agrupa los títulos en los que todos los episodios disponibles han sido marcados como vistos.
 
 \begin{figure}[H]
   \centering
@@ -624,7 +632,7 @@ El módulo de estadísticas unifica los datos de visionado del usuario mediante 
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.88\textwidth,height=0.43\textheight,keepaspectratio]{../notes/.images/estadisticas1.jpg}
+  \includegraphics[width=1\textwidth,height=0.5\textheight,keepaspectratio]{../notes/.images/estadisticas1.jpg}
 
   \vspace{0.6em}
 
@@ -659,7 +667,7 @@ El componente implementa renderizado incremental para evitar bloquear el hilo pr
 
 \subsection{Descubrir contenido (\texttt{/discover})}
 
-La sección de descubrimiento emplea \texttt{/discover/movie} y \texttt{/discover/tv} de TMDb, que aceptan parámetros de filtrado completos, a diferencia de la búsqueda libre por texto que utiliza \texttt{/search/multi}. \texttt{DiscoverClient.jsx} gestiona el estado completo de los filtros activos: género, plataforma de \textit{streaming} disponible, certificación de edad, rango de valoración media y mínimo de votos, rango de fechas de estreno y palabras clave con autocompletado contra \texttt{/search/keyword} de TMDb. Todos estos filtros se combinan en una única petición estructurada a TMDb cuyos parámetros se calculan dinámicamente mediante \texttt{buildDiscoverParams()} a partir del estado activo.
+La sección de descubrimiento emplea \texttt{/discover/movie} y \texttt{/discover/tv} de TMDb, que aceptan parámetros de filtrado completos, a diferencia de la búsqueda libre por texto. \texttt{DiscoverClient.jsx} gestiona el estado completo de los filtros activos: género, plataforma de \textit{streaming} disponible, certificación de edad, rango de valoración media y mínimo de votos, rango de fechas de estreno y palabras clave con autocompletado contra \texttt{/search/keyword} de TMDb. Todos estos filtros se combinan en una única petición estructurada a TMDb cuyos parámetros se calculan dinámicamente mediante \texttt{buildDiscoverParams()} a partir del estado activo.
 
 \begin{figure}[H]
   \centering
@@ -670,27 +678,27 @@ La sección de descubrimiento emplea \texttt{/discover/movie} y \texttt{/discove
 
 \subsection{Gestión de listas (\texttt{/lists})}
 
-El módulo de listas unifica cuatro tipologías de contenido curatorado. Las listas propias del usuario en TMDb se obtienen mediante \texttt{GET /account/\{id\}/lists} y permiten operaciones completas de CRUD: creación de nuevas listas mediante formulario modal con nombre y descripción (petición \texttt{POST /list}), adición o eliminación de títulos desde la página de detalle, y edición de metadatos. Las colecciones de saga de TMDb (franquicias como el MCU, la saga de Bourne o el universo de Star Wars) se tratan como un tipo especial de lista que \texttt{CollectionDetailsClient.jsx} renderiza con un hero propio y un grid ordenado cronológicamente. Las listas públicas de Trakt se gestionan mediante \texttt{TraktListDetailsClient.jsx}, que implementa paginación con carga bajo demanda en páginas de 48 ítems mediante un botón «Cargar más» que consulta \texttt{/api/trakt/lists/\{username\}/\{listId\}?page=\{n\}\&limit=48}.
+El módulo de listas unifica tres vistas de contenido. Las listas propias del usuario en TMDb se obtienen mediante \texttt{GET /account/\{id\}/lists} y permiten operaciones completas: creación de nuevas listas (petición \texttt{POST /list}), adición o eliminación de títulos desde la página de detalle y edición de metadatos. Las colecciones de saga de TMDb se tratan como un tipo especial de lista que \texttt{CollectionDetailsClient.jsx} renderiza con un hero propio y un grid ordenado cronológicamente. Las listas públicas de Trakt se gestionan mediante \texttt{TraktListDetailsClient.jsx}, que implementa paginación con carga bajo demanda en páginas de 48 ítems mediante un botón «Cargar más» que consulta \texttt{/api/trakt/lists/\{username\}/\{listId\}?page=\{n\}\&limit=48}.
 
-La página principal (\texttt{/lists}) precarga automáticamente los detalles de las primeras 3 listas del usuario (\texttt{PRELOAD\_FIRST\_N\_LISTS = 3}) para navegación instantánea al hacer clic. Las listas se muestran como tarjetas con un collage compuesto de hasta cuatro backdrops de los primeros títulos organizado en variantes de cuadrícula (1$\times$1 para listas con un título, 2$\times$1 para dos, 2$\times$2 para tres o más), generado por \texttt{ListCoverBackdropCollage()}. El diseño visual de cada lista incluye metadatos como el número de ítems, el nombre del creador y la descripción truncada, y permite ordenar las listas del usuario por fecha de creación, número de ítems o valoración media del contenido. \texttt{UnifiedListDetailsLayout.jsx} actúa como envoltorio de maquetación reutilizable para todas las páginas de detalle de lista, proporcionando el hero con título y metadatos, el sistema de pestañas con estado activo, y los controles superiores de filtrado y ordenación de forma consistente independientemente del tipo de lista (TMDb, colección o Trakt).
+El diseño visual de cada lista incluye metadatos como el número de ítems, el nombre del creador y la descripción y permite ordenar las listas del usuario por fecha de creación, número de ítems o valoración media del contenido. \texttt{UnifiedListDetailsLayout.jsx} actúa como diseño reutilizable para todas las páginas de detalle de lista, proporcionando el hero con título y metadatos, el sistema de pestañas con estado activo y los controles superiores de filtrado y ordenación de forma consistente independientemente del tipo de lista (TMDb, colección o Trakt).
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{../notes/.images/listastrakt.jpg}
+  \includegraphics[width=0.9\textwidth]{../notes/.images/listastrakt.jpg}
   \caption{Interfaz de las listas públicas de Trakt.}
   \label{fig:listas-trakt}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{../notes/.images/colecciones.jpg}
+  \includegraphics[width=0.9\textwidth]{../notes/.images/colecciones.jpg}
   \caption{Interfaz de la sección de colecciones.}
   \label{fig:colecciones}
 \end{figure}
 
 \subsection{Películas y Series (\texttt{/movies}, \texttt{/series})}
 
-Las páginas de películas y series especializan el dashboard principal en un único tipo de contenido. \texttt{MoviesPageClient.jsx} y \texttt{SeriesPageClient.jsx} comparten la arquitectura técnica, incluyendo sistemas de caché a nivel de módulo para extras (\texttt{movieExtrasCache}), backdrops (\texttt{movieBackdropCache}), imágenes (\texttt{movieImagesCache}) y trailers (\texttt{movieTrailerCache} con mapa de peticiones en vuelo para deduplicación). \texttt{pickBestBackdropByLangResVotes()} prioriza backdrops de resolución 1920$\times$1080 sobre 2560$\times$1440 y 3840$\times$2160, priorizando la velocidad de carga sobre la calidad máxima de imagen. La selección de poster aplica \texttt{pickBestPosterByLangThenResolution()}, que calcula el área de cada imagen disponible (ancho $\times$ alto) y selecciona el de mayor resolución entre los disponibles en inglés o español, con \textit{fallback} al \texttt{poster\_path} original de TMDb.
+Las páginas de películas y series especializan el dashboard principal en un único tipo de contenido. \texttt{MoviesPageClient.jsx} y \texttt{SeriesPageClient.jsx} comparten la arquitectura técnica, incluyendo sistemas de caché a nivel de módulo para extras, backdrops, imágenes y trailers. \texttt{pickBestBackdropByLangResVotes()} prioriza backdrops de resolución 1920$\times$1080 sobre 2560$\times$1440 y 3840$\times$2160, priorizando la velocidad de carga sobre la calidad máxima de imagen. La selección de poster aplica \texttt{pickBestPosterByLangThenResolution()}, que selecciona el de mayor resolución entre los disponibles en inglés o español, con \textit{fallback} al \texttt{poster\_path} original de TMDb.
 
 La sección de trailers reproduce el tráiler oficial de cualquier título directamente en la página sin navegar al detalle. Cuando se hace hover sobre una tarjeta, \texttt{prefetchTrailer(id)} comprueba el caché de trailers en memoria y, si no hay datos cacheados, solicita los vídeos del título a TMDb mediante \texttt{GET /\{type\}/\{id\}/videos} y almacena el resultado. Al hacer clic en el botón de reproducción, el componente abre \texttt{VideoModal} con el \texttt{videoKey} de YouTube del tráiler. Ambos módulos incluyen integración directa con los botones de favorito y watchlist de TMDb desde las tarjetas del grid, usando el patrón de actualización optimista descrito en el módulo de detalles, sin necesidad de navegar a la página de detalle para gestionar las listas personales.
 
@@ -710,9 +718,9 @@ La sección de trailers reproduce el tráiler oficial de cualquier título direc
 
 \subsection{Ficha de personas (\texttt{/details/person/[id]})}
 
-La ficha de persona implementada en \texttt{ActorDetails.jsx} carga en paralelo mediante \texttt{Promise.allSettled()} cinco recursos independientes: identificadores externos (\texttt{/person/\{id\}/external\_ids}), créditos combinados de películas y series (\texttt{/person/\{id\}/combined\_credits?language=es-ES}), galería de fotos de perfil (\texttt{/person/\{id\}/images}), imágenes promocionales etiquetadas (\texttt{/person/\{id\}/tagged\_images}) y traducciones disponibles (\texttt{/person/\{id\}/translations}), escogiendo la versión en español de la biografía si está disponible. El uso de \texttt{Promise.allSettled()} en lugar de \texttt{Promise.all()} garantiza que un fallo en uno de los recursos (por ejemplo, ausencia de imágenes etiquetadas) no cancele la carga de los demás.
+La ficha de persona implementada en \texttt{ActorDetails.jsx} carga en paralelo mediante \texttt{Promise.allSettled()} cinco recursos independientes: identificadores externos, créditos combinados de películas y series, galería de fotos de perfil, imágenes promocionales etiquetadas y traducciones disponibles, escogiendo la versión en español de la biografía si está disponible. El uso de \texttt{Promise.allSettled()} en lugar de \texttt{Promise.all()} garantiza que un fallo en uno de los recursos (por ejemplo, ausencia de imágenes etiquetadas) no cancele la carga de los demás.
 
-La filmografía completa se computa como un valor derivado mediante \texttt{useMemo()} a partir del array \texttt{combined\_credits}, normalizando el formato heterogéneo de los campos según si el ítem es una película (\texttt{release\_date}) o una serie (\texttt{first\_air\_date}), y si el crédito es como actor (\texttt{character}) o como miembro del equipo técnico (\texttt{job}, \texttt{department}). Los filtros disponibles son: tipo de medio (todas, películas, series), tipo de crédito (actuación, equipo técnico), departamento (para filtrar directores, guionistas, productores dentro del equipo técnico), rango de años desde/hasta, y búsqueda libre por título o nombre de personaje. Todos los filtros se aplican de forma combinada en un único paso de procesamiento sobre el array completo, sin peticiones adicionales al servidor. La ordenación por popularidad, fecha, valoración o alfabético se aplica como etapa posterior al filtrado. El sistema calcula estadísticas sobre la filmografía filtrada (total de créditos, películas, series, actuaciones, roles técnicos) que se muestran como tarjetas informativas en la cabecera, actualizándose en tiempo real al cambiar los filtros. La función \texttt{calcAge()} calcula la edad actual o la edad en el momento del fallecimiento a partir de las fechas de nacimiento y muerte, y \texttt{formatHumanDate()} formatea las fechas en español con localización \texttt{es-ES}.
+La filmografía completa se calcula como un valor derivado mediante \texttt{useMemo()} a partir del array \texttt{combined\_credits}, normalizando el formato de los campos según si el ítem es una película (\texttt{release\_date}) o una serie (\texttt{first\_air\_date}) y si el crédito es como actor (\texttt{character}) o como miembro del equipo técnico (\texttt{job}, \texttt{department}). Los filtros disponibles son: tipo de medio (todas, películas, series), tipo de crédito (actuación, equipo técnico), departamento (para filtrar directores, guionistas, productores dentro del equipo técnico), rango de años desde/hasta, y búsqueda libre por título o nombre de personaje. Todos los filtros se aplican de forma combinada en un único paso de procesamiento sobre el array completo, sin peticiones adicionales al servidor. La ordenación por popularidad, fecha, valoración o alfabético se aplica como etapa posterior al filtrado. El sistema calcula estadísticas sobre la filmografía filtrada (total de créditos, películas, series, actuaciones, roles técnicos) que se muestran como tarjetas informativas en la cabecera, actualizándose en tiempo real al cambiar los filtros. La función \texttt{calcAge()} calcula la edad actual o la edad en el momento del fallecimiento a partir de las fechas de nacimiento y muerte, y \texttt{formatHumanDate()} formatea las fechas en español con localización \texttt{es-ES}.
 
 \begin{figure}[H]
   \centering
@@ -723,9 +731,9 @@ La filmografía completa se computa como un valor derivado mediante \texttt{useM
 
 \subsection{Barra de navegación (Navbar)}
 
-La barra de navegación implementada en \texttt{Navbar.jsx} se encuentra presente en todas las páginas de la aplicación, ya que se instancia directamente en el \texttt{layout.jsx} raíz. En escritorio adopta una disposición horizontal en tres zonas: el logotipo y nombre de la aplicación a la izquierda, una barra de búsqueda centralizada, y a la derecha un conjunto de iconos de navegación con códigos de color por categoría temática (estadísticas en índigo, listas en morado, calendario en ámbar, series en progreso en verde, historial en rojo, favoritos en rojo, watchlist en azul). En móvil, la barra superior simplifica el contenido a logo, buscador y avatar, mientras que la navegación principal se traslada a una barra fija de iconos en la parte inferior de la pantalla accesible con el pulgar, complementada por un menú deslizable lateral (\textit{drawer}) que contiene los enlaces secundarios.
+La barra de navegación implementada en \texttt{Navbar.jsx} se encuentra presente en todas las páginas de la aplicación, ya que se instancia directamente en el \texttt{layout.jsx} raíz. En escritorio adopta una disposición horizontal en tres zonas: el logotipo a la izquierda con las distintas secciones de dashboards, una barra de búsqueda centralizada y a la derecha un conjunto de iconos de navegación con códigos de color por categoría. En móvil, la barra superior simplifica el contenido a logo, buscador y avatar, mientras que la navegación principal se traslada a una barra fija de iconos en la parte inferior de la pantalla accesible con el pulgar, complementada por un menú deslizable lateral (\textit{drawer}) que contiene los enlaces secundarios.
 
-La barra de búsqueda \texttt{SearchBar} se reutiliza tanto en la versión de escritorio como en la modal de búsqueda de móvil. Implementa un debounce de 300\,ms antes de lanzar cada consulta a \texttt{/search/multi?query=...\&language=es-ES}, y cancela las peticiones anteriores con \texttt{AbortController} para evitar que resultados de búsquedas superadas sobrescriban los de la búsqueda actual. El \textit{dropdown} de resultados muestra hasta diez sugerencias con el tipo de contenido codificado por color (badge azul para películas, badge verde para series, badge naranja para personas), la foto de perfil o poster en miniatura, el año de estreno y el rating de TMDb. Una variante del componente Navbar incluye el botón \texttt{TraktHistoryNavButton} que muestra en tiempo real cuántos ítems hay en la lista de pendientes, obtenido del contexto de autenticación \texttt{AuthContext} sin petición adicional. El efecto de transición de transparente a \textit{glassmorphism} al hacer \textit{scroll} se implementa con un listener \texttt{scroll} que aplica o elimina la clase \texttt{bg-black/70 backdrop-blur-12px} al superar un umbral de 100\,px.
+La barra de búsqueda \texttt{SearchBar} se reutiliza tanto en la versión de escritorio como en la modal de búsqueda de móvil. El resultado de búsqueda muestra hasta diez sugerencias con el tipo de contenido identificado por color, la foto de perfil o poster en miniatura, el año de estreno y el rating de TMDb.
 
 \begin{figure}[H]
   \centering
@@ -742,11 +750,11 @@ La barra de búsqueda \texttt{SearchBar} se reutiliza tanto en la versión de es
 \end{figure}
 
 % -----------------------------------------------------------------------
-\subsection{Patrones de optimización transversales}
+\subsection{Patrones de optimización y rendimiento}
 
-La aplicación implementa un conjunto de patrones de optimización aplicados de forma sistemática que explican los tiempos de respuesta percibidos como inmediatos a pesar de integrar datos de seis APIs externas distintas.
+La aplicación implementa un conjunto de patrones de optimización aplicados de forma sistemática que explican los tiempos de respuesta percibidos como inmediatos a pesar de integrar datos de varias APIs externas distintas.
 
-\textbf{Actualización optimista.} Todas las acciones de escritura del usuario (marcar como favorito, añadir a pendientes, valorar) actualizan la interfaz instantáneamente sin esperar la confirmación del servidor. La petición real se envía en paralelo en segundo plano, y solo si falla se revierte el cambio visual mostrando un mensaje de error. Este patrón elimina la latencia perceptible de 300 a 600 milisegundos que tendría una actualización sincrónica, creando la sensación de respuesta inmediata característica de las aplicaciones nativas.
+\textbf{Actualización optimista.} Todas las acciones de escritura del usuario (marcar como favorito, añadir a pendientes, valorar) actualizan la interfaz instantáneamente sin esperar la confirmación del servidor. La petición real se envía en paralelo en segundo plano y solo si falla se revierte el cambio visual mostrando un mensaje de error. Este patrón elimina la latencia perceptible creando la sensación de respuesta inmediata.
 
 \textbf{Precarga de imágenes.} Las imágenes de posters y backdrops se precargan con un margen adelantado respecto al viewport, de forma que cuando el usuario hace scroll las imágenes ya están disponibles en la caché del navegador, evitando tiempos de carga visibles.
 
@@ -762,15 +770,13 @@ La aplicación implementa un conjunto de patrones de optimización aplicados de 
 
 \subsection{Sistema de diseño global}
 
-El sistema de diseño parte de un principio rector: el contenido visual proveniente de TMDb (backdrops y posters de cada título) es el protagonista de la interfaz. La paleta de colores, los efectos de superficie y las estrategias de iluminación se han diseñado para potenciar, no competir con, estas imágenes.
+El sistema de diseño utiliza el contenido visual proveniente de TMDb (backdrops y posters de cada título) como protagonista de la interfaz. Además de ello se complementan las secciones de la aplicación con componentes propios que siguen una estética unificada.
 
-\textbf{Paleta de colores.} El color de fondo global es negro puro, sobre el cual se despliegan los backdrops a pantalla completa con gradientes perimetrales que los integran suavemente. Este enfoque traslada la estética de las plataformas de streaming (modo teatro) a la interfaz de seguimiento.
+\textbf{Paleta de colores.} El color de fondo global es negro puro, sobre el cual se despliegan los backdrops a pantalla completa con gradientes en los extremos.
 
-\textbf{Superficies de cristal (glassmorphism).} Las tarjetas, paneles laterales, la barra de navegación y los menús desplegables utilizan un efecto de cristal semitransparente: fondo blanco con 5\% de opacidad, desenfoque de 10 píxeles del contenido subyacente y borde sutil de 1 píxel. La opacidad baja mantiene la legibilidad del texto mientras proyecta el color del backdrop en la superficie del elemento. El desenfoque se procesa mediante GPU y no genera sobrecarga en el renderizado.
+\textbf{Superficies de cristal (glassmorphism).} Las tarjetas, paneles laterales, la barra de navegación y los menús desplegables utilizan un efecto de cristal semitransparente: fondo blanco con 5\% de opacidad, desenfoque de 10 píxeles del contenido subyacente y borde sutil de 1 píxel. La opacidad baja mantiene la legibilidad del texto mientras proyecta el color del backdrop en la superficie del elemento.
 
-\textbf{Tipografía.} El proyecto utiliza la familia Geist Sans y Geist Mono, tipografías de Vercel distribuidas como fuentes variables. Se cargan como fuentes del sistema sin peticiones externas, evitando el problema de \textit{Flash of Unstyled Text} (FOUT) durante la carga inicial.
-
-\textbf{Accesibilidad y movimiento reducido.} El sistema respeta las preferencias de accesibilidad del sistema operativo, desactivando automáticamente todas las transiciones y animaciones CSS para usuarios que han configurado la opción de movimiento reducido en su dispositivo.
+\textbf{Tipografía.} El proyecto utiliza PT Sans, una tipografía sans-serif de Google Fonts optimizada mediante el sistema de fuentes de Next.js (\texttt{next/font/google}). Se configura en el componente raíz \texttt{layout.jsx} y, adicionalmente, se aplica la clase \texttt{antialiased} de Tailwind para mejorar el renderizado de bordes en pantallas de alta resolución.
 
 \subsection{Componentes de Next.js utilizados}
 
@@ -789,7 +795,7 @@ El sistema de diseño parte de un principio rector: el contenido visual provenie
 
 \subsection{Componentes propios: Navbar}
 
-El componente \texttt{Navbar.jsx} (~30\,KB) implementa una navegación adaptativa con dos modos de presentación.
+El componente \texttt{Navbar.jsx} implementa una navegación adaptativa con dos modos de presentación.
 
 \textbf{Modo escritorio (lg+).} Una barra horizontal fija en la parte superior con tres zonas:
 \begin{itemize}
@@ -798,28 +804,11 @@ El componente \texttt{Navbar.jsx} (~30\,KB) implementa una navegación adaptativ
 \item \textbf{Derecha}: botones de acceso rápido a Estadísticas, Listas, Calendario, En Progreso, Historial, Favoritas y Pendientes; avatar del usuario autenticado.
 \end{itemize}
 
-Cada botón de icono utiliza un sistema de estilos por «tono de color» (\texttt{iconLinkClass(href, tone)}): al hacer \textit{hover}, el botón adquiere el color semántico de su función (rojo para Favoritas, azul para Pendientes, ámbar para Calendario, verde para En Progreso, etc.) junto con un halo de sombra coloreado:
-\begin{verbatim}
-hover:shadow-[0_0_18px_rgba(239,68,68,0.16)]
-\end{verbatim}
+Cada botón de icono utiliza un sistema de estilos por «tono de color» (\texttt{iconLinkClass(href, tone)}): al hacer \textit{hover}, el botón adquiere el color de su función (rojo para Favoritas, azul para Pendientes, ámbar para Calendario, verde para En Progreso, etc.) junto con un halo de sombra coloreado.
 
 Cuando el estado está activo (ruta actual), el color se intensifica con un fondo semitransparente y una sombra más pronunciada.
 
-\textbf{Modo móvil.} La barra superior se simplifica al logotipo centrado, un botón de menú (hamburgesa) y un botón de búsqueda. En la parte inferior de la pantalla aparece una barra de navegación fija (\textit{tab bar}) con las cuatro secciones de mayor uso. Esta arquitectura de doble barra es el patrón estándar de las aplicaciones de contenido multimedia en iOS y Android.
-
-El \textbf{drawer lateral} del menú móvil se implementa con Framer Motion:
-\begin{verbatim}
-<motion.aside
-  initial={{ x: -320 }}
-  animate={{ x: 0 }}
-  exit={{ x: -320 }}
-  transition={{ type: "tween", duration: 0.22 }}
->
-\end{verbatim}
-
-El fondo oscuro detrás del drawer (\texttt{bg-black/70 backdrop-blur-sm}) también se anima con \texttt{AnimatePresence} para que tanto la entrada como la salida del menú sean fluidas.
-
-La \textbf{búsqueda en móvil} abre un \textit{overlay} a pantalla completa (\texttt{bg-black/95 backdrop-blur-2xl}) que entra con una animación de escala y opacidad (\texttt{scale: 0.95$\rightarrow$1, opacity: 0$\rightarrow$1}), dando la sensación de que emerge desde el botón de búsqueda.
+\textbf{Modo móvil.} La barra superior se simplifica al logotipo centrado, un botón de menú y un botón de búsqueda. En la parte inferior de la pantalla aparece una barra de navegación fija (\textit{tab bar}) con las cuatro secciones de mayor uso. Esta arquitectura de doble barra es el patrón estándar de las aplicaciones de contenido multimedia en iOS y Android. El menú lateral deslizable (\textit{drawer}) contiene enlaces a las secciones secundarias (Estadísticas, Listas, Calendario, En Progreso, Historial) y se activa al hacer clic en el botón de menú de la barra superior.
 
 \subsection{Componente propio: LiquidButton}
 
@@ -827,7 +816,7 @@ La \textbf{búsqueda en móvil} abre un \textit{overlay} a pantalla completa (\t
 
 La arquitectura del componente se basa en tres capas superpuestas dentro de un \texttt{<button>}:
 \begin{enumerate}
-\item \textbf{Canvas de efectos}: un elemento \texttt{<canvas>} que ocupa toda la superficie del botón y gestiona, mediante \texttt{requestAnimationFrame}, las partículas flotantes, las ondulaciones de \textit{ripple} y los efectos de explosión al hacer clic.
+\item \textbf{Canvas de efectos}: un elemento \texttt{<canvas>} que ocupa toda la superficie del botón y gestiona, mediante \texttt{requestAnimationFrame}, las partículas flotantes, las ondulaciones animadas y los efectos de explosión al hacer clic.
 \item \textbf{Superposición de brillo}: un \texttt{<div>} con un gradiente lineal animado mediante CSS (\texttt{@keyframes liquidShine}) que recorre la superficie del botón de forma continua cuando está activo o en \textit{hover}.
 \item \textbf{Borde pulsante}: un segundo \texttt{<div>} circular con borde coloreado animado mediante \texttt{@keyframes liquidPulse} (escala 1 $\rightarrow$ 1.15 $\rightarrow$ 1, con periodo de 2 s).
 \end{enumerate}
@@ -837,7 +826,7 @@ El sistema de efectos de \textit{canvas} implementa:
 \item \textbf{Partículas flotantes}: 12 partículas con movimiento senoidal suave que se generan al entrar en \textit{hover}. Cada partícula tiene posición, velocidad, tamaño, opacidad y fase trigonométrica independientes.
 \item \textbf{Ripple (ondulación)}: al hacer \textit{hover} o clic, se crean ondas circulares que se expanden desde el punto de contacto y se desvanecen al alcanzar su radio máximo.
 \item \textbf{Trail effect}: al mover el ratón sobre el botón, se generan puntos de rastro que se desvanecen en 0,4 s, creando un efecto de «estela líquida».
-\item \textbf{Explosión}: al hacer clic, se generan 12 partículas que se dispersan en ángulos uniformes desde el punto de impacto con gravedad simulada (\texttt{vy += 0.12}) y decaimiento de opacidad.
+\item \textbf{Explosión}: al hacer clic, se generan 12 partículas que se dispersan en ángulos uniformes desde el punto de impacto con gravedad simulada.
 \end{itemize}
 
 El componente soporta un sistema de \textbf{propagación entre botones del mismo grupo} (\texttt{groupId}): al interactuar con un botón, este emite un \texttt{CustomEvent} al documento (\texttt{liquid-spread}, \texttt{liquid-click}, \texttt{liquid-proximity}) que es capturado por todos los botones del mismo grupo. Los botones próximos a la fuente del evento reaccionan con ondulaciones de intensidad proporcional a la distancia, creando la sensación de que el líquido se propaga físicamente entre botones adyacentes.
@@ -853,19 +842,19 @@ El color activo del botón es configurable mediante la prop \texttt{activeColor}
 
 \subsection{Componente propio: StarRating}
 
-\texttt{StarRating.jsx} gestiona la valoración personal del usuario en Trakt (escala 1--10). Utiliza \texttt{LiquidButton} como \textit{trigger} con \texttt{activeColor=''yellow''}: si el usuario ya tiene una valoración, el botón muestra el valor numérico con el efecto de partículas activo; si no, muestra el icono de estrella.
+\texttt{StarRating.jsx} gestiona la valoración personal del usuario en Trakt (escala 1--10). Utiliza \texttt{LiquidButton} como \textit{trigger} con \texttt{activeColor=''yellow''}: si el usuario ya tiene una valoración, el botón muestra el valor numérico con el efecto de partículas activo, si no, muestra el icono de estrella.
 
-Al hacer clic, el componente abre un modal renderizado mediante \texttt{createPortal()} directamente en \texttt{document.body}, evitando problemas de apilamiento CSS (\texttt{z-index}) con los elementos de la página de detalle. El modal contiene:
+Al hacer clic, el componente abre un modal que contiene:
 \begin{itemize}
 \item Un número grande que muestra el valor actual centrado sobre una estrella decorativa semitransparente.
-\item Un \textit{slider} HTML nativo (\texttt{<input type=``range''>}) con paso de 0,5 y recorrido de 1 a 10, cuyo \textit{thumb} nativo se oculta con \texttt{opacity: 0} y se sustituye por un \textit{thumb} personalizado posicionado con CSS (\texttt{left: calc(...)}).
-\item Botones de ajuste fino $-0{,}5$ / $+0{,}5$ a ambos lados del \textit{slider}.
+\item Un \textit{slider} HTML nativo (\texttt{<input type=``range''>}) con paso de 0,5 y recorrido de 1 a 10..
+\item Botones de ajuste $-0{,}5$ / $+0{,}5$ a ambos lados del \textit{slider}.
 \item Botón de confirmación y, si ya existe una valoración, botón de borrado con icono de papelera.
 \end{itemize}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.5\textwidth]{../notes/.images/puntuacion.jpg}
+  \includegraphics[width=0.6\textwidth]{../notes/.images/puntuacion.jpg}
   \caption{Interfaz del componente de valoración personal StarRating.}
   \label{fig:puntuacion}
 \end{figure}
@@ -885,9 +874,15 @@ Al hacer clic, el componente abre un modal renderizado mediante \texttt{createPo
 
 \texttt{EpisodeRatingsGrid.jsx} presenta una vista matricial de episodios para series, donde cada celda representa un episodio y su color refleja la puntuación. Este componente permite detectar de forma rápida patrones de calidad por temporada y ofrece navegación directa al detalle de episodio cuando el usuario hace clic en una celda.
 
+\textbf{Dos tipos de vista.} El componente ofrece dos disposiciones: \textit{Grid} (tabla con episodios en filas y temporadas en columnas) y \textit{Wrapped} (temporadas envueltas en bloques).
+
+\textbf{Modo invertido.} Exclusivo de la vista Grid, intercambia filas por columnas: las temporadas pasan a ser filas y los episodios columnas.
+
+\textbf{Media de temporada.} Añade una columna extra en cada temporada mostrando su puntuación promedio. Se calcula como la media aritmética de todos los episodios con puntuación de esa temporada.
+
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.5\textwidth]{../notes/.images/gridratings.jpg}
+  \includegraphics[width=0.7\textwidth]{../notes/.images/gridratings.jpg}
   \caption{Interfaz del componente EpisodeRatingsGrid.}
   \label{fig:gridratings}
 \end{figure}
@@ -915,24 +910,15 @@ Al hacer clic, el componente abre un modal renderizado mediante \texttt{createPo
 El bloque de control de visionado se apoya en tres componentes coordinados:
 \begin{itemize}
 \item \texttt{TraktEpisodesWatchedModal}: modal para gestionar el marcado de episodios en series de forma más detallada.
-\item \texttt{TraktWatchedModal}: modal de historial de visionados del título en Trakt.
+\item \texttt{TraktWatchedModal}: modal de historial de visionados en películas.
 \end{itemize}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\textwidth]{../notes/.images/episodiosvistos.jpg}
-  \caption{Interfaz del modal TraktEpisodesWatchedModal para gestionar episodios vistos.}
-  \label{fig:episodiosvistos}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.5\textwidth]{../notes/.images/historialvisionado.jpg}
+  \includegraphics[width=0.4\textwidth]{../notes/.images/historialvisionado.jpg}
   \caption{Interfaz del modal TraktWatchedModal con el historial de visionado.}
   \label{fig:historialvisionado}
 \end{figure}
-
-En conjunto, estos componentes centralizan las acciones de seguimiento y sincronización de visionado sin sacar al usuario de la ficha.
 
 \subsection{Componentes propios: modales de apoyo en DetailsClient}
 
@@ -943,6 +929,20 @@ En conjunto, estos componentes centralizan las acciones de seguimiento y sincron
 \item \texttt{ExternalLinksModal}: agrupar enlaces externos en móvil cuando no hay espacio para mostrar todos los iconos.
 \end{itemize}
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth]{../notes/.images/addlistmodal.jpg}
+  \caption{Modal AddToListModal para gestionar listas personalizadas.}
+  \label{fig:addlistmodal}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{../notes/.images/videomodal.jpg}
+  \caption{Modal VideoModal para reproducción de trailers.}
+  \label{fig:videomodal}
+\end{figure}
+
 Como apoyo adicional en la misma pantalla también es relevante \texttt{SeasonDetailsClient} (detalle expandible de temporadas y episodios).
 
 \subsection{Sistema de animaciones con Framer Motion}
@@ -950,32 +950,8 @@ Como apoyo adicional en la misma pantalla también es relevante \texttt{SeasonDe
 Framer Motion gestiona las animaciones de mayor complejidad del proyecto a través de cuatro patrones principales:
 
 \textbf{1. Animaciones de entrada escalonada (\texttt{staggerChildren}).} En el dashboard y en las páginas de listas, las tarjetas no aparecen todas simultáneamente. La variante del contenedor define un \texttt{staggerChildren} de 0,05\,s (reducido a 0,02\,s para listas largas de más de 30 ítems), de forma que cada tarjeta entra con un ligero retraso respecto a la anterior:
-\begin{verbatim}
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.05 }
-  }
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-};
-\end{verbatim}
 
-\textbf{2. \texttt{AnimatePresence} para salidas animadas.} El sistema de tres vistas (Grid, List, Compact) y las pestañas de la página de detalle utilizan \texttt{AnimatePresence} para animar tanto la entrada como la salida de los elementos del DOM. Cuando el usuario cambia de vista, el contenido saliente realiza una animación de salida (\texttt{exit}) antes de ser eliminado del DOM, evitando cortes bruscos:
-\begin{verbatim}
-<AnimatePresence mode="wait">
-  <motion.div
-    key={currentView}
-    initial={{ opacity: 0, x: 20 }}
-    animate={{ opacity: 1, x: 0 }}
-    exit={{ opacity: 0, x: -20 }}
-    transition={{ duration: 0.2 }}
-  />
-</AnimatePresence>
-\end{verbatim}
+\textbf{2. \texttt{AnimatePresence} para salidas animadas.} El sistema de tres vistas (Grid, List, Compact) y las pestañas de la página de detalle utilizan \texttt{AnimatePresence} para animar tanto la entrada como la salida de los elementos del DOM. Cuando el usuario cambia de vista, el contenido saliente realiza una animación de salida (\texttt{exit}) antes de ser eliminado del DOM, evitando cortes bruscos.
 
 El modo \texttt{''wait''} garantiza que la animación de salida se complete antes de que empiece la de entrada.
 
@@ -983,7 +959,7 @@ El modo \texttt{''wait''} garantiza que la animación de salida se complete ante
 
 \textbf{4. Carrusel del hero.} El carrusel automático de la página principal anima las transiciones entre slides con una combinación de \texttt{opacity} (entrada: 0$\rightarrow$1, salida: 1$\rightarrow$0) y un ligero desplazamiento horizontal (\texttt{x: +20$\rightarrow$0}). La pausa automática al hacer \textit{hover} se gestiona mediante un \texttt{useEffect} que detecta el evento \texttt{mouseenter} del contenedor del hero.
 
-\textbf{Performance de las animaciones.} Todas las animaciones de Framer Motion utilizan exclusivamente las propiedades CSS \texttt{transform} (para \texttt{x}, \texttt{y}, \texttt{scale}, \texttt{rotate}) y \texttt{opacity}, que el navegador puede procesar enteramente en la GPU sin necesidad de recalcular el \textit{layout} ni repintar capas del DOM. Esto garantiza que las animaciones se ejecuten a 60 fps incluso en dispositivos de gama media.
+\textbf{Rendimiento de las animaciones.} Todas las animaciones de Framer Motion utilizan exclusivamente las propiedades CSS \texttt{transform} (para \texttt{x}, \texttt{y}, \texttt{scale}, \texttt{rotate}) y \texttt{opacity}, que el navegador puede procesar enteramente en la GPU sin necesidad de recalcular el \textit{layout} ni repintar capas del DOM. Esto garantiza que las animaciones se ejecuten a 60 fps incluso en dispositivos de gama media.
 
 \subsection{Sistema de estilos global (\texttt{globals.css})}
 
@@ -1007,7 +983,7 @@ La transición entre vistas utiliza \texttt{AnimatePresence} de Framer Motion co
 \section{Rendimiento en producción}
 % -----------------------------------------------------------------------
 
-Las métricas obtenidas en producción (Vercel) mediante Lighthouse validan las decisiones de arquitectura tomadas:
+Las métricas obtenidas en producción (Vercel) mediante Lighthouse y Vercel Speed Insights validan las decisiones de arquitectura tomadas. La plataforma alcanza un Real Experience Score (RES) de 98/100.
 
 \begin{table}[!htbp]
 \begin{center}
@@ -1016,25 +992,49 @@ Las métricas obtenidas en producción (Vercel) mediante Lighthouse validan las 
 \textbf{Métrica} & \textbf{Valor obtenido} & \textbf{Objetivo} \\ 
 \hline
 \hline
+RES (Vercel Speed Insights) & 98/100 & >90 \\
+\hline
 Performance (Lighthouse) & 92/100 & >90 \\
 \hline
 SEO (Lighthouse) & 100/100 & 100 \\
 \hline
 Best Practices & 95/100 & >90 \\
 \hline
-LCP & 1,8 s & <2,5 s \\
+FCP & 1,44 s & <1,8 s \\
 \hline
-CLS & 0,05 & <0,1 \\
+LCP & 2,38 s & <2,5 s \\
 \hline
-FID & 45 ms & <100 ms \\
+CLS & 0,08 & <0,1 \\
+\hline
+INP & 64 ms & <200 ms \\
+\hline
+TTFB & 0,04 s & <0,6 s \\
 \hline
 \end{tabular}
-\caption{Métricas Lighthouse en producción}
+\caption{Métricas de rendimiento en producción (datos reales de usuarios)}
 \label{tab:lighthouse}
 \end{center}
 \end{table}
 
-El LCP de 1,8\,s se consigue principalmente gracias al SSR: el HTML con el \textit{hero} ya renderizado llega al navegador antes de que se descargue todo el JavaScript. El CLS de 0,05 se logra mediante el uso sistemático de \texttt{width} y \texttt{height} explícitos en el componente \texttt{<Image>} de Next.js \parencite{Google:2024a}.
+Las Core Web Vitals obtenidas reflejan la efectividad de las optimizaciones implementadas:
+
+\textbf{First Contentful Paint (FCP)} mide el tiempo hasta que aparece el primer elemento visual en pantalla. El valor de 1,44\,s se consigue gracias al SSR con Server Components, ya que el HTML con contenido ya renderizado llega al navegador antes de que se descargue el JavaScript, permitiendo que el usuario vea contenido inmediatamente.
+
+\textbf{Largest Contentful Paint (LCP)} mide cuándo se renderiza el elemento visual más grande del viewport (típicamente la imagen hero del dashboard). El valor de 2,38\,s se logra mediante la optimización automática de imágenes del componente \texttt{<Image>} de Next.js, que además precarga las imágenes críticas con la propiedad \texttt{priority}, y el uso de CDN de TMDb para servir imágenes con redimensionado bajo demanda.
+
+\textbf{Cumulative Layout Shift (CLS)} cuantifica la estabilidad visual durante la carga, midiendo cuánto se desplaza el contenido de forma inesperada. El valor de 0,08 (umbral: <0,1) se logra reservando el espacio de las imágenes mediante \texttt{width} y \texttt{height} explícitos antes de cargarlas, evitando que el contenido salte cuando las imágenes terminan de descargarse. Además, el uso de animaciones basadas en \texttt{transform} y \texttt{opacity} en lugar de propiedades que afectan al layout previene cambios de diseño inesperados durante las transiciones.
+
+\textbf{Interaction to Next Paint (INP)} mide la latencia de respuesta ante las interacciones del usuario (clics, taps, teclas). El valor de 64\,ms se consigue usando exclusivamente propiedades aceleradas por GPU (\texttt{transform}, \texttt{opacity}) en las animaciones de Framer Motion y aplicando actualización optimista en las acciones de favoritos y watchlist, que actualizan la interfaz instantáneamente sin esperar la respuesta del servidor.
+
+\textbf{Time to First Byte (TTFB)} representa el tiempo que tarda el servidor en responder con el primer byte de datos. El valor de 0,04\,s se debe a la infraestructura Edge de Vercel, que sirve las páginas desde nodos geográficamente cercanos al usuario, combinado con el sistema de caché multinivel que reduce drásticamente el tiempo de procesamiento en el servidor.
+
+\begin{figure}[!htbp]
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../notes/.images/rendimiento.jpg}
+\caption{Métricas de Vercel Speed Insights en producción}
+\label{fig:rendimiento}
+\end{center}
+\end{figure}
 
 % -----------------------------------------------------------------------
 \section{Sistema de caché multinivel}
@@ -1095,21 +1095,7 @@ El sistema aplica una estrategia de caché de dos niveles: la CDN almacena estas
 
 \subsection{Metadatos globales y por página}
 
-El archivo \texttt{layout.jsx} raíz define los metadatos por defecto de la aplicación mediante el objeto estático \texttt{metadata}:
-
-\begin{verbatim}
-export const metadata = {
-  title: 'The Show Verse',
-  description: 'Tu plataforma de películas y series',
-  manifest: '/site.webmanifest',
-  icons: {
-    icon: [
-      { url: '/icon.png', sizes: '256x256', type: 'image/png' },
-      { url: '/icon-512.png', sizes: '512x512' },
-    ]
-  }
-}
-\end{verbatim}
+El archivo \texttt{layout.jsx} raíz define los metadatos por defecto de la aplicación mediante el objeto estático \texttt{metadata}, que incluye el título genérico, la descripción global, el logotipo para Open Graph y Twitter Cards y la URL canónica de la página principal. Estos metadatos se aplican a todas las páginas que no definan sus propios metadatos específicos.
 
 \subsection{Resumen de la arquitectura dual de rutas}
 
@@ -1134,119 +1120,21 @@ Esta arquitectura garantiza:
 \section{Sistema de artwork personalizado}
 % -----------------------------------------------------------------------
 
-El sistema de \textit{artwork} personalizado permite sustituir manualmente el \textit{poster}, \textit{backdrop} o imagen de fondo asociados a una película o serie. Para ello se utiliza un archivo de configuración en la raíz del proyecto, desde el que se definen sobrescrituras vinculadas al identificador de TMDb de cada obra.
+El sistema de \textit{artwork} personalizado permite sobrescribir manualmente las imágenes oficiales (poster, backdrop, background) de cualquier título sin modificar los datos originales de TMDb. La implementación se basa en un archivo JSON de configuración en la raíz del proyecto (\texttt{artwork-overrides.json}) y una API Route que gestiona las lecturas y escrituras de forma centralizada.
 
-\subsection{Motivación}
+\subsection{Arquitectura del sistema}
 
-TMDb selecciona automáticamente el \textit{poster} con mayor número de votos para cada región lingüística. Sin embargo, en algunos casos el \textit{poster} automático no es el más representativo:
-\begin{itemize}
-\item El póster en español puede ser visualmente inferior al en inglés.
-\item Para series antiguas, el póster preferido puede ser el original de su estreno y no el rediseñado recientemente.
-\item Algunos títulos tienen pósters promocionales con mejor reconocimiento visual que el póster oficial.
-\end{itemize}
+El archivo \texttt{artwork-overrides.json} almacena las sobrescrituras utilizando claves compuestas por tipo y TMDb ID (\texttt{movie:550}, \texttt{tv:1399}). Cada entrada puede definir hasta tres tipos de imagen: \texttt{poster} (carátula vertical), \texttt{backdrop} (imagen horizontal de fondo) y \texttt{background} (imagen de fondo de pantalla completa). Las rutas admitidas incluyen imágenes del \texttt{public} folder del proyecto, rutas relativas de TMDb que se resuelven automáticamente contra su CDN, o URLs externas completas.
 
-Las sobrescrituras pueden apuntar tanto a imágenes alojadas en la carpeta pública del proyecto como a recursos externos o a rutas de la propia galería de TMDb, lo que ofrece flexibilidad suficiente para adaptar la identidad visual de cada ficha.
+La API Route \texttt{/api/artwork} expone dos operaciones: \texttt{GET} para consultar sobrescrituras existentes (admite consulta individual por \texttt{id} o consulta por lotes mediante \texttt{ids} separados por comas) y \texttt{POST} para guardar o eliminar sobrescrituras (si \texttt{filePath} es \texttt{null}, borra la sobrescritura). El runtime se fuerza a Node.js para permitir operaciones de sistema de archivos mediante \texttt{fs/promises}, y se marca como \texttt{dynamic: 'force-dynamic'} para evitar que Next.js cachee respuestas que deben reflejar cambios inmediatos.
 
-\subsection{Funcionamiento general}
+El módulo cliente \texttt{lib/artworkApi.js} encapsula las llamadas a la API mediante \texttt{saveArtworkOverride()} para escritura y \texttt{fetchArtworkOverrides()} para lectura por lotes. Ambas funciones implementan manejo robusto de errores devolviendo objetos vacíos en caso de fallo, garantizando que problemas de configuración no interrumpan el renderizado.
 
-Cuando la aplicación necesita mostrar una imagen principal, comprueba primero si existe una sobrescritura definida para ese título. Si la encuentra, utiliza esa referencia; en caso contrario, mantiene el comportamiento por defecto y recurre al material obtenido automáticamente desde TMDb. Este mecanismo introduce una capa de personalización no intrusiva, ya que permite corregir casos puntuales sin alterar el resto del flujo de obtención de datos.
+\subsection{Integración con componentes}
 
-El sistema también dispone de una API interna para consultar y actualizar estas preferencias de forma dinámica. De este modo, la gestión del \textit{artwork} puede realizarse sin modificar manualmente el código fuente, lo que simplifica el mantenimiento y facilita futuras tareas de administración del catálogo.
+Los componentes de interfaz consultan el sistema de sobrescrituras antes de renderizar imágenes. En \texttt{MainDashboardClient}, las tarjetas del carrusel principal solicitan sobrescrituras de backdrops en lotes al montar el componente, indexando los resultados en un \texttt{Map} para acceso instantáneo durante el renderizado. En \texttt{DetailsClient}, la página de detalle permite cambiar el artwork interactivamente: al hacer clic en el poster o backdrop, se abre un selector que muestra todas las imágenes disponibles en la galería de TMDb y permite guardar la selección mediante \texttt{saveArtworkOverride()}, actualizando inmediatamente la interfaz sin recargar la página.
 
-Los tipos de recurso admitidos incluyen:
-\begin{itemize}
-\item Ruta relativa al \textit{public folder} (\texttt{/custom/...}).
-\item Ruta de imagen de TMDb, resuelta automáticamente contra su CDN.
-\item URL externa completa (\texttt{https://...}).
-\end{itemize}
-
-% -----------------------------------------------------------------------
-\section{Integración con comunidad Trakt}
-% -----------------------------------------------------------------------
-
-\subsection{Sistema de comentarios}
-
-La página de detalle incluye una pestaña «Comunidad» que muestra los comentarios públicos de Trakt para el título actual. API Route implementada: \texttt{/api/trakt/community/comments}.
-
-\textbf{Ordenación disponible:}
-\begin{itemize}
-\item \texttt{likes}: comentarios con más \textit{likes} primero (default).
-\item \texttt{newest}: más recientesprimero.
-\item \texttt{oldest}: históricos primero.
-\item \texttt{replies}: con más respuestas primero.
-\end{itemize}
-
-\textbf{Paginación:} 20 comentarios por página, con carga bajo demanda al hacer \textit{scroll} hasta el final (\texttt{IntersectionObserver}).
-
-\textbf{Renderizado:} cada comentario muestra:
-\begin{itemize}
-\item Avatar y username del autor (link a perfil Trakt).
-\item Texto del comentario (Markdown renderizado con \texttt{react-markdown}).
-\item \textit{Spoiler warning}: los comentarios marcados como \textit{spoiler} en Trakt están ocultos por defecto, requieren clic para expandir.
-\item Contador de \textit{likes} y respuestas.
-\item Fecha de publicación relativa («hace 3 días»).
-\end{itemize}
-
-\subsection{Listas de la comunidad}
-
-La ruta \texttt{/api/trakt/community/lists} obtiene listas públicas populares de Trakt para un título:
-
-\begin{verbatim}
-GET /api/trakt/community/lists?type=movie&tmdbId=550
-    &tab=popular&page=1&limit=10
-\end{verbatim}
-
-\textbf{Pestañas disponibles:}
-\begin{itemize}
-\item \texttt{popular}: listas con más \textit{likes}.
-\item \texttt{trending}: listas con actividad reciente.
-\item \texttt{personal}: listas del usuario autenticado que contienen este título.
-\end{itemize}
-
-Cada lista muestra: nombre, descripción, autor, número de ítems, número de \textit{likes}, y botón de acceso rápido para ver la lista completa en \texttt{/lists/trakt/[listId]}.
-
-\subsection{Estadísticas de temporada}
-
-Para series, la pestaña «Comunidad» incluye ratings promedio de Trakt por temporada y episodio, obtenidos de \texttt{/api/trakt/community/seasons}.
-
-% -----------------------------------------------------------------------
-\section{Integración con Letterboxd}
-% -----------------------------------------------------------------------
-
-Letterboxd es la plataforma de referencia para cinéfilos y críticos de cine, con más de 10 millones de usuarios. Aunque no tiene API pública, \textit{The Show Verse} implementa integración mediante scraping controlado.
-
-\subsection{Búsqueda de películas en Letterboxd}
-
-La API Route \texttt{/api/links/letterboxd} construye URLs de búsqueda en Letterboxd:
-
-\begin{verbatim}
-GET /api/links/letterboxd?title=Inception&year=2010
-
-Response:
-{
-  "searchUrl": "https://letterboxd.com/search/Inception/",
-  "filmSlug": "inception-2010",
-  "directUrl": "https://letterboxd.com/film/inception-2010/"
-}
-\end{verbatim}
-
-Algoritmo de construcción del slug:
-\begin{enumerate}
-\item Normalizar título: minúsculas, eliminar caracteres especiales, espacios $\rightarrow$ guiones.
-\item Añadir año si el título es ambiguo (ej. «Dune» $\rightarrow$ \texttt{dune-2021} vs. \texttt{dune-1984}).
-\item Validar existencia mediante \texttt{HEAD} a la URL construida (código 200 confirma).
-\end{enumerate}
-
-Si la URL directa falla, se devuelve la URL de búsqueda como fallback.
-
-\subsection{Botón de acceso rápido}
-
-La página de detalle incluye un botón «Ver en Letterboxd» en la sección de enlaces externos que abre la película directamente en Letterboxd en nueva pestaña. Útil para usuarios que desean:
-\begin{itemize}
-\item Leer reseñas detalladas de la comunidad cinéfila.
-\item Añadir la película a sus listas personales de Letterboxd.
-\item Ver las listas de la comunidad que incluyen esta película.
-\end{itemize}
+Este sistema proporciona personalización visual sin alterar la integridad de los datos externos, útil para casos donde el artwork automático de TMDb no coincide con las preferencias estéticas del proyecto o cuando se desea destacar ediciones específicas de una obra.
 
 % -----------------------------------------------------------------------
 \section{Manejo de errores y estados de carga}
@@ -1282,9 +1170,7 @@ Estos estados incluyen un icono representativo de gran tamaño, un título que d
 \section{Diseño responsive y adaptación móvil}
 % -----------------------------------------------------------------------
 
-\subsection{Breakpoints y estrategia mobile-first}
-
-El diseño utiliza los breakpoints estándar de Tailwind CSS:
+El diseño responsive se implementa mediante Tailwind CSS siguiendo una estrategia \textit{mobile-first}: los estilos base se definen para pantallas pequeñas (320\,px) y se sobrescriben progresivamente mediante prefijos condicionales a medida que aumenta el ancho del viewport.
 
 \begin{table}[!htbp]
 \begin{center}
@@ -1304,64 +1190,37 @@ El diseño utiliza los breakpoints estándar de Tailwind CSS:
 \texttt{2xl} & 1536\,px & Pantallas grandes \\
 \hline
 \end{tabular}
-\caption{Breakpoints responsive}
+\caption{Breakpoints responsive de Tailwind CSS}
 \label{tab:breakpoints}
 \end{center}
 \end{table}
 
-La estrategia \textit{mobile-first} implica que todos los estilos base se definen para móvil (320\,px), y se sobrescriben progresivamente para pantallas más grandes:
+\subsection{Patrones de layout adaptativos}
 
-\begin{verbatim}
-<div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+Las cuadrículas de contenido utilizan un patrón de columnas progresivo que incrementa la densidad visual según el espacio disponible. Por ejemplo, la página de descubrimiento implementa \texttt{grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6}, mostrando 2 tarjetas en móvil y hasta 6 en pantallas ultra anchas. Este sistema permite maximizar el uso del viewport sin sacrificar legibilidad en dispositivos pequeños.
 
-\end{verbatim}
+Los layouts de dos columnas (sidebar + contenido principal) se adaptan mediante \texttt{flex-col lg:flex-row} o \texttt{grid-cols-1 lg:grid-cols-[300px\_1fr]}, transformando el diseño horizontal de escritorio en una disposición vertical apilada en móvil. La página de filtros de descubrimiento colapsa el panel lateral en un modal overlay accesible mediante botón en pantallas menores a 1024\,px.
 
-\subsection{Barra de navegación adaptativa}
+El espaciado interno y margenes se ajustan proporcionalmente mediante clases como \texttt{px-4 sm:px-6 lg:px-8}, aumentando el \textit{padding} horizontal de 1rem en móvil hasta 2rem en escritorio. Los títulos principales escalan mediante \texttt{text-4xl sm:text-5xl lg:text-6xl}, adaptando la jerarquía tipográfica al espacio disponible sin comprometer la legibilidad.
 
-El componente Navbar implementa dos arquitecturas completamente diferentes según el dispositivo:
+\subsection{Detección de viewport y hooks personalizados}
 
-\textbf{Desktop (lg+):}
-\begin{itemize}
-\item Barra horizontal superior con tres zonas (logo, búsqueda, links).
-\item Búsqueda siempre visible en centro.
-\item Todos los links principales visibles simultáneamente.
-\item Dropdown de avatar en esquina superior derecha.
-\end{itemize}
+El hook personalizado \texttt{useIsMobileLayout()} implementa detección reactiva del ancho de viewport mediante \texttt{window.matchMedia()}, actualizando el estado del componente cuando se cruza el umbral de 768\,px. Este hook permite condicionar lógica de negocio según el dispositivo, como activar lazy loading más agresivo en móvil o cambiar el comportamiento de modales. La implementación escucha tanto el evento \texttt{change} del \texttt{MediaQueryList} como \texttt{orientationchange} del \texttt{window} para garantizar actualizaciones correctas en cambios de orientación y los carruseles adaptan su configuración de slides visibles y espacio entre ellos según el tamaño de pantalla, mejorando la experiencia táctil en dispositivos móviles.
 
-\textbf{Móvil (<lg):}
-\begin{itemize}
-\item Barra superior simplificada: logo centrado + botón menú + botón búsqueda.
-\item \textit{Tab bar} inferior fijo con 4 secciones principales (Inicio, Descubrir, Favoritos, Perfil).
-\item Drawer lateral deslizante (\texttt{translate-x}) para menú completo.
-\item Búsqueda en \textit{overlay} a pantalla completa.
-\end{itemize}
-
-La transición entre modos ocurre automáticamente en \texttt{1024px} sin recarga de página.
-
-\subsection{Imágenes responsive}
-
-El componente \texttt{<Image>} de Next.js genera automáticamente \texttt{srcset} con múltiples resoluciones:
-
-\begin{verbatim}
-<Image
-  src="/poster.jpg"
-  width={300}
-  height={450}
-  sizes="(max-width: 768px) 50vw, 
-         (max-width: 1024px) 33vw, 
-         25vw"
-  alt="Poster"
-/>
-\end{verbatim}
-
-El navegador selecciona la resolución óptima según el tamaño de renderizado real. Resultado: ahorro de ancho de banda en móviles (imagen 300\,px en lugar de 1000\,px).
-
-% -----------------------------------------------------------------------
-\section{Plan de calidad: estrategia de testing}
-% -----------------------------------------------------------------------
-
-El proyecto no incluyó una suite de tests automatizados durante su desarrollo. La validación se realizó mediante pruebas manuales sistemáticas en navegador, una decisión pragmática dada la velocidad de iteración durante el prototipado. Esta limitación técnica debe abordarse antes de escalar el proyecto a producción.
-
-La estrategia propuesta para futuras iteraciones incluye \textbf{Vitest} para pruebas unitarias e integración, \textbf{React Testing Library} para validar componentes desde el comportamiento del usuario, \textbf{MSW} para simular respuestas de APIs externas, y \textbf{Playwright} para pruebas \textit{end-to-end} de flujos completos.
-
-Los módulos que requieren mayor cobertura de tests son: algoritmo de caché y deduplicación en vuelo, middleware de detección de bots, flujo OAuth y gestión de tokens, transformaciones de datos entre Trakt y TMDb, y algoritmos de selección de imágenes. Los componentes de presentación pura tienen menor necesidad de cobertura al aportar menos valor en la validación automatizada.
+\begin{figure}[!htbp]
+\begin{center}
+\begin{minipage}[b]{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{../notes/.images/dashboard-responsive.jpg}
+\caption{Diseño responsive MainDashboard}
+\label{fig:dashboard-responsive}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{../notes/.images/detalles-responsive.jpg}
+\caption{Vista móvil de la página de detalles}
+\label{fig:detalles-responsive}
+\end{minipage}
+\end{center}
+\end{figure}

@@ -18,6 +18,7 @@
 \usepackage{a4wide}
 \usepackage[normalsize]{subfigure}
 \usepackage{float}
+\usepackage{array}
 \usepackage{titlesec}
 \usepackage[Lenny]{fncychap}
 \usepackage{listings}
@@ -134,13 +135,9 @@
 
 
 % ÍNDICE DE FIGURAS
-\newpage{\pagestyle{empty}}
-\addcontentsline{toc}{chapter}{\numberline{}Índice de figuras}
 \listoffigures
 
 % ÍNDICE DE TABLAS
-\newpage{\pagestyle{empty}}
-\addcontentsline{toc}{chapter}{\numberline{}Índice de tablas}
 \listoftables
 
 
@@ -200,6 +197,7 @@ La plataforma incorpora además enlaces externos para acceder a los recursos en 
 % REFERENCIAS
 \newpage{\pagestyle{empty}}
 \addcontentsline{toc}{chapter}{\numberline{}Referencias}
+\nocite{*}
 \printbibliography
 
 
