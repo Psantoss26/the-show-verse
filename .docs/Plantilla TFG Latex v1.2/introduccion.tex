@@ -1,8 +1,8 @@
 \section{Justificación y contexto}
 
-En los últimos años, el consumo de películas y series ha cambiado radicalmente debido a que la mayoría del contenido se distribuye a través de plataformas de \textit{streaming} como Netflix, HBO Max, Disney+, Amazon Prime Video o Movistar+, cada una con su propio catálogo independiente, lo que genera un problema habitual para cualquier usuario porque el contenido está disperso en múltiples servicios y no existe ninguna herramienta que permita gestionarlo todo desde un único lugar.
+En los últimos años, el consumo de películas y series ha cambiado radicalmente debido a que la mayoría del contenido se distribuye a través de plataformas de \textit{streaming} como Netflix, HBO Max, Disney+, Amazon Prime Video o Movistar+, cada una con su propio catálogo independiente, lo que genera un problema habitual para cualquier usuario porque el contenido está disperso en múltiples servicios y no existe ninguna herramienta que permita gestionarlo todo desde un único lugar \parencite{CNMC:2025}.
 
-Esto provoca situaciones como perder el seguimiento de una serie que se dejó a medias, no recordar qué episodios se han visto, tener que buscar en varios sitios a la vez si una película está disponible en \textit{streaming}, consultar las puntuaciones y críticas de otros usuarios, o simplemente no tener un registro de lo que ya se ha visto. Las plataformas de \textit{tracking} que existen actualmente, como Trakt.tv o Letterboxd, resuelven parte del problema pero presentan sus propias limitaciones con falta de funcionalidades.
+Esto provoca situaciones como perder el seguimiento de una serie que se dejó a medias, no recordar qué episodios se han visto, tener que buscar en varios sitios a la vez si una película está disponible en \textit{streaming}, consultar las puntuaciones y críticas de otros usuarios, o simplemente no tener un registro de lo que ya se ha visto. Las plataformas de \textit{tracking} que existen actualmente, como Trakt.tv \parencite{Trakt:2024} o Letterboxd \parencite{Letterboxd:2024}, resuelven parte del problema pero presentan sus propias limitaciones con falta de funcionalidades.
 
 \textit{The Show Verse} nace como respuesta a esa necesidad ofreciendo una plataforma web que centraliza gran parte de la gestión del contenido audiovisual, integrando los datos de múltiples fuentes mediante APIs externas y ofreciendo al usuario una experiencia completa y funcional.
 
@@ -20,9 +20,9 @@ Las aplicaciones existentes en el mercado (Letterboxd, Trakt.tv, Simkl) ofrecen 
 
 El problema abordado en este trabajo puede descomponerse en varias categorías técnicas.
 
-\textbf{1. Integración de fuentes de datos.} Los datos necesarios para una plataforma de gestión de contenido audiovisual completa no están disponibles en una única API. TMDb proporciona los metadatos de películas y series (sinopsis, reparto, imágenes, trailers), además de las puntuaciones y listas de usuario. Trakt.tv gestiona el \textit{tracking} personal del usuario (historial de visionado, sección en progreso y estadísticas). OMDb complementa con las puntuaciones de IMDb y Rotten Tomatoes además de los premios y nominaciones de cada título. Cada API tiene su propio esquema de autenticación, formato de respuesta, límites de uso e identificadores.
+\textbf{1. Integración de fuentes de datos.} Los datos necesarios para una plataforma de gestión de contenido audiovisual completa no están disponibles en una única API. TMDb \parencite{TMDb:2024} proporciona los metadatos de películas y series (sinopsis, reparto, imágenes, trailers), además de las puntuaciones y listas de usuario. Trakt.tv \parencite{Trakt:2024} gestiona el \textit{tracking} personal del usuario (historial de visionado, sección en progreso y estadísticas). OMDb \parencite{OMDb:2024} complementa con las puntuaciones de IMDb y Rotten Tomatoes además de los premios y nominaciones de cada título. Cada API tiene su propio esquema de autenticación, formato de respuesta, límites de uso e identificadores.
 
-\textbf{2. Autenticación y gestión de sesiones.} La funcionalidad de sincronización con Trakt requiere que el usuario delegue permisos en la aplicación mediante OAuth 2.0, lo que implica implementar el flujo completo de autorización (redirección, intercambio de código por token, almacenamiento seguro, actualización automática), sin exponer en ningún momento las credenciales del usuario ni las claves privadas de la aplicación.
+\textbf{2. Autenticación y gestión de sesiones.} La funcionalidad de sincronización con Trakt requiere que el usuario delegue permisos en la aplicación mediante OAuth 2.0 \parencite{OWASP:2021}, lo que implica implementar el flujo completo de autorización (redirección, intercambio de código por token, almacenamiento seguro, actualización automática), sin exponer en ningún momento las credenciales del usuario ni las claves privadas de la aplicación.
 
 \textbf{3. Rendimiento y experiencia de usuario.} Este tipo de aplicación maneja grandes volúmenes de imágenes de alta resolución y realiza múltiples llamadas a APIs externas con límites de peticiones en algunos casos reducidos. Es importante que haya un equilibrio entre datos almacenados en caché y aquellos que se muestran en tiempo real.
 
@@ -35,14 +35,14 @@ El objetivo principal es diseñar e implementar una aplicación web completa y f
 \textbf{Objetivos específicos:}
 
 \begin{enumerate}
-\item Implementar la integración con la API de TMDb para obtener los metadatos completos de películas y series (sinopsis, características, imágenes, vídeos, temporadas y episodios).
-\item Desarrollar un sistema de autenticación OAuth 2.0 completo con Trakt.tv, incluyendo almacenamiento seguro de tokens en cookies \texttt{httpOnly}, actualización automática mediante \textit{refresh tokens} y revocación.
+\item Implementar la integración con la API de TMDb \parencite{TMDb:2024} para obtener los metadatos completos de películas y series (sinopsis, características, imágenes, vídeos, temporadas y episodios).
+\item Desarrollar un sistema de autenticación OAuth 2.0 \parencite{OWASP:2021,NextJS:2024} completo con Trakt.tv \parencite{Trakt:2024}, incluyendo almacenamiento seguro de tokens en cookies \texttt{httpOnly}, actualización automática mediante \textit{refresh tokens} y revocación.
 \item Construir un módulo de gestión personal (favoritos, pendientes, historial de visionado, series en progreso y puntuaciones de usuario) con sincronización bidireccional con Trakt y TMDb.
 \item Implementar un sistema de seguimiento de episodios completo para series, incluyendo marcado individual por episodio, marcado completo por temporada, visualización de progreso y tabla de puntuaciones por episodio y temporada.
-\item Diseñar una interfaz de usuario responsiva y accesible que ofrezca múltiples modos de visualización (Grid, List, Compact) con transiciones fluidas mediante Framer Motion y compatibilidad con dispositivos móviles.
+\item Diseñar una interfaz de usuario responsiva y accesible \parencite{W3C:2023} que ofrezca múltiples modos de visualización (Grid, List, Compact) con transiciones fluidas mediante Framer Motion \parencite{Framer:2024} y compatibilidad con dispositivos móviles.
 \item Optimizar el rendimiento de la aplicación mediante un sistema de caché multinivel (ISR en servidor, memoria de proceso Node.js, sessionStorage, localStorage) con deduplicación en vuelo para reducir el tráfico API.
 \item Implementar un \textit{middleware} Edge para optimización SEO, generación de metadatos Open Graph y reescritura de URLs para garantizar una indexación correcta.
-\item Integrar Plex Media Server para el acceso a la biblioteca local del usuario, incluyendo autenticación JWT, enlaces directos multiplataforma y búsqueda unificada.
+\item Integrar Plex Media Server \parencite{Plex:2024} para el acceso a la biblioteca local del usuario, incluyendo autenticación JWT, enlaces directos multiplataforma y búsqueda unificada.
 \item Desarrollar componentes interactivos avanzados con efectos visuales y sistema de actualización optimista para todas las acciones de usuario.
 \item Implementar una gestión de errores con \textit{graceful degradation} y \textit{skeleton loaders} para garantizar la funcionalidad parcial aunque fallen APIs externas.
 \item Desplegar la aplicación en un entorno de producción (Vercel).

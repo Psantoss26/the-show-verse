@@ -1,133 +1,133 @@
 \babel@toc {spanish}{}\relax 
-\contentsline {chapter}{\hbox to\@tempdima {\hfil }Resumen}{7}{chapter*.1}%
-\contentsline {chapter}{\hbox to\@tempdima {\hfil }Abstract}{8}{chapter*.1}%
-\contentsline {chapter}{\numberline {1}Introducción}{9}{chapter.1}%
-\contentsline {section}{\numberline {1.1}Justificación y contexto}{9}{section.1.1}%
-\contentsline {subsection}{\numberline {1.1.1}Motivación}{9}{subsection.1.1.1}%
-\contentsline {section}{\numberline {1.2}Planteamiento del problema}{10}{section.1.2}%
-\contentsline {section}{\numberline {1.3}Objetivos del trabajo}{11}{section.1.3}%
-\contentsline {section}{\numberline {1.4}Modelo de negocio}{12}{section.1.4}%
-\contentsline {subsection}{\numberline {1.4.1}Viabilidad real y dependencia de APIs}{12}{subsection.1.4.1}%
-\contentsline {subsection}{\numberline {1.4.2}Limitaciones por proveedor (coste y condiciones)}{12}{subsection.1.4.2}%
-\contentsline {subsection}{\numberline {1.4.3}Modelos de ingreso viables}{13}{subsection.1.4.3}%
-\contentsline {subsection}{\numberline {1.4.4}Conclusión de viabilidad}{13}{subsection.1.4.4}%
-\contentsline {chapter}{\numberline {2}Estado de la cuestión}{14}{chapter.2}%
-\contentsline {section}{\numberline {2.1}Marco teórico del trabajo}{14}{section.2.1}%
-\contentsline {subsection}{\numberline {2.1.1}Las plataformas de streaming y sus consecuencias para el usuario}{14}{subsection.2.1.1}%
-\contentsline {subsection}{\numberline {2.1.2}Autenticación y APIs REST}{14}{subsection.2.1.2}%
-\contentsline {subsection}{\numberline {2.1.3}Rendimiento web}{15}{subsection.2.1.3}%
-\contentsline {subsection}{\numberline {2.1.4}Diseño de interfaz}{16}{subsection.2.1.4}%
-\contentsline {section}{\numberline {2.2}Trabajos relacionados}{17}{section.2.2}%
-\contentsline {chapter}{\numberline {3}Aspectos metodológicos}{20}{chapter.3}%
-\contentsline {section}{\numberline {3.1}Metodología}{20}{section.3.1}%
-\contentsline {subsection}{\numberline {3.1.1}Criterios de integración de APIs}{20}{subsection.3.1.1}%
-\contentsline {subsection}{\numberline {3.1.2}Criterios de decisión para la autenticación}{21}{subsection.3.1.2}%
-\contentsline {subsection}{\numberline {3.1.3}Estrategia de caché}{21}{subsection.3.1.3}%
-\contentsline {section}{\numberline {3.2}Tecnologías empleadas}{23}{section.3.2}%
-\contentsline {section}{\numberline {3.3}Gestión del desarrollo y control de versiones}{23}{section.3.3}%
-\contentsline {subsection}{\numberline {3.3.1}Flujo de trabajo con GitHub}{23}{subsection.3.3.1}%
-\contentsline {section}{\numberline {3.4}Proceso de despliegue en producción}{23}{section.3.4}%
-\contentsline {subsection}{\numberline {3.4.1}Fase inicial: plataforma Vercel}{24}{subsection.3.4.1}%
-\contentsline {subsection}{\numberline {3.4.2}Proceso de deployment en Vercel}{24}{subsection.3.4.2}%
-\contentsline {subsection}{\numberline {3.4.3}Despliegue actual: servidor NAS propio}{24}{subsection.3.4.3}%
-\contentsline {subsection}{\numberline {3.4.4}GitHub Actions}{25}{subsection.3.4.4}%
-\contentsline {chapter}{\numberline {4}Desarrollo del trabajo}{26}{chapter.4}%
-\contentsline {section}{\numberline {4.1}Arquitectura del sistema}{26}{section.4.1}%
-\contentsline {subsection}{\numberline {4.1.1}Estructura de capas}{26}{subsection.4.1.1}%
-\contentsline {subsection}{\numberline {4.1.2}Estructura de carpetas}{26}{subsection.4.1.2}%
-\contentsline {section}{\numberline {4.2}Implementación del sistema de autenticación OAuth 2.0}{27}{section.4.2}%
-\contentsline {section}{\numberline {4.3}Integración con las APIs externas}{28}{section.4.3}%
-\contentsline {subsection}{\numberline {4.3.1}The Movie Database (TMDb) API v3}{28}{subsection.4.3.1}%
-\contentsline {subsection}{\numberline {4.3.2}OMDb API (Open Movie Database)}{30}{subsection.4.3.2}%
-\contentsline {subsection}{\numberline {4.3.3}Proxy de Trakt y transformación de datos}{30}{subsection.4.3.3}%
-\contentsline {subsection}{\numberline {4.3.4}JustWatch (API GraphQL no oficial)}{31}{subsection.4.3.4}%
-\contentsline {subsection}{\numberline {4.3.5}Plex Media Server}{31}{subsection.4.3.5}%
-\contentsline {section}{\numberline {4.4}Arquitectura de API Routes propias}{32}{section.4.4}%
-\contentsline {subsection}{\numberline {4.4.1}Funciones principales de las API Routes}{32}{subsection.4.4.1}%
-\contentsline {subsection}{\numberline {4.4.2}Categorías funcionales de endpoints}{33}{subsection.4.4.2}%
-\contentsline {subsubsection}{\numberline {4.4.2.1}Autenticación y gestión de sesiones}{33}{subsubsection.4.4.2.1}%
-\contentsline {subsubsection}{\numberline {4.4.2.2}Datos de usuario y actividad}{33}{subsubsection.4.4.2.2}%
-\contentsline {subsubsection}{\numberline {4.4.2.3}Valoraciones y puntuaciones}{34}{subsubsection.4.4.2.3}%
-\contentsline {subsubsection}{\numberline {4.4.2.4}Proxy y caché de datos externos}{34}{subsubsection.4.4.2.4}%
-\contentsline {subsubsection}{\numberline {4.4.2.5}Integración con Plex Media Server}{34}{subsubsection.4.4.2.5}%
-\contentsline {subsubsection}{\numberline {4.4.2.6}Enlaces externos y descubrimiento}{35}{subsubsection.4.4.2.6}%
-\contentsline {subsubsection}{\numberline {4.4.2.7}Listas y colecciones}{35}{subsubsection.4.4.2.7}%
-\contentsline {subsection}{\numberline {4.4.3}Patrones técnicos}{36}{subsection.4.4.3}%
-\contentsline {section}{\numberline {4.5}Implementación de los módulos funcionales}{37}{section.4.5}%
-\contentsline {subsection}{\numberline {4.5.1}Dashboard principal (\texttt {/})}{37}{subsection.4.5.1}%
-\contentsline {subsection}{\numberline {4.5.2}Página de detalles (\texttt {/details/[type]/[id]})}{39}{subsection.4.5.2}%
-\contentsline {subsubsection}{\numberline {4.5.2.1}Arquitectura de datos}{39}{subsubsection.4.5.2.1}%
-\contentsline {subsubsection}{\numberline {4.5.2.2}Menú de navegación por secciones}{40}{subsubsection.4.5.2.2}%
-\contentsline {subsubsection}{\numberline {4.5.2.3}Sistema de puntuaciones}{40}{subsubsection.4.5.2.3}%
-\contentsline {subsubsection}{\numberline {4.5.2.4}Botones de acción}{41}{subsubsection.4.5.2.4}%
-\contentsline {subsubsection}{\numberline {4.5.2.5}Gestión avanzada de episodios para series}{42}{subsubsection.4.5.2.5}%
-\contentsline {subsubsection}{\numberline {4.5.2.6}Enlaces externos y plataformas de streaming}{45}{subsubsection.4.5.2.6}%
-\contentsline {subsubsection}{\numberline {4.5.2.7}Imágenes y posters}{46}{subsubsection.4.5.2.7}%
-\contentsline {subsubsection}{\numberline {4.5.2.8}Trailers y vídeos}{47}{subsubsection.4.5.2.8}%
-\contentsline {subsubsection}{\numberline {4.5.2.9}Colección}{48}{subsubsection.4.5.2.9}%
-\contentsline {subsubsection}{\numberline {4.5.2.10}Sección de reparto y ficha de personas}{48}{subsubsection.4.5.2.10}%
-\contentsline {subsubsection}{\numberline {4.5.2.11}Comentarios, análisis de sentimientos y listas de Trakt}{49}{subsubsection.4.5.2.11}%
-\contentsline {subsubsection}{\numberline {4.5.2.12}Recomendaciones y contenido similar}{51}{subsubsection.4.5.2.12}%
-\contentsline {subsection}{\numberline {4.5.3}Favoritos (\texttt {/favorites})}{51}{subsection.4.5.3}%
-\contentsline {subsection}{\numberline {4.5.4}Pendientes (\texttt {/watchlist})}{54}{subsection.4.5.4}%
-\contentsline {subsection}{\numberline {4.5.5}Historial de visionado (\texttt {/history})}{55}{subsection.4.5.5}%
-\contentsline {subsection}{\numberline {4.5.6}En Progreso (\texttt {/in-progress})}{56}{subsection.4.5.6}%
-\contentsline {subsection}{\numberline {4.5.7}Estadísticas del usuario (\texttt {/stats})}{57}{subsection.4.5.7}%
-\contentsline {subsection}{\numberline {4.5.8}Calendario de estrenos (\texttt {/calendar})}{57}{subsection.4.5.8}%
-\contentsline {subsection}{\numberline {4.5.9}Biblioteca Personal (\texttt {/biblioteca})}{59}{subsection.4.5.9}%
-\contentsline {subsection}{\numberline {4.5.10}Descubrir contenido (\texttt {/discover})}{60}{subsection.4.5.10}%
-\contentsline {subsection}{\numberline {4.5.11}Gestión de listas (\texttt {/lists})}{61}{subsection.4.5.11}%
-\contentsline {subsection}{\numberline {4.5.12}Películas y Series (\texttt {/movies}, \texttt {/series})}{63}{subsection.4.5.12}%
-\contentsline {subsection}{\numberline {4.5.13}Ficha de personas (\texttt {/details/person/[id]})}{64}{subsection.4.5.13}%
-\contentsline {subsection}{\numberline {4.5.14}Barra de navegación (Navbar)}{65}{subsection.4.5.14}%
-\contentsline {subsection}{\numberline {4.5.15}Patrones de optimización y rendimiento}{66}{subsection.4.5.15}%
-\contentsline {section}{\numberline {4.6}Diseño de la interfaz}{67}{section.4.6}%
-\contentsline {subsection}{\numberline {4.6.1}Sistema de diseño global}{67}{subsection.4.6.1}%
-\contentsline {subsection}{\numberline {4.6.2}Componentes de Next.js utilizados}{68}{subsection.4.6.2}%
-\contentsline {subsection}{\numberline {4.6.3}Componentes propios: Navbar}{68}{subsection.4.6.3}%
-\contentsline {subsection}{\numberline {4.6.4}Componente propio: LiquidButton}{69}{subsection.4.6.4}%
-\contentsline {subsection}{\numberline {4.6.5}Componente propio: StarRating}{70}{subsection.4.6.5}%
-\contentsline {subsection}{\numberline {4.6.6}Componente propio: DetailsSectionMenu}{71}{subsection.4.6.6}%
-\contentsline {subsection}{\numberline {4.6.7}Componente propio: EpisodeRatingsGrid}{72}{subsection.4.6.7}%
-\contentsline {subsection}{\numberline {4.6.8}Componente propio: ScoreboardBar}{73}{subsection.4.6.8}%
-\contentsline {subsection}{\numberline {4.6.9}Componentes propios: control de visionado en Trakt}{73}{subsection.4.6.9}%
-\contentsline {subsection}{\numberline {4.6.10}Componentes propios: modales de apoyo en DetailsClient}{74}{subsection.4.6.10}%
-\contentsline {subsection}{\numberline {4.6.11}Sistema de animaciones con Framer Motion}{75}{subsection.4.6.11}%
-\contentsline {subsection}{\numberline {4.6.12}Sistema de estilos global (\texttt {globals.css})}{76}{subsection.4.6.12}%
-\contentsline {subsection}{\numberline {4.6.13}Sistema de tres vistas (Grid, List, Compact)}{76}{subsection.4.6.13}%
-\contentsline {section}{\numberline {4.7}Rendimiento en producción}{77}{section.4.7}%
-\contentsline {section}{\numberline {4.8}Sistema de caché multinivel}{79}{section.4.8}%
-\contentsline {subsection}{\numberline {4.8.1}Nivel 1: Incremental Static Regeneration (ISR)}{79}{subsection.4.8.1}%
-\contentsline {subsection}{\numberline {4.8.2}Nivel 2: Caché en memoria del proceso Node.js}{79}{subsection.4.8.2}%
-\contentsline {subsection}{\numberline {4.8.3}Nivel 3: Deduplicación de peticiones concurrentes}{79}{subsection.4.8.3}%
-\contentsline {subsection}{\numberline {4.8.4}Nivel 4: Caché en el navegador (sessionStorage)}{80}{subsection.4.8.4}%
-\contentsline {section}{\numberline {4.9}Middleware y optimización SEO}{80}{section.4.9}%
-\contentsline {subsection}{\numberline {4.9.1}Detección de bots y reescritura de rutas}{80}{subsection.4.9.1}%
-\contentsline {subsection}{\numberline {4.9.2}Generación de HTML optimizado para compartir}{80}{subsection.4.9.2}%
-\contentsline {subsection}{\numberline {4.9.3}Metadatos globales y por página}{81}{subsection.4.9.3}%
-\contentsline {subsection}{\numberline {4.9.4}Resumen de la arquitectura dual de rutas}{81}{subsection.4.9.4}%
-\contentsline {section}{\numberline {4.10}Sistema de artwork personalizado}{82}{section.4.10}%
-\contentsline {subsection}{\numberline {4.10.1}Arquitectura del sistema}{82}{subsection.4.10.1}%
-\contentsline {subsection}{\numberline {4.10.2}Integración con componentes}{83}{subsection.4.10.2}%
-\contentsline {section}{\numberline {4.11}Manejo de errores y estados de carga}{83}{section.4.11}%
-\contentsline {subsection}{\numberline {4.11.1}Estrategia de \textit {graceful degradation}}{83}{subsection.4.11.1}%
-\contentsline {subsection}{\numberline {4.11.2}Skeleton loaders}{83}{subsection.4.11.2}%
-\contentsline {subsection}{\numberline {4.11.3}Mensajes de error contextuales}{84}{subsection.4.11.3}%
-\contentsline {subsection}{\numberline {4.11.4}Estados vacíos}{84}{subsection.4.11.4}%
-\contentsline {section}{\numberline {4.12}Diseño responsive y adaptación móvil}{84}{section.4.12}%
-\contentsline {subsection}{\numberline {4.12.1}Patrones de layout adaptativos}{85}{subsection.4.12.1}%
-\contentsline {subsection}{\numberline {4.12.2}Detección de viewport y hooks personalizados}{85}{subsection.4.12.2}%
-\contentsline {chapter}{\numberline {5}Conclusiones}{87}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Logros alcanzados}{88}{section.5.1}%
-\contentsline {section}{\numberline {5.2}Discusión}{89}{section.5.2}%
-\contentsline {section}{\numberline {5.3}Análisis de riesgos y estrategias de mitigación}{89}{section.5.3}%
-\contentsline {subsection}{\numberline {5.3.1}Dependencia de servicios externos}{90}{subsection.5.3.1}%
-\contentsline {subsection}{\numberline {5.3.2}Gestión de autenticación y tokens de acceso}{90}{subsection.5.3.2}%
-\contentsline {subsection}{\numberline {5.3.3}Cumplimiento legal y protección de datos}{91}{subsection.5.3.3}%
-\contentsline {subsection}{\numberline {5.3.4}Escalabilidad y límites de uso}{91}{subsection.5.3.4}%
-\contentsline {subsection}{\numberline {5.3.5}Viabilidad de adopción y propuesta de valor}{92}{subsection.5.3.5}%
-\contentsline {subsection}{\numberline {5.3.6}Evaluación del riesgo residual}{92}{subsection.5.3.6}%
-\contentsline {section}{\numberline {5.4}Líneas futuras}{93}{section.5.4}%
-\contentsline {chapter}{\hbox to\@tempdima {\hfil }Referencias}{95}{section.5.4}%
-\contentsline {chapter}{\hbox to\@tempdima {\hfil }Glosario}{97}{chapter*.55}%
-\contentsline {chapter}{\hbox to\@tempdima {\hfil }Anexo}{98}{chapter*.56}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Resumen}{2}{chapter*.1}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Abstract}{3}{chapter*.1}%
+\contentsline {chapter}{\numberline {1}Introducción}{4}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Justificación y contexto}{4}{section.1.1}%
+\contentsline {subsection}{\numberline {1.1.1}Motivación}{4}{subsection.1.1.1}%
+\contentsline {section}{\numberline {1.2}Planteamiento del problema}{5}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Objetivos del trabajo}{6}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Modelo de negocio}{7}{section.1.4}%
+\contentsline {subsection}{\numberline {1.4.1}Viabilidad real y dependencia de APIs}{7}{subsection.1.4.1}%
+\contentsline {subsection}{\numberline {1.4.2}Limitaciones por proveedor (coste y condiciones)}{7}{subsection.1.4.2}%
+\contentsline {subsection}{\numberline {1.4.3}Modelos de ingreso viables}{8}{subsection.1.4.3}%
+\contentsline {subsection}{\numberline {1.4.4}Conclusión de viabilidad}{8}{subsection.1.4.4}%
+\contentsline {chapter}{\numberline {2}Estado de la cuestión}{9}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Marco teórico del trabajo}{9}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Las plataformas de streaming y sus consecuencias para el usuario}{9}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}Autenticación y APIs REST}{10}{subsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.1.3}Rendimiento web}{11}{subsection.2.1.3}%
+\contentsline {subsection}{\numberline {2.1.4}Diseño de interfaz}{12}{subsection.2.1.4}%
+\contentsline {section}{\numberline {2.2}Trabajos relacionados}{12}{section.2.2}%
+\contentsline {chapter}{\numberline {3}Aspectos metodológicos}{16}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Metodología}{16}{section.3.1}%
+\contentsline {subsection}{\numberline {3.1.1}Criterios de integración de APIs}{16}{subsection.3.1.1}%
+\contentsline {subsection}{\numberline {3.1.2}Criterios de decisión para la autenticación}{17}{subsection.3.1.2}%
+\contentsline {subsection}{\numberline {3.1.3}Estrategia de caché}{17}{subsection.3.1.3}%
+\contentsline {section}{\numberline {3.2}Tecnologías empleadas}{19}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Gestión del desarrollo y control de versiones}{19}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Flujo de trabajo con GitHub}{19}{subsection.3.3.1}%
+\contentsline {section}{\numberline {3.4}Proceso de despliegue en producción}{20}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Fase inicial: plataforma Vercel}{20}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {3.4.2}Proceso de deployment en Vercel}{20}{subsection.3.4.2}%
+\contentsline {subsection}{\numberline {3.4.3}Despliegue actual: servidor NAS propio}{21}{subsection.3.4.3}%
+\contentsline {subsection}{\numberline {3.4.4}GitHub Actions}{21}{subsection.3.4.4}%
+\contentsline {chapter}{\numberline {4}Desarrollo del trabajo}{22}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Arquitectura del sistema}{22}{section.4.1}%
+\contentsline {subsection}{\numberline {4.1.1}Estructura de capas}{22}{subsection.4.1.1}%
+\contentsline {subsection}{\numberline {4.1.2}Estructura de carpetas}{23}{subsection.4.1.2}%
+\contentsline {section}{\numberline {4.2}Implementación del sistema de autenticación OAuth 2.0}{24}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Integración con las APIs externas}{25}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}The Movie Database (TMDb) API v3}{25}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.3.2}OMDb API (Open Movie Database)}{26}{subsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.3.3}Proxy de Trakt y transformación de datos}{26}{subsection.4.3.3}%
+\contentsline {subsection}{\numberline {4.3.4}JustWatch (API GraphQL no oficial)}{28}{subsection.4.3.4}%
+\contentsline {subsection}{\numberline {4.3.5}Plex Media Server}{28}{subsection.4.3.5}%
+\contentsline {section}{\numberline {4.4}Arquitectura de API Routes propias}{29}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}Funciones principales de las API Routes}{29}{subsection.4.4.1}%
+\contentsline {subsection}{\numberline {4.4.2}Categorías funcionales de endpoints}{30}{subsection.4.4.2}%
+\contentsline {subsubsection}{\numberline {4.4.2.1}Autenticación y gestión de sesiones}{30}{subsubsection.4.4.2.1}%
+\contentsline {subsubsection}{\numberline {4.4.2.2}Datos de usuario y actividad}{30}{subsubsection.4.4.2.2}%
+\contentsline {subsubsection}{\numberline {4.4.2.3}Valoraciones y puntuaciones}{31}{subsubsection.4.4.2.3}%
+\contentsline {subsubsection}{\numberline {4.4.2.4}Proxy y caché de datos externos}{31}{subsubsection.4.4.2.4}%
+\contentsline {subsubsection}{\numberline {4.4.2.5}Integración con Plex Media Server}{31}{subsubsection.4.4.2.5}%
+\contentsline {subsubsection}{\numberline {4.4.2.6}Enlaces externos y descubrimiento}{32}{subsubsection.4.4.2.6}%
+\contentsline {subsubsection}{\numberline {4.4.2.7}Listas y colecciones}{32}{subsubsection.4.4.2.7}%
+\contentsline {subsection}{\numberline {4.4.3}Patrones técnicos}{33}{subsection.4.4.3}%
+\contentsline {section}{\numberline {4.5}Implementación de los módulos funcionales}{34}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Dashboard principal (\texttt {/})}{34}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}Página de detalles (\texttt {/details/[type]/[id]})}{36}{subsection.4.5.2}%
+\contentsline {subsubsection}{\numberline {4.5.2.1}Arquitectura de datos}{36}{subsubsection.4.5.2.1}%
+\contentsline {subsubsection}{\numberline {4.5.2.2}Menú de navegación por secciones}{37}{subsubsection.4.5.2.2}%
+\contentsline {subsubsection}{\numberline {4.5.2.3}Sistema de puntuaciones}{37}{subsubsection.4.5.2.3}%
+\contentsline {subsubsection}{\numberline {4.5.2.4}Botones de acción}{38}{subsubsection.4.5.2.4}%
+\contentsline {subsubsection}{\numberline {4.5.2.5}Gestión avanzada de episodios para series}{39}{subsubsection.4.5.2.5}%
+\contentsline {subsubsection}{\numberline {4.5.2.6}Enlaces externos y plataformas de streaming}{42}{subsubsection.4.5.2.6}%
+\contentsline {subsubsection}{\numberline {4.5.2.7}Imágenes y posters}{43}{subsubsection.4.5.2.7}%
+\contentsline {subsubsection}{\numberline {4.5.2.8}Trailers y vídeos}{44}{subsubsection.4.5.2.8}%
+\contentsline {subsubsection}{\numberline {4.5.2.9}Colección}{45}{subsubsection.4.5.2.9}%
+\contentsline {subsubsection}{\numberline {4.5.2.10}Sección de reparto y ficha de personas}{45}{subsubsection.4.5.2.10}%
+\contentsline {subsubsection}{\numberline {4.5.2.11}Comentarios, análisis de sentimientos y listas de Trakt}{46}{subsubsection.4.5.2.11}%
+\contentsline {subsubsection}{\numberline {4.5.2.12}Recomendaciones y contenido similar}{48}{subsubsection.4.5.2.12}%
+\contentsline {subsection}{\numberline {4.5.3}Favoritos (\texttt {/favorites})}{48}{subsection.4.5.3}%
+\contentsline {subsection}{\numberline {4.5.4}Pendientes (\texttt {/watchlist})}{51}{subsection.4.5.4}%
+\contentsline {subsection}{\numberline {4.5.5}Historial de visionado (\texttt {/history})}{52}{subsection.4.5.5}%
+\contentsline {subsection}{\numberline {4.5.6}En Progreso (\texttt {/in-progress})}{53}{subsection.4.5.6}%
+\contentsline {subsection}{\numberline {4.5.7}Estadísticas del usuario (\texttt {/stats})}{54}{subsection.4.5.7}%
+\contentsline {subsection}{\numberline {4.5.8}Calendario de estrenos (\texttt {/calendar})}{54}{subsection.4.5.8}%
+\contentsline {subsection}{\numberline {4.5.9}Biblioteca Personal (\texttt {/biblioteca})}{56}{subsection.4.5.9}%
+\contentsline {subsection}{\numberline {4.5.10}Descubrir contenido (\texttt {/discover})}{57}{subsection.4.5.10}%
+\contentsline {subsection}{\numberline {4.5.11}Gestión de listas (\texttt {/lists})}{58}{subsection.4.5.11}%
+\contentsline {subsection}{\numberline {4.5.12}Películas y Series (\texttt {/movies}, \texttt {/series})}{60}{subsection.4.5.12}%
+\contentsline {subsection}{\numberline {4.5.13}Ficha de personas (\texttt {/details/person/[id]})}{61}{subsection.4.5.13}%
+\contentsline {subsection}{\numberline {4.5.14}Barra de navegación (Navbar)}{62}{subsection.4.5.14}%
+\contentsline {subsection}{\numberline {4.5.15}Patrones de optimización y rendimiento}{63}{subsection.4.5.15}%
+\contentsline {section}{\numberline {4.6}Diseño de la interfaz}{64}{section.4.6}%
+\contentsline {subsection}{\numberline {4.6.1}Sistema de diseño global}{64}{subsection.4.6.1}%
+\contentsline {subsection}{\numberline {4.6.2}Componentes de Next.js utilizados}{65}{subsection.4.6.2}%
+\contentsline {subsection}{\numberline {4.6.3}Componentes propios: Navbar}{65}{subsection.4.6.3}%
+\contentsline {subsection}{\numberline {4.6.4}Componente propio: LiquidButton}{66}{subsection.4.6.4}%
+\contentsline {subsection}{\numberline {4.6.5}Componente propio: StarRating}{67}{subsection.4.6.5}%
+\contentsline {subsection}{\numberline {4.6.6}Componente propio: DetailsSectionMenu}{68}{subsection.4.6.6}%
+\contentsline {subsection}{\numberline {4.6.7}Componente propio: EpisodeRatingsGrid}{69}{subsection.4.6.7}%
+\contentsline {subsection}{\numberline {4.6.8}Componente propio: ScoreboardBar}{70}{subsection.4.6.8}%
+\contentsline {subsection}{\numberline {4.6.9}Componentes propios: control de visionado en Trakt}{70}{subsection.4.6.9}%
+\contentsline {subsection}{\numberline {4.6.10}Componentes propios: modales de apoyo en DetailsClient}{71}{subsection.4.6.10}%
+\contentsline {subsection}{\numberline {4.6.11}Sistema de animaciones con Framer Motion}{72}{subsection.4.6.11}%
+\contentsline {subsection}{\numberline {4.6.12}Sistema de estilos global (\texttt {globals.css})}{73}{subsection.4.6.12}%
+\contentsline {subsection}{\numberline {4.6.13}Sistema de tres vistas (Grid, List, Compact)}{73}{subsection.4.6.13}%
+\contentsline {section}{\numberline {4.7}Rendimiento en producción}{74}{section.4.7}%
+\contentsline {section}{\numberline {4.8}Sistema de caché multinivel}{76}{section.4.8}%
+\contentsline {subsection}{\numberline {4.8.1}Nivel 1: Incremental Static Regeneration (ISR)}{76}{subsection.4.8.1}%
+\contentsline {subsection}{\numberline {4.8.2}Nivel 2: Caché en memoria del proceso Node.js}{76}{subsection.4.8.2}%
+\contentsline {subsection}{\numberline {4.8.3}Nivel 3: Deduplicación de peticiones concurrentes}{76}{subsection.4.8.3}%
+\contentsline {subsection}{\numberline {4.8.4}Nivel 4: Caché en el navegador (sessionStorage)}{77}{subsection.4.8.4}%
+\contentsline {section}{\numberline {4.9}Middleware y optimización SEO}{77}{section.4.9}%
+\contentsline {subsection}{\numberline {4.9.1}Detección de bots y reescritura de rutas}{77}{subsection.4.9.1}%
+\contentsline {subsection}{\numberline {4.9.2}Generación de HTML optimizado para compartir}{77}{subsection.4.9.2}%
+\contentsline {subsection}{\numberline {4.9.3}Metadatos globales y por página}{78}{subsection.4.9.3}%
+\contentsline {subsection}{\numberline {4.9.4}Resumen de la arquitectura dual de rutas}{78}{subsection.4.9.4}%
+\contentsline {section}{\numberline {4.10}Sistema de artwork personalizado}{79}{section.4.10}%
+\contentsline {subsection}{\numberline {4.10.1}Arquitectura del sistema}{79}{subsection.4.10.1}%
+\contentsline {subsection}{\numberline {4.10.2}Integración con componentes}{80}{subsection.4.10.2}%
+\contentsline {section}{\numberline {4.11}Manejo de errores y estados de carga}{80}{section.4.11}%
+\contentsline {subsection}{\numberline {4.11.1}Estrategia de \textit {graceful degradation}}{80}{subsection.4.11.1}%
+\contentsline {subsection}{\numberline {4.11.2}Skeleton loaders}{80}{subsection.4.11.2}%
+\contentsline {subsection}{\numberline {4.11.3}Mensajes de error contextuales}{81}{subsection.4.11.3}%
+\contentsline {subsection}{\numberline {4.11.4}Estados vacíos}{81}{subsection.4.11.4}%
+\contentsline {section}{\numberline {4.12}Diseño responsive y adaptación móvil}{81}{section.4.12}%
+\contentsline {subsection}{\numberline {4.12.1}Patrones de layout adaptativos}{82}{subsection.4.12.1}%
+\contentsline {subsection}{\numberline {4.12.2}Detección de viewport y hooks personalizados}{82}{subsection.4.12.2}%
+\contentsline {chapter}{\numberline {5}Conclusiones}{84}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Logros alcanzados}{85}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Discusión}{86}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Análisis de riesgos y estrategias de mitigación}{86}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}Dependencia de servicios externos}{87}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}Gestión de autenticación y tokens de acceso}{87}{subsection.5.3.2}%
+\contentsline {subsection}{\numberline {5.3.3}Cumplimiento legal y protección de datos}{88}{subsection.5.3.3}%
+\contentsline {subsection}{\numberline {5.3.4}Escalabilidad y límites de uso}{88}{subsection.5.3.4}%
+\contentsline {subsection}{\numberline {5.3.5}Viabilidad de adopción y propuesta de valor}{89}{subsection.5.3.5}%
+\contentsline {subsection}{\numberline {5.3.6}Evaluación del riesgo residual}{89}{subsection.5.3.6}%
+\contentsline {section}{\numberline {5.4}Líneas futuras}{90}{section.5.4}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Referencias}{92}{section.5.4}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Glosario}{94}{chapter*.55}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Anexo}{95}{chapter*.56}%

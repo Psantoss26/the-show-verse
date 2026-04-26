@@ -31,11 +31,11 @@ El presente Trabajo de Fin de Grado ha sido realizado íntegramente por el alumn
 
 # RESUMEN EJECUTIVO
 
-**The Show Verse** es una aplicación web full-stack orientada a la gestión y el descubrimiento personalizado de contenido audiovisual (películas y series). La plataforma permite a los usuarios llevar un seguimiento exhaustivo de lo que han visto, lo que tienen pendiente y sus favoritos, sincronizando toda la información de forma bidireccional con la plataforma Trakt.tv mediante OAuth 2.0.
+**The Show Verse** es una aplicación web full-stack orientada a la gestión y el descubrimiento personalizado de contenido audiovisual (películas y series). La plataforma permite a los usuarios llevar un seguimiento exhaustivo de lo que han visto, lo que tienen pendiente y sus favoritos, sincronizando toda la información de forma bidireccional con la plataforma Trakt.tv mediante OAuth 2.0 [8].
 
-El proyecto está desarrollado con **Next.js 16** y **React 19**, utilizando el paradigma de **App Router** y **Server-Side Rendering (SSR)** para maximizar el rendimiento y el SEO. La interfaz implementa un diseño premium de tipo *glassmorphism* con animaciones fluidas mediante **Framer Motion**, y la capa de estilos se construye sobre **Tailwind CSS 4**.
+El proyecto está desarrollado con **Next.js 16** [1] y **React 19** [2], utilizando el paradigma de **App Router** y **Server-Side Rendering (SSR)** para maximizar el rendimiento y el SEO. La interfaz implementa un diseño premium de tipo *glassmorphism* con animaciones fluidas mediante **Framer Motion** [7], y la capa de estilos se construye sobre **Tailwind CSS 4** [6].
 
-La aplicación integra tres APIs externas: **The Movie Database (TMDb)** para obtener metadatos de películas, series y personas; **Trakt.tv** para la autenticación, el historial y la gestión de listas; y **OMDb** para enriquecer los datos con ratings complementarios de IMDb y Rotten Tomatoes.
+La aplicación integra tres APIs externas: **The Movie Database (TMDb)** [3] para obtener metadatos de películas, series y personas; **Trakt.tv** [4] para la autenticación, el historial y la gestión de listas; y **OMDb** [5] para enriquecer los datos con ratings complementarios de IMDb y Rotten Tomatoes.
 
 **Palabras clave:** Next.js, React, SSR, API REST, OAuth 2.0, TMDb, Trakt.tv, Tailwind CSS, Framer Motion, aplicación web, contenido audiovisual, gestión de media.
 
@@ -43,11 +43,11 @@ La aplicación integra tres APIs externas: **The Movie Database (TMDb)** para ob
 
 # ABSTRACT
 
-**The Show Verse** is a full-stack web application focused on the personalised management and discovery of audiovisual content (movies and TV shows). The platform enables users to keep an exhaustive log of what they have watched, their pending items and their favourites, synchronising all data bidirectionally with the Trakt.tv platform via OAuth 2.0.
+**The Show Verse** is a full-stack web application focused on the personalised management and discovery of audiovisual content (movies and TV shows). The platform enables users to keep an exhaustive log of what they have watched, their pending items and their favourites, synchronising all data bidirectionally with the Trakt.tv platform via OAuth 2.0 [8].
 
-The project is built with **Next.js 16** and **React 19**, leveraging the **App Router** paradigm and **Server-Side Rendering (SSR)** to maximise performance and SEO. The interface implements a premium glassmorphism design with smooth animations powered by **Framer Motion**, and the styling layer is built on **Tailwind CSS 4**.
+The project is built with **Next.js 16** [1] and **React 19** [2], leveraging the **App Router** paradigm and **Server-Side Rendering (SSR)** to maximise performance and SEO. The interface implements a premium glassmorphism design with smooth animations powered by **Framer Motion** [7], and the styling layer is built on **Tailwind CSS 4** [6].
 
-The application integrates three external APIs: **The Movie Database (TMDb)** for movie, series and person metadata; **Trakt.tv** for authentication, history and list management; and **OMDb** for supplementary ratings from IMDb and Rotten Tomatoes.
+The application integrates three external APIs: **The Movie Database (TMDb)** [3] for movie, series and person metadata; **Trakt.tv** [4] for authentication, history and list management; and **OMDb** [5] for supplementary ratings from IMDb and Rotten Tomatoes.
 
 **Keywords:** Next.js, React, SSR, REST API, OAuth 2.0, TMDb, Trakt.tv, Tailwind CSS, Framer Motion, web application, audiovisual content, media tracking.
 
@@ -135,36 +135,36 @@ El proyecto abarca de forma transversal las competencias del Grado en Ingenierí
 
 ## 2.1 Objetivo General
 
-Desarrollar una aplicación web completa, moderna y de calidad profesional para la gestión y el descubrimiento de contenido audiovisual, integrando múltiples fuentes de datos externas y ofreciendo una experiencia de usuario premium con sincronización en tiempo real con la plataforma Trakt.tv.
+Desarrollar una aplicación web completa, moderna y de calidad profesional para la gestión y el descubrimiento de contenido audiovisual, integrando múltiples fuentes de datos externas y ofreciendo una experiencia de usuario premium con sincronización en tiempo real con la plataforma Trakt.tv [4].
 
 ## 2.2 Objetivos Específicos
 
 **Objetivos Funcionales:**
 
-1. Implementar un sistema de autenticación OAuth 2.0 completo con Trakt.tv, incluyendo refresco automático de tokens y gestión segura de sesiones mediante cookies httpOnly.
-2. Integrar la API de TMDb para obtener metadatos completos de películas, series, temporadas, episodios y personas (actores, directores).
+1. Implementar un sistema de autenticación OAuth 2.0 [8] completo con Trakt.tv [4], incluyendo refresco automático de tokens y gestión segura de sesiones mediante cookies httpOnly.
+2. Integrar la API de TMDb [3] para obtener metadatos completos de películas, series, temporadas, episodios y personas (actores, directores).
 3. Desarrollar un dashboard dinámico con más de 10 secciones de contenido curado, incluyendo carruseles animados y un hero rotatorio.
 4. Implementar un módulo completo de gestión de favoritos, watchlist e historial de visionado sincronizado con Trakt.
 5. Crear un sistema de seguimiento de episodios y temporadas con progreso por serie.
 6. Desarrollar un explorador de contenido con búsqueda avanzada y filtros múltiples.
-7. Implementar un calendario de estrenos integrado con los datos de Trakt.
+7. Implementar un calendario de estrenos integrado con los datos de Trakt [4].
 8. Construir páginas de detalle completas para películas, series y actores.
 9. Ofrecer múltiples vistas (Grid, List, Compact) con transiciones animadas.
 10. Proporcionar estadísticas detalladas del historial del usuario.
 
 **Objetivos Técnicos:**
 
-1. Utilizar **Next.js 16** con **App Router** y **Server-Side Rendering** para garantizar el rendimiento y el SEO.
+1. Utilizar **Next.js 16** [1] con **App Router** y **Server-Side Rendering** para garantizar el rendimiento y el SEO.
 2. Alcanzar métricas de rendimiento excelentes: Performance > 90, SEO = 100 en Lighthouse.
 3. Garantizar un diseño completamente responsivo para móvil, tableta y escritorio.
-4. Implementar caché inteligente en el servidor (ISR) para reducir las llamadas a las APIs externas.
-5. Desarrollar un middleware de Next.js para el reenvío de bots de redes sociales.
+4. Implementar caché inteligente en el servidor (ISR) [1] para reducir las llamadas a las APIs externas.
+5. Desarrollar un middleware de Next.js [1] para el reenvío de bots de redes sociales.
 6. Publicar la aplicación en producción mediante Vercel con CI/CD automático.
 
 **Objetivos de Diseño:**
 
 1. Implementar un diseño visual premium con estética *glassmorphism* y paleta oscura.
-2. Lograr una experiencia de usuario fluida mediante animaciones con **Framer Motion**.
+2. Lograr una experiencia de usuario fluida mediante animaciones con **Framer Motion** [7].
 3. Asegurar la accesibilidad básica y los atajos de teclado.
 
 ---
@@ -210,17 +210,17 @@ Frente a los competidores analizados, **The Show Verse** ocupa un nicho diferenc
 
 ### 3.3.1 Next.js y el App Router
 
-**Next.js** se ha consolidado como el framework de referencia para el desarrollo de aplicaciones React en producción. La versión 13+ introdujo el **App Router**, un paradigma basado en React Server Components que permite renderizar componentes directamente en el servidor, reduciendo el JavaScript enviado al cliente y mejorando el rendimiento inicial (LCP, FCP).
+**Next.js** [1] se ha consolidado como el framework de referencia para el desarrollo de aplicaciones React [2] en producción. La versión 13+ introdujo el **App Router**, un paradigma basado en React Server Components [2] que permite renderizar componentes directamente en el servidor, reduciendo el JavaScript enviado al cliente y mejorando el rendimiento inicial (LCP, FCP).
 
 En este proyecto se utiliza Next.js 16 con App Router como base arquitectónica.
 
 ### 3.3.2 Server-Side Rendering e ISR
 
-El **SSR** (Server-Side Rendering) genera el HTML en el servidor en cada petición, garantizando contenido siempre actualizado y un SEO óptimo. El **ISR** (Incremental Static Regeneration) combina las ventajas del renderizado estático con la capacidad de regenerar páginas individuales sin necesidad de reconstruir toda la aplicación. En el proyecto se utiliza ISR con una ventana de revalidación de 10 minutos para los endpoints de catálogo de TMDb.
+El **SSR** (Server-Side Rendering) [1] genera el HTML en el servidor en cada petición, garantizando contenido siempre actualizado y un SEO óptimo. El **ISR** (Incremental Static Regeneration) [1] combina las ventajas del renderizado estático con la capacidad de regenerar páginas individuales sin necesidad de reconstruir toda la aplicación. En el proyecto se utiliza ISR con una ventana de revalidación de 10 minutos para los endpoints de catálogo de TMDb [3].
 
 ### 3.3.3 OAuth 2.0
 
-**OAuth 2.0** es el protocolo estándar de autorización más extendido. Permite a una aplicación acceder a recursos de terceros en nombre del usuario sin necesidad de conocer sus credenciales. En el proyecto se implementa el flujo **Authorization Code** con Trakt.tv, incluyendo el refresco automático de tokens expirados.
+**OAuth 2.0** [8] es el protocolo estándar de autorización más extendido. Permite a una aplicación acceder a recursos de terceros en nombre del usuario sin necesidad de conocer sus credenciales. En el proyecto se implementa el flujo **Authorization Code** [8] con Trakt.tv [4], incluyendo el refresco automático de tokens expirados.
 
 ---
 
@@ -228,7 +228,7 @@ El **SSR** (Server-Side Rendering) genera el HTML en el servidor en cada petici�
 
 ## 4.1 Metodología de Desarrollo
 
-El proyecto se ha desarrollado siguiendo una metodología **ágil adaptada** a un desarrollo individual, con las siguientes características:
+El proyecto se ha desarrollado siguiendo una metodología **ágil adaptada** [13] a un desarrollo individual, con las siguientes características:
 
 - **Iteraciones semanales:** cada semana se planifica un conjunto de funcionalidades a implementar.
 - **Backlog priorizado:** las funcionalidades se priorizan según su impacto en el usuario y su dependencia técnica.

@@ -15,9 +15,9 @@ El proceso de desarrollo se realiza en iteraciones de aproximadamente una semana
 La selección de las APIs externas ha seguido los siguientes criterios:
 
 \begin{itemize}
-\item TMDb fue seleccionada frente a otras alternativas por ofrecer la mayor cobertura de contenido, soporte en diferentes idiomas, galería de imágenes y datos de \textit{streaming}, además de disponer de la documentación más completa y una comunidad de desarrolladores activa.
-\item Trakt.tv fue seleccionada como plataforma de sincronización por su API pública v2 bien documentada, su soporte completo de series a nivel de episodio y por ser la plataforma de \textit{tracking} más referenciada por la comunidad de desarrolladores independientes.
-\item OMDb fue seleccionada únicamente para los datos de \textit{rating} de IMDb y Rotten Tomatoes, que TMDb no proporciona directamente.
+\item TMDb fue seleccionada frente a otras alternativas por ofrecer la mayor cobertura de contenido, soporte en diferentes idiomas, galería de imágenes y datos de \textit{streaming}, además de disponer de la documentación más completa y una comunidad de desarrolladores activa \parencite{TMDb:2024}.
+\item Trakt.tv fue seleccionada como plataforma de sincronización por su API pública v2 bien documentada, su soporte completo de series a nivel de episodio y por ser la plataforma de \textit{tracking} más referenciada por la comunidad de desarrolladores independientes \parencite{Trakt:2024}.
+\item OMDb fue seleccionada únicamente para los datos de \textit{rating} de IMDb y Rotten Tomatoes, que TMDb no proporciona directamente \parencite{OMDb:2024}.
 \end{itemize}
 
 \subsection{Criterios de decisión para la autenticación}
@@ -30,11 +30,11 @@ El problema de la autenticación OAuth 2.0 admitía varias opciones de implement
 \item La implementación propia ofrece mayor control sobre el manejo de errores y el almacenamiento de tokens.
 \end{itemize}
 
-Se optó por implementar el flujo Authorization Code de forma manual mediante \textbf{API Routes de Next.js}, almacenando los tokens en cookies \texttt{httpOnly} con atributos \texttt{Secure} y \texttt{SameSite=Lax}. Esta decisión garantiza que los tokens no sean accesibles desde JavaScript del navegador (protección frente a XSS) y que no se envíen en peticiones \textit{cross-site} no intencionadas (protección parcial frente a CSRF).
+Se optó por implementar el flujo Authorization Code de forma manual mediante \textbf{API Routes de Next.js}, almacenando los tokens en cookies \texttt{httpOnly} con atributos \texttt{Secure} y \texttt{SameSite=Lax} \parencite{NextJS:2024,OWASP:2021}. Esta decisión garantiza que los tokens no sean accesibles desde JavaScript del navegador (protección frente a XSS) y que no se envíen en peticiones \textit{cross-site} no intencionadas (protección parcial frente a CSRF).
 
 \subsection{Estrategia de caché}
 
-Para cada tipo de dato gestionado en la aplicación se ha definido una estrategia de caché en función de la frecuencia de actualización del dato en origen y su importancia para la experiencia de usuario.
+Para cada tipo de dato gestionado en la aplicación se ha definido una estrategia de caché en función de la frecuencia de actualización del dato en origen y su importancia para la experiencia de usuario. En el caso de las consultas a OMDb en el proxy servidor, las respuestas exitosas se guardan durante 24 horas y se reutilizan en solicitudes posteriores, mientras que los errores temporales se almacenan solo 60 segundos para evitar insistir de forma inmediata y permitir un nuevo intento poco después.
 
 \begin{table}[!htbp]
 \begin{center}
@@ -65,9 +65,9 @@ Estado personal del usuario & No-cache & En cada petición \\
 \end{center}
 \end{table}
 
-Esta diferenciación permite reducir el número de llamadas a APIs externas en un estimado del 70--80\% para los datos de catálogo, mientras se garantiza la actualización inmediata de los datos de usuario que requieren frescura absoluta.
+Esta diferenciación permite reducir el número de llamadas a APIs externas en un estimado del 70--80\% para los datos de catálogo, mientras se garantiza la actualización inmediata de los datos de usuario que requieren frescura absoluta \parencite{MDN:2024a,Vercel:2024c}.
 
-\textbf{Caché en múltiples niveles:} el sistema implementa cuatro niveles de caché complementarios:
+\textbf{Caché en múltiples niveles:} el sistema implementa cuatro niveles de caché complementarios \parencite{MDN:2024a}:
 
 \begin{enumerate}
 \item \textbf{ISR (Incremental Static Regeneration):} páginas estáticas regeneradas periódicamente en servidor, con servicio desde caché entre regeneraciones.
@@ -84,13 +84,13 @@ Esta diferenciación permite reducir el número de llamadas a APIs externas en u
 
 \section{Tecnologías empleadas}
 
-\textbf{Next.js 16 (Framework principal).} Seleccionado frente a otras alternativas (Remix, SvelteKit, Nuxt 3) por ser el framework React con mayor adopción industrial (>40\% de cuota entre frameworks React según npm trends 2024), la mejor integración con Vercel y la documentación más extensa. El App Router de Next.js 13+ es la única opción que implementa React Server Components de forma estable y con soporte oficial.
+\textbf{Next.js 16 (Framework principal).} Seleccionado frente a otras alternativas (Remix, SvelteKit, Nuxt 3) por ser el framework React con mayor adopción industrial (>40\% de cuota entre frameworks React según npm trends 2024), la mejor integración con Vercel y la documentación más extensa \parencite{Wieruch:2023}. El App Router de Next.js 13+ es la única opción que implementa React Server Components de forma estable y con soporte oficial \parencite{Vercel:2024a,Meta:2024}.
 
-\textbf{React 19.} La elección de React como biblioteca de UI es consecuencia directa de la elección de Next.js. React 19 introduce mejoras en el manejo de acciones de servidor y la promesa nativa en componentes de cliente.
+\textbf{React 19.} La elección de React como biblioteca de UI es consecuencia directa de la elección de Next.js. React 19 introduce mejoras en el manejo de acciones de servidor y la promesa nativa en componentes de cliente \parencite{React:2024}.
 
-\textbf{Tailwind CSS 4.} Seleccionado frente a CSS Modules, Styled Components o Emotion por el paradigma \textit{utility-first} que acelera el desarrollo sin sacrificar la personalización. La versión 4, basada en PostCSS con motor Rust nativo, elimina el PurgeCSS separado e incorpora mejoras sustanciales de rendimiento en el tiempo de compilación.
+\textbf{Tailwind CSS 4.} Seleccionado frente a CSS Modules, Styled Components o Emotion por el paradigma \textit{utility-first} que acelera el desarrollo sin sacrificar la personalización. La versión 4, basada en PostCSS con motor Rust nativo, elimina el PurgeCSS separado e incorpora mejoras sustanciales de rendimiento en el tiempo de compilación \parencite{TailwindCSS:2024}.
 
-\textbf{Framer Motion 12.} La elección de Framer Motion frente a otras librerías de animación (React Spring, CSS Animations puras) se basa en su modelo declarativo basado en variantes, su soporte nativo para animaciones de \textit{layout} y su integración con el ciclo de vida de los componentes React mediante \texttt{AnimatePresence}.
+\textbf{Framer Motion 12.} La elección de Framer Motion frente a otras librerías de animación (React Spring, CSS Animations puras) se basa en su modelo declarativo basado en variantes, su soporte nativo para animaciones de \textit{layout} y su integración con el ciclo de vida de los componentes React mediante \texttt{AnimatePresence} \parencite{Framer:2024}.
 
 \section{Gestión del desarrollo y control de versiones}
 
@@ -110,10 +110,10 @@ El proyecto ha pasado por dos fases de despliegue a lo largo de su desarrollo. E
 
 \subsection{Fase inicial: plataforma Vercel}
 
-Durante las primeras fases del desarrollo la aplicación se desplegó en Vercel, una plataforma de hosting optimizada para Next.js. Las razones de esta selección inicial son:
+Durante las primeras fases del desarrollo la aplicación se desplegó en Vercel \parencite{Vercel:2024a,Vercel:2024d}, una plataforma de hosting optimizada para Next.js. Las razones de esta selección inicial son:
 
 \begin{itemize}
-\item \textbf{Integración nativa con Next.js:} Las características de Next.js como Image Optimization, ISR y Edge Functions se soportan de forma nativa sin configuración adicional.
+\item \textbf{Integración nativa con Next.js:} Las características de Next.js como Image Optimization, ISR \parencite{Vercel:2024c} y Edge Functions \parencite{Vercel:2024b} se soportan de forma nativa sin configuración adicional.
 \item \textbf{API serverless:} Las API Routes se auto-escalan sin gestionar servidores o contenedores.
 \item \textbf{Edge computing:} Los Edge Functions ejecutan código más cerca del usuario, reduciendo latencia para SPA middleware.
 \item \textbf{Deployments automáticos:} Cada pull request genera un URL único de vista previa con el código del branch.
@@ -127,7 +127,7 @@ El despliegue se ejecuta automáticamente cuando se hace merge a la rama \texttt
 
 \subsection{Despliegue actual: servidor NAS propio}
 
-La aplicación se despliega actualmente en un servidor propio bajo el dominio \texttt{theshowverse.com}, mediante tres componentes principales. La aplicación se empaqueta en un contenedor Docker construido con un \texttt{Dockerfile} multietapa que separa la fase de compilación de la de ejecución, reduciendo el tamaño final de la imagen. Las variables de entorno sensibles se inyectan en tiempo de ejecución mediante un archivo \texttt{.env} externo al repositorio. El acceso público se gestiona a través de Cloudflare Tunnel: un segundo contenedor ejecuta \textit{cloudflared}, que mantiene una conexión cifrada saliente hacia Cloudflare, enrutando el tráfico del dominio al puerto \texttt{3000} del servidor sin necesidad de exponer puertos en el router ni disponer de IP pública fija. Por último, existe una página de mantenimiento para cuando el servidor no está disponible mediante un Cloudflare Worker.
+La aplicación está desplegada actualmentese en un servidor propio bajo el dominio \texttt{theshowverse.com}, mediante tres componentes principales. La aplicación se empaqueta en un contenedor Docker \parencite{Docker:2024} construido con un \texttt{Dockerfile} multietapa que separa la fase de compilación de la de ejecución, reduciendo el tamaño final de la imagen. Las variables de entorno sensibles se inyectan en tiempo de ejecución mediante un archivo \texttt{.env} externo al repositorio. El acceso público se gestiona a través de Cloudflare Tunnel \parencite{Cloudflare:2024}: un segundo contenedor ejecuta \textit{cloudflared}, que mantiene una conexión cifrada saliente hacia Cloudflare, enrutando el tráfico del dominio al puerto \texttt{3000} del servidor sin necesidad de exponer puertos en el router ni disponer de IP pública fija. Por último, existe una página de mantenimiento para cuando el servidor no está disponible mediante un Cloudflare Worker.
 
 \subsection{GitHub Actions}
 
