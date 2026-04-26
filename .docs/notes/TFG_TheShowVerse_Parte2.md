@@ -144,11 +144,11 @@ Para optimizar el número de llamadas a las APIs externas, se implementa una est
 
 | Tecnología | Versión | Rol en el Proyecto |
 |---|---|---|
-| **Next.js** | 16.0.7 | Framework principal (SSR, ISR, App Router, API Routes) |
-| **React** | 19.2.1 | Biblioteca de componentes de UI |
+| **Next.js** | 16.0.7 | Framework principal (SSR, ISR, App Router, API Routes) [1] |
+| **React** | 19.2.1 | Biblioteca de componentes de UI [2] |
 | **TypeScript** | 5.x | Tipado estático (configuración tsconfig) |
-| **Tailwind CSS** | 4.0 | Sistema de estilos utility-first |
-| **Framer Motion** | 12.6.5 | Animaciones y transiciones |
+| **Tailwind CSS** | 4.0 | Sistema de estilos utility-first [6] |
+| **Framer Motion** | 12.6.5 | Animaciones y transiciones [7] |
 
 ## 7.2 Librerías Complementarias
 
@@ -168,13 +168,13 @@ Para optimizar el número de llamadas a las APIs externas, se implementa una est
 
 | API | Rol | Autenticación |
 |---|---|---|
-| **TMDb API v3** | Metadatos de películas, series y personas | API Key (query param) |
-| **Trakt.tv API v2** | Autenticación, historial, listas, sincronización | OAuth 2.0 + Bearer Token |
-| **OMDb API** | Ratings complementarios (IMDb, RT) | API Key (query param) |
+| **TMDb API v3** | Metadatos de películas, series y personas [3] | API Key (query param) |
+| **Trakt.tv API v2** | Autenticación, historial, listas, sincronización [4] | OAuth 2.0 [8] + Bearer Token |
+| **OMDb API** | Ratings complementarios (IMDb, RT) [5] | API Key (query param) |
 
 ## 7.4 Tipografía
 
-La aplicación utiliza la fuente **PT Sans** de Google Fonts, con pesos 400 (regular) y 700 (negrita). Se carga mediante el sistema nativo `next/font/google`, optimizando el rendimiento y eliminando el riesgo de FOUT (*Flash of Unstyled Text*).
+La aplicación utiliza la fuente **PT Sans** de Google Fonts, con pesos 400 (regular) y 700 (negrita). Se carga mediante el sistema nativo `next/font/google` [1], optimizando el rendimiento y eliminando el riesgo de FOUT (*Flash of Unstyled Text*).
 
 ## 7.5 DevOps y Tooling
 
@@ -277,8 +277,8 @@ the-show-verse/
 
 El layout raíz envuelve toda la aplicación y tiene tres responsabilidades principales:
 
-1. **Carga de fuentes:** integra PT Sans mediante `next/font/google`, garantizando una carga optimizada sin bloqueo de renderizado.
-2. **Proveedor de autenticación:** envuelve la aplicación con `AuthProvider` (Context API) para distribuir el estado de autenticación a todos los componentes.
+1. **Carga de fuentes:** integra PT Sans mediante `next/font/google` [1], garantizando una carga optimizada sin bloqueo de renderizado.
+2. **Proveedor de autenticación:** envuelve la aplicación con `AuthProvider` (Context API [2]) para distribuir el estado de autenticación a todos los componentes.
 3. **Componentes de layout global:** renderiza la `Navbar` y los proveedores de analítica de Vercel.
 
 ```jsx
@@ -303,7 +303,7 @@ export default function RootLayout({ children }) {
 
 ### Patrón Server → Client
 
-Las páginas se estructuran siguiendo el patrón **Server Component → Client Component**:
+Las páginas se estructuran siguiendo el patrón **Server Component → Client Component** [1] [2]:
 
 ```jsx
 // src/app/details/[type]/[id]/page.jsx  (Server Component)
@@ -326,7 +326,7 @@ export default function DetailsClient({ details, credits }) {
 
 ## 8.3 Sistema de Autenticación (OAuth 2.0 con Trakt.tv)
 
-El sistema de autenticación implementa el flujo **OAuth 2.0 Authorization Code** con Trakt.tv. La gestión de tokens se realiza íntegramente en el servidor mediante **API Routes** de Next.js para garantizar la seguridad.
+El sistema de autenticación implementa el flujo **OAuth 2.0 Authorization Code** [8] con Trakt.tv [4]. La gestión de tokens se realiza íntegramente en el servidor mediante **API Routes** de Next.js [1] para garantizar la seguridad.
 
 ### Flujo Completo de Autenticación
 
@@ -367,7 +367,7 @@ Los tokens de acceso y refresco se almacenan en **cookies httpOnly**, lo que imp
 
 ### 8.4.1 Cliente TMDb ([src/lib/api/tmdb.js](file:///e:/ASNPORTS/PELICULAS/the-show-verse/src/lib/api/tmdb.js))
 
-El cliente TMDb encapsula todas las llamadas a la API v3 de The Movie Database. Sus características técnicas más relevantes son:
+El cliente TMDb [3] encapsula todas las llamadas a la API v3 de The Movie Database. Sus características técnicas más relevantes son:
 
 **URL Builder unificado:**
 ```javascript

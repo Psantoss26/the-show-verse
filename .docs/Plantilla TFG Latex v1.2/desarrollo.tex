@@ -8,11 +8,11 @@ En este capítulo se describe el desarrollo completo de \textit{The Show Verse},
 
 El sistema se estructura en tres capas diferenciadas, implementadas en una única base de código Next.js:
 
-\textbf{Capa de presentación (Client Components).} Componentes React que se ejecutan y se hidratan en el navegador. Gestionan el estado local de la interfaz, las interacciones del usuario y las peticiones a la capa intermedia. Los componentes de mayor complejidad son los encargados de la gestión del panel de control principal, la vista dinámica de detalles de películas o series y los módulos de contenido del usuario.
+\textbf{Capa de presentación (Client Components).} Componentes React \parencite{React:2024} que se ejecutan y se hidratan en el navegador. Gestionan el estado local de la interfaz, las interacciones del usuario y las peticiones a la capa intermedia. Los componentes de mayor complejidad son los encargados de la gestión del panel de control principal, la vista dinámica de detalles de películas o series y los módulos de contenido del usuario.
 
-\textbf{Capa de servidor (Server Components + API Routes).} Los Server Components de Next.js realizan la búsqueda inicial de datos directamente en el servidor, sin coste de JavaScript para el cliente. Las rutas de la API interna actúan como \textit{proxy} hacia los servicios externos, asegurando que los tokens de autenticación permanezcan privados en el servidor y transformando los datos al formato que requiere la interfaz para su renderizado.
+\textbf{Capa de servidor (Server Components + API Routes).} Los Server Components de Next.js \parencite{Vercel:2024a,Meta:2024} realizan la búsqueda inicial de datos directamente en el servidor, sin coste de JavaScript para el cliente. Las rutas de la API interna actúan como \textit{proxy} hacia los servicios externos, asegurando que los tokens de autenticación permanezcan privados en el servidor y transformando los datos al formato que requiere la interfaz para su renderizado.
 
-\textbf{Capa de datos (APIs externas).} TMDb, Trakt.tv, OMDb, JustWatch y Plex son las fuentes de los datos principales del catálogo y la información del perfil del usuario.
+\textbf{Capa de datos (APIs externas).} TMDb \parencite{TMDb:2024}, Trakt.tv \parencite{Trakt:2024}, OMDb \parencite{OMDb:2024}, JustWatch \parencite{JustWatch:2024} y Plex \parencite{Plex:2024} son las fuentes de los datos principales del catálogo y la información del perfil del usuario.
 
 \subsection{Estructura de carpetas}
 
@@ -72,7 +72,7 @@ Las rutas principales de la aplicación son:
 \section{Implementación del sistema de autenticación OAuth 2.0}
 % -----------------------------------------------------------------------
 
-La autenticación con Trakt se ha implementado con OAuth 2.0 \textit{Authorization Code} y una arquitectura híbrida cliente-servidor, de forma que la parte sensible del proceso queda en el backend y el frontend solo gestiona el estado de conexión.
+La autenticación con Trakt se ha implementado con OAuth 2.0 \textit{Authorization Code} \parencite{NextJS:2024,OWASP:2021} y una arquitectura híbrida cliente-servidor, de forma que la parte sensible del proceso queda en el backend y el frontend solo gestiona el estado de conexión.
 
 \textbf{1) Inicio del flujo de autorización.} Cuando el usuario pulsa «Conectar con Trakt», la aplicación llama a una ruta interna de inicio que calcula el \texttt{origin} activo (local o producción), construye el \texttt{redirect\_uri} correcto y genera un \texttt{state} con \textit{nonce} y ruta de retorno. Después redirige al usuario a la URL oficial de autorización de Trakt. Antes de redirigir, guarda en cookies \texttt{httpOnly} temporales el \texttt{state}, la ruta a la que debe volver el usuario y el \texttt{redirect\_uri} exacto usado en la solicitud.
 
@@ -92,12 +92,12 @@ Con este diseño, la gestión real del intercambio OAuth permanece en el servido
 
 \subsection{The Movie Database (TMDb) API v3}
 
-El cliente de TMDb (\texttt{lib/api/tmdb.js}) encapsula toda la lógica de acceso a la API v3. La función central \texttt{tmdb(path, params, options)} implementa:
+El cliente de TMDb (\texttt{lib/api/tmdb.js}) encapsula toda la lógica de acceso a la API v3 \parencite{TMDb:2024}. La función central \texttt{tmdb(path, params, options)} implementa:
 
 \begin{itemize}
 \item Un \textbf{constructor de URL unificado} que añade automáticamente la API Key y el idioma por defecto (\texttt{es-ES}).
 \item Un \textbf{mecanismo de timeout} mediante \texttt{AbortController} (8 segundos por defecto) para evitar que peticiones lentas bloqueen la interfaz.
-\item \textbf{Estrategia de caché}: en servidor se usa \texttt{force-cache} con revalidación ISR para reutilizar respuestas y reducir llamadas repetidas, mientras que en cliente se emplea \texttt{no-store} para evitar datos obsoletos en interacciones en tiempo real.
+\item \textbf{Estrategia de caché}: en servidor se usa \texttt{force-cache} con revalidación ISR \parencite{Vercel:2024c} para reutilizar respuestas y reducir llamadas repetidas, mientras que en cliente se emplea \texttt{no-store} para evitar datos obsoletos en interacciones en tiempo real.
 \item \textbf{Gestión de errores}: cuando la API devuelve un 404, la función interpreta que el recurso no existe y retorna \texttt{null} sin registrar un error. En el resto de casos, el fallo sí se registra en logs para diagnóstico y la función retorna igualmente \texttt{null} para no bloquear la interfaz.
 \end{itemize}
 
@@ -107,7 +107,7 @@ Un aspecto técnico importante es la resolución de imágenes: la función \text
 
 La Tabla~\ref{tab:tmdb-endpoints} recoge los \textit{endpoints} principales utilizados.
 
-\begin{table}[!htbp]
+\begin{table}[H]
 \begin{center}
 \begin{tabular}{| l | l |}
 \hline
@@ -144,7 +144,7 @@ La Tabla~\ref{tab:tmdb-endpoints} recoge los \textit{endpoints} principales util
 
 \subsection{OMDb API (Open Movie Database)}
 
-OMDb es la única fuente pública que permite obtener el \textit{rating} de IMDb, el número de votos y las puntuaciones de Rotten Tomatoes y Metacritic por \texttt{imdbId}. Para proteger la API Key, todas las peticiones a OMDb pasan por la API Route interna \texttt{/api/omdb}.
+OMDb es la única fuente pública que permite obtener el \textit{rating} de IMDb, el número de votos y las puntuaciones de Rotten Tomatoes y Metacritic por \texttt{imdbId} \parencite{OMDb:2024}. Para proteger la API Key, todas las peticiones a OMDb pasan por la API Route interna \texttt{/api/omdb}.
 
 El \textit{proxy} incorpora dos medidas para reducir carga y mejorar tiempos de respuesta. La primera es la deduplicación de peticiones en curso (\texttt{inflight Map} global): si varias tarjetas piden a la vez el mismo \texttt{imdbId}, todas comparten una única consulta a OMDb en lugar de lanzar peticiones duplicadas. La segunda es una caché en memoria por tipo de resultado, las respuestas correctas se guardan durante 24 horas y se reutilizan en solicitudes posteriores, mientras que los errores temporales se almacenan solo 60 segundos para evitar insistir de forma inmediata y permitir un nuevo intento poco después.
 
@@ -215,7 +215,7 @@ La integración con Plex se ha diseñado para conectar el catálogo de la biblio
 \section{Arquitectura de API Routes propias}
 % -----------------------------------------------------------------------
 
-Next.js permite definir API Routes como funciones \textit{serverless}, proporcionando endpoints HTTP personalizados. El proyecto implementa API Routes organizadas en el directorio \texttt{src/app/api/}, que actúan como capa intermedia entre el cliente y las APIs externas, implementando la lógica, transformación de datos, caché y seguridad.
+Next.js permite definir API Routes como funciones \textit{serverless} \parencite{Vercel:2024b}, proporcionando endpoints HTTP personalizados. El proyecto implementa API Routes organizadas en el directorio \texttt{src/app/api/}, que actúan como capa intermedia entre el cliente y las APIs externas, implementando la lógica, transformación de datos, caché y seguridad.
 
 \subsection{Funciones principales de las API Routes}
 
@@ -237,7 +237,7 @@ Las API Routes del proyecto cumplen seis funciones fundamentales:
 
 \subsubsection{Autenticación y gestión de sesiones}
 
-\textbf{Flujo OAuth 2.0 con Trakt.} La autenticación con Trakt se implementa mediante cuatro endpoints que gestionan el ciclo completo de sesión. El endpoint de inicio genera una URL de autorización con protección CSRF y redirecciona al usuario a Trakt para aprobar el acceso. El callback recibe el código de autorización, lo valida e intercambia por tokens de acceso y refresco que se almacenan en cookies HTTP-only seguras. El sistema incluye verificación automática del estado de sesión con renovación de tokens caducados y un endpoint de desconexión que revoca credenciales tanto en el servidor como en Trakt.
+\textbf{Flujo OAuth 2.0 con Trakt.} La autenticación con Trakt se implementa mediante cuatro endpoints que gestionan el ciclo completo de sesión \parencite{NextJS:2024,OWASP:2021}. El endpoint de inicio genera una URL de autorización con protección CSRF y redirecciona al usuario a Trakt para aprobar el acceso. El callback recibe el código de autorización, lo valida e intercambia por tokens de acceso y refresco que se almacenan en cookies HTTP-only seguras. El sistema incluye verificación automática del estado de sesión con renovación de tokens caducados y un endpoint de desconexión que revoca credenciales tanto en el servidor como en Trakt.
 
 \textbf{Autenticación TMDb.} Se utiliza un sistema de request token que requiere aprobación manual del usuario en la web oficial. El proceso obtiene un token temporal, espera la aprobación del usuario y crea una sesión persistente almacenada en cookies.
 
@@ -628,7 +628,7 @@ La página de series en progreso determina qué series se encuentran activas cua
 
 El módulo de estadísticas unifica los datos de visionado del usuario mediante una petición a la API Route interna \texttt{/api/trakt/user-stats}, que agrega \texttt{/users/me/stats} (resumen global del usuario), el historial completo de \texttt{/sync/history} y las listas de \texttt{watchedMovies} y \texttt{watchedShows} (para identificar títulos más vistos). La respuesta incluye el total de películas, series, episodios, temporadas, tiempo en red y distribución de géneros, además de listas de actores y directores más frecuentes en el historial.
 
-\texttt{StatsClient.jsx} transforma estos datos en gráficas y secciones visuales e interactivas haciendo uso de Recharts. La sección principal presenta tarjetas KPI con el total de horas de visionado, películas vistas, series seguidas y episodios completados. El gráfico de actividad mensual es un \texttt{AreaChart} que muestra los últimos 12 meses. La distribución por día de la semana y por hora del día se representa mediante \texttt{BarChart}. La distribución de géneros se visualiza como un \texttt{RadarChart} que mapea los seis géneros más consumidos. El histograma de ratings (distribución de puntuaciones del usuario) adopta la forma de un \texttt{BarChart} horizontal..
+\texttt{StatsClient.jsx} transforma estos datos en gráficas y secciones visuales e interactivas haciendo uso de Recharts \parencite{Recharts:2024}. La sección principal presenta tarjetas KPI con el total de horas de visionado, películas vistas, series seguidas y episodios completados. El gráfico de actividad mensual es un \texttt{AreaChart} que muestra los últimos 12 meses. La distribución por día de la semana y por hora del día se representa mediante \texttt{BarChart}. La distribución de géneros se visualiza como un \texttt{RadarChart} que mapea los seis géneros más consumidos. El histograma de ratings (distribución de puntuaciones del usuario) adopta la forma de un \texttt{BarChart} horizontal..
 
 \begin{figure}[htbp]
   \centering

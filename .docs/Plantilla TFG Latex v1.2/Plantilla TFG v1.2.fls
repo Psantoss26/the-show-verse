@@ -254,10 +254,10 @@ INPUT .\Plantilla TFG v1.2.out
 INPUT .\Plantilla TFG v1.2.out
 INPUT Plantilla TFG v1.2.out
 INPUT Plantilla TFG v1.2.out
-OUTPUT Plantilla TFG v1.2.pdf
 INPUT .\Plantilla TFG v1.2.out
 INPUT .\Plantilla TFG v1.2.out
 OUTPUT Plantilla TFG v1.2.out
+OUTPUT Plantilla TFG v1.2.pdf
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\biblatex-apa\spanish-apa.lbx
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\biblatex-apa\spanish-apa.lbx
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\biblatex-apa\spanish-apa.lbx
@@ -335,21 +335,7 @@ INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmr8r.
 INPUT .\Plantilla TFG v1.2.toc
 INPUT .\Plantilla TFG v1.2.toc
 INPUT Plantilla TFG v1.2.toc
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmb8t.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmr8t.vf
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmr8r.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmb8t.vf
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmb8r.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\t1pcr.fd
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\t1pcr.fd
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\t1pcr.fd
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8t.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\courier\pcrr8t.vf
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8r.tfm
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmri8t.tfm
 OUTPUT Plantilla TFG v1.2.toc
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmri8t.vf
-INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmri8r.tfm
 INPUT .\Plantilla TFG v1.2.lof
 INPUT .\Plantilla TFG v1.2.lof
 INPUT Plantilla TFG v1.2.lof
@@ -358,11 +344,19 @@ INPUT .\Plantilla TFG v1.2.lot
 INPUT .\Plantilla TFG v1.2.lot
 INPUT Plantilla TFG v1.2.lot
 OUTPUT Plantilla TFG v1.2.lot
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmr8t.vf
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmr8r.tfm
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmb8t.tfm
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmri8t.tfm
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmri8t.vf
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmri8r.tfm
 INPUT .\abstract.tex
 INPUT .\abstract.tex
 INPUT .\abstract.tex
 INPUT .\abstract.tex
 INPUT abstract.tex
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmb8t.vf
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmb8r.tfm
 INPUT .\introduccion.tex
 INPUT .\introduccion.tex
 INPUT .\introduccion.tex
@@ -372,6 +366,12 @@ INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmr8t.
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmb8t.tfm
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmb8t.vf
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmb8r.tfm
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\t1pcr.fd
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\t1pcr.fd
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\tex\latex\psnfss\t1pcr.fd
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8t.tfm
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\courier\pcrr8t.vf
+INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8r.tfm
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmr8t.tfm
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\public\amsfonts\cmextra\cmex7.tfm
 INPUT C:\Users\pablo\AppData\Local\Programs\MiKTeX\fonts\tfm\public\amsfonts\symbols\msam5.tfm

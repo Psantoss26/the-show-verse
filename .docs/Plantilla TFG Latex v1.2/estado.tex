@@ -4,31 +4,33 @@ El presente estado de la cuestión aborda el contexto tecnológico y de mercado 
 
 \subsection{Las plataformas de streaming y sus consecuencias para el usuario}
 
-La transición del modelo tradicional al \textit{streaming} bajo demanda se inició con el lanzamiento del servicio de Netflix en 2007, aunque su consolidación definitiva se produjo a partir de 2019, con la irrupción simultánea de Disney+, Apple TV+ y HBO Max. En 2024, el usuario medio en mercados como España o Estados Unidos tiene acceso simultáneo a entre 3 y 5 servicios de \textit{streaming} distintos, según datos de CNMC y Statista.
+La transición del modelo tradicional al \textit{streaming} bajo demanda se inició con el lanzamiento del servicio de Netflix en 2007, aunque su consolidación definitiva se produjo a partir de 2019, con la irrupción simultánea de Disney+, Apple TV+ y HBO Max. En 2024, el usuario medio en mercados como España o Estados Unidos tiene acceso simultáneo a entre 3 y 5 servicios de \textit{streaming} distintos, según datos de CNMC y Statista \parencite{CNMC:2025,Statista:2024}.
 
-Esta fragmentación genera una sobrecarga de elección en cada usuario, lo que provoca que inviertan una gran cantidad de tiempo en decidir qué ver, olviden mantener un registro de lo visto y pierdan el seguimiento de las series que consumen de forma no continua.
+La distribución del contenido entre múltiples plataformas introduce varios problemas estructurales para el usuario. Explorar múltiples catálogos antes de decidir qué contenido consumir incrementa el tiempo de búsqueda y reduce la satisfacción percibida. En series con emisión semanal o consumidas de forma no continua, el usuario pierde fácilmente la referencia del último episodio visto, especialmente cuando gestiona múltiples series simultáneamente en diferentes plataformas. Las licencias temporales provocan que películas y series desaparezcan de una plataforma sin previo aviso o migren a otra, obligando al usuario a mantener múltiples suscripciones activas. Cada plataforma mantiene su propio registro de reproducción aislado, sin posibilidad de exportación o integración, impidiendo al usuario tener una visión global de su consumo audiovisual, generar estadísticas agregadas o recuperar su historial si cancela una suscripción. Finalmente, aspectos como la gestión de listas personalizadas, la valoración de contenido, las recomendaciones o el control parental presentan diferencias significativas de implementación entre servicios, dificultando la consistencia en la experiencia de usuario.
 
-La necesidad de una capa de abstracción sobre las plataformas de \textit{streaming} ha generado el desarrollo de aplicaciones conocidas como \textit{media trackers}.
+La respuesta a esta problemática ha sido el desarrollo de aplicaciones conocidas como \textit{media trackers} o plataformas de seguimiento de contenido audiovisual. Estas herramientas actúan como una capa de abstracción sobre las plataformas de \textit{streaming}, permitiendo al usuario mantener un registro unificado de su consumo independientemente del servicio donde visualice el contenido. Las funcionalidades típicas incluyen seguimiento de progreso por episodio, gestión de listas de pendientes y favoritos, historial completo de visualizaciones, estadísticas de consumo, descubrimiento de nuevos contenidos mediante recomendaciones y búsqueda de disponibilidad entre plataformas.
+
+Este contexto de fragmentación y la necesidad de herramientas de gestión unificada constituye el problema fundamental que \textit{The Show Verse} pretende resolver mediante una solución técnicamente integrada que combine seguimiento, descubrimiento, información de disponibilidad y gestión de biblioteca local en una única aplicación web con una interfaz moderna y un rendimiento optimizado.
 
 \subsection{Autenticación y APIs REST}
 
-Se hace uso del estándar OAuth 2.0 para la autenticación con Trakt.tv, que es el servicio que ofrece la funcionalidad de seguimiento más completa y que actúa como punto central de la gestión del contenido del usuario. TMDb también ofrece soporte para autenticación mediante OAuth 2.0, aunque en este caso se ha optado por un sistema de autenticación basado en API Key para simplificar la integración y evitar la complejidad adicional de gestionar tokens de acceso y renovación.
+Se hace uso del estándar OAuth 2.0 \parencite{OWASP:2021} para la autenticación con Trakt.tv, que es el servicio que ofrece la funcionalidad de seguimiento más completa y que actúa como punto central de la gestión del contenido del usuario. TMDb también ofrece soporte para autenticación mediante OAuth 2.0, aunque en este caso se ha optado por un sistema de autenticación basado en API Key para simplificar la integración y evitar la complejidad adicional de gestionar tokens de acceso y renovación.
 
-Las APIs utilizadas en este proyecto siguen el estilo REST con las siguientes especificidades:
+Las APIs utilizadas en este proyecto siguen el estilo REST con las siguientes características:
 
-\textbf{TMDb API v3} es una API REST pública con autenticación por API Key. Proporciona acceso a su base de datos de más de 800.000 películas y 150.000 series de televisión, con soporte para más de 40 idiomas. Su límite de peticiones es de 40 peticiones por 10 segundos para cuentas gratuitas.
+\textbf{TMDb API v3} \parencite{TMDb:2024} es una API REST pública con autenticación por API Key. Proporciona acceso a su base de datos de más de 800.000 películas y 150.000 series de televisión, con soporte para más de 40 idiomas. Su límite de peticiones es de 40 peticiones por 10 segundos para cuentas gratuitas.
 
-\textbf{Trakt.tv API v2} combina autenticación por API Key para \textit{endpoints} públicos con OAuth 2.0 Bearer Token para \textit{endpoints} autenticados. Un aspecto técnico relevante es el sistema de identificadores: Trakt mantiene sus propios slugs e IDs, pero acepta identificadores de IMDb y TMDb mediante el \textit{endpoint} de búsqueda por ID externo.
+\textbf{Trakt.tv API v2} \parencite{Trakt:2024} combina autenticación por API Key para \textit{endpoints} públicos con OAuth 2.0 Bearer Token para \textit{endpoints} autenticados. Un aspecto técnico relevante es el sistema de identificadores: Trakt mantiene sus propios slugs e IDs, pero acepta identificadores de IMDb y TMDb mediante el \textit{endpoint} de búsqueda por ID externo.
 
-\textbf{OMDb API} se utiliza como fuente complementaria para los metadatos y puntuaciones externas vinculadas al identificador de IMDb. Su integración se realiza mediante peticiones de lectura a través de la API interna del proyecto para unificar el formato de respuesta y control de errores.
+\textbf{OMDb API} \parencite{OMDb:2024} se utiliza como fuente complementaria para los metadatos y puntuaciones externas vinculadas al identificador de IMDb. Su integración se realiza mediante peticiones de lectura a través de la API interna del proyecto para unificar el formato de respuesta y control de errores.
 
-\textbf{JustWatch} se integra para obtener enlaces de disponibilidad en plataformas de \textit{streaming}. En este caso no se consume una API REST pública oficial, sino que se encapsula la consulta en rutas internas del proyecto que normalizan parámetros, validan resultados y aplican caché antes de exponer el enlace en la interfaz.
+\textbf{JustWatch} \parencite{JustWatch:2024} se integra para obtener enlaces de disponibilidad en plataformas de \textit{streaming}. En este caso no se consume una API REST pública oficial, sino que se encapsula la consulta en rutas internas del proyecto que normalizan parámetros, validan resultados y aplican caché antes de exponer el enlace en la interfaz.
 
-\textbf{Plex Media Server} se incorpora como fuente del catálogo de contenido multimedia local del usuario. La comunicación se realiza por HTTP/HTTPS contra el servidor Plex configurado por el usuario y se protege mediante autenticación basada en token, lo que permite combinar en una misma vista contenido personal y datos procedentes de servicios en la nube.
+\textbf{Plex Media Server} \parencite{Plex:2024} se incorpora como fuente del catálogo de contenido multimedia local del usuario. La comunicación se realiza por HTTP/HTTPS contra el servidor Plex configurado por el usuario y se protege mediante autenticación basada en token, lo que permite combinar en una misma vista contenido personal y datos procedentes de servicios en la nube.
 
 \subsection{Rendimiento web}
 
-El rendimiento de \textit{The Show Verse} se plantea de forma global, no solo para una vista concreta. La aplicación combina páginas con alta densidad de información, por lo que la estrategia prioriza mantener tiempos de respuesta estables cuando aumentan simultáneamente el número de elementos en pantalla y el volumen de llamadas a APIs.
+El rendimiento de \textit{The Show Verse} se plantea de forma global, no solo para una vista concreta. La aplicación combina páginas con alta densidad de información, por lo que la estrategia prioriza mantener tiempos de respuesta estables cuando aumentan simultáneamente el número de elementos en pantalla y el volumen de llamadas a APIs \parencite{Google:2024a,Google:2024b}.
 
 En la capa de renderizado se adopta un enfoque híbrido de SSR/ISR según la criticidad y frecuencia de cambio de los datos. Las vistas principales se sirven con el contenido inicial desde el servidor y revalidación periódica, mientras que los bloques secundarios se cargan de forma diferida en el cliente para no penalizar el primer renderizado. En paralelo, la agregación de datos se resuelve con \texttt{Promise.all} y límites de tiempo acotados, evitando que una dependencia externa lenta bloquee la página completa.
 
@@ -38,13 +40,13 @@ Como criterio general, el proyecto guarda temporalmente información en varios n
 
 \subsection{Diseño de interfaz}
 
-El diseño de interfaz de \textit{The Show Verse} utiliza un tema oscuro general para destacar los carteles (\textit{posters}) y fondos (\textit{backdrops}) del contenido teniendo como referencia las plataformas de \textit{streaming} actuales.
+El diseño de interfaz de \textit{The Show Verse} utiliza un tema oscuro general para destacar los carteles (\textit{posters}) y fondos (\textit{backdrops}) del contenido teniendo como referencia las plataformas de \textit{streaming} actuales \parencite{Babich:2021,Nielsen:2024}.
 
 \textbf{Vistas personalizadas.} 
 Las principales secciones de la aplicación ofrecen múltiples modos de visualización: cuadrícula (\textit{grid}), lista (\textit{list}) o vista compacta (\textit{compact}). La elección del usuario se almacena en el navegador mediante \textit{localStorage} para mantener la preferencia en futuras visitas. Además, el Historial incluye una vista específica de calendario y la sección En progreso incorpora una vista de tarjetas con barras de porcentaje para mostrar el avance de las series.
 
 \textbf{Diseño responsive.} 
-La interfaz se adapta al dispositivo del usuario. En la versión de escritorio, se utilizan efectos de animación al pasar el cursor (\textit{hover}) por las tarjetas para desplegar menús e información. En dispositivos móviles, estos efectos se desactivan y se sustituyen por toques directos en botones adaptados a pantallas táctiles evitando problemas de navegación.
+La interfaz se adapta al dispositivo del usuario \parencite{MDN:2024d}. En la versión de escritorio, se utilizan efectos de animación al pasar el cursor (\textit{hover}) por las tarjetas para desplegar menús e información. En dispositivos móviles, estos efectos se desactivan y se sustituyen por toques directos en botones adaptados a pantallas táctiles evitando problemas de navegación.
 
 \textbf{Componentes propios.} 
 Para evitar depender de librerías genéricas y mantener una identidad visual coherente, se han desarrollado componentes personalizados:
@@ -57,11 +59,11 @@ Para evitar depender de librerías genéricas y mantener una identidad visual co
 \end{itemize}
 
 \textbf{Transiciones.} 
-Se emplea la librería \textit{Framer Motion} para animar la interfaz al aplicar filtros, cambiar de vista o desplegar información lo que evita cambios de pantalla bruscos y mejora la experiencia de usuario.
+Se emplea la librería \textit{Framer Motion} \parencite{Framer:2024} para animar la interfaz al aplicar filtros, cambiar de vista o desplegar información lo que evita cambios de pantalla bruscos y mejora la experiencia de usuario.
 
 \section{Trabajos relacionados}
 
-\textbf{Letterboxd} (fundado en 2011, Auckland, Nueva Zelanda) es la plataforma de referencia para el registro y la crítica cinematográfica personal. Con más de 20 millones de usuarios registrados en 2024, su principal fortaleza es la componente social y el sistema de reseñas. Su limitación más significativa para los propósitos de este trabajo es la ausencia de soporte para el seguimiento de series de televisión por episodio.
+\textbf{Letterboxd} \parencite{Letterboxd:2024} (fundado en 2011, Auckland, Nueva Zelanda) es la plataforma de referencia para el registro y la crítica cinematográfica personal. Con más de 20 millones de usuarios registrados en 2024, su principal fortaleza es la componente social y el sistema de reseñas. Su limitación más significativa para los propósitos de este trabajo es la ausencia de soporte para el seguimiento de series de televisión por episodio.
 
 \begin{figure}[H]
     \centering
@@ -69,7 +71,7 @@ Se emplea la librería \textit{Framer Motion} para animar la interfaz al aplicar
     \caption{Interfaz principal de Letterboxd.}
 \end{figure}
 
-\textbf{Trakt.tv} (fundado en 2010) es la plataforma más completa en cuanto a funcionalidades de \textit{tracking}, con soporte completo para películas y series a nivel de episodio. Su característica diferencial es la API pública v2, documentada y con límites de uso generosos para desarrolladores registrados. Sin embargo, su interfaz de usuario presenta un diseño anticuado que no ha evolucionado significativamente en la última década.
+\textbf{Trakt.tv} \parencite{Trakt:2024} (fundado en 2010) es la plataforma más completa en cuanto a funcionalidades de \textit{tracking}, con soporte completo para películas y series a nivel de episodio. Su característica diferencial es la API pública v2, documentada y con límites de uso generosos para desarrolladores registrados. Sin embargo, su interfaz de usuario presenta un diseño anticuado que no ha evolucionado significativamente en la última década.
 
 \begin{figure}[H]
     \centering
@@ -77,7 +79,7 @@ Se emplea la librería \textit{Framer Motion} para animar la interfaz al aplicar
     \caption{Interfaz principal de Trakt.tv.}
 \end{figure}
 
-\textbf{Simkl} (fundado en 2012) ofrece funcionalidades similares a Trakt con una interfaz algo menos moderna y con un ecosistema de API menos estable y una comunidad de usuarios significativamente menor.
+\textbf{Simkl} \parencite{Simkl:2024} (fundado en 2012) ofrece funcionalidades similares a Trakt con una interfaz algo menos moderna y con un ecosistema de API menos estable y una comunidad de usuarios significativamente menor.
 
 \begin{figure}[H]
     \centering
@@ -85,7 +87,7 @@ Se emplea la librería \textit{Framer Motion} para animar la interfaz al aplicar
     \caption{Interfaz principal de Simkl.}
 \end{figure}
 
-\textbf{JustWatch} (fundado en 2014) se especializa en la localización de contenido entre plataformas de \textit{streaming}, pero carece de funcionalidades de \textit{tracking} personal.
+\textbf{JustWatch} \parencite{JustWatch:2024} (fundado en 2014) se especializa en la localización de contenido entre plataformas de \textit{streaming}, pero carece de funcionalidades de \textit{tracking} personal.
 
 \begin{figure}[H]
     \centering

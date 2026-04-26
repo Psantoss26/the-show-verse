@@ -79,7 +79,6 @@
       \field{labeltitlesource}{title}
       \field{title}{Glassmorphism in User Interfaces}
       \field{year}{2021}
-      \true{nocite}
       \verb{urlraw}
       \verb https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
       \endverb
@@ -141,12 +140,41 @@
       \field{labeltitlesource}{title}
       \field{title}{{Cloudflare Tunnel Documentation}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
       \endverb
       \verb{url}
       \verb https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
+      \endverb
+    \endentry
+    \entry{CNMC:2025}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=6d07a471d225b63c9b871719a3607a00}{%
+           family={{CNMC}},
+           familyi={C\bibinitperiod}}}%
+      }
+      \strng{namehash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{fullhash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{fullhashraw}{6d07a471d225b63c9b871719a3607a00}
+      \strng{bibnamehash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{authorbibnamehash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{authornamehash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{authorfullhash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{authorfullhashraw}{6d07a471d225b63c9b871719a3607a00}
+      \field{sortinit}{C}
+      \field{sortinithash}{4d103a86280481745c9c897c925753c0}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Panel del Sector Audiovisual}}
+      \field{year}{2025}
+      \verb{urlraw}
+      \verb https://www.cnmc.es/prensa/panel-sector-audiovisual-20251121
+      \endverb
+      \verb{url}
+      \verb https://www.cnmc.es/prensa/panel-sector-audiovisual-20251121
       \endverb
     \endentry
     \entry{Docker:2024}{online}{}{}
@@ -172,7 +200,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Docker Documentation --- Get Started}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://docs.docker.com/get-started/
       \endverb
@@ -203,7 +230,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Framer Motion Documentation}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.framer.com/motion/
       \endverb
@@ -236,7 +262,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Core Web Vitals report}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://support.google.com/webmasters/answer/9205520
       \endverb
@@ -269,7 +294,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Web Vitals --- Essential metrics for a healthy site}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://web.dev/vitals/
       \endverb
@@ -277,26 +301,20 @@
       \verb https://web.dev/vitals/
       \endverb
     \endentry
-    \entry{Hardt:2012}{manual}{}{}
+    \entry{OWASP:2024}{online}{}{}
       \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=645c23d98c8c0ad0899cb4be651e6a02}{%
-           family={Hardt},
-           familyi={H\bibinitperiod},
-           given={Dick},
-           giveni={D\bibinitperiod},
-           givenun=0}}%
+        {{un=0,uniquepart=base,hash=cb869738ad7fd931d3bd5f3be5820164}{%
+           family={{HackerOne}},
+           familyi={H\bibinitperiod}}}%
       }
-      \list{organization}{1}{%
-        {IETF}%
-      }
-      \strng{namehash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{fullhash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{fullhashraw}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{bibnamehash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{authorbibnamehash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{authornamehash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{authorfullhash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{authorfullhashraw}{645c23d98c8c0ad0899cb4be651e6a02}
+      \strng{namehash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{fullhash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{fullhashraw}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{bibnamehash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{authorbibnamehash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{authornamehash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{authorfullhash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{authorfullhashraw}{cb869738ad7fd931d3bd5f3be5820164}
       \field{sortinit}{H}
       \field{sortinithash}{23a3aa7c24e56cfa16945d55545109b5}
       \field{extradatescope}{labelyear}
@@ -304,14 +322,13 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{{RFC 6749: The OAuth 2.0 Authorization Framework}}
-      \field{year}{2012}
-      \true{nocite}
+      \field{title}{{OWASP Top 10 Web App Security Risks}}
+      \field{year}{2024}
       \verb{urlraw}
-      \verb https://www.rfc-editor.org/rfc/rfc6749
+      \verb https://www.hackerone.com/knowledge-center/owasp-top-10-web-app-security-risks
       \endverb
       \verb{url}
-      \verb https://www.rfc-editor.org/rfc/rfc6749
+      \verb https://www.hackerone.com/knowledge-center/owasp-top-10-web-app-security-risks
       \endverb
     \endentry
     \entry{RFC8693:2020}{manual}{}{}
@@ -398,7 +415,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{JustWatch --- The Streaming Guide}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.justwatch.com/
       \endverb
@@ -463,7 +479,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{About Letterboxd}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://letterboxd.com/about/
       \endverb
@@ -496,7 +511,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{HTTP Caching}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
       \endverb
@@ -529,7 +543,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{IndexedDB API}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
       \endverb
@@ -562,7 +575,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Responsive Design}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developer.mozilla.org/en-US/docs/Learn/CSS/CSS_layout/Responsive_Design
       \endverb
@@ -595,7 +607,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Service Worker API}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
       \endverb
@@ -628,7 +639,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{React Documentation --- React Server Components}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://react.dev/reference/rsc/server-components
       \endverb
@@ -661,7 +671,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{React Documentation --- Thinking in React}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://react.dev/learn/thinking-in-react
       \endverb
@@ -698,6 +707,21 @@
       \endverb
       \verb{url}
       \verb https://www.typescriptlang.org/docs/
+      \endverb
+    \endentry
+    \entry{Wieruch:2023}{online}{}{}
+      \field{sortinit}{N}
+      \field{sortinithash}{22369a73d5f88983a108b63f07f37084}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labeltitlesource}{title}
+      \field{title}{{Next.js Roadmap}}
+      \field{year}{2023}
+      \verb{urlraw}
+      \verb https://roadmap.sh/nextjs
+      \endverb
+      \verb{url}
+      \verb https://roadmap.sh/nextjs
       \endverb
     \endentry
     \entry{Nielsen:2023}{online}{}{}
@@ -754,7 +778,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Glassmorphism --- Modern UI Trend}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.nngroup.com/articles/glassmorphism/
       \endverb
@@ -816,7 +839,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{The Open Movie Database API}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.omdbapi.com/
       \endverb
@@ -875,7 +897,6 @@
       \strng{authornamehash}{24b95a7fdad5a850196cd87546dcc70b}
       \strng{authorfullhash}{24b95a7fdad5a850196cd87546dcc70b}
       \strng{authorfullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
-      \field{extraname}{1}
       \field{sortinit}{O}
       \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
       \field{extradatescope}{labelyear}
@@ -885,44 +906,11 @@
       \field{labeltitlesource}{title}
       \field{title}{{OAuth 2.0 Security Best Current Practice}}
       \field{year}{2021}
-      \true{nocite}
       \verb{urlraw}
       \verb https://oauth.net/2/oauth-best-practice/
       \endverb
       \verb{url}
       \verb https://oauth.net/2/oauth-best-practice/
-      \endverb
-    \endentry
-    \entry{OWASP:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=24b95a7fdad5a850196cd87546dcc70b}{%
-           family={{OWASP}},
-           familyi={O\bibinitperiod}}}%
-      }
-      \strng{namehash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{fullhash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{fullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{bibnamehash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{authorbibnamehash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{authornamehash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{authorfullhash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{authorfullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
-      \field{extraname}{2}
-      \field{sortinit}{O}
-      \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{OWASP Top 10: Broken Authentication}}
-      \field{year}{2024}
-      \true{nocite}
-      \verb{urlraw}
-      \verb https://owasp.org/www-project-top-ten/
-      \endverb
-      \verb{url}
-      \verb https://owasp.org/www-project-top-ten/
       \endverb
     \endentry
     \entry{Plex:2024}{online}{}{}
@@ -948,7 +936,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Plex Media Server API Documentation}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.plex.tv/
       \endverb
@@ -979,7 +966,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Recharts --- A composable charting library built on React components}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://recharts.org/
       \endverb
@@ -1018,6 +1004,22 @@
       \verb https://seriesgraph.com/
       \endverb
     \endentry
+    \entry{SeriesGuide:2024}{online}{}{}
+      \field{sortinit}{S}
+      \field{sortinithash}{b164b07b29984b41daf1e85279fbc5ab}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labeltitlesource}{title}
+      \field{title}{{SeriesGuide --- Track Your Favorite TV Shows and Movies}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.seriesgui.de/
+      \endverb
+      \verb{url}
+      \verb https://www.seriesgui.de/
+      \endverb
+    \endentry
     \entry{Simkl:2024}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=e3fdec5d358db392fdefe441dd0298ee}{%
@@ -1041,7 +1043,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Simkl --- TV Tracker, Movie and Anime Tracker}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://simkl.com/
       \endverb
@@ -1072,7 +1073,6 @@
       \field{labeltitlesource}{title}
       \field{title}{Number of Netflix subscribers worldwide from 1st quarter 2013 to 4th quarter 2023}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
       \endverb
@@ -1103,7 +1103,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Tailwind CSS Documentation}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://tailwindcss.com/docs
       \endverb
@@ -1134,7 +1133,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{TMDb API Documentation v3}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developer.themoviedb.org/docs/getting-started
       \endverb
@@ -1165,7 +1163,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Trakt API Documentation v2}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://trakt.docs.apiary.io/
       \endverb
@@ -1204,37 +1201,6 @@
       \verb https://www.tvtime.com/
       \endverb
     \endentry
-    \entry{SeriesGuide:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=7aa4cc1b4a03df58b0567b252464f777}{%
-           family={{Uwe Trottmann}},
-           familyi={U\bibinitperiod}}}%
-      }
-      \strng{namehash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{fullhash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{fullhashraw}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{bibnamehash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{authorbibnamehash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{authornamehash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{authorfullhash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{authorfullhashraw}{7aa4cc1b4a03df58b0567b252464f777}
-      \field{sortinit}{U}
-      \field{sortinithash}{6901a00e45705986ee5e7ca9fd39adca}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{SeriesGuide --- Track Your Favorite TV Shows and Movies}}
-      \field{year}{2024}
-      \true{nocite}
-      \verb{urlraw}
-      \verb https://seriesguide.tv/
-      \endverb
-      \verb{url}
-      \verb https://seriesguide.tv/
-      \endverb
-    \endentry
     \entry{Vercel:2024a}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
@@ -1260,7 +1226,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Next.js Documentation --- App Router}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://nextjs.org/docs/app
       \endverb
@@ -1268,7 +1233,7 @@
       \verb https://nextjs.org/docs/app
       \endverb
     \endentry
-    \entry{Vercel:2024c}{online}{}{}
+    \entry{NextJS:2024}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
            family={{Vercel}},
@@ -1291,17 +1256,16 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{{Next.js Documentation --- Incremental Static Regeneration}}
+      \field{title}{{Next.js Documentation --- Authentication}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
-      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
+      \verb https://nextjs.org/docs/pages/guides/authentication
       \endverb
       \verb{url}
-      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
+      \verb https://nextjs.org/docs/pages/guides/authentication
       \endverb
     \endentry
-    \entry{Vercel:2024b}{online}{}{}
+    \entry{Vercel:2024c}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
            family={{Vercel}},
@@ -1324,17 +1288,16 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{{Vercel Documentation --- Edge Functions and Middleware}}
+      \field{title}{{Next.js Documentation --- Incremental Static Regeneration}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
-      \verb https://vercel.com/docs/functions
+      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
       \endverb
       \verb{url}
-      \verb https://vercel.com/docs/functions
+      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
       \endverb
     \endentry
-    \entry{Vercel:2024d}{online}{}{}
+    \entry{Vercel:2024b}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
            family={{Vercel}},
@@ -1357,9 +1320,40 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
+      \field{title}{{Vercel Documentation --- Edge Functions and Middleware}}
+      \field{year}{2024}
+      \verb{urlraw}
+      \verb https://vercel.com/docs/functions
+      \endverb
+      \verb{url}
+      \verb https://vercel.com/docs/functions
+      \endverb
+    \endentry
+    \entry{Vercel:2024d}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
+           family={{Vercel}},
+           familyi={V\bibinitperiod}}}%
+      }
+      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \field{extraname}{5}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{extradate}{5}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
       \field{title}{{Vercel Speed Insights}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://vercel.com/docs/speed-insights
       \endverb
@@ -1391,7 +1385,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Web Content Accessibility Guidelines (WCAG) 2.1}}
       \field{year}{2023}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.w3.org/TR/WCAG21/
       \endverb
@@ -1423,46 +1416,11 @@
       \field{labeltitlesource}{title}
       \field{title}{{Progressive Web Apps (PWAs)}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.w3.org/TR/appmanifest/
       \endverb
       \verb{url}
       \verb https://www.w3.org/TR/appmanifest/
-      \endverb
-    \endentry
-    \entry{Wieruch:2023}{book}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=243e85ae7a690c6e398cd334598b4873}{%
-           family={Wieruch},
-           familyi={W\bibinitperiod},
-           given={Robin},
-           giveni={R\bibinitperiod},
-           givenun=0}}%
-      }
-      \strng{namehash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{fullhash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{fullhashraw}{243e85ae7a690c6e398cd334598b4873}
-      \strng{bibnamehash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{authorbibnamehash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{authornamehash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{authorfullhash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{authorfullhashraw}{243e85ae7a690c6e398cd334598b4873}
-      \field{sortinit}{W}
-      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{The Road to Next.js}
-      \field{year}{2023}
-      \true{nocite}
-      \verb{urlraw}
-      \verb https://www.roadtonextjs.com/
-      \endverb
-      \verb{url}
-      \verb https://www.roadtonextjs.com/
       \endverb
     \endentry
   \enddatalist
@@ -1527,7 +1485,6 @@
       \field{labeltitlesource}{title}
       \field{title}{Glassmorphism in User Interfaces}
       \field{year}{2021}
-      \true{nocite}
       \verb{urlraw}
       \verb https://uxplanet.org/glassmorphism-in-user-interfaces-1f39bb1308c9
       \endverb
@@ -1589,12 +1546,41 @@
       \field{labeltitlesource}{title}
       \field{title}{{Cloudflare Tunnel Documentation}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
       \endverb
       \verb{url}
       \verb https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
+      \endverb
+    \endentry
+    \entry{CNMC:2025}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=6d07a471d225b63c9b871719a3607a00}{%
+           family={{CNMC}},
+           familyi={C\bibinitperiod}}}%
+      }
+      \strng{namehash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{fullhash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{fullhashraw}{6d07a471d225b63c9b871719a3607a00}
+      \strng{bibnamehash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{authorbibnamehash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{authornamehash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{authorfullhash}{6d07a471d225b63c9b871719a3607a00}
+      \strng{authorfullhashraw}{6d07a471d225b63c9b871719a3607a00}
+      \field{sortinit}{C}
+      \field{sortinithash}{4d103a86280481745c9c897c925753c0}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Panel del Sector Audiovisual}}
+      \field{year}{2025}
+      \verb{urlraw}
+      \verb https://www.cnmc.es/prensa/panel-sector-audiovisual-20251121
+      \endverb
+      \verb{url}
+      \verb https://www.cnmc.es/prensa/panel-sector-audiovisual-20251121
       \endverb
     \endentry
     \entry{Docker:2024}{online}{}{}
@@ -1620,7 +1606,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Docker Documentation --- Get Started}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://docs.docker.com/get-started/
       \endverb
@@ -1651,7 +1636,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Framer Motion Documentation}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.framer.com/motion/
       \endverb
@@ -1684,7 +1668,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Core Web Vitals report}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://support.google.com/webmasters/answer/9205520
       \endverb
@@ -1717,7 +1700,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Web Vitals --- Essential metrics for a healthy site}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://web.dev/vitals/
       \endverb
@@ -1725,26 +1707,20 @@
       \verb https://web.dev/vitals/
       \endverb
     \endentry
-    \entry{Hardt:2012}{manual}{}{}
+    \entry{OWASP:2024}{online}{}{}
       \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=645c23d98c8c0ad0899cb4be651e6a02}{%
-           family={Hardt},
-           familyi={H\bibinitperiod},
-           given={Dick},
-           giveni={D\bibinitperiod},
-           givenun=0}}%
+        {{un=0,uniquepart=base,hash=cb869738ad7fd931d3bd5f3be5820164}{%
+           family={{HackerOne}},
+           familyi={H\bibinitperiod}}}%
       }
-      \list{organization}{1}{%
-        {IETF}%
-      }
-      \strng{namehash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{fullhash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{fullhashraw}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{bibnamehash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{authorbibnamehash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{authornamehash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{authorfullhash}{645c23d98c8c0ad0899cb4be651e6a02}
-      \strng{authorfullhashraw}{645c23d98c8c0ad0899cb4be651e6a02}
+      \strng{namehash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{fullhash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{fullhashraw}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{bibnamehash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{authorbibnamehash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{authornamehash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{authorfullhash}{cb869738ad7fd931d3bd5f3be5820164}
+      \strng{authorfullhashraw}{cb869738ad7fd931d3bd5f3be5820164}
       \field{sortinit}{H}
       \field{sortinithash}{23a3aa7c24e56cfa16945d55545109b5}
       \field{extradatescope}{labelyear}
@@ -1752,14 +1728,13 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{{RFC 6749: The OAuth 2.0 Authorization Framework}}
-      \field{year}{2012}
-      \true{nocite}
+      \field{title}{{OWASP Top 10 Web App Security Risks}}
+      \field{year}{2024}
       \verb{urlraw}
-      \verb https://www.rfc-editor.org/rfc/rfc6749
+      \verb https://www.hackerone.com/knowledge-center/owasp-top-10-web-app-security-risks
       \endverb
       \verb{url}
-      \verb https://www.rfc-editor.org/rfc/rfc6749
+      \verb https://www.hackerone.com/knowledge-center/owasp-top-10-web-app-security-risks
       \endverb
     \endentry
     \entry{RFC8693:2020}{manual}{}{}
@@ -1846,7 +1821,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{JustWatch --- The Streaming Guide}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.justwatch.com/
       \endverb
@@ -1911,7 +1885,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{About Letterboxd}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://letterboxd.com/about/
       \endverb
@@ -1944,7 +1917,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{HTTP Caching}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
       \endverb
@@ -1977,7 +1949,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{IndexedDB API}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
       \endverb
@@ -2010,7 +1981,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Responsive Design}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developer.mozilla.org/en-US/docs/Learn/CSS/CSS_layout/Responsive_Design
       \endverb
@@ -2043,7 +2013,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Service Worker API}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
       \endverb
@@ -2076,7 +2045,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{React Documentation --- React Server Components}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://react.dev/reference/rsc/server-components
       \endverb
@@ -2109,7 +2077,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{React Documentation --- Thinking in React}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://react.dev/learn/thinking-in-react
       \endverb
@@ -2146,6 +2113,21 @@
       \endverb
       \verb{url}
       \verb https://www.typescriptlang.org/docs/
+      \endverb
+    \endentry
+    \entry{Wieruch:2023}{online}{}{}
+      \field{sortinit}{N}
+      \field{sortinithash}{22369a73d5f88983a108b63f07f37084}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labeltitlesource}{title}
+      \field{title}{{Next.js Roadmap}}
+      \field{year}{2023}
+      \verb{urlraw}
+      \verb https://roadmap.sh/nextjs
+      \endverb
+      \verb{url}
+      \verb https://roadmap.sh/nextjs
       \endverb
     \endentry
     \entry{Nielsen:2023}{online}{}{}
@@ -2202,7 +2184,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Glassmorphism --- Modern UI Trend}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.nngroup.com/articles/glassmorphism/
       \endverb
@@ -2264,7 +2245,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{The Open Movie Database API}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.omdbapi.com/
       \endverb
@@ -2323,7 +2303,6 @@
       \strng{authornamehash}{24b95a7fdad5a850196cd87546dcc70b}
       \strng{authorfullhash}{24b95a7fdad5a850196cd87546dcc70b}
       \strng{authorfullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
-      \field{extraname}{1}
       \field{sortinit}{O}
       \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
       \field{extradatescope}{labelyear}
@@ -2333,44 +2312,11 @@
       \field{labeltitlesource}{title}
       \field{title}{{OAuth 2.0 Security Best Current Practice}}
       \field{year}{2021}
-      \true{nocite}
       \verb{urlraw}
       \verb https://oauth.net/2/oauth-best-practice/
       \endverb
       \verb{url}
       \verb https://oauth.net/2/oauth-best-practice/
-      \endverb
-    \endentry
-    \entry{OWASP:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=24b95a7fdad5a850196cd87546dcc70b}{%
-           family={{OWASP}},
-           familyi={O\bibinitperiod}}}%
-      }
-      \strng{namehash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{fullhash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{fullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{bibnamehash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{authorbibnamehash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{authornamehash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{authorfullhash}{24b95a7fdad5a850196cd87546dcc70b}
-      \strng{authorfullhashraw}{24b95a7fdad5a850196cd87546dcc70b}
-      \field{extraname}{2}
-      \field{sortinit}{O}
-      \field{sortinithash}{2cd7140a07aea5341f9e2771efe90aae}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{OWASP Top 10: Broken Authentication}}
-      \field{year}{2024}
-      \true{nocite}
-      \verb{urlraw}
-      \verb https://owasp.org/www-project-top-ten/
-      \endverb
-      \verb{url}
-      \verb https://owasp.org/www-project-top-ten/
       \endverb
     \endentry
     \entry{Plex:2024}{online}{}{}
@@ -2396,7 +2342,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Plex Media Server API Documentation}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.plex.tv/
       \endverb
@@ -2427,7 +2372,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Recharts --- A composable charting library built on React components}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://recharts.org/
       \endverb
@@ -2466,6 +2410,22 @@
       \verb https://seriesgraph.com/
       \endverb
     \endentry
+    \entry{SeriesGuide:2024}{online}{}{}
+      \field{sortinit}{S}
+      \field{sortinithash}{b164b07b29984b41daf1e85279fbc5ab}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labeltitlesource}{title}
+      \field{title}{{SeriesGuide --- Track Your Favorite TV Shows and Movies}}
+      \field{year}{2024}
+      \true{nocite}
+      \verb{urlraw}
+      \verb https://www.seriesgui.de/
+      \endverb
+      \verb{url}
+      \verb https://www.seriesgui.de/
+      \endverb
+    \endentry
     \entry{Simkl:2024}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=e3fdec5d358db392fdefe441dd0298ee}{%
@@ -2489,7 +2449,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Simkl --- TV Tracker, Movie and Anime Tracker}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://simkl.com/
       \endverb
@@ -2520,7 +2479,6 @@
       \field{labeltitlesource}{title}
       \field{title}{Number of Netflix subscribers worldwide from 1st quarter 2013 to 4th quarter 2023}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.statista.com/statistics/250934/quarterly-number-of-netflix-streaming-subscribers-worldwide/
       \endverb
@@ -2551,7 +2509,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Tailwind CSS Documentation}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://tailwindcss.com/docs
       \endverb
@@ -2582,7 +2539,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{TMDb API Documentation v3}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://developer.themoviedb.org/docs/getting-started
       \endverb
@@ -2613,7 +2569,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Trakt API Documentation v2}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://trakt.docs.apiary.io/
       \endverb
@@ -2652,37 +2607,6 @@
       \verb https://www.tvtime.com/
       \endverb
     \endentry
-    \entry{SeriesGuide:2024}{online}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=7aa4cc1b4a03df58b0567b252464f777}{%
-           family={{Uwe Trottmann}},
-           familyi={U\bibinitperiod}}}%
-      }
-      \strng{namehash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{fullhash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{fullhashraw}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{bibnamehash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{authorbibnamehash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{authornamehash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{authorfullhash}{7aa4cc1b4a03df58b0567b252464f777}
-      \strng{authorfullhashraw}{7aa4cc1b4a03df58b0567b252464f777}
-      \field{sortinit}{U}
-      \field{sortinithash}{6901a00e45705986ee5e7ca9fd39adca}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{{SeriesGuide --- Track Your Favorite TV Shows and Movies}}
-      \field{year}{2024}
-      \true{nocite}
-      \verb{urlraw}
-      \verb https://seriesguide.tv/
-      \endverb
-      \verb{url}
-      \verb https://seriesguide.tv/
-      \endverb
-    \endentry
     \entry{Vercel:2024a}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
@@ -2708,7 +2632,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Next.js Documentation --- App Router}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://nextjs.org/docs/app
       \endverb
@@ -2716,7 +2639,7 @@
       \verb https://nextjs.org/docs/app
       \endverb
     \endentry
-    \entry{Vercel:2024c}{online}{}{}
+    \entry{NextJS:2024}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
            family={{Vercel}},
@@ -2739,17 +2662,16 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{{Next.js Documentation --- Incremental Static Regeneration}}
+      \field{title}{{Next.js Documentation --- Authentication}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
-      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
+      \verb https://nextjs.org/docs/pages/guides/authentication
       \endverb
       \verb{url}
-      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
+      \verb https://nextjs.org/docs/pages/guides/authentication
       \endverb
     \endentry
-    \entry{Vercel:2024b}{online}{}{}
+    \entry{Vercel:2024c}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
            family={{Vercel}},
@@ -2772,17 +2694,16 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{title}{{Vercel Documentation --- Edge Functions and Middleware}}
+      \field{title}{{Next.js Documentation --- Incremental Static Regeneration}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
-      \verb https://vercel.com/docs/functions
+      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
       \endverb
       \verb{url}
-      \verb https://vercel.com/docs/functions
+      \verb https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration
       \endverb
     \endentry
-    \entry{Vercel:2024d}{online}{}{}
+    \entry{Vercel:2024b}{online}{}{}
       \name{author}{1}{}{%
         {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
            family={{Vercel}},
@@ -2805,9 +2726,40 @@
       \true{uniqueprimaryauthor}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
+      \field{title}{{Vercel Documentation --- Edge Functions and Middleware}}
+      \field{year}{2024}
+      \verb{urlraw}
+      \verb https://vercel.com/docs/functions
+      \endverb
+      \verb{url}
+      \verb https://vercel.com/docs/functions
+      \endverb
+    \endentry
+    \entry{Vercel:2024d}{online}{}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=dc173d57136dbe619cbccee88ee6421c}{%
+           family={{Vercel}},
+           familyi={V\bibinitperiod}}}%
+      }
+      \strng{namehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{fullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{bibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorbibnamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authornamehash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhash}{dc173d57136dbe619cbccee88ee6421c}
+      \strng{authorfullhashraw}{dc173d57136dbe619cbccee88ee6421c}
+      \field{extraname}{5}
+      \field{sortinit}{V}
+      \field{sortinithash}{afb52128e5b4dc4b843768c0113d673b}
+      \field{extradate}{5}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
       \field{title}{{Vercel Speed Insights}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://vercel.com/docs/speed-insights
       \endverb
@@ -2839,7 +2791,6 @@
       \field{labeltitlesource}{title}
       \field{title}{{Web Content Accessibility Guidelines (WCAG) 2.1}}
       \field{year}{2023}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.w3.org/TR/WCAG21/
       \endverb
@@ -2871,46 +2822,11 @@
       \field{labeltitlesource}{title}
       \field{title}{{Progressive Web Apps (PWAs)}}
       \field{year}{2024}
-      \true{nocite}
       \verb{urlraw}
       \verb https://www.w3.org/TR/appmanifest/
       \endverb
       \verb{url}
       \verb https://www.w3.org/TR/appmanifest/
-      \endverb
-    \endentry
-    \entry{Wieruch:2023}{book}{}{}
-      \name{author}{1}{}{%
-        {{un=0,uniquepart=base,hash=243e85ae7a690c6e398cd334598b4873}{%
-           family={Wieruch},
-           familyi={W\bibinitperiod},
-           given={Robin},
-           giveni={R\bibinitperiod},
-           givenun=0}}%
-      }
-      \strng{namehash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{fullhash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{fullhashraw}{243e85ae7a690c6e398cd334598b4873}
-      \strng{bibnamehash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{authorbibnamehash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{authornamehash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{authorfullhash}{243e85ae7a690c6e398cd334598b4873}
-      \strng{authorfullhashraw}{243e85ae7a690c6e398cd334598b4873}
-      \field{sortinit}{W}
-      \field{sortinithash}{4315d78024d0cea9b57a0c6f0e35ed0d}
-      \field{extradatescope}{labelyear}
-      \field{labeldatesource}{}
-      \true{uniqueprimaryauthor}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{The Road to Next.js}
-      \field{year}{2023}
-      \true{nocite}
-      \verb{urlraw}
-      \verb https://www.roadtonextjs.com/
-      \endverb
-      \verb{url}
-      \verb https://www.roadtonextjs.com/
       \endverb
     \endentry
   \enddatalist
