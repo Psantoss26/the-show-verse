@@ -33,6 +33,13 @@ const getCachedScoreboardFull = unstable_cache(
   { revalidate: 120 },
 );
 
+function hasCommunityData(result) {
+  return (
+    typeof result?.community?.rating === "number" ||
+    typeof result?.community?.votes === "number"
+  );
+}
+
 export async function getCachedTraktScoreboardData({
   type,
   tmdbId,
@@ -49,7 +56,30 @@ export async function getCachedTraktScoreboardData({
     episode == null ? "" : String(episode),
   ];
 
-  return includeStats
+  const cachedResult = await (includeStats
     ? getCachedScoreboardFull(...args)
-    : getCachedScoreboardQuick(...args);
+    : getCachedScoreboardQuick(...args));
+
+  if (cachedResult?.found && hasCommunityData(cachedResult)) {
+    return cachedResult;
+  }
+
+  try {
+    const freshResult = await getTraktScoreboardData({
+      type,
+      tmdbId,
+      traktId,
+      includeStats,
+      season,
+      episode,
+    });
+
+    if (freshResult?.found) {
+      return freshResult;
+    }
+
+    return cachedResult || freshResult || { found: false };
+  } catch {
+    return cachedResult || { found: false };
+  }
 }

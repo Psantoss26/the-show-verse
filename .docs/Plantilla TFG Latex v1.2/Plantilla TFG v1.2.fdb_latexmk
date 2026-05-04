@@ -1,12 +1,12 @@
 # Fdb version 4
-["biber Plantilla TFG v1.2"] 1777218158.6906 "Plantilla TFG v1.2.bcf" "Plantilla TFG v1.2.bbl" "Plantilla TFG v1.2" 1777218871.20671 0
-  "Plantilla TFG v1.2.bcf" 1777218870 139525 2235055a8c2997bb3941336b524a2f0c "pdflatex"
-  "biblio.bib" 1777217361 8668 4a6cd08a9ef872f96a1570a12a14ceb5 ""
+["biber Plantilla TFG v1.2"] 1777218980.62817 "Plantilla TFG v1.2.bcf" "Plantilla TFG v1.2.bbl" "Plantilla TFG v1.2" 1777218995.3386 0
+  "Plantilla TFG v1.2.bcf" 1777218994 139525 2235055a8c2997bb3941336b524a2f0c "pdflatex"
+  "biblio.bib" 1777218972 8668 4a6cd08a9ef872f96a1570a12a14ceb5 ""
   (generated)
   "Plantilla TFG v1.2.bbl"
   "Plantilla TFG v1.2.blg"
   (rewritten before read)
-["pdflatex"] 1777218867.08878 "e:/ASNPORTS/PELICULAS/the-show-verse/.docs/Plantilla TFG Latex v1.2/Plantilla TFG v1.2.tex" "Plantilla TFG v1.2.pdf" "Plantilla TFG v1.2" 1777218871.2075 2
+["pdflatex"] 1777218991.52331 "e:/ASNPORTS/PELICULAS/the-show-verse/.docs/Plantilla TFG Latex v1.2/Plantilla TFG v1.2.tex" "Plantilla TFG v1.2.pdf" "Plantilla TFG v1.2" 1777218995.33938 0
   "../notes/.images/addlistmodal.jpg" 1776849541 53240 3d3bbebdd21c9fe950301f5781916980 ""
   "../notes/.images/biblioteca.jpg" 1776849503 477571 1d8e4eb83ff73ed3e7aba1a8805e3679 ""
   "../notes/.images/botonesaccion.jpg" 1776849503 8661 998c4e65a91301be02bda172d93a1b62 ""
@@ -224,24 +224,24 @@
   "C:/Users/pablo/AppData/Local/Programs/MiKTeX/tex/latex/wasysym/wasysym.sty" 1579693002 11252 7fbfbe7bbcbe1f73acbe32ae2f10c666 ""
   "C:/Users/pablo/AppData/Local/Programs/MiKTeX/tex/latex/xstring/xstring.sty" 1693735632 123 a302f2c651a95033260db60e51527ae8 ""
   "LogoUCJC.png" 1776849503 40164 b272e52b7ad6d11519399042b799e411 ""
-  "Plantilla TFG v1.2.aux" 1777218870 50141 2d69d97fc6cf45ec837a4dfab94c7cdf "pdflatex"
-  "Plantilla TFG v1.2.bbl" 1777218296 117965 5f465fd7b2911adeeef896587ab442d8 "biber Plantilla TFG v1.2"
-  "Plantilla TFG v1.2.lof" 1777218870 5961 4cf11271183780d8b01232dbdc0864e0 "pdflatex"
-  "Plantilla TFG v1.2.lot" 1777218870 1243 40776db72a6725a7491d5f04fd061a78 "pdflatex"
-  "Plantilla TFG v1.2.out" 1777218870 29254 cc73b3f2d018d67d6ea63eefad88c04e "pdflatex"
-  "Plantilla TFG v1.2.run.xml" 1777218870 2467 efcf709cb20dabfb9b2686db7671fed4 "pdflatex"
+  "Plantilla TFG v1.2.aux" 1777218994 50173 6392ae7f8639476d2bb15412a3143331 "pdflatex"
+  "Plantilla TFG v1.2.bbl" 1777218983 117965 5f465fd7b2911adeeef896587ab442d8 "biber Plantilla TFG v1.2"
+  "Plantilla TFG v1.2.lof" 1777218994 5961 73e31127d943db362e4122a220d3f26a "pdflatex"
+  "Plantilla TFG v1.2.lot" 1777218994 1245 d66f0bae436525015beb65ba07c8cad8 "pdflatex"
+  "Plantilla TFG v1.2.out" 1777218994 29254 cc73b3f2d018d67d6ea63eefad88c04e "pdflatex"
+  "Plantilla TFG v1.2.run.xml" 1777218994 2467 f2452d2e94df24f61cdcdf3707e00b79 "pdflatex"
   "Plantilla TFG v1.2.tex" 1776851225 7115 1f3927189d8fc74965e0a53541623fdd ""
-  "Plantilla TFG v1.2.toc" 1777218870 13444 8826e6f1e2a9e854b9fedc5a40b6f3c3 "pdflatex"
+  "Plantilla TFG v1.2.toc" 1777218994 13455 695cf47a9d02438cec12a8a3a3cbe0d6 "pdflatex"
   "U-tad-logo-azul.pdf" 1776849503 78222 713fd0be62da9454a6ffe104592e6a47 ""
   "abstract.tex" 1776851225 2328 fdaab2a6736cacdcf3401227526a0220 ""
   "anexo.tex" 1776850871 2579 c129ad8b97f068ec05d35fa403a49435 ""
-  "aspectos.tex" 1777218850 12494 cd6a66b7d7b54dea0888dfe211009128 ""
-  "conclusiones.tex" 1777217361 18175 c9f438b20da8583d7b9cba8102ce18c1 ""
-  "desarrollo.tex" 1777218850 122371 ead16604a21ccdcbace23106a06afdb9 ""
+  "aspectos.tex" 1777218972 12494 cd6a66b7d7b54dea0888dfe211009128 ""
+  "conclusiones.tex" 1777218972 18175 c9f438b20da8583d7b9cba8102ce18c1 ""
+  "desarrollo.tex" 1777218983 122371 ead16604a21ccdcbace23106a06afdb9 ""
   "e:/ASNPORTS/PELICULAS/the-show-verse/.docs/Plantilla TFG Latex v1.2/Plantilla TFG v1.2.tex" 1776851225 7115 1f3927189d8fc74965e0a53541623fdd ""
-  "estado.tex" 1777217693 12452 8cf54bdf373353994306c577fb111ab3 ""
+  "estado.tex" 1777218972 12452 8cf54bdf373353994306c577fb111ab3 ""
   "glosario.tex" 1776849503 2065 7c723e3b91d3e6a99e7ab5438d3cfc40 ""
-  "introduccion.tex" 1777217361 12235 f80ed4f4a9d0860e0c9ab2a05465b689 ""
+  "introduccion.tex" 1777218972 12235 f80ed4f4a9d0860e0c9ab2a05465b689 ""
   "portada.tex" 1776849503 1031 bce0b147e13e00f2c417014277b998cc ""
   (generated)
   "Plantilla TFG v1.2.aux"
