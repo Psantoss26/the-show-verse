@@ -5,7 +5,13 @@ import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
 export const runtime = "nodejs";
 export const maxDuration = 12;
 
-function getCacheHeaders(includeStats) {
+function getCacheHeaders(includeStats, cacheable = true) {
+  if (!cacheable) {
+    return {
+      "Cache-Control": "private, no-store, max-age=0",
+    };
+  }
+
   return {
     "Cache-Control": includeStats
       ? "public, s-maxage=120, stale-while-revalidate=900"
@@ -42,7 +48,7 @@ export async function GET(req) {
     });
 
     return NextResponse.json(result || { found: false }, {
-      headers: cacheHeaders,
+      headers: getCacheHeaders(includeStats, !!result?.found),
     });
   } catch (e) {
     const isRecoverable =
@@ -56,7 +62,10 @@ export async function GET(req) {
       /timeout|rate limit|forbidden/i.test(e?.message || "");
 
     if (isRecoverable) {
-      return NextResponse.json({ found: false }, { headers: cacheHeaders });
+      return NextResponse.json(
+        { found: false },
+        { headers: getCacheHeaders(includeStats, false) },
+      );
     }
 
     return NextResponse.json(
@@ -64,7 +73,7 @@ export async function GET(req) {
         found: false,
         error: e?.message || "Unexpected error",
       },
-      { status: 500, headers: cacheHeaders },
+      { status: 500, headers: getCacheHeaders(includeStats, false) },
     );
   }
 }
