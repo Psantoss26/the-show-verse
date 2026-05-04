@@ -14,6 +14,23 @@ const EMPTY_STATS = {
   favorited: null,
 };
 
+function shapeCommunity(primary, fallback = null) {
+  const rating =
+    typeof primary?.rating === "number"
+      ? primary.rating
+      : typeof fallback?.rating === "number"
+        ? fallback.rating
+        : null;
+  const votes =
+    typeof primary?.votes === "number"
+      ? primary.votes
+      : typeof fallback?.votes === "number"
+        ? fallback.votes
+        : null;
+
+  return { rating, votes };
+}
+
 function shapeStats(stats) {
   if (!stats) return EMPTY_STATS;
   return {
@@ -97,6 +114,8 @@ export async function getTraktScoreboardData({
     fetchTrakt(path, { timeoutMs: fastTimeoutMs, maxRetries: 0 });
   const ftStats = (path) =>
     fetchTraktMaybe(path, { timeoutMs: statsTimeoutMs, maxRetries: 0 });
+  const ftCommunity = (path) =>
+    fetchTraktMaybe(path, { timeoutMs: fastTimeoutMs, maxRetries: 0 });
 
   if (normalizedType === "movie" || normalizedType === "show") {
     const plural = normalizedType === "show" ? "shows" : "movies";
@@ -111,16 +130,21 @@ export async function getTraktScoreboardData({
 
     if (!resolvedTraktId) return { found: false };
 
-    const [summary, stats] = includeStats
+    const [summary, ratings, stats] = includeStats
       ? await Promise.all([
           ft(`/${plural}/${resolvedTraktId}`).catch(() => null),
+          ftCommunity(`/${plural}/${resolvedTraktId}/ratings`),
           fetchOptionalStats(
             [`/${plural}/${resolvedTraktId}/stats`],
             ftStats,
             process.env.NODE_ENV === "production" ? 5000 : 3000,
           ),
         ])
-      : [await ft(`/${plural}/${resolvedTraktId}`).catch(() => null), null];
+      : [
+          await ft(`/${plural}/${resolvedTraktId}`).catch(() => null),
+          await ftCommunity(`/${plural}/${resolvedTraktId}/ratings`),
+          null,
+        ];
 
     const slug = summary?.ids?.slug || resolved?.slug || ids?.slug || resolvedTraktId;
     const traktUrl =
@@ -132,10 +156,7 @@ export async function getTraktScoreboardData({
       found: true,
       ids: summary?.ids || ids,
       traktUrl,
-      community: {
-        rating: typeof summary?.rating === "number" ? summary.rating : null,
-        votes: typeof summary?.votes === "number" ? summary.votes : null,
-      },
+      community: shapeCommunity(ratings, summary),
       stats: shapeStats(stats),
       external: {
         rtAudience: null,
@@ -170,16 +191,21 @@ export async function getTraktScoreboardData({
   if (!traktShowId) return { found: false };
 
   if (normalizedType === "season") {
-    const [seasons, stats] = includeStats
+    const [seasons, ratings, stats] = includeStats
       ? await Promise.all([
           ft(`/shows/${traktShowId}/seasons?extended=full`),
+          ftCommunity(`/shows/${traktShowId}/seasons/${seasonNumber}/ratings`),
           fetchOptionalStats(
             [`/shows/${traktShowId}/seasons/${seasonNumber}/stats`],
             ftStats,
             process.env.NODE_ENV === "production" ? 5000 : 3000,
           ),
         ])
-      : [await ft(`/shows/${traktShowId}/seasons?extended=full`), null];
+      : [
+          await ft(`/shows/${traktShowId}/seasons?extended=full`),
+          await ftCommunity(`/shows/${traktShowId}/seasons/${seasonNumber}/ratings`),
+          null,
+        ];
     const seasonObj = Array.isArray(seasons)
       ? seasons.find((s) => Number(s?.number) === Number(seasonNumber))
       : null;
@@ -193,10 +219,7 @@ export async function getTraktScoreboardData({
       found: true,
       ids: seasonIds,
       traktUrl,
-      community: {
-        rating: typeof seasonObj?.rating === "number" ? seasonObj.rating : null,
-        votes: typeof seasonObj?.votes === "number" ? seasonObj.votes : null,
-      },
+      community: shapeCommunity(ratings, seasonObj),
       stats: shapeStats(stats),
       external: {
         rtAudience: null,
@@ -207,10 +230,13 @@ export async function getTraktScoreboardData({
     };
   }
 
-  const [ep, stats] = includeStats
+  const [ep, ratings, stats] = includeStats
     ? await Promise.all([
         ft(
           `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
+        ),
+        ftCommunity(
+          `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/ratings`,
         ),
         fetchOptionalStats(
           [
@@ -224,6 +250,9 @@ export async function getTraktScoreboardData({
         await ft(
           `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}?extended=full`,
         ),
+        await ftCommunity(
+          `/shows/${traktShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}/ratings`,
+        ),
         null,
       ];
   const epIds = ep?.ids;
@@ -235,10 +264,7 @@ export async function getTraktScoreboardData({
     found: true,
     ids: epIds,
     traktUrl,
-    community: {
-      rating: typeof ep?.rating === "number" ? ep.rating : null,
-      votes: typeof ep?.votes === "number" ? ep.votes : null,
-    },
+    community: shapeCommunity(ratings, ep),
     stats: shapeStats(stats),
     external: {
       rtAudience: null,
