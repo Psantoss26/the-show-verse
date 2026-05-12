@@ -377,7 +377,7 @@ export default function DetailsClient({
   // -- Datos basicos derivados de las props --
   const title = data.title || data.name; // Peliculas usan "title", series usan "name"
   const endpointType = type === "tv" ? "tv" : "movie"; // Tipo normalizado para endpoints de API
-  const yearIso = (data.release_date || data.first_air_date || "")?.slice(0, 4); // Ano de estreno
+  const yearIso = (data.release_date || data.first_air_date || "")?.slice(0, 4); // Año de estreno
 
   // URLs de TMDb para enlace externo y pagina de "donde ver"
   const tmdbDetailUrl =
@@ -389,7 +389,7 @@ export default function DetailsClient({
 
   // -- Estado general de la UI --
   const [showAdminImages, setShowAdminImages] = useState(false); // Panel admin de imagenes (solo admin)
-  const [reviewLimit, setReviewLimit] = useState(2); // Numero de resenas visibles (expandible)
+  const [reviewLimit, setReviewLimit] = useState(2); // Numero de reseñas visibles (expandible)
   const [useBackdrop, setUseBackdrop] = useState(true); // Alternar entre backdrop y poster como fondo
 
   // -- Autenticacion y permisos --
