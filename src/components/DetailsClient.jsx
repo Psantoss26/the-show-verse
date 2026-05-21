@@ -86,8 +86,6 @@ import {
   MessageSquare,
   MoreHorizontal,
   SlidersHorizontal,
-  Globe2,
-  PenLine,
 } from "lucide-react";
 
 // Boton con efecto liquido para acciones principales
@@ -385,7 +383,6 @@ function getAwardVisual(name) {
   if (/\bacademy\b|oscar/.test(n)) {
     return {
       label: "OSCAR",
-      Icon: Trophy,
       background:
         "radial-gradient(circle at 50% 18%, rgba(255,231,138,0.36), transparent 30%), linear-gradient(145deg, #3d2a08 0%, #090807 48%, #000 100%)",
       accent: "text-yellow-200",
@@ -396,7 +393,6 @@ function getAwardVisual(name) {
   if (/golden\s+globes?/.test(n)) {
     return {
       label: "GLOBES",
-      Icon: Globe2,
       background:
         "radial-gradient(circle at 50% 26%, rgba(252,211,77,0.34), transparent 32%), linear-gradient(145deg, #2c1d08 0%, #071716 52%, #010101 100%)",
       accent: "text-amber-200",
@@ -407,7 +403,6 @@ function getAwardVisual(name) {
   if (/bafta/.test(n)) {
     return {
       label: "BAFTA",
-      Icon: FilmIcon,
       background:
         "radial-gradient(circle at 50% 22%, rgba(251,191,36,0.28), transparent 33%), linear-gradient(145deg, #301f0c 0%, #16100c 42%, #000 100%)",
       accent: "text-orange-200",
@@ -418,7 +413,6 @@ function getAwardVisual(name) {
   if (/actor|screen\s+actors|sag/.test(n)) {
     return {
       label: "ACTORS",
-      Icon: Users,
       background:
         "radial-gradient(circle at 50% 18%, rgba(125,211,252,0.24), transparent 34%), linear-gradient(145deg, #071b2b 0%, #060b12 52%, #000 100%)",
       accent: "text-sky-200",
@@ -429,7 +423,6 @@ function getAwardVisual(name) {
   if (/writers?|screenplay|wga|guild/.test(n)) {
     return {
       label: "WGA",
-      Icon: PenLine,
       background:
         "radial-gradient(circle at 50% 18%, rgba(216,180,254,0.22), transparent 34%), linear-gradient(145deg, #241035 0%, #100817 52%, #000 100%)",
       accent: "text-violet-200",
@@ -440,7 +433,6 @@ function getAwardVisual(name) {
   if (/\bafi\b/.test(n)) {
     return {
       label: "AFI",
-      Icon: Star,
       background:
         "radial-gradient(circle at 50% 18%, rgba(248,113,113,0.22), transparent 34%), linear-gradient(145deg, #2f0d0d 0%, #130809 50%, #000 100%)",
       accent: "text-red-200",
@@ -451,7 +443,6 @@ function getAwardVisual(name) {
   if (/japan/.test(n)) {
     return {
       label: "JAPAN",
-      Icon: Sparkles,
       background:
         "radial-gradient(circle at 50% 18%, rgba(244,114,182,0.22), transparent 34%), linear-gradient(145deg, #2a0d1d 0%, #13080f 52%, #000 100%)",
       accent: "text-pink-200",
@@ -462,7 +453,6 @@ function getAwardVisual(name) {
   if (/czech|lion/.test(n)) {
     return {
       label: "LION",
-      Icon: Trophy,
       background:
         "radial-gradient(circle at 50% 18%, rgba(250,204,21,0.25), transparent 34%), linear-gradient(145deg, #2f2608 0%, #101006 52%, #000 100%)",
       accent: "text-yellow-200",
@@ -472,12 +462,146 @@ function getAwardVisual(name) {
 
   return {
     label: getAwardInitials(name),
-    Icon: Trophy,
     background:
       "radial-gradient(circle at 50% 18%, rgba(250,204,21,0.2), transparent 34%), linear-gradient(145deg, #1f1b12 0%, #0b0b0b 52%, #000 100%)",
     accent: "text-yellow-200",
     ring: "border-yellow-300/20",
   };
+}
+
+function awardCategoryContextLabel(category) {
+  const c = String(category || "").toLowerCase();
+  if (/drama series/.test(c)) return "en drama";
+  if (/comedy series/.test(c)) return "en comedia";
+  if (/limited series|miniseries|television movie|tv movie/.test(c)) {
+    return "en miniserie/TV";
+  }
+  if (/motion picture|feature film|film\b/.test(c)) return "en película";
+  if (/series/.test(c)) return "en serie";
+  return "";
+}
+
+function normalizeAwardCategoryKey(category) {
+  return String(category || "")
+    .toLowerCase()
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatCommonAwardCategory(category) {
+  const c = normalizeAwardCategoryKey(category);
+
+  const exact = {
+    "best picture": "Mejor película",
+    "best film": "Mejor película",
+    "best director": "Mejor dirección",
+    "best original screenplay": "Mejor guion original",
+    "best adapted screenplay": "Mejor guion adaptado",
+    "best screenplay": "Mejor guion",
+    "best original score": "Mejor música original",
+    "best original song": "Mejor canción original",
+    "best cinematography": "Mejor fotografía",
+    "best editing": "Mejor montaje",
+    "best film editing": "Mejor montaje",
+    "best production design": "Mejor diseño de producción",
+    "best art direction": "Mejor dirección artística",
+    "best costume design": "Mejor vestuario",
+    "best makeup": "Mejor maquillaje",
+    "best make-up and hair": "Mejor maquillaje y peluquería",
+    "best visual effects": "Mejores efectos visuales",
+    "best special effects": "Mejores efectos especiales",
+    "best sound": "Mejor sonido",
+    "best sound editing": "Mejor edición de sonido",
+    "best sound mixing": "Mejor mezcla de sonido",
+    "best foreign film": "Mejor película extranjera",
+    "best international feature film": "Mejor película internacional",
+    "best foreign language film": "Mejor película en lengua extranjera",
+    "outstanding foreign language film": "Mejor película en lengua extranjera",
+    "afi movies of the year": "Película del año",
+  };
+
+  if (exact[c]) return exact[c];
+
+  if (/best motion picture - drama/.test(c)) return "Mejor película dramática";
+  if (/best motion picture - musical or comedy/.test(c)) {
+    return "Mejor película musical o comedia";
+  }
+  if (/best television series - drama/.test(c)) {
+    return "Mejor serie dramática";
+  }
+  if (/best television series - musical or comedy/.test(c)) {
+    return "Mejor serie musical o comedia";
+  }
+  if (/best limited series|best television movie/.test(c)) {
+    return "Mejor miniserie o película de TV";
+  }
+
+  if (/best director/.test(c)) return "Mejor dirección";
+  if (/best screenplay/.test(c)) return "Mejor guion";
+  if (/best original score/.test(c)) return "Mejor música original";
+  if (/best original song/.test(c)) return "Mejor canción original";
+
+  if (/best (lead )?actor/.test(c)) {
+    const context = awardCategoryContextLabel(category);
+    return ["Mejor actor", context].filter(Boolean).join(" ");
+  }
+  if (/best (lead )?actress/.test(c)) {
+    const context = awardCategoryContextLabel(category);
+    return ["Mejor actriz", context].filter(Boolean).join(" ");
+  }
+  if (/best supporting actor/.test(c)) {
+    const context = awardCategoryContextLabel(category);
+    return ["Mejor actor de reparto", context].filter(Boolean).join(" ");
+  }
+  if (/best supporting actress/.test(c)) {
+    const context = awardCategoryContextLabel(category);
+    return ["Mejor actriz de reparto", context].filter(Boolean).join(" ");
+  }
+
+  if (/outstanding drama series/.test(c)) return "Mejor serie dramática";
+  if (/outstanding comedy series/.test(c)) return "Mejor serie de comedia";
+  if (/outstanding limited|outstanding television movie/.test(c)) {
+    return "Mejor miniserie o película de TV";
+  }
+  if (/outstanding directing/.test(c)) {
+    const context = awardCategoryContextLabel(category);
+    return ["Mejor dirección", context].filter(Boolean).join(" ");
+  }
+  if (/outstanding writing/.test(c)) {
+    const context = awardCategoryContextLabel(category);
+    return ["Mejor guion", context].filter(Boolean).join(" ");
+  }
+  if (/outstanding casting/.test(c)) {
+    const context = awardCategoryContextLabel(category);
+    return ["Mejor casting", context].filter(Boolean).join(" ");
+  }
+
+  return null;
+}
+
+function formatAwardCategory(category, groupName) {
+  const raw = String(category || "").trim();
+  if (!raw) return groupName || "Premio";
+
+  const group = String(groupName || "").toLowerCase();
+  const c = normalizeAwardCategoryKey(raw);
+  const isActorAward = /actor|screen\s+actors|sag/.test(group);
+
+  if (isActorAward || /outstanding performance/.test(c)) {
+    const context = awardCategoryContextLabel(raw);
+    const withContext = (base) => [base, context].filter(Boolean).join(" ");
+
+    if (/stunt ensemble|action performance/.test(c)) {
+      return withContext("Mejor equipo de especialistas");
+    }
+    if (/ensemble|cast/.test(c)) return withContext("Mejor reparto");
+    if (/guest actor/.test(c)) return withContext("Mejor actor invitado");
+    if (/female actor|actress/.test(c)) return withContext("Mejor actriz");
+    if (/male actor|actor/.test(c)) return withContext("Mejor actor");
+  }
+
+  return formatCommonAwardCategory(raw) || raw;
 }
 
 function AwardsPanel({ awards, details }) {
@@ -530,12 +654,12 @@ function AwardsPanel({ awards, details }) {
 function AwardCard({ item }) {
   const people = Array.isArray(item?.people) ? item.people.filter(Boolean) : [];
   const visual = getAwardVisual(item?.groupName);
-  const VisualIcon = visual.Icon;
+  const categoryLabel = formatAwardCategory(item?.category, item?.groupName);
 
   return (
     <article className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1">
       <div className="aspect-[2/3] overflow-hidden relative flex flex-col bg-black">
-        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-2">
+        <div className="absolute inset-x-0 top-0 z-10 hidden items-start justify-between gap-2 p-2 sm:flex">
           <span
             className={`rounded-md border px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider shadow-sm backdrop-blur-md ${awardResultClass(
               item?.result,
@@ -551,7 +675,7 @@ function AwardCard({ item }) {
         </div>
 
         <div
-          className="relative flex min-h-0 flex-[1.12] items-center justify-center overflow-hidden p-5 sm:p-6"
+          className="relative flex min-h-0 flex-[1.28] items-center justify-center overflow-hidden p-3 sm:flex-[1.12] sm:p-6"
           style={{ background: visual.background }}
         >
           <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.18)_48%,transparent_52%)]" />
@@ -559,7 +683,7 @@ function AwardCard({ item }) {
           <div className="absolute inset-x-8 bottom-5 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
           {item?.groupImageUrl && (
-            <div className="absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-black/45 p-1.5 backdrop-blur-md">
+            <div className="absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/45 p-1 backdrop-blur-md sm:right-3 sm:bottom-3 sm:h-10 sm:w-10 sm:rounded-lg sm:p-1.5">
               <img
                 src={item.groupImageUrl}
                 alt=""
@@ -570,36 +694,40 @@ function AwardCard({ item }) {
             </div>
           )}
 
-          <div
-            className={`relative flex h-20 w-20 items-center justify-center rounded-full border bg-black/35 shadow-[0_20px_55px_rgba(0,0,0,0.65)] backdrop-blur-sm ${visual.ring}`}
-          >
-            <VisualIcon className={`h-10 w-10 ${visual.accent}`} />
-          </div>
-
-          <div className="absolute inset-x-4 bottom-14 text-center">
+          <div className="absolute inset-x-2 bottom-8 text-center sm:inset-x-4 sm:bottom-14">
             <div
-              className={`text-2xl font-black tracking-[0.18em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] ${visual.accent}`}
+              className={`text-base font-black tracking-[0.14em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] sm:text-2xl sm:tracking-[0.18em] ${visual.accent}`}
             >
               {visual.label}
             </div>
-            <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-white/55 line-clamp-1">
+            <div className="mt-1 hidden text-[9px] font-bold uppercase tracking-[0.18em] text-white/55 line-clamp-1 sm:block">
               {item?.groupName}
             </div>
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-[0.9] flex-col justify-end border-t border-white/10 bg-gradient-to-t from-black via-black to-neutral-950 px-2.5 py-3 sm:px-3">
-          <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-2">
-            {item?.category || item?.groupName}
-          </p>
-          <p className="mt-1 text-yellow-400 text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">
-            {item?.groupName}
-          </p>
-          {people.length > 0 && (
-            <p className="mt-1 text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-2">
-              {people.join(", ")}
+        <div className="flex min-h-0 flex-[0.72] flex-col justify-end border-t border-white/10 bg-gradient-to-t from-black via-black to-neutral-950 px-2 py-2 sm:flex-[0.9] sm:px-3 sm:py-3">
+          <div className="sm:hidden">
+            <p className="text-center text-[10px] font-extrabold leading-tight text-white line-clamp-2">
+              {categoryLabel}
             </p>
-          )}
+            <p className="mt-1 text-center text-[9px] font-bold leading-tight text-yellow-400 line-clamp-1">
+              {item?.groupName}
+            </p>
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-white font-extrabold text-sm leading-tight line-clamp-2">
+              {categoryLabel}
+            </p>
+            <p className="mt-1 text-yellow-400 text-xs font-bold leading-tight line-clamp-1">
+              {item?.groupName}
+            </p>
+            {people.length > 0 && (
+              <p className="mt-1 text-gray-300 text-xs leading-tight line-clamp-2">
+                {people.join(", ")}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </article>
