@@ -1,8 +1,11 @@
 // ActorDetails.jsx
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
+import { Swiper, SwiperSlide } from "swiper/react";
+import "swiper/swiper-bundle.css";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   ImageOff,
   Link as LinkIcon,
@@ -28,6 +31,13 @@ import {
   Calendar,
   ArrowUpRight,
 } from "lucide-react";
+import {
+  AnimatedSection,
+  FadeIn,
+  ScaleIn,
+  StaggerContainer,
+} from "@/components/details/AnimatedSection";
+import DetailsSectionMenu from "./DetailsSectionMenu";
 
 /* --- CONFIG & UTILS --- */
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -83,61 +93,28 @@ async function fetchJson(url) {
 
 /* --- UI COMPONENTS --- */
 
-function Badge({ children, icon: Icon, className = "", variant = "default" }) {
-  const variants = {
-    default: "bg-zinc-800/50 text-zinc-300 border-zinc-700/50",
-    highlight: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    warning: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    danger: "bg-red-500/10 text-red-400 border-red-500/20",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium backdrop-blur-sm ${
-        variants[variant] || variants.default
-      } ${className}`}
-    >
-      {Icon && <Icon className="w-3.5 h-3.5" />}
-      {children}
-    </span>
-  );
-}
-
 function SectionTitle({ title, subtitle, icon: Icon, right }) {
   return (
     <div className="flex items-start justify-between gap-4 mb-5">
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         {Icon && (
-          <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-emerald-400 shadow-[0_0_15px_-3px_rgba(52,211,153,0.3)]">
+          <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/5 border border-emerald-500/20 text-emerald-400 shadow-[0_0_15px_-3px_rgba(52,211,153,0.2)]">
             <Icon className="w-5 h-5" />
           </div>
         )}
-        <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+        <div className="flex flex-col">
+          <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">
             {title}
           </h2>
-          {subtitle && <p className="text-xs text-zinc-400 mt-1">{subtitle}</p>}
+          {subtitle && (
+            <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
+              {subtitle}
+            </p>
+          )}
         </div>
       </div>
       {right ? <div className="shrink-0">{right}</div> : null}
     </div>
-  );
-}
-
-function SocialButton({ href, icon: Icon, label }) {
-  if (!href) return null;
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      title={label}
-      className="group relative flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 transition-all duration-300"
-    >
-      <Icon className="w-4 h-4" />
-      <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap">
-        {label}
-      </span>
-    </a>
   );
 }
 
@@ -275,7 +252,6 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
   const personId = actorDetails?.id;
 
   // UI States
-  const [tab, setTab] = useState("credits");
   const [showFullBio, setShowFullBio] = useState(false);
   const [loadingExtra, setLoadingExtra] = useState(false);
   const [extraErr, setExtraErr] = useState("");
@@ -300,6 +276,129 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
   const tmdbUrl = personId
     ? `https://www.themoviedb.org/person/${personId}`
     : null;
+
+  // ====== Poster 3D Tilt ======
+  const posterWrapRef = useRef(null);
+  const posterTiltRef = useRef(null);
+  const posterAnimRafRef = useRef(0);
+  const posterTargetRef = useRef({ rx: 0, ry: 0, s: 1 });
+  const posterStateRef = useRef({ rx: 0, ry: 0, s: 1 });
+  const posterIsInteractingRef = useRef(false);
+
+  const prefersReducedMotion = useReducedMotion();
+  const [poster3dEnabled, setPoster3dEnabled] = useState(false);
+
+  const POSTER_MAX = 10;
+  const POSTER_SCALE = 1.03;
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setPoster3dEnabled(false);
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const update = () => setPoster3dEnabled(media.matches);
+    update();
+    if (media.addEventListener) media.addEventListener("change", update);
+    else media.addListener(update);
+    return () => {
+      if (media.removeEventListener)
+        media.removeEventListener("change", update);
+      else media.removeListener(update);
+    };
+  }, [prefersReducedMotion]);
+
+  const kickPosterAnimation = useCallback(() => {
+    if (!poster3dEnabled || posterAnimRafRef.current) return;
+    const el = posterTiltRef.current;
+    if (!el) return;
+
+    const loop = () => {
+      const cur = posterStateRef.current;
+      const target = posterTargetRef.current;
+      const k = posterIsInteractingRef.current ? 0.18 : 0.14;
+
+      cur.rx += (target.rx - cur.rx) * k;
+      cur.ry += (target.ry - cur.ry) * k;
+      cur.s += (target.s - cur.s) * k;
+
+      el.style.transform =
+        `translateZ(0px) rotateX(${cur.rx.toFixed(3)}deg) rotateY(${cur.ry.toFixed(3)}deg) ` +
+        `scale3d(${cur.s.toFixed(4)}, ${cur.s.toFixed(4)}, ${cur.s.toFixed(4)})`;
+
+      const isSettled =
+        Math.abs(target.rx - cur.rx) < 0.02 &&
+        Math.abs(target.ry - cur.ry) < 0.02 &&
+        Math.abs(target.s - cur.s) < 0.002;
+
+      if (posterIsInteractingRef.current || !isSettled) {
+        posterAnimRafRef.current = window.requestAnimationFrame(loop);
+      } else {
+        posterAnimRafRef.current = 0;
+      }
+    };
+    posterAnimRafRef.current = window.requestAnimationFrame(loop);
+  }, [poster3dEnabled]);
+
+  const setPosterTargetFromPointer = useCallback(
+    (clientX, clientY) => {
+      if (!poster3dEnabled) return;
+      const wrapper = posterWrapRef.current;
+      if (!wrapper) return;
+
+      const rect = wrapper.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+
+      const rx = ((y - cy) / cy) * -POSTER_MAX;
+      const ry = ((x - cx) / cx) * POSTER_MAX;
+
+      posterIsInteractingRef.current = true;
+      posterTargetRef.current = { rx, ry, s: POSTER_SCALE };
+      kickPosterAnimation();
+    },
+    [kickPosterAnimation, poster3dEnabled],
+  );
+
+  const resetPosterTarget = useCallback(() => {
+    posterIsInteractingRef.current = false;
+    posterTargetRef.current = { rx: 0, ry: 0, s: 1 };
+    kickPosterAnimation();
+  }, [kickPosterAnimation]);
+
+  useEffect(() => {
+    const el = posterTiltRef.current;
+    if (!el) return;
+
+    if (!poster3dEnabled) {
+      el.style.transform =
+        "translateZ(0px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)";
+      if (posterAnimRafRef.current) {
+        window.cancelAnimationFrame(posterAnimRafRef.current);
+        posterAnimRafRef.current = 0;
+      }
+      return;
+    }
+
+    posterIsInteractingRef.current = false;
+    posterTargetRef.current = { rx: 0, ry: 0, s: 1 };
+    posterStateRef.current = { rx: 0, ry: 0, s: 1 };
+    el.style.transform =
+      "translateZ(0px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)";
+
+    return () => {
+      if (posterAnimRafRef.current) {
+        window.cancelAnimationFrame(posterAnimRafRef.current);
+        posterAnimRafRef.current = 0;
+      }
+    };
+  }, [poster3dEnabled, profileSrc]);
 
   const loadAll = useCallback(async () => {
     if (!TMDB_API_KEY || !personId) return;
@@ -346,7 +445,6 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
     setYearFrom("");
     setYearTo("");
     setSort("date_desc");
-    setTab("credits");
     setShowFullBio(false);
     if (personId && TMDB_API_KEY) loadAll();
   }, [personId, loadAll]);
@@ -501,16 +599,6 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
   const taggedCount = taggedImages?.results?.length || 0;
   const photosCount = photos.length;
 
-  const Tabs = useMemo(
-    () => [
-      { id: "credits", label: "Créditos", icon: Film, count: stats.total },
-      { id: "photos", label: "Fotos", icon: Images, count: photosCount },
-      { id: "tagged", label: "En medios", icon: Tags, count: taggedCount },
-      { id: "about", label: "Perfil", icon: User },
-    ],
-    [stats.total, photosCount, taggedCount],
-  );
-
   const clearFilters = () => {
     setQ("");
     setMediaFilter("all");
@@ -529,75 +617,370 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
       .slice(0, 5);
   }, [creditsAll]);
 
+  // hero background
+  const heroBackgroundPath =
+    taggedImages?.results?.[0]?.file_path ||
+    images?.profiles?.[0]?.file_path ||
+    actorDetails?.profile_path;
+
+  const heroBackgroundStyle = useMemo(() => {
+    if (!heroBackgroundPath) return null;
+    return {
+      backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
+    };
+  }, [heroBackgroundPath]);
+
+  const sectionItems = useMemo(() => {
+    const items = [];
+    if (popularItems.length > 0)
+      items.push({ id: "popular", label: "Destacados", icon: Star });
+    if (stats.total > 0)
+      items.push({
+        id: "credits",
+        label: "Créditos",
+        icon: Film,
+        count: stats.total,
+      });
+    if (photosCount > 0)
+      items.push({
+        id: "photos",
+        label: "Fotos",
+        icon: Images,
+        count: photosCount,
+      });
+    if (taggedCount > 0)
+      items.push({
+        id: "tagged",
+        label: "En medios",
+        icon: Tags,
+        count: taggedCount,
+      });
+    items.push({ id: "about", label: "Perfil", icon: User });
+    return items;
+  }, [popularItems.length, stats.total, photosCount, taggedCount]);
+
+  const STICKY_TOP = 72;
+  const sentinelRef = useRef(null);
+  const menuStickyRef = useRef(null);
+  const sectionElsRef = useRef({});
+
+  const [menuCompact, setMenuCompact] = useState(false);
+  const [menuH, setMenuH] = useState(0);
+  const [activeSectionId, setActiveSectionId] = useState(null);
+
+  const registerSection = useCallback(
+    (sid) => (el) => {
+      if (el) sectionElsRef.current[sid] = el;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!menuStickyRef.current) return;
+    const el = menuStickyRef.current;
+    const update = () => setMenuH(el.getBoundingClientRect().height || 0);
+    update();
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        setMenuCompact(!entry.isIntersecting);
+      },
+      {
+        threshold: 0,
+        root: null,
+        rootMargin: `-${STICKY_TOP}px 0px 0px 0px`,
+      },
+    );
+    io.observe(sentinelRef.current);
+    return () => io.disconnect();
+  }, []);
+
+  const scrollToSection = useCallback(
+    (sid) => {
+      const el =
+        sectionElsRef.current[sid] || document.getElementById(`section-${sid}`);
+      if (!el) return;
+
+      const offset = STICKY_TOP + (menuH || 0) + 10;
+      const y = window.scrollY + el.getBoundingClientRect().top - offset;
+      window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+    },
+    [menuH],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ids = (sectionItems || []).map((x) => x?.id).filter(Boolean);
+    if (!ids.length) return;
+
+    let raf = 0;
+    const compute = () => {
+      const offset = STICKY_TOP + (menuH || 0) + 16;
+      let current = ids[0];
+
+      for (const sid of ids) {
+        const el = sectionElsRef.current[sid];
+        if (!el) continue;
+        const top = el.getBoundingClientRect().top;
+        if (top - offset <= 0) current = sid;
+        else break;
+      }
+
+      setActiveSectionId((prev) => (prev === current ? prev : current));
+    };
+
+    const onScroll = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        compute();
+      });
+    };
+
+    compute();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, [sectionItems, menuH]);
+
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
-      {/* Ambient background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-emerald-900/10 rounded-full blur-[120px]" />
-        <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-indigo-900/10 rounded-full blur-[100px]" />
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150" />
+      {/* Background */}
+      <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a]">
+        {heroBackgroundStyle ? (
+          <>
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{
+                ...heroBackgroundStyle,
+                transform: "scale(1)",
+                filter: "blur(14px) brightness(0.65) saturate(1.05)",
+              }}
+            />
+            <div
+              className="absolute inset-0 bg-cover transition-opacity duration-1000"
+              style={{
+                ...heroBackgroundStyle,
+                backgroundPosition: "center top",
+                transform: "scale(1)",
+                transformOrigin: "center top",
+              }}
+            />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-[#0a0a0a]" />
+        )}
+
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20 backdrop-blur-[2px]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-        {/* HERO */}
-        <div className="pt-10 pb-8 sm:pt-16 sm:pb-10">
-          <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-start">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12 pb-24">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 items-start transform-gpu"
+        >
+          {/* --- COLUMNA IZQUIERDA: POSTER + SOCIALS --- */}
+          <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-[max-width] duration-500 ease-out">
             {/* Profile Image */}
-            <div className="shrink-0 relative group w-48 sm:w-60 md:w-72 lg:w-80 mx-auto md:mx-0">
-              <div className="absolute -inset-1 bg-gradient-to-br from-emerald-500 to-indigo-600 rounded-[2rem] opacity-30 blur transition duration-500" />
-              <div className="relative aspect-[2/3] rounded-[1.75rem] overflow-hidden shadow-2xl bg-zinc-900 ring-1 ring-white/10">
-                {profileSrc ? (
-                  <img
-                    src={profileSrc}
-                    alt={actorDetails?.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-zinc-600">
-                    <User className="w-16 h-16" />
+            <div className="relative">
+              <div
+                ref={posterWrapRef}
+                onPointerMove={(e) =>
+                  setPosterTargetFromPointer(e.clientX, e.clientY)
+                }
+                onPointerLeave={resetPosterTarget}
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture?.(e.pointerId);
+                  setPosterTargetFromPointer(e.clientX, e.clientY);
+                }}
+                className="relative"
+                style={{
+                  perspective: poster3dEnabled ? 1100 : undefined,
+                  transformStyle: "preserve-3d",
+                  touchAction: "none",
+                }}
+              >
+                <div
+                  ref={posterTiltRef}
+                  className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 aspect-[2/3] will-change-transform"
+                  style={{
+                    transformStyle: "preserve-3d",
+                    backfaceVisibility: "hidden",
+                    WebkitBackfaceVisibility: "hidden",
+                    outline: "1px solid transparent",
+                    isolation: "isolate",
+                  }}
+                >
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10 z-20" />
+                  <div className="relative w-full h-full bg-neutral-950 z-10 overflow-hidden">
+                    {profileSrc ? (
+                      <img
+                        src={profileSrc}
+                        alt={actorDetails?.name}
+                        className="w-full h-full object-cover"
+                        style={{
+                          transform: poster3dEnabled
+                            ? "scale(1.08)"
+                            : "scale(1)",
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                        <User className="w-16 h-16" />
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
 
-            {/* Info */}
-            <div className="flex-1 min-w-0 text-center md:text-left space-y-6">
-              <div>
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter text-white mb-2 leading-[1.1]">
-                  {safeText(actorDetails?.name)}
-                </h1>
+            {/* Social Links under profile picture like DetailsClient providers */}
+            {socials && Object.values(socials).some(Boolean) && (
+              <StaggerContainer
+                className="flex flex-row flex-wrap justify-center items-center gap-3 w-full px-1 py-2"
+                staggerDelay={0.05}
+              >
+                {Object.entries(socials).map(([key, url], index) => {
+                  if (!url) return null;
+                  let Icon = Globe;
+                  if (key === "imdb") Icon = LinkIcon;
+                  if (key === "instagram") Icon = Instagram;
+                  if (key === "twitter") Icon = Twitter;
+                  if (key === "facebook") Icon = Facebook;
+                  if (key === "youtube") Icon = Youtube;
+                  if (key === "tmdb") Icon = ExternalLink;
 
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-sm text-zinc-400">
-                  {actorDetails?.birthday && (
-                    <span className="flex items-center gap-1.5">
-                      <Cake className="w-4 h-4 text-zinc-500" />
-                      {formatHumanDate(actorDetails.birthday)}
-                      {age && (
-                        <span className="text-emerald-400 font-semibold">
-                          ({age} años)
-                        </span>
-                      )}
+                  return (
+                    <motion.a
+                      key={key}
+                      href={url}
+                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{
+                        duration: 0.28,
+                        delay: 0.03 + index * 0.04,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={key.charAt(0).toUpperCase() + key.slice(1)}
+                      className="group relative flex items-center justify-center w-10 h-10 lg:w-11 lg:h-11 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 transition-all duration-300 transform hover:scale-110"
+                    >
+                      <Icon className="w-4 h-4 lg:w-5 lg:h-5" />
+                    </motion.a>
+                  );
+                })}
+              </StaggerContainer>
+            )}
+          </div>
+
+          {/* --- COLUMNA DERECHA: INFO --- */}
+          <div className="flex-1 flex flex-col min-w-0 w-full">
+            <FadeIn delay={0.06} className="mb-5 px-1">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3 text-center md:text-left">
+                {safeText(actorDetails?.name)}
+              </h1>
+
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 text-base md:text-lg font-medium text-zinc-300">
+                {actorDetails?.birthday && (
+                  <span className="flex items-center gap-1.5">
+                    <Cake className="w-4 h-4 text-zinc-500" />
+                    {formatHumanDate(actorDetails.birthday)}
+                    {age && (
+                      <span className="text-emerald-400 font-semibold">
+                        ({age} años)
+                      </span>
+                    )}
+                  </span>
+                )}
+                {actorDetails?.deathday && (
+                  <span className="flex items-center gap-1.5 text-red-400">
+                    <Skull className="w-4 h-4" />†{" "}
+                    {formatHumanDate(actorDetails.deathday)}
+                  </span>
+                )}
+                {actorDetails?.place_of_birth && (
+                  <span className="hidden sm:flex items-center gap-1.5">
+                    <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                    {actorDetails.place_of_birth}
+                  </span>
+                )}
+              </div>
+            </FadeIn>
+
+            <ScaleIn delay={0.18} className="mb-6">
+              <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden p-4 flex gap-4 overflow-x-auto no-scrollbar items-center">
+                <div className="shrink-0 flex flex-col">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
+                    Conocido/a por
+                  </span>
+                  <span className="text-white text-sm font-semibold">
+                    {actorDetails?.known_for_department || "—"}
+                  </span>
+                </div>
+                <div className="w-px h-6 bg-white/10 shrink-0" />
+                <div className="shrink-0 flex flex-col">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
+                    Créditos Totales
+                  </span>
+                  <span className="text-white text-sm font-semibold">
+                    {stats.total}
+                  </span>
+                </div>
+                <div className="w-px h-6 bg-white/10 shrink-0" />
+                <div className="shrink-0 flex flex-col">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
+                    Actuación
+                  </span>
+                  <span className="text-white text-sm font-semibold">
+                    {stats.acting}
+                  </span>
+                </div>
+                <div className="w-px h-6 bg-white/10 shrink-0" />
+                <div className="shrink-0 flex flex-col">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
+                    Equipo Técnico
+                  </span>
+                  <span className="text-white text-sm font-semibold">
+                    {stats.crew}
+                  </span>
+                </div>
+                <div className="w-px h-8 bg-white/10 shrink-0" />
+                <div className="shrink-0 flex items-center gap-3">
+                  <TrendingUp className="w-5 h-5 text-rose-400" />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
+                      Popularidad
                     </span>
-                  )}
-                  {actorDetails?.deathday && (
-                    <span className="flex items-center gap-1.5 text-red-400">
-                      <Skull className="w-4 h-4" />†{" "}
-                      {formatHumanDate(actorDetails.deathday)}
+                    <span className="text-white text-sm font-semibold">
+                      {Math.round(actorDetails?.popularity || 0)}
                     </span>
-                  )}
-                  {actorDetails?.place_of_birth && (
-                    <span className="hidden sm:flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                      {actorDetails.place_of_birth}
-                    </span>
-                  )}
+                  </div>
                 </div>
               </div>
+            </ScaleIn>
 
-              {/* Bio */}
-              <div className="relative">
-                <div
-                  className={`prose prose-invert prose-sm max-w-none text-zinc-300 leading-relaxed ${
+            <FadeIn delay={0.24}>
+              <div className="p-5 rounded-2xl bg-white/5 border border-white/5 relative">
+                <p
+                  className={`text-zinc-200 text-base leading-relaxed text-justify whitespace-pre-line ${
                     !showFullBio && bio.length > 420
                       ? "line-clamp-4 mask-fade-bottom"
                       : ""
@@ -608,7 +991,7 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
                       Sin biografía disponible.
                     </span>
                   )}
-                </div>
+                </p>
                 {bio.length > 420 && (
                   <button
                     onClick={() => setShowFullBio(!showFullBio)}
@@ -621,563 +1004,360 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
                   </button>
                 )}
               </div>
-
-              {/* Stats + Dept */}
-              <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                <Badge variant="highlight" icon={TrendingUp}>
-                  Pop: {Math.round(actorDetails?.popularity || 0)}
-                </Badge>
-                <Badge icon={Briefcase}>
-                  {actorDetails?.known_for_department || "—"}
-                </Badge>
-                <Badge icon={Film}>{stats.movies} Cine</Badge>
-                <Badge icon={Tv2}>{stats.tv} TV</Badge>
-                <Badge icon={User}>{stats.acting} Actuación</Badge>
-                <Badge icon={Briefcase}>{stats.crew} Equipo</Badge>
-              </div>
-
-              {/* Socials */}
-              <div className="flex items-center justify-center md:justify-start gap-3 pt-1 flex-wrap">
-                <SocialButton
-                  href={socials.tmdb}
-                  icon={ExternalLink}
-                  label="TMDb"
-                />
-                <SocialButton
-                  href={socials.imdb}
-                  icon={LinkIcon}
-                  label="IMDb"
-                />
-                <SocialButton
-                  href={socials.instagram}
-                  icon={Instagram}
-                  label="Instagram"
-                />
-                <SocialButton
-                  href={socials.twitter}
-                  icon={Twitter}
-                  label="Twitter"
-                />
-                <SocialButton
-                  href={socials.facebook}
-                  icon={Facebook}
-                  label="Facebook"
-                />
-                <SocialButton
-                  href={socials.youtube}
-                  icon={Youtube}
-                  label="YouTube"
-                />
-                <SocialButton
-                  href={socials.homepage}
-                  icon={Globe}
-                  label="Website"
-                />
-              </div>
-
-              {!!extraErr && (
-                <div className="text-xs text-red-300/90">{extraErr}</div>
-              )}
-              {loadingExtra && (
-                <div className="text-xs text-zinc-400">
-                  Cargando datos extra…
-                </div>
-              )}
-            </div>
+            </FadeIn>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Tabs */}
-        <div className="sticky top-4 z-40 mb-8 rounded-2xl border border-white/5 bg-black/60 backdrop-blur-xl shadow-xl overflow-x-auto no-scrollbar">
-          <div className="flex items-center p-1.5 min-w-max">
-            {Tabs.map((t) => {
-              const isActive = tab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`relative flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                    isActive
-                      ? "text-white bg-zinc-800 shadow-lg ring-1 ring-white/10"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  <t.icon
-                    className={`w-4 h-4 ${isActive ? "text-emerald-400" : ""}`}
-                  />
-                  {t.label}
-                  {typeof t.count === "number" && (
-                    <span
-                      className={`ml-1 text-[11px] font-extrabold px-2 py-0.5 rounded-full border ${
-                        isActive
-                          ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
-                          : "border-white/10 bg-white/5 text-zinc-300"
-                      }`}
-                    >
-                      {t.count}
-                    </span>
-                  )}
-                  {isActive && (
-                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-400" />
-                  )}
-                </button>
-              );
-            })}
+        {/* =================================================================
+            MENÚ DE NAVEGACIÓN STICKY Y SECCIONES DE CONTENIDO
+           ================================================================= */}
+        <div className="mt-8 sm:mt-10">
+          <div ref={sentinelRef} className="h-px w-full" />
+          <div
+            ref={menuStickyRef}
+            className="sticky z-30 py-2"
+            style={{
+              top: STICKY_TOP,
+              willChange: "transform",
+              backfaceVisibility: "hidden",
+            }}
+          >
+            <DetailsSectionMenu
+              items={sectionItems}
+              activeId={activeSectionId}
+              onChange={scrollToSection}
+              colorScheme="emerald"
+            />
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* MAIN */}
-          <div className="lg:col-span-8 space-y-8">
-            {/* TAB: CREDITS */}
-            {tab === "credits" && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <SectionTitle
-                  title="Créditos en pantalla"
-                  subtitle={`${filteredCredits.length} de ${stats.total} resultados`}
-                  icon={Film}
-                  right={
-                    <button
-                      type="button"
-                      onClick={clearFilters}
-                      className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-xs font-bold text-zinc-200"
-                      title="Limpiar filtros"
-                    >
-                      Limpiar
-                    </button>
-                  }
-                />
-
-                {/* Filters (arreglado: una sola línea de selects, sin partir en dos) */}
-                <div className="bg-zinc-900/45 border border-white/5 rounded-2xl p-4 mb-6 backdrop-blur-sm">
-                  {/* Search */}
-                  <div className="relative group">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-emerald-400 transition-colors" />
-                    <input
-                      type="text"
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                      placeholder="Buscar por título o rol…"
-                      className="w-full bg-black/35 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                    />
-                  </div>
-
-                  {/* One-line controls */}
-                  <div className="mt-3 flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
-                    <SelectInput
-                      className="min-w-[165px] shrink-0"
-                      value={mediaFilter}
-                      onChange={(e) => setMediaFilter(e.target.value)}
-                      options={[
-                        { label: "Tipo (todos)", value: "all" },
-                        { label: "Películas", value: "movie" },
-                        { label: "Series", value: "tv" },
-                      ]}
-                      placeholder="Tipo"
-                    />
-
-                    <SelectInput
-                      className="min-w-[175px] shrink-0"
-                      value={sort}
-                      onChange={(e) => setSort(e.target.value)}
-                      options={[
-                        { label: "Más recientes", value: "date_desc" },
-                        { label: "Más antiguos", value: "date_asc" },
-                        { label: "Popularidad", value: "pop_desc" },
-                        { label: "Mejor valorados", value: "rating_desc" },
-                        { label: "A-Z", value: "alpha" },
-                      ]}
-                      icon={ArrowUpRight}
-                      placeholder="Orden"
-                    />
-
-                    <SelectInput
-                      className="min-w-[165px] shrink-0"
-                      value={yearFrom}
-                      onChange={(e) => setYearFrom(e.target.value)}
-                      options={yearOptions}
-                      icon={Calendar}
-                      placeholder="Desde (cualquiera)"
-                    />
-
-                    <SelectInput
-                      className="min-w-[165px] shrink-0"
-                      value={yearTo}
-                      onChange={(e) => setYearTo(e.target.value)}
-                      options={yearOptions}
-                      icon={Calendar}
-                      placeholder="Hasta (cualquiera)"
-                    />
-
-                    <SelectInput
-                      className="min-w-[170px] shrink-0"
-                      value={creditFilter}
-                      onChange={(e) => {
-                        setCreditFilter(e.target.value);
-                        if (e.target.value !== "crew") setDeptFilter("all");
+          <div className="mt-6 space-y-14">
+            {popularItems.length > 0 && (
+              <section id="section-popular" ref={registerSection("popular")}>
+                <AnimatedSection delay={0.04}>
+                  <section className="mb-16">
+                    <SectionTitle title="Destacados" icon={Star} />
+                    <Swiper
+                      spaceBetween={12}
+                      slidesPerView={3}
+                      breakpoints={{
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 5, spaceBetween: 18 },
+                        1280: { slidesPerView: 6, spaceBetween: 20 },
                       }}
-                      options={[
-                        { label: "Actuación", value: "acting" },
-                        { label: "Equipo", value: "crew" },
-                        { label: "Todos", value: "all" },
-                      ]}
-                      placeholder="Rol"
-                    />
-
-                    {creditFilter === "crew" && (
-                      <SelectInput
-                        className="min-w-[200px] shrink-0"
-                        value={deptFilter}
-                        onChange={(e) => setDeptFilter(e.target.value)}
-                        options={[
-                          { label: "Dept. (todos)", value: "all" },
-                          ...deptOptions,
-                        ]}
-                        placeholder="Departamento"
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {/* Grid (solo portadas; info en hover) */}
-                {filteredCredits.length > 0 ? (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 gap-x-5 gap-y-6">
-                    {filteredCredits.map((c) => (
-                      <PosterCard
-                        key={`${c.id}-${c.credit_id || "x"}-${c.media_type || "m"}`}
-                        item={c}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-16 text-center border border-dashed border-white/10 rounded-3xl bg-white/5">
-                    <Film className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                    <p className="text-zinc-400">
-                      No se encontraron créditos con estos filtros.
-                    </p>
-                    <button
-                      onClick={clearFilters}
-                      className="mt-4 text-sm text-emerald-400 hover:underline"
+                      className="pb-8"
                     >
-                      Limpiar filtros
-                    </button>
-                  </div>
-                )}
-              </div>
+                      {popularItems.map((item) => (
+                        <SwiperSlide key={`popular-${item.id}`}>
+                          <PosterCard item={item} />
+                        </SwiperSlide>
+                      ))}
+                    </Swiper>
+                  </section>
+                </AnimatedSection>
+              </section>
             )}
 
-            {/* TAB: PHOTOS */}
-            {tab === "photos" && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <SectionTitle
-                  title="Fotos"
-                  subtitle={`${photos.length} imágenes`}
-                  icon={Images}
-                />
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {photos.map((p) => (
-                    <a
-                      key={p.file_path}
-                      href={tmdbImg(p.file_path, "original")}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="group relative aspect-[2/3] rounded-xl overflow-hidden bg-zinc-900 border border-white/10 hover:border-emerald-500/50 transition-colors"
-                    >
-                      <img
-                        src={tmdbImg(p.file_path, "w500")}
-                        alt=""
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        loading="lazy"
-                      />
-                      <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 backdrop-blur rounded text-[10px] text-white font-mono opacity-0 group-hover:opacity-100 transition-opacity">
-                        {p.width}x{p.height}
-                      </div>
-                    </a>
-                  ))}
-                </div>
-                {!photos.length && (
-                  <div className="text-zinc-500 italic">
-                    No hay fotos disponibles.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB: TAGGED */}
-            {tab === "tagged" && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <SectionTitle
-                  title="Apariciones en medios"
-                  subtitle="Imágenes donde aparece etiquetado/a"
-                  icon={Tags}
-                />
-                <div className="columns-2 sm:columns-3 gap-4 space-y-4">
-                  {taggedImages?.results?.map((t) => (
-                    <a
-                      key={t.file_path}
-                      href={tmdbImg(t.file_path, "original")}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="break-inside-avoid relative group rounded-xl overflow-hidden border border-white/10 bg-zinc-900/40 hover:border-emerald-500/40 transition-colors block"
-                    >
-                      <img
-                        src={tmdbImg(t.file_path, "w500")}
-                        alt=""
-                        className="w-full h-auto"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <ExternalLink className="w-6 h-6 text-white" />
-                      </div>
-                      {(t.media?.title || t.media?.name) && (
-                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent text-xs text-white line-clamp-1">
-                          {t.media.title || t.media.name}
-                        </div>
-                      )}
-                    </a>
-                  ))}
-                </div>
-                {!taggedImages?.results?.length && (
-                  <div className="text-zinc-500 italic">
-                    No hay imágenes etiquetadas.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB: ABOUT */}
-            {tab === "about" && (
-              <div className="grid gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <SectionTitle
-                  title="Perfil"
-                  subtitle="Datos del actor/actriz"
-                  icon={User}
-                />
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="p-5 rounded-2xl bg-zinc-900/45 border border-white/5 space-y-4">
-                    <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
-                      Información
-                    </h3>
-                    <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
-                      <span className="text-zinc-400">Género</span>
-                      <span className="text-white text-right">
-                        {genderLabel(actorDetails?.gender)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
-                      <span className="text-zinc-400">Lugar</span>
-                      <span className="text-white text-right max-w-[60%] truncate">
-                        {safeText(actorDetails?.place_of_birth)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
-                      <span className="text-zinc-400">Conocido/a por</span>
-                      <span className="text-white text-right">
-                        {safeText(actorDetails?.known_for_department)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <span className="text-zinc-400">TMDb ID</span>
-                      <span className="text-white font-mono">
-                        {safeText(actorDetails?.id)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-5 rounded-2xl bg-zinc-900/45 border border-white/5 space-y-4">
-                    <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
-                      Enlaces & Alias
-                    </h3>
-
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(socials).map(([key, url]) =>
-                        url ? (
-                          <a
-                            key={key}
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-3 py-1.5 rounded-lg bg-zinc-800/70 hover:bg-emerald-500/15 hover:text-emerald-300 border border-white/5 text-sm capitalize transition-colors"
-                          >
-                            {key}
-                          </a>
-                        ) : null,
-                      )}
-                    </div>
-
-                    <div className="mt-1">
-                      <h4 className="text-xs text-zinc-500 mb-2">
-                        También conocido/a como
-                      </h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(actorDetails?.also_known_as || [])
-                          .slice(0, 14)
-                          .map((a) => (
-                            <span
-                              key={a}
-                              className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-400 border border-white/5"
-                            >
-                              {a}
-                            </span>
-                          ))}
-                        {(actorDetails?.also_known_as || []).length > 14 && (
-                          <span className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-500 border border-white/5">
-                            +{(actorDetails?.also_known_as || []).length - 14}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* SIDE */}
-          <div className="lg:col-span-4">
-            <div className="sticky top-24 space-y-6">
-              {/* Más populares (sin scrollbar, más espacio) */}
-              <div className="rounded-3xl border border-white/10 bg-zinc-900/30 backdrop-blur p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-[0.08]">
-                  <Star className="w-24 h-24 text-yellow-500" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-4 relative z-10">
-                  Más populares
-                </h3>
-
-                <div className="space-y-3 relative z-10">
-                  {popularItems.map((item) => {
-                    const href =
-                      item.media_type === "movie"
-                        ? `/details/movie/${item.id}`
-                        : `/details/tv/${item.id}`;
-                    const title = item.title || item.name || "Sin título";
-                    const year = item.year || "—";
-                    const isTv = item.media_type === "tv";
-                    const rating = Number(item.vote_average || 0);
-
-                    return (
-                      <Link
-                        key={`${item.media_type}:${item.id}:${item.credit_id || "x"}`}
-                        href={href}
-                        prefetch={false}
-                        className="flex gap-3 group rounded-2xl p-2.5 hover:bg-white/5 transition"
-                        title={title}
+            <section id="section-credits" ref={registerSection("credits")}>
+              <AnimatedSection delay={0.04}>
+                <section className="mb-16">
+                  <SectionTitle
+                    title="Créditos en pantalla"
+                    subtitle={`${filteredCredits.length} de ${stats.total} resultados`}
+                    icon={Film}
+                    right={
+                      <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-xs font-bold text-zinc-200"
+                        title="Limpiar filtros"
                       >
-                        <div className="w-12 h-[72px] rounded-xl overflow-hidden shrink-0 shadow ring-1 ring-white/10 group-hover:ring-emerald-500/35 transition">
+                        Limpiar
+                      </button>
+                    }
+                  />
+
+                  {/* Filters */}
+                  <div className="bg-zinc-900/45 border border-white/5 rounded-2xl p-4 mb-6 backdrop-blur-sm">
+                    {/* Search */}
+                    <div className="relative group">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-emerald-400 transition-colors" />
+                      <input
+                        type="text"
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        placeholder="Buscar por título o rol…"
+                        className="w-full bg-black/35 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                      />
+                    </div>
+
+                    {/* One-line controls */}
+                    <div className="mt-3 flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
+                      <SelectInput
+                        className="min-w-[165px] shrink-0"
+                        value={mediaFilter}
+                        onChange={(e) => setMediaFilter(e.target.value)}
+                        options={[
+                          { label: "Tipo (todos)", value: "all" },
+                          { label: "Películas", value: "movie" },
+                          { label: "Series", value: "tv" },
+                        ]}
+                        placeholder="Tipo"
+                      />
+
+                      <SelectInput
+                        className="min-w-[175px] shrink-0"
+                        value={sort}
+                        onChange={(e) => setSort(e.target.value)}
+                        options={[
+                          { label: "Más recientes", value: "date_desc" },
+                          { label: "Más antiguos", value: "date_asc" },
+                          { label: "Popularidad", value: "pop_desc" },
+                          { label: "Mejor valorados", value: "rating_desc" },
+                          { label: "A-Z", value: "alpha" },
+                        ]}
+                        icon={ArrowUpRight}
+                        placeholder="Orden"
+                      />
+
+                      <SelectInput
+                        className="min-w-[165px] shrink-0"
+                        value={yearFrom}
+                        onChange={(e) => setYearFrom(e.target.value)}
+                        options={yearOptions}
+                        icon={Calendar}
+                        placeholder="Desde (cualquiera)"
+                      />
+
+                      <SelectInput
+                        className="min-w-[165px] shrink-0"
+                        value={yearTo}
+                        onChange={(e) => setYearTo(e.target.value)}
+                        options={yearOptions}
+                        icon={Calendar}
+                        placeholder="Hasta (cualquiera)"
+                      />
+
+                      <SelectInput
+                        className="min-w-[170px] shrink-0"
+                        value={creditFilter}
+                        onChange={(e) => {
+                          setCreditFilter(e.target.value);
+                          if (e.target.value !== "crew") setDeptFilter("all");
+                        }}
+                        options={[
+                          { label: "Actuación", value: "acting" },
+                          { label: "Equipo", value: "crew" },
+                          { label: "Todos", value: "all" },
+                        ]}
+                        placeholder="Rol"
+                      />
+
+                      {creditFilter === "crew" && (
+                        <SelectInput
+                          className="min-w-[200px] shrink-0"
+                          value={deptFilter}
+                          onChange={(e) => setDeptFilter(e.target.value)}
+                          options={[
+                            { label: "Dept. (todos)", value: "all" },
+                            ...deptOptions,
+                          ]}
+                          placeholder="Departamento"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Grid */}
+                  {filteredCredits.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
+                      {filteredCredits.map((c) => (
+                        <PosterCard
+                          key={`${c.id}-${c.credit_id || "x"}-${c.media_type || "m"}`}
+                          item={c}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-16 text-center border border-dashed border-white/10 rounded-3xl bg-white/5">
+                      <Film className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
+                      <p className="text-zinc-400">
+                        No se encontraron créditos con estos filtros.
+                      </p>
+                      <button
+                        onClick={clearFilters}
+                        className="mt-4 text-sm text-emerald-400 hover:underline"
+                      >
+                        Limpiar filtros
+                      </button>
+                    </div>
+                  )}
+                </section>
+              </AnimatedSection>
+            </section>
+
+            {photos.length > 0 && (
+              <section id="section-photos" ref={registerSection("photos")}>
+                <AnimatedSection delay={0.04}>
+                  <section className="mb-16">
+                    <SectionTitle
+                      title="Fotos"
+                      subtitle={`${photos.length} imágenes`}
+                      icon={Images}
+                    />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {photos.map((p) => (
+                        <a
+                          key={p.file_path}
+                          href={tmdbImg(p.file_path, "original")}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="group relative aspect-[2/3] rounded-xl overflow-hidden bg-zinc-900 border border-white/10 hover:border-emerald-500/50 transition-colors"
+                        >
                           <img
-                            src={tmdbImg(item.poster_path, "w185")}
-                            className="w-full h-full object-cover"
+                            src={tmdbImg(p.file_path, "w500")}
                             alt=""
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
                           />
-                        </div>
-
-                        <div className="min-w-0 flex-1 py-0.5">
-                          <div className="text-sm font-extrabold text-zinc-200 group-hover:text-emerald-300 line-clamp-2 transition-colors">
-                            {title}
+                          <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 backdrop-blur rounded text-[10px] text-white font-mono opacity-0 group-hover:opacity-100 transition-opacity">
+                            {p.width}x{p.height}
                           </div>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                </AnimatedSection>
+              </section>
+            )}
 
-                          <div className="mt-1 flex items-center gap-2 text-[12px] text-zinc-500">
-                            <span className="inline-flex items-center gap-1">
-                              {isTv ? (
-                                <Tv2 className="w-3.5 h-3.5" />
-                              ) : (
-                                <Film className="w-3.5 h-3.5" />
-                              )}
-                              {isTv ? "Serie" : "Película"}
-                            </span>
-                            <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                            <span>{year}</span>
+            {taggedImages?.results?.length > 0 && (
+              <section id="section-tagged" ref={registerSection("tagged")}>
+                <AnimatedSection delay={0.04}>
+                  <section className="mb-16">
+                    <SectionTitle
+                      title="Apariciones en medios"
+                      subtitle="Imágenes donde aparece etiquetado/a"
+                      icon={Tags}
+                    />
+                    <div className="columns-2 sm:columns-3 lg:columns-4 gap-4 space-y-4">
+                      {taggedImages.results.map((t) => (
+                        <a
+                          key={t.file_path}
+                          href={tmdbImg(t.file_path, "original")}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="break-inside-avoid relative group rounded-xl overflow-hidden border border-white/10 bg-zinc-900/40 hover:border-emerald-500/40 transition-colors block"
+                        >
+                          <img
+                            src={tmdbImg(t.file_path, "w500")}
+                            alt=""
+                            className="w-full h-auto"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ExternalLink className="w-6 h-6 text-white" />
                           </div>
-
-                          {rating > 0 && (
-                            <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-extrabold text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 px-2 py-1 rounded-full">
-                              <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-                              {rating.toFixed(1)}
+                          {(t.media?.title || t.media?.name) && (
+                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent text-xs text-white line-clamp-1">
+                              {t.media.title || t.media.name}
                             </div>
                           )}
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                </AnimatedSection>
+              </section>
+            )}
+
+            <section id="section-about" ref={registerSection("about")}>
+              <AnimatedSection delay={0.04}>
+                <section className="mb-16">
+                  <SectionTitle
+                    title="Perfil"
+                    subtitle="Datos del actor/actriz"
+                    icon={User}
+                  />
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="p-5 rounded-2xl bg-zinc-900/45 border border-white/5 space-y-4">
+                      <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
+                        Información
+                      </h3>
+                      <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
+                        <span className="text-zinc-400">Género</span>
+                        <span className="text-white text-right">
+                          {genderLabel(actorDetails?.gender)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
+                        <span className="text-zinc-400">Lugar</span>
+                        <span className="text-white text-right max-w-[60%] truncate">
+                          {safeText(actorDetails?.place_of_birth)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
+                        <span className="text-zinc-400">Conocido/a por</span>
+                        <span className="text-white text-right">
+                          {safeText(actorDetails?.known_for_department)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-zinc-400">TMDb ID</span>
+                        <span className="text-white font-mono">
+                          {safeText(actorDetails?.id)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-5 rounded-2xl bg-zinc-900/45 border border-white/5 space-y-4">
+                      <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
+                        Enlaces & Alias
+                      </h3>
+
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(socials).map(([key, url]) =>
+                          url ? (
+                            <a
+                              key={key}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 rounded-lg bg-zinc-800/70 hover:bg-emerald-500/15 hover:text-emerald-300 border border-white/5 text-sm capitalize transition-colors"
+                            >
+                              {key}
+                            </a>
+                          ) : null,
+                        )}
+                      </div>
+
+                      <div className="mt-1">
+                        <h4 className="text-xs text-zinc-500 mb-2">
+                          También conocido/a como
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(actorDetails?.also_known_as || [])
+                            .slice(0, 14)
+                            .map((a) => (
+                              <span
+                                key={a}
+                                className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-400 border border-white/5"
+                              >
+                                {a}
+                              </span>
+                            ))}
+                          {(actorDetails?.also_known_as || []).length > 14 && (
+                            <span className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-500 border border-white/5">
+                              +{(actorDetails?.also_known_as || []).length - 14}
+                            </span>
+                          )}
                         </div>
-                      </Link>
-                    );
-                  })}
-
-                  {!popularItems.length && (
-                    <div className="text-sm text-zinc-500">
-                      No hay títulos destacados.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Resumen (sin recortes) */}
-              <div className="rounded-3xl border border-white/10 bg-zinc-900/30 backdrop-blur p-6">
-                <h3 className="text-lg font-bold text-white mb-4">Resumen</h3>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-zinc-400">Debut</span>
-                    <span className="text-white font-medium">
-                      {yearOptions[yearOptions.length - 1]?.label || "—"}
-                    </span>
-                  </div>
-
-                  <div className="w-full h-px bg-white/5" />
-
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-zinc-400">Créditos</span>
-                    <span className="text-emerald-400 font-bold text-lg">
-                      {stats.total}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <div className="bg-white/5 rounded-xl p-3 text-center">
-                      <div className="text-xl font-extrabold text-white">
-                        {stats.movies}
-                      </div>
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                        Cine
-                      </div>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-3 text-center">
-                      <div className="text-xl font-extrabold text-white">
-                        {stats.tv}
-                      </div>
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                        TV
                       </div>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <div className="bg-white/5 rounded-xl p-3 text-center">
-                      <div className="text-xl font-extrabold text-white">
-                        {stats.acting}
-                      </div>
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                        Actuación
-                      </div>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-3 text-center">
-                      <div className="text-xl font-extrabold text-white">
-                        {stats.crew}
-                      </div>
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                        Equipo
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {!TMDB_API_KEY && (
-                <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/10 text-red-200 text-xs">
-                  <strong>⚠️ Developer:</strong> Falta{" "}
-                  <code>NEXT_PUBLIC_TMDB_API_KEY</code>. No cargarán datos extra
-                  (socials/credits/images).
-                </div>
-              )}
-            </div>
+                </section>
+              </AnimatedSection>
+            </section>
           </div>
         </div>
       </div>
