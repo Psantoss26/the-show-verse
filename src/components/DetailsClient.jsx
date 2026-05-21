@@ -86,6 +86,8 @@ import {
   MessageSquare,
   MoreHorizontal,
   SlidersHorizontal,
+  Globe2,
+  PenLine,
 } from "lucide-react";
 
 // Boton con efecto liquido para acciones principales
@@ -99,7 +101,8 @@ import {
   markInWatchlist,
   getExternalIds,
 } from "@/lib/api/tmdb";
-import { fetchOmdbByImdb } from "@/lib/api/omdb"; // Datos extra de OMDb (IMDb rating, premios, RT, MC)
+import { fetchOmdbByImdb } from "@/lib/api/omdb"; // Datos extra de OMDb (IMDb rating, RT, MC)
+import { fetchTmdbAwards } from "@/lib/api/tmdbAwards";
 import StarRating from "./StarRating"; // Componente de puntuacion con estrellas
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl"; // Boton de marcar visto en Trakt
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal"; // Modal de historial de visionados
@@ -332,6 +335,275 @@ function isPossiblyStaleEmptyMovieTraktStatus(
     return false;
   if (nextValue.lastWatchedAt) return false;
   return hasMeaningfulTraktSnapshot(prevValue);
+}
+
+function awardResultLabel(result) {
+  if (result === "winner") return "Ganador";
+  if (result === "nominee") return "Nominado";
+  return "Reconocimiento";
+}
+
+function awardResultClass(result) {
+  if (result === "winner") {
+    return "border-yellow-400/30 bg-yellow-400/15 text-yellow-100";
+  }
+  if (result === "nominee") {
+    return "border-sky-300/20 bg-sky-300/10 text-sky-100";
+  }
+  return "border-white/10 bg-white/10 text-zinc-200";
+}
+
+function flattenAwardItems(details) {
+  const groups = Array.isArray(details?.groups) ? details.groups : [];
+  return groups.flatMap((group) =>
+    (Array.isArray(group?.items) ? group.items : []).map((item, index) => ({
+      ...item,
+      id: `${group?.name || "award"}-${item?.category || "category"}-${item?.year || "year"}-${index}`,
+      groupName: group?.name || "Premio",
+      groupImageUrl: group?.imageUrl || null,
+    })),
+  );
+}
+
+function getAwardInitials(name) {
+  const words = String(name || "Premio")
+    .replace(/\b(awards?|film|prize|academy|guild|of|the|and|de|la)\b/gi, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const initials = words
+    .slice(0, 3)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+  return initials || "TSV";
+}
+
+function getAwardVisual(name) {
+  const n = String(name || "").toLowerCase();
+
+  if (/\bacademy\b|oscar/.test(n)) {
+    return {
+      label: "OSCAR",
+      Icon: Trophy,
+      background:
+        "radial-gradient(circle at 50% 18%, rgba(255,231,138,0.36), transparent 30%), linear-gradient(145deg, #3d2a08 0%, #090807 48%, #000 100%)",
+      accent: "text-yellow-200",
+      ring: "border-yellow-300/25",
+    };
+  }
+
+  if (/golden\s+globes?/.test(n)) {
+    return {
+      label: "GLOBES",
+      Icon: Globe2,
+      background:
+        "radial-gradient(circle at 50% 26%, rgba(252,211,77,0.34), transparent 32%), linear-gradient(145deg, #2c1d08 0%, #071716 52%, #010101 100%)",
+      accent: "text-amber-200",
+      ring: "border-amber-300/25",
+    };
+  }
+
+  if (/bafta/.test(n)) {
+    return {
+      label: "BAFTA",
+      Icon: FilmIcon,
+      background:
+        "radial-gradient(circle at 50% 22%, rgba(251,191,36,0.28), transparent 33%), linear-gradient(145deg, #301f0c 0%, #16100c 42%, #000 100%)",
+      accent: "text-orange-200",
+      ring: "border-orange-300/25",
+    };
+  }
+
+  if (/actor|screen\s+actors|sag/.test(n)) {
+    return {
+      label: "ACTORS",
+      Icon: Users,
+      background:
+        "radial-gradient(circle at 50% 18%, rgba(125,211,252,0.24), transparent 34%), linear-gradient(145deg, #071b2b 0%, #060b12 52%, #000 100%)",
+      accent: "text-sky-200",
+      ring: "border-sky-300/25",
+    };
+  }
+
+  if (/writers?|screenplay|wga|guild/.test(n)) {
+    return {
+      label: "WGA",
+      Icon: PenLine,
+      background:
+        "radial-gradient(circle at 50% 18%, rgba(216,180,254,0.22), transparent 34%), linear-gradient(145deg, #241035 0%, #100817 52%, #000 100%)",
+      accent: "text-violet-200",
+      ring: "border-violet-300/25",
+    };
+  }
+
+  if (/\bafi\b/.test(n)) {
+    return {
+      label: "AFI",
+      Icon: Star,
+      background:
+        "radial-gradient(circle at 50% 18%, rgba(248,113,113,0.22), transparent 34%), linear-gradient(145deg, #2f0d0d 0%, #130809 50%, #000 100%)",
+      accent: "text-red-200",
+      ring: "border-red-300/25",
+    };
+  }
+
+  if (/japan/.test(n)) {
+    return {
+      label: "JAPAN",
+      Icon: Sparkles,
+      background:
+        "radial-gradient(circle at 50% 18%, rgba(244,114,182,0.22), transparent 34%), linear-gradient(145deg, #2a0d1d 0%, #13080f 52%, #000 100%)",
+      accent: "text-pink-200",
+      ring: "border-pink-300/25",
+    };
+  }
+
+  if (/czech|lion/.test(n)) {
+    return {
+      label: "LION",
+      Icon: Trophy,
+      background:
+        "radial-gradient(circle at 50% 18%, rgba(250,204,21,0.25), transparent 34%), linear-gradient(145deg, #2f2608 0%, #101006 52%, #000 100%)",
+      accent: "text-yellow-200",
+      ring: "border-yellow-300/25",
+    };
+  }
+
+  return {
+    label: getAwardInitials(name),
+    Icon: Trophy,
+    background:
+      "radial-gradient(circle at 50% 18%, rgba(250,204,21,0.2), transparent 34%), linear-gradient(145deg, #1f1b12 0%, #0b0b0b 52%, #000 100%)",
+    accent: "text-yellow-200",
+    ring: "border-yellow-300/20",
+  };
+}
+
+function AwardsPanel({ awards, details }) {
+  const wins = Number(details?.wins || 0);
+  const nominations = Number(details?.nominations || 0);
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-5 sm:p-6">
+      <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
+
+      <div className="relative z-10">
+        <div className="flex items-start gap-4">
+          <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
+            <Trophy className="w-8 h-8" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-bold text-white mb-2">
+              Reconocimientos
+            </h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-yellow-400/20 bg-black/20 p-4">
+                <div className="text-3xl font-black tracking-tight text-yellow-200">
+                  {wins}
+                </div>
+                <div className="mt-1 text-xs font-bold uppercase tracking-wide text-yellow-100/75">
+                  {wins === 1 ? "Premio ganado" : "Premios ganados"}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="text-3xl font-black tracking-tight text-zinc-100">
+                  {nominations}
+                </div>
+                <div className="mt-1 text-xs font-bold uppercase tracking-wide text-zinc-400">
+                  {nominations === 1 ? "Nominación" : "Nominaciones"}
+                </div>
+              </div>
+            </div>
+            {awards && (
+              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                {awards}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AwardCard({ item }) {
+  const people = Array.isArray(item?.people) ? item.people.filter(Boolean) : [];
+  const visual = getAwardVisual(item?.groupName);
+  const VisualIcon = visual.Icon;
+
+  return (
+    <article className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1">
+      <div className="aspect-[2/3] overflow-hidden relative flex flex-col bg-black">
+        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-2">
+          <span
+            className={`rounded-md border px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider shadow-sm backdrop-blur-md ${awardResultClass(
+              item?.result,
+            )}`}
+          >
+            {awardResultLabel(item?.result)}
+          </span>
+          {item?.year && (
+            <span className="rounded-md border border-white/10 bg-black/45 px-1.5 py-0.5 text-[9px] font-extrabold text-zinc-200 backdrop-blur-md">
+              {item.year}
+            </span>
+          )}
+        </div>
+
+        <div
+          className="relative flex min-h-0 flex-[1.12] items-center justify-center overflow-hidden p-5 sm:p-6"
+          style={{ background: visual.background }}
+        >
+          <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.18)_48%,transparent_52%)]" />
+          <div className="absolute inset-x-5 top-12 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+          <div className="absolute inset-x-8 bottom-5 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+
+          {item?.groupImageUrl && (
+            <div className="absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-black/45 p-1.5 backdrop-blur-md">
+              <img
+                src={item.groupImageUrl}
+                alt=""
+                className="h-full w-full object-contain"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          )}
+
+          <div
+            className={`relative flex h-20 w-20 items-center justify-center rounded-full border bg-black/35 shadow-[0_20px_55px_rgba(0,0,0,0.65)] backdrop-blur-sm ${visual.ring}`}
+          >
+            <VisualIcon className={`h-10 w-10 ${visual.accent}`} />
+          </div>
+
+          <div className="absolute inset-x-4 bottom-14 text-center">
+            <div
+              className={`text-2xl font-black tracking-[0.18em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] ${visual.accent}`}
+            >
+              {visual.label}
+            </div>
+            <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-white/55 line-clamp-1">
+              {item?.groupName}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-[0.9] flex-col justify-end border-t border-white/10 bg-gradient-to-t from-black via-black to-neutral-950 px-2.5 py-3 sm:px-3">
+          <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-2">
+            {item?.category || item?.groupName}
+          </p>
+          <p className="mt-1 text-yellow-400 text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">
+            {item?.groupName}
+          </p>
+          {people.length > 0 && (
+            <p className="mt-1 text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-2">
+              {people.join(", ")}
+            </p>
+          )}
+        </div>
+      </div>
+    </article>
+  );
 }
 
 // =====================================================================
@@ -4796,16 +5068,16 @@ export default function DetailsClient({
   ]);
 
   // =====================================================================
-  // DATOS EXTRA: IMDb, Rotten Tomatoes, Metacritic y Premios
-  // Carga ratings de OMDb (IMDb, RT, MC) con cache en localStorage.
-  // Los votos y premios se cargan en idle (requestIdleCallback) para no
-  // bloquear la UI.
+  // DATOS EXTRA: IMDb, Rotten Tomatoes, Metacritic y premios
+  // OMDb aporta ratings externos (IMDb, RT, MC) con cache en localStorage.
+  // TMDb aporta premios y nominaciones detalladas.
   // =====================================================================
 
   const [extras, setExtras] = useState({
     imdbRating: null,
     imdbVotes: null,
     awards: null,
+    awardsDetails: null,
     rtScore: null,
     mcScore: null,
   });
@@ -4814,7 +5086,7 @@ export default function DetailsClient({
   // ID de IMDb resuelto (puede venir directo de TMDb o cargarse via getExternalIds)
   const [resolvedImdbId, setResolvedImdbId] = useState(null);
 
-  // Carga datos de OMDb: rating IMDb, votos, premios, RT y Metacritic.
+  // Carga datos de OMDb: rating IMDb, votos, RT y Metacritic.
   // Usa cache en localStorage para evitar peticiones repetidas.
   useEffect(() => {
     let abort = false;
@@ -4834,13 +5106,13 @@ export default function DetailsClient({
     const run = async () => {
       try {
         // Reset suave al cambiar de contenido
-        setExtras({
+        setExtras((prev) => ({
+          ...prev,
           imdbRating: null,
           imdbVotes: null,
-          awards: null,
           rtScore: null,
           mcScore: null,
-        });
+        }));
         setImdbVotesLoading(false);
 
         // Resetear el imdbId resuelto para este contenido
@@ -4864,9 +5136,6 @@ export default function DetailsClient({
         }
         if (cached?.imdbVotes != null) {
           setExtras((prev) => ({ ...prev, imdbVotes: cached.imdbVotes }));
-        }
-        if (cached?.awards) {
-          setExtras((prev) => ({ ...prev, awards: cached.awards }));
         }
         if (cached?.rtScore != null) {
           setExtras((prev) => ({ ...prev, rtScore: cached.rtScore }));
@@ -4908,7 +5177,7 @@ export default function DetailsClient({
           mcScore,
         });
 
-        // Votos y premios se cargan en idle para no bloquear la UI
+        // Los votos se cargan en idle para no bloquear la UI
         setImdbVotesLoading(true);
         runIdle(() => {
           if (abort) return;
@@ -4918,33 +5187,26 @@ export default function DetailsClient({
               ? Number(String(omdb.imdbVotes).replace(/,/g, ""))
               : null;
 
-          const awards =
-            typeof omdb?.Awards === "string" && omdb.Awards.trim()
-              ? omdb.Awards.trim()
-              : null;
-
           setExtras((prev) => ({
             ...prev,
             imdbVotes: Number.isFinite(votes) ? votes : null,
-            awards,
           }));
 
           writeOmdbCache(imdbId, {
             imdbVotes: Number.isFinite(votes) ? votes : null,
-            awards,
           });
 
           setImdbVotesLoading(false);
         });
       } catch {
         if (!abort) {
-          setExtras({
+          setExtras((prev) => ({
+            ...prev,
             imdbRating: null,
             imdbVotes: null,
-            awards: null,
             rtScore: null,
             mcScore: null,
-          });
+          }));
           setImdbVotesLoading(false);
 
           // Resetear el resolvedImdbId si hay error
@@ -4958,6 +5220,34 @@ export default function DetailsClient({
       abort = true;
     };
   }, [type, id, data?.imdb_id, data?.external_ids?.imdb_id, endpointType]);
+
+  // Carga premios y nominaciones desde TMDb.
+  useEffect(() => {
+    let abort = false;
+
+    setExtras((prev) => ({
+      ...prev,
+      awards: null,
+      awardsDetails: null,
+    }));
+
+    const run = async () => {
+      const awardsData = await fetchTmdbAwards(endpointType, id);
+      if (abort) return;
+
+      setExtras((prev) => ({
+        ...prev,
+        awards: awardsData?.summary || null,
+        awardsDetails: awardsData || null,
+      }));
+    };
+
+    run();
+
+    return () => {
+      abort = true;
+    };
+  }, [endpointType, id]);
 
   /**
    * Puntuacion unificada: envia la puntuacion a TMDb y Trakt simultaneamente.
@@ -5797,6 +6087,11 @@ export default function DetailsClient({
 
   const hasProduction = !!production;
   const hasAwards = !!extras?.awards;
+  const awardItems = useMemo(
+    () => flattenAwardItems(extras?.awardsDetails),
+    [extras?.awardsDetails],
+  );
+  const hasAwardItems = awardItems.length > 0;
 
   const countries = (() => {
     const pc = Array.isArray(data.production_countries)
@@ -6204,6 +6499,16 @@ export default function DetailsClient({
         : undefined,
     });
 
+    // Premios
+    if (hasAwardItems) {
+      items.push({
+        id: "awards",
+        label: "Premios",
+        icon: Trophy,
+        count: awardItems.length,
+      });
+    }
+
     // Coleccion
     if (collectionId) {
       items.push({
@@ -6289,6 +6594,8 @@ export default function DetailsClient({
     castData,
     castDataForUI,
     recommendations,
+    hasAwardItems,
+    awardItems.length,
     collectionId,
     collectionData,
   ]);
@@ -8179,23 +8486,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           exit={{ opacity: 0, y: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-6">
-                            <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
-
-                            <div className="flex items-start gap-4 relative z-10">
-                              <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
-                                <Trophy className="w-8 h-8" />
-                              </div>
-                              <div className="flex-1">
-                                <h3 className="text-lg font-bold text-white mb-2">
-                                  Reconocimientos
-                                </h3>
-                                <p className="text-base font-medium text-yellow-100/90 leading-relaxed whitespace-pre-line">
-                                  {extras.awards}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
+                          <AwardsPanel
+                            awards={extras.awards}
+                            details={extras.awardsDetails}
+                          />
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -8382,8 +8676,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
 
                 {/* ===== TAB 4: PREMIOS ===== */}
-                {/* Muestra los reconocimientos y premios obtenidos */}
-                {/* Solo visible si hay datos de premios disponibles desde OMDb */}
+                {/* Muestra los reconocimientos y premios obtenidos desde TMDb */}
                 {activeTab === "awards" && extras.awards && (
                   <motion.div
                     key="awards-backdrop"
@@ -8392,23 +8685,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-6">
-                      <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
-
-                      <div className="flex items-start gap-4 relative z-10">
-                        <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
-                          <Trophy className="w-8 h-8" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-bold text-white mb-2">
-                            Reconocimientos
-                          </h3>
-                          <p className="text-base font-medium text-yellow-100/90 leading-relaxed whitespace-pre-line">
-                            {extras.awards}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                    <AwardsPanel
+                      awards={extras.awards}
+                      details={extras.awardsDetails}
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -8659,6 +8939,34 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
               </AnimatedSection>
             </section>
+
+            {hasAwardItems && (
+              <section id="section-awards" ref={registerSection("awards")}>
+                <AnimatedSection delay={0.04}>
+                  <section className="mb-16">
+                    <SectionTitle title="Premios" icon={Trophy} />
+
+                    <Swiper
+                      spaceBetween={12}
+                      slidesPerView={3}
+                      breakpoints={{
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 5, spaceBetween: 18 },
+                        1280: { slidesPerView: 6, spaceBetween: 20 },
+                      }}
+                      className="pb-8"
+                    >
+                      {awardItems.map((award) => (
+                        <SwiperSlide key={award.id}>
+                          <AwardCard item={award} />
+                        </SwiperSlide>
+                      ))}
+                    </Swiper>
+                  </section>
+                </AnimatedSection>
+              </section>
+            )}
 
             {collectionId && (
               <section
