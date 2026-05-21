@@ -9586,22 +9586,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         activePath,
                       } = artworkSelection;
 
-                      if (
-                        (!ordered || ordered.length === 0) &&
-                        (imagesLoading || !artworkInitialized)
-                      ) {
-                        return null;
-                      }
-
-                      if (!ordered || ordered.length === 0) {
-                        return (
-                          <div className="text-sm text-zinc-400">
-                            No hay imágenes disponibles con los filtros
-                            actuales.
-                          </div>
-                        );
-                      }
-
                       // 2 en movil y 4 en desktop para backdrops (vista previa / fondo)
                       const isBackdropLike = activeImagesTab !== "posters";
 
@@ -9621,31 +9605,70 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             1280: { slidesPerView: 4, spaceBetween: 20 },
                           };
 
+                      const loadingCardsCount = Math.max(
+                        1,
+                        Math.min(
+                          ordered?.length || (isPoster ? 7 : 4),
+                          isPoster ? 7 : 4,
+                        ),
+                      );
+
+                      const loadingCarousel = (
+                        <Swiper
+                          key={`${activeImagesTab}-loading`}
+                          spaceBetween={12}
+                          slidesPerView={isBackdropLike ? 2 : 3}
+                          breakpoints={breakpoints}
+                          allowTouchMove={false}
+                          className="pt-3 pb-8"
+                        >
+                          {Array.from({ length: loadingCardsCount }).map(
+                            (_, index) => (
+                              <SwiperSlide
+                                key={`${activeImagesTab}-loading-${index}`}
+                                className="h-full pt-1 pb-3"
+                              >
+                                <div
+                                  className={`w-full rounded-2xl border-2 border-white/10 bg-white/5 animate-pulse ${aspect}`}
+                                  aria-hidden="true"
+                                />
+                              </SwiperSlide>
+                            ),
+                          )}
+                        </Swiper>
+                      );
+
+                      if (
+                        (!ordered || ordered.length === 0) &&
+                        (imagesLoading || !artworkInitialized)
+                      ) {
+                        return (
+                          <div className="relative overflow-x-hidden overflow-y-visible">
+                            {loadingCarousel}
+                          </div>
+                        );
+                      }
+
+                      if (!ordered || ordered.length === 0) {
+                        return (
+                          <div className="text-sm text-zinc-400">
+                            No hay imágenes disponibles con los filtros
+                            actuales.
+                          </div>
+                        );
+                      }
+
                       return (
                         <div className="relative overflow-x-hidden overflow-y-visible">
-                          {/* Loading visual: una fila de 7 tarjetas placeholder */}
-                          {!artworkRowReady && (
-                            <div
-                              className="grid grid-cols-7 gap-[18px] pb-8"
-                              aria-hidden="true"
-                            >
-                              {Array.from({ length: 7 }).map((_, i) => (
-                                <div
-                                  key={i}
-                                  className={`rounded-2xl bg-white/5 animate-pulse ${aspect}`}
-                                />
-                              ))}
-                            </div>
-                          )}
+                          {!artworkRowReady && loadingCarousel}
 
-                          {/* Carrusel: aparece "de golpe" cuando ya están cargadas */}
                           {artworkRowReady && (
                             <Swiper
                               key={activeImagesTab}
                               spaceBetween={12}
                               slidesPerView={isBackdropLike ? 2 : 3}
                               breakpoints={breakpoints}
-                              className="pb-8"
+                              className="pt-3 pb-8"
                             >
                               {ordered.map((img, index) => {
                                 const filePath = img?.file_path;
@@ -9671,7 +9694,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 return (
                                   <SwiperSlide
                                     key={filePath}
-                                    className="h-full pb-3"
+                                    className="h-full pt-1 pb-3"
                                   >
                                     <div
                                       role="button"
