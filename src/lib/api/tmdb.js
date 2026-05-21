@@ -911,7 +911,7 @@ export async function discoverTV(params = {}) {
 // Películas — secciones principales que pediste
 export async function fetchMovieSections({
   pageRand = 1,
-  genreIds = [28, 35, 18, 878, 53, 16],
+  genreIds = [35, 16, 12, 10751, 36, 27],
 } = {}) {
   const makeDecade = (from, to) =>
     discoverMovies({
@@ -922,10 +922,10 @@ export async function fetchMovieSections({
     });
 
   const queries = [
-    // Más votadas (evita rarezas con pocos votos)
+    // Más votadas — los títulos con más valoraciones (blockbusters mainstream)
     discoverMovies({
-      sort_by: "vote_average.desc",
-      "vote_count.gte": 1000,
+      sort_by: "vote_count.desc",
+      "vote_average.gte": 6.5,
       page: pageRand,
     }),
 
@@ -976,12 +976,12 @@ export async function fetchMovieSections({
   ] = await Promise.all([...queries, ...genrePromises]);
 
   const GENRE_NAMES = {
-    28: "Acción",
     35: "Comedia",
-    18: "Drama",
-    878: "Ciencia Ficción",
-    53: "Thriller",
     16: "Animación",
+    12: "Aventura",
+    10751: "Familia",
+    36: "Historia",
+    27: "Terror",
   };
 
   const byGenre = {};
@@ -1007,7 +1007,7 @@ export async function fetchMovieSections({
 // Series — secciones principales que pediste
 export async function fetchTVSections({
   pageRand = 1,
-  genreIds = [18, 35, 9648, 10764, 16, 80, 10765],
+  genreIds = [35, 9648, 10764, 10759, 99],
 } = {}) {
   const makeDecade = (from, to) =>
     discoverTV({
@@ -1072,13 +1072,11 @@ export async function fetchTVSections({
   ] = await Promise.all([...queries, ...genrePromises]);
 
   const GENRE_NAMES_TV = {
-    18: "Drama",
     35: "Comedia",
     9648: "Misterio",
     10764: "Reality",
-    16: "Animación",
-    80: "Crimen",
-    10765: "Ciencia Ficción y Fantasía",
+    10759: "Acción y Aventura",
+    99: "Documental",
   };
 
   const byGenre = {};

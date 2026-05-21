@@ -1464,6 +1464,24 @@ export default function MoviesPageClient({ initialData }) {
           />
         )}
 
+        {dashboardData.top_imdb?.length > 0 && (
+          <Row
+            title="Lo más aclamado en IMDb"
+            items={dashboardData.top_imdb}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        )}
+
+        {dashboardData["Más votadas"]?.length ? (
+          <Row
+            title="Las más votadas de todos los tiempos"
+            items={dashboardData["Más votadas"]}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        ) : null}
+
         {dashboardData["Superéxito"]?.length ? (
           <Row
             title="Taquillazos imprescindibles"
@@ -1472,6 +1490,15 @@ export default function MoviesPageClient({ initialData }) {
             posterCacheRef={posterCacheRef}
           />
         ) : null}
+
+        {dashboardData.mind?.length > 0 && (
+          <Row
+            title="Guiones que te vuelan la cabeza"
+            items={dashboardData.mind}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        )}
 
         {dashboardData.action?.length > 0 && (
           <Row
@@ -1493,17 +1520,8 @@ export default function MoviesPageClient({ initialData }) {
 
         {dashboardData.thrillers?.length > 0 && (
           <Row
-            title="Thrillers intensos"
+            title="Thrillers que no te sueltan"
             items={dashboardData.thrillers}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        )}
-
-        {dashboardData.mind?.length > 0 && (
-          <Row
-            title="Guiones complejos"
-            items={dashboardData.mind}
             isMobile={isMobile}
             posterCacheRef={posterCacheRef}
           />
@@ -1547,7 +1565,7 @@ export default function MoviesPageClient({ initialData }) {
 
         {dashboardData["Década de 2010"]?.length ? (
           <Row
-            title="Hits de 2010"
+            title="Hits de los 2010"
             items={dashboardData["Década de 2010"]}
             isMobile={isMobile}
             posterCacheRef={posterCacheRef}
@@ -1556,7 +1574,7 @@ export default function MoviesPageClient({ initialData }) {
 
         {dashboardData["Década de 2020"]?.length ? (
           <Row
-            title="Lo mejor de 2020"
+            title="Lo mejor de esta década"
             items={dashboardData["Década de 2020"]}
             isMobile={isMobile}
             posterCacheRef={posterCacheRef}

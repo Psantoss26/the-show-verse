@@ -9,6 +9,7 @@ import {
   fetchMediaByKeyword,
   fetchMovieSections,
   fetchMindBendingMovies,
+  discoverMovies,
 } from "@/lib/api/tmdb";
 
 // Ajusta el revalidate según lo fresco que quieras el contenido
@@ -120,6 +121,9 @@ async function getDashboardData() {
       romance,
       vengeance,
       mind,
+      blockbustersP1,
+      blockbustersP2,
+      blockbustersP3,
       baseSections,
     ] = await Promise.all([
       // TMDb originales
@@ -155,6 +159,9 @@ async function getDashboardData() {
         language: lang,
       }),
       fetchMindBendingMovies(),
+      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 1 }),
+      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 2 }),
+      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 3 }),
       fetchMovieSections
         ? fetchMovieSections({ language: lang })
         : Promise.resolve({}),
@@ -269,6 +276,32 @@ async function getDashboardData() {
     }
     if (Object.keys(curatedByGenre).length > 0) {
       curatedBaseSections["Por género"] = curatedByGenre;
+    }
+
+    // Superéxito con pool amplio (3 páginas) para sobrevivir la deduplicación
+    const blockbustersRaw = [...blockbustersP1, ...blockbustersP2, ...blockbustersP3];
+    curatedBaseSections["Superéxito"] = curateList(blockbustersRaw, {
+      minVotes: 4000,
+      minRating: 6.5,
+      minSize: 25,
+      maxSize: 80,
+    });
+
+    // Deduplicación en cascada: cada sección elimina títulos ya vistos en las anteriores
+    const imdbIdSet = new Set((curatedTopIMDb || []).map((m) => m.id));
+    if (curatedBaseSections["Más votadas"]) {
+      curatedBaseSections["Más votadas"] = curatedBaseSections[
+        "Más votadas"
+      ].filter((m) => !imdbIdSet.has(m.id));
+    }
+    const seenAfterMostVoted = new Set([
+      ...imdbIdSet,
+      ...(curatedBaseSections["Más votadas"] || []).map((m) => m.id),
+    ]);
+    if (curatedBaseSections["Superéxito"]) {
+      curatedBaseSections["Superéxito"] = curatedBaseSections[
+        "Superéxito"
+      ].filter((m) => !seenAfterMostVoted.has(m.id));
     }
 
     return {

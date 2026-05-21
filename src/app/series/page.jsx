@@ -6,6 +6,7 @@ import {
   fetchMediaByGenre,
   fetchTVSections,
   fetchRomanceSeriesWithGoodReviews,
+  discoverTV,
 } from "@/lib/api/tmdb";
 
 export const revalidate = 1800; // 30 min
@@ -111,6 +112,7 @@ async function getDashboardData() {
       crime,
       romance,
       animation,
+      kDrama,
       baseSections,
     ] = await Promise.all([
       // TMDb originales
@@ -143,6 +145,11 @@ async function getDashboardData() {
         minVotes: 400,
         language: lang,
       }), // Animación
+      discoverTV({
+        with_original_language: "ko",
+        sort_by: "popularity.desc",
+        "vote_count.gte": 300,
+      }), // K-Drama
       fetchTVSections
         ? fetchTVSections({ language: lang })
         : Promise.resolve({}),
@@ -199,6 +206,13 @@ async function getDashboardData() {
       maxSize: 60,
     });
 
+    const curatedKDrama = curateList(kDrama, {
+      minVotes: 300,
+      minRating: 6.0,
+      minSize: 20,
+      maxSize: 60,
+    });
+
     const curatedBaseSections = {};
     const curatedByGenre = {};
 
@@ -212,17 +226,24 @@ async function getDashboardData() {
       }
 
       let params;
-      if (key === "En Emisión") {
+      if (key === "Premiadas") {
         params = {
-          minVotes: 400,
+          minVotes: 800,
+          minRating: 7.2,
+          minSize: 20,
+          maxSize: 60,
+        };
+      } else if (key === "Superéxito") {
+        params = {
+          minVotes: 1500,
           minRating: 6.5,
           minSize: 20,
           maxSize: 60,
         };
-      } else if (key === "Aclamadas por la crítica") {
+      } else if (key === "Más votadas") {
         params = {
-          minVotes: 800,
-          minRating: 7.2,
+          minVotes: 600,
+          minRating: 6.2,
           minSize: 20,
           maxSize: 60,
         };
@@ -271,6 +292,7 @@ async function getDashboardData() {
       drama: curatedDrama,
       scifi_fantasy: curatedScifiFantasy,
       crime: curatedCrime,
+      kDrama: curatedKDrama,
       romance: curatedRomance,
       animation: curatedAnimation,
       ...curatedBaseSections,
