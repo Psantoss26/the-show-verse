@@ -9,6 +9,7 @@ export default function DetailsSectionMenu({
   onChange,
   className = "",
   maxWidthClass = "max-w-[1400px]",
+  colorScheme = "yellow",
 }) {
   const safeItems = useMemo(
     () => (Array.isArray(items) ? items.filter(Boolean) : []),
@@ -21,6 +22,30 @@ export default function DetailsSectionMenu({
 
   const [scale, setScale] = useState(1);
   const [fits, setFits] = useState(true);
+
+  const colors = useMemo(() => {
+    if (colorScheme === "emerald") {
+      return {
+        focusRing: "focus-visible:ring-emerald-500/50",
+        activeBg:
+          "from-emerald-500/15 via-emerald-400/8 to-teal-500/12 border-emerald-500/20",
+        iconActive:
+          "text-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.6)]",
+        badgeBg: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+        indicator:
+          "from-emerald-500 via-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(52,211,153,0.5)]",
+      };
+    }
+    return {
+      focusRing: "focus-visible:ring-yellow-500/50",
+      activeBg:
+        "from-yellow-500/15 via-yellow-400/8 to-orange-500/12 border-yellow-500/20",
+      iconActive: "text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.6)]",
+      badgeBg: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+      indicator:
+        "from-yellow-500 via-yellow-400 to-orange-500 shadow-[0_0_8px_rgba(250,204,21,0.5)]",
+    };
+  }, [colorScheme]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -151,7 +176,8 @@ export default function DetailsSectionMenu({
                               "group relative flex items-center justify-center rounded-xl",
                               "px-3 py-2 sm:px-3.5 sm:py-2.5",
                               "transition-all duration-300 ease-out",
-                              "outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/50",
+                              "outline-none focus-visible:ring-2",
+                              colors.focusRing,
                               "whitespace-nowrap",
                               active ? "" : "hover:bg-white/5",
                             ].join(" ")}
@@ -170,7 +196,7 @@ export default function DetailsSectionMenu({
                                     stiffness: 800,
                                     damping: 20,
                                   }}
-                                  className="absolute inset-0 rounded-xl bg-gradient-to-br from-yellow-500/15 via-yellow-400/8 to-orange-500/12 shadow-lg border border-yellow-500/20"
+                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br shadow-lg border ${colors.activeBg}`}
                                 />
                               )}
                             </AnimatePresence>
@@ -191,7 +217,7 @@ export default function DetailsSectionMenu({
                                     className={[
                                       "h-5 w-5 transition-all duration-300",
                                       active
-                                        ? "text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.6)]"
+                                        ? colors.iconActive
                                         : "text-zinc-400 group-hover:text-zinc-200",
                                     ].join(" ")}
                                   />
@@ -222,7 +248,7 @@ export default function DetailsSectionMenu({
                                     duration: 0.15,
                                     ease: "easeOut",
                                   }}
-                                  className="ml-1 rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-400 border border-yellow-500/30"
+                                  className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold border ${colors.badgeBg}`}
                                 >
                                   {item.badge}
                                 </motion.span>
@@ -241,7 +267,7 @@ export default function DetailsSectionMenu({
                                     stiffness: 800,
                                     damping: 20,
                                   }}
-                                  className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r from-yellow-500 via-yellow-400 to-orange-500 shadow-[0_0_8px_rgba(250,204,21,0.5)]"
+                                  className={`absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r ${colors.indicator}`}
                                 />
                               )}
                             </AnimatePresence>
