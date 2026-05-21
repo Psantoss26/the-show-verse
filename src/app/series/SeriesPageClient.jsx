@@ -1441,23 +1441,41 @@ export default function SeriesPageClient({ initialData }) {
           />
         )}
 
-        {dashboardData["En Emisión"]?.length ? (
+        {dashboardData["Más votadas"]?.length ? (
           <Row
-            title="En emisión ahora mismo"
-            items={dashboardData["En Emisión"]}
+            title="Las más valoradas de la historia"
+            items={dashboardData["Más votadas"]}
             isMobile={isMobile}
             posterCacheRef={posterCacheRef}
           />
         ) : null}
 
-        {dashboardData["Aclamadas por la crítica"]?.length ? (
+        {dashboardData["Premiadas"]?.length ? (
           <Row
-            title="Aclamadas por la crítica"
-            items={dashboardData["Aclamadas por la crítica"]}
+            title="Ganadoras de grandes premios"
+            items={dashboardData["Premiadas"]}
             isMobile={isMobile}
             posterCacheRef={posterCacheRef}
           />
         ) : null}
+
+        {dashboardData["Superéxito"]?.length ? (
+          <Row
+            title="Fenómenos de audiencia"
+            items={dashboardData["Superéxito"]}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        ) : null}
+
+        {dashboardData.drama?.length > 0 && (
+          <Row
+            title="Drama que te deja sin palabras"
+            items={dashboardData.drama}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        )}
 
         {dashboardData.scifi_fantasy?.length > 0 && (
           <Row
@@ -1472,6 +1490,15 @@ export default function SeriesPageClient({ initialData }) {
           <Row
             title="Crimen y suspense"
             items={dashboardData.crime}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        )}
+
+        {dashboardData.kDrama?.length > 0 && (
+          <Row
+            title="K-Drama que engancha"
+            items={dashboardData.kDrama}
             isMobile={isMobile}
             posterCacheRef={posterCacheRef}
           />
@@ -1494,6 +1521,42 @@ export default function SeriesPageClient({ initialData }) {
             posterCacheRef={posterCacheRef}
           />
         )}
+
+        {dashboardData["Década de 1990"]?.length ? (
+          <Row
+            title="Clásicos de los 90"
+            items={dashboardData["Década de 1990"]}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        ) : null}
+
+        {dashboardData["Década de 2000"]?.length ? (
+          <Row
+            title="Favoritas de los 2000"
+            items={dashboardData["Década de 2000"]}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        ) : null}
+
+        {dashboardData["Década de 2010"]?.length ? (
+          <Row
+            title="Hits de los 2010"
+            items={dashboardData["Década de 2010"]}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        ) : null}
+
+        {dashboardData["Década de 2020"]?.length ? (
+          <Row
+            title="Lo mejor de esta década"
+            items={dashboardData["Década de 2020"]}
+            isMobile={isMobile}
+            posterCacheRef={posterCacheRef}
+          />
+        ) : null}
 
         <GenreRows
           groups={dashboardData["Por género"]}
