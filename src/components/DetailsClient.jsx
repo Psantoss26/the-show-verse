@@ -7465,22 +7465,19 @@ export default function DetailsClient({
   const posterRafRef = useRef(0);
   const prefersReducedMotion = useReducedMotion();
   const [poster3dEnabled, setPoster3dEnabled] = useState(false);
-  // ====== Poster 3D Idle / Tilt (ORDEN CORRECTO) ======
-  const posterIdleRafRef = useRef(0);
-  const posterIsInteractingRef = useRef(false);
-  const posterIdleStartRef = useRef(0);
   const posterTiltRef = useRef(null); // El recuadro completo que se inclina
   const posterAnimRafRef = useRef(0); // Un solo rAF
   const posterTargetRef = useRef({ rx: 0, ry: 0, s: 1 });
   const posterStateRef = useRef({ rx: 0, ry: 0, s: 1 });
   const posterLastInputRef = useRef(0);
 
-  const POSTER_MAX = 10; // grados
-  const POSTER_SCALE = 1.03; // escala al hover
+  const POSTER_MAX = 12; // grados
+  const POSTER_SCALE = 1.06; // escala al hover
   const POSTER_OVERSCAN = 1.02; // Minimo para no perder nitidez
+  const IDLE_DELAY = 220; // ms sin interacción => idle
 
   // Overscan
-  const posterImgOverscan = poster3dEnabled ? 1.08 : 1;
+  const posterImgOverscan = poster3dEnabled ? 1.12 : 1;
 
   useEffect(() => {
     if (prefersReducedMotion) {
@@ -7497,40 +7494,6 @@ export default function DetailsClient({
     media.addEventListener?.("change", update);
     return () => media.removeEventListener?.("change", update);
   }, [prefersReducedMotion]);
-
-  const kickPosterAnimation = useCallback(() => {
-    if (!poster3dEnabled || posterAnimRafRef.current) return;
-
-    const el = posterTiltRef.current;
-    if (!el) return;
-
-    const loop = () => {
-      const cur = posterStateRef.current;
-      const target = posterTargetRef.current;
-      const k = posterIsInteractingRef.current ? 0.18 : 0.14;
-
-      cur.rx += (target.rx - cur.rx) * k;
-      cur.ry += (target.ry - cur.ry) * k;
-      cur.s += (target.s - cur.s) * k;
-
-      el.style.transform =
-        `translateZ(0px) rotateX(${cur.rx.toFixed(3)}deg) rotateY(${cur.ry.toFixed(3)}deg) ` +
-        `scale3d(${cur.s.toFixed(4)}, ${cur.s.toFixed(4)}, ${cur.s.toFixed(4)})`;
-
-      const isSettled =
-        Math.abs(target.rx - cur.rx) < 0.02 &&
-        Math.abs(target.ry - cur.ry) < 0.02 &&
-        Math.abs(target.s - cur.s) < 0.002;
-
-      if (posterIsInteractingRef.current || !isSettled) {
-        posterAnimRafRef.current = requestAnimationFrame(loop);
-      } else {
-        posterAnimRafRef.current = 0;
-      }
-    };
-
-    posterAnimRafRef.current = requestAnimationFrame(loop);
-  }, [poster3dEnabled]);
 
   const setPosterTargetFromPointer = useCallback(
     (clientX, clientY) => {
@@ -7551,45 +7514,64 @@ export default function DetailsClient({
       const rx = ((y - cy) / cy) * -POSTER_MAX;
       const ry = ((x - cx) / cx) * POSTER_MAX;
 
-      posterIsInteractingRef.current = true;
       posterTargetRef.current = { rx, ry, s: POSTER_SCALE };
-      kickPosterAnimation();
+      posterLastInputRef.current =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
     },
-    [kickPosterAnimation, poster3dEnabled],
+    [poster3dEnabled],
   );
 
   const resetPosterTarget = useCallback(() => {
-    posterIsInteractingRef.current = false;
     posterTargetRef.current = { rx: 0, ry: 0, s: 1 };
-    kickPosterAnimation();
-  }, [kickPosterAnimation]);
+    posterLastInputRef.current =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+  }, []);
 
-  // Animacion 3D del poster/backdrop solo cuando hay interaccion
+  // Animacion 3D continua: idle automático cuando no hay interacción
   useEffect(() => {
+    if (!poster3dEnabled) return;
+
     const el = posterTiltRef.current;
     if (!el) return;
 
-    if (!poster3dEnabled) {
-      el.style.transform =
-        "translateZ(0px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)";
-      if (posterAnimRafRef.current) {
-        cancelAnimationFrame(posterAnimRafRef.current);
-        posterAnimRafRef.current = 0;
-      }
-      return;
-    }
+    let mounted = true;
 
-    posterIsInteractingRef.current = false;
-    posterTargetRef.current = { rx: 0, ry: 0, s: 1 };
-    posterStateRef.current = { rx: 0, ry: 0, s: 1 };
-    el.style.transform =
-      "translateZ(0px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)";
+    const loop = (t) => {
+      if (!mounted) return;
+
+      const now = t ?? (typeof performance !== "undefined" ? performance.now() : Date.now());
+      const idle = now - posterLastInputRef.current > IDLE_DELAY;
+
+      let target = posterTargetRef.current;
+
+      if (idle) {
+        const dt = now / 1000;
+        target = {
+          rx: Math.sin(dt * 1.05) * 5.5,
+          ry: Math.cos(dt * 0.90) * 8.5,
+          s: 1.03 + Math.sin(dt * 1.60) * 0.01,
+        };
+      }
+
+      const cur = posterStateRef.current;
+      const k = 0.14;
+      cur.rx += (target.rx - cur.rx) * k;
+      cur.ry += (target.ry - cur.ry) * k;
+      cur.s += (target.s - cur.s) * k;
+
+      el.style.transform =
+        `translateZ(0px) rotateX(${cur.rx.toFixed(3)}deg) rotateY(${cur.ry.toFixed(3)}deg) ` +
+        `scale3d(${cur.s.toFixed(4)}, ${cur.s.toFixed(4)}, ${cur.s.toFixed(4)})`;
+
+      posterAnimRafRef.current = requestAnimationFrame(loop);
+    };
+
+    posterAnimRafRef.current = requestAnimationFrame(loop);
 
     return () => {
-      if (posterAnimRafRef.current) {
-        cancelAnimationFrame(posterAnimRafRef.current);
-        posterAnimRafRef.current = 0;
-      }
+      mounted = false;
+      if (posterAnimRafRef.current) cancelAnimationFrame(posterAnimRafRef.current);
+      posterAnimRafRef.current = 0;
     };
   }, [poster3dEnabled, displayPosterPath]);
 
