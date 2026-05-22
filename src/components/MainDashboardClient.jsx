@@ -131,6 +131,8 @@ const formatRuntime = (mins) => {
 const buildImg = (path, size = "original") =>
   `https://image.tmdb.org/t/p/${size}${path}`;
 
+const PREVIEW_BACKDROP_SIZE = "w780";
+
 const GENRES = {
   28: "Acción",
   12: "Aventura",
@@ -162,14 +164,21 @@ const GENRES = {
 };
 
 /* --------- precargar una imagen --------- */
+const imagePreloadCache = new Map();
+
 function preloadImage(src) {
-  return new Promise((resolve) => {
-    if (!src) return resolve(false);
+  if (!src) return Promise.resolve(false);
+  if (imagePreloadCache.has(src)) return imagePreloadCache.get(src);
+
+  const promise = new Promise((resolve) => {
     const img = new Image();
+    img.decoding = "async";
     img.onload = () => resolve(true);
     img.onerror = () => resolve(false);
     img.src = src;
   });
+  imagePreloadCache.set(src, promise);
+  return promise;
 }
 
 function runWhenBrowserIdle(callback, { timeout = 1500, delay = 250 } = {}) {
@@ -217,43 +226,44 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
   const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
   const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
   const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1));
+  const hasNoLanguage = (img) => !norm(img?.iso_639_1);
 
   // Mantener el orden, aplicando minWidth si procede
   const pool0 =
     minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
   const pool = pool0.length ? pool0 : list;
 
-  // 3 primeras imágenes EN disponibles (en orden)
+  // 3 primeras imágenes con idioma preferido. Si no existen, 3 sin idioma.
   const top3en = [];
+  const top3NoLanguage = [];
   for (const b of pool) {
     if (isPreferredLang(b)) top3en.push(b);
+    else if (hasNoLanguage(b)) top3NoLanguage.push(b);
     if (top3en.length === 3) break;
   }
 
-  // Si no hay EN, cae a las 3 primeras del pool
-  const top3 = top3en.length ? top3en : pool.slice(0, 3);
-  if (!top3.length) return null;
+  const candidates = top3en.length ? top3en : top3NoLanguage.slice(0, 3);
+  if (!candidates.length) return null;
 
   // 1) 1920x1080
-  const b1080 = top3.find(
+  const b1080 = candidates.find(
     (b) => (b?.width || 0) === 1920 && (b?.height || 0) === 1080,
   );
   if (b1080) return b1080;
 
   // 2) 1712x964
-  const b1712 = top3.find(
+  const b1712 = candidates.find(
     (b) => (b?.width || 0) === 1712 && (b?.height || 0) === 964,
   );
   if (b1712) return b1712;
 
   // 3) 4K 3840x2160
-  const b4k = top3.find(
+  const b4k = candidates.find(
     (b) => (b?.width || 0) === 3840 && (b?.height || 0) === 2160,
   );
   if (b4k) return b4k;
 
-  // 4) primera de esas 3
-  return top3[0];
+  return candidates[0];
 }
 
 function pickBestPosterByLangThenResolution(list, opts = {}) {
@@ -640,36 +650,23 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     if (!movie) return;
 
     const loadAll = async () => {
+      const revealBackdrop = (path) => {
+        if (abort) return;
+        setBackdropPath(path);
+        setBackdropReady(false);
+      };
+
       const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
       if (userBackdrop) {
         movieBackdropCache.set(movie.id, userBackdrop);
-        const url = buildImg(userBackdrop, "w1280");
-        await preloadImage(url);
-        if (!abort) {
-          setBackdropPath(userBackdrop);
-          setBackdropReady(true);
-        }
+        revealBackdrop(userBackdrop);
       } else if (backdropOverride) {
         movieBackdropCache.set(movie.id, backdropOverride);
-        const url = buildImg(backdropOverride, "w1280");
-        await preloadImage(url);
-        if (!abort) {
-          setBackdropPath(backdropOverride);
-          setBackdropReady(true);
-        }
+        revealBackdrop(backdropOverride);
       } else {
         const cachedBackdrop = movieBackdropCache.get(movie.id);
         if (cachedBackdrop !== undefined) {
-          if (!abort) {
-            setBackdropPath(cachedBackdrop);
-            if (cachedBackdrop) {
-              const url = buildImg(cachedBackdrop, "w1280");
-              await preloadImage(url);
-              if (!abort) setBackdropReady(true);
-            } else {
-              setBackdropReady(false);
-            }
-          }
+          revealBackdrop(cachedBackdrop);
         } else {
           try {
             const mediaType =
@@ -679,31 +676,14 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                 ? "tv"
                 : "movie";
             const preferred = await fetchBestBackdrop(movie.id, mediaType);
-            const chosen =
-              preferred ||
-              movie.backdrop_path ||
-              movie.poster_path ||
-              movie.profile_path ||
-              null;
+            const chosen = preferred || null;
 
             movieBackdropCache.set(movie.id, chosen);
 
-            if (chosen) {
-              const url = buildImg(chosen, "w1280");
-              await preloadImage(url);
-              if (!abort) {
-                setBackdropPath(chosen);
-                setBackdropReady(true);
-              }
-            } else if (!abort) {
-              setBackdropPath(null);
-              setBackdropReady(false);
-            }
+            revealBackdrop(chosen);
           } catch {
-            if (!abort) {
-              setBackdropPath(null);
-              setBackdropReady(false);
-            }
+            movieBackdropCache.set(movie.id, null);
+            revealBackdrop(null);
           }
         }
       }
@@ -887,13 +867,9 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     }
   };
 
-  const resolvedBackdrop =
-    backdropPath ||
-    movie.backdrop_path ||
-    movie.poster_path ||
-    movie.profile_path ||
-    null;
-  const bgSrc = resolvedBackdrop ? buildImg(resolvedBackdrop, "w1280") : null;
+  const bgSrc = backdropPath
+    ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
+    : null;
 
   const genres = (() => {
     const ids =
@@ -938,13 +914,19 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
           </div>
         )}
 
-        {!showTrailer && backdropReady && bgSrc && (
+        {!showTrailer && bgSrc && (
           <img
+            key={bgSrc}
             src={bgSrc}
             alt={movie.title || movie.name}
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+              backdropReady ? "opacity-100" : "opacity-0"
+            }`}
+            loading="eager"
             decoding="async"
+            fetchPriority="high"
+            onLoad={() => setBackdropReady(true)}
+            onError={() => setBackdropReady(false)}
           />
         )}
 
@@ -1195,35 +1177,24 @@ function InlinePreviewCardAnticipated({
     if (!movie) return;
 
     const loadAll = async () => {
+      const revealBackdrop = (path) => {
+        if (abort) return;
+        setBackdropPath(path);
+        setBackdropReady(false);
+      };
+
       // Backdrop (igual que tu preview normal)
       const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
       if (userBackdrop) {
-        const url = buildImg(userBackdrop, "w1280");
-        await preloadImage(url);
-        if (!abort) {
-          setBackdropPath(userBackdrop);
-          setBackdropReady(true);
-        }
+        movieBackdropCache.set(movie.id, userBackdrop);
+        revealBackdrop(userBackdrop);
       } else if (backdropOverride) {
-        const url = buildImg(backdropOverride, "w1280");
-        await preloadImage(url);
-        if (!abort) {
-          setBackdropPath(backdropOverride);
-          setBackdropReady(true);
-        }
+        movieBackdropCache.set(movie.id, backdropOverride);
+        revealBackdrop(backdropOverride);
       } else {
         const cachedBackdrop = movieBackdropCache.get(movie.id);
         if (cachedBackdrop !== undefined) {
-          if (!abort) {
-            setBackdropPath(cachedBackdrop);
-            if (cachedBackdrop) {
-              const url = buildImg(cachedBackdrop, "w1280");
-              await preloadImage(url);
-              if (!abort) setBackdropReady(true);
-            } else {
-              setBackdropReady(false);
-            }
-          }
+          revealBackdrop(cachedBackdrop);
         } else {
           try {
             const mediaTypeForBackdrop =
@@ -1236,27 +1207,14 @@ function InlinePreviewCardAnticipated({
               movie.id,
               mediaTypeForBackdrop,
             );
-            const chosen =
-              preferred || movie.backdrop_path || movie.poster_path || null;
+            const chosen = preferred || null;
 
             movieBackdropCache.set(movie.id, chosen);
 
-            if (chosen) {
-              const url = buildImg(chosen, "w1280");
-              await preloadImage(url);
-              if (!abort) {
-                setBackdropPath(chosen);
-                setBackdropReady(true);
-              }
-            } else if (!abort) {
-              setBackdropPath(null);
-              setBackdropReady(false);
-            }
+            revealBackdrop(chosen);
           } catch {
-            if (!abort) {
-              setBackdropPath(null);
-              setBackdropReady(false);
-            }
+            movieBackdropCache.set(movie.id, null);
+            revealBackdrop(null);
           }
         }
       }
@@ -1408,9 +1366,9 @@ function InlinePreviewCardAnticipated({
     }
   };
 
-  const resolvedBackdrop =
-    backdropPath || movie.backdrop_path || movie.poster_path || null;
-  const bgSrc = resolvedBackdrop ? buildImg(resolvedBackdrop, "w1280") : null;
+  const bgSrc = backdropPath
+    ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
+    : null;
 
   const genres = (() => {
     const ids =
@@ -1446,13 +1404,19 @@ function InlinePreviewCardAnticipated({
           <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
         )}
 
-        {!showTrailer && backdropReady && bgSrc && (
+        {!showTrailer && bgSrc && (
           <img
+            key={bgSrc}
             src={bgSrc}
             alt={movie.title || movie.name}
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+              backdropReady ? "opacity-100" : "opacity-0"
+            }`}
+            loading="eager"
             decoding="async"
+            fetchPriority="high"
+            onLoad={() => setBackdropReady(true)}
+            onError={() => setBackdropReady(false)}
           />
         )}
 
@@ -1853,13 +1817,28 @@ function Row({
 
       for (const movie of toPreload) {
         const backdropOverride = backdropOverrides?.[movie.id];
-        const backdropPath = backdropOverride || movie.backdrop_path;
+        let backdropPath = backdropOverride || movieBackdropCache.get(movie.id);
+
+        if (backdropPath === undefined) {
+          try {
+            const mediaType =
+              movie.media_type === "tv" ||
+              (movie.name && !movie.title) ||
+              movie.first_air_date
+                ? "tv"
+                : "movie";
+            backdropPath =
+              (await fetchBestBackdrop(movie.id, mediaType)) || null;
+          } catch {
+            backdropPath = null;
+          }
+          movieBackdropCache.set(movie.id, backdropPath);
+        }
 
         if (backdropPath) {
-          const img = new Image();
-          img.src = buildImg(backdropPath, "w1280");
-          setPreloadedBackdrops((prev) => new Set([...prev, movie.id]));
+          preloadImage(buildImg(backdropPath, PREVIEW_BACKDROP_SIZE));
         }
+        setPreloadedBackdrops((prev) => new Set([...prev, movie.id]));
       }
     };
 

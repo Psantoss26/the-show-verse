@@ -101,6 +101,7 @@ import {
 } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb"; // Datos extra de OMDb (IMDb rating, RT, MC)
 import { fetchTmdbAwards } from "@/lib/api/tmdbAwards";
+import { formatDashboardAwards } from "@/lib/details/awardsText";
 import StarRating from "./StarRating"; // Componente de puntuacion con estrellas
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl"; // Boton de marcar visto en Trakt
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal"; // Modal de historial de visionados
@@ -414,14 +415,35 @@ function awardResultClass(result) {
 
 function flattenAwardItems(details) {
   const groups = Array.isArray(details?.groups) ? details.groups : [];
+  let sourceIndex = 0;
+
   return groups.flatMap((group) =>
-    (Array.isArray(group?.items) ? group.items : []).map((item, index) => ({
-      ...item,
-      id: `${group?.name || "award"}-${item?.category || "category"}-${item?.year || "year"}-${index}`,
-      groupName: group?.name || "Premio",
-      groupImageUrl: group?.imageUrl || null,
-    })),
+    (Array.isArray(group?.items) ? group.items : []).map((item, index) => {
+      const flattened = {
+        ...item,
+        id: `${group?.name || "award"}-${item?.category || "category"}-${item?.year || "year"}-${index}`,
+        groupName: group?.name || "Premio",
+        groupImageUrl: group?.imageUrl || null,
+        sourceIndex,
+      };
+      sourceIndex += 1;
+      return flattened;
+    }),
   );
+}
+
+function awardResultRank(result) {
+  if (result === "winner") return 0;
+  if (result === "nominee") return 1;
+  return 2;
+}
+
+function sortAwardItemsForDisplay(items) {
+  return [...items].sort((a, b) => {
+    const byResult = awardResultRank(a?.result) - awardResultRank(b?.result);
+    if (byResult !== 0) return byResult;
+    return (a?.sourceIndex ?? 0) - (b?.sourceIndex ?? 0);
+  });
 }
 
 function getAwardInitials(name) {
@@ -436,6 +458,64 @@ function getAwardInitials(name) {
     .join("")
     .toUpperCase();
   return initials || "TSV";
+}
+
+function formatAwardGroupName(name) {
+  const raw = String(name || "").trim();
+  if (!raw) return "Premio";
+
+  const n = raw.toLowerCase();
+
+  if (/academy awards?|oscars?/.test(n)) return "Premios Oscar";
+  if (/primetime emmy|emmy/.test(n)) return "Premios Emmy";
+  if (/golden\s+globes?/.test(n)) return "Globos de Oro";
+  if (/bafta/.test(n)) return "Premios BAFTA";
+  if (/goya/.test(n)) return "Premios Goya";
+  if (/c[eé]sar/.test(n)) return "Premios César";
+  if (/screen\s+actors\s+guild|sag/.test(n)) {
+    return "Premios del Sindicato de Actores";
+  }
+  if (/actor awards?/.test(n)) return "Premios de Interpretación";
+  if (/writers?\s+guild|wga/.test(n)) {
+    return "Premios del Sindicato de Guionistas";
+  }
+  if (/directors?\s+guild|dga/.test(n)) {
+    return "Premios del Sindicato de Directores";
+  }
+  if (/producers?\s+guild|pga/.test(n)) {
+    return "Premios del Sindicato de Productores";
+  }
+  if (/japan academy film prize/.test(n)) {
+    return "Premios de la Academia Japonesa de Cine";
+  }
+  if (/mainichi film awards?/.test(n)) return "Premios Mainichi de Cine";
+  if (/american film institute|\bafi\b/.test(n)) {
+    return "Instituto Americano de Cine";
+  }
+  if (/critics'? choice/.test(n)) return "Premios de la Crítica";
+  if (/independent spirit/.test(n)) return "Premios Independent Spirit";
+  if (/saturn awards?/.test(n)) return "Premios Saturn";
+  if (/annie awards?/.test(n)) return "Premios Annie";
+  if (/hugo awards?/.test(n)) return "Premios Hugo";
+  if (/grammy awards?/.test(n)) return "Premios Grammy";
+  if (/cannes/.test(n)) return "Festival de Cannes";
+  if (/venice/.test(n)) return "Festival de Venecia";
+  if (/berlin/.test(n)) return "Festival de Berlín";
+  if (/national board of review/.test(n)) return "National Board of Review";
+  if (/new york film critics/.test(n)) {
+    return "Críticos de Cine de Nueva York";
+  }
+  if (/los angeles film critics/.test(n)) {
+    return "Críticos de Cine de Los Ángeles";
+  }
+  if (/online film critics/.test(n)) return "Críticos de Cine Online";
+
+  return raw
+    .replace(/\bAwards?\b/g, "Premios")
+    .replace(/\bFilm\b/g, "Cine")
+    .replace(/\bPrize\b/g, "Premio")
+    .replace(/\bAcademy\b/g, "Academia")
+    .replace(/\bGuild\b/g, "Sindicato");
 }
 
 function getAwardVisual(name) {
@@ -453,7 +533,7 @@ function getAwardVisual(name) {
 
   if (/golden\s+globes?/.test(n)) {
     return {
-      label: "GLOBES",
+      label: "GLOBOS",
       background:
         "radial-gradient(circle at 50% 26%, rgba(252,211,77,0.34), transparent 32%), linear-gradient(145deg, #2c1d08 0%, #071716 52%, #010101 100%)",
       accent: "text-amber-200",
@@ -473,7 +553,7 @@ function getAwardVisual(name) {
 
   if (/actor|screen\s+actors|sag/.test(n)) {
     return {
-      label: "ACTORS",
+      label: "ACTORES",
       background:
         "radial-gradient(circle at 50% 18%, rgba(125,211,252,0.24), transparent 34%), linear-gradient(145deg, #071b2b 0%, #060b12 52%, #000 100%)",
       accent: "text-sky-200",
@@ -483,7 +563,7 @@ function getAwardVisual(name) {
 
   if (/writers?|screenplay|wga|guild/.test(n)) {
     return {
-      label: "WGA",
+      label: "GUION",
       background:
         "radial-gradient(circle at 50% 18%, rgba(216,180,254,0.22), transparent 34%), linear-gradient(145deg, #241035 0%, #100817 52%, #000 100%)",
       accent: "text-violet-200",
@@ -503,7 +583,7 @@ function getAwardVisual(name) {
 
   if (/japan/.test(n)) {
     return {
-      label: "JAPAN",
+      label: "JAPÓN",
       background:
         "radial-gradient(circle at 50% 18%, rgba(244,114,182,0.22), transparent 34%), linear-gradient(145deg, #2a0d1d 0%, #13080f 52%, #000 100%)",
       accent: "text-pink-200",
@@ -513,7 +593,7 @@ function getAwardVisual(name) {
 
   if (/czech|lion/.test(n)) {
     return {
-      label: "LION",
+      label: "LEÓN",
       background:
         "radial-gradient(circle at 50% 18%, rgba(250,204,21,0.25), transparent 34%), linear-gradient(145deg, #2f2608 0%, #101006 52%, #000 100%)",
       accent: "text-yellow-200",
@@ -532,6 +612,27 @@ function getAwardVisual(name) {
 
 function awardCategoryContextLabel(category) {
   const c = String(category || "").toLowerCase();
+  if (/motion picture.*drama|drama.*motion picture/.test(c)) {
+    return "en película dramática";
+  }
+  if (
+    /motion picture.*(musical or comedy|comedy or musical)/.test(c) ||
+    /(musical or comedy|comedy or musical).*motion picture/.test(c)
+  ) {
+    return "en película musical o comedia";
+  }
+  if (/television series.*drama|drama.*television series/.test(c)) {
+    return "en serie dramática";
+  }
+  if (
+    /television series.*(musical or comedy|comedy or musical)/.test(c) ||
+    /(musical or comedy|comedy or musical).*television series/.test(c)
+  ) {
+    return "en serie musical o comedia";
+  }
+  if (/musical or comedy|comedy or musical/.test(c)) {
+    return "en musical o comedia";
+  }
   if (/drama series/.test(c)) return "en drama";
   if (/comedy series/.test(c)) return "en comedia";
   if (/limited series|miniseries|television movie|tv movie/.test(c)) {
@@ -559,6 +660,10 @@ function formatCommonAwardCategory(category) {
     "best director": "Mejor dirección",
     "best original screenplay": "Mejor guion original",
     "best adapted screenplay": "Mejor guion adaptado",
+    "best screenplay based on material from another medium":
+      "Mejor guion adaptado",
+    "best screenplay based on material previously produced or published":
+      "Mejor guion adaptado",
     "best screenplay": "Mejor guion",
     "best original score": "Mejor música original",
     "best original song": "Mejor canción original",
@@ -596,6 +701,21 @@ function formatCommonAwardCategory(category) {
   }
   if (/best limited series|best television movie/.test(c)) {
     return "Mejor miniserie o película de TV";
+  }
+
+  if (/best performance by/.test(c)) {
+    const context = awardCategoryContextLabel(category);
+    const withContext = (base) => [base, context].filter(Boolean).join(" ");
+
+    if (/ensemble|cast/.test(c)) return withContext("Mejor reparto");
+    if (/supporting/.test(c) && /(female actor|actress|actriz)/.test(c)) {
+      return withContext("Mejor actriz de reparto");
+    }
+    if (/supporting/.test(c) && /(male actor|actor)/.test(c)) {
+      return withContext("Mejor actor de reparto");
+    }
+    if (/female actor|actress/.test(c)) return withContext("Mejor actriz");
+    if (/male actor|actor/.test(c)) return withContext("Mejor actor");
   }
 
   if (/best director/.test(c)) return "Mejor dirección";
@@ -643,7 +763,7 @@ function formatCommonAwardCategory(category) {
 
 function formatAwardCategory(category, groupName) {
   const raw = String(category || "").trim();
-  if (!raw) return groupName || "Premio";
+  if (!raw) return formatAwardGroupName(groupName);
 
   const group = String(groupName || "").toLowerCase();
   const c = normalizeAwardCategoryKey(raw);
@@ -666,6 +786,8 @@ function formatAwardCategory(category, groupName) {
 }
 
 function AwardsPanel({ awards }) {
+  const formattedAwards = formatDashboardAwards(awards);
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-5 sm:p-6">
       <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
@@ -679,9 +801,9 @@ function AwardsPanel({ awards }) {
             <h3 className="text-lg font-bold text-white mb-2">
               Reconocimientos
             </h3>
-            {awards && (
+            {formattedAwards && (
               <p className="text-base leading-relaxed text-zinc-200">
-                {awards}
+                {formattedAwards}
               </p>
             )}
           </div>
@@ -713,6 +835,7 @@ function AwardCard({ item }) {
   const people = Array.isArray(item?.people) ? item.people.filter(Boolean) : [];
   const visual = getAwardVisual(item?.groupName);
   const categoryLabel = formatAwardCategory(item?.category, item?.groupName);
+  const groupLabel = formatAwardGroupName(item?.groupName);
 
   return (
     <article className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1">
@@ -759,7 +882,7 @@ function AwardCard({ item }) {
               {visual.label}
             </div>
             <div className="mt-1 hidden text-[9px] font-bold uppercase tracking-[0.18em] text-white/55 line-clamp-1 sm:block">
-              {item?.groupName}
+              {groupLabel}
             </div>
           </div>
         </div>
@@ -770,7 +893,7 @@ function AwardCard({ item }) {
               {categoryLabel}
             </p>
             <p className="mt-1 text-center text-[9px] font-bold leading-tight text-yellow-400 line-clamp-1">
-              {item?.groupName}
+              {groupLabel}
             </p>
           </div>
           <div className="hidden sm:block">
@@ -778,7 +901,7 @@ function AwardCard({ item }) {
               {categoryLabel}
             </p>
             <p className="mt-1 text-yellow-400 text-xs font-bold leading-tight line-clamp-1">
-              {item?.groupName}
+              {groupLabel}
             </p>
             {people.length > 0 && (
               <p className="mt-1 text-gray-300 text-xs leading-tight line-clamp-2">
@@ -6414,7 +6537,7 @@ export default function DetailsClient({
   const hasProduction = !!production;
   const hasAwards = !!extras?.awards;
   const awardItems = useMemo(
-    () => flattenAwardItems(extras?.awardsDetails),
+    () => sortAwardItemsForDisplay(flattenAwardItems(extras?.awardsDetails)),
     [extras?.awardsDetails],
   );
   const hasAwardItems = awardItems.length > 0;
@@ -9258,11 +9381,26 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       }}
                       className="pb-8"
                     >
-                      {awardItems.map((award) => (
-                        <SwiperSlide key={award.id}>
-                          <AwardCard item={award} />
-                        </SwiperSlide>
-                      ))}
+                      {awardItems.map((award, index) => {
+                        const previous = awardItems[index - 1] || null;
+                        const startsNominations =
+                          award?.result === "nominee" &&
+                          previous?.result === "winner";
+
+                        return (
+                          <SwiperSlide key={award.id}>
+                            <div
+                              className={
+                                startsNominations
+                                  ? "relative before:absolute before:-left-2.5 before:top-3 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-yellow-300/80 before:via-yellow-500/45 before:to-transparent"
+                                  : ""
+                              }
+                            >
+                              <AwardCard item={award} />
+                            </div>
+                          </SwiperSlide>
+                        );
+                      })}
                     </Swiper>
                   </section>
                 </AnimatedSection>

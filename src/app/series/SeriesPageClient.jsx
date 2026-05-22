@@ -99,6 +99,8 @@ const formatRuntime = (mins) => {
 const buildImg = (path, size = "original") =>
   `https://image.tmdb.org/t/p/${size}${path}`;
 
+const PREVIEW_BACKDROP_SIZE = "w780";
+
 const TV_GENRES = {
   10759: "Acción y aventura",
   16: "Animación",
@@ -119,14 +121,21 @@ const TV_GENRES = {
 };
 
 /* --------- Precargar imagen --------- */
+const imagePreloadCache = new Map();
+
 function preloadImage(src) {
-  return new Promise((resolve) => {
-    if (!src) return resolve(false);
+  if (!src) return Promise.resolve(false);
+  if (imagePreloadCache.has(src)) return imagePreloadCache.get(src);
+
+  const promise = new Promise((resolve) => {
     const img = new Image();
+    img.decoding = "async";
     img.onload = () => resolve(true);
     img.onerror = () => resolve(false);
     img.src = src;
   });
+  imagePreloadCache.set(src, promise);
+  return promise;
 }
 
 /* =================== CACHÉS COMPARTIDOS (CLIENTE TV) =================== */
@@ -270,38 +279,40 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
   const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
   const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
   const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1));
+  const hasNoLanguage = (img) => !norm(img?.iso_639_1);
 
   // Mantener orden + minWidth
   const pool0 =
     minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
   const pool = pool0.length ? pool0 : list;
 
-  // ✅ SOLO 3 primeras EN (en orden). Si no hay EN, no devolvemos nada (siempre EN).
+  // Primero 3 con idioma preferido; si no hay, 3 sin idioma.
   const top3en = [];
+  const top3NoLanguage = [];
   for (const b of pool) {
     if (isPreferredLang(b)) top3en.push(b);
+    else if (hasNoLanguage(b)) top3NoLanguage.push(b);
     if (top3en.length === 3) break;
   }
-  if (!top3en.length) return null;
+  const candidates = top3en.length ? top3en : top3NoLanguage.slice(0, 3);
+  if (!candidates.length) return null;
 
   const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
 
-  // Prioridades dentro de esas 3 EN
-  const b1080 = top3en.find((b) => isRes(b, 1920, 1080));
+  // Prioridades dentro del grupo elegido
+  const b1080 = candidates.find((b) => isRes(b, 1920, 1080));
   if (b1080) return b1080;
 
-  const b1440 = top3en.find((b) => isRes(b, 2560, 1440));
+  const b1440 = candidates.find((b) => isRes(b, 2560, 1440));
   if (b1440) return b1440;
 
-  const b4k = top3en.find((b) => isRes(b, 3840, 2160));
+  const b4k = candidates.find((b) => isRes(b, 3840, 2160));
   if (b4k) return b4k;
 
-  // ✅ si no hay 4K, intenta 1280x720
-  const b720 = top3en.find((b) => isRes(b, 1280, 720));
+  const b720 = candidates.find((b) => isRes(b, 1280, 720));
   if (b720) return b720;
 
-  // si no hay ninguna, primera de esas 3 EN
-  return top3en[0];
+  return candidates[0];
 }
 
 function pickBestPosterByLangThenResolution(list, opts = {}) {
@@ -511,9 +522,9 @@ function Top10MobileBackdropCardTV({ show, rank }) {
       let chosen = null;
       try {
         const preferred = await fetchBestTVBackdrop(show.id);
-        chosen = preferred || show.backdrop_path || show.poster_path || null;
+        chosen = preferred || null;
       } catch {
-        chosen = show.backdrop_path || show.poster_path || null;
+        chosen = null;
       }
 
       tvBackdropCache.set(show.id, chosen);
@@ -642,63 +653,33 @@ function InlinePreviewCard({ show, heightClass }) {
     if (!show) return;
 
     const loadAll = async () => {
+      const revealBackdrop = (path) => {
+        if (abort) return;
+        setBackdropPath(path);
+        setBackdropReady(false);
+      };
+
       const { backdrop: userBackdrop } = getTVArtworkPreference(show.id);
       const userPreferredBackdrop = userBackdrop || null;
 
       if (userPreferredBackdrop) {
         tvBackdropCache.set(show.id, userPreferredBackdrop);
-        const url = buildImg(userPreferredBackdrop, "w1280");
-        await preloadImage(url);
-        if (!abort) {
-          setBackdropPath(userPreferredBackdrop);
-          setBackdropReady(true);
-        }
+        revealBackdrop(userPreferredBackdrop);
       } else {
         const cachedBackdrop = tvBackdropCache.get(show.id);
         if (cachedBackdrop !== undefined) {
-          if (!abort) {
-            setBackdropPath(cachedBackdrop);
-            if (cachedBackdrop) {
-              const url = buildImg(cachedBackdrop, "w1280");
-              await preloadImage(url);
-              if (!abort) setBackdropReady(true);
-            } else {
-              setBackdropReady(false);
-            }
-          }
+          revealBackdrop(cachedBackdrop);
         } else {
           try {
             const preferred = await fetchBestTVBackdrop(show.id);
-            const chosen =
-              preferred || show.backdrop_path || show.poster_path || null;
+            const chosen = preferred || null;
 
             tvBackdropCache.set(show.id, chosen);
 
-            if (chosen) {
-              const url = buildImg(chosen, "w1280");
-              await preloadImage(url);
-              if (!abort) {
-                setBackdropPath(chosen);
-                setBackdropReady(true);
-              }
-            } else if (!abort) {
-              setBackdropPath(null);
-              setBackdropReady(false);
-            }
+            revealBackdrop(chosen);
           } catch {
-            const fallback = show.backdrop_path || show.poster_path || null;
-            if (fallback) {
-              tvBackdropCache.set(show.id, fallback);
-              const url = buildImg(fallback, "w1280");
-              await preloadImage(url);
-              if (!abort) {
-                setBackdropPath(fallback);
-                setBackdropReady(true);
-              }
-            } else if (!abort) {
-              setBackdropPath(null);
-              setBackdropReady(false);
-            }
+            tvBackdropCache.set(show.id, null);
+            revealBackdrop(null);
           }
         }
       }
@@ -853,9 +834,9 @@ function InlinePreviewCard({ show, heightClass }) {
     }
   };
 
-  const resolvedBackdrop =
-    backdropPath || show.backdrop_path || show.poster_path || null;
-  const bgSrc = resolvedBackdrop ? buildImg(resolvedBackdrop, "w1280") : null;
+  const bgSrc = backdropPath
+    ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
+    : null;
 
   const genres = (() => {
     const ids =
@@ -890,13 +871,19 @@ function InlinePreviewCard({ show, heightClass }) {
           <div className="absolute inset-0 bg-neutral-900" />
         )}
 
-        {!showTrailer && backdropReady && bgSrc && (
+        {!showTrailer && bgSrc && (
           <img
+            key={bgSrc}
             src={bgSrc}
             alt={show.name || show.title}
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+              backdropReady ? "opacity-100" : "opacity-0"
+            }`}
+            loading="eager"
             decoding="async"
+            fetchPriority="high"
+            onLoad={() => setBackdropReady(true)}
+            onError={() => setBackdropReady(false)}
           />
         )}
 
@@ -1092,6 +1079,38 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const [canNext, setCanNext] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
   const isInView = useInView(rowRef, { once: true, margin: "-100px" });
+  const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
+
+  useEffect(() => {
+    if (!isHoveredRow || !items?.length || isMobile) return;
+
+    const preloadBackdrops = async () => {
+      const toPreload = items
+        .slice(0, 5)
+        .filter((show) => !preloadedBackdrops.has(show.id));
+
+      for (const show of toPreload) {
+        let backdropPath = tvBackdropCache.get(show.id);
+
+        if (backdropPath === undefined) {
+          try {
+            backdropPath = (await fetchBestTVBackdrop(show.id)) || null;
+          } catch {
+            backdropPath = null;
+          }
+          tvBackdropCache.set(show.id, backdropPath);
+        }
+
+        if (backdropPath) {
+          preloadImage(buildImg(backdropPath, PREVIEW_BACKDROP_SIZE));
+        }
+        setPreloadedBackdrops((prev) => new Set([...prev, show.id]));
+      }
+    };
+
+    const timer = window.setTimeout(preloadBackdrops, 150);
+    return () => window.clearTimeout(timer);
+  }, [isHoveredRow, items, isMobile, preloadedBackdrops]);
 
   const isTop10 = title === "Top 10 hoy en España";
   const hasActivePreview = !!hoveredId;
