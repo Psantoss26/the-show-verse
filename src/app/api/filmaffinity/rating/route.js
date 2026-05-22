@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 const CACHE = new Map();
 const TTL = 1000 * 60 * 60 * 24;
 const MAX_CANDIDATES = 8;
+const BRAVE_SEARCH_URL = "https://search.brave.com/search";
 
 function cacheGet(key) {
   const hit = CACHE.get(key);
@@ -18,6 +19,7 @@ function cacheGet(key) {
 }
 
 function cacheSet(key, data) {
+  if (data?.rating == null && !data?.url) return;
   CACHE.set(key, { ts: Date.now(), data });
 }
 
@@ -45,7 +47,7 @@ function normalizeTitle(value = "") {
   return stripTags(value)
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/\([^)]*\)/g, " ")
     .replace(/\b(the|a|an|el|la|los|las|un|una|unos|unas)\b/g, " ")
     .replace(/&/g, " and ")
@@ -65,6 +67,19 @@ function parseNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function parseCompactNumber(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  const match = text.match(/^([\d.,]+)\s*([kmb])?$/i);
+  if (!match) return parseNumber(text);
+  const base = parseNumber(match[1]);
+  if (!Number.isFinite(base)) return null;
+  const unit = match[2]?.toLowerCase();
+  const multiplier =
+    unit === "k" ? 1000 : unit === "m" ? 1000000 : unit === "b" ? 1000000000 : 1;
+  return Math.round(base * multiplier);
+}
+
 function unique(items) {
   return Array.from(new Set(items.filter(Boolean)));
 }
@@ -81,6 +96,31 @@ async function safeFetch(url) {
       "accept-language": "es-ES,es;q=0.9,en;q=0.8",
     },
   });
+}
+
+function decodeJsString(value = "") {
+  try {
+    return JSON.parse(`"${String(value).replace(/"/g, '\\"')}"`);
+  } catch {
+    return value
+      .replace(/\\u([0-9a-f]{4})/gi, (_, n) =>
+        String.fromCharCode(parseInt(n, 16)),
+      )
+      .replace(/\\"/g, '"')
+      .replace(/\\\//g, "/")
+      .replace(/\\\\/g, "\\");
+  }
+}
+
+function extractYear(value = "") {
+  const year = Number(String(value).match(/\b(19|20)\d{2}\b/)?.[0]);
+  return Number.isFinite(year) ? year : null;
+}
+
+function isFilmAffinityChallenge(text = "") {
+  return /cf-mitigated|just a moment|enable javascript and cookies|challenge-platform|cf_chl/i.test(
+    text,
+  );
 }
 
 function extractCandidateUrls(html) {
@@ -104,7 +144,24 @@ function extractCandidateUrls(html) {
   return urls;
 }
 
+function extractBraveCandidateUrls(html, limit = 24) {
+  const urls = [];
+  const seen = new Set();
+  const re =
+    /https:\/\/(?:www|m)\.filmaffinity\.com\/(?:es|en|us)\/film\d+\.html/gi;
+  let match;
+  while ((match = re.exec(html)) && urls.length < limit) {
+    const normalized = decodeHtml(match[0]).replace(/\/$/, "");
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      urls.push(normalized);
+    }
+  }
+  return urls;
+}
+
 function parseDetail(html, url) {
+  if (isFilmAffinityChallenge(html)) return null;
   const ratingMatch =
     html.match(/id=["']movie-rat-avg["'][^>]*content=["']([\d.,]+)["']/i) ||
     html.match(/id=["']movie-rat-avg["'][^>]*>([\s\S]*?)<\/div>/i);
@@ -144,6 +201,113 @@ function parseDetail(html, url) {
     url,
     isTv,
   };
+}
+
+function parseBraveRenderedCandidate(section, url) {
+  const titleMatch =
+    section.match(/title=["']([^"']+\s-\s*filmaffinity)["']/i) ||
+    section.match(/<div[^>]*class=["'][^"']*\btitle\b[^"']*["'][^>]*>([^<]*\s-\s*Filmaffinity)<\/div>/i);
+  const rawTitle = stripTags(titleMatch?.[1] || "");
+  const title = rawTitle.replace(/\s*-\s*filmaffinity\s*$/i, "").trim();
+
+  const rating = parseNumber(
+    section.match(/(?:Rating|Puntuaci[oó]n):\s*([\d.,]+)\s*\/\s*10/i)?.[1],
+  );
+  if (rating == null) return null;
+
+  const votesMatch = section.match(
+    /(?:Rating|Puntuaci[oó]n):\s*[\d.,]+\s*\/\s*10[\s\S]{0,140}?([\d.,]+\s*[kmb]?)\s*(?:votes|votos)/i,
+  );
+  const votes = parseCompactNumber(votesMatch?.[1]);
+
+  const originalTitle = stripTags(
+    section.match(/original:\s*([^.<]+)(?:[.<]|$)/i)?.[1] || "",
+  );
+  const year =
+    extractYear(title) ||
+    extractYear(section.match(/Release date[\s\S]{0,220}?<\/span>/i)?.[0]);
+
+  return {
+    title: title.replace(/\s*\((19|20)\d{2}\)\s*$/i, "").trim(),
+    originalTitle,
+    year,
+    rating,
+    votes: Number.isFinite(votes) ? votes : null,
+    url,
+    isTv: /\b(serie|series|tv)\b/i.test(section),
+  };
+}
+
+function parseBraveDataCandidate(section, url, rawTitle = "") {
+  const rating = parseNumber(
+    section.match(/ratingValue:\s*([\d.,]+)/i)?.[1],
+  );
+  if (rating == null) return null;
+
+  const votes = parseCompactNumber(
+    section.match(/reviewCount:\s*([\d.,]+)/i)?.[1],
+  );
+  const movieName = decodeJsString(
+    section.match(/\bname:\s*"((?:\\.|[^"\\])+)"/)?.[1] || "",
+  );
+  const decodedTitle = decodeJsString(rawTitle);
+  const title = stripTags(
+    (movieName || decodedTitle).replace(/\s*-\s*filmaffinity\s*$/i, ""),
+  );
+  const year =
+    extractYear(decodedTitle) ||
+    extractYear(section.match(/\brelease:\s*"((?:\\.|[^"\\])+)"/)?.[1] || "");
+
+  return {
+    title: title.replace(/\s*\((19|20)\d{2}\)\s*$/i, "").trim(),
+    originalTitle: "",
+    year,
+    rating,
+    votes: Number.isFinite(votes) ? votes : null,
+    url,
+    isTv: /\b(tv|series|serie)\b/i.test(section),
+  };
+}
+
+function extractBraveCandidates(html) {
+  const candidates = [];
+  const seen = new Set();
+  const filmUrls = extractBraveCandidateUrls(html);
+
+  for (const url of filmUrls) {
+    const index = html.indexOf(url);
+    if (index === -1) continue;
+    const end = html.indexOf('data-pos="', index + 20);
+    const section = html.slice(
+      Math.max(0, index - 1400),
+      end === -1 ? index + 12000 : Math.min(end, index + 12000),
+    );
+    const candidate = parseBraveRenderedCandidate(section, url);
+    if (candidate && !seen.has(url)) {
+      seen.add(url);
+      candidates.push(candidate);
+    }
+  }
+
+  const dataRe =
+    /title:\s*"((?:\\.|[^"\\])+)".{0,800}?url:\s*"(https:\/\/(?:www|m)\.filmaffinity\.com\/(?:es|en|us)\/film\d+\.html)"/gsi;
+  let match;
+  while ((match = dataRe.exec(html)) && candidates.length < MAX_CANDIDATES) {
+    const url = decodeJsString(match[2]).replace(/\/$/, "");
+    if (seen.has(url)) continue;
+    const next = html.indexOf("},{title:", dataRe.lastIndex);
+    const section = html.slice(
+      match.index,
+      next === -1 ? match.index + 12000 : Math.min(next, match.index + 12000),
+    );
+    const candidate = parseBraveDataCandidate(section, url, match[1]);
+    if (candidate) {
+      seen.add(url);
+      candidates.push(candidate);
+    }
+  }
+
+  return candidates;
 }
 
 function scoreCandidate(candidate, wanted) {
@@ -236,6 +400,7 @@ async function searchFilmAffinity({ title, originalTitle, year, type }) {
       continue;
     }
     const html = await res.text();
+    if (isFilmAffinityChallenge(html)) continue;
     for (const candidateUrl of extractCandidateUrls(html)) {
       if (!seen.has(candidateUrl)) {
         seen.add(candidateUrl);
@@ -271,6 +436,48 @@ async function searchFilmAffinity({ title, originalTitle, year, type }) {
     .sort((a, b) => b.score - a.score)[0];
 }
 
+async function searchBraveFilmAffinity({ title, originalTitle, year, type }) {
+  const queries = unique([
+    `${title || originalTitle || ""} ${year || ""} FilmAffinity`.trim(),
+    originalTitle && originalTitle !== title
+      ? `${originalTitle} ${year || ""} FilmAffinity`.trim()
+      : "",
+    title && originalTitle && originalTitle !== title
+      ? `"${title}" "${originalTitle}" FilmAffinity`
+      : "",
+  ]);
+
+  const candidates = [];
+  const seen = new Set();
+
+  for (const query of queries) {
+    const url = `${BRAVE_SEARCH_URL}?q=${encodeURIComponent(query)}&source=web`;
+    try {
+      const res = await safeFetch(url);
+      if (!res.ok) continue;
+      const html = await res.text();
+      for (const candidate of extractBraveCandidates(html)) {
+        if (seen.has(candidate.url)) continue;
+        seen.add(candidate.url);
+        candidates.push(candidate);
+      }
+    } catch {}
+    if (candidates.length >= MAX_CANDIDATES) break;
+  }
+
+  if (!candidates.length) return null;
+
+  const wanted = { title, originalTitle, year, type };
+  const [best] = candidates
+    .map((candidate) => ({
+      ...candidate,
+      score: scoreCandidate(candidate, wanted),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  return best?.score >= 45 ? best : null;
+}
+
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const title = searchParams.get("title")?.trim();
@@ -287,31 +494,42 @@ export async function GET(req) {
   if (hit) return NextResponse.json(hit);
 
   try {
-    const match = await searchFilmAffinity({
-      title,
-      originalTitle,
-      year,
-      type,
-    });
+    const match =
+      (await searchFilmAffinity({
+        title,
+        originalTitle,
+        year,
+        type,
+      })) ||
+      (await searchBraveFilmAffinity({
+        title,
+        originalTitle,
+        year,
+        type,
+      }));
 
-    const payload =
-      match?.rating != null
-        ? {
-            rating: match.rating,
-            votes: match.votes,
-            url: match.url,
-            title: match.title,
-            year: match.year,
-          }
-        : { rating: null, votes: null, url: null };
+    if (match?.rating != null) {
+      const payload = {
+        rating: match.rating,
+        votes: match.votes,
+        url: match.url,
+        title: match.title,
+        year: match.year,
+      };
+      cacheSet(key, payload);
+      return NextResponse.json(payload, {
+        headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400" },
+      });
+    }
 
-    cacheSet(key, payload);
+    const payload = { rating: null, votes: null, url: null };
     return NextResponse.json(payload, {
-      headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400" },
+      headers: { "Cache-Control": "no-store" },
     });
   } catch {
     const payload = { rating: null, votes: null, url: null };
-    cacheSet(key, payload);
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, {
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 }

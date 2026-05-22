@@ -218,34 +218,6 @@ const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 // Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
 const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
-const FILMAFFINITY_CACHE_TTL = 1000 * 60 * 60 * 24 * 7;
-
-function readFilmAffinityCache(key) {
-  if (!key || typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(`showverse:fa:${key}`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (Date.now() - Number(parsed?.t || 0) > FILMAFFINITY_CACHE_TTL) {
-      window.sessionStorage.removeItem(`showverse:fa:${key}`);
-      return null;
-    }
-    return parsed?.data || null;
-  } catch {
-    return null;
-  }
-}
-
-function writeFilmAffinityCache(key, data) {
-  if (!key || typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(
-      `showverse:fa:${key}`,
-      JSON.stringify({ t: Date.now(), data }),
-    );
-  } catch {}
-}
-
 /**
  * Obtiene el scoreboard publico (puntuaciones agregadas de multiples fuentes).
  * Llama al endpoint /api/scoreboard/public con type, id e imdbId.
@@ -5234,9 +5206,6 @@ export default function DetailsClient({
     awardsDetails: null,
     rtScore: null,
     mcScore: null,
-    filmAffinityRating: null,
-    filmAffinityVotes: null,
-    filmAffinityUrl: null,
   });
   // ID de IMDb resuelto (puede venir directo de TMDb o cargarse via getExternalIds)
   const [resolvedImdbId, setResolvedImdbId] = useState(null);
@@ -5361,76 +5330,7 @@ export default function DetailsClient({
     };
   }, [type, id, data?.imdb_id, data?.external_ids?.imdb_id, endpointType]);
 
-  // Carga la puntuacion de FilmAffinity mediante una busqueda por titulo.
-  useEffect(() => {
-    let abort = false;
-    const originalTitle = data?.original_title || data?.original_name || "";
-    const cacheKey = `${endpointType}:${id}:${title || ""}:${originalTitle}:${yearIso || ""}`;
 
-    setExtras((prev) => ({
-      ...prev,
-      filmAffinityRating: null,
-      filmAffinityVotes: null,
-      filmAffinityUrl: null,
-    }));
-
-    const cached = readFilmAffinityCache(cacheKey);
-    if (cached) {
-      setExtras((prev) => ({
-        ...prev,
-        filmAffinityRating:
-          typeof cached.rating === "number" ? cached.rating : null,
-        filmAffinityVotes: cached.votes ?? null,
-        filmAffinityUrl: cached.url || null,
-      }));
-      return () => {
-        abort = true;
-      };
-    }
-
-    const run = async () => {
-      if (!title && !originalTitle) return;
-      const params = new URLSearchParams({
-        type: endpointType,
-        title: title || originalTitle,
-      });
-      if (originalTitle) params.set("originalTitle", originalTitle);
-      if (yearIso) params.set("year", yearIso);
-
-      try {
-        const res = await fetch(`/api/filmaffinity/rating?${params}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        if (abort) return;
-
-        const next = {
-          rating: typeof json?.rating === "number" ? json.rating : null,
-          votes: json?.votes ?? null,
-          url: json?.url || null,
-        };
-        writeFilmAffinityCache(cacheKey, next);
-
-        setExtras((prev) => ({
-          ...prev,
-          filmAffinityRating: next.rating,
-          filmAffinityVotes: next.votes,
-          filmAffinityUrl: next.url,
-        }));
-      } catch {}
-    };
-
-    run();
-    return () => {
-      abort = true;
-    };
-  }, [
-    endpointType,
-    id,
-    title,
-    data?.original_title,
-    data?.original_name,
-    yearIso,
-  ]);
 
   // Carga premios y nominaciones desde TMDb.
   useEffect(() => {
@@ -6249,8 +6149,12 @@ export default function DetailsClient({
         href: seriesGraphUrl,
       });
 
-    // (opcional) TMDb detail/watch si quieres:
-    // if (tmdbDetailUrl) items.push({ id: 'tmdb', label: 'TMDb', icon: '/logo-TMDb.png', href: tmdbDetailUrl })
+    items.push({
+      id: "fa",
+      label: "FilmAffinity",
+      icon: "/logoFilmaffinity.png",
+      href: `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent((title || "") + (yearIso ? ` ${yearIso}` : ""))}&stype=title`,
+    });
 
     return items;
   }, [
@@ -6261,6 +6165,8 @@ export default function DetailsClient({
     letterboxdUrl,
     type,
     seriesGraphUrl,
+    title,
+    yearIso,
   ]);
 
   // ====== Datos meta / características (reorganizadas) ======
@@ -8277,16 +8183,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       />
                     )}
 
-                    {/* Badge de FilmAffinity - Obtenido por busqueda manual del titulo */}
-                    {extras.filmAffinityRating != null && (
-                      <CompactBadge
-                        logo="/logoFilmaffinity.png"
-                        value={Number(extras.filmAffinityRating).toFixed(1)}
-                        sub={formatCountShort(extras.filmAffinityVotes)}
-                        href={extras.filmAffinityUrl || undefined}
-                      />
-                    )}
-
                     {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm) */}
                     {/* Muestra el porcentaje de audiencia de RT, prioriza datos de Trakt sobre OMDb */}
                     {(tScoreboard?.external?.rtAudience != null ||
@@ -8363,6 +8259,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             href={seriesGraphUrl}
                           />
                         )}
+
+                        {/* FilmAffinity */}
+                        <ExternalLinkButton
+                          icon="/logoFilmaffinity.png"
+                          title="FilmAffinity"
+                          href={`https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent((title || "") + (yearIso ? ` ${yearIso}` : ""))}&stype=title`}
+                        />
                       </div>
 
                       {/* Versión Móvil: botón "..." que abre modal de enlaces */}
