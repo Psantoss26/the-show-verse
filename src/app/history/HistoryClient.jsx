@@ -1947,54 +1947,26 @@ const HistoryGridCard = memo(function HistoryGridCard({
 // MAIN PAGE
 // ----------------------------
 export default function HistoryClient() {
-  const initialHistoryCacheRef = useRef(null);
-  if (initialHistoryCacheRef.current === null) {
-    initialHistoryCacheRef.current = readHistoryCache();
-  }
-
+  const [hydrated, setHydrated] = useState(false);
   const [auth, setAuth] = useState({ loading: true, connected: false });
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [historyLoaded, setHistoryLoaded] = useState(
-    () => !!initialHistoryCacheRef.current?.items,
-  );
-  const [raw, setRaw] = useState(
-    () => initialHistoryCacheRef.current?.items || [],
-  );
-  const [hasMoreHistory, setHasMoreHistory] = useState(
-    () => !!initialHistoryCacheRef.current?.hasMore,
-  );
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [raw, setRaw] = useState([]);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [mutatingId, setMutatingId] = useState("");
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const loadMoreRef = useRef(null);
   const loadingHistoryRef = useRef(false);
   const nextHistoryPageRef = useRef(1);
-  const hasMoreHistoryRef = useRef(!!initialHistoryCacheRef.current?.hasMore);
+  const hasMoreHistoryRef = useRef(false);
 
   // UI States
-  const [viewMode, setViewMode] = useState(() => {
-    if (typeof window === "undefined") return "compact";
-    const saved = window.localStorage.getItem("showverse:history:viewMode");
-    return saved === "list" || saved === "grid" || saved === "compact"
-      ? saved
-      : "compact";
-  });
-  const [groupBy, setGroupBy] = useState(() => {
-    if (typeof window === "undefined") return "day";
-    const saved = window.localStorage.getItem("showverse:history:groupBy");
-    return saved || "day";
-  });
-  const [typeFilter, setTypeFilter] = useState(() => {
-    if (typeof window === "undefined") return "all";
-    const saved = window.localStorage.getItem("showverse:history:typeFilter");
-    return saved || "all";
-  });
-  const [sortBy, setSortBy] = useState(() => {
-    if (typeof window === "undefined") return "date-desc";
-    const saved = window.localStorage.getItem("showverse:history:sortBy");
-    return saved || "date-desc";
-  });
+  const [viewMode, setViewMode] = useState("compact");
+  const [groupBy, setGroupBy] = useState("day");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("date-desc");
   const [q, setQ] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [monthDate, setMonthDate] = useState(() => {
@@ -2017,23 +1989,61 @@ export default function HistoryClient() {
     });
   }, []);
 
+  useEffect(() => {
+    const cached = readHistoryCache();
+    if (cached?.items?.length) {
+      setRaw(cached.items);
+      setHistoryLoaded(true);
+      setHasMoreHistory(cached.hasMore);
+      hasMoreHistoryRef.current = cached.hasMore;
+    }
+
+    const savedViewMode = window.localStorage.getItem(
+      "showverse:history:viewMode",
+    );
+    if (
+      savedViewMode === "list" ||
+      savedViewMode === "grid" ||
+      savedViewMode === "compact"
+    ) {
+      setViewMode(savedViewMode);
+    }
+
+    const savedGroupBy = window.localStorage.getItem(
+      "showverse:history:groupBy",
+    );
+    if (savedGroupBy) setGroupBy(savedGroupBy);
+
+    const savedTypeFilter = window.localStorage.getItem(
+      "showverse:history:typeFilter",
+    );
+    if (savedTypeFilter) setTypeFilter(savedTypeFilter);
+
+    const savedSortBy = window.localStorage.getItem(
+      "showverse:history:sortBy",
+    );
+    if (savedSortBy) setSortBy(savedSortBy);
+
+    setHydrated(true);
+  }, []);
+
   // Persistir estados de UI en localStorage
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!hydrated) return;
     window.localStorage.setItem("showverse:history:viewMode", viewMode);
-  }, [viewMode]);
+  }, [hydrated, viewMode]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!hydrated) return;
     window.localStorage.setItem("showverse:history:groupBy", groupBy);
-  }, [groupBy]);
+  }, [groupBy, hydrated]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!hydrated) return;
     window.localStorage.setItem("showverse:history:typeFilter", typeFilter);
-  }, [typeFilter]);
+  }, [hydrated, typeFilter]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!hydrated) return;
     window.localStorage.setItem("showverse:history:sortBy", sortBy);
-  }, [sortBy]);
+  }, [hydrated, sortBy]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1024px)");
