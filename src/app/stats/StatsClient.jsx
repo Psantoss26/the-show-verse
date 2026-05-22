@@ -10,22 +10,16 @@ import {
   Tv,
   TrendingUp,
   Award,
-  Sparkles,
   Activity,
   PieChart as PieChartIcon,
   Star,
   Heart,
   Users,
-  Trophy,
   Target,
   ArrowUp,
-  ArrowDown,
   Timer,
-  Share2,
   Library,
   MessageSquare,
-  LogIn,
-  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -237,7 +231,15 @@ const processHourOfDay = (historyData) => {
 // COMPONENTS
 // -----------------------------------------------------------------------------
 
-function KPICard({ title, value, subtitle, icon: Icon, color, delay = 0 }) {
+function KPICard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  color,
+  delay = 0,
+  loading = false,
+}) {
   const styles = COLOR_STYLES[color] || COLOR_STYLES.emerald;
 
   return (
@@ -267,11 +269,17 @@ function KPICard({ title, value, subtitle, icon: Icon, color, delay = 0 }) {
 
         <div>
           <div className="text-4xl font-black text-white tracking-tight leading-none mb-1">
-            {value}
+            {loading ? (
+              <span className="inline-block h-9 w-24 rounded-xl bg-white/10 animate-pulse" />
+            ) : (
+              value
+            )}
           </div>
-          {subtitle && (
+          {loading ? (
+            <span className="inline-block h-4 w-28 rounded-lg bg-white/5 animate-pulse" />
+          ) : subtitle ? (
             <div className="text-sm font-medium text-zinc-500">{subtitle}</div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -340,31 +348,96 @@ function CustomTooltip({ active, payload, label, formatter }) {
 // -----------------------------------------------------------------------------
 export default function StatsClient() {
   const [loading, setLoading] = useState(true);
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [peopleLoaded, setPeopleLoaded] = useState(false);
   const [notConnected, setNotConnected] = useState(false);
   const [data, setData] = useState(null);
+  const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState("overview"); // overview | patterns | yearly
 
   useEffect(() => {
+    let ignore = false;
+
     const fetchData = async () => {
       try {
-        const res = await fetch("/api/trakt/user-stats", { cache: "no-store" });
+        setError("");
+        const res = await fetch(
+          "/api/trakt/user-stats?historyLimit=1500&includePeople=0&localizeTitles=0",
+          { cache: "no-store" },
+        );
         if (res.status === 401) {
+          if (ignore) return;
           setNotConnected(true);
           setLoading(false);
           return;
         }
         if (res.ok) {
           const json = await res.json();
+          if (ignore) return;
           setData(json);
+        } else {
+          const json = await res.json().catch(() => ({}));
+          if (!ignore) {
+            setError(json?.error || "No se pudieron cargar las estadísticas.");
+          }
         }
       } catch (e) {
         console.error(e);
+        if (!ignore) setError("No se pudieron cargar las estadísticas.");
       } finally {
-        setLoading(false);
+        if (!ignore) setLoading(false);
       }
     };
     fetchData();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!data || notConnected || peopleLoaded) return;
+    if ((data.topActors || []).length || (data.topDirectors || []).length) {
+      return;
+    }
+
+    let ignore = false;
+
+    const fetchPeople = async () => {
+      setPeopleLoading(true);
+      try {
+        const res = await fetch(
+          "/api/trakt/user-stats?peopleOnly=1&historyLimit=0&localizeTitles=0",
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        if (ignore) return;
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                topActors: json.topActors || [],
+                topDirectors: json.topDirectors || [],
+              }
+            : prev,
+        );
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!ignore) {
+          setPeopleLoaded(true);
+          setPeopleLoading(false);
+        }
+      }
+    };
+
+    fetchPeople();
+
+    return () => {
+      ignore = true;
+    };
+  }, [data, notConnected, peopleLoaded]);
 
   const stats = useMemo(() => {
     if (!data) return null;
@@ -440,14 +513,6 @@ export default function StatsClient() {
     const m = mins % 60;
     return `${h}h ${m}m`;
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-      </div>
-    );
-  }
 
   if (notConnected) {
     return (
@@ -574,9 +639,10 @@ export default function StatsClient() {
         </motion.div>
 
         {/* Content Area */}
-        {!stats ? (
-          <div className="flex h-64 items-center justify-center text-zinc-500">
-            <p>No se pudieron cargar las estadísticas.</p>
+        {loading && !stats ? null : !stats ? (
+          <div className="flex h-64 flex-col items-center justify-center gap-3 text-zinc-500">
+            <BarChart3 className="w-10 h-10 text-zinc-700" />
+            <p>{error || "No se pudieron cargar las estadísticas."}</p>
           </div>
         ) : (
           <AnimatePresence mode="wait">
@@ -610,7 +676,7 @@ export default function StatsClient() {
                   <KPICard
                     title="Episodios"
                     value={stats.episodes.watched.toLocaleString()}
-                    subtitle={`${stats.raw.shows.watched.toLocaleString()} series`}
+                    subtitle={`${(stats.raw?.shows?.watched || 0).toLocaleString()} series`}
                     icon={Tv}
                     color="purple"
                     delay={0.3}
@@ -908,6 +974,31 @@ export default function StatsClient() {
                 </div>
 
                 {/* Top People Row */}
+                {peopleLoading &&
+                  stats.topActors.length === 0 &&
+                  stats.topDirectors.length === 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                    >
+                      <SectionTitle
+                        icon={Users}
+                        title="Actores y Directores"
+                        subtitle="Cargando favoritos en segundo plano"
+                        color="yellow"
+                      />
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                        {Array.from({ length: 6 }).map((_, idx) => (
+                          <div key={idx}>
+                            <div className="aspect-[2/3] rounded-xl bg-white/[0.06] animate-pulse mb-2" />
+                            <div className="h-3 rounded bg-white/10 animate-pulse" />
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
                 {stats.topActors.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
