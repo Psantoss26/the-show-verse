@@ -16,7 +16,6 @@ import { getExternalIds } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { traktGetScoreboard } from "@/lib/api/traktClient";
 import {
-  Loader2,
   Bookmark,
   Film,
   ChevronDown,
@@ -105,6 +104,37 @@ const backdropInFlight = new Map();
 
 // Persistent score cache - 30 days TTL
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const WATCHLIST_CACHE_KEY = "showverse:watchlist:items:v1";
+const WATCHLIST_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function readWatchlistCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(WATCHLIST_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.items)) return null;
+    return {
+      items: parsed.items,
+      fresh: Date.now() - Number(parsed.t || 0) < WATCHLIST_CACHE_TTL_MS,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeWatchlistCache(items) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      WATCHLIST_CACHE_KEY,
+      JSON.stringify({
+        t: Date.now(),
+        items: Array.isArray(items) ? items : [],
+      }),
+    );
+  } catch {}
+}
 
 // Cache management for scores
 function readScoreCache(source) {
@@ -1090,10 +1120,12 @@ function WatchlistCard({
 // ================== MAIN COMPONENT ==================
 export default function WatchlistClient() {
   const { session, account, hydrated } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState([]);
-  const [imdbScores, setImdbScores] = useState(new Map());
-  const [traktScores, setTraktScores] = useState(new Map());
+  const [loading, setLoading] = useState(() => !readWatchlistCache()?.items);
+  const [items, setItems] = useState(() => readWatchlistCache()?.items || []);
+  const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
+  const [traktScores, setTraktScores] = useState(() =>
+    readScoreCache("trakt"),
+  );
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
 
@@ -1168,7 +1200,7 @@ export default function WatchlistClient() {
       }
 
       try {
-        setLoading(true);
+        setLoading(items.length === 0);
         const response = await fetch("/api/tmdb/account/watchlist");
 
         if (!response.ok) {
@@ -1201,6 +1233,7 @@ export default function WatchlistClient() {
         if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
         setItems(watchlistWithIndex);
+        writeWatchlistCache(watchlistWithIndex);
       } catch (error) {
         console.error("Error loading watchlist:", error);
         setItems([]);
@@ -1688,12 +1721,7 @@ export default function WatchlistClient() {
   };
 
   if (!hydrated) {
-    // Still checking authentication, show nothing or loader
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-      </div>
-    );
+    return <div className="min-h-screen bg-[#050505]" />;
   }
 
   if (!session || !account) {
@@ -1747,58 +1775,48 @@ export default function WatchlistClient() {
               </p>
             </div>
 
-            <motion.div
-              className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-blue-400">
-                  <Bookmark className="w-4 h-4 md:w-5 md:h-5 fill-blue-400" />
+            {!loading && (
+              <motion.div
+                className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
+                <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                  <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-blue-400">
+                    <Bookmark className="w-4 h-4 md:w-5 md:h-5 fill-blue-400" />
+                  </div>
+                  <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                    {stats.total}
+                  </div>
+                  <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                    Total
+                  </div>
                 </div>
-                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
-                  {loading ? (
-                    <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
-                  ) : (
-                    stats.total
-                  )}
+                <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                  <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
+                    <Film className="w-4 h-4 md:w-5 md:h-5" />
+                  </div>
+                  <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                    {stats.movies}
+                  </div>
+                  <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                    Películas
+                  </div>
                 </div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
-                  Total
+                <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                  <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400">
+                    <TvGlyph className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+                  </div>
+                  <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                    {stats.shows}
+                  </div>
+                  <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                    Series
+                  </div>
                 </div>
-              </div>
-              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
-                  <Film className="w-4 h-4 md:w-5 md:h-5" />
-                </div>
-                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
-                  {loading ? (
-                    <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
-                  ) : (
-                    stats.movies
-                  )}
-                </div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
-                  Películas
-                </div>
-              </div>
-              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400">
-                  <TvGlyph className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
-                </div>
-                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
-                  {loading ? (
-                    <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
-                  ) : (
-                    stats.shows
-                  )}
-                </div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
-                  Series
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            )}
           </div>
         </motion.header>
 
@@ -2456,14 +2474,7 @@ export default function WatchlistClient() {
         {/* Scores load silently in background - no loading indicator */}
 
         {/* Content */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-            <p className="text-zinc-500 text-sm">
-              Cargando lista de pendientes...
-            </p>
-          </div>
-        ) : sorted.length === 0 ? (
+        {loading ? null : sorted.length === 0 ? (
           <motion.div
             className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
             initial={{ opacity: 0, scale: 0.95 }}
