@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 
 import { SectionTitle, VisualMetaCard } from "@/components/details/DetailAtoms";
+import { AnimatedSection } from "@/components/details/AnimatedSection";
+import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import { CompactBadge, MiniStat } from "@/components/details/DetailHeaderBits";
 import {
   formatDateEs,
@@ -254,11 +256,12 @@ export default function EpisodeDetailsClient({
   const voteCount =
     typeof episode?.vote_count === "number" ? episode.vote_count : null;
 
-  const cast = Array.isArray(episode?.credits?.cast)
-    ? episode.credits.cast
-    : [];
-  const guestStars = Array.isArray(episode?.credits?.guest_stars)
-    ? episode.credits.guest_stars
+  const [episodeCredits, setEpisodeCredits] = useState(
+    () => episode?.credits || null,
+  );
+  const cast = Array.isArray(episodeCredits?.cast) ? episodeCredits.cast : [];
+  const guestStars = Array.isArray(episodeCredits?.guest_stars)
+    ? episodeCredits.guest_stars
     : [];
   const initialWatchedBySeason = useMemo(
     () => normalizeWatchedBySeason(initialShowWatched?.watchedBySeason),
@@ -287,6 +290,10 @@ export default function EpisodeDetailsClient({
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    setEpisodeCredits(episode?.credits || null);
+  }, [episode, showId, seasonNumber, episodeNumber]);
 
   const parseScoreboardData = useCallback((r) => {
     if (!r?.found) return null;
@@ -368,7 +375,6 @@ export default function EpisodeDetailsClient({
     const controller = new AbortController();
     const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
-        setTScoreboard((s) => ({ ...s, loading: true }));
         let json = await fetchEpisodeScoreboardCached({
           showId,
           seasonNumber,
@@ -463,6 +469,40 @@ export default function EpisodeDetailsClient({
     };
   }, [showId, seasonNumber, episodeNumber, imdbId, imdb]);
 
+  useEffect(() => {
+    if (episodeCredits) return;
+
+    let alive = true;
+    const controller = new AbortController();
+    const cancelSchedule = scheduleAfterFirstPaint(async () => {
+      try {
+        const res = await fetch(
+          `/api/tmdb/tv/${encodeURIComponent(showId)}/season/${encodeURIComponent(seasonNumber)}/episode/${encodeURIComponent(episodeNumber)}/credits`,
+          { cache: "force-cache", signal: controller.signal },
+        );
+        if (!res.ok) return;
+        const credits = await res.json().catch(() => null);
+        if (!alive) return;
+        if (
+          Array.isArray(credits?.cast) ||
+          Array.isArray(credits?.guest_stars)
+        ) {
+          setEpisodeCredits(credits);
+        }
+      } catch (error) {
+        if (alive && error?.name !== "AbortError") {
+          setEpisodeCredits(null);
+        }
+      }
+    }, 420);
+
+    return () => {
+      alive = false;
+      controller.abort();
+      cancelSchedule();
+    };
+  }, [episodeCredits, showId, seasonNumber, episodeNumber]);
+
   // =========================
   // Rating SOLO Trakt + StarRating
   // =========================
@@ -473,7 +513,7 @@ export default function EpisodeDetailsClient({
 
   // Estado de Trakt para watched
   const [trakt, setTrakt] = useState({
-    loading: !hasInitialShowWatched,
+    loading: false,
     connected: hasInitialShowWatched
       ? initialShowWatched?.connected !== false
       : false,
@@ -486,16 +526,17 @@ export default function EpisodeDetailsClient({
   });
   const [watchedBusy, setWatchedBusy] = useState(false);
 
-  // Cargar rating del usuario (Trakt)
+  // Cargar rating del usuario (Trakt) en segundo plano.
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const controller = new AbortController();
+    const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
         const res = await fetch(
           `/api/trakt/ratings?type=episode&tmdbId=${Number(showId)}&season=${Number(seasonNumber)}&episode=${Number(
             episodeNumber,
           )}`,
-          { cache: "no-store" },
+          { cache: "no-store", signal: controller.signal },
         );
 
         if (!alive) return;
@@ -511,16 +552,19 @@ export default function EpisodeDetailsClient({
         const j = await res.json().catch(() => ({}));
         setUserRating(typeof j?.rating === "number" ? j.rating : null);
       } catch (e) {
+        if (e?.name === "AbortError") return;
         console.error(e);
         if (alive) {
           setUserRating(null);
           setTraktConnected(false);
         }
       }
-    })();
+    }, 320);
 
     return () => {
       alive = false;
+      controller.abort();
+      cancelSchedule();
     };
   }, [showId, seasonNumber, episodeNumber]);
 
@@ -567,7 +611,7 @@ export default function EpisodeDetailsClient({
     let nextWatchedBySeason = initialWatchedBySeason;
     let nextLoaded = hasInitialShowWatched;
     let nextTrakt = {
-      loading: !hasInitialShowWatched,
+      loading: false,
       connected: hasInitialShowWatched
         ? initialShowWatched?.connected !== false
         : false,
@@ -768,7 +812,7 @@ export default function EpisodeDetailsClient({
       () => {
         void reloadEpisodeTraktState({ background: true });
       },
-      hasInitialShowWatched ? 2500 : 0,
+      hasInitialShowWatched ? 2500 : 900,
     );
 
     return () => window.clearTimeout(timer);
@@ -803,7 +847,7 @@ export default function EpisodeDetailsClient({
     window.addEventListener("pageshow", handlePageShow);
     document.addEventListener("visibilitychange", handleVisibility);
 
-    if (trakt.loading || (!trakt.connected && !trakt.error)) {
+    if (trakt.loading) {
       [900, 2200].forEach((delay) => {
         const timer = window.setTimeout(() => {
           void syncEpisodeTraktState({ force: true });
@@ -920,7 +964,12 @@ export default function EpisodeDetailsClient({
       {/* Content */}
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
         {/* Back buttons */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-wrap items-center gap-2 mb-6"
+        >
           <button
             type="button"
             onClick={() => router.back()}
@@ -942,33 +991,44 @@ export default function EpisodeDetailsClient({
           >
             <MonitorPlay className="w-4 h-4" /> {showName}
           </Link>
-        </div>
+        </motion.div>
 
         {/* Hero */}
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-10 animate-in fade-in duration-700 slide-in-from-bottom-4 items-start">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-10 items-start transform-gpu"
+        >
           {/* Left still */}
-          <div className="w-full max-w-[520px] lg:max-w-[560px] mx-auto lg:mx-0 flex-shrink-0">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40">
-              <div className="relative aspect-video bg-neutral-900">
-                {stillPath ? (
-                  <img
-                    src={`https://image.tmdb.org/t/p/original${stillPath}`}
-                    alt={epName}
-                    className="w-full h-full object-cover"
-                    loading="eager"
-                    decoding="async"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <ImageOff className="w-10 h-10 text-neutral-700" />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, x: -20, scale: 0.985 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full max-w-[520px] lg:max-w-[560px] mx-auto lg:mx-0 flex-shrink-0"
+          >
+            <AnimatedPosterFrame
+              src={
+                stillPath
+                  ? `https://image.tmdb.org/t/p/original${stillPath}`
+                  : null
+              }
+              alt={epName}
+              aspect="video"
+            />
+          </motion.div>
 
           {/* Right info + SCOREBOARD + TABS */}
-          <div className="flex-1 flex flex-col min-w-0 w-full">
+          <motion.div
+            initial={{ opacity: 0, x: 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              duration: 0.46,
+              delay: 0.04,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="flex-1 flex flex-col min-w-0 w-full"
+          >
             <div className="mb-5 px-1">
               <div className="text-xs font-bold uppercase tracking-widest text-zinc-400">
                 Episodio {episodeNumber} · Temporada {seasonNumber}
@@ -1016,10 +1076,6 @@ export default function EpisodeDetailsClient({
     "
               >
                 <div className="flex items-center gap-4 sm:gap-5 shrink-0">
-                  {tScoreboard.loading && (
-                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  )}
-
                   <CompactBadge
                     logo="/logo-TMDb.png"
                     logoClassName="h-2 sm:h-4"
@@ -1204,8 +1260,8 @@ export default function EpisodeDetailsClient({
                 </AnimatePresence>
               </div>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {/* === ESTILOS PARA SSR SWIPER FIX (EVITAR SALTOS) === */}
         {!isMounted && (
@@ -1224,7 +1280,7 @@ export default function EpisodeDetailsClient({
 
         {/* === Reparto del episodio === */}
         {cast.length > 0 && (
-          <section className="mb-10">
+          <AnimatedSection className="mb-10" delay={0.04}>
             <SectionTitle title="Reparto del episodio" icon={UsersIcon} />
             <Swiper
               spaceBetween={12}
@@ -1271,12 +1327,12 @@ export default function EpisodeDetailsClient({
                 </SwiperSlide>
               ))}
             </Swiper>
-          </section>
+          </AnimatedSection>
         )}
 
         {/* === Invitados === */}
         {guestStars.length > 0 && (
-          <section className="mb-10">
+          <AnimatedSection className="mb-10" delay={0.04}>
             <SectionTitle title="Invitados" icon={UsersIcon} />
             <Swiper
               spaceBetween={12}
@@ -1323,7 +1379,7 @@ export default function EpisodeDetailsClient({
                 </SwiperSlide>
               ))}
             </Swiper>
-          </section>
+          </AnimatedSection>
         )}
       </div>
     </div>
