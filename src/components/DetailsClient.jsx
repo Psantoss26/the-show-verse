@@ -134,7 +134,6 @@ import DetailsSectionMenu from "./DetailsSectionMenu";
 import {
   readOmdbCache,
   writeOmdbCache,
-  runIdle,
   extractOmdbExtraScores,
 } from "@/lib/details/omdbCache";
 
@@ -219,6 +218,33 @@ const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 // Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
 const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
+const FILMAFFINITY_CACHE_TTL = 1000 * 60 * 60 * 24 * 7;
+
+function readFilmAffinityCache(key) {
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(`showverse:fa:${key}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - Number(parsed?.t || 0) > FILMAFFINITY_CACHE_TTL) {
+      window.sessionStorage.removeItem(`showverse:fa:${key}`);
+      return null;
+    }
+    return parsed?.data || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeFilmAffinityCache(key, data) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      `showverse:fa:${key}`,
+      JSON.stringify({ t: Date.now(), data }),
+    );
+  } catch {}
+}
 
 /**
  * Obtiene el scoreboard publico (puntuaciones agregadas de multiples fuentes).
@@ -5208,9 +5234,10 @@ export default function DetailsClient({
     awardsDetails: null,
     rtScore: null,
     mcScore: null,
+    filmAffinityRating: null,
+    filmAffinityVotes: null,
+    filmAffinityUrl: null,
   });
-  const [imdbVotesLoading, setImdbVotesLoading] = useState(false);
-
   // ID de IMDb resuelto (puede venir directo de TMDb o cargarse via getExternalIds)
   const [resolvedImdbId, setResolvedImdbId] = useState(null);
 
@@ -5241,7 +5268,6 @@ export default function DetailsClient({
           rtScore: null,
           mcScore: null,
         }));
-        setImdbVotesLoading(false);
 
         // Resetear el imdbId resuelto para este contenido
         setResolvedImdbId(null);
@@ -5259,17 +5285,20 @@ export default function DetailsClient({
 
         // Intentar cargar datos desde cache de localStorage
         const cached = readOmdbCache(imdbId);
-        if (cached?.imdbRating != null) {
-          setExtras((prev) => ({ ...prev, imdbRating: cached.imdbRating }));
-        }
-        if (cached?.imdbVotes != null) {
-          setExtras((prev) => ({ ...prev, imdbVotes: cached.imdbVotes }));
-        }
-        if (cached?.rtScore != null) {
-          setExtras((prev) => ({ ...prev, rtScore: cached.rtScore }));
-        }
-        if (cached?.mcScore != null) {
-          setExtras((prev) => ({ ...prev, mcScore: cached.mcScore }));
+        const hasCachedScores =
+          cached?.imdbRating != null ||
+          cached?.imdbVotes != null ||
+          cached?.rtScore != null ||
+          cached?.mcScore != null;
+
+        if (hasCachedScores) {
+          setExtras((prev) => ({
+            ...prev,
+            imdbRating: cached?.imdbRating ?? null,
+            imdbVotes: cached?.imdbVotes ?? null,
+            rtScore: cached?.rtScore ?? null,
+            mcScore: cached?.mcScore ?? null,
+          }));
         }
 
         // Si el cache esta fresco y completo, no hacer peticion de red
@@ -5290,41 +5319,25 @@ export default function DetailsClient({
             : null;
 
         const { rtScore, mcScore } = extractOmdbExtraScores(omdb);
+        const votes =
+          omdb?.imdbVotes && omdb.imdbVotes !== "N/A"
+            ? Number(String(omdb.imdbVotes).replace(/,/g, ""))
+            : null;
 
-        // Mostrar datos rapidos primero (IMDb + RT + MC)
+        // Actualizar IMDb, votos, RT y Metacritic juntos para evitar apariciones escalonadas.
         setExtras((prev) => ({
           ...prev,
           imdbRating: Number.isFinite(imdbRating) ? imdbRating : null,
+          imdbVotes: Number.isFinite(votes) ? votes : null,
           rtScore,
           mcScore,
         }));
 
         writeOmdbCache(imdbId, {
           imdbRating: Number.isFinite(imdbRating) ? imdbRating : null,
+          imdbVotes: Number.isFinite(votes) ? votes : null,
           rtScore,
           mcScore,
-        });
-
-        // Los votos se cargan en idle para no bloquear la UI
-        setImdbVotesLoading(true);
-        runIdle(() => {
-          if (abort) return;
-
-          const votes =
-            omdb?.imdbVotes && omdb.imdbVotes !== "N/A"
-              ? Number(String(omdb.imdbVotes).replace(/,/g, ""))
-              : null;
-
-          setExtras((prev) => ({
-            ...prev,
-            imdbVotes: Number.isFinite(votes) ? votes : null,
-          }));
-
-          writeOmdbCache(imdbId, {
-            imdbVotes: Number.isFinite(votes) ? votes : null,
-          });
-
-          setImdbVotesLoading(false);
         });
       } catch {
         if (!abort) {
@@ -5335,7 +5348,6 @@ export default function DetailsClient({
             rtScore: null,
             mcScore: null,
           }));
-          setImdbVotesLoading(false);
 
           // Resetear el resolvedImdbId si hay error
           setResolvedImdbId(null);
@@ -5348,6 +5360,77 @@ export default function DetailsClient({
       abort = true;
     };
   }, [type, id, data?.imdb_id, data?.external_ids?.imdb_id, endpointType]);
+
+  // Carga la puntuacion de FilmAffinity mediante una busqueda por titulo.
+  useEffect(() => {
+    let abort = false;
+    const originalTitle = data?.original_title || data?.original_name || "";
+    const cacheKey = `${endpointType}:${id}:${title || ""}:${originalTitle}:${yearIso || ""}`;
+
+    setExtras((prev) => ({
+      ...prev,
+      filmAffinityRating: null,
+      filmAffinityVotes: null,
+      filmAffinityUrl: null,
+    }));
+
+    const cached = readFilmAffinityCache(cacheKey);
+    if (cached) {
+      setExtras((prev) => ({
+        ...prev,
+        filmAffinityRating:
+          typeof cached.rating === "number" ? cached.rating : null,
+        filmAffinityVotes: cached.votes ?? null,
+        filmAffinityUrl: cached.url || null,
+      }));
+      return () => {
+        abort = true;
+      };
+    }
+
+    const run = async () => {
+      if (!title && !originalTitle) return;
+      const params = new URLSearchParams({
+        type: endpointType,
+        title: title || originalTitle,
+      });
+      if (originalTitle) params.set("originalTitle", originalTitle);
+      if (yearIso) params.set("year", yearIso);
+
+      try {
+        const res = await fetch(`/api/filmaffinity/rating?${params}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (abort) return;
+
+        const next = {
+          rating: typeof json?.rating === "number" ? json.rating : null,
+          votes: json?.votes ?? null,
+          url: json?.url || null,
+        };
+        writeFilmAffinityCache(cacheKey, next);
+
+        setExtras((prev) => ({
+          ...prev,
+          filmAffinityRating: next.rating,
+          filmAffinityVotes: next.votes,
+          filmAffinityUrl: next.url,
+        }));
+      } catch {}
+    };
+
+    run();
+    return () => {
+      abort = true;
+    };
+  }, [
+    endpointType,
+    id,
+    title,
+    data?.original_title,
+    data?.original_name,
+    yearIso,
+  ]);
 
   // Carga premios y nominaciones desde TMDb.
   useEffect(() => {
@@ -5606,10 +5689,10 @@ export default function DetailsClient({
   const [ratingsError, setRatingsError] = useState(null);
   const [ratingsLoading, setRatingsLoading] = useState(false);
 
-  // Carga los ratings de episodios para series TV (excluyendo especiales)
+  // Carga los ratings de episodios desde SeriesGraph para series TV.
   useEffect(() => {
     const RATINGS_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 días
-    const cacheKey = `showverse:tv:${id}:episode-ratings:v3-imdb-tmdb`;
+    const cacheKey = `showverse:tv:${id}:episode-ratings:v4-seriesgraph`;
 
     const readCache = () => {
       if (typeof window === "undefined") return null;
@@ -5659,7 +5742,9 @@ export default function DetailsClient({
 
       setRatingsLoading(true);
       try {
-        const res = await fetch(`/api/tv/${id}/ratings?excludeSpecials=true`);
+        const res = await fetch(
+          `/api/seriesgraph/episode-ratings?tmdbId=${encodeURIComponent(id)}`,
+        );
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error);
         if (!ignore) {
@@ -5896,17 +5981,12 @@ export default function DetailsClient({
 
   // =====================================================================
   // ENLACES EXTERNOS
-  // URLs a sitios externos: FilmAffinity, JustWatch, Letterboxd,
+  // URLs a sitios externos: JustWatch, Letterboxd,
   // SeriesGraph, sitio oficial. Se resuelven via API para obtener
   // URLs directas (no de busqueda) cuando es posible.
   // =====================================================================
 
   const [externalLinksOpen, setExternalLinksOpen] = useState(false); // Modal de enlaces externos abierto
-
-  // URL de busqueda en FilmAffinity
-  const filmAffinitySearchUrl = `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent(
-    data.title || data.name,
-  )}`;
 
   const isMovie = endpointType === "movie";
 
@@ -6144,13 +6224,6 @@ export default function DetailsClient({
         icon: "/logo-Web.png",
         href: officialSiteUrl,
       });
-    if (filmAffinitySearchUrl)
-      items.push({
-        id: "fa",
-        label: "FilmAffinity",
-        icon: "/logoFilmaffinity.png",
-        href: filmAffinitySearchUrl,
-      });
     if (jwHref)
       items.push({
         id: "jw",
@@ -6182,7 +6255,6 @@ export default function DetailsClient({
     return items;
   }, [
     officialSiteUrl,
-    filmAffinitySearchUrl,
     justWatchUrl,
     extLinks.justwatch,
     isMovie,
@@ -8223,6 +8295,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       />
                     )}
 
+                    {/* Badge de FilmAffinity - Obtenido por busqueda manual del titulo */}
+                    {extras.filmAffinityRating != null && (
+                      <CompactBadge
+                        logo="/logoFilmaffinity.png"
+                        value={Number(extras.filmAffinityRating).toFixed(1)}
+                        sub={formatCountShort(extras.filmAffinityVotes)}
+                        href={extras.filmAffinityUrl || undefined}
+                      />
+                    )}
+
                     {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm) */}
                     {/* Muestra el porcentaje de audiencia de RT, prioriza datos de Trakt sobre OMDb */}
                     {(tScoreboard?.external?.rtAudience != null ||
@@ -8262,7 +8344,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   )}
 
                   {/* ========== B. ENLACES EXTERNOS ========== */}
-                  {/* Botones para acceder a páginas externas (Web oficial, FilmAffinity, JustWatch, etc.) */}
+                  {/* Botones para acceder a páginas externas (Web oficial, JustWatch, etc.) */}
                   {/* Solo se muestran aquí cuando NO estamos en modo backdrop (en ese modo se muestran abajo con las plataformas) */}
                   {!isBackdropPoster && (
                     <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
@@ -8275,12 +8357,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             href={officialSiteUrl}
                           />
                         </div>
-
-                        {/* FilmAffinity - búsqueda del título */}
-                        <ExternalLinkButton
-                          icon="/logoFilmaffinity.png"
-                          href={filmAffinitySearchUrl}
-                        />
 
                         {/* JustWatch - dónde ver el contenido */}
                         <ExternalLinkButton
@@ -10250,11 +10326,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         icon={TrendingUp}
                       />
                       <div className="p-0">
-                        {ratingsLoading && (
-                          <p className="text-sm text-gray-300 mb-2">
-                            Cargando ratings…
-                          </p>
-                        )}
                         {ratingsError && (
                           <p className="text-sm text-red-400 mb-2">
                             {ratingsError}
@@ -10270,7 +10341,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             ratings={ratings}
                             showId={Number(id)}
                             density="compact"
-                            fallbackSource="tmdb"
                           />
                         )}
                       </div>
