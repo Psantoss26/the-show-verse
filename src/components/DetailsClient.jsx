@@ -244,6 +244,67 @@ function withTimeout(promise, timeoutMs) {
   ]);
 }
 
+function normalizeProviderName(name = "") {
+  return String(name)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function getProviderFamilyKey(provider) {
+  const normalizedName = normalizeProviderName(provider?.provider_name || "");
+
+  if (/\bmovistar\b|^m\+/.test(normalizedName)) {
+    return "movistar";
+  }
+
+  return provider?.provider_id != null
+    ? String(provider.provider_id)
+    : normalizedName.replace(/[^a-z0-9]+/g, "-");
+}
+
+function providerPreferenceScore(provider, familyKey) {
+  if (familyKey !== "movistar") return 0;
+
+  const name = normalizeProviderName(provider?.provider_name || "");
+  let score = name.length;
+
+  if (/\bficcion\b|\btotal\b|\bdeportes\b|\blaliga\b|\bseleccion\b/.test(name)) {
+    score += 100;
+  }
+
+  return score;
+}
+
+function dedupeStreamingProviders(providers) {
+  const deduped = [];
+  const indexByFamily = new Map();
+
+  for (const provider of providers) {
+    if (!provider) continue;
+
+    const familyKey = getProviderFamilyKey(provider);
+    const existingIndex = indexByFamily.get(familyKey);
+
+    if (existingIndex == null) {
+      indexByFamily.set(familyKey, deduped.length);
+      deduped.push(provider);
+      continue;
+    }
+
+    const existing = deduped[existingIndex];
+    if (
+      providerPreferenceScore(provider, familyKey) <
+      providerPreferenceScore(existing, familyKey)
+    ) {
+      deduped[existingIndex] = provider;
+    }
+  }
+
+  return deduped;
+}
+
 function hasResolvedTraktBootstrap(value) {
   if (!value || typeof value.connected !== "boolean") return false;
   if (value.connected === false) return true;
@@ -776,6 +837,7 @@ export default function DetailsClient({
   const title = data.title || data.name; // Peliculas usan "title", series usan "name"
   const endpointType = type === "tv" ? "tv" : "movie"; // Tipo normalizado para endpoints de API
   const yearIso = (data.release_date || data.first_air_date || "")?.slice(0, 4); // Año de estreno
+  const filmAffinitySearchUrl = `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent((title || "").trim())}&stype=title`;
 
   // URLs de TMDb para enlace externo y pagina de "donde ver"
   const tmdbDetailUrl =
@@ -6153,7 +6215,7 @@ export default function DetailsClient({
       id: "fa",
       label: "FilmAffinity",
       icon: "/logoFilmaffinity.png",
-      href: `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent((title || "") + (yearIso ? ` ${yearIso}` : ""))}&stype=title`,
+      href: filmAffinitySearchUrl,
     });
 
     return items;
@@ -6165,8 +6227,7 @@ export default function DetailsClient({
     letterboxdUrl,
     type,
     seriesGraphUrl,
-    title,
-    yearIso,
+    filmAffinitySearchUrl,
   ]);
 
   // ====== Datos meta / características (reorganizadas) ======
@@ -7151,7 +7212,7 @@ export default function DetailsClient({
       });
     }
 
-    return providers.slice(0, 6);
+    return dedupeStreamingProviders(providers).slice(0, 6);
   }, [streamingProviders, plexAvailable, plexUrl]);
 
   // Refs para gestion de carga de poster (los estados estan definidos al inicio)
@@ -8264,7 +8325,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         <ExternalLinkButton
                           icon="/logoFilmaffinity.png"
                           title="FilmAffinity"
-                          href={`https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent((title || "") + (yearIso ? ` ${yearIso}` : ""))}&stype=title`}
+                          href={filmAffinitySearchUrl}
                         />
                       </div>
 
