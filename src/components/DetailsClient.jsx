@@ -270,7 +270,9 @@ function providerPreferenceScore(provider, familyKey) {
   const name = normalizeProviderName(provider?.provider_name || "");
   let score = name.length;
 
-  if (/\bficcion\b|\btotal\b|\bdeportes\b|\blaliga\b|\bseleccion\b/.test(name)) {
+  if (
+    /\bficcion\b|\btotal\b|\bdeportes\b|\blaliga\b|\bseleccion\b/.test(name)
+  ) {
     score += 100;
   }
 
@@ -10008,11 +10010,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             <section id="section-sentiment" ref={registerSection("sentiment")}>
               <AnimatedSection delay={0.04}>
                 {/* ===================================================== */}
-                {/* Trakt: sentimientos (AI summary) - Solo mostrar si no hay error */}
+                {/* Trakt: sentimientos - Solo mostrar si no hay error */}
                 {!tSentiment.error && (
                   <section className="mb-12">
                     <SectionTitle
-                      title="Análisis de Sentimientos"
+                      title="Análisis de sentimientos"
                       icon={Sparkles}
                     />
 
@@ -10029,10 +10031,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           </div>
                           <div>
                             <h3 className="text-base font-bold leading-tight text-white">
-                              Trakt Community Pulse
+                              Pulso de la comunidad de Trakt
                             </h3>
                             <p className="text-xs font-medium text-zinc-400">
-                              Resumen por IA basado en comentarios sobre{" "}
+                              Resumen automático basado en comentarios sobre{" "}
                               <span className="text-zinc-200">{title}</span>
                             </p>
                           </div>
@@ -10052,7 +10054,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <ThumbsUp className="h-4 w-4" />
                               </div>
                               <span className="font-bold tracking-wide text-emerald-100">
-                                Lo Bueno
+                                Lo bueno
                               </span>
                             </div>
 
@@ -10082,7 +10084,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <ThumbsDown className="h-4 w-4" />
                               </div>
                               <span className="font-bold tracking-wide text-rose-100">
-                                Lo Malo
+                                Lo malo
                               </span>
                             </div>
 
