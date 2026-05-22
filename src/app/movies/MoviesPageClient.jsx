@@ -99,6 +99,8 @@ const formatRuntime = (mins) => {
 const buildImg = (path, size = "original") =>
   `https://image.tmdb.org/t/p/${size}${path}`;
 
+const PREVIEW_BACKDROP_SIZE = "w780";
+
 const MOVIE_GENRES = {
   28: "Acción",
   12: "Aventura",
@@ -151,14 +153,21 @@ async function resolvePreviewSources(filePath) {
 }
 
 /* --------- Precargar imagen (resolve tras onload) --------- */
+const imagePreloadCache = new Map();
+
 function preloadImage(src) {
-  return new Promise((resolve) => {
-    if (!src) return resolve(false);
+  if (!src) return Promise.resolve(false);
+  if (imagePreloadCache.has(src)) return imagePreloadCache.get(src);
+
+  const promise = new Promise((resolve) => {
     const img = new Image();
+    img.decoding = "async";
     img.onload = () => resolve(true);
     img.onerror = () => resolve(false);
     img.src = src;
   });
+  imagePreloadCache.set(src, promise);
+  return promise;
 }
 
 /* =================== CACHÉS COMPARTIDOS (cliente) =================== */
@@ -192,36 +201,40 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
   const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
   const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
   const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1));
+  const hasNoLanguage = (img) => !norm(img?.iso_639_1);
 
   // Mantener orden + minWidth (si no hay, cae al original)
   const pool0 =
     minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
   const pool = pool0.length ? pool0 : list;
 
-  // ✅ SOLO 3 primeras EN (en orden). Si no hay EN, devolvemos null (siempre EN)
+  // Primero 3 con idioma preferido; si no hay, 3 sin idioma.
   const top3en = [];
+  const top3NoLanguage = [];
   for (const b of pool) {
     if (isPreferredLang(b)) top3en.push(b);
+    else if (hasNoLanguage(b)) top3NoLanguage.push(b);
     if (top3en.length === 3) break;
   }
-  if (!top3en.length) return null;
+  const candidates = top3en.length ? top3en : top3NoLanguage.slice(0, 3);
+  if (!candidates.length) return null;
 
   const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
 
-  // Prioridades: 1920x1080, 2560x1440, 3840x2160, 1280x720, y si no la primera EN
-  const b1080 = top3en.find((b) => isRes(b, 1920, 1080));
+  // Prioridades: 1920x1080, 2560x1440, 3840x2160, 1280x720.
+  const b1080 = candidates.find((b) => isRes(b, 1920, 1080));
   if (b1080) return b1080;
 
-  const b1440 = top3en.find((b) => isRes(b, 2560, 1440));
+  const b1440 = candidates.find((b) => isRes(b, 2560, 1440));
   if (b1440) return b1440;
 
-  const b4k = top3en.find((b) => isRes(b, 3840, 2160));
+  const b4k = candidates.find((b) => isRes(b, 3840, 2160));
   if (b4k) return b4k;
 
-  const b720 = top3en.find((b) => isRes(b, 1280, 720));
+  const b720 = candidates.find((b) => isRes(b, 1280, 720));
   if (b720) return b720;
 
-  return top3en[0];
+  return candidates[0];
 }
 
 function pickBestPosterByLangThenResolution(list, opts = {}) {
@@ -529,9 +542,9 @@ function Top10MobileBackdropCard({ movie, rank }) {
       let chosen = null;
       try {
         const preferred = await fetchBestBackdrop(movie.id);
-        chosen = preferred || movie.backdrop_path || movie.poster_path || null;
+        chosen = preferred || null;
       } catch {
-        chosen = movie.backdrop_path || movie.poster_path || null;
+        chosen = null;
       }
 
       movieBackdropCache.set(movie.id, chosen);
@@ -657,62 +670,32 @@ function InlinePreviewCard({ movie, heightClass }) {
     if (!movie) return;
 
     const loadAll = async () => {
+      const revealBackdrop = (path) => {
+        if (abort) return;
+        setBackdropPath(path);
+        setBackdropReady(false);
+      };
+
       const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
       const userPreferredBackdrop = userBackdrop || null;
 
       if (userPreferredBackdrop) {
         movieBackdropCache.set(movie.id, userPreferredBackdrop);
-        const url = buildImg(userPreferredBackdrop, "w1280");
-        await preloadImage(url);
-        if (!abort) {
-          setBackdropPath(userPreferredBackdrop);
-          setBackdropReady(true);
-        }
+        revealBackdrop(userPreferredBackdrop);
       } else {
         const cachedBackdrop = movieBackdropCache.get(movie.id);
         if (cachedBackdrop !== undefined) {
-          if (!abort) {
-            setBackdropPath(cachedBackdrop);
-            if (cachedBackdrop) {
-              const url = buildImg(cachedBackdrop, "w1280");
-              await preloadImage(url);
-              if (!abort) setBackdropReady(true);
-            } else {
-              setBackdropReady(false);
-            }
-          }
+          revealBackdrop(cachedBackdrop);
         } else {
           try {
             const preferred = await fetchBestBackdrop(movie.id);
-            const chosen =
-              preferred || movie.backdrop_path || movie.poster_path || null;
+            const chosen = preferred || null;
             movieBackdropCache.set(movie.id, chosen);
 
-            if (chosen) {
-              const url = buildImg(chosen, "w1280");
-              await preloadImage(url);
-              if (!abort) {
-                setBackdropPath(chosen);
-                setBackdropReady(true);
-              }
-            } else if (!abort) {
-              setBackdropPath(null);
-              setBackdropReady(false);
-            }
+            revealBackdrop(chosen);
           } catch {
-            const fallback = movie.backdrop_path || movie.poster_path || null;
-            if (fallback) {
-              movieBackdropCache.set(movie.id, fallback);
-              const url = buildImg(fallback, "w1280");
-              await preloadImage(url);
-              if (!abort) {
-                setBackdropPath(fallback);
-                setBackdropReady(true);
-              }
-            } else if (!abort) {
-              setBackdropPath(null);
-              setBackdropReady(false);
-            }
+            movieBackdropCache.set(movie.id, null);
+            revealBackdrop(null);
           }
         }
       }
@@ -865,7 +848,9 @@ function InlinePreviewCard({ movie, heightClass }) {
     }
   };
 
-  const bgSrc = backdropPath ? buildImg(backdropPath, "w1280") : null;
+  const bgSrc = backdropPath
+    ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
+    : null;
 
   const genres = (() => {
     const ids =
@@ -900,13 +885,19 @@ function InlinePreviewCard({ movie, heightClass }) {
           <div className="absolute inset-0 bg-neutral-900" />
         )}
 
-        {!showTrailer && backdropReady && bgSrc && (
+        {!showTrailer && bgSrc && (
           <img
+            key={bgSrc}
             src={bgSrc}
             alt={movie.title || movie.name}
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+              backdropReady ? "opacity-100" : "opacity-0"
+            }`}
+            loading="eager"
             decoding="async"
+            fetchPriority="high"
+            onLoad={() => setBackdropReady(true)}
+            onError={() => setBackdropReady(false)}
           />
         )}
 
@@ -1124,6 +1115,38 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const [canNext, setCanNext] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
   const isInView = useInView(rowRef, { once: true, margin: "-100px" });
+  const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
+
+  useEffect(() => {
+    if (!isHoveredRow || !items?.length || isMobile) return;
+
+    const preloadBackdrops = async () => {
+      const toPreload = items
+        .slice(0, 5)
+        .filter((movie) => !preloadedBackdrops.has(movie.id));
+
+      for (const movie of toPreload) {
+        let backdropPath = movieBackdropCache.get(movie.id);
+
+        if (backdropPath === undefined) {
+          try {
+            backdropPath = (await fetchBestBackdrop(movie.id)) || null;
+          } catch {
+            backdropPath = null;
+          }
+          movieBackdropCache.set(movie.id, backdropPath);
+        }
+
+        if (backdropPath) {
+          preloadImage(buildImg(backdropPath, PREVIEW_BACKDROP_SIZE));
+        }
+        setPreloadedBackdrops((prev) => new Set([...prev, movie.id]));
+      }
+    };
+
+    const timer = window.setTimeout(preloadBackdrops, 150);
+    return () => window.clearTimeout(timer);
+  }, [isHoveredRow, items, isMobile, preloadedBackdrops]);
 
   const isTop10 = title === "Top 10 hoy en España";
   const hasActivePreview = !!hoveredId;
