@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 
 import { SectionTitle, VisualMetaCard } from "@/components/details/DetailAtoms";
+import { AnimatedSection } from "@/components/details/AnimatedSection";
+import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import { CompactBadge, MiniStat } from "@/components/details/DetailHeaderBits";
 import {
   formatDateEs,
@@ -341,7 +343,7 @@ export default function SeasonDetailsClient({
         .filter((episodeNumber) => Number.isFinite(episodeNumber)),
     ).size;
     return {
-      loading: !hasInitialShowWatched,
+      loading: false,
       connected: hasInitialShowWatched
         ? initialShowWatched?.connected !== false
         : false,
@@ -377,7 +379,7 @@ export default function SeasonDetailsClient({
     let nextWatchedBySeason = initialWatchedBySeason;
     let nextLoaded = hasInitialShowWatched;
     let nextTrakt = {
-      loading: !hasInitialShowWatched,
+      loading: false,
       connected: hasInitialShowWatched
         ? initialShowWatched?.connected !== false
         : false,
@@ -593,7 +595,6 @@ export default function SeasonDetailsClient({
     const controller = new AbortController();
     const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
-        setTScoreboard((s) => ({ ...s, loading: true }));
         let json = await fetchSeasonScoreboardCached({
           showId,
           seasonNumber,
@@ -688,7 +689,6 @@ export default function SeasonDetailsClient({
     const controller = new AbortController();
     const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
-        setRatingLoading(true);
         const res = await fetch(
           `/api/trakt/ratings?type=season&tmdbId=${Number(showId)}&season=${Number(seasonNumber)}`,
           {
@@ -770,7 +770,7 @@ export default function SeasonDetailsClient({
       () => {
         void reloadSeasonTraktState({ background: true });
       },
-      hasBootstrap ? 2500 : 0,
+      hasBootstrap ? 2500 : 900,
     );
 
     return () => window.clearTimeout(timer);
@@ -805,7 +805,7 @@ export default function SeasonDetailsClient({
     window.addEventListener("pageshow", handlePageShow);
     document.addEventListener("visibilitychange", handleVisibility);
 
-    if (trakt.loading || (!trakt.connected && !trakt.error)) {
+    if (trakt.loading) {
       [900, 2200].forEach((delay) => {
         const timer = window.setTimeout(() => {
           void syncSeasonTraktState({ force: true });
@@ -918,7 +918,12 @@ export default function SeasonDetailsClient({
       {/* Content */}
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
         {/* Back buttons */}
-        <div className="flex items-center gap-2 mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+          className="flex items-center gap-2 mb-6"
+        >
           <button
             type="button"
             onClick={() => router.back()}
@@ -933,33 +938,42 @@ export default function SeasonDetailsClient({
           >
             <MonitorPlay className="w-4 h-4" /> {showName}
           </Link>
-        </div>
+        </motion.div>
 
         {/* Hero */}
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-10 animate-in fade-in duration-700 slide-in-from-bottom-4 items-start">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-10 items-start transform-gpu"
+        >
           {/* Left poster */}
-          <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10">
-            <div className="relative rounded-xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40">
-              <div className="relative aspect-[2/3] bg-neutral-900">
-                {posterPath ? (
-                  <img
-                    src={`https://image.tmdb.org/t/p/w780${posterPath}`}
-                    alt={seasonName}
-                    className="w-full h-full object-cover"
-                    loading="eager"
-                    decoding="async"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <ImageOff className="w-10 h-10 text-neutral-700" />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, x: -20, scale: 0.985 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10"
+          >
+            <AnimatedPosterFrame
+              src={
+                posterPath ? `https://image.tmdb.org/t/p/w780${posterPath}` : null
+              }
+              alt={seasonName}
+              aspect="poster"
+            />
+          </motion.div>
 
           {/* Right info + SCOREBOARD + TABS */}
-          <div className="flex-1 flex flex-col min-w-0 w-full">
+          <motion.div
+            initial={{ opacity: 0, x: 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              duration: 0.46,
+              delay: 0.04,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="flex-1 flex flex-col min-w-0 w-full"
+          >
             <div className="mb-5 px-1">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
                 <Layers className="w-4 h-4" />
@@ -1006,10 +1020,6 @@ export default function SeasonDetailsClient({
               >
                 {/* A. Ratings */}
                 <div className="flex items-center gap-4 sm:gap-5 shrink-0">
-                  {tScoreboard.loading && (
-                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  )}
-
                   <CompactBadge
                     logo="/logo-TMDb.png"
                     logoClassName="h-2 sm:h-4"
@@ -1215,11 +1225,11 @@ export default function SeasonDetailsClient({
                 </AnimatePresence>
               </div>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {/* Episodes */}
-        <section className="mb-12">
+        <AnimatedSection className="mb-12" delay={0.04}>
           {/* Header con toggle (mismo estilo SectionTitle) */}
           <div className="flex items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3 border-l-4 border-yellow-500 pl-4 py-1">
@@ -1441,7 +1451,7 @@ export default function SeasonDetailsClient({
               )}
             </>
           )}
-        </section>
+        </AnimatedSection>
       </div>
     </div>
   );

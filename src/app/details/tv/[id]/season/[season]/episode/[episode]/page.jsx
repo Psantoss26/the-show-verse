@@ -1,9 +1,4 @@
-// src/app/details/tv/[id]/season/[season]/episode/[episode]/page.jsx
-import { cookies } from "next/headers";
 import EpisodeDetailsClient from "@/components/EpisodeDetailsClient";
-import { getCachedEpisodeImdbData } from "@/lib/api/ratingsCached";
-import { getCachedTraktScoreboardData } from "@/lib/trakt/scoreboardCached";
-import { getTraktShowWatchedFromCookieStore } from "@/lib/trakt/server";
 
 export const revalidate = 3600; // 1h
 
@@ -17,15 +12,6 @@ async function tmdbFetch(path) {
   if (!res.ok)
     throw new Error(json?.status_message || `TMDb error ${res.status}`);
   return json;
-}
-
-function resolveWithin(promise, timeoutMs, fallback = null) {
-  return Promise.race([
-    promise,
-    new Promise((resolve) => {
-      setTimeout(() => resolve(fallback), timeoutMs);
-    }),
-  ]);
 }
 
 export default async function EpisodePage({ params }) {
@@ -51,49 +37,12 @@ export default async function EpisodePage({ params }) {
 
   const showPromise = tmdbFetch(`/tv/${showId}?append_to_response=external_ids`);
   const episodePromise = tmdbFetch(
-    `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}?append_to_response=credits,external_ids`,
+    `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
   );
 
-  const [show, episode] = await Promise.all([
-    showPromise,
-    episodePromise,
-  ]);
+  const [show, episode] = await Promise.all([showPromise, episodePromise]);
 
   const showImdbId = show?.external_ids?.imdb_id || null;
-  const cookieStore = await cookies();
-  const [initialScoreboard, initialShowWatched, initialImdb] =
-    await Promise.all([
-      resolveWithin(
-        getCachedTraktScoreboardData({
-          type: "episode",
-          tmdbId: showId,
-          season: seasonNumber,
-          episode: episodeNumber,
-          includeStats: false,
-        }).catch(() => null),
-        1200,
-        null,
-      ),
-      resolveWithin(
-        getTraktShowWatchedFromCookieStore(cookieStore, {
-          tmdbId: showId,
-        }).catch(() => null),
-        950,
-        null,
-      ),
-      showImdbId
-        ? resolveWithin(
-            getCachedEpisodeImdbData({
-              showId,
-              imdbId: showImdbId,
-              seasonNumber,
-              episodeNumber,
-            }).catch(() => null),
-            1200,
-            null,
-          )
-        : Promise.resolve(null),
-    ]);
 
   const imdbUrl = showImdbId
     ? `https://www.imdb.com/title/${showImdbId}/episodes?season=${seasonNumber}`
@@ -106,9 +55,9 @@ export default async function EpisodePage({ params }) {
       episodeNumber={episodeNumber}
       show={show}
       episode={episode}
-      initialScoreboard={initialScoreboard}
-      initialShowWatched={initialShowWatched}
-      imdb={initialImdb}
+      initialScoreboard={null}
+      initialShowWatched={null}
+      imdb={null}
       imdbId={showImdbId}
       imdbUrl={imdbUrl}
     />
