@@ -697,6 +697,18 @@ function normalizeOmdbAwards(value) {
   return text;
 }
 
+function toRatingNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function getSeasonNumber(season) {
+  const parsed = Number(
+    season?.number ?? season?.season_number ?? season?.seasonNumber,
+  );
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function AwardCard({ item }) {
   const people = Array.isArray(item?.people) ? item.people.filter(Boolean) : [];
   const visual = getAwardVisual(item?.groupName);
@@ -5645,6 +5657,7 @@ export default function DetailsClient({
   const [ratings, setRatings] = useState(null); // Ratings por episodio
   const [ratingsError, setRatingsError] = useState(null);
   const [ratingsLoading, setRatingsLoading] = useState(false);
+  const [seasonImdbRatings, setSeasonImdbRatings] = useState({});
 
   // Carga los ratings de episodios desde SeriesGraph para series TV.
   useEffect(() => {
@@ -5719,6 +5732,157 @@ export default function DetailsClient({
       ignore = true;
     };
   }, [id, type]);
+
+  const visibleTraktSeasons = useMemo(() => {
+    if (!Array.isArray(tSeasons?.items)) return [];
+    return tSeasons.items.filter((season) => {
+      const seasonNumber = getSeasonNumber(season);
+      return seasonNumber != null && seasonNumber > 0;
+    });
+  }, [tSeasons?.items]);
+
+  const visibleSeasonNumbers = useMemo(
+    () =>
+      visibleTraktSeasons
+        .map((season) => getSeasonNumber(season))
+        .filter((seasonNumber) => seasonNumber != null && seasonNumber > 0),
+    [visibleTraktSeasons],
+  );
+
+  const visibleSeasonNumbersKey = useMemo(
+    () => visibleSeasonNumbers.join(","),
+    [visibleSeasonNumbers],
+  );
+
+  const seriesGraphSeasonRatings = useMemo(() => {
+    const rawSeasons = Array.isArray(ratings?.seasons)
+      ? ratings.seasons
+      : Array.isArray(ratings)
+        ? ratings
+        : [];
+
+    const map = new Map();
+
+    rawSeasons.forEach((season) => {
+      const seasonNumber = getSeasonNumber(season);
+      if (seasonNumber == null || seasonNumber <= 0) return;
+
+      const episodes = Array.isArray(season?.episodes) ? season.episodes : [];
+      const values = episodes
+        .map((episode) =>
+          toRatingNumber(
+            episode?.seriesGraphRating ??
+              episode?.seriesgraphRating ??
+              episode?.series_graph_rating ??
+              episode?.rating ??
+              episode?.vote_average,
+          ),
+        )
+        .filter((rating) => rating != null);
+
+      if (!values.length) return;
+
+      const average =
+        values.reduce((sum, rating) => sum + rating, 0) / values.length;
+      map.set(seasonNumber, Number(average.toFixed(1)));
+    });
+
+    return map;
+  }, [ratings]);
+
+  useEffect(() => {
+    if (type !== "tv" || !resolvedImdbId || !visibleSeasonNumbers.length) {
+      setSeasonImdbRatings({});
+      return;
+    }
+
+    let ignore = false;
+    const controller = new AbortController();
+    const cacheKey = `showverse:tv:${id}:season-imdb-ratings:${resolvedImdbId}`;
+    const requested = new Set(visibleSeasonNumbers);
+
+    const readCache = () => {
+      if (typeof window === "undefined") return {};
+      try {
+        const raw = window.sessionStorage.getItem(cacheKey);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch {
+        return {};
+      }
+    };
+
+    const writeCache = (value) => {
+      if (typeof window === "undefined") return;
+      try {
+        window.sessionStorage.setItem(cacheKey, JSON.stringify(value || {}));
+      } catch {}
+    };
+
+    const run = async () => {
+      const cached = readCache();
+      const cachedForVisible = Object.fromEntries(
+        Object.entries(cached).filter(([seasonNumber]) =>
+          requested.has(Number(seasonNumber)),
+        ),
+      );
+
+      if (!ignore) setSeasonImdbRatings(cachedForVisible);
+
+      const missing = visibleSeasonNumbers.filter(
+        (seasonNumber) =>
+          !Object.prototype.hasOwnProperty.call(cached, String(seasonNumber)),
+      );
+      if (!missing.length) return;
+
+      const next = { ...cached };
+      let cursor = 0;
+      const workerCount = Math.min(4, missing.length);
+
+      await Promise.all(
+        Array.from({ length: workerCount }, async () => {
+          while (!ignore && cursor < missing.length) {
+            const seasonNumber = missing[cursor++];
+            try {
+              const params = new URLSearchParams({
+                showId: String(id),
+                imdbId: resolvedImdbId,
+                season: String(seasonNumber),
+              });
+              const res = await fetch(`/api/ratings/season?${params}`, {
+                signal: controller.signal,
+                cache: "no-store",
+              });
+              const data = await res.json().catch(() => ({}));
+              const rating = res.ok ? toRatingNumber(data?.rating) : null;
+              next[seasonNumber] = rating;
+            } catch (error) {
+              if (error?.name === "AbortError") return;
+              next[seasonNumber] = null;
+            }
+          }
+        }),
+      );
+
+      if (ignore) return;
+      writeCache(next);
+      setSeasonImdbRatings(
+        Object.fromEntries(
+          Object.entries(next).filter(([seasonNumber]) =>
+            requested.has(Number(seasonNumber)),
+          ),
+        ),
+      );
+    };
+
+    run();
+
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
+  }, [type, id, resolvedImdbId, visibleSeasonNumbersKey, visibleSeasonNumbers]);
 
   // =====================================================================
   // HANDLERS DE SELECCION DE ARTWORK
@@ -6708,9 +6872,7 @@ export default function DetailsClient({
         id: "seasons",
         label: "Temporadas",
         icon: Layers,
-        count: Array.isArray(tSeasons?.items)
-          ? tSeasons.items.length
-          : undefined,
+        count: visibleTraktSeasons.length || undefined,
       });
       // TV: Episodios
       items.push({
@@ -6751,7 +6913,7 @@ export default function DetailsClient({
     videos,
     tComments?.total,
     reviews,
-    tSeasons?.items,
+    visibleTraktSeasons.length,
     tLists?.items,
     castData,
     castDataForUI,
@@ -10119,12 +10281,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       )}
 
                       {!tSeasons.loading &&
-                        (tSeasons.items || []).map((s) => {
-                          const sn = Number(s?.number);
-                          const titleSeason =
-                            sn === 0 ? "Especiales" : `Temporada ${sn}`;
-                          const rating =
-                            typeof s?.rating === "number" ? s.rating : null;
+                        visibleTraktSeasons.map((s) => {
+                          const sn = getSeasonNumber(s);
+                          const titleSeason = `Temporada ${sn}`;
+                          const imdbRating = toRatingNumber(
+                            seasonImdbRatings?.[sn],
+                          );
+                          const seriesGraphRating =
+                            seriesGraphSeasonRatings.get(sn) ?? null;
+                          const rating = imdbRating ?? seriesGraphRating;
+                          const imdbSeasonUrl = resolvedImdbId
+                            ? `https://www.imdb.com/title/${resolvedImdbId}/episodes/?season=${sn}`
+                            : null;
 
                           // Lógica de progreso (usa TMDb para saber total)
                           const tmdbSeason = (data?.seasons || []).find(
@@ -10184,23 +10352,23 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </div>
                                   </div>
 
-                                  {/* Botón externo a Trakt (NO navega a la season page) */}
-                                  {trakt?.traktUrl && (
+                                  {/* Botón externo a IMDb (NO navega a la season page interna) */}
+                                  {imdbSeasonUrl && (
                                     <a
-                                      href={`${trakt.traktUrl}/seasons/${sn}`}
+                                      href={imdbSeasonUrl}
                                       target="_blank"
                                       rel="noreferrer"
                                       onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         window.open(
-                                          `${trakt.traktUrl}/seasons/${sn}`,
+                                          imdbSeasonUrl,
                                           "_blank",
                                           "noopener,noreferrer",
                                         );
                                       }}
                                       className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
-                                      title="Ver en Trakt"
+                                      title="Ver temporada en IMDb"
                                     >
                                       <ExternalLink className="h-4 w-4" />
                                     </a>
