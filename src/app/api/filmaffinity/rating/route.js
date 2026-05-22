@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 const CACHE = new Map();
 const TTL = 1000 * 60 * 60 * 24;
-const MAX_CANDIDATES = 6;
+const MAX_CANDIDATES = 8;
 
 function cacheGet(key) {
   const hit = CACHE.get(key);
@@ -45,7 +45,7 @@ function normalizeTitle(value = "") {
   return stripTags(value)
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/\([^)]*\)/g, " ")
     .replace(/\b(the|a|an|el|la|los|las|un|una|unos|unas)\b/g, " ")
     .replace(/&/g, " and ")
@@ -169,17 +169,26 @@ function scoreCandidate(candidate, wanted) {
     }
   }
 
+  // Strong bonus when candidate's originalTitle matches exactly — the most
+  // reliable signal for international films with different localized titles
+  // (e.g. "Inception" original title on a film listed as "Origen" in Spain)
+  const wantedOrigNorm = normalizeTitle(wanted.originalTitle);
+  const candidateOrigNorm = normalizeTitle(candidate.originalTitle);
+  if (wantedOrigNorm && candidateOrigNorm && wantedOrigNorm === candidateOrigNorm) {
+    score += 55;
+  }
+
   const wantedYear = Number(wanted.year);
   if (wantedYear && candidate.year) {
     const delta = Math.abs(candidate.year - wantedYear);
     if (delta === 0) score += 45;
-    else if (delta === 1) score += 18;
-    else if (delta <= 3) score += 5;
-    else score -= Math.min(35, delta * 3);
+    else if (delta === 1) score += 10;
+    else if (delta <= 3) score -= 15;
+    else score -= Math.min(60, delta * 5);
   }
 
   if (wanted.type === "tv" && candidate.isTv) score += 15;
-  if (wanted.type === "movie" && candidate.isTv) score -= 18;
+  if (wanted.type === "movie" && candidate.isTv) score -= 30;
   if (candidate.rating != null) score += 10;
   if (candidate.votes != null) score += Math.min(8, Math.log10(candidate.votes + 1));
 
@@ -187,12 +196,26 @@ function scoreCandidate(candidate, wanted) {
 }
 
 async function searchFilmAffinity({ title, originalTitle, year, type }) {
-  const queries = unique([
-    year ? `${title} ${year}` : title,
-    title,
-    year ? `${originalTitle} ${year}` : originalTitle,
-    originalTitle,
-  ]);
+  const normTitle = normalizeTitle(title);
+  const normOrig = normalizeTitle(originalTitle);
+  const hasDistinctOriginal = !!(normOrig && normOrig !== normTitle);
+
+  // FA's text search does not reliably filter by year in the query string —
+  // e.g. "Inception 2010" may return no results because the Spanish title is "Origen".
+  // Strategy:
+  //   - When the original title differs (e.g. "Inception" ≠ "Origen"):
+  //       1. Search by originalTitle alone — FA indexes original titles and often
+  //          redirects directly to the correct film page.
+  //       2. Search by localized title alone as a broader fallback.
+  //   - When title == originalTitle (e.g. "Breaking Bad"):
+  //       1. Try title + year — works well for common titles in the same language.
+  //       2. Title alone as fallback.
+  //   Year is used ONLY in scoring, never in the query string for distinct-original films.
+  const rawQueries = hasDistinctOriginal
+    ? [originalTitle, title]
+    : unique([year ? `${title} ${year}` : title, title]);
+
+  const queries = unique(rawQueries.filter(Boolean));
 
   const candidateUrls = [];
   const seen = new Set();
@@ -203,11 +226,14 @@ async function searchFilmAffinity({ title, originalTitle, year, type }) {
     const res = await safeFetch(url);
     if (!res.ok) continue;
     if (/\/film\d+\.html\/?$/i.test(res.url || "")) {
+      // FA redirected straight to a film page — add it and skip HTML extraction
+      // (the page body contains related-film links, not search results)
       const directUrl = res.url.replace(/\/$/, "");
       if (!seen.has(directUrl)) {
         seen.add(directUrl);
         candidateUrls.push(directUrl);
       }
+      continue;
     }
     const html = await res.text();
     for (const candidateUrl of extractCandidateUrls(html)) {
@@ -217,7 +243,6 @@ async function searchFilmAffinity({ title, originalTitle, year, type }) {
       }
       if (candidateUrls.length >= MAX_CANDIDATES) break;
     }
-    if (candidateUrls.length >= 3) break;
   }
 
   const candidates = (
