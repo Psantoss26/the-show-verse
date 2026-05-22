@@ -71,7 +71,9 @@ export default function TraktWatchedControl({
             </span>
           )}
           {labelSub && (
-            <span className="text-[8px] font-bold tracking-tight text-emerald-400 uppercase leading-none opacity-95">
+            <span
+              className={`${labelHighlight ? "text-[9px]" : "text-[10px]"} font-bold tracking-tight text-emerald-400 uppercase leading-none opacity-95`}
+            >
               {labelSub}
             </span>
           )}
