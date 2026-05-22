@@ -43,11 +43,51 @@ import {
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 80;
+const HISTORY_CACHE_KEY = "showverse:history:items:v1";
+const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 
 // ----------------------------
 // UTILS
 // ----------------------------
 const pad2 = (n) => String(n).padStart(2, "0");
+
+function readHistoryCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(HISTORY_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.items)) return null;
+    return {
+      items: parsed.items,
+      hasMore: !!parsed.hasMore,
+      fresh: Date.now() - Number(parsed.t || 0) < HISTORY_CACHE_TTL_MS,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeHistoryCache(items, { hasMore = false } = {}) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      HISTORY_CACHE_KEY,
+      JSON.stringify({
+        t: Date.now(),
+        items: Array.isArray(items) ? items : [],
+        hasMore: !!hasMore,
+      }),
+    );
+  } catch {}
+}
+
+function clearHistoryCache() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(HISTORY_CACHE_KEY);
+  } catch {}
+}
 
 function ymdLocal(date) {
   const d = date instanceof Date ? date : new Date(date);
@@ -1910,9 +1950,13 @@ export default function HistoryClient() {
   const [auth, setAuth] = useState({ loading: true, connected: false });
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
-  const [raw, setRaw] = useState([]);
-  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(
+    () => !!readHistoryCache()?.items,
+  );
+  const [raw, setRaw] = useState(() => readHistoryCache()?.items || []);
+  const [hasMoreHistory, setHasMoreHistory] = useState(
+    () => !!readHistoryCache()?.hasMore,
+  );
   const [historyError, setHistoryError] = useState("");
   const [mutatingId, setMutatingId] = useState("");
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
@@ -2035,7 +2079,10 @@ export default function HistoryClient() {
       setHasMoreHistory(nextHasMore);
 
       setRaw((prev) => {
-        if (reset) return sorted;
+        if (reset) {
+          writeHistoryCache(sorted, { hasMore: nextHasMore });
+          return sorted;
+        }
 
         const seen = new Set((prev || []).map((x) => String(getHistoryId(x))));
         const merged = [...(prev || [])];
@@ -2046,16 +2093,16 @@ export default function HistoryClient() {
             merged.push(item);
           }
         }
-        return merged.sort(
+        const nextItems = merged.sort(
           (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
         );
+        writeHistoryCache(nextItems, { hasMore: nextHasMore });
+        return nextItems;
       });
     } catch (error) {
       setHistoryError(error?.message || "No se pudo cargar el historial.");
       if (reset) {
-        setRaw([]);
         hasMoreHistoryRef.current = false;
-        setHasMoreHistory(false);
       }
     } finally {
       loadingHistoryRef.current = false;
@@ -2075,6 +2122,7 @@ export default function HistoryClient() {
       setHasMoreHistory(false);
       hasMoreHistoryRef.current = false;
       nextHistoryPageRef.current = 1;
+      clearHistoryCache();
       setShowDisconnectModal(false);
       // Redirigir a la página principal
       window.location.href = "/";
@@ -2114,11 +2162,13 @@ export default function HistoryClient() {
     setMutatingId(`del:${historyId}`);
     try {
       await apiPost("/api/trakt/history/remove", { ids: [historyId] });
-      setRaw((prev) =>
-        (prev || []).filter(
+      setRaw((prev) => {
+        const nextItems = (prev || []).filter(
           (x) => String(getHistoryId(x)) !== String(historyId),
-        ),
-      );
+        );
+        writeHistoryCache(nextItems, { hasMore: hasMoreHistoryRef.current });
+        return nextItems;
+      });
     } catch {
       // noop
     } finally {
@@ -2238,14 +2288,6 @@ export default function HistoryClient() {
     setExpandedGroups(new Set());
   }, [sorted, groupBy, typeFilter, q, selectedDay]);
 
-  if (auth.loading) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-emerald-500/30">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -2276,7 +2318,7 @@ export default function HistoryClient() {
                 </h1>
 
                 {/* Botones redondos junto al título */}
-                {auth.connected && (
+                {auth.connected && historyLoaded && (
                   <div className="flex items-center gap-2">
                     <motion.button
                       onClick={() => loadHistory()}
@@ -2316,7 +2358,7 @@ export default function HistoryClient() {
             </div>
 
             {/* Solo estadísticas a la derecha */}
-            {auth.connected && (
+            {auth.connected && historyLoaded && (
               <motion.div
                 className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
                 initial={{ opacity: 0, y: 20 }}
@@ -2331,7 +2373,7 @@ export default function HistoryClient() {
                   <StatCard
                     label="Cargados"
                     value={stats.plays}
-                    loading={!historyLoaded}
+                    loading={false}
                     icon={CheckCircle2}
                     colorClass="text-emerald-400 bg-emerald-500/10"
                   />
@@ -2344,7 +2386,7 @@ export default function HistoryClient() {
                   <StatCard
                     label="Títulos Únicos"
                     value={stats.unique}
-                    loading={!historyLoaded}
+                    loading={false}
                     icon={LayoutList}
                     colorClass="text-purple-400 bg-purple-500/10"
                   />
@@ -2357,7 +2399,7 @@ export default function HistoryClient() {
                   <StatCard
                     label="Películas"
                     value={stats.movies}
-                    loading={!historyLoaded}
+                    loading={false}
                     icon={Film}
                     colorClass="text-sky-400 bg-sky-500/10"
                   />
@@ -2370,7 +2412,7 @@ export default function HistoryClient() {
                   <StatCard
                     label="Episodios"
                     value={stats.shows}
-                    loading={!historyLoaded}
+                    loading={false}
                     icon={Tv}
                     colorClass="text-pink-400 bg-pink-500/10"
                   />
@@ -2885,7 +2927,7 @@ export default function HistoryClient() {
               </motion.div>
             )}
 
-            {!auth.connected ? (
+            {!auth.loading && !auth.connected ? (
               <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed">
                 <div className="mb-6">
                   <img
@@ -2913,12 +2955,7 @@ export default function HistoryClient() {
                 </button>
               </div>
             ) : !historyLoaded && loading ? (
-              <div className="py-24 text-center border border-zinc-800 rounded-3xl bg-zinc-900/20">
-                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-4" />
-                <p className="text-zinc-400 font-medium">
-                  Cargando primeros elementos...
-                </p>
-              </div>
+              null
             ) : historyLoaded && filtered.length === 0 && !loading ? (
               <motion.div
                 className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
