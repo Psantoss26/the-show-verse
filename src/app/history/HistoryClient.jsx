@@ -1947,15 +1947,22 @@ const HistoryGridCard = memo(function HistoryGridCard({
 // MAIN PAGE
 // ----------------------------
 export default function HistoryClient() {
+  const initialHistoryCacheRef = useRef(null);
+  if (initialHistoryCacheRef.current === null) {
+    initialHistoryCacheRef.current = readHistoryCache();
+  }
+
   const [auth, setAuth] = useState({ loading: true, connected: false });
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(
-    () => !!readHistoryCache()?.items,
+    () => !!initialHistoryCacheRef.current?.items,
   );
-  const [raw, setRaw] = useState(() => readHistoryCache()?.items || []);
+  const [raw, setRaw] = useState(
+    () => initialHistoryCacheRef.current?.items || [],
+  );
   const [hasMoreHistory, setHasMoreHistory] = useState(
-    () => !!readHistoryCache()?.hasMore,
+    () => !!initialHistoryCacheRef.current?.hasMore,
   );
   const [historyError, setHistoryError] = useState("");
   const [mutatingId, setMutatingId] = useState("");
@@ -1963,7 +1970,7 @@ export default function HistoryClient() {
   const loadMoreRef = useRef(null);
   const loadingHistoryRef = useRef(false);
   const nextHistoryPageRef = useRef(1);
-  const hasMoreHistoryRef = useRef(false);
+  const hasMoreHistoryRef = useRef(!!initialHistoryCacheRef.current?.hasMore);
 
   // UI States
   const [viewMode, setViewMode] = useState(() => {
