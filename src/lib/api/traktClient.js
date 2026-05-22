@@ -296,6 +296,7 @@ export async function traktGetHistory({
   page = 1,
   limit = "all",
   extended = "full",
+  enrich = true,
 } = {}) {
   const qs = new URLSearchParams();
   qs.set("type", type);
@@ -304,6 +305,7 @@ export async function traktGetHistory({
   if (from) qs.set("from", from);
   if (to) qs.set("to", to);
   if (extended) qs.set("extended", extended);
+  qs.set("enrich", enrich ? "1" : "0");
 
   const res = await fetch(`/api/trakt/history?${qs.toString()}`, {
     cache: "no-store",

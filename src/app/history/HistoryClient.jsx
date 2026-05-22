@@ -6,7 +6,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useLayoutEffect,
   memo,
 } from "react";
 import Link from "next/link";
@@ -43,6 +42,7 @@ import {
 } from "@/lib/api/traktClient";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const HISTORY_PAGE_SIZE = 80;
 
 // ----------------------------
 // UTILS
@@ -187,13 +187,13 @@ function collapseConsecutive(items) {
 
   for (let i = 1; i < items.length; i++) {
     const curr = items[i];
+    const currentTmdbId = getTmdbId(current);
+    const currTmdbId = getTmdbId(curr);
     const sameShow =
       getItemType(current) === "show" &&
       getItemType(curr) === "show" &&
-      getTmdbId(current) &&
-      getTmdbId(current) === getTmdbId(curr) &&
-      current.poster_path &&
-      current.poster_path === curr.poster_path;
+      currentTmdbId &&
+      currentTmdbId === currTmdbId;
     if (sameShow) {
       current._group.push(curr);
     } else {
@@ -269,19 +269,6 @@ function normalizeHistoryResponse(json) {
   if (Array.isArray(json)) return { items: json };
   if (Array.isArray(json?.items)) return { items: json.items };
   return { items: [] };
-}
-
-async function mapLimit(arr, limit, fn) {
-  const out = new Array(arr.length);
-  let i = 0;
-  const workers = Array.from({ length: Math.max(1, limit) }, async () => {
-    while (i < arr.length) {
-      const idx = i++;
-      out[idx] = await fn(arr[idx], idx);
-    }
-  });
-  await Promise.all(workers);
-  return out;
 }
 
 // Intersection Observer hook for lazy loading
@@ -1145,11 +1132,17 @@ function CalendarPanel({
 // ----------------------------
 function Poster({ entry, className = "" }) {
   const [posterPath, setPosterPath] = useState(entry?.poster_path || null);
+  const { ref, hasBeenInView } = useInView({
+    threshold: 0.01,
+    rootMargin: "350px",
+  });
+
   useEffect(() => {
     setPosterPath(entry?.poster_path || null);
   }, [entry?.poster_path]);
 
   useEffect(() => {
+    if (!hasBeenInView) return;
     let ignore = false;
     const run = async () => {
       if (posterPath) return;
@@ -1164,7 +1157,7 @@ function Poster({ entry, className = "" }) {
     return () => {
       ignore = true;
     };
-  }, [posterPath, entry]);
+  }, [posterPath, entry, hasBeenInView]);
 
   const src = posterPath
     ? `https://image.tmdb.org/t/p/w342${posterPath}`
@@ -1172,6 +1165,7 @@ function Poster({ entry, className = "" }) {
 
   return (
     <div
+      ref={ref}
       className={`overflow-hidden bg-zinc-800 border border-white/5 shrink-0 relative shadow-lg ${className}`}
     >
       {src ? (
@@ -1915,10 +1909,17 @@ const HistoryGridCard = memo(function HistoryGridCard({
 export default function HistoryClient() {
   const [auth, setAuth] = useState({ loading: true, connected: false });
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [raw, setRaw] = useState([]);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [historyError, setHistoryError] = useState("");
   const [mutatingId, setMutatingId] = useState("");
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const loadMoreRef = useRef(null);
+  const loadingHistoryRef = useRef(false);
+  const nextHistoryPageRef = useRef(1);
+  const hasMoreHistoryRef = useRef(false);
 
   // UI States
   const [viewMode, setViewMode] = useState(() => {
@@ -1952,7 +1953,6 @@ export default function HistoryClient() {
   });
   const [selectedDay, setSelectedDay] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(true);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [showCalendarView, setShowCalendarView] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
@@ -1988,7 +1988,6 @@ export default function HistoryClient() {
     const mq = window.matchMedia("(max-width: 1024px)");
     const apply = () => {
       setIsMobile(!!mq.matches);
-      setFiltersOpen(!mq.matches);
     };
     apply();
     mq.addEventListener?.("change", apply);
@@ -2004,39 +2003,64 @@ export default function HistoryClient() {
     }
   }, []);
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async ({ reset = true } = {}) => {
+    if (loadingHistoryRef.current) return;
+
+    const pageToLoad = reset ? 1 : nextHistoryPageRef.current;
+    if (!reset && !hasMoreHistoryRef.current) return;
+
+    loadingHistoryRef.current = true;
+    setHistoryError("");
     setLoading(true);
+    setLoadingMore(!reset);
+
     try {
       const json = await traktGetHistory({
         type: "all",
-        page: 1,
-        limit: "all",
+        page: pageToLoad,
+        limit: HISTORY_PAGE_SIZE,
+        enrich: false,
       });
       const { items } = normalizeHistoryResponse(json);
       const sorted = [...items].sort(
         (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
       );
+      const nextHasMore =
+        typeof json?.pagination?.hasMore === "boolean"
+          ? json.pagination.hasMore
+          : items.length >= HISTORY_PAGE_SIZE;
 
-      // Optimized: Load only essential data, images loaded on-demand with Intersection Observer
-      const enriched = await mapLimit(sorted, 15, async (e) => {
-        const t = getItemType(e);
-        const id = getTmdbId(e);
-        if (!t || !id) return e;
-        const r = await fetchTmdbPoster({ type: t, tmdbId: id });
-        if (!r) return e;
-        return {
-          ...e,
-          title_es: r?.title_es || null,
-          year: r?.year || getYear(e),
-          poster_path: r?.poster_path || null,
-        };
+      nextHistoryPageRef.current = pageToLoad + 1;
+      hasMoreHistoryRef.current = nextHasMore;
+      setHasMoreHistory(nextHasMore);
+
+      setRaw((prev) => {
+        if (reset) return sorted;
+
+        const seen = new Set((prev || []).map((x) => String(getHistoryId(x))));
+        const merged = [...(prev || [])];
+        for (const item of sorted) {
+          const id = String(getHistoryId(item));
+          if (!seen.has(id)) {
+            seen.add(id);
+            merged.push(item);
+          }
+        }
+        return merged.sort(
+          (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
+        );
       });
-
-      setRaw(enriched);
-    } catch {
-      setRaw([]);
+    } catch (error) {
+      setHistoryError(error?.message || "No se pudo cargar el historial.");
+      if (reset) {
+        setRaw([]);
+        hasMoreHistoryRef.current = false;
+        setHasMoreHistory(false);
+      }
     } finally {
+      loadingHistoryRef.current = false;
       setLoading(false);
+      setLoadingMore(false);
       setHistoryLoaded(true);
     }
   }, []);
@@ -2048,6 +2072,9 @@ export default function HistoryClient() {
       setAuth({ loading: false, connected: false });
       setRaw([]);
       setHistoryLoaded(false);
+      setHasMoreHistory(false);
+      hasMoreHistoryRef.current = false;
+      nextHistoryPageRef.current = 1;
       setShowDisconnectModal(false);
       // Redirigir a la página principal
       window.location.href = "/";
@@ -2061,9 +2088,26 @@ export default function HistoryClient() {
   useEffect(() => {
     loadAuth();
   }, [loadAuth]);
-  useLayoutEffect(() => {
-    if (!auth.loading && auth.connected) loadHistory();
+
+  useEffect(() => {
+    if (!auth.loading && auth.connected) loadHistory({ reset: true });
   }, [auth.loading, auth.connected, loadHistory]);
+
+  useEffect(() => {
+    if (!auth.connected || !historyLoaded || !hasMoreHistory || loading) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadHistory({ reset: false });
+      },
+      { threshold: 0.01, rootMargin: "900px 0px" },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [auth.connected, hasMoreHistory, historyLoaded, loadHistory, loading]);
 
   const removeFromHistory = useCallback(async (_entry, { historyId }) => {
     if (!historyId) return;
@@ -2285,7 +2329,7 @@ export default function HistoryClient() {
                   transition={{ duration: 0.4, delay: 0.5 }}
                 >
                   <StatCard
-                    label="Total Vistos"
+                    label="Cargados"
                     value={stats.plays}
                     loading={!historyLoaded}
                     icon={CheckCircle2}
@@ -2868,6 +2912,13 @@ export default function HistoryClient() {
                   Conectar ahora
                 </button>
               </div>
+            ) : !historyLoaded && loading ? (
+              <div className="py-24 text-center border border-zinc-800 rounded-3xl bg-zinc-900/20">
+                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-4" />
+                <p className="text-zinc-400 font-medium">
+                  Cargando primeros elementos...
+                </p>
+              </div>
             ) : historyLoaded && filtered.length === 0 && !loading ? (
               <motion.div
                 className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
@@ -2877,8 +2928,16 @@ export default function HistoryClient() {
               >
                 <LayoutList className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
                 <p className="text-zinc-500 font-medium">
-                  No se encontraron resultados.
+                  {historyError || "No se encontraron resultados."}
                 </p>
+                {historyError && (
+                  <button
+                    onClick={() => loadHistory({ reset: true })}
+                    className="mt-4 text-emerald-500 text-sm font-bold hover:underline"
+                  >
+                    Reintentar
+                  </button>
+                )}
                 {q && (
                   <button
                     onClick={() => setQ("")}
@@ -3047,9 +3106,35 @@ export default function HistoryClient() {
                           )}
                         </div>
                       )}
-                    </motion.div>
-                  );
-                })}
+                  </motion.div>
+                );
+              })}
+
+                {(hasMoreHistory || loadingMore || historyError) && (
+                  <div
+                    ref={loadMoreRef}
+                    className="flex flex-col items-center justify-center gap-3 py-8"
+                  >
+                    {historyError && (
+                      <p className="text-sm text-red-300">{historyError}</p>
+                    )}
+                    {hasMoreHistory && (
+                      <button
+                        type="button"
+                        onClick={() => loadHistory({ reset: false })}
+                        disabled={loadingMore || loading}
+                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-sm font-bold text-zinc-200 hover:border-emerald-500/40 hover:text-white transition disabled:opacity-50"
+                      >
+                        {loadingMore ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                        ) : (
+                          <ChevronsUpDown className="w-4 h-4 text-emerald-400" />
+                        )}
+                        {loadingMore ? "Cargando más..." : "Cargar más"}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </motion.div>

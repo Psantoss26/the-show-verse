@@ -87,6 +87,12 @@ export async function GET(request) {
   );
   const limitRaw = request.nextUrl.searchParams.get("limit") || "all";
   const extended = request.nextUrl.searchParams.get("extended") || "full";
+  const enrichRaw = request.nextUrl.searchParams.get("enrich");
+  const enrich =
+    enrichRaw == null ||
+    !["0", "false", "minimal", "none"].includes(
+      String(enrichRaw).toLowerCase(),
+    );
 
   const numericLimit = Number(limitRaw);
   const hasNumericLimit = Number.isFinite(numericLimit) && numericLimit > 0;
@@ -127,6 +133,7 @@ export async function GET(request) {
     const raw = [];
     let currentPage = page;
     const maxPages = 100;
+    let lastPageSize = 0;
 
     while (currentPage < page + maxPages) {
       const path = buildPath(currentPage, perPage);
@@ -135,6 +142,7 @@ export async function GET(request) {
         throw new Error(r?.json?.error || `Trakt history failed (${r.status})`);
 
       const pageItems = Array.isArray(r.json) ? r.json : [];
+      lastPageSize = pageItems.length;
       raw.push(...pageItems);
 
       // Si es modo paginado clásico, una sola petición (siempre que no pidan > perPage)
@@ -169,6 +177,7 @@ export async function GET(request) {
             tmdbId,
             title: obj?.title ?? null,
             year: obj?.year ?? null,
+            detailsHref: detailsHrefFor("movie", tmdbId),
           };
         }
 
@@ -195,6 +204,7 @@ export async function GET(request) {
             season,
             number,
             episodeTitle,
+            detailsHref: detailsHrefFor("show", tmdbId),
           };
         }
 
@@ -209,6 +219,7 @@ export async function GET(request) {
             tmdbId,
             title: obj?.title ?? null,
             year: obj?.year ?? null,
+            detailsHref: detailsHrefFor("show", tmdbId),
           };
         }
 
@@ -217,22 +228,25 @@ export async function GET(request) {
       .filter(Boolean)
       .filter((x) => x.id && x.watched_at && x.type && x.tmdbId);
 
-    // ✅ Enriquecemos con TMDb ES + poster_path (para que tu Poster() no refetchee)
-    const enriched = await mapLimit(normalized, 10, async (item) => {
-      const tmdbType = item.type === "movie" ? "movie" : "show";
-      const tmdb = await fetchTmdbLocalized({
-        type: tmdbType,
-        tmdbId: item.tmdbId,
-      }).catch(() => null);
+    // En modo progresivo, no bloqueamos la respuesta enriqueciendo cada item
+    // contra TMDb. El cliente carga posters bajo demanda cuando entran en vista.
+    const enriched = enrich
+      ? await mapLimit(normalized, 10, async (item) => {
+          const tmdbType = item.type === "movie" ? "movie" : "show";
+          const tmdb = await fetchTmdbLocalized({
+            type: tmdbType,
+            tmdbId: item.tmdbId,
+          }).catch(() => null);
 
-      return {
-        ...item,
-        title_es: tmdb?.title || null,
-        poster_path: tmdb?.poster_path || null,
-        year: tmdb?.year || item.year || null,
-        detailsHref: detailsHrefFor(item.type, item.tmdbId),
-      };
-    });
+          return {
+            ...item,
+            title_es: tmdb?.title || null,
+            poster_path: tmdb?.poster_path || null,
+            year: tmdb?.year || item.year || null,
+            detailsHref: detailsHrefFor(item.type, item.tmdbId),
+          };
+        })
+      : normalized;
 
     const plays = enriched.length;
     const uniques = new Set(enriched.map((x) => `${x.type}:${x.tmdbId}`)).size;
@@ -243,6 +257,12 @@ export async function GET(request) {
       connected: true,
       items: enriched,
       stats: { plays, uniques, movies, shows },
+      pagination: {
+        page,
+        limit: perPage,
+        returned: enriched.length,
+        hasMore: !fetchAll && lastPageSize >= perPage,
+      },
     });
 
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
