@@ -32,6 +32,7 @@ import {
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchArtworkOverrides } from "@/lib/artworkApi";
+import { formatDashboardAwards } from "@/lib/details/awardsText";
 
 // Constantes para evitar recreación de referencias
 const EMPTY_ARRAY = [];
@@ -759,7 +760,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                 typeof rawAwards === "string" &&
                 rawAwards.trim()
               ) {
-                awards = rawAwards.trim();
+                awards = formatDashboardAwards(rawAwards);
               }
               const r = omdb?.imdbRating;
               if (r && !Number.isNaN(Number(r))) {
@@ -1042,7 +1043,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
             )}
 
             {extras?.awards && (
-              <div className="mt-1 text-[11px] sm:text-xs text-emerald-300 line-clamp-1">
+              <div className="mt-1 text-[10px] sm:text-[11px] leading-tight text-emerald-300">
                 {extras.awards}
               </div>
             )}

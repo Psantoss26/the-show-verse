@@ -29,6 +29,10 @@ import {
   formatVoteCount,
   formatCountShort,
 } from "@/lib/details/formatters";
+import {
+  fetchSeriesGraphRatingsCached,
+  getSeriesGraphSeasonAggregate,
+} from "@/lib/details/seriesGraphRatings";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import {
@@ -646,18 +650,35 @@ export default function SeasonDetailsClient({
   ]);
 
   useEffect(() => {
-    if (imdb || !showImdbId) return;
+    if (imdb?.rating != null) return;
 
     let alive = true;
     const controller = new AbortController();
     const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
-        const nextImdb = await fetchSeasonImdbCached({
+        let nextImdb = null;
+
+        const seriesGraphRatings = await fetchSeriesGraphRatingsCached({
           showId,
-          showImdbId,
-          seasonNumber,
+          title: showName,
           signal: controller.signal,
         });
+        nextImdb = getSeriesGraphSeasonAggregate({
+          ratings: seriesGraphRatings,
+          seasonNumber,
+          showId,
+          title: showName,
+        });
+
+        if (nextImdb?.rating == null && showImdbId) {
+          nextImdb = await fetchSeasonImdbCached({
+            showId,
+            showImdbId,
+            seasonNumber,
+            signal: controller.signal,
+          });
+        }
+
         if (alive) {
           setImdbData(nextImdb);
         }
@@ -672,7 +693,7 @@ export default function SeasonDetailsClient({
       controller.abort();
       cancelSchedule();
     };
-  }, [showId, showImdbId, seasonNumber, imdb]);
+  }, [showId, showImdbId, seasonNumber, imdb, showName]);
 
   // Rate (Trakt)
   const [userRating, setUserRating] = useState(null);

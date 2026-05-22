@@ -30,6 +30,10 @@ import {
   formatVoteCount,
   formatCountShort,
 } from "@/lib/details/formatters";
+import {
+  fetchSeriesGraphRatingsCached,
+  getSeriesGraphEpisodeRating,
+} from "@/lib/details/seriesGraphRatings";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import {
@@ -440,19 +444,37 @@ export default function EpisodeDetailsClient({
   }, [showId, imdbId, seasonNumber, episodeNumber, imdb]);
 
   useEffect(() => {
-    if (imdb?.rating != null || !imdbId) return;
+    if (imdb?.rating != null) return;
 
     let alive = true;
     const controller = new AbortController();
     const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
-        const nextImdb = await fetchEpisodeImdbCached({
+        let nextImdb = null;
+
+        const seriesGraphRatings = await fetchSeriesGraphRatingsCached({
           showId,
-          seasonNumber,
-          episodeNumber,
-          imdbId,
+          title: showName,
           signal: controller.signal,
         });
+        nextImdb = getSeriesGraphEpisodeRating({
+          ratings: seriesGraphRatings,
+          seasonNumber,
+          episodeNumber,
+          showId,
+          title: showName,
+        });
+
+        if (nextImdb?.rating == null && imdbId) {
+          nextImdb = await fetchEpisodeImdbCached({
+            showId,
+            seasonNumber,
+            episodeNumber,
+            imdbId,
+            signal: controller.signal,
+          });
+        }
+
         if (alive) {
           setImdbData(nextImdb);
         }
@@ -467,7 +489,7 @@ export default function EpisodeDetailsClient({
       controller.abort();
       cancelSchedule();
     };
-  }, [showId, seasonNumber, episodeNumber, imdbId, imdb]);
+  }, [showId, seasonNumber, episodeNumber, imdbId, imdb, showName]);
 
   useEffect(() => {
     if (episodeCredits) return;
