@@ -16,7 +16,6 @@ import { getExternalIds, fetchRatedForUser } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { traktGetItemStatus, traktGetScoreboard } from "@/lib/api/traktClient";
 import {
-  Loader2,
   Heart,
   Film,
   FilterX,
@@ -116,6 +115,39 @@ const TRAKT_SCORE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // Persistent score cache - 30 days TTL
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const FAVORITES_CACHE_KEY = "showverse:favorites:items:v1";
+const FAVORITES_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function readFavoritesCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(FAVORITES_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.items)) return null;
+    return {
+      items: parsed.items,
+      ratedItems: Array.isArray(parsed.ratedItems) ? parsed.ratedItems : [],
+      fresh: Date.now() - Number(parsed.t || 0) < FAVORITES_CACHE_TTL_MS,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeFavoritesCache(items, ratedItems = []) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      FAVORITES_CACHE_KEY,
+      JSON.stringify({
+        t: Date.now(),
+        items: Array.isArray(items) ? items : [],
+        ratedItems: Array.isArray(ratedItems) ? ratedItems : [],
+      }),
+    );
+  } catch {}
+}
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
@@ -1214,11 +1246,15 @@ function FavoriteCard({
 // ================== MAIN COMPONENT ==================
 export default function FavoritesClient() {
   const { session, account, hydrated } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState([]);
-  const [ratedItems, setRatedItems] = useState([]);
-  const [imdbScores, setImdbScores] = useState(new Map());
-  const [traktScores, setTraktScores] = useState(new Map());
+  const [loading, setLoading] = useState(() => !readFavoritesCache()?.items);
+  const [items, setItems] = useState(() => readFavoritesCache()?.items || []);
+  const [ratedItems, setRatedItems] = useState(
+    () => readFavoritesCache()?.ratedItems || [],
+  );
+  const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
+  const [traktScores, setTraktScores] = useState(() =>
+    readScoreCache("trakt"),
+  );
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
 
@@ -1303,7 +1339,7 @@ export default function FavoritesClient() {
       }
 
       try {
-        setLoading(true);
+        setLoading(items.length === 0);
 
         // Fetch favorites and rated items in parallel so user_rating
         // is available from the very first render — avoids the flash
@@ -1359,6 +1395,7 @@ export default function FavoritesClient() {
 
           setRatedItems(rated);
           setItems(favoritesWithMeta);
+          writeFavoritesCache(favoritesWithMeta, rated);
         }
       } catch (error) {
         console.error("Error loading favorites:", error);
@@ -1969,12 +2006,7 @@ export default function FavoritesClient() {
   };
 
   if (!hydrated) {
-    // Still checking authentication, show nothing or loader
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
-      </div>
-    );
+    return <div className="min-h-screen bg-[#050505]" />;
   }
 
   if (!session || !account) {
@@ -2028,58 +2060,48 @@ export default function FavoritesClient() {
               </p>
             </div>
 
-            <motion.div
-              className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-red-400">
-                  <Heart className="w-4 h-4 md:w-5 md:h-5 fill-red-400" />
+            {!loading && (
+              <motion.div
+                className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
+                <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                  <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-red-400">
+                    <Heart className="w-4 h-4 md:w-5 md:h-5 fill-red-400" />
+                  </div>
+                  <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                    {stats.total}
+                  </div>
+                  <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                    Total
+                  </div>
                 </div>
-                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
-                  {loading ? (
-                    <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
-                  ) : (
-                    stats.total
-                  )}
+                <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                  <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
+                    <Film className="w-4 h-4 md:w-5 md:h-5" />
+                  </div>
+                  <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                    {stats.movies}
+                  </div>
+                  <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                    Películas
+                  </div>
                 </div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
-                  Total
+                <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                  <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400">
+                    <TvGlyph className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+                  </div>
+                  <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                    {stats.shows}
+                  </div>
+                  <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                    Series
+                  </div>
                 </div>
-              </div>
-              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
-                  <Film className="w-4 h-4 md:w-5 md:h-5" />
-                </div>
-                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
-                  {loading ? (
-                    <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
-                  ) : (
-                    stats.movies
-                  )}
-                </div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
-                  Películas
-                </div>
-              </div>
-              <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400">
-                  <TvGlyph className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
-                </div>
-                <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
-                  {loading ? (
-                    <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
-                  ) : (
-                    stats.shows
-                  )}
-                </div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
-                  Series
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            )}
           </div>
         </motion.header>
 
@@ -2803,12 +2825,7 @@ export default function FavoritesClient() {
         {/* Scores load silently in background - no loading indicator */}
 
         {/* Content */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
-            <p className="text-zinc-500 text-sm">Cargando favoritos...</p>
-          </div>
-        ) : sorted.length === 0 ? (
+        {loading ? null : sorted.length === 0 ? (
           <motion.div
             className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
             initial={{ opacity: 0, scale: 0.95 }}
