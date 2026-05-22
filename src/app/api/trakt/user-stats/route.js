@@ -68,12 +68,22 @@ async function getTMDbCredits(tmdbId, type) {
   return { cast: [], crew: [] };
 }
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const searchParams = request?.nextUrl?.searchParams || new URLSearchParams();
+    const includePeople = searchParams.get("includePeople") !== "0";
+    const peopleOnly = searchParams.get("peopleOnly") === "1";
+    const localizeTitles = searchParams.get("localizeTitles") !== "0";
+    const historyLimitRaw = Number(searchParams.get("historyLimit") || 10000);
+    const historyLimit = Number.isFinite(historyLimitRaw)
+      ? Math.max(0, Math.min(10000, Math.floor(historyLimitRaw)))
+      : 10000;
+
     const cookieStore = await cookies();
 
     // ✅ AUTH: Usar la lógica centralizada que refresca tokens si es necesario
-    const { token, refreshedTokens, shouldClear } = await getValidTraktToken(cookieStore);
+    const { token, refreshedTokens, shouldClear } =
+      await getValidTraktToken(cookieStore);
 
     if (!token) {
       const res = NextResponse.json(
@@ -108,61 +118,90 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Obtener estadísticas del usuario
-    const statsRes = await fetch(`${TRAKT_API}/users/${username}/stats`, {
-      headers: traktHeaders(accessToken),
-    });
+    const headers = traktHeaders(accessToken);
+    const statsPromise = peopleOnly
+      ? Promise.resolve(null)
+      : fetch(`${TRAKT_API}/users/${username}/stats`, { headers });
+    const watchedMoviesPromise = fetch(
+      `${TRAKT_API}/users/${username}/watched/movies?extended=full`,
+      { headers },
+    );
+    const watchedShowsPromise = peopleOnly
+      ? Promise.resolve(null)
+      : fetch(`${TRAKT_API}/users/${username}/watched/shows?extended=full`, {
+          headers,
+        });
+    const historyPromise =
+      peopleOnly || historyLimit <= 0
+        ? Promise.resolve(null)
+        : fetch(
+            `${TRAKT_API}/users/${username}/history?limit=${historyLimit}`,
+            { headers },
+          );
 
-    if (!statsRes.ok) {
+    const [statsRes, watchedMoviesRes, watchedShowsRes, historyRes] =
+      await Promise.all([
+        statsPromise,
+        watchedMoviesPromise,
+        watchedShowsPromise,
+        historyPromise,
+      ]);
+
+    if (!peopleOnly && !statsRes?.ok) {
       return NextResponse.json(
         { error: "Failed to fetch user stats" },
-        { status: statsRes.status },
+        { status: statsRes?.status || 500 },
       );
     }
 
-    const stats = await statsRes.json();
+    const [stats, watchedMovies, watchedShows, history] = await Promise.all([
+      statsRes?.ok ? statsRes.json() : Promise.resolve(null),
+      watchedMoviesRes.ok ? watchedMoviesRes.json() : Promise.resolve([]),
+      watchedShowsRes?.ok ? watchedShowsRes.json() : Promise.resolve([]),
+      historyRes?.ok ? historyRes.json() : Promise.resolve([]),
+    ]);
 
-    // Obtener películas más vistas
-    const watchedMoviesRes = await fetch(
-      `${TRAKT_API}/users/${username}/watched/movies?extended=full`,
-      {
-        headers: traktHeaders(accessToken),
-      },
-    );
+    const moviesWithSpanishTitles = localizeTitles
+      ? await Promise.all(
+          watchedMovies.slice(0, 20).map(async (item) => {
+            const tmdbId = item.movie?.ids?.tmdb;
+            if (tmdbId) {
+              const spanishTitle = await getTMDbTitle(tmdbId, "movie");
+              if (spanishTitle) {
+                return {
+                  ...item,
+                  movie: {
+                    ...item.movie,
+                    title: spanishTitle,
+                  },
+                };
+              }
+            }
+            return item;
+          }),
+        )
+      : watchedMovies.slice(0, 20);
 
-    const watchedMovies = watchedMoviesRes.ok
-      ? await watchedMoviesRes.json()
-      : [];
-
-    // Enriquecer películas con títulos en español
-    const moviesWithSpanishTitles = await Promise.all(
-      watchedMovies.slice(0, 20).map(async (item) => {
-        const tmdbId = item.movie?.ids?.tmdb;
-        if (tmdbId) {
-          const spanishTitle = await getTMDbTitle(tmdbId, "movie");
-          if (spanishTitle) {
-            return {
-              ...item,
-              movie: {
-                ...item.movie,
-                title: spanishTitle,
-              },
-            };
-          }
-        }
-        return item;
-      }),
-    );
-
-    // Obtener series más vistas
-    const watchedShowsRes = await fetch(
-      `${TRAKT_API}/users/${username}/watched/shows?extended=full`,
-      {
-        headers: traktHeaders(accessToken),
-      },
-    );
-
-    const watchedShows = watchedShowsRes.ok ? await watchedShowsRes.json() : [];
+    const showsWithSpanishTitles = localizeTitles
+      ? await Promise.all(
+          watchedShows.slice(0, 20).map(async (item) => {
+            const tmdbId = item.show?.ids?.tmdb;
+            if (tmdbId) {
+              const spanishTitle = await getTMDbTitle(tmdbId, "tv");
+              if (spanishTitle) {
+                return {
+                  ...item,
+                  show: {
+                    ...item.show,
+                    title: spanishTitle,
+                  },
+                };
+              }
+            }
+            return item;
+          }),
+        )
+      : watchedShows.slice(0, 20);
 
     // Calcular estadísticas de géneros a partir de todo el historial visto
     const genreCounts = {};
@@ -181,43 +220,12 @@ export async function GET() {
       });
     });
 
-    // Enriquecer series con títulos en español
-    const showsWithSpanishTitles = await Promise.all(
-      watchedShows.slice(0, 20).map(async (item) => {
-        const tmdbId = item.show?.ids?.tmdb;
-        if (tmdbId) {
-          const spanishTitle = await getTMDbTitle(tmdbId, "tv");
-          if (spanishTitle) {
-            return {
-              ...item,
-              show: {
-                ...item.show,
-                title: spanishTitle,
-              },
-            };
-          }
-        }
-        return item;
-      }),
-    );
-
-    // Obtener historial reciente para análisis temporal
-    const historyRes = await fetch(
-      `${TRAKT_API}/users/${username}/history?limit=10000`,
-      {
-        headers: traktHeaders(accessToken),
-      },
-    );
-
-    const history = historyRes.ok ? await historyRes.json() : [];
-
     // Obtener créditos (actores y directores) de las películas más vistas
     const actorCount = {};
     const directorCount = {};
 
-    const creditsPromises = moviesWithSpanishTitles
-      .slice(0, 50)
-      .map(async (item) => {
+    if (includePeople) {
+      const creditsPromises = watchedMovies.slice(0, 50).map(async (item) => {
         const tmdbId = item.movie?.ids?.tmdb;
         if (tmdbId) {
           const credits = await getTMDbCredits(tmdbId, "movie");
@@ -248,7 +256,8 @@ export async function GET() {
         }
       });
 
-    await Promise.all(creditsPromises);
+      await Promise.all(creditsPromises);
+    }
 
     const topActors = Object.entries(actorCount)
       .map(([id, data]) => ({ id: parseInt(id), ...data }))
@@ -260,16 +269,21 @@ export async function GET() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
-    const response = NextResponse.json({
-      username,
-      stats,
-      genres: genreCounts,
-      watchedMovies: moviesWithSpanishTitles,
-      watchedShows: showsWithSpanishTitles,
-      history,
-      topActors,
-      topDirectors,
-    });
+    const payload = peopleOnly
+      ? { username, topActors, topDirectors }
+      : {
+          username,
+          stats,
+          genres: genreCounts,
+          watchedMovies: moviesWithSpanishTitles,
+          watchedShows: showsWithSpanishTitles,
+          history,
+          historyLimit,
+          topActors,
+          topDirectors,
+        };
+
+    const response = NextResponse.json(payload);
 
     if (refreshedTokens) {
       setTraktCookies(response, refreshedTokens);
