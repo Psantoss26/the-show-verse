@@ -20,11 +20,14 @@ export const writeOmdbCache = (imdbId, patch) => {
     if (!imdbId || typeof window === 'undefined') return
     try {
         const prev = readOmdbCache(imdbId) || {}
+        const hasPatchValue = (key) =>
+            Object.prototype.hasOwnProperty.call(patch || {}, key)
         const next = {
             t: Date.now(),
             imdbRating: patch?.imdbRating ?? prev?.imdbRating ?? null,
             imdbVotes: patch?.imdbVotes ?? prev?.imdbVotes ?? null,
-            awards: patch?.awards ?? prev?.awards ?? null,
+            awards: hasPatchValue('awards') ? patch.awards : prev?.awards ?? null,
+            awardsFetched: patch?.awardsFetched ?? prev?.awardsFetched ?? false,
             rtScore: patch?.rtScore ?? prev?.rtScore ?? null,
             mcScore: patch?.mcScore ?? prev?.mcScore ?? null
         }

@@ -665,10 +665,7 @@ function formatAwardCategory(category, groupName) {
   return formatCommonAwardCategory(raw) || raw;
 }
 
-function AwardsPanel({ awards, details }) {
-  const wins = Number(details?.wins || 0);
-  const nominations = Number(details?.nominations || 0);
-
+function AwardsPanel({ awards }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-5 sm:p-6">
       <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
@@ -682,26 +679,8 @@ function AwardsPanel({ awards, details }) {
             <h3 className="text-lg font-bold text-white mb-2">
               Reconocimientos
             </h3>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-yellow-400/20 bg-black/20 p-4">
-                <div className="text-3xl font-black tracking-tight text-yellow-200">
-                  {wins}
-                </div>
-                <div className="mt-1 text-xs font-bold uppercase tracking-wide text-yellow-100/75">
-                  {wins === 1 ? "Premio ganado" : "Premios ganados"}
-                </div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                <div className="text-3xl font-black tracking-tight text-zinc-100">
-                  {nominations}
-                </div>
-                <div className="mt-1 text-xs font-bold uppercase tracking-wide text-zinc-400">
-                  {nominations === 1 ? "Nominación" : "Nominaciones"}
-                </div>
-              </div>
-            </div>
             {awards && (
-              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              <p className="text-base leading-relaxed text-zinc-200">
                 {awards}
               </p>
             )}
@@ -710,6 +689,12 @@ function AwardsPanel({ awards, details }) {
       </div>
     </div>
   );
+}
+
+function normalizeOmdbAwards(value) {
+  const text = String(value || "").trim();
+  if (!text || text === "N/A") return null;
+  return text;
 }
 
 function AwardCard({ item }) {
@@ -5260,7 +5245,8 @@ export default function DetailsClient({
   // =====================================================================
   // DATOS EXTRA: IMDb, Rotten Tomatoes, Metacritic y premios
   // OMDb aporta ratings externos (IMDb, RT, MC) con cache en localStorage.
-  // TMDb aporta premios y nominaciones detalladas.
+  // OMDb aporta tambien el resumen textual de premios que se muestra en la ficha.
+  // TMDb aporta premios detallados para la seccion independiente de carrusel.
   // =====================================================================
 
   const [extras, setExtras] = useState({
@@ -5298,6 +5284,7 @@ export default function DetailsClient({
           ...prev,
           imdbRating: null,
           imdbVotes: null,
+          awards: null,
           rtScore: null,
           mcScore: null,
         }));
@@ -5323,12 +5310,14 @@ export default function DetailsClient({
           cached?.imdbVotes != null ||
           cached?.rtScore != null ||
           cached?.mcScore != null;
+        const hasCachedAwards = !!cached?.awardsFetched;
 
-        if (hasCachedScores) {
+        if (hasCachedScores || hasCachedAwards) {
           setExtras((prev) => ({
             ...prev,
             imdbRating: cached?.imdbRating ?? null,
             imdbVotes: cached?.imdbVotes ?? null,
+            awards: normalizeOmdbAwards(cached?.awards),
             rtScore: cached?.rtScore ?? null,
             mcScore: cached?.mcScore ?? null,
           }));
@@ -5338,7 +5327,8 @@ export default function DetailsClient({
         if (
           cached?.fresh &&
           cached?.imdbRating != null &&
-          cached?.imdbVotes != null
+          cached?.imdbVotes != null &&
+          cached?.awardsFetched
         )
           return;
 
@@ -5352,6 +5342,7 @@ export default function DetailsClient({
             : null;
 
         const { rtScore, mcScore } = extractOmdbExtraScores(omdb);
+        const awards = normalizeOmdbAwards(omdb?.Awards);
         const votes =
           omdb?.imdbVotes && omdb.imdbVotes !== "N/A"
             ? Number(String(omdb.imdbVotes).replace(/,/g, ""))
@@ -5362,6 +5353,7 @@ export default function DetailsClient({
           ...prev,
           imdbRating: Number.isFinite(imdbRating) ? imdbRating : null,
           imdbVotes: Number.isFinite(votes) ? votes : null,
+          awards,
           rtScore,
           mcScore,
         }));
@@ -5369,6 +5361,8 @@ export default function DetailsClient({
         writeOmdbCache(imdbId, {
           imdbRating: Number.isFinite(imdbRating) ? imdbRating : null,
           imdbVotes: Number.isFinite(votes) ? votes : null,
+          awards,
+          awardsFetched: true,
           rtScore,
           mcScore,
         });
@@ -5378,6 +5372,7 @@ export default function DetailsClient({
             ...prev,
             imdbRating: null,
             imdbVotes: null,
+            awards: null,
             rtScore: null,
             mcScore: null,
           }));
@@ -5396,13 +5391,12 @@ export default function DetailsClient({
 
 
 
-  // Carga premios y nominaciones desde TMDb.
+  // Carga premios detallados desde TMDb para la seccion independiente.
   useEffect(() => {
     let abort = false;
 
     setExtras((prev) => ({
       ...prev,
-      awards: null,
       awardsDetails: null,
     }));
 
@@ -5412,7 +5406,6 @@ export default function DetailsClient({
 
       setExtras((prev) => ({
         ...prev,
-        awards: awardsData?.summary || null,
         awardsDetails: awardsData || null,
       }));
     };
@@ -8638,10 +8631,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           exit={{ opacity: 0, y: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <AwardsPanel
-                            awards={extras.awards}
-                            details={extras.awardsDetails}
-                          />
+                          <AwardsPanel awards={extras.awards} />
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -8828,7 +8818,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
 
                 {/* ===== TAB 4: PREMIOS ===== */}
-                {/* Muestra los reconocimientos y premios obtenidos desde TMDb */}
+                {/* Muestra el resumen de premios devuelto por OMDb */}
                 {activeTab === "awards" && extras.awards && (
                   <motion.div
                     key="awards-backdrop"
@@ -8837,10 +8827,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <AwardsPanel
-                      awards={extras.awards}
-                      details={extras.awardsDetails}
-                    />
+                    <AwardsPanel awards={extras.awards} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -10031,7 +10018,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           </div>
                           <div>
                             <h3 className="text-base font-bold leading-tight text-white">
-                              Pulso de la comunidad de Trakt
+                              Opiniones de la comunidad de Trakt
                             </h3>
                             <p className="text-xs font-medium text-zinc-400">
                               Resumen automático basado en comentarios sobre{" "}
