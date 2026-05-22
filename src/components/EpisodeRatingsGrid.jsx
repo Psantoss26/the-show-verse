@@ -120,57 +120,31 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
         </div>
 
         <div className="space-y-2">
-          {activeData.imdbVal != null && (
+          {activeData.seriesGraphVal != null && (
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
-                <img src="/logo-IMDb.png" alt="IMDb" className="h-3 w-auto" />
+                <img
+                  src="/logoseriesgraph.png"
+                  alt="SeriesGraph"
+                  className="h-3 w-auto"
+                />
                 <span className="text-[10px] uppercase tracking-wide text-yellow-300 font-bold">
-                  IMDb
+                  SeriesGraph
                 </span>
               </div>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-[14px] font-bold">
-                  {activeData.format1(activeData.imdbVal)}
+                  {activeData.format1(activeData.seriesGraphVal)}
                 </span>
-                {activeData.imdbVotesStr && (
+                {activeData.seriesGraphVotesStr && (
                   <span className="text-[10px] text-zinc-400">
-                    {activeData.imdbVotesStr} votos
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeData.tmdbVal != null && (
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1">
-                <img src="/logo-TMDb.png" alt="TMDb" className="h-3 w-auto" />
-                <span className="text-[10px] uppercase tracking-wide text-blue-300 font-bold">
-                  TMDb
-                </span>
-              </div>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-[14px] font-bold">
-                  {activeData.format1(activeData.tmdbVal)}
-                </span>
-                {activeData.tmdbVotesStr && (
-                  <span className="text-[10px] text-zinc-400">
-                    {activeData.tmdbVotesStr} votos
+                    {activeData.seriesGraphVotesStr} votos
                   </span>
                 )}
               </div>
             </div>
           )}
         </div>
-
-        {activeData.avgVal != null && (
-          <div className="mt-2 pt-2 border-t border-white/20 text-[11px] flex justify-between gap-4 items-center">
-            <span className="text-zinc-400">Media global</span>
-            <span className="font-bold text-white text-[13px]">
-              {activeData.format1(activeData.avgVal)}
-            </span>
-          </div>
-        )}
       </div>
     </div>,
     document.body,
@@ -180,7 +154,7 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
 export default function EpisodeRatingsGrid({
   ratings,
   showId, // TMDb show id para poder navegar
-  initialSource = "imdb", // compat
+  initialSource = "seriesgraph", // compat
   density = "compact",
   fillMissingWithTmdb = false,
   fallbackSource = "tmdb",
@@ -303,12 +277,22 @@ export default function EpisodeRatingsGrid({
                 isUnaired = true;
             }
 
+            const seriesGraphRating = toRatingNumber(
+              ep.seriesGraphRating ??
+                ep.seriesgraphRating ??
+                ep.series_graph_rating ??
+                ep.seriesGraph ??
+                ep.seriesgraph ??
+                (ep.source === "seriesgraph" ? ep.vote_average : null),
+            );
             let tmdbRating = toRatingNumber(
               ep.tmdbRating ?? ep.tmdb ?? ep.vote_average,
             );
             let imdbRating = toRatingNumber(ep.imdbRating ?? ep.imdb);
 
-            let displayRating = imdbRating;
+            let displayRating = seriesGraphRating;
+            if (displayRating == null && initialSource === "imdb")
+              displayRating = imdbRating;
             if (displayRating == null && fallbackSource === "tmdb")
               displayRating = tmdbRating;
             if (displayRating == null && fillMissingWithTmdb)
@@ -320,6 +304,14 @@ export default function EpisodeRatingsGrid({
               displayRating = null;
             }
 
+            const seriesGraphVotes = toNumberSafe(
+              ep.seriesGraphVotes ??
+                ep.seriesgraphVotes ??
+                ep.series_graph_votes ??
+                ep.num_votes ??
+                ep.votes ??
+                (ep.source === "seriesgraph" ? ep.vote_count : null),
+            );
             const tmdbVotes = toNumberSafe(
               ep.tmdbVotes ?? ep.tmdb_votes ?? ep.vote_count,
             );
@@ -333,15 +325,20 @@ export default function EpisodeRatingsGrid({
             return {
               episodeNumber,
               name: ep.name || "",
+              seriesGraphRating,
               tmdbRating,
               imdbRating,
               displayRating,
+              seriesGraphVotes,
               tmdbVotes,
               imdbVotes,
               airDate: airDateStr,
               isUnaired,
               source:
                 ep.source ||
+                (seriesGraphRating != null
+                  ? "seriesgraph"
+                  : null) ||
                 (imdbRating != null
                   ? "imdb"
                   : tmdbRating != null
@@ -426,7 +423,13 @@ export default function EpisodeRatingsGrid({
       maxEpisodes: maxEp,
       seasonAverages: seasonAveragesMap,
     };
-  }, [ratings, shouldFlatten, fillMissingWithTmdb, fallbackSource]);
+  }, [
+    ratings,
+    shouldFlatten,
+    fillMissingWithTmdb,
+    fallbackSource,
+    initialSource,
+  ]);
 
   const singleSeasonView =
     shouldFlatten && seasonsSorted.length === 1 && totalSeasonsEstimate > 1;
@@ -478,20 +481,14 @@ export default function EpisodeRatingsGrid({
     if (!ep || ep.isUnaired) return null;
 
     const hasData =
-      ep.imdbRating != null ||
-      ep.tmdbRating != null ||
+      ep.seriesGraphRating != null ||
       ep.displayRating != null;
     if (!hasData) return null;
 
     const titleText = ep.name || `Episodio ${episodeNumber}`;
-    const imdbVal = ep.imdbRating;
-    const tmdbVal = ep.tmdbRating;
-    const imdbVotesStr = ep.imdbVotes ? ep.imdbVotes.toLocaleString() : null;
-    const tmdbVotesStr = ep.tmdbVotes ? ep.tmdbVotes.toLocaleString() : null;
-
-    const nums = [imdbVal, tmdbVal].filter((v) => typeof v === "number");
-    const avgVal = nums.length
-      ? Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1))
+    const seriesGraphVal = ep.seriesGraphRating ?? ep.displayRating;
+    const seriesGraphVotesStr = ep.seriesGraphVotes
+      ? ep.seriesGraphVotes.toLocaleString()
       : null;
 
     const seasonInfo = singleSeasonView
@@ -501,11 +498,8 @@ export default function EpisodeRatingsGrid({
     return {
       titleText,
       seasonInfo,
-      imdbVal,
-      tmdbVal,
-      imdbVotesStr,
-      tmdbVotesStr,
-      avgVal,
+      seriesGraphVal,
+      seriesGraphVotesStr,
       format1,
     };
   };
