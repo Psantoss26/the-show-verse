@@ -10594,6 +10594,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <EpisodeRatingsGrid
                             ratings={ratings}
                             showId={Number(id)}
+                            tmdbSeasons={data?.seasons || []}
                             density="compact"
                           />
                         )}

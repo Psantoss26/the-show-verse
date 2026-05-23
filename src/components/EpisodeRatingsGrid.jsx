@@ -154,6 +154,7 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
 export default function EpisodeRatingsGrid({
   ratings,
   showId, // TMDb show id para poder navegar
+  tmdbSeasons = [],
   initialSource = "seriesgraph", // compat
   density = "compact",
   fillMissingWithTmdb = false,
@@ -449,6 +450,103 @@ export default function EpisodeRatingsGrid({
     return Array.from({ length: maxEpisodes }, (_, i) => i + 1);
   }, [maxEpisodes]);
 
+  const tmdbSeasonsSorted = useMemo(() => {
+    return (Array.isArray(tmdbSeasons) ? tmdbSeasons : [])
+      .map((season) => {
+        const seasonNumber = Number(season?.season_number);
+        const episodeCount = Number(season?.episode_count || 0);
+        if (!Number.isFinite(seasonNumber) || seasonNumber <= 0) return null;
+        if (!Number.isFinite(episodeCount) || episodeCount <= 0) return null;
+        return {
+          seasonNumber,
+          episodeCount,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.seasonNumber - b.seasonNumber);
+  }, [tmdbSeasons]);
+
+  const visualEpisodeOrdinal = useCallback(
+    (seasonNumber, episodeNumber) => {
+      let ordinal = Number(episodeNumber || 0);
+      if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
+
+      const currentSeasonNumber = Number(seasonNumber);
+      for (const season of seasonsSorted) {
+        if (Number(season?.season_number) >= currentSeasonNumber) break;
+
+        const maxEpisode = (season?.episodes || []).reduce((max, ep) => {
+          const epNumber = Number(ep?.episodeNumber || 0);
+          return Number.isFinite(epNumber) ? Math.max(max, epNumber) : max;
+        }, 0);
+
+        ordinal += maxEpisode || Number(season?.episodes?.length || 0);
+      }
+
+      return ordinal;
+    },
+    [seasonsSorted],
+  );
+
+  const mapOrdinalToTmdbEpisode = useCallback(
+    (ordinal) => {
+      if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
+
+      let remaining = ordinal;
+      for (const season of tmdbSeasonsSorted) {
+        if (remaining <= season.episodeCount) {
+          return {
+            seasonNumber: season.seasonNumber,
+            episodeNumber: remaining,
+          };
+        }
+        remaining -= season.episodeCount;
+      }
+
+      return null;
+    },
+    [tmdbSeasonsSorted],
+  );
+
+  const resolveEpisodeRouteTarget = useCallback(
+    (ep, seasonNumber, episodeNumber) => {
+      const visualSeason = Number(seasonNumber);
+      const visualEpisode = Number(episodeNumber);
+      if (!Number.isFinite(visualSeason) || !Number.isFinite(visualEpisode)) {
+        return null;
+      }
+
+      const directSeason = tmdbSeasonsSorted.find(
+        (season) => season.seasonNumber === visualSeason,
+      );
+      if (directSeason && visualEpisode <= directSeason.episodeCount) {
+        return {
+          seasonNumber: visualSeason,
+          episodeNumber: visualEpisode,
+        };
+      }
+
+      const ordinal = visualEpisodeOrdinal(visualSeason, visualEpisode);
+      const mapped = mapOrdinalToTmdbEpisode(ordinal);
+      if (mapped) return mapped;
+
+      const originalSeason = Number(ep?._origSeasonNumber);
+      const originalEpisode = Number(ep?._origEpisodeNumber);
+      if (Number.isFinite(originalSeason) && Number.isFinite(originalEpisode)) {
+        return {
+          seasonNumber: originalSeason,
+          episodeNumber: originalEpisode,
+        };
+      }
+
+      return {
+        seasonNumber: visualSeason,
+        episodeNumber: visualEpisode,
+      };
+    },
+    [mapOrdinalToTmdbEpisode, tmdbSeasonsSorted, visualEpisodeOrdinal],
+  );
+
   const format1 = (v) => {
     if (v == null) return null;
     const num = Math.round(Number(v) * 10) / 10;
@@ -547,13 +645,14 @@ export default function EpisodeRatingsGrid({
       if (!showId) return;
       if (!ep || ep.isUnaired) return;
 
-      const s = ep?._origSeasonNumber ?? seasonNumber;
-      const e = ep?._origEpisodeNumber ?? episodeNumber;
+      const target = resolveEpisodeRouteTarget(ep, seasonNumber, episodeNumber);
+      const s = target?.seasonNumber;
+      const e = target?.episodeNumber;
       if (s == null || e == null) return;
 
       router.push(`/details/tv/${showId}/season/${s}/episode/${e}`);
     },
-    [router, showId],
+    [resolveEpisodeRouteTarget, router, showId],
   );
 
   const gridSize = seasonsSorted.length * maxEpisodes;
