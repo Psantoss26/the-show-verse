@@ -1,4 +1,4 @@
-import ProfileClient from "./ProfileClient";
+import StatsClient from "../stats/StatsClient";
 
 export const metadata = {
   title: "Mi Perfil · The Show Verse",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function ProfilePage() {
-  return <ProfileClient />;
+  return <StatsClient />;
 }

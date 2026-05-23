@@ -16,10 +16,12 @@ import {
   Heart,
   Users,
   Target,
-  ArrowUp,
   Timer,
   Library,
   MessageSquare,
+  MapPin,
+  BookMarked,
+  ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -69,6 +71,33 @@ const CHART_THEME = {
   grid: "#27272a", // zinc-800
   tooltipBg: "#18181b",
   tooltipBorder: "#27272a",
+};
+
+const tmdbImg = (path, size = "w342") =>
+  path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
+
+const fmtDate = (iso) => {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const fmtDateShort = (iso) => {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
+  });
+};
+
+const starColor = (rating) => {
+  if (rating >= 9) return COLORS.yellow;
+  if (rating >= 7) return COLORS.emerald;
+  if (rating >= 5) return COLORS.indigo;
+  return COLORS.red;
 };
 
 const COLOR_STYLES = {
@@ -291,20 +320,30 @@ function KPICard({
   );
 }
 
-function SectionTitle({ icon: Icon, title, subtitle, color = "indigo" }) {
+function SectionTitle({ icon: Icon, title, subtitle, color = "indigo", href }) {
   const styles = COLOR_STYLES[color] || COLOR_STYLES.indigo;
 
   return (
-    <div className="flex items-center gap-3 mb-6">
-      <div
-        className={`p-2 rounded-lg border ${styles.iconBg} border-white/10 ${styles.iconText}`}
-      >
-        <Icon className="w-5 h-5" />
+    <div className="flex items-center justify-between gap-4 mb-6">
+      <div className="flex items-center gap-3">
+        <div
+          className={`p-2 rounded-lg border ${styles.iconBg} border-white/10 ${styles.iconText}`}
+        >
+          <Icon className="w-5 h-5" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-white">{title}</h2>
+          {subtitle && <p className="text-sm text-zinc-500">{subtitle}</p>}
+        </div>
       </div>
-      <div>
-        <h2 className="text-xl font-bold text-white">{title}</h2>
-        {subtitle && <p className="text-sm text-zinc-500">{subtitle}</p>}
-      </div>
+      {href && (
+        <Link
+          href={href}
+          className="flex items-center gap-1 text-xs text-zinc-500 transition-colors hover:text-white"
+        >
+          Ver todo <ChevronRight className="h-3 w-3" />
+        </Link>
+      )}
     </div>
   );
 }
@@ -343,15 +382,245 @@ function CustomTooltip({ active, payload, label, formatter }) {
   return null;
 }
 
+function ProfileHero({ user }) {
+  if (!user) {
+    return (
+      <div className="flex items-center gap-5">
+        <div className="h-24 w-24 rounded-3xl bg-zinc-900/50 animate-pulse" />
+        <div className="space-y-3">
+          <div className="h-10 w-64 rounded-xl bg-zinc-900/50 animate-pulse" />
+          <div className="h-4 w-44 rounded-lg bg-zinc-900/40 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  const avatarUrl = user?.avatarUrl || null;
+  const displayName = user.name || user.username || "Usuario";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.1 }}
+      className="flex min-w-0 items-center gap-5"
+    >
+      <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-3xl ring-2 ring-indigo-500/35 shadow-2xl shadow-indigo-500/10 sm:h-28 sm:w-28">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
+            <span className="text-4xl font-black text-white">
+              {displayName[0]?.toUpperCase() || "?"}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="mb-2 flex items-center gap-3">
+          <div className="h-px w-12 bg-indigo-500" />
+          <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">
+            Tu cuenta
+          </span>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h1 className="min-w-0 truncate text-4xl font-black tracking-tighter text-white md:text-6xl">
+            {displayName}
+            <span className="text-indigo-500">.</span>
+          </h1>
+          {user.vip && (
+            <span className="rounded-full border border-yellow-500/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-black uppercase text-yellow-400">
+              VIP
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm font-medium text-zinc-500">@{user.username}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+          {user.location && (
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              {user.location}
+            </span>
+          )}
+          {user.joined_at && (
+            <span className="flex items-center gap-1">
+              <CalendarIcon className="h-3 w-3" />
+              Desde {fmtDate(user.joined_at)}
+            </span>
+          )}
+        </div>
+        {user.about && (
+          <p className="mt-2 line-clamp-1 max-w-lg text-sm text-zinc-400">
+            {user.about}
+          </p>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function PosterCard({ item, showRating = false, dateField = "watched_at" }) {
+  const [err, setErr] = useState(false);
+  const src = tmdbImg(item.poster_path, "w185");
+
+  return (
+    <Link
+      href={item.detailsHref || "#"}
+      className="group relative block w-28 flex-shrink-0 overflow-hidden rounded-xl border border-transparent bg-neutral-800/80 shadow-lg transition-all duration-300 transform-gpu hover:-translate-y-1 hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25"
+      title={item.title}
+    >
+      <div className="relative aspect-[2/3] overflow-hidden">
+        {src && !err ? (
+          <img
+            src={src}
+            alt={item.title}
+            className="h-full w-full object-cover grayscale-[18%] transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0"
+            onError={() => setErr(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            {item.type === "movie" ? (
+              <Film className="h-8 w-8 text-zinc-600" />
+            ) : (
+              <Tv className="h-8 w-8 text-zinc-600" />
+            )}
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 transition-opacity duration-300 group-hover:opacity-90" />
+        {showRating && item.rating && (
+          <div
+            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-xs font-black text-white shadow-lg"
+            style={{ background: starColor(item.rating) }}
+          >
+            {item.rating}
+          </div>
+        )}
+        <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <p className="truncate text-xs font-extrabold leading-tight text-white">
+            {item.title}
+          </p>
+          <p className="text-[10px] leading-tight text-zinc-300">
+            {fmtDateShort(item[dateField])}
+          </p>
+          {item.episode && (
+            <p className="text-[10px] leading-tight text-zinc-400">
+              T{item.episode.season}:E{item.episode.number}
+            </p>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function RankedPosterCard({ item, rank, type }) {
+  const media = type === "movie" ? item?.movie : item?.show;
+  const tmdbId = media?.ids?.tmdb;
+  const title = media?.title || "Sin título";
+  const year = media?.year || "";
+  const plays = item?.plays || 0;
+  const posterPath = media?.poster_path || null;
+  const href = tmdbId
+    ? `/details/${type === "movie" ? "movie" : "tv"}/${tmdbId}`
+    : "#";
+  const src = tmdbImg(posterPath, "w342");
+
+  return (
+    <Link
+      href={href}
+      className="group relative block overflow-hidden rounded-xl border border-transparent bg-neutral-800/80 shadow-lg transition-all duration-300 transform-gpu hover:-translate-y-1 hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25"
+      title={title}
+    >
+      <div className="relative aspect-[2/3] overflow-hidden">
+        {src ? (
+          <img
+            src={src}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover grayscale-[18%] transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-500">
+            {type === "movie" ? (
+              <Film className="h-9 w-9 opacity-60" />
+            ) : (
+              <Tv className="h-9 w-9 opacity-60" />
+            )}
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 transition-opacity duration-300 group-hover:opacity-90" />
+
+        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <span className="rounded-md border border-yellow-500/30 bg-yellow-500/20 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-yellow-300 shadow-sm backdrop-blur-md">
+            #{rank}
+          </span>
+          <span className="rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-zinc-200 backdrop-blur-md">
+            {plays.toLocaleString("es-ES")} vistas
+          </span>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 p-2.5 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 sm:p-3">
+          <p className="line-clamp-2 text-[11px] font-extrabold leading-tight text-white sm:text-sm">
+            {title}
+          </p>
+          {year && (
+            <p className="mt-0.5 text-[10px] leading-tight text-zinc-300 sm:text-xs">
+              {year}
+            </p>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function WatchlistCard({ item }) {
+  const src = tmdbImg(item.poster_path, "w92");
+
+  return (
+    <Link
+      href={item.detailsHref || "#"}
+      className="group flex items-center gap-3 rounded-2xl border border-white/5 bg-zinc-800/40 p-3 transition-all hover:border-white/10 hover:bg-zinc-800/80"
+    >
+      <div className="h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-700">
+        {src ? (
+          <img src={src} alt={item.title} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            {item.type === "movie" ? (
+              <Film className="h-4 w-4 text-zinc-500" />
+            ) : (
+              <Tv className="h-4 w-4 text-zinc-500" />
+            )}
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-white transition-colors group-hover:text-indigo-400">
+          {item.title}
+        </p>
+        <p className="text-xs text-zinc-500">
+          {item.year} · {item.type === "movie" ? "Película" : "Serie"}
+        </p>
+      </div>
+      <ChevronRight className="h-4 w-4 flex-shrink-0 text-zinc-600 transition-colors group-hover:text-white" />
+    </Link>
+  );
+}
+
 // -----------------------------------------------------------------------------
 // MAIN COMPONENT
 // -----------------------------------------------------------------------------
-export default function StatsClient() {
+export default function StatsClient({ connectNext = "/profile" }) {
   const [loading, setLoading] = useState(true);
   const [peopleLoading, setPeopleLoading] = useState(false);
   const [peopleLoaded, setPeopleLoaded] = useState(false);
   const [notConnected, setNotConnected] = useState(false);
   const [data, setData] = useState(null);
+  const [profileData, setProfileData] = useState(null);
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState("overview"); // overview | patterns | yearly
 
@@ -361,10 +630,17 @@ export default function StatsClient() {
     const fetchData = async () => {
       try {
         setError("");
-        const res = await fetch(
-          "/api/trakt/user-stats?historyLimit=1500&includePeople=0&localizeTitles=0",
-          { cache: "no-store" },
-        );
+        const [statsResult, profileResult] = await Promise.allSettled([
+          fetch(
+            "/api/trakt/user-stats?historyLimit=1500&includePeople=0&localizeTitles=1",
+            { cache: "no-store" },
+          ),
+          fetch("/api/trakt/profile", { cache: "no-store" }),
+        ]);
+
+        const res =
+          statsResult.status === "fulfilled" ? statsResult.value : null;
+        if (!res) throw new Error("No se pudieron cargar las estadísticas.");
         if (res.status === 401) {
           if (ignore) return;
           setNotConnected(true);
@@ -379,6 +655,14 @@ export default function StatsClient() {
           const json = await res.json().catch(() => ({}));
           if (!ignore) {
             setError(json?.error || "No se pudieron cargar las estadísticas.");
+          }
+        }
+
+        if (profileResult.status === "fulfilled") {
+          const profileRes = profileResult.value;
+          if (profileRes.ok) {
+            const profileJson = await profileRes.json();
+            if (!ignore) setProfileData(profileJson);
           }
         }
       } catch (e) {
@@ -514,6 +798,11 @@ export default function StatsClient() {
     return `${h}h ${m}m`;
   };
 
+  const profileUser = profileData?.user || null;
+  const recentHistory = profileData?.recentHistory || [];
+  const recentRatings = profileData?.recentRatings || [];
+  const watchlist = profileData?.watchlist || [];
+
   if (notConnected) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 pb-20">
@@ -537,11 +826,11 @@ export default function StatsClient() {
               </span>
             </div>
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              Estadísticas
+              Perfil
               <span className="text-indigo-500">.</span>
             </h1>
             <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-              Tus estadísticas personalizadas de Trakt.
+              Tu actividad y estadísticas en Trakt.
             </p>
           </motion.div>
 
@@ -563,7 +852,9 @@ export default function StatsClient() {
               </p>
               <button
                 onClick={() =>
-                  window.location.assign("/api/trakt/auth/start?next=/stats")
+                  window.location.assign(
+                    `/api/trakt/auth/start?next=${encodeURIComponent(connectNext)}`,
+                  )
                 }
                 className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
               >
@@ -577,7 +868,7 @@ export default function StatsClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 pb-20 selection:bg-emerald-500/30">
+    <div className="min-h-screen bg-[#0a0a0a] pb-20 text-zinc-100 selection:bg-emerald-500/30">
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] mix-blend-screen" />
@@ -589,25 +880,12 @@ export default function StatsClient() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8"
+          className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,auto)] lg:items-center"
         >
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-indigo-500" />
-              <span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">
-                Tu Perfil
-              </span>
-            </div>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              Estadísticas
-              <span className="text-indigo-500">.</span>
-            </h1>
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-              Tus estadísticas personalizadas de Trakt.
-            </p>
-          </div>
+          <ProfileHero user={profileUser} />
 
-          <div className="flex p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-x-auto">
+          <div className="flex justify-start lg:justify-end">
+            <div className="flex p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-x-auto">
             {[
               { id: "overview", label: "General", icon: PieChartIcon },
               { id: "patterns", label: "Patrones", icon: TrendingUp },
@@ -635,6 +913,7 @@ export default function StatsClient() {
                 </span>
               </button>
             ))}
+            </div>
           </div>
         </motion.div>
 
@@ -653,7 +932,7 @@ export default function StatsClient() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.5 }}
-                className="space-y-8"
+                className="flex flex-col gap-8"
               >
                 {/* KPIs */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -747,8 +1026,81 @@ export default function StatsClient() {
                   </div>
                 </div>
 
+                {recentHistory.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.18 }}
+                    className="relative order-2"
+                  >
+                    <SectionTitle
+                      icon={Activity}
+                      title="Vistos recientemente"
+                      subtitle="Tus últimas visualizaciones"
+                      color="emerald"
+                      href="/history"
+                    />
+                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                      {recentHistory.map((item, idx) => (
+                        <PosterCard key={`${item.type}-${item.tmdbId}-${idx}`} item={item} />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                {recentRatings.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.22 }}
+                    className="relative order-2"
+                  >
+                    <SectionTitle
+                      icon={Star}
+                      title="Últimas valoraciones"
+                      subtitle="Lo que has puntuado recientemente"
+                      color="yellow"
+                    />
+                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                      {recentRatings.map((item, idx) => (
+                        <PosterCard
+                          key={`${item.type}-${item.tmdbId}-${idx}`}
+                          item={item}
+                          showRating
+                          dateField="rated_at"
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                {watchlist.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.26 }}
+                    className="relative order-2"
+                  >
+                    <SectionTitle
+                      icon={BookMarked}
+                      title="Watchlist"
+                      subtitle="Títulos que quieres ver"
+                      color="indigo"
+                      href="/watchlist"
+                    />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {watchlist.map((item, idx) => (
+                        <WatchlistCard
+                          key={`${item.type}-${item.tmdbId}-${idx}`}
+                          item={item}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Main Charts Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="order-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Activity Chart - Spans 2 cols */}
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -889,13 +1241,13 @@ export default function StatsClient() {
                 </div>
 
                 {/* Top Content Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="order-3 grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Top Movies */}
                   <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.7 }}
-                    className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6"
+                    className="relative"
                   >
                     <SectionTitle
                       icon={Film}
@@ -903,30 +1255,14 @@ export default function StatsClient() {
                       subtitle="Las que más has visto"
                       color="blue"
                     />
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                       {stats.topMovies.map((item, idx) => (
-                        <Link
-                          key={idx}
-                          href={`/details/movie/${item.movie.ids.tmdb}`}
-                          className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group"
-                        >
-                          <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${idx === 0 ? "bg-blue-500 text-black" : "bg-white/10 text-zinc-400"}`}
-                          >
-                            {idx + 1}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-zinc-200 truncate group-hover:text-blue-400 transition">
-                              {item.movie.title}
-                            </h4>
-                            <p className="text-xs text-zinc-500">
-                              {item.plays} reproducciones
-                            </p>
-                          </div>
-                          <div className="opacity-0 group-hover:opacity-100 transition text-blue-500">
-                            <ArrowUp className="w-4 h-4 rotate-45" />
-                          </div>
-                        </Link>
+                        <RankedPosterCard
+                          key={item.movie?.ids?.tmdb || idx}
+                          item={item}
+                          rank={idx + 1}
+                          type="movie"
+                        />
                       ))}
                     </div>
                   </motion.div>
@@ -936,7 +1272,7 @@ export default function StatsClient() {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.7 }}
-                    className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6"
+                    className="relative"
                   >
                     <SectionTitle
                       icon={Tv}
@@ -944,30 +1280,14 @@ export default function StatsClient() {
                       subtitle="Tus maratones favoritos"
                       color="purple"
                     />
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                       {stats.topShows.map((item, idx) => (
-                        <Link
-                          key={idx}
-                          href={`/details/tv/${item.show.ids.tmdb}`}
-                          className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group"
-                        >
-                          <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm ${idx === 0 ? "bg-purple-500 text-black" : "bg-white/10 text-zinc-400"}`}
-                          >
-                            {idx + 1}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-zinc-200 truncate group-hover:text-purple-400 transition">
-                              {item.show.title}
-                            </h4>
-                            <p className="text-xs text-zinc-500">
-                              {item.plays} vistos
-                            </p>
-                          </div>
-                          <div className="opacity-0 group-hover:opacity-100 transition text-purple-500">
-                            <ArrowUp className="w-4 h-4 rotate-45" />
-                          </div>
-                        </Link>
+                        <RankedPosterCard
+                          key={item.show?.ids?.tmdb || idx}
+                          item={item}
+                          rank={idx + 1}
+                          type="show"
+                        />
                       ))}
                     </div>
                   </motion.div>
@@ -980,7 +1300,7 @@ export default function StatsClient() {
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                      className="order-4 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
                     >
                       <SectionTitle
                         icon={Users}
@@ -1004,7 +1324,7 @@ export default function StatsClient() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.65 }}
-                    className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                    className="order-4 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
                   >
                     <SectionTitle
                       icon={Users}
@@ -1053,7 +1373,7 @@ export default function StatsClient() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.7 }}
-                    className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl mt-6"
+                    className="order-4 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
                   >
                     <SectionTitle
                       icon={Film}
