@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   Film, Tv, Clock, Star, Heart, Users, BookMarked, Trophy,
   Calendar, MapPin, ExternalLink, Play, Eye, TrendingUp,
-  Activity, Library, ChevronRight, Loader2, UserX, Zap,
+  Activity, Library, ChevronRight, UserX, Zap, Timer,
+  MessageSquare,
 } from "lucide-react";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -15,13 +16,11 @@ const tmdbImg = (path, size = "w342") =>
 
 const fmtDate = (iso) => {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-ES", {
-    day: "numeric", month: "short", year: "numeric",
-  });
+  return new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
 };
 
 const fmtDateShort = (iso) => {
-  if (!iso) return "—";
+  if (!iso) return "";
   return new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 };
 
@@ -40,28 +39,61 @@ const starColor = (r) => {
   return "#ef4444";
 };
 
-// ─── sub-components ─────────────────────────────────────────────────────────
+// ─── Color tokens matching StatsClient ──────────────────────────────────────
+const COLOR_STYLES = {
+  cyan:   { iconBg: "bg-cyan-500/10",   iconText: "text-cyan-500",   ring: "ring-cyan-500/20",   glow: "bg-cyan-500/20" },
+  blue:   { iconBg: "bg-blue-500/10",   iconText: "text-blue-500",   ring: "ring-blue-500/20",   glow: "bg-blue-500/20" },
+  purple: { iconBg: "bg-purple-500/10", iconText: "text-purple-500", ring: "ring-purple-500/20", glow: "bg-purple-500/20" },
+  pink:   { iconBg: "bg-pink-500/10",   iconText: "text-pink-500",   ring: "ring-pink-500/20",   glow: "bg-pink-500/20" },
+  emerald:{ iconBg: "bg-emerald-500/10",iconText: "text-emerald-500",ring: "ring-emerald-500/20",glow: "bg-emerald-500/20" },
+  yellow: { iconBg: "bg-yellow-500/10", iconText: "text-yellow-500", ring: "ring-yellow-500/20", glow: "bg-yellow-500/20" },
+  orange: { iconBg: "bg-orange-500/10", iconText: "text-orange-500", ring: "ring-orange-500/20", glow: "bg-orange-500/20" },
+  indigo: { iconBg: "bg-indigo-500/10", iconText: "text-indigo-500", ring: "ring-indigo-500/20", glow: "bg-indigo-500/20" },
+  rose:   { iconBg: "bg-rose-500/10",   iconText: "text-rose-500",   ring: "ring-rose-500/20",   glow: "bg-rose-500/20" },
+  teal:   { iconBg: "bg-teal-500/10",   iconText: "text-teal-500",   ring: "ring-teal-500/20",   glow: "bg-teal-500/20" },
+};
 
-function StatPill({ icon: Icon, label, value, color = "#6366f1" }) {
+// ─── KPI Card — identical to StatsClient ────────────────────────────────────
+function KPICard({ title, value, subtitle, icon: Icon, color, delay = 0 }) {
+  const s = COLOR_STYLES[color] || COLOR_STYLES.indigo;
   return (
-    <div className="flex flex-col items-center gap-1 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all">
-      <div className="p-2 rounded-xl" style={{ background: `${color}20` }}>
-        <Icon className="w-5 h-5" style={{ color }} />
+    <motion.div
+      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.5 }}
+      className="relative overflow-hidden p-6 rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl group hover:bg-zinc-900/80 transition-all duration-300"
+    >
+      <div className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity ${s.iconText}`}>
+        <Icon className="w-24 h-24 transform rotate-12 -translate-y-4 translate-x-4" />
       </div>
-      <span className="text-xl font-black text-white">{value ?? "—"}</span>
-      <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">{label}</span>
-    </div>
+      <div className="relative z-10 flex flex-col h-full justify-between">
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`p-2.5 rounded-xl ${s.iconBg} ${s.iconText} ring-1 ${s.ring}`}>
+            <Icon className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">{title}</h3>
+        </div>
+        <div>
+          <div className="text-4xl font-black text-white tracking-tight leading-none mb-1">{value}</div>
+          {subtitle && <div className="text-sm font-medium text-zinc-500">{subtitle}</div>}
+        </div>
+      </div>
+      <div className={`absolute -bottom-10 -left-10 w-32 h-32 rounded-full blur-3xl pointer-events-none ${s.glow} group-hover:opacity-30 transition-all`} />
+    </motion.div>
   );
 }
 
-function SectionHeader({ icon: Icon, title, href, color = "#6366f1" }) {
+// ─── Section title — identical to StatsClient ───────────────────────────────
+function SectionTitle({ icon: Icon, title, subtitle, color = "indigo", href }) {
+  const s = COLOR_STYLES[color] || COLOR_STYLES.indigo;
   return (
-    <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center gap-2">
-        <div className="p-1.5 rounded-lg" style={{ background: `${color}20` }}>
-          <Icon className="w-4 h-4" style={{ color }} />
+    <div className="flex items-center justify-between gap-3 mb-6">
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-lg border ${s.iconBg} border-white/10 ${s.iconText}`}>
+          <Icon className="w-5 h-5" />
         </div>
-        <h2 className="text-base font-bold text-white">{title}</h2>
+        <div>
+          <h2 className="text-xl font-bold text-white">{title}</h2>
+          {subtitle && <p className="text-sm text-zinc-500">{subtitle}</p>}
+        </div>
       </div>
       {href && (
         <Link href={href} className="flex items-center gap-1 text-xs text-zinc-500 hover:text-white transition-colors">
@@ -72,101 +104,107 @@ function SectionHeader({ icon: Icon, title, href, color = "#6366f1" }) {
   );
 }
 
-function PosterCard({ item, showRating = false, showDate = false, dateField = "watched_at" }) {
-  const [imgErr, setImgErr] = useState(false);
-  const src = tmdbImg(item.poster_path, "w185");
-  const href = item.detailsHref || "#";
-
+// ─── Mini stat chip ──────────────────────────────────────────────────────────
+function MiniStat({ icon: Icon, label, value }) {
   return (
-    <Link href={href} className="group flex-shrink-0 w-28 relative">
-      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 border border-white/5 group-hover:border-white/20 transition-all group-hover:scale-105 duration-300">
-        {src && !imgErr ? (
-          <img src={src} alt={item.title} className="w-full h-full object-cover" onError={() => setImgErr(true)} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            {item.type === "movie" ? <Film className="w-8 h-8 text-zinc-600" /> : <Tv className="w-8 h-8 text-zinc-600" />}
-          </div>
-        )}
+    <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
+      <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500"><Icon className="w-5 h-5" /></div>
+      <div>
+        <div className="text-xl font-bold">{value}</div>
+        <div className="text-xs text-zinc-500 uppercase font-bold">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Poster card (horizontal scroll) ────────────────────────────────────────
+function PosterCard({ item, showRating, dateField = "watched_at" }) {
+  const [err, setErr] = useState(false);
+  const src = tmdbImg(item.poster_path, "w185");
+  return (
+    <Link href={item.detailsHref || "#"} className="group flex-shrink-0 w-28">
+      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 border border-white/5 group-hover:border-white/20 group-hover:scale-105 transition-all duration-300 relative">
+        {src && !err
+          ? <img src={src} alt={item.title} className="w-full h-full object-cover" onError={() => setErr(true)} />
+          : <div className="w-full h-full flex items-center justify-center">{item.type === "movie" ? <Film className="w-8 h-8 text-zinc-600" /> : <Tv className="w-8 h-8 text-zinc-600" />}</div>
+        }
         {showRating && item.rating && (
-          <div className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white shadow-lg"
-            style={{ background: starColor(item.rating) }}>
+          <div className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white shadow-lg" style={{ background: starColor(item.rating) }}>
             {item.rating}
           </div>
         )}
       </div>
       <div className="mt-1.5 px-0.5">
-        <p className="text-xs font-semibold text-white truncate leading-tight">{item.title}</p>
-        {showDate && (
-          <p className="text-[10px] text-zinc-500 mt-0.5">{fmtDateShort(item[dateField])}</p>
-        )}
-        {item.episode && (
-          <p className="text-[10px] text-zinc-500 truncate">
-            T{item.episode.season}E{item.episode.number}
-          </p>
-        )}
+        <p className="text-xs font-semibold text-white truncate">{item.title}</p>
+        <p className="text-[10px] text-zinc-500">{fmtDateShort(item[dateField])}</p>
+        {item.episode && <p className="text-[10px] text-zinc-500">T{item.episode.season}·E{item.episode.number}</p>}
       </div>
     </Link>
   );
 }
 
-function HorizontalScroll({ children }) {
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none" style={{ scrollbarWidth: "none" }}>
-      {children}
-    </div>
-  );
-}
-
+// ─── Not connected (same pattern as StatsClient) ────────────────────────────
 function NotConnected() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-8">
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 pb-20">
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px]" />
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] mix-blend-screen" />
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] mix-blend-screen" />
       </div>
-      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 max-w-md w-full text-center">
-        <div className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center mx-auto mb-6">
-          <UserX className="w-10 h-10 text-zinc-500" />
-        </div>
-        <h1 className="text-3xl font-black text-white mb-3">Conecta tu cuenta</h1>
-        <p className="text-zinc-400 mb-8 text-sm leading-relaxed">
-          Para ver tu perfil, historial y estadísticas personalizadas necesitas conectar tu cuenta de Trakt.
-        </p>
-        <button
-          onClick={() => window.location.assign("/api/trakt/auth/start?next=/profile")}
-          className="inline-flex items-center gap-2 px-8 py-3 bg-white text-black font-bold rounded-2xl hover:bg-zinc-200 transition-all shadow-lg shadow-white/10">
-          <Zap className="w-4 h-4" /> Conectar Trakt
-        </button>
-        <p className="text-xs text-zinc-600 mt-6">También necesitas iniciar sesión con TMDb para ver tu avatar</p>
-      </motion.div>
-    </div>
-  );
-}
-
-function ProfileSkeleton() {
-  return (
-    <div className="min-h-screen bg-[#0a0a0a] animate-pulse">
-      <div className="h-48 bg-zinc-900" />
-      <div className="max-w-5xl mx-auto px-4 -mt-16 relative z-10">
-        <div className="flex items-end gap-5 mb-8">
-          <div className="w-32 h-32 rounded-2xl bg-zinc-800 border-4 border-zinc-900 flex-shrink-0" />
-          <div className="flex-1 space-y-3 pb-2">
-            <div className="h-7 w-48 rounded-xl bg-zinc-800" />
-            <div className="h-4 w-64 rounded-lg bg-zinc-800/60" />
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-px w-12 bg-indigo-500" />
+            <span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">Tu cuenta</span>
+          </div>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+            Perfil<span className="text-indigo-500">.</span>
+          </h1>
+        </motion.div>
+        <div className="flex items-center justify-center py-12 lg:py-24">
+          <div className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed">
+            <div className="mb-6">
+              <img src="/logo-Trakt.png" alt="Trakt" className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Conecta tu cuenta de Trakt</h2>
+            <p className="text-zinc-400 max-w-sm mb-8 text-sm">
+              Para ver tu perfil, historial y estadísticas necesitas iniciar sesión con Trakt.
+            </p>
+            <button
+              onClick={() => window.location.assign("/api/trakt/auth/start?next=/profile")}
+              className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
+            >
+              Conectar ahora
+            </button>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-3 mb-8">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="h-24 rounded-2xl bg-zinc-900" />
-          ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+function Skeleton() {
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] animate-pulse">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        <div className="h-8 w-48 rounded-xl bg-zinc-800" />
+        <div className="flex items-center gap-6">
+          <div className="w-32 h-32 rounded-3xl bg-zinc-800" />
+          <div className="space-y-3">
+            <div className="h-7 w-52 rounded-xl bg-zinc-800" />
+            <div className="h-4 w-36 rounded-lg bg-zinc-800/60" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => <div key={i} className="h-32 rounded-3xl bg-zinc-900" />)}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── main ────────────────────────────────────────────────────────────────────
+// ─── Main ────────────────────────────────────────────────────────────────────
 export default function ProfileClient() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -179,276 +217,220 @@ export default function ProfileClient() {
       try {
         const res = await fetch("/api/trakt/profile", { cache: "no-store" });
         if (res.status === 401) { if (!ignore) setNotConnected(true); return; }
-        if (res.ok) {
-          const json = await res.json();
-          if (!ignore) setData(json);
-        } else {
-          const j = await res.json().catch(() => ({}));
-          if (!ignore) setError(j?.error || "Error cargando perfil");
-        }
-      } catch (e) {
-        if (!ignore) setError("Error de red");
-      } finally {
-        if (!ignore) setLoading(false);
-      }
+        if (res.ok) { const j = await res.json(); if (!ignore) setData(j); }
+        else { const j = await res.json().catch(() => ({})); if (!ignore) setError(j?.error || "Error"); }
+      } catch { if (!ignore) setError("Error de red"); }
+      finally { if (!ignore) setLoading(false); }
     })();
     return () => { ignore = true; };
   }, []);
 
-  if (loading) return <ProfileSkeleton />;
+  if (loading) return <Skeleton />;
   if (notConnected) return <NotConnected />;
 
-  const { user, stats, recentHistory, recentRatings, watchlist, collectionCount } = data || {};
+  const { user = {}, stats, recentHistory = [], recentRatings = [], watchlist = [], collectionCount = 0 } = data || {};
   const s = stats || {};
   const movies = s.movies || {};
   const episodes = s.episodes || {};
   const shows = s.shows || {};
+  const seasons = s.seasons || {};
   const ratings = s.ratings || {};
+  const network = s.network || {};
 
   const totalMins = (movies.minutes || 0) + (episodes.minutes || 0);
-  const avgRating = ratings.distribution
-    ? (() => {
-        const dist = ratings.distribution;
-        let total = 0, count = 0;
-        Object.entries(dist).forEach(([r, c]) => { total += Number(r) * c; count += c; });
-        return count > 0 ? (total / count).toFixed(1) : "—";
-      })()
-    : "—";
+  const totalHours = Math.round(totalMins / 60);
 
-  // Banner from first history item with backdrop
-  const bannerItem = (recentHistory || []).find(h => h.backdrop_path);
-  const bannerSrc = bannerItem ? tmdbImg(bannerItem.backdrop_path, "w1280") : null;
+  const avgRating = (() => {
+    const dist = ratings.distribution || {};
+    let total = 0, count = 0;
+    Object.entries(dist).forEach(([r, c]) => { total += Number(r) * c; count += c; });
+    return count > 0 ? (total / count).toFixed(1) : "—";
+  })();
+
+  const totalComments = (movies.comments || 0) + (shows.comments || 0) + (seasons.comments || 0) + (episodes.comments || 0);
+
+  // Avatar URL — use Trakt avatar
+  const avatarUrl = user?.avatarUrl || null;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white pb-24 selection:bg-indigo-500/30">
-      {/* Ambient BG */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-indigo-600/8 rounded-full blur-[160px]" />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-600/8 rounded-full blur-[140px]" />
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 pb-20 selection:bg-indigo-500/30">
+      {/* Background Ambience */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] mix-blend-screen" />
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] mix-blend-screen" />
       </div>
 
-      {/* ── BANNER ── */}
-      <div className="relative h-52 md:h-64 overflow-hidden">
-        {bannerSrc ? (
-          <>
-            <img src={bannerSrc} alt="banner" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-[#0a0a0a]" />
-          </>
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-indigo-900/40 via-purple-900/30 to-zinc-900">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-600/20 via-transparent to-transparent" />
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+        {/* ── HEADER (same pattern as Stats) ── */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10"
+        >
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-px w-12 bg-indigo-500" />
+              <span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">Tu cuenta</span>
+            </div>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+              Perfil<span className="text-indigo-500">.</span>
+            </h1>
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
+              Tu actividad y estadísticas en Trakt.
+            </p>
           </div>
-        )}
-      </div>
 
-      {/* ── CONTENT ── */}
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6">
-
-        {/* ── HERO SECTION ── */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-          className="flex flex-col sm:flex-row items-start sm:items-end gap-5 -mt-20 mb-8">
-          {/* Avatar */}
-          <div className="flex-shrink-0 w-32 h-32 rounded-2xl overflow-hidden border-4 border-[#0a0a0a] bg-zinc-800 shadow-2xl shadow-black/60">
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
-                <span className="text-4xl font-black text-white">
-                  {(user?.name || user?.username || "?")[0].toUpperCase()}
+          {/* User card — avatar BIG, no separate banner */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}
+            className="flex items-center gap-4 p-4 rounded-2xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl"
+          >
+            {/* Avatar grande */}
+            <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 ring-2 ring-indigo-500/30">
+              {avatarUrl
+                ? <img src={avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
+                    <span className="text-3xl font-black text-white">
+                      {(user.name || user.username || "?")[0].toUpperCase()}
+                    </span>
+                  </div>
+                )
+              }
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xl font-black text-white truncate">{user.name || user.username}</p>
+                {user.vip && <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">VIP</span>}
+              </div>
+              <p className="text-zinc-500 text-sm">@{user.username}</p>
+              <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500 flex-wrap">
+                {user.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{user.location}</span>}
+                {user.joined_at && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />Desde {fmtDate(user.joined_at)}</span>}
+                <span className="flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  <span className="text-white font-bold">{user.followers}</span> seg. ·
+                  <span className="text-white font-bold">{user.following}</span> sig.
                 </span>
               </div>
-            )}
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0 sm:pb-1">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h1 className="text-2xl md:text-3xl font-black text-white truncate">
-                {user?.name || user?.username}
-              </h1>
-              {user?.vip && (
-                <span className="px-2 py-0.5 text-[10px] font-black tracking-widest uppercase rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-                  VIP
-                </span>
-              )}
-              {user?.private && (
-                <span className="px-2 py-0.5 text-[10px] font-black tracking-widest uppercase rounded-full bg-zinc-700 text-zinc-400">
-                  Privado
-                </span>
-              )}
+              {user.about && <p className="mt-1 text-xs text-zinc-400 line-clamp-1 max-w-xs">{user.about}</p>}
             </div>
-            <p className="text-zinc-500 text-sm mb-2">@{user?.username}</p>
-            <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
-              {user?.location && (
-                <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{user.location}</span>
-              )}
-              {user?.joined_at && (
-                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />Desde {fmtDate(user.joined_at)}</span>
-              )}
-              <span className="flex items-center gap-1"><Users className="w-3 h-3" />
-                <span className="text-white font-bold">{user?.followers}</span> seguidores ·
-                <span className="text-white font-bold">{user?.following}</span> siguiendo
-              </span>
-            </div>
-            {user?.about && (
-              <p className="mt-2 text-sm text-zinc-400 line-clamp-2 max-w-xl">{user.about}</p>
+            {user.traktUrl && (
+              <a href={user.traktUrl} target="_blank" rel="noopener noreferrer"
+                className="flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl bg-zinc-800 border border-white/10 text-xs font-bold hover:bg-zinc-700 transition-all ml-2">
+                <img src="/logo-Trakt.png" alt="Trakt" className="w-4 h-4 rounded" />
+                Trakt <ExternalLink className="w-3 h-3" />
+              </a>
             )}
-          </div>
-
-          {/* Trakt link */}
-          {user?.traktUrl && (
-            <a href={user.traktUrl} target="_blank" rel="noopener noreferrer"
-              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800 border border-white/10 text-sm font-bold hover:bg-zinc-700 transition-all">
-              <img src="/logo-Trakt.png" alt="Trakt" className="w-4 h-4 rounded" />
-              Ver en Trakt <ExternalLink className="w-3 h-3" />
-            </a>
-          )}
+          </motion.div>
         </motion.div>
 
-        {/* ── STATS GRID ── */}
+        {/* ── KPI Cards ── */}
         {stats && (
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-8">
-            <StatPill icon={Film} label="Películas" value={(movies.watched || 0).toLocaleString()} color="#3b82f6" />
-            <StatPill icon={Play} label="Plays" value={(movies.plays || 0).toLocaleString()} color="#06b6d4" />
-            <StatPill icon={Tv} label="Series" value={(shows.watched || 0).toLocaleString()} color="#a855f7" />
-            <StatPill icon={Eye} label="Episodios" value={(episodes.watched || 0).toLocaleString()} color="#ec4899" />
-            <StatPill icon={Clock} label="Tiempo" value={fmtMinutes(totalMins)} color="#10b981" />
-            <StatPill icon={Star} label="Rating Medio" value={avgRating} color="#f59e0b" />
-            <StatPill icon={Library} label="Colección" value={(collectionCount || 0).toLocaleString()} color="#f97316" />
-            <StatPill icon={Trophy} label="Valoraciones" value={(ratings.total || 0).toLocaleString()} color="#e879f9" />
-          </motion.div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <KPICard title="Tiempo Total" value={`${Math.floor(totalHours / 24)}d ${totalHours % 24}h`} subtitle={`${totalHours.toLocaleString()} horas`} icon={Timer} color="cyan" delay={0.1} />
+            <KPICard title="Películas" value={(movies.watched || 0).toLocaleString()} subtitle={`${(movies.plays || 0).toLocaleString()} plays`} icon={Film} color="blue" delay={0.2} />
+            <KPICard title="Episodios" value={(episodes.watched || 0).toLocaleString()} subtitle={`${(shows.watched || 0).toLocaleString()} series`} icon={Tv} color="purple" delay={0.3} />
+            <KPICard title="Colección" value={collectionCount.toLocaleString()} subtitle="Películas guardadas" icon={Library} color="orange" delay={0.4} />
+          </div>
         )}
 
-        {/* ── RATING DISTRIBUTION ── */}
+        {/* ── Secondary mini-stats ── */}
+        {stats && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <MiniStat icon={Star} label="Valoraciones" value={ratings.total || 0} />
+            <MiniStat icon={MessageSquare} label="Comentarios" value={totalComments} />
+            <MiniStat icon={Users} label="Seguidores" value={network.followers || user.followers || 0} />
+            <MiniStat icon={Heart} label="Amigos" value={network.friends || user.following || 0} />
+          </div>
+        )}
+
+        {/* ── Rating distribution ── */}
         {ratings?.distribution && Object.keys(ratings.distribution).length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-            className="mb-8 p-5 rounded-2xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl">
-            <SectionHeader icon={Star} title="Distribución de valoraciones" color="#f59e0b" />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}
+            className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden mb-6"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 rounded-full blur-3xl pointer-events-none" />
+            <SectionTitle icon={Star} title="Distribución de valoraciones" subtitle={`${ratings.total} valoraciones · media ${avgRating}/10`} color="yellow" />
             <div className="flex items-end gap-1.5 h-20">
               {[1,2,3,4,5,6,7,8,9,10].map((r) => {
                 const count = ratings.distribution?.[r] || 0;
-                const max = Math.max(...Object.values(ratings.distribution || {}));
-                const pct = max > 0 ? (count / max) * 100 : 0;
+                const max = Math.max(...Object.values(ratings.distribution || {}), 1);
+                const pct = (count / max) * 100;
                 return (
                   <div key={r} className="flex-1 flex flex-col items-center gap-1">
                     <div className="w-full flex items-end justify-center" style={{ height: 60 }}>
-                      <div
-                        className="w-full rounded-t-md transition-all duration-500"
-                        style={{
-                          height: `${Math.max(pct, 2)}%`,
-                          background: starColor(r),
-                          opacity: count > 0 ? 0.85 : 0.15,
-                        }}
-                      />
+                      <div className="w-full rounded-t-md transition-all duration-700"
+                        style={{ height: `${Math.max(pct, 2)}%`, background: starColor(r), opacity: count > 0 ? 0.85 : 0.15 }} />
                     </div>
                     <span className="text-[10px] text-zinc-500 font-bold">{r}</span>
                   </div>
                 );
               })}
             </div>
-            <p className="text-xs text-zinc-600 mt-2 text-right">{ratings.total} valoraciones totales · media {avgRating}/10</p>
           </motion.div>
         )}
 
-        {/* ── GRID MAIN ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* ── Recent History ── */}
+        {recentHistory.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.25 }}
+            className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden mb-6"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+            <SectionTitle icon={Activity} title="Vistos recientemente" subtitle="Tus últimas visualizaciones" color="emerald" href="/history" />
+            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+              {recentHistory.map((item, i) => <PosterCard key={i} item={item} dateField="watched_at" />)}
+            </div>
+          </motion.div>
+        )}
 
-          {/* LEFT: History + Ratings */}
-          <div className="lg:col-span-3 space-y-6">
+        {/* ── Recent Ratings ── */}
+        {recentRatings.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}
+            className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden mb-6"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 rounded-full blur-3xl pointer-events-none" />
+            <SectionTitle icon={Star} title="Últimas valoraciones" subtitle="Lo que has puntuado recientemente" color="yellow" href="/stats" />
+            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+              {recentRatings.map((item, i) => <PosterCard key={i} item={item} showRating dateField="rated_at" />)}
+            </div>
+          </motion.div>
+        )}
 
-            {/* Recent history */}
-            {(recentHistory || []).length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                className="p-5 rounded-2xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl">
-                <SectionHeader icon={Activity} title="Vistos recientemente" href="/history" color="#10b981" />
-                <HorizontalScroll>
-                  {recentHistory.map((item, i) => (
-                    <PosterCard key={`${item.tmdbId}-${i}`} item={item} showDate dateField="watched_at" />
-                  ))}
-                </HorizontalScroll>
-              </motion.div>
-            )}
-
-            {/* Recent ratings */}
-            {(recentRatings || []).length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-                className="p-5 rounded-2xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl">
-                <SectionHeader icon={Star} title="Valoraciones recientes" href="/stats" color="#f59e0b" />
-                <HorizontalScroll>
-                  {recentRatings.map((item, i) => (
-                    <PosterCard key={`${item.tmdbId}-${i}`} item={item} showRating showDate dateField="rated_at" />
-                  ))}
-                </HorizontalScroll>
-              </motion.div>
-            )}
-          </div>
-
-          {/* RIGHT: Quick stats + watchlist */}
-          <div className="lg:col-span-2 space-y-6">
-
-            {/* Watchlist */}
-            {(watchlist || []).length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-                className="p-5 rounded-2xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl">
-                <SectionHeader icon={BookMarked} title="Watchlist" href="/watchlist" color="#6366f1" />
-                <div className="space-y-2">
-                  {watchlist.slice(0, 6).map((item, i) => {
-                    const src = tmdbImg(item.poster_path, "w92");
-                    return (
-                      <Link key={i} href={item.detailsHref || "#"}
-                        className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all group">
-                        <div className="w-10 h-14 rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0">
-                          {src ? (
-                            <img src={src} alt={item.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              {item.type === "movie" ? <Film className="w-4 h-4 text-zinc-600" /> : <Tv className="w-4 h-4 text-zinc-600" />}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white truncate group-hover:text-indigo-400 transition-colors">{item.title}</p>
-                          <p className="text-xs text-zinc-500">{item.year} · {item.type === "movie" ? "Película" : "Serie"}</p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-white transition-colors flex-shrink-0" />
-                      </Link>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
-
-            {/* Extra stats card */}
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-              className="p-5 rounded-2xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl">
-              <SectionHeader icon={TrendingUp} title="Más estadísticas" href="/stats" color="#a855f7" />
-              <div className="space-y-3">
-                {[
-                  { label: "Temporadas vistas", value: (s.seasons?.watched || 0).toLocaleString(), icon: Tv, color: "#a855f7" },
-                  { label: "Comentarios", value: ((movies.comments || 0) + (shows.comments || 0) + (episodes.comments || 0)).toLocaleString(), icon: Heart, color: "#ec4899" },
-                  { label: "Colección (películas)", value: (collectionCount || 0).toLocaleString(), icon: Library, color: "#f97316" },
-                  { label: "Plays de películas", value: (movies.plays || 0).toLocaleString(), icon: Film, color: "#3b82f6" },
-                  { label: "Horas de series", value: `${Math.floor((episodes.minutes || 0) / 60)}h`, icon: Clock, color: "#10b981" },
-                ].map(({ label, value, icon: Icon, color }) => (
-                  <div key={label} className="flex items-center justify-between gap-3 py-1">
-                    <div className="flex items-center gap-2">
-                      <Icon className="w-4 h-4 flex-shrink-0" style={{ color }} />
-                      <span className="text-sm text-zinc-400">{label}</span>
+        {/* ── Watchlist ── */}
+        {watchlist.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.35 }}
+            className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+            <SectionTitle icon={BookMarked} title="Watchlist" subtitle="Títulos que quieres ver" color="indigo" href="/watchlist" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {watchlist.map((item, i) => {
+                const src = tmdbImg(item.poster_path, "w92");
+                return (
+                  <Link key={i} href={item.detailsHref || "#"}
+                    className="flex items-center gap-3 p-3 rounded-2xl bg-zinc-800/40 border border-white/5 hover:bg-zinc-800/80 hover:border-white/10 transition-all group">
+                    <div className="w-10 h-14 rounded-lg overflow-hidden bg-zinc-700 flex-shrink-0">
+                      {src ? <img src={src} alt={item.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center">{item.type === "movie" ? <Film className="w-4 h-4 text-zinc-500" /> : <Tv className="w-4 h-4 text-zinc-500" />}</div>}
                     </div>
-                    <span className="text-sm font-bold text-white">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white truncate group-hover:text-indigo-400 transition-colors">{item.title}</p>
+                      <p className="text-xs text-zinc-500">{item.year} · {item.type === "movie" ? "Película" : "Serie"}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-white transition-colors flex-shrink-0" />
+                  </Link>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
 
-        {/* Error state */}
         {error && (
-          <div className="mt-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
-            {error}
-          </div>
+          <div className="mt-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">{error}</div>
         )}
       </div>
     </div>
