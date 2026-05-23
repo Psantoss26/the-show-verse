@@ -381,9 +381,9 @@ export default function Navbar() {
           <div className="flex items-center gap-2 flex-shrink-0 pr-12">
             <div className="flex items-center gap-2">
               <Link
-                href="/stats"
-                className={iconLinkClass("/stats", "indigo")}
-                title="Estadísticas"
+                href="/profile"
+                className={iconLinkClass("/profile", "indigo")}
+                title="Perfil y estadísticas"
               >
                 <BarChart3 className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
               </Link>
@@ -640,15 +640,15 @@ export default function Navbar() {
                 <div className="my-3 h-px bg-neutral-800" />
 
                 <Link
-                  href="/stats"
+                  href="/profile"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/stats")
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/profile")
                     ? "bg-white/10 text-white"
                     : "text-neutral-300 hover:bg-white/5"
                     }`}
                 >
                   <BarChart3 className="w-5 h-5" />
-                  <span>Estadísticas</span>
+                  <span>Perfil y estadísticas</span>
                 </Link>
 
                 <Link

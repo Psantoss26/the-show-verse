@@ -29,7 +29,7 @@ function traktHeaders(accessToken = null) {
   return headers;
 }
 
-async function getTMDbTitle(tmdbId, type) {
+async function getTMDbDetails(tmdbId, type) {
   try {
     const endpoint = type === "movie" ? "movie" : "tv";
     const res = await fetch(
@@ -39,10 +39,19 @@ async function getTMDbTitle(tmdbId, type) {
 
     if (res.ok) {
       const data = await res.json();
-      return type === "movie" ? data.title : data.name;
+      return {
+        title: type === "movie" ? data.title : data.name,
+        poster_path: data.poster_path || null,
+        backdrop_path: data.backdrop_path || null,
+        year:
+          (type === "movie" ? data.release_date : data.first_air_date)?.slice(
+            0,
+            4,
+          ) || null,
+      };
     }
   } catch (err) {
-    console.error(`Error fetching TMDb title for ${type} ${tmdbId}:`, err);
+    console.error(`Error fetching TMDb details for ${type} ${tmdbId}:`, err);
   }
   return null;
 }
@@ -166,13 +175,16 @@ export async function GET(request) {
           watchedMovies.slice(0, 20).map(async (item) => {
             const tmdbId = item.movie?.ids?.tmdb;
             if (tmdbId) {
-              const spanishTitle = await getTMDbTitle(tmdbId, "movie");
-              if (spanishTitle) {
+              const tmdb = await getTMDbDetails(tmdbId, "movie");
+              if (tmdb) {
                 return {
                   ...item,
                   movie: {
                     ...item.movie,
-                    title: spanishTitle,
+                    title: tmdb.title || item.movie?.title,
+                    year: tmdb.year || item.movie?.year,
+                    poster_path: tmdb.poster_path,
+                    backdrop_path: tmdb.backdrop_path,
                   },
                 };
               }
@@ -187,13 +199,16 @@ export async function GET(request) {
           watchedShows.slice(0, 20).map(async (item) => {
             const tmdbId = item.show?.ids?.tmdb;
             if (tmdbId) {
-              const spanishTitle = await getTMDbTitle(tmdbId, "tv");
-              if (spanishTitle) {
+              const tmdb = await getTMDbDetails(tmdbId, "tv");
+              if (tmdb) {
                 return {
                   ...item,
                   show: {
                     ...item.show,
-                    title: spanishTitle,
+                    title: tmdb.title || item.show?.title,
+                    year: tmdb.year || item.show?.year,
+                    poster_path: tmdb.poster_path,
+                    backdrop_path: tmdb.backdrop_path,
                   },
                 };
               }

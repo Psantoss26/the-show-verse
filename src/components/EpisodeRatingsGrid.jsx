@@ -119,32 +119,11 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
           {activeData.seasonInfo}
         </div>
 
-        <div className="space-y-2">
-          {activeData.seriesGraphVal != null && (
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1">
-                <img
-                  src="/logoseriesgraph.png"
-                  alt="SeriesGraph"
-                  className="h-3 w-auto"
-                />
-                <span className="text-[10px] uppercase tracking-wide text-yellow-300 font-bold">
-                  SeriesGraph
-                </span>
-              </div>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-[14px] font-bold">
-                  {activeData.format1(activeData.seriesGraphVal)}
-                </span>
-                {activeData.seriesGraphVotesStr && (
-                  <span className="text-[10px] text-zinc-400">
-                    {activeData.seriesGraphVotesStr} votos
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {activeData.votesText && (
+          <div className="text-[11px] font-medium text-zinc-400">
+            {activeData.votesText}
+          </div>
+        )}
       </div>
     </div>,
     document.body,
@@ -176,6 +155,57 @@ export default function EpisodeRatingsGrid({
   const tooltipEnabled = !isTouchLike;
   const [hoveredEp, setHoveredEp] = useState(null);
   const [anchorRect, setAnchorRect] = useState(null);
+  const [episodeTitleCache, setEpisodeTitleCache] = useState(() => new Map());
+  const episodeTitleInFlightRef = useRef(new Map());
+  const episodeTitlePreloadKeyRef = useRef(null);
+
+  const ensureSpanishEpisodeTitle = useCallback(
+    async (tooltipData) => {
+      if (!showId || !tooltipData?.titleKey || !tooltipData?.routeTarget) return;
+      const { titleKey, routeTarget } = tooltipData;
+
+      if (episodeTitleCache.has(titleKey)) return;
+      if (episodeTitleInFlightRef.current.has(titleKey)) return;
+
+      const request = fetch(
+        `/api/tmdb/tv/${encodeURIComponent(showId)}/season/${encodeURIComponent(routeTarget.seasonNumber)}/episode/${encodeURIComponent(routeTarget.episodeNumber)}`,
+        { cache: "force-cache" },
+      )
+        .then((res) => (res.ok ? res.json() : null))
+        .then((json) => {
+          const name =
+            typeof json?.name === "string" && json.name.trim()
+              ? json.name.trim()
+              : null;
+
+          setEpisodeTitleCache((prev) => {
+            const next = new Map(prev);
+            next.set(titleKey, name);
+            return next;
+          });
+
+          setHoveredEp((current) =>
+            current?.titleKey === titleKey
+              ? { ...current, titleText: name || current.titleText }
+              : current,
+          );
+        })
+        .catch(() => {
+          setEpisodeTitleCache((prev) => {
+            const next = new Map(prev);
+            next.set(titleKey, null);
+            return next;
+          });
+        })
+        .finally(() => {
+          episodeTitleInFlightRef.current.delete(titleKey);
+        });
+
+      episodeTitleInFlightRef.current.set(titleKey, request);
+      return request;
+    },
+    [episodeTitleCache, showId],
+  );
 
   const handleMouseEnter = useCallback(
     (e, epData) => {
@@ -183,8 +213,9 @@ export default function EpisodeRatingsGrid({
       const rect = e.currentTarget.getBoundingClientRect();
       setAnchorRect(rect);
       setHoveredEp(epData);
+      void ensureSpanishEpisodeTitle(epData);
     },
-    [tooltipEnabled],
+    [ensureSpanishEpisodeTitle, tooltipEnabled],
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -547,6 +578,58 @@ export default function EpisodeRatingsGrid({
     [mapOrdinalToTmdbEpisode, tmdbSeasonsSorted, visualEpisodeOrdinal],
   );
 
+  useEffect(() => {
+    if (!tooltipEnabled || !inView || !showId || !seasonsSorted.length) return;
+
+    const preloadKey = `${showId}:${seasonsSorted
+      .map((s) => `${s.season_number}:${s.episodes.length}`)
+      .join("|")}`;
+    if (episodeTitlePreloadKeyRef.current === preloadKey) return;
+    episodeTitlePreloadKeyRef.current = preloadKey;
+
+    const pending = [];
+    for (const season of seasonsSorted) {
+      for (const ep of season.episodes || []) {
+        if (!ep || ep.isUnaired) continue;
+        const routeTarget = resolveEpisodeRouteTarget(
+          ep,
+          season.season_number,
+          ep.episodeNumber,
+        );
+        if (!routeTarget) continue;
+        const titleKey = `${routeTarget.seasonNumber}:${routeTarget.episodeNumber}`;
+        if (episodeTitleCache.has(titleKey)) continue;
+        if (episodeTitleInFlightRef.current.has(titleKey)) continue;
+        pending.push({ titleKey, routeTarget });
+      }
+    }
+
+    if (!pending.length) return;
+
+    let cancelled = false;
+    const queue = [...pending];
+    const runWorker = async () => {
+      while (!cancelled && queue.length) {
+        const item = queue.shift();
+        if (item) await ensureSpanishEpisodeTitle(item);
+      }
+    };
+
+    void Promise.all(Array.from({ length: 4 }, runWorker));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    ensureSpanishEpisodeTitle,
+    episodeTitleCache,
+    inView,
+    resolveEpisodeRouteTarget,
+    seasonsSorted,
+    showId,
+    tooltipEnabled,
+  ]);
+
   const format1 = (v) => {
     if (v == null) return null;
     const num = Math.round(Number(v) * 10) / 10;
@@ -620,22 +703,27 @@ export default function EpisodeRatingsGrid({
       ep.displayRating != null;
     if (!hasData) return null;
 
-    const titleText = ep.name || `Episodio ${episodeNumber}`;
-    const seriesGraphVal = ep.seriesGraphRating ?? ep.displayRating;
-    const seriesGraphVotesStr = ep.seriesGraphVotes
-      ? ep.seriesGraphVotes.toLocaleString()
-      : null;
+    const routeTarget = resolveEpisodeRouteTarget(ep, seasonNumber, episodeNumber);
+    const titleKey = routeTarget
+      ? `${routeTarget.seasonNumber}:${routeTarget.episodeNumber}`
+      : `${seasonNumber}:${episodeNumber}`;
+    const cachedSpanishTitle = episodeTitleCache.get(titleKey);
+    const titleText = cachedSpanishTitle || ep.name || "";
+    if (!titleText) return null;
+    const votes = ep.seriesGraphVotes ?? ep.tmdbVotes ?? ep.imdbVotes ?? null;
+    const votesText =
+      votes != null ? `${votes.toLocaleString("es-ES")} votos` : null;
 
     const seasonInfo = singleSeasonView
-      ? `Episode ${episodeNumber}`
-      : `Season ${seasonNumber}, Episode ${episodeNumber}`;
+      ? `Episodio ${episodeNumber}`
+      : `Temporada ${seasonNumber}, episodio ${episodeNumber}`;
 
     return {
+      titleKey,
       titleText,
       seasonInfo,
-      seriesGraphVal,
-      seriesGraphVotesStr,
-      format1,
+      votesText,
+      routeTarget,
     };
   };
 
