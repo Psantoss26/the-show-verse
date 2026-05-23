@@ -29,6 +29,7 @@ import {
 } from "@/lib/api/tmdb";
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
+import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 
 const anton = Anton({ weight: "400", subsets: ["latin"] });
@@ -706,7 +707,10 @@ function InlinePreviewCard({ show, heightClass }) {
               imdb = ext?.imdb_id || null;
             }
             if (imdb) {
-              const omdb = await fetchOmdbByImdb(imdb);
+              const [omdb, imdbDataset] = await Promise.all([
+                fetchOmdbByImdb(imdb),
+                fetchImdbRatingByImdb(imdb),
+              ]);
               const rawAwards = omdb?.Awards;
               if (
                 rawAwards &&
@@ -715,9 +719,8 @@ function InlinePreviewCard({ show, heightClass }) {
               ) {
                 awards = formatDashboardAwards(rawAwards);
               }
-              const r = omdb?.imdbRating;
-              if (r && !Number.isNaN(Number(r))) {
-                imdbRating = Number(r);
+              if (typeof imdbDataset?.rating === "number") {
+                imdbRating = imdbDataset.rating;
               }
             }
           } catch {}

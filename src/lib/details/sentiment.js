@@ -7,6 +7,12 @@ const normalizeText = (text = '') =>
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
 
+const normalizeTerm = (text = '') =>
+    String(text)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+
 const POSITIVE_PATTERNS = [
     {
         id: 'visuals',
@@ -155,6 +161,76 @@ const NEGATIVE_PATTERNS = [
     },
 ]
 
+const TRIVIA_PATTERNS = [
+    {
+        id: 'references',
+        terms: [
+            'reference', 'references', 'referencing', 'easter egg', 'callback', 'homage',
+            'tribute', 'nod', 'cameo', 'cameos', 'connection', 'connected',
+            'universe', 'franchise',
+            'referencia', 'referencias', 'guiño', 'guino', 'homenaje', 'cameo', 'cameos',
+            'conexion', 'conectad', 'universo', 'franquicia',
+        ],
+        text: 'Se comentan referencias, guiños o conexiones con otras obras.',
+    },
+    {
+        id: 'adaptation',
+        terms: [
+            'based on', 'adapted', 'adaptation', 'book', 'novel', 'comic', 'manga',
+            'game', 'source material', 'original',
+            'basad', 'adaptacion', 'adaptado', 'libro', 'novela', 'comic', 'manga',
+            'juego', 'material original', 'obra original',
+        ],
+        text: 'Aparecen detalles sobre la obra original o el material en el que se basa.',
+    },
+    {
+        id: 'production',
+        terms: [
+            'behind the scenes', 'production', 'filming', 'shooting', 'set', 'location',
+            'locations', 'practical effect', 'practical effects', 'makeup', 'costume',
+            'bts', 'camera', 'edited', 'editing', 'cut', 'budget',
+            'rodaje', 'produccion', 'escenario', 'localizacion', 'localizaciones',
+            'efecto practico', 'efectos practicos', 'maquillaje', 'vestuario',
+            'camara', 'montaje', 'presupuesto',
+        ],
+        text: 'La conversación menciona detalles de rodaje, producción o puesta en escena.',
+    },
+    {
+        id: 'real-context',
+        terms: [
+            'true story', 'real story', 'real life', 'historical', 'history', 'inspired by',
+            'actual', 'event', 'events',
+            'historia real', 'vida real', 'historico', 'historica', 'historia',
+            'inspirad', 'hecho real', 'hechos reales', 'evento', 'eventos',
+        ],
+        text: 'Se señalan conexiones con hechos reales, contexto histórico o inspiración real.',
+    },
+    {
+        id: 'cast',
+        terms: [
+            'actor was', 'actress was', 'cast was', 'director was', 'originally',
+            'audition', 'role', 'voice', 'dub', 'voice actor',
+            'actor era', 'actriz era', 'reparto', 'director era', 'originalmente',
+            'audicion', 'papel', 'voz', 'doblaje', 'actor de voz',
+        ],
+        text: 'Hay menciones curiosas sobre reparto, voces, casting o dirección.',
+    },
+    {
+        id: 'details',
+        terms: [
+            'fun fact', 'trivia', 'did you know', 'detail', 'details', 'symbolism',
+            'meaning', 'hidden', 'foreshadowing',
+            'post credits', 'after credits', 'credits scene', 'timeline', 'chronology',
+            'version', 'versions', 'alternate', 'extended', 'deleted scene',
+            'curiosidad', 'sabias que', 'sabías que', 'detalle', 'detalles',
+            'simbolismo', 'significado', 'oculto', 'presagio',
+            'postcreditos', 'post creditos', 'escena eliminada', 'version',
+            'versiones', 'alternativa', 'extendida', 'cronologia',
+        ],
+        text: 'Los usuarios destacan pequeños detalles, símbolos o lecturas ocultas.',
+    },
+]
+
 const splitSentences = (text) =>
     normalizeText(text)
         .split(/(?<=[\.\!\?])\s+|\n+/g)
@@ -167,7 +243,7 @@ const matchPatterns = (sentence, patterns) =>
         .map((pattern) => ({
             ...pattern,
             score: pattern.terms.reduce(
-                (acc, term) => (sentence.includes(term) ? acc + 1 : acc),
+                (acc, term) => (sentence.includes(normalizeTerm(term)) ? acc + 1 : acc),
                 0,
             ),
         }))
@@ -198,10 +274,12 @@ export const buildSentimentFromComments = (comments = []) => {
         for (const sentence of splitSentences(text)) {
             const positive = matchPatterns(sentence, POSITIVE_PATTERNS)
             const negative = matchPatterns(sentence, NEGATIVE_PATTERNS)
+            const trivia = matchPatterns(sentence, TRIVIA_PATTERNS)
             const positiveScore = positive.reduce((acc, item) => acc + item.score, 0)
             const negativeScore = negative.reduce((acc, item) => acc + item.score, 0)
+            const triviaScore = trivia.reduce((acc, item) => acc + item.score, 0)
 
-            if (positiveScore === 0 && negativeScore === 0) continue
+            if (positiveScore === 0 && negativeScore === 0 && triviaScore === 0) continue
 
             if (positiveScore > negativeScore) {
                 pool.push({
@@ -218,6 +296,15 @@ export const buildSentimentFromComments = (comments = []) => {
                     likes,
                 })
             }
+
+            if (triviaScore > 0) {
+                pool.push({
+                    ...trivia[0],
+                    sentiment: 'trivia',
+                    totalScore: triviaScore,
+                    likes,
+                })
+            }
         }
     }
 
@@ -229,9 +316,13 @@ export const buildSentimentFromComments = (comments = []) => {
     const cons = pool
         .filter((item) => item.sentiment === 'negative')
         .sort(sortBySignal)
+    const trivia = pool
+        .filter((item) => item.sentiment === 'trivia')
+        .sort(sortBySignal)
 
     return {
         pros: uniqueSpanishPoints(pros, 4),
         cons: uniqueSpanishPoints(cons, 4),
+        trivia: uniqueSpanishPoints(trivia, 4),
     }
 }

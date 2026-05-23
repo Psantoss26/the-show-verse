@@ -3,7 +3,7 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { LayoutGrid, WrapText, ArrowUpDown, BarChart3 } from "lucide-react";
+import { LayoutGrid, WrapText, ArrowUpDown, BarChart3, Info } from "lucide-react";
 
 /* =======================
    Hooks (perf / mobile)
@@ -168,7 +168,8 @@ export default function EpisodeRatingsGrid({
   const userPickedLayoutRef = useRef(false);
 
   const [inverted, setInverted] = useState(false);
-  const [showSeasonAvg, setShowSeasonAvg] = useState(false);
+  const [showSeasonAvg, setShowSeasonAvg] = useState(true);
+  const [legendOpen, setLegendOpen] = useState(false);
 
   // Tooltip (DESACTIVADO EN MÓVIL/TOUCH)
   const tooltipEnabled = !isTouchLike;
@@ -194,14 +195,14 @@ export default function EpisodeRatingsGrid({
   // tamaños
   const SIZES = {
     compact: {
-      cell: "w-[46px] h-[30px] md:w-[54px] md:h-[34px] lg:w-[60px] lg:h-[38px]",
-      headerPad: "px-2 py-1.5",
-      stickyCol: "w-12 md:w-14 lg:w-16",
+      cell: "w-[54px] h-[36px] sm:w-[60px] sm:h-[40px] lg:w-[66px] lg:h-[43px]",
+      headerPad: "px-0 py-1.5 sm:px-1",
+      stickyCol: "w-5 sm:w-8 lg:w-9",
     },
     comfy: {
-      cell: "w-[64px] h-[38px] md:w-[74px] md:h-[44px] lg:w-[84px] lg:h-[48px]",
-      headerPad: "px-3 py-2",
-      stickyCol: "w-16 md:w-20 lg:w-24",
+      cell: "w-[64px] h-[42px] sm:w-[70px] sm:h-[46px] lg:w-[78px] lg:h-[50px]",
+      headerPad: "px-0 py-2 sm:px-1.5",
+      stickyCol: "w-6 sm:w-9 lg:w-10",
     },
   };
   const SZ = SIZES[density] ?? SIZES.compact;
@@ -456,24 +457,60 @@ export default function EpisodeRatingsGrid({
 
   const toneFor = (v) => {
     if (v == null)
-      return { bg: "bg-zinc-800", text: "text-zinc-400", ring: "ring-white/5" };
-    if (v >= 9.5)
-      return { bg: "bg-teal-400", text: "text-black", ring: "ring-black/10" };
+      return {
+        bg: "bg-[#2f3035]",
+        text: "text-zinc-400",
+        ring: "ring-transparent",
+        bar: "bg-zinc-700",
+      };
+    if (v >= 9.7)
+      return {
+        bg: "bg-[#26a8ea]",
+        text: "text-white",
+        ring: "ring-transparent",
+        bar: "bg-[#26a8ea]",
+      };
     if (v >= 9.0)
       return {
-        bg: "bg-emerald-700",
-        text: "text-white/90",
-        ring: "ring-black/10",
+        bg: "bg-[#0b6f3d]",
+        text: "text-white",
+        ring: "ring-transparent",
+        bar: "bg-[#0b6f3d]",
       };
     if (v >= 8.0)
-      return { bg: "bg-green-500", text: "text-black", ring: "ring-black/10" };
+      return {
+        bg: "bg-[#24b260]",
+        text: "text-[#10231b]",
+        ring: "ring-transparent",
+        bar: "bg-[#24b260]",
+      };
     if (v >= 7.0)
-      return { bg: "bg-yellow-300", text: "text-black", ring: "ring-black/10" };
+      return {
+        bg: "bg-[#f2d43b]",
+        text: "text-[#1d1d1f]",
+        ring: "ring-transparent",
+        bar: "bg-[#f2d43b]",
+      };
     if (v >= 6.0)
-      return { bg: "bg-yellow-500", text: "text-black", ring: "ring-black/10" };
+      return {
+        bg: "bg-[#f39b16]",
+        text: "text-[#1d1d1f]",
+        ring: "ring-transparent",
+        bar: "bg-[#f39b16]",
+      };
     if (v >= 5.0)
-      return { bg: "bg-red-500", text: "text-white", ring: "ring-black/10" };
-    return { bg: "bg-purple-700", text: "text-white", ring: "ring-white/10" };
+      return {
+        bg: "bg-[#f04444]",
+        text: "text-white",
+        ring: "ring-transparent",
+        bar: "bg-[#f04444]",
+      };
+    return {
+      bg: "bg-[#8b22d6]",
+      text: "text-white",
+      ring: "ring-transparent",
+      bar: "bg-[#8b22d6]",
+    };
   };
 
   const buildTooltipData = (ep, seasonNumber, episodeNumber) => {
@@ -566,19 +603,18 @@ export default function EpisodeRatingsGrid({
   // =======================
   const renderGrid = () => (
     <div
-      className="overflow-x-auto overflow-y-visible mt-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain"
+      className="-ml-3 pr-3 overflow-x-auto overflow-y-visible mt-3 [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:ml-0 sm:pr-0"
       style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
-      <table className="border-separate border-spacing-0 [table-layout:fixed]">
+      <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed] [font-family:Inter,ui-sans-serif,system-ui,sans-serif]">
         <thead>
           <tr>
             <th
               className={`
                 sticky left-0 z-10
-                bg-black/70
-                md:bg-black/60 md:backdrop-blur
+                bg-transparent
                 ${SZ.headerPad}
-                text-left text-[11px] text-zinc-400 font-medium
+                text-left text-[12px] text-zinc-400 font-medium
                 ${SZ.stickyCol}
               `}
             />
@@ -587,10 +623,8 @@ export default function EpisodeRatingsGrid({
                 key={s.season_number}
                 className={`
                   ${SZ.headerPad}
-                  text-center text-xs text-zinc-200 font-semibold
-                  bg-black/70
-                  md:bg-black/60 md:backdrop-blur
-                  border-b border-white/10
+                  text-center text-[14px] lg:text-[15px] text-zinc-100 font-medium
+                  bg-transparent
                 `}
               >
                 S{s.season_number}
@@ -605,12 +639,10 @@ export default function EpisodeRatingsGrid({
               <td
                 className={`
                   sticky left-0 z-10
-                  bg-black/70
-                  md:bg-black/60 md:backdrop-blur
+                  bg-transparent
                   ${SZ.headerPad}
-                  text-[11px] text-zinc-300 font-medium
+                  text-right text-[13px] lg:text-[14px] text-zinc-100 font-medium
                   ${SZ.stickyCol}
-                  border-r border-white/5
                 `}
               >
                 E{epNum}
@@ -625,6 +657,7 @@ export default function EpisodeRatingsGrid({
 
                 const bgClass = isUpcoming ? "bg-zinc-400" : spec.bg;
                 const textClass = isUpcoming ? "text-black" : spec.text;
+                const isBlank = !ep;
 
                 const tooltipData = isUpcoming
                   ? null
@@ -633,7 +666,13 @@ export default function EpisodeRatingsGrid({
                   cellProps(ep, s.season_number, epNum);
 
                 return (
-                  <td key={`s${s.season_number}-e${epNum}`} className="p-1">
+                  <td
+                    key={`s${s.season_number}-e${epNum}`}
+                    className="p-0 align-middle"
+                  >
+                    {isBlank ? (
+                      <div className={SZ.cell} aria-hidden="true" />
+                    ) : (
                     <div
                       onMouseEnter={
                         tooltipEnabled
@@ -654,21 +693,21 @@ export default function EpisodeRatingsGrid({
                         className={`
                           ${bgClass} ${textClass}
                           ${SZ.cell}
-                          rounded-[6px]
+                          rounded-[5px]
                           flex items-center justify-center
-                          text-[16px] md:text-[15px] lg:text-[22px]
-                          font-semibold
+                          text-[21px] sm:text-[23px] lg:text-[27px]
+                          font-extrabold leading-none
                           [font-variant-numeric:tabular-nums]
                           select-none
-                          ${clickable ? "cursor-pointer hover:brightness-[1.06]" : "cursor-default"}
+                          ${clickable ? "cursor-pointer hover:brightness-[1.08]" : "cursor-default"}
                           ${clickable ? "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30" : ""}
-                          ${tooltipEnabled ? "md:shadow-[0_0_0_2px_rgba(0,0,0,0.9)]" : "shadow-none"}
-                          transition
+                          transition duration-150
                         `}
                       >
                         {val ?? "—"}
                       </div>
                     </div>
+                    )}
                   </td>
                 );
               })}
@@ -680,15 +719,13 @@ export default function EpisodeRatingsGrid({
               <td
                 className={`
                   sticky left-0 z-10
-                  bg-black/80
-                  md:backdrop-blur
+                  bg-transparent
                   ${SZ.headerPad}
-                  text-[11px] text-zinc-100 font-semibold
+                  text-right text-[13px] lg:text-[14px] text-zinc-300 font-semibold
                   ${SZ.stickyCol}
-                  border-t border-white/10 border-r border-white/5
                 `}
               >
-                AVG
+                AVG.
               </td>
 
               {seasonsSorted.map((s) => {
@@ -699,16 +736,16 @@ export default function EpisodeRatingsGrid({
                 return (
                   <td
                     key={`avg-s${s.season_number}`}
-                    className="px-2 pt-3 pb-2 text-center align-bottom border-t border-white/10"
+                    className="p-0 pt-1 text-center align-bottom"
                   >
-                    <div className="flex flex-col items-center gap-[2px] min-w-[40px]">
-                      <span className="text-sm md:text-base lg:text-lg font-semibold text-white [font-variant-numeric:tabular-nums]">
+                    <div className={`${SZ.cell} flex flex-col items-center justify-end gap-[5px]`}>
+                      <span className="text-[24px] lg:text-[27px] font-extrabold leading-none text-white [font-variant-numeric:tabular-nums]">
                         {val ?? "—"}
                       </span>
                       <span
                         className={`
-                          mt-[2px] h-[3px] md:h-[4px] w-8 md:w-10 lg:w-12 rounded-full
-                          ${avg == null ? "bg-zinc-700" : spec.bg}
+                          h-[4px] w-full rounded-t-sm
+                          ${avg == null ? "bg-zinc-700" : spec.bar}
                         `}
                       />
                     </div>
@@ -727,19 +764,18 @@ export default function EpisodeRatingsGrid({
   // =======================
   const renderGridInverted = () => (
     <div
-      className="overflow-x-auto overflow-y-visible mt-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain"
+      className="-ml-3 pr-3 overflow-x-auto overflow-y-visible mt-3 [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:ml-0 sm:pr-0"
       style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
-      <table className="border-separate border-spacing-0 [table-layout:fixed]">
+      <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed] [font-family:Inter,ui-sans-serif,system-ui,sans-serif]">
         <thead>
           <tr>
             <th
               className={`
                 sticky left-0 z-10
-                bg-black/70
-                md:bg-black/60 md:backdrop-blur
+                bg-transparent
                 ${SZ.headerPad}
-                text-left text-[11px] text-zinc-400 font-medium
+                text-left text-[12px] text-zinc-400 font-medium
                 ${SZ.stickyCol}
               `}
             />
@@ -748,10 +784,8 @@ export default function EpisodeRatingsGrid({
                 key={`eh-${epNum}`}
                 className={`
                   ${SZ.headerPad}
-                  text-center text-xs text-zinc-200 font-semibold
-                  bg-black/70
-                  md:bg-black/60 md:backdrop-blur
-                  border-b border-white/10
+                  text-center text-[14px] lg:text-[15px] text-zinc-100 font-medium
+                  bg-transparent
                 `}
               >
                 E{epNum}
@@ -761,13 +795,11 @@ export default function EpisodeRatingsGrid({
               <th
                 className={`
                   ${SZ.headerPad}
-                  text-center text-xs text-zinc-200 font-semibold
-                  bg-black/70
-                  md:bg-black/60 md:backdrop-blur
-                  border-b border-white/10
+                  text-center text-[14px] lg:text-[15px] text-zinc-100 font-medium
+                  bg-transparent
                 `}
               >
-                AVG
+                AVG.
               </th>
             )}
           </tr>
@@ -779,12 +811,10 @@ export default function EpisodeRatingsGrid({
               <td
                 className={`
                   sticky left-0 z-10
-                  bg-black/70
-                  md:bg-black/60 md:backdrop-blur
+                  bg-transparent
                   ${SZ.headerPad}
-                  text-[11px] text-zinc-300 font-medium
+                  text-right text-[13px] lg:text-[14px] text-zinc-100 font-medium
                   ${SZ.stickyCol}
-                  border-r border-white/5
                 `}
               >
                 S{s.season_number}
@@ -799,6 +829,7 @@ export default function EpisodeRatingsGrid({
                 const spec = toneFor(raw);
                 const bgClass = isUpcoming ? "bg-zinc-400" : spec.bg;
                 const textClass = isUpcoming ? "text-black" : spec.text;
+                const isBlank = !ep;
 
                 const tooltipData = isUpcoming
                   ? null
@@ -807,7 +838,13 @@ export default function EpisodeRatingsGrid({
                   cellProps(ep, s.season_number, epNum);
 
                 return (
-                  <td key={`s${s.season_number}-e${epNum}`} className="p-1">
+                  <td
+                    key={`s${s.season_number}-e${epNum}`}
+                    className="p-0 align-middle"
+                  >
+                    {isBlank ? (
+                      <div className={SZ.cell} aria-hidden="true" />
+                    ) : (
                     <div
                       onMouseEnter={
                         tooltipEnabled
@@ -826,14 +863,14 @@ export default function EpisodeRatingsGrid({
                         onKeyDown={onKeyDown}
                         title={title}
                         className={`
-                          ${bgClass} ${textClass} ring-1 ${spec.ring}
-                          rounded-[6px]
+                          ${bgClass} ${textClass}
+                          rounded-[5px]
                           ${SZ.cell}
                           flex items-center justify-center
-                          font-semibold
+                          font-extrabold leading-none
                           [font-variant-numeric:tabular-nums]
-                          text-[16px] md:text-[16px] lg:text-[22px]
-                          ${clickable ? "cursor-pointer hover:brightness-[1.07]" : "cursor-default"}
+                          text-[21px] sm:text-[23px] lg:text-[27px]
+                          ${clickable ? "cursor-pointer hover:brightness-[1.08]" : "cursor-default"}
                           ${clickable ? "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30" : ""}
                           transition duration-150
                           select-none
@@ -842,26 +879,27 @@ export default function EpisodeRatingsGrid({
                         {val ?? "—"}
                       </div>
                     </div>
+                    )}
                   </td>
                 );
               })}
 
               {showSeasonAvg && (
-                <td className="px-2 pt-3 pb-2 text-center align-bottom border-l border-white/10">
+                <td className="p-0 pt-1 text-center align-bottom">
                   {(() => {
                     const avg = seasonAverages.get(s.season_number) ?? null;
                     const spec = toneFor(avg);
                     const val = format1(avg);
 
                     return (
-                      <div className="flex flex-col items-center gap-[2px] min-w-[40px]">
-                        <span className="text-sm md:text-base lg:text-lg font-semibold text-white [font-variant-numeric:tabular-nums]">
+                      <div className={`${SZ.cell} flex flex-col items-center justify-end gap-[5px]`}>
+                        <span className="text-[24px] lg:text-[27px] font-extrabold leading-none text-white [font-variant-numeric:tabular-nums]">
                           {val ?? "—"}
                         </span>
                         <span
                           className={`
-                            mt-[2px] h-[3px] md:h-[4px] w-8 md:w-10 lg:w-12 rounded-full
-                            ${avg == null ? "bg-zinc-700" : spec.bg}
+                            h-[4px] w-full rounded-t-sm
+                            ${avg == null ? "bg-zinc-700" : spec.bar}
                           `}
                         />
                       </div>
@@ -936,14 +974,14 @@ export default function EpisodeRatingsGrid({
                       onKeyDown={onKeyDown}
                       title={title}
                       className={`
-                        ${bgClass} ${textClass} ring-1 ${spec.ring}
-                        rounded-[6px]
+                        ${bgClass} ${textClass}
+                        rounded-[5px]
                         ${SZ.cell}
                         flex items-center justify-center
-                        font-semibold
+                        font-extrabold leading-none
                         [font-variant-numeric:tabular-nums]
-                        text-[16px] md:text-[16px] lg:text-[22px]
-                        ${clickable ? "cursor-pointer hover:brightness-[1.07]" : "cursor-default"}
+                        text-[21px] sm:text-[23px] lg:text-[27px]
+                        ${clickable ? "cursor-pointer hover:brightness-[1.08]" : "cursor-default"}
                         ${clickable ? "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30" : ""}
                         transition duration-150
                         select-none
@@ -974,38 +1012,28 @@ export default function EpisodeRatingsGrid({
     <>
       <div ref={inViewRef} className="space-y-3">
         {/* Controles */}
-        <div className="flex flex-wrap items-center gap-3">
-          <SegmentedToggle
-            options={[
-              { id: "grid", label: "Grid" },
-              { id: "wrapped", label: "Wrapped" },
-            ]}
-            value={layoutMode}
-            onChange={setLayoutModeSafe}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <ViewModeControl value={layoutMode} onChange={setLayoutModeSafe} />
+
+          <IconToggle
+            icon={ArrowUpDown}
+            label="Invertida"
+            checked={inverted}
+            disabled={layoutMode === "wrapped"}
+            onChange={(v) => {
+              if (layoutMode === "grid") setInverted(v);
+            }}
           />
 
-          <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-300">
-            <div className="flex items-center gap-1.5">
-              <ArrowUpDown className="w-3.5 h-3.5 opacity-80" />
-              <span>Inverted</span>
-            </div>
-            <Switch
-              checked={inverted}
-              disabled={layoutMode === "wrapped"}
-              onChange={(v) => {
-                if (layoutMode === "grid") setInverted(v);
-              }}
-            />
+          <IconToggle
+            icon={BarChart3}
+            label="Media"
+            checked={showSeasonAvg}
+            onChange={setShowSeasonAvg}
+          />
 
-            <div className="flex items-center gap-1.5 ml-3">
-              <BarChart3 className="w-3.5 h-3.5 opacity-80" />
-              <span>Season Avg.</span>
-            </div>
-            <Switch checked={showSeasonAvg} onChange={setShowSeasonAvg} />
-          </div>
+          <LegendPopover open={legendOpen} setOpen={setLegendOpen} />
         </div>
-
-        <LegendSeriesGraph />
 
         {/* Layout */}
         {layoutMode === "grid" ? (
@@ -1038,27 +1066,42 @@ export default function EpisodeRatingsGrid({
    Controles auxiliares
 ======================= */
 
-function SegmentedToggle({ options, value, onChange }) {
+const LEGEND_ITEMS = [
+  ["bg-[#26a8ea]", "Absolute Cinema"],
+  ["bg-[#0b6f3d]", "Awesome"],
+  ["bg-[#24b260]", "Great"],
+  ["bg-[#f2d43b]", "Good"],
+  ["bg-[#f39b16]", "Average"],
+  ["bg-[#f04444]", "Bad"],
+  ["bg-[#8b22d6]", "Garbage"],
+  ["bg-[#2f3035]", "Sin nota"],
+];
+
+function ViewModeControl({ value, onChange }) {
+  const options = [
+    { id: "grid", label: "Grid", icon: LayoutGrid },
+    { id: "wrapped", label: "Wrapped", icon: WrapText },
+  ];
+
   return (
-    <div className="inline-flex items-center rounded-full bg-black/30 border border-white/10 p-0.5 backdrop-blur-sm shadow-[0_8px_20px_rgba(0,0,0,0.45)]">
+    <div className="inline-flex h-9 items-center rounded-full border border-white/10 bg-black/35 p-1 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md">
       {options.map((opt) => {
         const active = opt.id === value;
-        let Icon = null;
-        if (opt.id === "grid") Icon = LayoutGrid;
-        if (opt.id === "wrapped") Icon = WrapText;
+        const Icon = opt.icon;
 
         return (
           <button
             key={opt.id}
             type="button"
             onClick={() => onChange(opt.id)}
+            aria-pressed={active}
             className={`
-              px-3 py-1.5 text-[11px] font-medium rounded-full
-              inline-flex items-center gap-1.5 transition-colors
-              ${active ? "bg-white text-black shadow-sm" : "text-zinc-200 hover:bg-white/5"}
+              h-7 rounded-full px-2.5 text-[11px] font-semibold
+              inline-flex items-center gap-1.5 transition-all duration-150
+              ${active ? "bg-white text-black shadow-sm" : "text-zinc-300 hover:bg-white/10 hover:text-white"}
             `}
           >
-            {Icon && <Icon className="w-3.5 h-3.5" />}
+            <Icon className="h-3.5 w-3.5" />
             <span>{opt.label}</span>
           </button>
         );
@@ -1067,56 +1110,92 @@ function SegmentedToggle({ options, value, onChange }) {
   );
 }
 
-function Switch({ checked, onChange, disabled }) {
+function IconToggle({ icon: Icon, label, checked, onChange, disabled }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => !disabled && onChange(!checked)}
+    <div
       className={`
-        w-10 h-5 rounded-full flex items-center px-[3px]
-        transition-colors border
-        ${
-          disabled
-            ? "opacity-40 cursor-not-allowed bg-black/40 border-white/10"
-            : checked
-              ? "bg-emerald-500 border-emerald-400"
-              : "bg-black/40 border-white/15"
-        }
+        inline-flex h-9 items-center gap-2 rounded-full border border-white/10
+        bg-black/30 px-2.5 text-[11px] font-semibold text-zinc-300
+        shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-md
+        ${disabled ? "opacity-45" : ""}
       `}
-      aria-pressed={checked}
     >
-      <span
+      <Icon className="h-3.5 w-3.5 text-zinc-300" />
+      <span className="hidden sm:inline">{label}</span>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
         className={`
-          w-4 h-4 rounded-full bg-white shadow
-          transform transition-transform
-          ${checked ? "translate-x-4" : "translate-x-0"}
+          relative h-5 w-9 rounded-full border transition-colors duration-150
+          ${
+            disabled
+              ? "cursor-not-allowed border-white/10 bg-black/40"
+              : checked
+                ? "border-emerald-400 bg-emerald-500"
+                : "border-white/15 bg-black/50"
+          }
         `}
-      />
-    </button>
+        aria-label={label}
+        aria-pressed={checked}
+      >
+        <span
+          className={`
+            absolute left-[3px] top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow
+            transition-transform duration-150
+            ${checked ? "translate-x-4" : "translate-x-0"}
+          `}
+        />
+      </button>
+    </div>
   );
 }
 
-function LegendSeriesGraph() {
-  const items = [
-    ["bg-teal-400", "Absolute Cinema"],
-    ["bg-emerald-700", "Awesome"],
-    ["bg-green-500", "Great"],
-    ["bg-yellow-300", "Good"],
-    ["bg-yellow-500", "Average"],
-    ["bg-red-500", "Bad"],
-    ["bg-purple-700", "Garbage"],
-    ["bg-zinc-800", "Sin nota"],
-  ];
+function LegendPopover({ open, setOpen }) {
+  const show = () => setOpen(true);
+  const hide = () => setOpen(false);
 
   return (
-    <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-300">
-      {items.map(([c, l]) => (
-        <span key={l} className="inline-flex items-center gap-1">
-          <span className={`inline-block w-3 h-3 rounded-full ${c}`} />
-          {l}
-        </span>
-      ))}
+    <div
+      className="relative"
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-label="Ver leyenda de colores"
+        className={`
+          inline-flex h-9 w-9 items-center justify-center rounded-full
+          border border-white/10 bg-black/35 text-zinc-200
+          shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md
+          transition-colors hover:bg-white/10 hover:text-white
+        `}
+      >
+        <Info className="h-4 w-4" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-2 w-[min(78vw,260px)] rounded-xl border border-white/10 bg-[#111214]/95 p-3 shadow-2xl backdrop-blur-xl sm:w-[300px]">
+          <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-400">
+            Leyenda
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {LEGEND_ITEMS.map(([c, l]) => (
+              <span
+                key={l}
+                className="inline-flex items-center gap-2 text-[12px] font-medium text-zinc-100"
+              >
+                <span className={`inline-block h-3.5 w-3.5 rounded-full ${c}`} />
+                {l}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

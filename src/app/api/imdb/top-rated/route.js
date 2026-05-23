@@ -1,5 +1,6 @@
 // /app/api/imdb/top-rated/route.js
 import { NextResponse } from "next/server";
+import { lookupImdbRatings } from "@/lib/server/imdbRatingsDataset";
 
 export const runtime = "nodejs";
 export const revalidate = 43200; // 12 horas
@@ -8,7 +9,6 @@ export const revalidate = 43200; // 12 horas
 const API_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
-const OMDB_KEY = process.env.OMDB_API_KEY;
 
 function buildUrl(path, params = {}) {
   const url = new URL(`${BASE_URL}${path}`);
@@ -63,15 +63,6 @@ async function tmdbImdbId(type, id) {
   return data?.imdb_id || null;
 }
 
-async function omdbByImdb(imdb) {
-  if (!OMDB_KEY) return null;
-  const url = `https://www.omdbapi.com/?apikey=${OMDB_KEY}&i=${imdb}`;
-  const res = await fetch(url, { next: { revalidate: 60 * 60 * 24 } });
-  const j = await res.json().catch(() => ({}));
-  if (j?.Response === "False") return null;
-  return j;
-}
-
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -99,11 +90,57 @@ export async function GET(req) {
     // 1) Semillas desde TMDb
     const candidates = await tmdbDiscoverSeed({ type, pages });
 
-    // ✅ Si no hay OMDb key, devolvemos “top” basado en TMDb (fallback)
-    if (!OMDB_KEY) {
-      console.warn(
-        "[IMDb Top-Rated] OMDB_KEY not configured, using TMDb fallback",
+    // 2) Pre-filtrar por vote_count de TMDb antes de resolver IMDb.
+    // Reduce llamadas externas: items con pocos votos en TMDb raramente superan minVotes en IMDb.
+    const tmdbVoteThreshold =
+      type === "movie"
+        ? Math.max(minVotes * 0.08, 500)
+        : Math.max(minVotes * 0.15, 200);
+    const preFiltered = candidates.filter(
+      (it) => (it.vote_count || 0) >= tmdbVoteThreshold,
+    );
+
+    // 3) Resolver IMDb IDs desde TMDb (paralelo)
+    const concurrency = 8;
+    const queue = [...preFiltered];
+    const withImdbIds = [];
+
+    async function worker() {
+      while (queue.length) {
+        const item = queue.shift();
+        try {
+          const imdb = await tmdbImdbId(type, item.id);
+          if (!imdb) continue;
+          withImdbIds.push({ ...item, imdb_id: imdb });
+        } catch {
+          // seguimos
+        }
+      }
+    }
+
+    await Promise.all(new Array(concurrency).fill(0).map(worker));
+
+    let imdbRatings = {};
+    try {
+      imdbRatings = await lookupImdbRatings(
+        withImdbIds.map((item) => item.imdb_id),
       );
+    } catch {
+      imdbRatings = {};
+    }
+
+    const enriched = withImdbIds
+      .map((item) => {
+        const imdb = imdbRatings[item.imdb_id];
+        if (!imdb?.rating || Number(imdb.votes || 0) < minVotes) return null;
+        return {
+          ...item,
+          _imdb: { rating: imdb.rating, votes: imdb.votes },
+        };
+      })
+      .filter(Boolean);
+
+    if (!enriched.length) {
       const fallback = [...candidates]
         .sort(
           (a, b) =>
@@ -123,54 +160,6 @@ export async function GET(req) {
       return res;
     }
 
-    // 2) Pre-filtrar por vote_count de TMDb antes de llamar a OMDB
-    // Reduce llamadas API: items con pocos votos en TMDb raramente superan minVotes en IMDb
-    const tmdbVoteThreshold =
-      type === "movie"
-        ? Math.max(minVotes * 0.08, 500)
-        : Math.max(minVotes * 0.15, 200);
-    const preFiltered = candidates.filter(
-      (it) => (it.vote_count || 0) >= tmdbVoteThreshold,
-    );
-
-    // 3) Enriquecer con IMDb (paralelo)
-    const concurrency = 8;
-    const queue = [...preFiltered];
-    const enriched = [];
-
-    async function worker() {
-      while (queue.length) {
-        const item = queue.shift();
-        try {
-          const imdb = await tmdbImdbId(type, item.id);
-          if (!imdb) continue;
-
-          const o = await omdbByImdb(imdb);
-          if (!o) continue;
-
-          const imdbRating =
-            o?.imdbRating && o.imdbRating !== "N/A"
-              ? Number(o.imdbRating)
-              : null;
-          const imdbVotes = o?.imdbVotes
-            ? Number(String(o.imdbVotes).replace(/,/g, ""))
-            : 0;
-          if (!imdbRating) continue;
-          if (imdbVotes < minVotes) continue;
-
-          enriched.push({
-            ...item,
-            imdb_id: imdb,
-            _imdb: { rating: imdbRating, votes: imdbVotes },
-          });
-        } catch {
-          // seguimos
-        }
-      }
-    }
-
-    await Promise.all(new Array(concurrency).fill(0).map(worker));
-
     // 3) Orden por rating IMDb y votos
     enriched.sort((a, b) => {
       const r = (b._imdb?.rating || 0) - (a._imdb?.rating || 0);
@@ -182,7 +171,7 @@ export async function GET(req) {
 
     const res = NextResponse.json({
       items,
-      meta: { source: "imdb+omdb", type },
+      meta: { source: "imdb-dataset", type },
     });
     res.headers.set(
       "Cache-Control",
