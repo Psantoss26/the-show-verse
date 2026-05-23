@@ -99,7 +99,8 @@ import {
   markInWatchlist,
   getExternalIds,
 } from "@/lib/api/tmdb";
-import { fetchOmdbByImdb } from "@/lib/api/omdb"; // Datos extra de OMDb (IMDb rating, RT, MC)
+import { fetchOmdbByImdb } from "@/lib/api/omdb"; // Datos extra de OMDb (RT, MC, premios)
+import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { fetchTmdbAwards } from "@/lib/api/tmdbAwards";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import StarRating from "./StarRating"; // Componente de puntuacion con estrellas
@@ -116,6 +117,7 @@ import {
   traktGetShowWatched,
   traktSetEpisodeWatched,
   traktGetComments,
+  traktGetSentiments,
   traktGetLists,
   traktGetShowSeasons,
   traktGetScoreboard,
@@ -164,9 +166,6 @@ import {
   mixedCount,
   sumCount,
 } from "@/lib/details/formatters";
-
-// Analisis de sentimiento: extrae pros/contras de comentarios de Trakt
-import { buildSentimentFromComments } from "@/lib/details/sentiment";
 
 // -- Gestion de listas de usuario en TMDb (CRUD) --
 import {
@@ -817,6 +816,31 @@ function normalizeOmdbAwards(value) {
   const text = String(value || "").trim();
   if (!text || text === "N/A") return null;
   return text;
+}
+
+function normalizeSentimentKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatTraktSentimentList(items = [], max = 4) {
+  const seen = new Set();
+  const out = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const text = String(item?.sentiment_es || "").trim();
+    const key = normalizeSentimentKey(text);
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+    if (out.length >= max) break;
+  }
+
+  return out;
 }
 
 function toRatingNumber(value) {
@@ -3200,11 +3224,11 @@ export default function DetailsClient({
   // -- Analisis de sentimiento: pros y contras extraidos de comentarios --
   const [tSentiment, setTSentiment] = useState({
     loading: false,
-    error: "",
-    pros: [],
-    cons: [],
-    sourceCount: 0,
-  });
+  error: "",
+  pros: [],
+  cons: [],
+  sourceCount: 0,
+});
 
   // -- Comentarios de Trakt con paginacion y pestanas --
   const [tCommentsTab, setTCommentsTab] = useState("recent"); // "likes30" (top 30 dias) | "likesAll" (top historico) | "recent"
@@ -3267,7 +3291,7 @@ export default function DetailsClient({
       setTraktDeferredReady(true);
     }, 6000);
     return () => window.clearTimeout(safetyTimer);
-  }, [id, traktType, traktDeferredReady]);
+  }, [id, traktType, traktDeferredReady, data, type, title]);
 
   // Resetear todos los datos de la comunidad de Trakt al cambiar de contenido
   useEffect(() => {
@@ -3398,34 +3422,24 @@ export default function DetailsClient({
 
       try {
         const r = await withTimeout(
-          traktGetComments({
+          traktGetSentiments({
             type: traktType,
             tmdbId: id,
-            sort: "likes",
-            page: 1,
-            limit: 50,
           }),
           20000,
         );
 
         if (ignore) return;
 
-        const allItems = Array.isArray(r?.items) ? r.items : [];
-        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-        const recentItems = allItems.filter((c) => {
-          const t = new Date(c?.created_at || 0).getTime();
-          return Number.isFinite(t) && t >= cutoff;
-        });
-
-        const sourceItems = recentItems.length > 0 ? recentItems : allItems;
-        const { pros, cons } = buildSentimentFromComments(sourceItems);
+        const pros = formatTraktSentimentList(r?.good, 4);
+        const cons = formatTraktSentimentList(r?.bad, 4);
 
         setTSentiment({
           loading: false,
           error: "",
           pros,
           cons,
-          sourceCount: sourceItems.length,
+          sourceCount: Number(r?.comment_count || 0) || 0,
         });
       } catch (e) {
         if (ignore) return;
@@ -5467,21 +5481,20 @@ export default function DetailsClient({
         )
           return;
 
-        // Peticion a OMDb para obtener datos frescos
-        const omdb = await fetchOmdbByImdb(imdbId);
+        // IMDb rating: dataset oficial de IMDb. OMDb queda para awards/RT/MC.
+        const [imdbDataset, omdb] = await Promise.all([
+          fetchImdbRatingByImdb(imdbId),
+          fetchOmdbByImdb(imdbId),
+        ]);
         if (abort) return;
 
         const imdbRating =
-          omdb?.imdbRating && omdb.imdbRating !== "N/A"
-            ? Number(omdb.imdbRating)
-            : null;
+          typeof imdbDataset?.rating === "number" ? imdbDataset.rating : null;
+        const votes =
+          typeof imdbDataset?.votes === "number" ? imdbDataset.votes : null;
 
         const { rtScore, mcScore } = extractOmdbExtraScores(omdb);
         const awards = normalizeOmdbAwards(omdb?.Awards);
-        const votes =
-          omdb?.imdbVotes && omdb.imdbVotes !== "N/A"
-            ? Number(String(omdb.imdbVotes).replace(/,/g, ""))
-            : null;
 
         // Actualizar IMDb, votos, RT y Metacritic juntos para evitar apariciones escalonadas.
         setExtras((prev) => ({
@@ -7253,15 +7266,15 @@ export default function DetailsClient({
             if (cached?.fresh) return;
           }
 
-          const omdb = await fetchOmdbByImdb(imdbId);
-          const r =
-            omdb?.imdbRating && omdb.imdbRating !== "N/A"
-              ? Number(omdb.imdbRating)
-              : null;
-
-          const safe = Number.isFinite(r) ? r : null;
+          const imdbDataset = await fetchImdbRatingByImdb(imdbId);
+          const safe =
+            typeof imdbDataset?.rating === "number" ? imdbDataset.rating : null;
           setRecImdbRatings((prev) => ({ ...prev, [rid]: safe }));
-          writeOmdbCache(imdbId, { imdbRating: safe });
+          writeOmdbCache(imdbId, {
+            imdbRating: safe,
+            imdbVotes:
+              typeof imdbDataset?.votes === "number" ? imdbDataset.votes : null,
+          });
         } catch {
           setRecImdbRatings((prev) => ({ ...prev, [rid]: null }));
         } finally {
@@ -10321,7 +10334,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               Opiniones de la comunidad de Trakt
                             </h3>
                             <p className="text-xs font-medium text-zinc-400">
-                              Resumen automático basado en comentarios sobre{" "}
+                              Resumen oficial de sentimientos de Trakt sobre{" "}
                               <span className="text-zinc-200">{title}</span>
                             </p>
                           </div>
@@ -10333,7 +10346,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                       <div className="p-6">
                         {/* Sin mostrar error, directamente el contenido */}
-                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                           {/* Columna Positiva */}
                           <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
                             <div className="mb-4 flex items-center gap-3">
@@ -10341,7 +10354,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <ThumbsUp className="h-4 w-4" />
                               </div>
                               <span className="font-bold tracking-wide text-emerald-100">
-                                Lo bueno
+                                Positivo
                               </span>
                             </div>
 
@@ -10371,7 +10384,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <ThumbsDown className="h-4 w-4" />
                               </div>
                               <span className="font-bold tracking-wide text-rose-100">
-                                Lo malo
+                                Negativo
                               </span>
                             </div>
 

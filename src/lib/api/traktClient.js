@@ -453,6 +453,19 @@ export async function traktGetComments({
   return json;
 }
 
+export async function traktGetSentiments({ type, tmdbId }) {
+  const qs = new URLSearchParams({
+    type: String(type),
+    tmdbId: String(tmdbId),
+  });
+  const res = await fetch(`/api/trakt/community/sentiments?${qs.toString()}`, {
+    cache: "no-store",
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || "Error cargando sentimientos");
+  return json;
+}
+
 export async function traktGetLists({
   type,
   tmdbId,
