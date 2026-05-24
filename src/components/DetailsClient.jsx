@@ -244,6 +244,43 @@ function withTimeout(promise, timeoutMs) {
   ]);
 }
 
+function formatRuntimeMinutes(minutes) {
+  const total = Number(minutes);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const rounded = Math.round(total);
+  const hours = Math.floor(rounded / 60);
+  const mins = rounded % 60;
+  if (hours <= 0) return `${mins}m`;
+  if (mins <= 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
+function formatEpisodeRuntime(data) {
+  const runtimes = Array.isArray(data?.episode_run_time)
+    ? data.episode_run_time
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value > 0)
+    : [];
+
+  const uniqueRuntimes = [...new Set(runtimes)].sort((a, b) => a - b);
+
+  if (uniqueRuntimes.length === 1) {
+    const value = formatRuntimeMinutes(uniqueRuntimes[0]);
+    return value;
+  }
+
+  if (uniqueRuntimes.length > 1) {
+    const min = formatRuntimeMinutes(uniqueRuntimes[0]);
+    const max = formatRuntimeMinutes(uniqueRuntimes[uniqueRuntimes.length - 1]);
+    return min && max ? `${min}-${max}` : null;
+  }
+
+  const lastEpisodeRuntime = formatRuntimeMinutes(
+    data?.last_episode_to_air?.runtime,
+  );
+  return lastEpisodeRuntime;
+}
+
 function DetailsArrowCarousel({ children, className = "", ...swiperProps }) {
   const swiperRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -336,11 +373,11 @@ function DetailsArrowCarousel({ children, className = "", ...swiperProps }) {
             exit={{ opacity: 0 }}
             type="button"
             onClick={handlePrevClick}
-            className="absolute inset-y-0 left-0 z-30 hidden w-24 items-center justify-start bg-gradient-to-r from-black/85 via-black/55 to-transparent transition-colors hover:from-black/95 hover:via-black/75 pointer-events-auto sm:flex"
+            className="absolute inset-y-0 -left-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10"
             aria-label="Anterior"
           >
             <motion.span
-              className="ml-4 text-4xl font-semibold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+              className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
               whileHover={{ x: -4 }}
             >
               ‹
@@ -357,11 +394,11 @@ function DetailsArrowCarousel({ children, className = "", ...swiperProps }) {
             exit={{ opacity: 0 }}
             type="button"
             onClick={handleNextClick}
-            className="absolute inset-y-0 right-0 z-30 hidden w-24 items-center justify-end bg-gradient-to-l from-black/85 via-black/55 to-transparent transition-colors hover:from-black/95 hover:via-black/75 pointer-events-auto sm:flex"
+            className="absolute inset-y-0 -right-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10"
             aria-label="Siguiente"
           >
             <motion.span
-              className="mr-4 text-4xl font-semibold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+              className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
               whileHover={{ x: 4 }}
             >
               ›
@@ -6722,9 +6759,12 @@ export default function DetailsClient({
     type === "tv" ? formatDateEs(data.last_air_date) : null;
 
   const runtimeValue =
-    type === "movie" && data.runtime
-      ? `${Math.floor(data.runtime / 60)}h ${data.runtime % 60}m`
-      : null;
+    type === "movie" ? formatRuntimeMinutes(data.runtime) : null;
+
+  const episodeRuntimeValue =
+    type === "tv" ? formatEpisodeRuntime(data) : null;
+
+  const displayRuntimeValue = runtimeValue || episodeRuntimeValue;
 
   const budgetValue =
     type === "movie" && data.budget > 0
@@ -8397,10 +8437,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </span>
                 )}
 
-                {runtimeValue && (
+                {displayRuntimeValue && (
                   <>
                     <span className="text-white text-[10px]">●</span>
-                    <span>{runtimeValue}</span>
+                    <span>{displayRuntimeValue}</span>
                   </>
                 )}
 
@@ -8958,6 +8998,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               />
                             ) : null}
 
+                            {type !== "movie" && episodeRuntimeValue ? (
+                              <VisualMetaCard
+                                icon={ClockIcon}
+                                label="Duración por episodio"
+                                value={episodeRuntimeValue}
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              />
+                            ) : null}
+
                             {/* Tarjeta: Fecha de Estreno/Inicio - Película: fecha de estreno, Serie: fecha de inicio */}
                             <VisualMetaCard
                               icon={CalendarIcon}
@@ -9154,6 +9203,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
                               : "—"
                           }
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                        />
+                      ) : null}
+
+                      {type !== "movie" && episodeRuntimeValue ? (
+                        <VisualMetaCard
+                          icon={ClockIcon}
+                          label="Duración por episodio"
+                          value={episodeRuntimeValue}
                           className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
                       ) : null}
@@ -10112,7 +10170,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       }
 
                       return (
-                        <div className="relative overflow-x-hidden overflow-y-visible">
+                        <div className="relative overflow-visible">
                           {!artworkRowReady && loadingCarousel}
 
                           {artworkRowReady && (
