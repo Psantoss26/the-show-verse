@@ -244,6 +244,135 @@ function withTimeout(promise, timeoutMs) {
   ]);
 }
 
+function DetailsArrowCarousel({ children, className = "", ...swiperProps }) {
+  const swiperRef = useRef(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+
+  const updateNav = useCallback((swiper) => {
+    if (!swiper) return;
+    const hasOverflow = !swiper.isLocked;
+    setCanPrev(hasOverflow && !swiper.isBeginning);
+    setCanNext(hasOverflow && !swiper.isEnd);
+  }, []);
+
+  const handleSwiper = useCallback(
+    (swiper) => {
+      swiperRef.current = swiper;
+      updateNav(swiper);
+    },
+    [updateNav],
+  );
+
+  const getStep = useCallback((swiper) => {
+    const current = swiper?.params?.slidesPerView;
+    return typeof current === "number" ? Math.max(1, Math.floor(current)) : 1;
+  }, []);
+
+  const handlePrevClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const swiper = swiperRef.current;
+      if (!swiper) return;
+      swiper.slideTo(Math.max((swiper.activeIndex || 0) - getStep(swiper), 0));
+    },
+    [getStep],
+  );
+
+  const handleNextClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const swiper = swiperRef.current;
+      if (!swiper) return;
+      const maxIndex = Math.max((swiper.slides?.length || 1) - 1, 0);
+      swiper.slideTo(
+        Math.min((swiper.activeIndex || 0) + getStep(swiper), maxIndex),
+      );
+    },
+    [getStep],
+  );
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Swiper
+        {...swiperProps}
+        onSwiper={(swiper) => {
+          handleSwiper(swiper);
+          swiperProps.onSwiper?.(swiper);
+        }}
+        onSlideChange={(swiper) => {
+          updateNav(swiper);
+          swiperProps.onSlideChange?.(swiper);
+        }}
+        onResize={(swiper) => {
+          updateNav(swiper);
+          swiperProps.onResize?.(swiper);
+        }}
+        onReachBeginning={(swiper) => {
+          updateNav(swiper);
+          swiperProps.onReachBeginning?.(swiper);
+        }}
+        onReachEnd={(swiper) => {
+          updateNav(swiper);
+          swiperProps.onReachEnd?.(swiper);
+        }}
+        className={className}
+      >
+        {children}
+      </Swiper>
+
+      <AnimatePresence>
+        {isHovered && canPrev && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            type="button"
+            onClick={handlePrevClick}
+            className="absolute inset-y-0 left-0 z-30 hidden w-24 items-center justify-start bg-gradient-to-r from-black/85 via-black/55 to-transparent transition-colors hover:from-black/95 hover:via-black/75 pointer-events-auto sm:flex"
+            aria-label="Anterior"
+          >
+            <motion.span
+              className="ml-4 text-4xl font-semibold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+              whileHover={{ x: -4 }}
+            >
+              ‹
+            </motion.span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isHovered && canNext && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            type="button"
+            onClick={handleNextClick}
+            className="absolute inset-y-0 right-0 z-30 hidden w-24 items-center justify-end bg-gradient-to-l from-black/85 via-black/55 to-transparent transition-colors hover:from-black/95 hover:via-black/75 pointer-events-auto sm:flex"
+            aria-label="Siguiente"
+          >
+            <motion.span
+              className="mr-4 text-4xl font-semibold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+              whileHover={{ x: 4 }}
+            >
+              ›
+            </motion.span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function normalizeProviderName(name = "") {
   return String(name)
     .normalize("NFD")
@@ -9171,7 +9300,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {castDataForUI && castDataForUI.length > 0 && (
                   <section className="mb-16">
                     <SectionTitle title="Reparto Principal" icon={Users} />
-                    <Swiper
+                    <DetailsArrowCarousel
                       spaceBetween={12}
                       slidesPerView={3}
                       breakpoints={{
@@ -9215,7 +9344,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           </Link>
                         </SwiperSlide>
                       ))}
-                    </Swiper>
+                    </DetailsArrowCarousel>
                   </section>
                 )}
               </AnimatedSection>
@@ -9228,7 +9357,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <section className="mb-16">
                     <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
 
-                    <Swiper
+                    <DetailsArrowCarousel
                       spaceBetween={12}
                       slidesPerView={3}
                       breakpoints={{
@@ -9371,7 +9500,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           </SwiperSlide>
                         );
                       })}
-                    </Swiper>
+                    </DetailsArrowCarousel>
                   </section>
                 )}
               </AnimatedSection>
@@ -9383,7 +9512,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <section className="mb-16">
                     <SectionTitle title="Premios" icon={Trophy} />
 
-                    <Swiper
+                    <DetailsArrowCarousel
                       spaceBetween={12}
                       slidesPerView={3}
                       breakpoints={{
@@ -9414,7 +9543,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           </SwiperSlide>
                         );
                       })}
-                    </Swiper>
+                    </DetailsArrowCarousel>
                   </section>
                 </AnimatedSection>
               </section>
@@ -9438,7 +9567,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         Cargando colección…
                       </div>
                     ) : collectionData?.items?.length ? (
-                      <Swiper
+                      <DetailsArrowCarousel
                         spaceBetween={12}
                         slidesPerView={3}
                         breakpoints={{
@@ -9486,7 +9615,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             </Link>
                           </SwiperSlide>
                         ))}
-                      </Swiper>
+                      </DetailsArrowCarousel>
                     ) : (
                       <div className="mt-3 sm:mt-4 text-sm text-zinc-400">
                         No hay datos de colección.
@@ -9987,7 +10116,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           {!artworkRowReady && loadingCarousel}
 
                           {artworkRowReady && (
-                            <Swiper
+                            <DetailsArrowCarousel
                               key={activeImagesTab}
                               spaceBetween={12}
                               slidesPerView={isBackdropLike ? 2 : 3}
@@ -10123,7 +10252,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   </SwiperSlide>
                                 );
                               })}
-                            </Swiper>
+                            </DetailsArrowCarousel>
                           )}
                         </div>
                       );
@@ -10196,7 +10325,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         )}
 
                       {videos.length > 0 && (
-                        <Swiper
+                        <DetailsArrowCarousel
                           spaceBetween={12}
                           slidesPerView={2}
                           breakpoints={{
@@ -10299,7 +10428,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </SwiperSlide>
                             );
                           })}
-                        </Swiper>
+                        </DetailsArrowCarousel>
                       )}
                     </div>
                   </section>
