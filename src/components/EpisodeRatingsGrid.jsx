@@ -73,6 +73,7 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
 
   useEffect(() => {
     if (!enabled) return;
+    if (!activeData) return;
     if (!anchorRect || !tooltipRef.current) return;
 
     const tooltip = tooltipRef.current;
@@ -95,7 +96,7 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
     }
 
     setCoords({ top, left });
-  }, [anchorRect, enabled]);
+  }, [activeData, anchorRect, enabled]);
 
   if (!enabled) return null;
   if (!activeData) return null;
@@ -107,7 +108,7 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
       style={{
         top: coords.top,
         left: coords.left,
-        opacity: anchorRect ? 1 : 0,
+        opacity: anchorRect && coords.top > 0 ? 1 : 0,
       }}
     >
       <div className="bg-black text-white px-3 py-2 rounded-md shadow-2xl border border-white/10 max-w-[280px] sm:max-w-[320px]">
@@ -158,14 +159,17 @@ export default function EpisodeRatingsGrid({
   const [episodeTitleCache, setEpisodeTitleCache] = useState(() => new Map());
   const episodeTitleInFlightRef = useRef(new Map());
   const episodeTitlePreloadKeyRef = useRef(null);
+  const activeHoverTitleKeyRef = useRef(null);
 
   const ensureSpanishEpisodeTitle = useCallback(
     async (tooltipData) => {
       if (!showId || !tooltipData?.titleKey || !tooltipData?.routeTarget) return;
       const { titleKey, routeTarget } = tooltipData;
 
-      if (episodeTitleCache.has(titleKey)) return;
-      if (episodeTitleInFlightRef.current.has(titleKey)) return;
+      if (episodeTitleCache.has(titleKey)) return episodeTitleCache.get(titleKey);
+      if (episodeTitleInFlightRef.current.has(titleKey)) {
+        return episodeTitleInFlightRef.current.get(titleKey);
+      }
 
       const request = fetch(
         `/api/tmdb/tv/${encodeURIComponent(showId)}/season/${encodeURIComponent(routeTarget.seasonNumber)}/episode/${encodeURIComponent(routeTarget.episodeNumber)}`,
@@ -189,6 +193,8 @@ export default function EpisodeRatingsGrid({
               ? { ...current, titleText: name || current.titleText }
               : current,
           );
+
+          return name;
         })
         .catch(() => {
           setEpisodeTitleCache((prev) => {
@@ -196,6 +202,7 @@ export default function EpisodeRatingsGrid({
             next.set(titleKey, null);
             return next;
           });
+          return null;
         })
         .finally(() => {
           episodeTitleInFlightRef.current.delete(titleKey);
@@ -212,14 +219,26 @@ export default function EpisodeRatingsGrid({
       if (!tooltipEnabled || !epData) return;
       const rect = e.currentTarget.getBoundingClientRect();
       setAnchorRect(rect);
-      setHoveredEp(epData);
-      void ensureSpanishEpisodeTitle(epData);
+      activeHoverTitleKeyRef.current = epData.titleKey;
+
+      if (epData.titleText) {
+        setHoveredEp(epData);
+        return;
+      }
+
+      setHoveredEp(null);
+      void ensureSpanishEpisodeTitle(epData).then((spanishTitle) => {
+        if (activeHoverTitleKeyRef.current !== epData.titleKey) return;
+        if (!spanishTitle) return;
+        setHoveredEp({ ...epData, titleText: spanishTitle });
+      });
     },
     [ensureSpanishEpisodeTitle, tooltipEnabled],
   );
 
   const handleMouseLeave = useCallback(() => {
     if (!tooltipEnabled) return;
+    activeHoverTitleKeyRef.current = null;
     setHoveredEp(null);
     setAnchorRect(null);
   }, [tooltipEnabled]);
@@ -708,8 +727,10 @@ export default function EpisodeRatingsGrid({
       ? `${routeTarget.seasonNumber}:${routeTarget.episodeNumber}`
       : `${seasonNumber}:${episodeNumber}`;
     const cachedSpanishTitle = episodeTitleCache.get(titleKey);
-    const titleText = cachedSpanishTitle || ep.name || "";
-    if (!titleText) return null;
+    const titleText =
+      typeof cachedSpanishTitle === "string" && cachedSpanishTitle.trim()
+        ? cachedSpanishTitle.trim()
+        : "";
     const votes = ep.seriesGraphVotes ?? ep.tmdbVotes ?? ep.imdbVotes ?? null;
     const votesText =
       votes != null ? `${votes.toLocaleString("es-ES")} votos` : null;
