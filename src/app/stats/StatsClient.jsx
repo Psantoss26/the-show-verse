@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3,
@@ -24,6 +24,56 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
+
+// Swiper slider component and styles
+import { Swiper, SwiperSlide } from "swiper/react";
+import "swiper/swiper-bundle.css";
+
+// Score fetching APIs
+import { getExternalIds } from "@/lib/api/tmdb";
+import { fetchOmdbByImdb } from "@/lib/api/omdb";
+import { traktGetScoreboard } from "@/lib/api/traktClient";
+
+// Score caching system identical to favorites
+const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function readScoreCache(source) {
+  if (typeof window === "undefined") return new Map();
+  try {
+    const key = `showverse:scores:${source}`;
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return new Map();
+
+    const parsed = JSON.parse(raw);
+    const now = Date.now();
+    const cache = new Map();
+
+    Object.entries(parsed).forEach(([id, entry]) => {
+      if (entry.t && now - entry.t < SCORE_CACHE_TTL_MS) {
+        cache.set(id, entry.score);
+      }
+    });
+
+    return cache;
+  } catch {
+    return new Map();
+  }
+}
+
+function updateScoreCache(source, id, score) {
+  if (typeof window === "undefined") return;
+  try {
+    const key = `showverse:scores:${source}`;
+    const raw = window.localStorage.getItem(key);
+    const data = raw ? JSON.parse(raw) : {};
+
+    data[id] = { score, t: Date.now() };
+
+    window.localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn("Failed to update score cache:", e);
+  }
+}
 import {
   AreaChart,
   Area,
@@ -460,153 +510,306 @@ function ProfileHero({ user }) {
   );
 }
 
-function PosterCard({ item, showRating = false, dateField = "watched_at" }) {
+function ProfileUnifiedCard({
+  item,
+  type, // "movie" | "show" | "person"
+  sectionColor = "indigo",
+  rank,
+  plays,
+  showRating = false,
+  dateField,
+  role,
+  count,
+  isScrollable = false,
+}) {
   const [err, setErr] = useState(false);
-  const src = tmdbImg(item.poster_path, "w185");
+  const [imdbScore, setImdbScore] = useState(null);
+  const [traktScore, setTraktScore] = useState(null);
+  const [loadingScores, setLoadingScores] = useState(false);
 
-  return (
-    <Link
-      href={item.detailsHref || "#"}
-      className="group relative block w-28 flex-shrink-0 overflow-hidden rounded-xl border border-transparent bg-neutral-800/80 shadow-lg transition-all duration-300 transform-gpu hover:-translate-y-1 hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25"
-      title={item.title}
-    >
-      <div className="relative aspect-[2/3] overflow-hidden">
-        {src && !err ? (
-          <img
-            src={src}
-            alt={item.title}
-            className="h-full w-full object-cover grayscale-[18%] transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0"
-            onError={() => setErr(true)}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            {item.type === "movie" ? (
-              <Film className="h-8 w-8 text-zinc-600" />
-            ) : (
-              <Tv className="h-8 w-8 text-zinc-600" />
-            )}
+  // Extract media properties safely
+  const media = type === "movie" ? (item?.movie || item) : type === "show" ? (item?.show || item) : item;
+  const tmdbId = media?.ids?.tmdb || media?.tmdbId || media?.id;
+  const title = media?.title || media?.name || "Sin título";
+  const year = media?.year || (media?.release_date ? media.release_date.slice(0, 4) : "") || (media?.first_air_date ? media.first_air_date.slice(0, 4) : "");
+
+  // Extract TMDb score
+  const tmdbScore = media?.vote_average || item?.vote_average || null;
+
+  // Extract first genre
+  const firstGenre = media?.genres?.[0]?.name || media?.genres?.[0] || null;
+
+  // Resolve links
+  let href = "#";
+  const mediaType = (type || item.type) === "movie" ? "movie" : "tv";
+  if (type === "person") {
+    if (item.id) href = `/details/person/${item.id}`;
+  } else {
+    if (tmdbId) href = `/details/${mediaType}/${tmdbId}`;
+  }
+
+  // Image source path
+  let path = media?.poster_path || media?.profile_path || null;
+  const src = tmdbImg(path, "w342");
+
+  // Load scores on hover if not in cache
+  const handleHover = useCallback(async () => {
+    if (type === "person" || loadingScores || (imdbScore && traktScore) || !tmdbId) return;
+
+    setLoadingScores(true);
+
+    try {
+      const itemId = String(tmdbId);
+
+      // Load IMDb score
+      if (!imdbScore) {
+        const cachedImdb = readScoreCache("imdb");
+        if (cachedImdb.has(itemId)) {
+          setImdbScore(cachedImdb.get(itemId));
+        } else {
+          try {
+            const externalIds = await getExternalIds(mediaType, tmdbId);
+            const imdbId = externalIds?.imdb_id;
+
+            if (imdbId) {
+              const omdbData = await fetchOmdbByImdb(imdbId);
+              const imdbRating = omdbData?.imdbRating;
+
+              if (imdbRating && imdbRating !== "N/A") {
+                const numRating = parseFloat(imdbRating);
+                if (!isNaN(numRating)) {
+                  setImdbScore(numRating);
+                  updateScoreCache("imdb", itemId, numRating);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch IMDb score for ${itemId}:`, err);
+          }
+        }
+      }
+
+      // Load Trakt score
+      if (!traktScore) {
+        const cachedTrakt = readScoreCache("trakt");
+        if (cachedTrakt.has(itemId)) {
+          setTraktScore(cachedTrakt.get(itemId));
+        } else {
+          try {
+            const traktData = await traktGetScoreboard({
+              type: mediaType,
+              tmdbId,
+            });
+            const traktRating = traktData?.community?.rating;
+
+            if (
+              traktRating &&
+              typeof traktRating === "number" &&
+              !isNaN(traktRating)
+            ) {
+              setTraktScore(traktRating);
+              updateScoreCache("trakt", itemId, traktRating);
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch Trakt score for ${itemId}:`, err);
+          }
+        }
+      }
+    } finally {
+      setLoadingScores(false);
+    }
+  }, [imdbScore, traktScore, loadingScores, tmdbId, mediaType, type]);
+
+  // Render top right badge
+  const renderTopRight = () => {
+    if (type === "person") {
+      return null;
+    }
+
+    return (
+      <div className="flex flex-col items-end gap-1">
+        {tmdbScore && (
+          <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+            <span className="text-emerald-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
+              {Number(tmdbScore).toFixed(1)}
+            </span>
+            <img src="/logo-TMDb.png" alt="" className="w-auto h-2 sm:h-2.5 opacity-100" />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 transition-opacity duration-300 group-hover:opacity-90" />
-        {showRating && item.rating && (
-          <div
-            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-xs font-black text-white shadow-lg"
-            style={{ background: starColor(item.rating) }}
-          >
-            {item.rating}
+        {imdbScore && (
+          <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+            <span className="text-yellow-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
+              {typeof imdbScore === "number" ? imdbScore.toFixed(1) : imdbScore}
+            </span>
+            <img src="/logo-IMDb.png" alt="" className="w-auto h-2.5 sm:h-3 opacity-100" />
           </div>
         )}
-        <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-          <p className="truncate text-xs font-extrabold leading-tight text-white">
-            {item.title}
-          </p>
-          <p className="text-[10px] leading-tight text-zinc-300">
-            {fmtDateShort(item[dateField])}
-          </p>
-          {item.episode && (
-            <p className="text-[10px] leading-tight text-zinc-400">
-              T{item.episode.season}:E{item.episode.number}
-            </p>
-          )}
-        </div>
+        {traktScore && (
+          <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+            <span className="text-pink-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
+              {typeof traktScore === "number" ? traktScore.toFixed(1) : traktScore}
+            </span>
+            <img src="/logo-Trakt.png" alt="" className="w-auto h-2 sm:h-2.5 opacity-100" />
+          </div>
+        )}
       </div>
-    </Link>
-  );
-}
+    );
+  };
 
-function RankedPosterCard({ item, rank, type }) {
-  const media = type === "movie" ? item?.movie : item?.show;
-  const tmdbId = media?.ids?.tmdb;
-  const title = media?.title || "Sin título";
-  const year = media?.year || "";
-  const plays = item?.plays || 0;
-  const posterPath = media?.poster_path || null;
-  const href = tmdbId
-    ? `/details/${type === "movie" ? "movie" : "tv"}/${tmdbId}`
-    : "#";
-  const src = tmdbImg(posterPath, "w342");
+  // Render top left badge
+  const renderTopLeft = () => {
+    if (rank !== undefined) {
+      return (
+        <span className="rounded-md border border-yellow-500/30 bg-yellow-500/20 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-yellow-300 shadow-sm backdrop-blur-md">
+          #{rank}
+        </span>
+      );
+    }
+    const itemType = type || item.type;
+    if (itemType === "movie") {
+      return (
+        <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-sky-500/30 bg-sky-500/20 text-sky-300 shadow-sm backdrop-blur-md">
+          PELÍCULA
+        </span>
+      );
+    }
+    if (itemType === "show" || itemType === "tv") {
+      return (
+        <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-purple-500/30 bg-purple-500/20 text-purple-300 shadow-sm backdrop-blur-md">
+          SERIE
+        </span>
+      );
+    }
+    if (type === "person" && role) {
+      return (
+        <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-white/10 bg-white/5 text-zinc-300 shadow-sm backdrop-blur-md">
+          {role === "actor" ? "ACTOR" : "DIRECTOR"}
+        </span>
+      );
+    }
+    return null;
+  };
+
+  const borderColorStyles = {
+    emerald: "rgba(16, 185, 129, 0.4)",
+    yellow: "rgba(234, 179, 8, 0.4)",
+    indigo: "rgba(99, 102, 241, 0.4)",
+    blue: "rgba(59, 130, 246, 0.4)",
+    purple: "rgba(168, 85, 247, 0.4)",
+    rose: "rgba(244, 63, 94, 0.4)",
+  };
+
+  const hoverBorderColor = borderColorStyles[sectionColor] || borderColorStyles.indigo;
+  const shadowColorStyles = {
+    emerald: "16, 185, 129",
+    yellow: "234, 179, 8",
+    indigo: "99, 102, 241",
+    blue: "59, 130, 246",
+    purple: "168, 85, 247",
+    rose: "244, 63, 94",
+  };
+  const hoverShadowRgb = shadowColorStyles[sectionColor] || shadowColorStyles.indigo;
+  const hoverShadowColor = [
+    `0 18px 48px -24px rgba(${hoverShadowRgb}, 0.72)`,
+    `0 10px 24px -18px rgba(${hoverShadowRgb}, 0.58)`,
+    "0 16px 30px -24px rgba(0, 0, 0, 0.75)",
+  ].join(", ");
 
   return (
     <Link
       href={href}
-      className="group relative block overflow-hidden rounded-xl border border-transparent bg-neutral-800/80 shadow-lg transition-all duration-300 transform-gpu hover:-translate-y-1 hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25"
+      className={`relative z-0 block focus:z-[90] focus:outline-none ${isScrollable ? "w-32 sm:w-40 flex-shrink-0" : "w-full"}`}
       title={title}
     >
-      <div className="relative aspect-[2/3] overflow-hidden">
-        {src ? (
+      <motion.div
+        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/5 bg-neutral-800/80 shadow-lg transition-colors duration-300 transform-gpu will-change-transform"
+        whileHover={{
+          y: -6,
+          zIndex: 100,
+          boxShadow: hoverShadowColor,
+          borderColor: hoverBorderColor,
+        }}
+        whileTap={{ y: -2 }}
+        transition={{ type: "spring", stiffness: 360, damping: 26 }}
+        onMouseEnter={handleHover}
+        onFocus={handleHover}
+      >
+        {src && !err ? (
           <img
             src={src}
             alt={title}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover grayscale-[18%] transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0"
+            className="h-full w-full object-cover grayscale-[18%] transition-transform duration-500 transform-gpu group-hover:scale-[1.08] group-hover:-translate-y-1 group-hover:grayscale-0"
+            onError={() => setErr(true)}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-500">
-            {type === "movie" ? (
-              <Film className="h-9 w-9 opacity-60" />
+          <div className="flex h-full w-full items-center justify-center bg-neutral-900 text-zinc-600">
+            {type === "person" ? (
+              <Users className="h-8 w-8 opacity-60" />
+            ) : type === "movie" || item.type === "movie" ? (
+              <Film className="h-8 w-8 opacity-60" />
             ) : (
-              <Tv className="h-9 w-9 opacity-60" />
+              <Tv className="h-8 w-8 opacity-60" />
             )}
           </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 transition-opacity duration-300 group-hover:opacity-90" />
-
-        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-          <span className="rounded-md border border-yellow-500/30 bg-yellow-500/20 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-yellow-300 shadow-sm backdrop-blur-md">
-            #{rank}
-          </span>
-          <span className="rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-zinc-200 backdrop-blur-md">
-            {plays.toLocaleString("es-ES")} vistas
-          </span>
+        {/* Top hover overlay badges */}
+        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between p-3 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <div>{renderTopLeft()}</div>
+          <div>{renderTopRight()}</div>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-2.5 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 sm:p-3">
-          <p className="line-clamp-2 text-[11px] font-extrabold leading-tight text-white sm:text-sm">
-            {title}
-          </p>
-          {year && (
-            <p className="mt-0.5 text-[10px] leading-tight text-zinc-300 sm:text-xs">
-              {year}
-            </p>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
+        {/* Bottom gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-function WatchlistCard({ item }) {
-  const src = tmdbImg(item.poster_path, "w92");
+        {/* Bottom hover details */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <div className="flex items-end justify-between gap-3">
+            <div className="min-w-0 text-left flex-1">
+              <h3 className="line-clamp-2 text-xs font-bold leading-tight text-white sm:text-sm drop-shadow-md">
+                {title}
+              </h3>
 
-  return (
-    <Link
-      href={item.detailsHref || "#"}
-      className="group flex items-center gap-3 rounded-2xl border border-white/5 bg-zinc-800/40 p-3 transition-all hover:border-white/10 hover:bg-zinc-800/80"
-    >
-      <div className="h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-700">
-        {src ? (
-          <img src={src} alt={item.title} className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            {item.type === "movie" ? (
-              <Film className="h-4 w-4 text-zinc-500" />
-            ) : (
-              <Tv className="h-4 w-4 text-zinc-500" />
+              {/* Subtitle depending on card context */}
+              {type !== "person" ? (
+                <p className="text-yellow-500 text-[10px] font-bold mt-0.5 drop-shadow-md">
+                  {year}
+                  {firstGenre && ` • ${firstGenre}`}
+                  {item.episode && ` • T${item.episode.season}:E${item.episode.number}`}
+                </p>
+              ) : (
+                count !== undefined && (
+                  <p className="mt-0.5 text-[10px] font-bold text-zinc-300 sm:text-xs">
+                    {count} {role === "actor" ? "pelis" : "obras"}
+                  </p>
+                )
+              )}
+
+              {dateField && item[dateField] && (
+                <p className="mt-0.5 text-[10px] leading-tight text-zinc-400 font-medium">
+                  {fmtDateShort(item[dateField])}
+                </p>
+              )}
+            </div>
+
+            {/* Play Count (vistas) for ranked top movie/shows */}
+            {plays !== undefined && (
+              <span className="text-zinc-400 text-[10px] font-bold shrink-0 opacity-75 sm:text-xs">
+                {plays} vistas
+              </span>
+            )}
+
+            {/* User rating (e.g. "10") rendered big on bottom-right */}
+            {showRating && item.rating && (
+              <span className="text-yellow-400 text-2xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
+                {item.rating}
+              </span>
             )}
           </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-white transition-colors group-hover:text-indigo-400">
-          {item.title}
-        </p>
-        <p className="text-xs text-zinc-500">
-          {item.year} · {item.type === "movie" ? "Película" : "Serie"}
-        </p>
-      </div>
-      <ChevronRight className="h-4 w-4 flex-shrink-0 text-zinc-600 transition-colors group-hover:text-white" />
+        </div>
+      </motion.div>
     </Link>
   );
 }
@@ -700,10 +903,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
         setData((prev) =>
           prev
             ? {
-                ...prev,
-                topActors: json.topActors || [],
-                topDirectors: json.topDirectors || [],
-              }
+              ...prev,
+              topActors: json.topActors || [],
+              topDirectors: json.topDirectors || [],
+            }
             : prev,
         );
       } catch (e) {
@@ -780,10 +983,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
       timeDistribution,
       topMovies: (data.watchedMovies || [])
         .sort((a, b) => b.plays - a.plays)
-        .slice(0, 5),
+        .slice(0, 6),
       topShows: (data.watchedShows || [])
         .sort((a, b) => b.plays - a.plays)
-        .slice(0, 5),
+        .slice(0, 6),
       years: [
         ...new Set(history.map((h) => new Date(h.watched_at).getFullYear())),
       ].sort((a, b) => b - a),
@@ -886,33 +1089,32 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
           <div className="flex justify-start lg:justify-end">
             <div className="flex p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-x-auto">
-            {[
-              { id: "overview", label: "General", icon: PieChartIcon },
-              { id: "patterns", label: "Patrones", icon: TrendingUp },
-              { id: "yearly", label: "Histórico", icon: CalendarIcon },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setViewMode(tab.id)}
-                className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${
-                  viewMode === tab.id
-                    ? "text-black"
-                    : "text-zinc-400 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                {viewMode === tab.id && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute inset-0 bg-white rounded-xl"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center gap-2">
-                  <tab.icon className="w-4 h-4" />
-                  {tab.label}
-                </span>
-              </button>
-            ))}
+              {[
+                { id: "overview", label: "General", icon: PieChartIcon },
+                { id: "patterns", label: "Patrones", icon: TrendingUp },
+                { id: "yearly", label: "Histórico", icon: CalendarIcon },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setViewMode(tab.id)}
+                  className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === tab.id
+                      ? "text-black"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                >
+                  {viewMode === tab.id && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className="absolute inset-0 bg-white rounded-xl"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-2">
+                    <tab.icon className="w-4 h-4" />
+                    {tab.label}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </motion.div>
@@ -1040,10 +1242,33 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       color="emerald"
                       href="/history"
                     />
-                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                      {recentHistory.map((item, idx) => (
-                        <PosterCard key={`${item.type}-${item.tmdbId}-${idx}`} item={item} />
-                      ))}
+                    <div className="-mt-3 overflow-hidden pb-3 pt-6">
+                      <Swiper
+                        spaceBetween={12}
+                        slidesPerView={3}
+                        breakpoints={{
+                          500: { slidesPerView: 3, spaceBetween: 14 },
+                          768: { slidesPerView: 4, spaceBetween: 16 },
+                          1024: { slidesPerView: 5, spaceBetween: 18 },
+                          1280: { slidesPerView: 6, spaceBetween: 20 },
+                        }}
+                        className="profile-hover-swiper !overflow-visible px-1"
+                      >
+                        {recentHistory.map((item, idx) => (
+                          <SwiperSlide
+                            key={`${item.type}-${item.tmdbId}-${idx}`}
+                            className="!overflow-visible !z-0 hover:!z-[80] focus-within:!z-[80]"
+                          >
+                            <ProfileUnifiedCard
+                              item={item}
+                              type={item.type}
+                              sectionColor="emerald"
+                              dateField="watched_at"
+                              isScrollable={false}
+                            />
+                          </SwiperSlide>
+                        ))}
+                      </Swiper>
                     </div>
                   </motion.div>
                 )}
@@ -1061,15 +1286,34 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Lo que has puntuado recientemente"
                       color="yellow"
                     />
-                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                      {recentRatings.map((item, idx) => (
-                        <PosterCard
-                          key={`${item.type}-${item.tmdbId}-${idx}`}
-                          item={item}
-                          showRating
-                          dateField="rated_at"
-                        />
-                      ))}
+                    <div className="-mt-3 overflow-hidden pb-3 pt-6">
+                      <Swiper
+                        spaceBetween={12}
+                        slidesPerView={3}
+                        breakpoints={{
+                          500: { slidesPerView: 3, spaceBetween: 14 },
+                          768: { slidesPerView: 4, spaceBetween: 16 },
+                          1024: { slidesPerView: 5, spaceBetween: 18 },
+                          1280: { slidesPerView: 6, spaceBetween: 20 },
+                        }}
+                        className="profile-hover-swiper !overflow-visible px-1"
+                      >
+                        {recentRatings.map((item, idx) => (
+                          <SwiperSlide
+                            key={`${item.type}-${item.tmdbId}-${idx}`}
+                            className="!overflow-visible !z-0 hover:!z-[80] focus-within:!z-[80]"
+                          >
+                            <ProfileUnifiedCard
+                              item={item}
+                              type={item.type}
+                              sectionColor="yellow"
+                              showRating
+                              dateField="rated_at"
+                              isScrollable={false}
+                            />
+                          </SwiperSlide>
+                        ))}
+                      </Swiper>
                     </div>
                   </motion.div>
                 )}
@@ -1088,13 +1332,33 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       color="indigo"
                       href="/watchlist"
                     />
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {watchlist.map((item, idx) => (
-                        <WatchlistCard
-                          key={`${item.type}-${item.tmdbId}-${idx}`}
-                          item={item}
-                        />
-                      ))}
+                    <div className="-mt-3 overflow-hidden pb-3 pt-6">
+                      <Swiper
+                        spaceBetween={12}
+                        slidesPerView={3}
+                        breakpoints={{
+                          500: { slidesPerView: 3, spaceBetween: 14 },
+                          768: { slidesPerView: 4, spaceBetween: 16 },
+                          1024: { slidesPerView: 5, spaceBetween: 18 },
+                          1280: { slidesPerView: 6, spaceBetween: 20 },
+                        }}
+                        className="profile-hover-swiper !overflow-visible px-1"
+                      >
+                        {watchlist.map((item, idx) => (
+                          <SwiperSlide
+                            key={`${item.type}-${item.tmdbId}-${idx}`}
+                            className="!overflow-visible !z-0 hover:!z-[80] focus-within:!z-[80]"
+                          >
+                            <ProfileUnifiedCard
+                              item={item}
+                              type={item.type}
+                              sectionColor="indigo"
+                              dateField="listed_at"
+                              isScrollable={false}
+                            />
+                          </SwiperSlide>
+                        ))}
+                      </Swiper>
                     </div>
                   </motion.div>
                 )}
@@ -1241,7 +1505,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 </div>
 
                 {/* Top Content Row */}
-                <div className="order-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="order-3 space-y-8">
                   {/* Top Movies */}
                   <motion.div
                     initial={{ opacity: 0, x: -20 }}
@@ -1255,13 +1519,15 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Las que más has visto"
                       color="blue"
                     />
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                       {stats.topMovies.map((item, idx) => (
-                        <RankedPosterCard
+                        <ProfileUnifiedCard
                           key={item.movie?.ids?.tmdb || idx}
                           item={item}
-                          rank={idx + 1}
                           type="movie"
+                          sectionColor="blue"
+                          rank={idx + 1}
+                          plays={item.plays}
                         />
                       ))}
                     </div>
@@ -1280,13 +1546,15 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Tus maratones favoritos"
                       color="purple"
                     />
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                       {stats.topShows.map((item, idx) => (
-                        <RankedPosterCard
+                        <ProfileUnifiedCard
                           key={item.show?.ids?.tmdb || idx}
                           item={item}
-                          rank={idx + 1}
                           type="show"
+                          sectionColor="purple"
+                          rank={idx + 1}
+                          plays={item.plays}
                         />
                       ))}
                     </div>
@@ -1334,34 +1602,14 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     />
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
                       {stats.topActors.map((person, idx) => (
-                        <Link
+                        <ProfileUnifiedCard
                           key={person.id}
-                          href={`/details/person/${person.id}`}
-                          className="group relative"
-                        >
-                          <div className="aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 mb-2 border border-white/5 group-hover:border-yellow-500/50 transition-all duration-300">
-                            {person.profile_path ? (
-                              <img
-                                src={`https://image.tmdb.org/t/p/w342${person.profile_path}`}
-                                alt={person.name}
-                                className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-600">
-                                <Users className="w-8 h-8" />
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition" />
-                            <div className="absolute bottom-0 left-0 right-0 p-2">
-                              <p className="text-white text-xs font-bold leading-tight truncate">
-                                {person.name}
-                              </p>
-                              <p className="text-yellow-400 text-[10px] font-medium">
-                                {person.count} pelis
-                              </p>
-                            </div>
-                          </div>
-                        </Link>
+                          item={person}
+                          type="person"
+                          sectionColor="yellow"
+                          role="actor"
+                          count={person.count}
+                        />
                       ))}
                     </div>
                   </motion.div>
@@ -1383,34 +1631,14 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     />
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
                       {stats.topDirectors.map((person, idx) => (
-                        <Link
+                        <ProfileUnifiedCard
                           key={person.id}
-                          href={`/details/person/${person.id}`}
-                          className="group relative"
-                        >
-                          <div className="aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 mb-2 border border-white/5 group-hover:border-rose-500/50 transition-all duration-300">
-                            {person.profile_path ? (
-                              <img
-                                src={`https://image.tmdb.org/t/p/w342${person.profile_path}`}
-                                alt={person.name}
-                                className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-600">
-                                <Film className="w-8 h-8" />
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition" />
-                            <div className="absolute bottom-0 left-0 right-0 p-2">
-                              <p className="text-white text-xs font-bold leading-tight truncate">
-                                {person.name}
-                              </p>
-                              <p className="text-rose-400 text-[10px] font-medium">
-                                {person.count} pelis
-                              </p>
-                            </div>
-                          </div>
-                        </Link>
+                          item={person}
+                          type="person"
+                          sectionColor="rose"
+                          role="director"
+                          count={person.count}
+                        />
                       ))}
                     </div>
                   </motion.div>
