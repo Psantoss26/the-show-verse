@@ -10,6 +10,7 @@
 
 // -- Hooks de React --
 import {
+  Children,
   useRef,
   useState,
   useEffect,
@@ -281,11 +282,17 @@ function formatEpisodeRuntime(data) {
   return lastEpisodeRuntime;
 }
 
-function DetailsArrowCarousel({ children, className = "", ...swiperProps }) {
+function DetailsArrowCarousel({
+  children,
+  className = "",
+  arrowClassName = "inset-y-0",
+  ...swiperProps
+}) {
   const swiperRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const childrenCount = Children.count(children);
 
   const updateNav = useCallback((swiper) => {
     if (!swiper) return;
@@ -298,9 +305,33 @@ function DetailsArrowCarousel({ children, className = "", ...swiperProps }) {
     (swiper) => {
       swiperRef.current = swiper;
       updateNav(swiper);
+      requestAnimationFrame(() => {
+        swiper.update?.();
+        updateNav(swiper);
+      });
     },
     [updateNav],
   );
+
+  useEffect(() => {
+    const swiper = swiperRef.current;
+    if (!swiper) return undefined;
+
+    const refresh = () => {
+      swiper.update?.();
+      updateNav(swiper);
+    };
+
+    const raf = requestAnimationFrame(refresh);
+    const t1 = window.setTimeout(refresh, 120);
+    const t2 = window.setTimeout(refresh, 450);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [childrenCount, updateNav]);
 
   const getStep = useCallback((swiper) => {
     const current = swiper?.params?.slidesPerView;
@@ -340,6 +371,9 @@ function DetailsArrowCarousel({ children, className = "", ...swiperProps }) {
     >
       <Swiper
         {...swiperProps}
+        observer={swiperProps.observer ?? true}
+        observeParents={swiperProps.observeParents ?? true}
+        resizeObserver={swiperProps.resizeObserver ?? true}
         onSwiper={(swiper) => {
           handleSwiper(swiper);
           swiperProps.onSwiper?.(swiper);
@@ -373,7 +407,7 @@ function DetailsArrowCarousel({ children, className = "", ...swiperProps }) {
             exit={{ opacity: 0 }}
             type="button"
             onClick={handlePrevClick}
-            className="absolute inset-y-0 -left-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10"
+            className={`absolute -left-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10 ${arrowClassName}`}
             aria-label="Anterior"
           >
             <motion.span
@@ -394,7 +428,7 @@ function DetailsArrowCarousel({ children, className = "", ...swiperProps }) {
             exit={{ opacity: 0 }}
             type="button"
             onClick={handleNextClick}
-            className="absolute inset-y-0 -right-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10"
+            className={`absolute -right-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10 ${arrowClassName}`}
             aria-label="Siguiente"
           >
             <motion.span
@@ -10180,6 +10214,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               slidesPerView={isBackdropLike ? 2 : 3}
                               breakpoints={breakpoints}
                               className="pt-3 pb-8"
+                              arrowClassName="top-3 bottom-8"
                             >
                               {ordered.map((img, index) => {
                                 const filePath = img?.file_path;
