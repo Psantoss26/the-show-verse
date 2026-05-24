@@ -25,10 +25,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-// Swiper slider component and styles
-import { Swiper, SwiperSlide } from "swiper/react";
-import "swiper/swiper-bundle.css";
-
 // Score fetching APIs
 import { getExternalIds } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
@@ -532,9 +528,16 @@ function ProfileUnifiedCard({
   const tmdbId = media?.ids?.tmdb || media?.tmdbId || media?.id;
   const title = media?.title || media?.name || "Sin título";
   const year = media?.year || (media?.release_date ? media.release_date.slice(0, 4) : "") || (media?.first_air_date ? media.first_air_date.slice(0, 4) : "");
+  const episodeSeason = item?.episode?.season;
+  const episodeNumber = item?.episode?.number;
+  const isEpisodeCard =
+    type !== "movie" &&
+    Number.isFinite(Number(episodeSeason)) &&
+    Number.isFinite(Number(episodeNumber));
 
   // Extract TMDb score
-  const tmdbScore = media?.vote_average || item?.vote_average || null;
+  const tmdbScore =
+    item?.episode?.vote_average || media?.vote_average || item?.vote_average || null;
 
   // Extract first genre
   const firstGenre = media?.genres?.[0]?.name || media?.genres?.[0] || null;
@@ -542,8 +545,12 @@ function ProfileUnifiedCard({
   // Resolve links
   let href = "#";
   const mediaType = (type || item.type) === "movie" ? "movie" : "tv";
-  if (type === "person") {
+  if (item?.detailsHref) {
+    href = item.detailsHref;
+  } else if (type === "person") {
     if (item.id) href = `/details/person/${item.id}`;
+  } else if (isEpisodeCard) {
+    href = `/details/tv/${tmdbId}/season/${episodeSeason}/episode/${episodeNumber}`;
   } else {
     if (tmdbId) href = `/details/${mediaType}/${tmdbId}`;
   }
@@ -559,7 +566,10 @@ function ProfileUnifiedCard({
     setLoadingScores(true);
 
     try {
-      const itemId = String(tmdbId);
+      const scoreType = isEpisodeCard ? "episode" : mediaType;
+      const itemId = isEpisodeCard
+        ? `${tmdbId}:s${episodeSeason}:e${episodeNumber}`
+        : String(tmdbId);
 
       // Load IMDb score
       if (!imdbScore) {
@@ -568,8 +578,9 @@ function ProfileUnifiedCard({
           setImdbScore(cachedImdb.get(itemId));
         } else {
           try {
-            const externalIds = await getExternalIds(mediaType, tmdbId);
-            const imdbId = externalIds?.imdb_id;
+            const imdbId = isEpisodeCard
+              ? item?.episode?.imdb_id
+              : (await getExternalIds(mediaType, tmdbId))?.imdb_id;
 
             if (imdbId) {
               const omdbData = await fetchOmdbByImdb(imdbId);
@@ -597,8 +608,10 @@ function ProfileUnifiedCard({
         } else {
           try {
             const traktData = await traktGetScoreboard({
-              type: mediaType,
+              type: scoreType,
               tmdbId,
+              season: isEpisodeCard ? episodeSeason : undefined,
+              episode: isEpisodeCard ? episodeNumber : undefined,
             });
             const traktRating = traktData?.community?.rating;
 
@@ -618,7 +631,18 @@ function ProfileUnifiedCard({
     } finally {
       setLoadingScores(false);
     }
-  }, [imdbScore, traktScore, loadingScores, tmdbId, mediaType, type]);
+  }, [
+    episodeNumber,
+    episodeSeason,
+    imdbScore,
+    isEpisodeCard,
+    item?.episode?.imdb_id,
+    loadingScores,
+    mediaType,
+    tmdbId,
+    traktScore,
+    type,
+  ]);
 
   // Render top right badge
   const renderTopRight = () => {
@@ -1242,33 +1266,16 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       color="emerald"
                       href="/history"
                     />
-                    <div className="-mt-3 overflow-hidden pb-3 pt-6">
-                      <Swiper
-                        spaceBetween={12}
-                        slidesPerView={3}
-                        breakpoints={{
-                          500: { slidesPerView: 3, spaceBetween: 14 },
-                          768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 5, spaceBetween: 18 },
-                          1280: { slidesPerView: 6, spaceBetween: 20 },
-                        }}
-                        className="profile-hover-swiper !overflow-visible px-1"
-                      >
-                        {recentHistory.map((item, idx) => (
-                          <SwiperSlide
-                            key={`${item.type}-${item.tmdbId}-${idx}`}
-                            className="!overflow-visible !z-0 hover:!z-[80] focus-within:!z-[80]"
-                          >
-                            <ProfileUnifiedCard
-                              item={item}
-                              type={item.type}
-                              sectionColor="emerald"
-                              dateField="watched_at"
-                              isScrollable={false}
-                            />
-                          </SwiperSlide>
-                        ))}
-                      </Swiper>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                      {recentHistory.slice(0, 6).map((item, idx) => (
+                        <ProfileUnifiedCard
+                          key={`${item.type}-${item.tmdbId}-${idx}`}
+                          item={item}
+                          type={item.type}
+                          sectionColor="emerald"
+                          dateField="watched_at"
+                        />
+                      ))}
                     </div>
                   </motion.div>
                 )}
@@ -1286,34 +1293,17 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Lo que has puntuado recientemente"
                       color="yellow"
                     />
-                    <div className="-mt-3 overflow-hidden pb-3 pt-6">
-                      <Swiper
-                        spaceBetween={12}
-                        slidesPerView={3}
-                        breakpoints={{
-                          500: { slidesPerView: 3, spaceBetween: 14 },
-                          768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 5, spaceBetween: 18 },
-                          1280: { slidesPerView: 6, spaceBetween: 20 },
-                        }}
-                        className="profile-hover-swiper !overflow-visible px-1"
-                      >
-                        {recentRatings.map((item, idx) => (
-                          <SwiperSlide
-                            key={`${item.type}-${item.tmdbId}-${idx}`}
-                            className="!overflow-visible !z-0 hover:!z-[80] focus-within:!z-[80]"
-                          >
-                            <ProfileUnifiedCard
-                              item={item}
-                              type={item.type}
-                              sectionColor="yellow"
-                              showRating
-                              dateField="rated_at"
-                              isScrollable={false}
-                            />
-                          </SwiperSlide>
-                        ))}
-                      </Swiper>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                      {recentRatings.slice(0, 6).map((item, idx) => (
+                        <ProfileUnifiedCard
+                          key={`${item.type}-${item.tmdbId}-${idx}`}
+                          item={item}
+                          type={item.type}
+                          sectionColor="yellow"
+                          showRating
+                          dateField="rated_at"
+                        />
+                      ))}
                     </div>
                   </motion.div>
                 )}
@@ -1332,33 +1322,16 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       color="indigo"
                       href="/watchlist"
                     />
-                    <div className="-mt-3 overflow-hidden pb-3 pt-6">
-                      <Swiper
-                        spaceBetween={12}
-                        slidesPerView={3}
-                        breakpoints={{
-                          500: { slidesPerView: 3, spaceBetween: 14 },
-                          768: { slidesPerView: 4, spaceBetween: 16 },
-                          1024: { slidesPerView: 5, spaceBetween: 18 },
-                          1280: { slidesPerView: 6, spaceBetween: 20 },
-                        }}
-                        className="profile-hover-swiper !overflow-visible px-1"
-                      >
-                        {watchlist.map((item, idx) => (
-                          <SwiperSlide
-                            key={`${item.type}-${item.tmdbId}-${idx}`}
-                            className="!overflow-visible !z-0 hover:!z-[80] focus-within:!z-[80]"
-                          >
-                            <ProfileUnifiedCard
-                              item={item}
-                              type={item.type}
-                              sectionColor="indigo"
-                              dateField="listed_at"
-                              isScrollable={false}
-                            />
-                          </SwiperSlide>
-                        ))}
-                      </Swiper>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                      {watchlist.slice(0, 6).map((item, idx) => (
+                        <ProfileUnifiedCard
+                          key={`${item.type}-${item.tmdbId}-${idx}`}
+                          item={item}
+                          type={item.type}
+                          sectionColor="indigo"
+                          dateField="listed_at"
+                        />
+                      ))}
                     </div>
                   </motion.div>
                 )}

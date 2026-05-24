@@ -461,6 +461,7 @@ export default function EpisodeDetailsClient({
           ratings: seriesGraphRatings,
           seasonNumber,
           episodeNumber,
+          tmdbSeasons: show?.seasons,
           showId,
           title: showName,
         });
@@ -489,7 +490,7 @@ export default function EpisodeDetailsClient({
       controller.abort();
       cancelSchedule();
     };
-  }, [showId, seasonNumber, episodeNumber, imdbId, imdb, showName]);
+  }, [showId, seasonNumber, episodeNumber, imdbId, imdb, showName, show?.seasons]);
 
   useEffect(() => {
     if (episodeCredits) return;
