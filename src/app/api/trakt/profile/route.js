@@ -94,6 +94,8 @@ async function parallelLimit(items, limit, fn) {
 
 export async function GET(request) {
   try {
+    const searchParams = request?.nextUrl?.searchParams || new URLSearchParams();
+    const compact = searchParams.get("compact") === "1";
     const cookieStore = await cookies();
     const { token, refreshedTokens, shouldClear } = await getValidTraktToken(cookieStore);
 
@@ -116,12 +118,16 @@ export async function GET(request) {
       collectionMoviesRes,
     ] = await Promise.allSettled([
       fetch(`${TRAKT_API}/users/settings`, { headers: h, cache: "no-store" }),
-      fetch(`${TRAKT_API}/users/me/stats`, { headers: h, cache: "no-store" }),
+      compact
+        ? Promise.resolve(null)
+        : fetch(`${TRAKT_API}/users/me/stats`, { headers: h, cache: "no-store" }),
       fetch(`${TRAKT_API}/sync/history?limit=30&extended=full`, { headers: h, cache: "no-store" }),
       fetch(`${TRAKT_API}/sync/ratings/movies?limit=15&extended=full`, { headers: h, cache: "no-store" }),
       fetch(`${TRAKT_API}/sync/ratings/shows?limit=15&extended=full`, { headers: h, cache: "no-store" }),
       fetch(`${TRAKT_API}/sync/watchlist?extended=full&limit=15`, { headers: h, cache: "no-store" }),
-      fetch(`${TRAKT_API}/sync/collection/movies`, { headers: h, cache: "no-store" }),
+      compact
+        ? Promise.resolve(null)
+        : fetch(`${TRAKT_API}/sync/collection/movies`, { headers: h, cache: "no-store" }),
     ]);
 
     // Parse settings (required)
@@ -158,10 +164,18 @@ export async function GET(request) {
 
     // Also fetch followers/following counts and top watched
     const [followersRes, followingRes, watchedMoviesRes, watchedShowsRes] = await Promise.allSettled([
-      fetch(`${TRAKT_API}/users/${username}/followers`, { headers: h, cache: "no-store" }),
-      fetch(`${TRAKT_API}/users/${username}/following`, { headers: h, cache: "no-store" }),
-      fetch(`${TRAKT_API}/users/${username}/watched/movies`, { headers: h, cache: "no-store" }),
-      fetch(`${TRAKT_API}/users/${username}/watched/shows`, { headers: h, cache: "no-store" }),
+      compact
+        ? Promise.resolve(null)
+        : fetch(`${TRAKT_API}/users/${username}/followers`, { headers: h, cache: "no-store" }),
+      compact
+        ? Promise.resolve(null)
+        : fetch(`${TRAKT_API}/users/${username}/following`, { headers: h, cache: "no-store" }),
+      compact
+        ? Promise.resolve(null)
+        : fetch(`${TRAKT_API}/users/${username}/watched/movies`, { headers: h, cache: "no-store" }),
+      compact
+        ? Promise.resolve(null)
+        : fetch(`${TRAKT_API}/users/${username}/watched/shows`, { headers: h, cache: "no-store" }),
     ]);
     const followers = followersRes.status === "fulfilled" && followersRes.value?.ok
       ? (await safeJson(followersRes.value)) || [] : [];
@@ -307,16 +321,20 @@ export async function GET(request) {
       plays: item.plays,
     }));
 
-    const enrichedTopMovies = await parallelLimit(normalizedTopMovies, 6, async (item) => {
-      const tmdbId = item.movie?.ids?.tmdb;
-      const tmdb = await fetchTmdbPoster(tmdbId, "movie");
-      return { ...item, movie: { ...item.movie, poster_path: tmdb?.poster_path || null, title: tmdb?.title || item.movie?.title } };
-    });
-    const enrichedTopShows = await parallelLimit(normalizedTopShows, 6, async (item) => {
-      const tmdbId = item.show?.ids?.tmdb;
-      const tmdb = await fetchTmdbPoster(tmdbId, "tv");
-      return { ...item, show: { ...item.show, poster_path: tmdb?.poster_path || null, title: tmdb?.title || item.show?.title } };
-    });
+    const enrichedTopMovies = compact
+      ? []
+      : await parallelLimit(normalizedTopMovies, 6, async (item) => {
+          const tmdbId = item.movie?.ids?.tmdb;
+          const tmdb = await fetchTmdbPoster(tmdbId, "movie");
+          return { ...item, movie: { ...item.movie, poster_path: tmdb?.poster_path || null, title: tmdb?.title || item.movie?.title } };
+        });
+    const enrichedTopShows = compact
+      ? []
+      : await parallelLimit(normalizedTopShows, 6, async (item) => {
+          const tmdbId = item.show?.ids?.tmdb;
+          const tmdb = await fetchTmdbPoster(tmdbId, "tv");
+          return { ...item, show: { ...item.show, poster_path: tmdb?.poster_path || null, title: tmdb?.title || item.show?.title } };
+        });
 
     // Enrich watchlist
     const enrichedWatchlist = await parallelLimit(normalizedWatchlist, 4, async (item) => {
