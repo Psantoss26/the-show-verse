@@ -42,6 +42,41 @@ import { traktGetScoreboard } from "@/lib/api/traktClient";
 
 // Score caching system identical to favorites
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const PROFILE_STATS_CACHE_KEY = "showverse:profile:stats:v2";
+const PROFILE_DATA_CACHE_KEY = "showverse:profile:data:v2";
+const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function readProfileSessionCache(key) {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    if (Date.now() - Number(parsed.t || 0) > PROFILE_CACHE_TTL_MS) return null;
+    return parsed.data || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeProfileSessionCache(key, data) {
+  if (typeof window === "undefined" || !data) return;
+  try {
+    window.sessionStorage.setItem(
+      key,
+      JSON.stringify({ t: Date.now(), data }),
+    );
+  } catch {}
+}
+
+function clearProfileSessionCache() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(PROFILE_STATS_CACHE_KEY);
+    window.sessionStorage.removeItem(PROFILE_DATA_CACHE_KEY);
+  } catch {}
+}
 
 const useIsMobileLayout = (breakpointPx = 768) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -480,45 +515,49 @@ function ProfileCardScroller({ children }) {
     <div className="-mx-4 sm:mx-0">
       <div
         className="relative z-0 px-3 hover:z-[200] sm:px-0"
-        style={{ overflowX: "clip", overflowY: "visible" }}
         onMouseEnter={() => setIsHoveredRow(true)}
         onMouseLeave={() => setIsHoveredRow(false)}
       >
-        <Swiper
-          slidesPerView={3}
-          spaceBetween={12}
-          onSwiper={handleSwiper}
-          onSlideChange={updateNav}
-          onResize={updateNav}
-          onReachBeginning={updateNav}
-          onReachEnd={updateNav}
-          breakpoints={breakpointsRow}
-          loop={false}
-          watchOverflow={true}
-          grabCursor={!isMobile}
-          simulateTouch={true}
-          allowTouchMove={true}
-          preventClicks={true}
-          preventClicksPropagation={true}
-          threshold={isMobile ? 2 : 5}
-          touchRatio={isMobile ? 1.5 : 1}
-          freeMode={
-            !isMobile
-              ? { enabled: true, momentum: true, momentumRatio: 0.5 }
-              : false
-          }
-          modules={[Navigation, FreeMode]}
-          className="relative z-0 !overflow-visible pb-8 pt-7"
+        <div
+          className="relative z-0"
+          style={{ overflowX: "clip", overflowY: "visible" }}
         >
-          {slides.map((child, idx) => (
-            <SwiperSlide
-              key={child?.key || idx}
-              className="relative !h-auto select-none !overflow-visible !z-0 hover:!z-[300] focus-within:!z-[300]"
-            >
-              {child}
-            </SwiperSlide>
-          ))}
-        </Swiper>
+          <Swiper
+            slidesPerView={3}
+            spaceBetween={12}
+            onSwiper={handleSwiper}
+            onSlideChange={updateNav}
+            onResize={updateNav}
+            onReachBeginning={updateNav}
+            onReachEnd={updateNav}
+            breakpoints={breakpointsRow}
+            loop={false}
+            watchOverflow={true}
+            grabCursor={!isMobile}
+            simulateTouch={true}
+            allowTouchMove={true}
+            preventClicks={true}
+            preventClicksPropagation={true}
+            threshold={isMobile ? 2 : 5}
+            touchRatio={isMobile ? 1.5 : 1}
+            freeMode={
+              !isMobile
+                ? { enabled: true, momentum: true, momentumRatio: 0.5 }
+                : false
+            }
+            modules={[Navigation, FreeMode]}
+            className="relative z-0 !overflow-visible pb-8 pt-7"
+          >
+            {slides.map((child, idx) => (
+              <SwiperSlide
+                key={child?.key || idx}
+                className="relative !h-auto select-none !overflow-visible !z-0 hover:!z-[300] focus-within:!z-[300]"
+              >
+                {child}
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        </div>
 
         <AnimatePresence>
           {showPrev && !isMobile && (
@@ -528,10 +567,11 @@ function ProfileCardScroller({ children }) {
               exit={{ opacity: 0 }}
               type="button"
               onClick={handlePrevClick}
-              className="absolute inset-y-0 left-0 z-30 hidden w-28 items-center justify-start bg-gradient-to-r from-black/80 via-black/55 to-transparent transition-colors hover:from-black/95 hover:via-black/75 pointer-events-auto sm:flex"
+              className="absolute inset-y-0 -left-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10"
+              aria-label="Anterior"
             >
               <motion.span
-                className="ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]"
+                className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
                 whileHover={{ x: -4 }}
               >
                 ‹
@@ -548,10 +588,11 @@ function ProfileCardScroller({ children }) {
               exit={{ opacity: 0 }}
               type="button"
               onClick={handleNextClick}
-              className="absolute inset-y-0 right-0 z-30 hidden w-28 items-center justify-end bg-gradient-to-l from-black/80 via-black/55 to-transparent transition-colors hover:from-black/95 hover:via-black/75 pointer-events-auto sm:flex"
+              className="absolute inset-y-0 -right-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10"
+              aria-label="Siguiente"
             >
               <motion.span
-                className="mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]"
+                className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
                 whileHover={{ x: 4 }}
               >
                 ›
@@ -1030,50 +1071,139 @@ export default function StatsClient({ connectNext = "/profile" }) {
   useEffect(() => {
     let ignore = false;
 
-    const fetchData = async () => {
+    const cachedStats = readProfileSessionCache(PROFILE_STATS_CACHE_KEY);
+    const cachedProfile = readProfileSessionCache(PROFILE_DATA_CACHE_KEY);
+
+    if (cachedStats) {
+      setData(cachedStats);
+      setLoading(false);
+    }
+    if (cachedProfile) {
+      setProfileData(cachedProfile);
+    }
+
+    const mergeStatsData = (json) => {
+      setData((prev) => {
+        const nextMoviesHaveArtwork = (json?.watchedMovies || []).some(
+          (item) => item?.movie?.poster_path,
+        );
+        const prevMoviesHaveArtwork = (prev?.watchedMovies || []).some(
+          (item) => item?.movie?.poster_path,
+        );
+        const nextShowsHaveArtwork = (json?.watchedShows || []).some(
+          (item) => item?.show?.poster_path,
+        );
+        const prevShowsHaveArtwork = (prev?.watchedShows || []).some(
+          (item) => item?.show?.poster_path,
+        );
+        const merged = {
+          ...json,
+          watchedMovies:
+            !nextMoviesHaveArtwork && prevMoviesHaveArtwork
+              ? prev.watchedMovies
+              : json?.watchedMovies || prev?.watchedMovies || [],
+          watchedShows:
+            !nextShowsHaveArtwork && prevShowsHaveArtwork
+              ? prev.watchedShows
+              : json?.watchedShows || prev?.watchedShows || [],
+          topActors:
+            Array.isArray(json?.topActors) && json.topActors.length
+              ? json.topActors
+              : prev?.topActors || [],
+          topDirectors:
+            Array.isArray(json?.topDirectors) && json.topDirectors.length
+              ? json.topDirectors
+              : prev?.topDirectors || [],
+        };
+        writeProfileSessionCache(PROFILE_STATS_CACHE_KEY, merged);
+        return merged;
+      });
+    };
+
+    const refreshTopArtwork = async () => {
       try {
-        setError("");
-        const [statsResult, profileResult] = await Promise.allSettled([
-          fetch(
-            "/api/trakt/user-stats?historyLimit=1500&includePeople=0&localizeTitles=1",
-            { cache: "no-store" },
-          ),
-          fetch("/api/trakt/profile", { cache: "no-store" }),
-        ]);
-
-        const res =
-          statsResult.status === "fulfilled" ? statsResult.value : null;
-        if (!res) throw new Error("No se pudieron cargar las estadísticas.");
-        if (res.status === 401) {
-          if (ignore) return;
-          setNotConnected(true);
-          setLoading(false);
-          return;
-        }
-        if (res.ok) {
-          const json = await res.json();
-          if (ignore) return;
-          setData(json);
-        } else {
-          const json = await res.json().catch(() => ({}));
-          if (!ignore) {
-            setError(json?.error || "No se pudieron cargar las estadísticas.");
-          }
-        }
-
-        if (profileResult.status === "fulfilled") {
-          const profileRes = profileResult.value;
-          if (profileRes.ok) {
-            const profileJson = await profileRes.json();
-            if (!ignore) setProfileData(profileJson);
-          }
-        }
+        const res = await fetch(
+          "/api/trakt/user-stats?historyLimit=0&includePeople=0&localizeTitles=1",
+          { cache: "no-store" },
+        );
+        if (ignore || !res.ok) return;
+        const json = await res.json();
+        if (ignore) return;
+        setData((prev) => {
+          if (!prev) return prev;
+          const merged = {
+            ...prev,
+            watchedMovies: Array.isArray(json?.watchedMovies)
+              ? json.watchedMovies
+              : prev.watchedMovies,
+            watchedShows: Array.isArray(json?.watchedShows)
+              ? json.watchedShows
+              : prev.watchedShows,
+          };
+          writeProfileSessionCache(PROFILE_STATS_CACHE_KEY, merged);
+          return merged;
+        });
       } catch (e) {
         console.error(e);
-        if (!ignore) setError("No se pudieron cargar las estadísticas.");
-      } finally {
-        if (!ignore) setLoading(false);
       }
+    };
+
+    const fetchData = async () => {
+      setError("");
+      if (!cachedStats) setLoading(true);
+
+      const statsPromise = (async () => {
+        try {
+          const res = await fetch(
+            "/api/trakt/user-stats?historyLimit=1500&includePeople=0&localizeTitles=0",
+            { cache: "no-store" },
+          );
+          if (ignore) return;
+          if (res.status === 401) {
+            clearProfileSessionCache();
+            setNotConnected(true);
+            return;
+          }
+          if (!res.ok) {
+            const json = await res.json().catch(() => ({}));
+            if (!cachedStats) {
+              setError(
+                json?.error || "No se pudieron cargar las estadísticas.",
+              );
+            }
+            return;
+          }
+
+          const json = await res.json();
+          if (ignore) return;
+          mergeStatsData(json);
+          refreshTopArtwork();
+        } catch (e) {
+          console.error(e);
+          if (!ignore && !cachedStats) {
+            setError("No se pudieron cargar las estadísticas.");
+          }
+        } finally {
+          if (!ignore) setLoading(false);
+        }
+      })();
+
+      const profilePromise = (async () => {
+        try {
+          const res = await fetch("/api/trakt/profile?compact=1", {
+            cache: "no-store",
+          });
+          if (ignore || !res.ok) return;
+          const json = await res.json();
+          if (ignore) return;
+          setProfileData(json);
+          writeProfileSessionCache(PROFILE_DATA_CACHE_KEY, json);
+        } catch (e) {
+          console.error(e);
+        }
+      })();
+
+      await Promise.allSettled([statsPromise, profilePromise]);
     };
     fetchData();
 
@@ -1100,15 +1230,16 @@ export default function StatsClient({ connectNext = "/profile" }) {
         if (!res.ok) return;
         const json = await res.json();
         if (ignore) return;
-        setData((prev) =>
-          prev
-            ? {
-              ...prev,
-              topActors: json.topActors || [],
-              topDirectors: json.topDirectors || [],
-            }
-            : prev,
-        );
+        setData((prev) => {
+          if (!prev) return prev;
+          const merged = {
+            ...prev,
+            topActors: json.topActors || [],
+            topDirectors: json.topDirectors || [],
+          };
+          writeProfileSessionCache(PROFILE_STATS_CACHE_KEY, merged);
+          return merged;
+        });
       } catch (e) {
         console.error(e);
       } finally {
@@ -1187,6 +1318,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
       topShows: (data.watchedShows || [])
         .sort((a, b) => b.plays - a.plays)
         .slice(0, 15),
+      topMoviesReady: (data.watchedMovies || []).some(
+        (item) => item?.movie?.poster_path,
+      ),
+      topShowsReady: (data.watchedShows || []).some(
+        (item) => item?.show?.poster_path,
+      ),
       years: [
         ...new Set(history.map((h) => new Date(h.watched_at).getFullYear())),
       ].sort((a, b) => b - a),
@@ -1320,7 +1457,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
         </motion.div>
 
         {/* Content Area */}
-        {loading && !stats ? null : !stats ? (
+        {!stats && error ? (
           <div className="flex h-64 flex-col items-center justify-center gap-3 text-zinc-500">
             <BarChart3 className="w-10 h-10 text-zinc-700" />
             <p>{error || "No se pudieron cargar las estadísticas."}</p>
@@ -1337,96 +1474,100 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 className="flex flex-col gap-8"
               >
                 {/* KPIs */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <KPICard
-                    title="Tiempo Total"
-                    value={`${stats.totalDays}d ${stats.totalHours % 24}h`}
-                    subtitle={`${stats.totalHours.toLocaleString()} horas`}
-                    icon={Timer}
-                    color="cyan"
-                    delay={0.1}
-                  />
-                  <KPICard
-                    title="Películas"
-                    value={stats.movies.watched.toLocaleString()}
-                    subtitle={`${stats.movies.plays.toLocaleString()} plays`}
-                    icon={Film}
-                    color="blue"
-                    delay={0.2}
-                  />
-                  <KPICard
-                    title="Episodios"
-                    value={stats.episodes.watched.toLocaleString()}
-                    subtitle={`${(stats.raw?.shows?.watched || 0).toLocaleString()} series`}
-                    icon={Tv}
-                    color="purple"
-                    delay={0.3}
-                  />
-                  <KPICard
-                    title="Colección"
-                    value={stats.totalCollected.toLocaleString()}
-                    subtitle="Items guardados"
-                    icon={Library}
-                    color="orange"
-                    delay={0.4}
-                  />
-                </div>
+                {stats && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <KPICard
+                      title="Tiempo Total"
+                      value={`${stats.totalDays}d ${stats.totalHours % 24}h`}
+                      subtitle={`${stats.totalHours.toLocaleString()} horas`}
+                      icon={Timer}
+                      color="cyan"
+                      delay={0.1}
+                    />
+                    <KPICard
+                      title="Películas"
+                      value={stats.movies.watched.toLocaleString()}
+                      subtitle={`${stats.movies.plays.toLocaleString()} plays`}
+                      icon={Film}
+                      color="blue"
+                      delay={0.2}
+                    />
+                    <KPICard
+                      title="Episodios"
+                      value={stats.episodes.watched.toLocaleString()}
+                      subtitle={`${(stats.raw?.shows?.watched || 0).toLocaleString()} series`}
+                      icon={Tv}
+                      color="purple"
+                      delay={0.3}
+                    />
+                    <KPICard
+                      title="Colección"
+                      value={stats.totalCollected.toLocaleString()}
+                      subtitle="Items guardados"
+                      icon={Library}
+                      color="orange"
+                      delay={0.4}
+                    />
+                  </div>
+                )}
 
                 {/* Secondary KPIs */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
-                    <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500">
-                      <Star className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-xl font-bold">
-                        {stats.ratings.total}
+                {stats && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
+                      <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500">
+                        <Star className="w-5 h-5" />
                       </div>
-                      <div className="text-xs text-zinc-500 uppercase font-bold">
-                        Valoraciones
+                      <div>
+                        <div className="text-xl font-bold">
+                          {stats.ratings.total}
+                        </div>
+                        <div className="text-xs text-zinc-500 uppercase font-bold">
+                          Valoraciones
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
+                      <div className="p-2 bg-rose-500/10 rounded-lg text-rose-500">
+                        <MessageSquare className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-xl font-bold">
+                          {stats.totalComments}
+                        </div>
+                        <div className="text-xs text-zinc-500 uppercase font-bold">
+                          Comentarios
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
+                      <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-xl font-bold">
+                          {stats.network.followers}
+                        </div>
+                        <div className="text-xs text-zinc-500 uppercase font-bold">
+                          Seguidores
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
+                      <div className="p-2 bg-teal-500/10 rounded-lg text-teal-500">
+                        <Heart className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-xl font-bold">
+                          {stats.network.friends}
+                        </div>
+                        <div className="text-xs text-zinc-500 uppercase font-bold">
+                          Amigos
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
-                    <div className="p-2 bg-rose-500/10 rounded-lg text-rose-500">
-                      <MessageSquare className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-xl font-bold">
-                        {stats.totalComments}
-                      </div>
-                      <div className="text-xs text-zinc-500 uppercase font-bold">
-                        Comentarios
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
-                    <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
-                      <Users className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-xl font-bold">
-                        {stats.network.followers}
-                      </div>
-                      <div className="text-xs text-zinc-500 uppercase font-bold">
-                        Seguidores
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
-                    <div className="p-2 bg-teal-500/10 rounded-lg text-teal-500">
-                      <Heart className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-xl font-bold">
-                        {stats.network.friends}
-                      </div>
-                      <div className="text-xs text-zinc-500 uppercase font-bold">
-                        Amigos
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                )}
 
                 {recentHistory.length > 0 && (
                   <motion.div
@@ -1516,232 +1657,221 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 )}
 
                 {/* Main Charts Row */}
-                <div className="order-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Activity Chart - Spans 2 cols */}
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="lg:col-span-2 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-                    <SectionTitle
-                      icon={Activity}
-                      title="Actividad Mensual"
-                      subtitle="Visualizaciones en el último año"
-                      color="indigo"
-                    />
-
-                    <div className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                          data={stats.monthlyData}
-                          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                        >
-                          <defs>
-                            <linearGradient
-                              id="colorTotal"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor={COLORS.indigo}
-                                stopOpacity={0.3}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor={COLORS.indigo}
-                                stopOpacity={0}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            vertical={false}
-                            stroke={CHART_THEME.grid}
-                          />
-                          <XAxis
-                            dataKey="label"
-                            stroke={CHART_THEME.text}
-                            tick={{ fill: CHART_THEME.text, fontSize: 12 }}
-                            tickLine={false}
-                            axisLine={false}
-                            dy={10}
-                          />
-                          <YAxis
-                            stroke={CHART_THEME.text}
-                            tick={{ fill: CHART_THEME.text, fontSize: 12 }}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <Tooltip
-                            content={<CustomTooltip />}
-                            cursor={{
-                              stroke: "rgba(255,255,255,0.1)",
-                              strokeWidth: 2,
-                            }}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="total"
-                            name="Total"
-                            stroke={COLORS.indigo}
-                            strokeWidth={3}
-                            fillOpacity={1}
-                            fill="url(#colorTotal)"
-                            animationDuration={1500}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </motion.div>
-
-                  {/* Time Distribution */}
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center justify-center relative"
-                  >
-                    <SectionTitle
-                      icon={Clock}
-                      title="Distribución de Tiempo"
-                      subtitle="Películas vs Series"
-                      color="indigo"
-                    />
-                    <div className="h-[250px] w-full relative">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={stats.timeDistribution}
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
-                          >
-                            {stats.timeDistribution.map((entry, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={entry.color}
-                                stroke="rgba(0,0,0,0)"
-                              />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            content={
-                              <CustomTooltip formatter={formatMinutes} />
-                            }
-                            wrapperStyle={{ zIndex: 1000 }}
-                          />
-                          <Legend
-                            verticalAlign="bottom"
-                            height={36}
-                            iconType="circle"
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      {/* Center Text */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
-                        <span className="text-3xl font-black text-white">
-                          {stats.formattedTotalTime.split(" ")[0]}
-                        </span>
-                        <span className="text-sm font-bold text-zinc-500 uppercase tracking-widest">
-                          {stats.formattedTotalTime.split(" ")[1]}
-                        </span>
-                      </div>
-                    </div>
-                  </motion.div>
-                </div>
-
-                {/* Top Content Row */}
-                <div className="order-3 space-y-8">
-                  {/* Top Movies */}
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.7 }}
-                    className="relative"
-                  >
-                    <SectionTitle
-                      icon={Film}
-                      title="Películas Top"
-                      subtitle="Las que más has visto"
-                      color="blue"
-                    />
-                    <ProfileCardScroller>
-                      {stats.topMovies.slice(0, 15).map((item, idx) => (
-                        <ProfileCardScrollerItem key={item.movie?.ids?.tmdb || idx}>
-                          <ProfileUnifiedCard
-                            item={item}
-                            type="movie"
-                            sectionColor="blue"
-                            rank={idx + 1}
-                            plays={item.plays}
-                          />
-                        </ProfileCardScrollerItem>
-                      ))}
-                    </ProfileCardScroller>
-                  </motion.div>
-
-                  {/* Top Shows */}
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.7 }}
-                    className="relative"
-                  >
-                    <SectionTitle
-                      icon={Tv}
-                      title="Series Top"
-                      subtitle="Tus maratones favoritos"
-                      color="purple"
-                    />
-                    <ProfileCardScroller>
-                      {stats.topShows.slice(0, 15).map((item, idx) => (
-                        <ProfileCardScrollerItem key={item.show?.ids?.tmdb || idx}>
-                          <ProfileUnifiedCard
-                            item={item}
-                            type="show"
-                            sectionColor="purple"
-                            rank={idx + 1}
-                            plays={item.plays}
-                          />
-                        </ProfileCardScrollerItem>
-                      ))}
-                    </ProfileCardScroller>
-                  </motion.div>
-                </div>
-
-                {/* Top People Row */}
-                {peopleLoading &&
-                  stats.topActors.length === 0 &&
-                  stats.topDirectors.length === 0 && (
+                {stats && (
+                  <div className="order-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Activity Chart - Spans 2 cols */}
                     <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                      className="relative order-4"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="lg:col-span-2 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+                      <SectionTitle
+                        icon={Activity}
+                        title="Actividad Mensual"
+                        subtitle="Visualizaciones en el último año"
+                        color="indigo"
+                      />
+
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart
+                            data={stats.monthlyData}
+                            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                          >
+                            <defs>
+                              <linearGradient
+                                id="colorTotal"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="5%"
+                                  stopColor={COLORS.indigo}
+                                  stopOpacity={0.3}
+                                />
+                                <stop
+                                  offset="95%"
+                                  stopColor={COLORS.indigo}
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              vertical={false}
+                              stroke={CHART_THEME.grid}
+                            />
+                            <XAxis
+                              dataKey="label"
+                              stroke={CHART_THEME.text}
+                              tick={{ fill: CHART_THEME.text, fontSize: 12 }}
+                              tickLine={false}
+                              axisLine={false}
+                              dy={10}
+                            />
+                            <YAxis
+                              stroke={CHART_THEME.text}
+                              tick={{ fill: CHART_THEME.text, fontSize: 12 }}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <Tooltip
+                              content={<CustomTooltip />}
+                              cursor={{
+                                stroke: "rgba(255,255,255,0.1)",
+                                strokeWidth: 2,
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="total"
+                              name="Total"
+                              stroke={COLORS.indigo}
+                              strokeWidth={3}
+                              fillOpacity={1}
+                              fill="url(#colorTotal)"
+                              animationDuration={1500}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </motion.div>
+
+                    {/* Time Distribution */}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center justify-center relative"
                     >
                       <SectionTitle
-                        icon={Users}
-                        title="Actores y Directores"
-                        subtitle="Cargando favoritos en segundo plano"
-                        color="yellow"
+                        icon={Clock}
+                        title="Distribución de Tiempo"
+                        subtitle="Películas vs Series"
+                        color="indigo"
                       />
-                      <ProfileCardScroller>
-                        {Array.from({ length: 15 }).map((_, idx) => (
-                          <ProfileCardScrollerItem key={idx}>
-                            <div className="aspect-[2/3] rounded-xl bg-white/[0.06] animate-pulse mb-2" />
-                            <div className="h-3 rounded bg-white/10 animate-pulse" />
-                          </ProfileCardScrollerItem>
-                        ))}
-                      </ProfileCardScroller>
+                      <div className="h-[250px] w-full relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={stats.timeDistribution}
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              {stats.timeDistribution.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={entry.color}
+                                  stroke="rgba(0,0,0,0)"
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              content={
+                                <CustomTooltip formatter={formatMinutes} />
+                              }
+                              wrapperStyle={{ zIndex: 1000 }}
+                            />
+                            <Legend
+                              verticalAlign="bottom"
+                              height={36}
+                              iconType="circle"
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        {/* Center Text */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
+                          <span className="text-3xl font-black text-white">
+                            {stats.formattedTotalTime.split(" ")[0]}
+                          </span>
+                          <span className="text-sm font-bold text-zinc-500 uppercase tracking-widest">
+                            {stats.formattedTotalTime.split(" ")[1]}
+                          </span>
+                        </div>
+                      </div>
                     </motion.div>
-                  )}
+                  </div>
+                )}
 
-                {stats.topActors.length > 0 && (
+                {/* Top Content Row */}
+                {stats && (stats.topMoviesReady || stats.topShowsReady) && (
+                  <div className="order-3 space-y-8">
+                    {/* Top Movies */}
+                    {stats.topMoviesReady && (
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.7 }}
+                        className="relative"
+                      >
+                        <SectionTitle
+                          icon={Film}
+                          title="Películas Top"
+                          subtitle="Las que más has visto"
+                          color="blue"
+                        />
+                        <ProfileCardScroller>
+                          {stats.topMovies
+                            .filter((item) => item?.movie?.poster_path)
+                            .slice(0, 15)
+                            .map((item, idx) => (
+                              <ProfileCardScrollerItem key={item.movie?.ids?.tmdb || idx}>
+                                <ProfileUnifiedCard
+                                  item={item}
+                                  type="movie"
+                                  sectionColor="blue"
+                                  rank={idx + 1}
+                                  plays={item.plays}
+                                />
+                              </ProfileCardScrollerItem>
+                            ))}
+                        </ProfileCardScroller>
+                      </motion.div>
+                    )}
+
+                    {/* Top Shows */}
+                    {stats.topShowsReady && (
+                      <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.7 }}
+                        className="relative"
+                      >
+                        <SectionTitle
+                          icon={Tv}
+                          title="Series Top"
+                          subtitle="Tus maratones favoritos"
+                          color="purple"
+                        />
+                        <ProfileCardScroller>
+                          {stats.topShows
+                            .filter((item) => item?.show?.poster_path)
+                            .slice(0, 15)
+                            .map((item, idx) => (
+                              <ProfileCardScrollerItem key={item.show?.ids?.tmdb || idx}>
+                                <ProfileUnifiedCard
+                                  item={item}
+                                  type="show"
+                                  sectionColor="purple"
+                                  rank={idx + 1}
+                                  plays={item.plays}
+                                />
+                              </ProfileCardScrollerItem>
+                            ))}
+                        </ProfileCardScroller>
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                {/* Top People Row */}
+                {stats?.topActors?.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1771,7 +1901,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 )}
 
                 {/* Top Directors Row */}
-                {stats.topDirectors.length > 0 && (
+                {stats?.topDirectors?.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1802,7 +1932,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
               </motion.div>
             )}
 
-            {viewMode === "patterns" && (
+            {stats && viewMode === "patterns" && (
               <motion.div
                 key="patterns"
                 initial={{ opacity: 0, y: 20 }}
@@ -1986,7 +2116,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
               </motion.div>
             )}
 
-            {viewMode === "yearly" && (
+            {stats && viewMode === "yearly" && (
               <motion.div
                 key="yearly"
                 initial={{ opacity: 0, scale: 0.95 }}
