@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  Children,
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3,
@@ -24,6 +31,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Navigation, FreeMode } from "swiper";
+import "swiper/swiper-bundle.css";
 
 // Score fetching APIs
 import { getExternalIds } from "@/lib/api/tmdb";
@@ -32,6 +42,28 @@ import { traktGetScoreboard } from "@/lib/api/traktClient";
 
 // Score caching system identical to favorites
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+const useIsMobileLayout = (breakpointPx = 768) => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width:${breakpointPx - 1}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    if (mq.addEventListener) mq.addEventListener("change", update);
+    else mq.addListener(update);
+    window.addEventListener("orientationchange", update);
+    window.addEventListener("resize", update);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      else mq.removeListener(update);
+      window.removeEventListener("orientationchange", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [breakpointPx]);
+
+  return isMobile;
+};
 
 function readScoreCache(source) {
   if (typeof window === "undefined") return new Map();
@@ -394,6 +426,148 @@ function SectionTitle({ icon: Icon, title, subtitle, color = "indigo", href }) {
   );
 }
 
+function ProfileCardScroller({ children }) {
+  const swiperRef = useRef(null);
+  const [isHoveredRow, setIsHoveredRow] = useState(false);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+  const isMobile = useIsMobileLayout(768);
+  const slides = Children.toArray(children);
+
+  const breakpointsRow = {
+    0: { slidesPerView: 3, spaceBetween: 12 },
+    640: { slidesPerView: 4, spaceBetween: 14 },
+    768: { slidesPerView: 4, spaceBetween: 16 },
+    1024: { slidesPerView: 5, spaceBetween: 18 },
+    1280: { slidesPerView: 6, spaceBetween: 20 },
+  };
+
+  const updateNav = (swiper) => {
+    if (!swiper) return;
+    const hasOverflow = !swiper.isLocked;
+    setCanPrev(hasOverflow && !swiper.isBeginning);
+    setCanNext(hasOverflow && !swiper.isEnd);
+  };
+
+  const handleSwiper = (swiper) => {
+    swiperRef.current = swiper;
+    updateNav(swiper);
+  };
+
+  const handlePrevClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const swiper = swiperRef.current;
+    if (!swiper) return;
+    const target = Math.max((swiper.activeIndex || 0) - 6, 0);
+    swiper.slideTo(target);
+  };
+
+  const handleNextClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const swiper = swiperRef.current;
+    if (!swiper) return;
+    const maxIndex = swiper.slides.length - 1;
+    const target = Math.min((swiper.activeIndex || 0) + 6, maxIndex);
+    swiper.slideTo(target);
+  };
+
+  const showPrev = isHoveredRow && canPrev;
+  const showNext = isHoveredRow && canNext;
+
+  return (
+    <div className="-mx-4 sm:mx-0">
+      <div
+        className="relative z-0 px-3 hover:z-[200] sm:px-0"
+        style={{ overflowX: "clip", overflowY: "visible" }}
+        onMouseEnter={() => setIsHoveredRow(true)}
+        onMouseLeave={() => setIsHoveredRow(false)}
+      >
+        <Swiper
+          slidesPerView={3}
+          spaceBetween={12}
+          onSwiper={handleSwiper}
+          onSlideChange={updateNav}
+          onResize={updateNav}
+          onReachBeginning={updateNav}
+          onReachEnd={updateNav}
+          breakpoints={breakpointsRow}
+          loop={false}
+          watchOverflow={true}
+          grabCursor={!isMobile}
+          simulateTouch={true}
+          allowTouchMove={true}
+          preventClicks={true}
+          preventClicksPropagation={true}
+          threshold={isMobile ? 2 : 5}
+          touchRatio={isMobile ? 1.5 : 1}
+          freeMode={
+            !isMobile
+              ? { enabled: true, momentum: true, momentumRatio: 0.5 }
+              : false
+          }
+          modules={[Navigation, FreeMode]}
+          className="relative z-0 !overflow-visible pb-8 pt-7"
+        >
+          {slides.map((child, idx) => (
+            <SwiperSlide
+              key={child?.key || idx}
+              className="relative !h-auto select-none !overflow-visible !z-0 hover:!z-[300] focus-within:!z-[300]"
+            >
+              {child}
+            </SwiperSlide>
+          ))}
+        </Swiper>
+
+        <AnimatePresence>
+          {showPrev && !isMobile && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              type="button"
+              onClick={handlePrevClick}
+              className="absolute inset-y-0 left-0 z-30 hidden w-28 items-center justify-start bg-gradient-to-r from-black/80 via-black/55 to-transparent transition-colors hover:from-black/95 hover:via-black/75 pointer-events-auto sm:flex"
+            >
+              <motion.span
+                className="ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]"
+                whileHover={{ x: -4 }}
+              >
+                ‹
+              </motion.span>
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showNext && !isMobile && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              type="button"
+              onClick={handleNextClick}
+              className="absolute inset-y-0 right-0 z-30 hidden w-28 items-center justify-end bg-gradient-to-l from-black/80 via-black/55 to-transparent transition-colors hover:from-black/95 hover:via-black/75 pointer-events-auto sm:flex"
+            >
+              <motion.span
+                className="mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]"
+                whileHover={{ x: 4 }}
+              >
+                ›
+              </motion.span>
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+function ProfileCardScrollerItem({ children }) {
+  return children;
+}
+
 function CustomTooltip({ active, payload, label, formatter }) {
   if (active && payload && payload.length) {
     const title = label || (payload[0] && payload[0].name);
@@ -742,14 +916,15 @@ function ProfileUnifiedCard({
   return (
     <Link
       href={href}
-      className={`relative z-0 block focus:z-[90] focus:outline-none ${isScrollable ? "w-32 sm:w-40 flex-shrink-0" : "w-full"}`}
-      title={title}
+      className={`relative z-0 block hover:z-[300] focus:z-[300] focus:outline-none ${isScrollable ? "w-32 sm:w-40 flex-shrink-0" : "w-full"}`}
+      draggable={false}
+      onDragStart={(e) => e.preventDefault()}
     >
       <motion.div
         className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/5 bg-neutral-800/80 shadow-lg transition-colors duration-300 transform-gpu will-change-transform"
         whileHover={{
           y: -6,
-          zIndex: 100,
+          zIndex: 300,
           boxShadow: hoverShadowColor,
           borderColor: hoverBorderColor,
         }}
@@ -764,6 +939,7 @@ function ProfileUnifiedCard({
             alt={title}
             loading="lazy"
             decoding="async"
+            draggable={false}
             className="h-full w-full object-cover grayscale-[18%] transition-transform duration-500 transform-gpu group-hover:scale-[1.08] group-hover:-translate-y-1 group-hover:grayscale-0"
             onError={() => setErr(true)}
           />
@@ -1007,15 +1183,15 @@ export default function StatsClient({ connectNext = "/profile" }) {
       timeDistribution,
       topMovies: (data.watchedMovies || [])
         .sort((a, b) => b.plays - a.plays)
-        .slice(0, 6),
+        .slice(0, 15),
       topShows: (data.watchedShows || [])
         .sort((a, b) => b.plays - a.plays)
-        .slice(0, 6),
+        .slice(0, 15),
       years: [
         ...new Set(history.map((h) => new Date(h.watched_at).getFullYear())),
       ].sort((a, b) => b - a),
-      topActors: (data.topActors || []).slice(0, 6),
-      topDirectors: (data.topDirectors || []).slice(0, 6),
+      topActors: (data.topActors || []).slice(0, 15),
+      topDirectors: (data.topDirectors || []).slice(0, 15),
     };
   }, [data]);
 
@@ -1266,17 +1442,18 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       color="emerald"
                       href="/history"
                     />
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                      {recentHistory.slice(0, 6).map((item, idx) => (
-                        <ProfileUnifiedCard
-                          key={`${item.type}-${item.tmdbId}-${idx}`}
-                          item={item}
-                          type={item.type}
-                          sectionColor="emerald"
-                          dateField="watched_at"
-                        />
+                    <ProfileCardScroller>
+                      {recentHistory.slice(0, 15).map((item, idx) => (
+                        <ProfileCardScrollerItem key={`${item.type}-${item.tmdbId}-${idx}`}>
+                          <ProfileUnifiedCard
+                            item={item}
+                            type={item.type}
+                            sectionColor="emerald"
+                            dateField="watched_at"
+                          />
+                        </ProfileCardScrollerItem>
                       ))}
-                    </div>
+                    </ProfileCardScroller>
                   </motion.div>
                 )}
 
@@ -1293,18 +1470,19 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Lo que has puntuado recientemente"
                       color="yellow"
                     />
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                      {recentRatings.slice(0, 6).map((item, idx) => (
-                        <ProfileUnifiedCard
-                          key={`${item.type}-${item.tmdbId}-${idx}`}
-                          item={item}
-                          type={item.type}
-                          sectionColor="yellow"
-                          showRating
-                          dateField="rated_at"
-                        />
+                    <ProfileCardScroller>
+                      {recentRatings.slice(0, 15).map((item, idx) => (
+                        <ProfileCardScrollerItem key={`${item.type}-${item.tmdbId}-${idx}`}>
+                          <ProfileUnifiedCard
+                            item={item}
+                            type={item.type}
+                            sectionColor="yellow"
+                            showRating
+                            dateField="rated_at"
+                          />
+                        </ProfileCardScrollerItem>
                       ))}
-                    </div>
+                    </ProfileCardScroller>
                   </motion.div>
                 )}
 
@@ -1322,17 +1500,18 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       color="indigo"
                       href="/watchlist"
                     />
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                      {watchlist.slice(0, 6).map((item, idx) => (
-                        <ProfileUnifiedCard
-                          key={`${item.type}-${item.tmdbId}-${idx}`}
-                          item={item}
-                          type={item.type}
-                          sectionColor="indigo"
-                          dateField="listed_at"
-                        />
+                    <ProfileCardScroller>
+                      {watchlist.slice(0, 15).map((item, idx) => (
+                        <ProfileCardScrollerItem key={`${item.type}-${item.tmdbId}-${idx}`}>
+                          <ProfileUnifiedCard
+                            item={item}
+                            type={item.type}
+                            sectionColor="indigo"
+                            dateField="listed_at"
+                          />
+                        </ProfileCardScrollerItem>
                       ))}
-                    </div>
+                    </ProfileCardScroller>
                   </motion.div>
                 )}
 
@@ -1492,18 +1671,19 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Las que más has visto"
                       color="blue"
                     />
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                      {stats.topMovies.map((item, idx) => (
-                        <ProfileUnifiedCard
-                          key={item.movie?.ids?.tmdb || idx}
-                          item={item}
-                          type="movie"
-                          sectionColor="blue"
-                          rank={idx + 1}
-                          plays={item.plays}
-                        />
+                    <ProfileCardScroller>
+                      {stats.topMovies.slice(0, 15).map((item, idx) => (
+                        <ProfileCardScrollerItem key={item.movie?.ids?.tmdb || idx}>
+                          <ProfileUnifiedCard
+                            item={item}
+                            type="movie"
+                            sectionColor="blue"
+                            rank={idx + 1}
+                            plays={item.plays}
+                          />
+                        </ProfileCardScrollerItem>
                       ))}
-                    </div>
+                    </ProfileCardScroller>
                   </motion.div>
 
                   {/* Top Shows */}
@@ -1519,18 +1699,19 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Tus maratones favoritos"
                       color="purple"
                     />
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                      {stats.topShows.map((item, idx) => (
-                        <ProfileUnifiedCard
-                          key={item.show?.ids?.tmdb || idx}
-                          item={item}
-                          type="show"
-                          sectionColor="purple"
-                          rank={idx + 1}
-                          plays={item.plays}
-                        />
+                    <ProfileCardScroller>
+                      {stats.topShows.slice(0, 15).map((item, idx) => (
+                        <ProfileCardScrollerItem key={item.show?.ids?.tmdb || idx}>
+                          <ProfileUnifiedCard
+                            item={item}
+                            type="show"
+                            sectionColor="purple"
+                            rank={idx + 1}
+                            plays={item.plays}
+                          />
+                        </ProfileCardScrollerItem>
                       ))}
-                    </div>
+                    </ProfileCardScroller>
                   </motion.div>
                 </div>
 
@@ -1539,9 +1720,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   stats.topActors.length === 0 &&
                   stats.topDirectors.length === 0 && (
                     <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="order-4 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                      className="relative order-4"
                     >
                       <SectionTitle
                         icon={Users}
@@ -1549,14 +1730,14 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         subtitle="Cargando favoritos en segundo plano"
                         color="yellow"
                       />
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-                        {Array.from({ length: 6 }).map((_, idx) => (
-                          <div key={idx}>
+                      <ProfileCardScroller>
+                        {Array.from({ length: 15 }).map((_, idx) => (
+                          <ProfileCardScrollerItem key={idx}>
                             <div className="aspect-[2/3] rounded-xl bg-white/[0.06] animate-pulse mb-2" />
                             <div className="h-3 rounded bg-white/10 animate-pulse" />
-                          </div>
+                          </ProfileCardScrollerItem>
                         ))}
-                      </div>
+                      </ProfileCardScroller>
                     </motion.div>
                   )}
 
@@ -1565,7 +1746,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.65 }}
-                    className="order-4 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                    className="relative order-4"
                   >
                     <SectionTitle
                       icon={Users}
@@ -1573,18 +1754,19 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Las caras que más ves"
                       color="yellow"
                     />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-                      {stats.topActors.map((person, idx) => (
-                        <ProfileUnifiedCard
-                          key={person.id}
-                          item={person}
-                          type="person"
-                          sectionColor="yellow"
-                          role="actor"
-                          count={person.count}
-                        />
+                    <ProfileCardScroller>
+                      {stats.topActors.slice(0, 15).map((person, idx) => (
+                        <ProfileCardScrollerItem key={person.id}>
+                          <ProfileUnifiedCard
+                            item={person}
+                            type="person"
+                            sectionColor="yellow"
+                            role="actor"
+                            count={person.count}
+                          />
+                        </ProfileCardScrollerItem>
                       ))}
-                    </div>
+                    </ProfileCardScroller>
                   </motion.div>
                 )}
 
@@ -1594,7 +1776,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.7 }}
-                    className="order-4 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                    className="relative order-4"
                   >
                     <SectionTitle
                       icon={Film}
@@ -1602,18 +1784,19 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Los cineastas que más sigues"
                       color="rose"
                     />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-                      {stats.topDirectors.map((person, idx) => (
-                        <ProfileUnifiedCard
-                          key={person.id}
-                          item={person}
-                          type="person"
-                          sectionColor="rose"
-                          role="director"
-                          count={person.count}
-                        />
+                    <ProfileCardScroller>
+                      {stats.topDirectors.slice(0, 15).map((person, idx) => (
+                        <ProfileCardScrollerItem key={person.id}>
+                          <ProfileUnifiedCard
+                            item={person}
+                            type="person"
+                            sectionColor="rose"
+                            role="director"
+                            count={person.count}
+                          />
+                        </ProfileCardScrollerItem>
                       ))}
-                    </div>
+                    </ProfileCardScroller>
                   </motion.div>
                 )}
               </motion.div>

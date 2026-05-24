@@ -117,10 +117,10 @@ export async function GET(request) {
     ] = await Promise.allSettled([
       fetch(`${TRAKT_API}/users/settings`, { headers: h, cache: "no-store" }),
       fetch(`${TRAKT_API}/users/me/stats`, { headers: h, cache: "no-store" }),
-      fetch(`${TRAKT_API}/sync/history?limit=20&extended=full`, { headers: h, cache: "no-store" }),
-      fetch(`${TRAKT_API}/sync/ratings/movies?limit=10&extended=full`, { headers: h, cache: "no-store" }),
-      fetch(`${TRAKT_API}/sync/ratings/shows?limit=10&extended=full`, { headers: h, cache: "no-store" }),
-      fetch(`${TRAKT_API}/sync/watchlist?extended=full&limit=10`, { headers: h, cache: "no-store" }),
+      fetch(`${TRAKT_API}/sync/history?limit=30&extended=full`, { headers: h, cache: "no-store" }),
+      fetch(`${TRAKT_API}/sync/ratings/movies?limit=15&extended=full`, { headers: h, cache: "no-store" }),
+      fetch(`${TRAKT_API}/sync/ratings/shows?limit=15&extended=full`, { headers: h, cache: "no-store" }),
+      fetch(`${TRAKT_API}/sync/watchlist?extended=full&limit=15`, { headers: h, cache: "no-store" }),
       fetch(`${TRAKT_API}/sync/collection/movies`, { headers: h, cache: "no-store" }),
     ]);
 
@@ -209,7 +209,7 @@ export async function GET(request) {
         return null;
       })
       .filter(Boolean)
-      .slice(0, 12);
+      .slice(0, 15);
 
     // Normalize recent ratings (movies + shows combined, sorted by rated_at)
     const normalizedRatings = [
@@ -233,7 +233,7 @@ export async function GET(request) {
       })),
     ]
       .sort((a, b) => new Date(b.rated_at) - new Date(a.rated_at))
-      .slice(0, 12);
+      .slice(0, 15);
 
     // Normalize watchlist
     const normalizedWatchlist = rawWatchlist
@@ -252,7 +252,7 @@ export async function GET(request) {
         };
       })
       .filter(Boolean)
-      .slice(0, 8);
+      .slice(0, 15);
 
     // Enrich history with TMDb posters (parallel, limited concurrency)
     const enrichedHistory = await parallelLimit(normalizedHistory, 6, async (item) => {
@@ -298,11 +298,11 @@ export async function GET(request) {
     });
 
     // Build top movies/shows (Trakt returns watched sorted by plays desc by default)
-    const normalizedTopMovies = rawWatchedMovies.slice(0, 6).map((item) => ({
+    const normalizedTopMovies = rawWatchedMovies.slice(0, 15).map((item) => ({
       movie: { ...item.movie, plays: item.plays },
       plays: item.plays,
     }));
-    const normalizedTopShows = rawWatchedShows.slice(0, 6).map((item) => ({
+    const normalizedTopShows = rawWatchedShows.slice(0, 15).map((item) => ({
       show: { ...item.show, plays: item.plays },
       plays: item.plays,
     }));
