@@ -56,6 +56,112 @@ function buildSeriesGraphUrl(showId, title) {
   }`;
 }
 
+function getNormalizedRatingSeasons(ratings) {
+  return (
+    Array.isArray(ratings?.seasons)
+      ? ratings.seasons
+      : Array.isArray(ratings)
+        ? ratings
+        : []
+  )
+    .map((season) => {
+      const seasonNumber = getSeasonNumber(season);
+      const episodes = Array.isArray(season?.episodes) ? season.episodes : [];
+      if (!Number.isFinite(seasonNumber) || seasonNumber <= 0) return null;
+      if (!episodes.length) return null;
+      return { season, seasonNumber, episodes };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.seasonNumber - b.seasonNumber);
+}
+
+function getTmdbEpisodeOrdinal(tmdbSeasons, seasonNumber, episodeNumber) {
+  const targetSeasonNumber = Number(seasonNumber);
+  const targetEpisodeNumber = Number(episodeNumber);
+  if (
+    !Number.isFinite(targetSeasonNumber) ||
+    !Number.isFinite(targetEpisodeNumber) ||
+    targetSeasonNumber <= 0 ||
+    targetEpisodeNumber <= 0
+  ) {
+    return null;
+  }
+
+  const seasons = (Array.isArray(tmdbSeasons) ? tmdbSeasons : [])
+    .map((season) => {
+      const number = Number(season?.season_number ?? season?.seasonNumber);
+      const count = Number(season?.episode_count ?? season?.episodeCount);
+      if (!Number.isFinite(number) || number <= 0) return null;
+      if (!Number.isFinite(count) || count <= 0) return null;
+      return { number, count };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.number - b.number);
+
+  if (!seasons.length) return null;
+
+  let ordinal = targetEpisodeNumber;
+  for (const season of seasons) {
+    if (season.number >= targetSeasonNumber) break;
+    ordinal += season.count;
+  }
+
+  return ordinal;
+}
+
+function mapTmdbRouteToRatingsEpisode({
+  ratings,
+  tmdbSeasons,
+  seasonNumber,
+  episodeNumber,
+} = {}) {
+  const seasons = getNormalizedRatingSeasons(ratings);
+  if (!seasons.length) return null;
+
+  const directSeasonNumber = Number(seasonNumber);
+  const directEpisodeNumber = Number(episodeNumber);
+  const directSeason = seasons.find(
+    (season) => season.seasonNumber === directSeasonNumber,
+  );
+  const directEpisode = directSeason?.episodes.find(
+    (episode) => getEpisodeNumber(episode) === directEpisodeNumber,
+  );
+  if (directEpisode) {
+    return {
+      season: directSeason.season,
+      episode: directEpisode,
+      seasonNumber: directSeasonNumber,
+      episodeNumber: directEpisodeNumber,
+    };
+  }
+
+  const ordinal = getTmdbEpisodeOrdinal(
+    tmdbSeasons,
+    seasonNumber,
+    episodeNumber,
+  );
+  if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
+
+  let remaining = ordinal;
+  for (const season of seasons) {
+    const sortedEpisodes = [...season.episodes].sort(
+      (a, b) => (getEpisodeNumber(a) || 0) - (getEpisodeNumber(b) || 0),
+    );
+    if (remaining <= sortedEpisodes.length) {
+      const episode = sortedEpisodes[remaining - 1];
+      return {
+        season: season.season,
+        episode,
+        seasonNumber: season.seasonNumber,
+        episodeNumber: getEpisodeNumber(episode),
+      };
+    }
+    remaining -= sortedEpisodes.length;
+  }
+
+  return null;
+}
+
 export async function fetchSeriesGraphRatingsCached({
   showId,
   title,
@@ -103,14 +209,11 @@ export function getSeriesGraphSeasonAggregate({
     return null;
   }
 
-  const seasons = Array.isArray(ratings?.seasons)
-    ? ratings.seasons
-    : Array.isArray(ratings)
-      ? ratings
-      : [];
-  const season = seasons.find(
-    (item) => getSeasonNumber(item) === targetSeasonNumber,
+  const seasons = getNormalizedRatingSeasons(ratings);
+  const seasonWrapper = seasons.find(
+    (item) => item.seasonNumber === targetSeasonNumber,
   );
+  const season = seasonWrapper?.season;
   const episodes = Array.isArray(season?.episodes) ? season.episodes : [];
   const values = episodes
     .map((episode) => getSeriesGraphRating(episode))
@@ -137,6 +240,7 @@ export function getSeriesGraphEpisodeRating({
   ratings,
   seasonNumber,
   episodeNumber,
+  tmdbSeasons,
   showId,
   title,
 } = {}) {
@@ -149,17 +253,13 @@ export function getSeriesGraphEpisodeRating({
     return null;
   }
 
-  const seasons = Array.isArray(ratings?.seasons)
-    ? ratings.seasons
-    : Array.isArray(ratings)
-      ? ratings
-      : [];
-  const season = seasons.find(
-    (item) => getSeasonNumber(item) === targetSeasonNumber,
-  );
-  const episode = (Array.isArray(season?.episodes) ? season.episodes : []).find(
-    (item) => getEpisodeNumber(item) === targetEpisodeNumber,
-  );
+  const resolved = mapTmdbRouteToRatingsEpisode({
+    ratings,
+    tmdbSeasons,
+    seasonNumber: targetSeasonNumber,
+    episodeNumber: targetEpisodeNumber,
+  });
+  const episode = resolved?.episode || null;
   const rating = getSeriesGraphRating(episode);
   if (rating == null) return null;
 
@@ -169,5 +269,7 @@ export function getSeriesGraphEpisodeRating({
     votes: getSeriesGraphVotes(episode),
     source: "seriesgraph",
     url: ratings?.meta?.providerUrl || buildSeriesGraphUrl(showId, title),
+    seasonNumber: resolved?.seasonNumber ?? targetSeasonNumber,
+    episodeNumber: resolved?.episodeNumber ?? targetEpisodeNumber,
   };
 }

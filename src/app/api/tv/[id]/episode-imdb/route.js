@@ -1,7 +1,44 @@
 import { NextResponse } from "next/server";
 import { getCachedEpisodeImdbData } from "@/lib/api/ratingsCached";
+import { getSeriesGraphEpisodeRating } from "@/lib/details/seriesGraphRatings";
 
 export const revalidate = 3600;
+
+const TMDB_API_KEY =
+  process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+
+async function safeJson(res) {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function fetchTmdbShowSeasons(showId) {
+  if (!TMDB_API_KEY || !showId) return [];
+
+  const res = await fetch(
+    `https://api.themoviedb.org/3/tv/${encodeURIComponent(showId)}?api_key=${TMDB_API_KEY}&language=es-ES`,
+    { next: { revalidate: 86400 } },
+  );
+  if (!res.ok) return [];
+
+  const data = await safeJson(res);
+  return Array.isArray(data?.seasons) ? data.seasons : [];
+}
+
+async function fetchSeriesGraphRatings(request, showId) {
+  const seriesGraphUrl = new URL(
+    `/api/seriesgraph/episode-ratings?tmdbId=${encodeURIComponent(showId)}`,
+    request.url,
+  );
+  const res = await fetch(seriesGraphUrl, {
+    next: { revalidate: 60 * 60 * 24 * 30 },
+  });
+  if (!res.ok) return null;
+  return safeJson(res);
+}
 
 export async function GET(request, context) {
   const { params } = context;
@@ -31,6 +68,31 @@ export async function GET(request, context) {
   }
 
   try {
+    const [seriesGraphRatings, tmdbSeasons] = await Promise.all([
+      fetchSeriesGraphRatings(request, id),
+      fetchTmdbShowSeasons(id),
+    ]);
+
+    const seriesGraphImdb = getSeriesGraphEpisodeRating({
+      ratings: seriesGraphRatings,
+      seasonNumber,
+      episodeNumber,
+      tmdbSeasons,
+      showId: id,
+    });
+
+    if (typeof seriesGraphImdb?.rating === "number") {
+      return NextResponse.json(
+        { imdb: seriesGraphImdb },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+          },
+        },
+      );
+    }
+
     const imdb = await getCachedEpisodeImdbData({
       showId: id,
       imdbId,

@@ -507,11 +507,15 @@ export async function traktGetScoreboard({
   type,
   tmdbId,
   traktId,
+  season,
+  episode,
   includeStats = true,
 } = {}) {
   const qs = new URLSearchParams({ type: String(type) });
   if (tmdbId != null) qs.set("tmdbId", String(tmdbId));
   if (traktId != null) qs.set("traktId", String(traktId));
+  if (season != null) qs.set("season", String(season));
+  if (episode != null) qs.set("episode", String(episode));
   if (!includeStats) qs.set("includeStats", "0");
   return fetchGetJsonDeduped(`/api/trakt/scoreboard?${qs.toString()}`, {
     credentials: "include",

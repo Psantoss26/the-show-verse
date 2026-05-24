@@ -56,6 +56,29 @@ async function fetchTmdbPoster(tmdbId, type) {
   }
 }
 
+async function fetchTmdbEpisode(tmdbId, season, episode) {
+  if (!TMDB_KEY || !tmdbId || !season || !episode) return null;
+  try {
+    const res = await fetch(
+      `${TMDB_API}/tv/${tmdbId}/season/${season}/episode/${episode}?api_key=${TMDB_KEY}&language=es-ES&append_to_response=external_ids`,
+      { next: { revalidate: 86400 } }
+    );
+    if (!res.ok) return null;
+    const data = await safeJson(res);
+    if (!data) return null;
+    return {
+      name: data.name || null,
+      still_path: data.still_path || null,
+      air_date: data.air_date || null,
+      vote_average: data.vote_average || null,
+      vote_count: data.vote_count || null,
+      imdb_id: data.external_ids?.imdb_id || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function parallelLimit(items, limit, fn) {
   const results = new Array(items.length);
   let index = 0;
@@ -165,6 +188,8 @@ export async function GET(request) {
         }
         if (h?.show && h?.episode) {
           const tmdbId = h.show?.ids?.tmdb;
+          const season = h.episode?.season;
+          const number = h.episode?.number;
           return {
             type: "show",
             tmdbId,
@@ -172,11 +197,13 @@ export async function GET(request) {
             year: h.show?.year,
             watched_at: h.watched_at,
             episode: {
-              season: h.episode?.season,
-              number: h.episode?.number,
+              season,
+              number,
               title: h.episode?.title,
             },
-            detailsHref: tmdbId ? `/details/tv/${tmdbId}` : null,
+            detailsHref: tmdbId && season && number
+              ? `/details/tv/${tmdbId}/season/${season}/episode/${number}`
+              : tmdbId ? `/details/tv/${tmdbId}` : null,
           };
         }
         return null;
@@ -229,15 +256,31 @@ export async function GET(request) {
 
     // Enrich history with TMDb posters (parallel, limited concurrency)
     const enrichedHistory = await parallelLimit(normalizedHistory, 6, async (item) => {
-      const tmdb = await fetchTmdbPoster(item.tmdbId, item.type === "movie" ? "movie" : "tv");
+      const [tmdb, episodeDetail] = await Promise.all([
+        fetchTmdbPoster(item.tmdbId, item.type === "movie" ? "movie" : "tv"),
+        item.episode
+          ? fetchTmdbEpisode(item.tmdbId, item.episode.season, item.episode.number)
+          : Promise.resolve(null),
+      ]);
       return {
         ...item,
         poster_path: tmdb?.poster_path || null,
         backdrop_path: tmdb?.backdrop_path || null,
         title: tmdb?.title || item.title,
         year: tmdb?.year || item.year,
-        vote_average: tmdb?.vote_average || null,
+        vote_average: episodeDetail?.vote_average || tmdb?.vote_average || null,
         genres: tmdb?.genres || [],
+        episode: item.episode
+          ? {
+            ...item.episode,
+            title: episodeDetail?.name || item.episode.title,
+            still_path: episodeDetail?.still_path || null,
+            air_date: episodeDetail?.air_date || null,
+            vote_average: episodeDetail?.vote_average || null,
+            vote_count: episodeDetail?.vote_count || null,
+            imdb_id: episodeDetail?.imdb_id || null,
+          }
+          : item.episode,
       };
     });
 
