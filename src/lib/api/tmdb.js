@@ -418,9 +418,32 @@ export async function getActorDetails(id) {
   return data || null;
 }
 
+export async function getActorDetailsFull(id) {
+  const data = await tmdb(`/person/${id}`, {
+    language: "es-ES",
+    append_to_response:
+      "combined_credits,external_ids,images,tagged_images,translations",
+  });
+  return data || null;
+}
+
 export async function getActorMovies(id) {
   const data = await tmdb(`/person/${id}/movie_credits`, { language: "es-ES" });
   return data || { cast: [] };
+}
+
+export async function getActorKnownFor(id, name) {
+  if (!id || !name) return [];
+  const data = await tmdb("/search/person", {
+    language: "es-ES",
+    query: name,
+    include_adult: false,
+    page: 1,
+  });
+  const match = (data?.results || []).find(
+    (result) => String(result?.id) === String(id),
+  );
+  return match?.known_for || [];
 }
 
 /* -------------------- Ratings por episodio (API local) -------------------- */
