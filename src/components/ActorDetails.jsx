@@ -1,12 +1,15 @@
 // ActorDetails.jsx
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { Children, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { Swiper, SwiperSlide } from "swiper/react";
+import { FreeMode } from "swiper";
 import "swiper/swiper-bundle.css";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
+  Award,
+  CheckCircle2,
   ImageOff,
   Link as LinkIcon,
   ExternalLink,
@@ -16,7 +19,7 @@ import {
   Youtube,
   Globe,
   Film,
-  Tv as Tv2,
+  Tv as TvIcon,
   User,
   Cake,
   Skull,
@@ -24,12 +27,15 @@ import {
   TrendingUp,
   Star,
   Search,
+  Filter,
   SlidersHorizontal,
   Images,
   Tags,
+  Trophy,
+  X,
+  ArrowUpDown,
   ChevronDown,
   Calendar,
-  ArrowUpRight,
 } from "lucide-react";
 import {
   AnimatedSection,
@@ -47,6 +53,22 @@ const tmdbImg = (path, size = "original") =>
   path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
 const safeText = (v, fallback = "—") =>
   v == null || v === "" ? fallback : String(v);
+
+function awardResultLabel(result) {
+  if (result === "winner") return "Ganador";
+  if (result === "nominee") return "Nominado";
+  return "Reconocimiento";
+}
+
+function awardResultClass(result) {
+  if (result === "winner") {
+    return "border-yellow-400/30 bg-yellow-400/15 text-yellow-100";
+  }
+  if (result === "nominee") {
+    return "border-sky-300/20 bg-sky-300/10 text-sky-100";
+  }
+  return "border-white/10 bg-white/10 text-zinc-200";
+}
 
 const genderLabel = (g) => {
   if (g === 1) return "Mujer";
@@ -73,6 +95,229 @@ const yearFromDate = (s) => {
   return /^\d{4}$/.test(y) ? Number(y) : null;
 };
 
+const isSelfLikeCredit = (character = "") =>
+  /\b(self|himself|herself|host|archive footage|uncredited)\b/i.test(
+    String(character),
+  );
+
+const knownForKey = (item) => `${item?.media_type || "movie"}-${item?.id}`;
+
+const normalizeKnownForItem = (item) => {
+  if (!item?.id) return null;
+  const media_type = item.media_type || (item.first_air_date ? "tv" : "movie");
+  const date = media_type === "tv" ? item.first_air_date : item.release_date;
+  return {
+    ...item,
+    kind: "acting",
+    media_type,
+    year: yearFromDate(date),
+    date,
+    subtitle: "",
+  };
+};
+
+function cleanAwardTitle(name) {
+  return String(name || "")
+    .trim()
+    .replace(/^(?:Anexo|Annex|Lista|List):\s*/i, "")
+    .trim();
+}
+
+function getAwardInitials(name) {
+  const words = cleanAwardTitle(name || "Premio")
+    .replace(/\b(awards?|award|film|prize|academy|guild|of|the|and|de|la|premios?|premio)\b/gi, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const initials = words
+    .slice(0, 3)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+  return initials || "PREMIO";
+}
+
+function formatAwardGroupName(name) {
+  const raw = cleanAwardTitle(name);
+  if (!raw) return "Premio";
+
+  const n = raw.toLowerCase();
+  if (/academy awards?|oscars?|óscars?|oscar|óscar/.test(n)) return "Premios Oscar";
+  if (/golden\s+globes?/.test(n)) return "Globos de Oro";
+  if (/bafta/.test(n)) return "Premios BAFTA";
+  if (/emmy/.test(n)) return "Premios Emmy";
+  if (/screen\s+actors\s+guild|sag/.test(n)) {
+    return "Premios del Sindicato de Actores";
+  }
+  if (/actor awards?/.test(n)) return "Premios de Interpretación";
+  if (/writers?\s+guild|wga/.test(n)) {
+    return "Premios del Sindicato de Guionistas";
+  }
+  if (/directors?\s+guild|dga/.test(n)) {
+    return "Premios del Sindicato de Directores";
+  }
+  if (/cannes/.test(n)) return "Festival de Cannes";
+  if (/venice/.test(n)) return "Festival de Venecia";
+  if (/berlin/.test(n)) return "Festival de Berlín";
+
+  return raw
+    .replace(/\bAwards?\b/g, "Premios")
+    .replace(/\bAward\b/g, "Premio")
+    .replace(/\bFilm\b/g, "Cine")
+    .replace(/\bPrize\b/g, "Premio")
+    .replace(/\bAcademy\b/g, "Academia")
+    .replace(/\bGuild\b/g, "Sindicato");
+}
+
+function getAwardVisual(name) {
+  const n = cleanAwardTitle(name).toLowerCase();
+
+  if (/\bacademy\b|oscar|óscar/.test(n)) {
+    return {
+      label: "OSCAR",
+      background:
+        "radial-gradient(circle at 50% 18%, rgba(255,231,138,0.36), transparent 30%), linear-gradient(145deg, #3d2a08 0%, #090807 48%, #000 100%)",
+      accent: "text-yellow-200",
+    };
+  }
+
+  if (/golden\s+globes?/.test(n)) {
+    return {
+      label: "GLOBOS",
+      background:
+        "radial-gradient(circle at 50% 26%, rgba(252,211,77,0.34), transparent 32%), linear-gradient(145deg, #2c1d08 0%, #071716 52%, #010101 100%)",
+      accent: "text-amber-200",
+    };
+  }
+
+  if (/actor|screen\s+actors|sag/.test(n)) {
+    return {
+      label: "ACTORES",
+      background:
+        "radial-gradient(circle at 50% 18%, rgba(125,211,252,0.24), transparent 34%), linear-gradient(145deg, #071b2b 0%, #060b12 52%, #000 100%)",
+      accent: "text-sky-200",
+    };
+  }
+
+  if (/writers?|screenplay|wga|guild|guion/.test(n)) {
+    return {
+      label: "GUION",
+      background:
+        "radial-gradient(circle at 50% 18%, rgba(216,180,254,0.22), transparent 34%), linear-gradient(145deg, #241035 0%, #100817 52%, #000 100%)",
+      accent: "text-violet-200",
+    };
+  }
+
+  if (/bafta/.test(n)) {
+    return {
+      label: "BAFTA",
+      background:
+        "radial-gradient(circle at 50% 22%, rgba(251,191,36,0.28), transparent 33%), linear-gradient(145deg, #301f0c 0%, #16100c 42%, #000 100%)",
+      accent: "text-orange-200",
+    };
+  }
+
+  return {
+    label: getAwardInitials(name),
+    background:
+      "radial-gradient(circle at 50% 18%, rgba(250,204,21,0.2), transparent 34%), linear-gradient(145deg, #1f1b12 0%, #0b0b0b 52%, #000 100%)",
+    accent: "text-yellow-200",
+  };
+}
+
+const knownForFallbackScore = (item) => {
+  const popularity = Number(item?.popularity || 0);
+  const voteCount = Number(item?.vote_count || 0);
+  const voteAverage = Number(item?.vote_average || 0);
+  const order = Number.isFinite(Number(item?.order)) ? Number(item.order) : 99;
+  const episodeCount = Number(item?.episode_count || 0);
+  const isMovie = item?.media_type !== "tv";
+  const roleScore = Math.max(0, 20 - Math.min(order, 20)) * 2.2;
+  const voteScore = Math.log10(voteCount + 1) * 8;
+  const popularityScore = Math.sqrt(Math.max(popularity, 0)) * 7;
+  const mediaScore = isMovie ? 18 : Math.min(episodeCount, 30) * 0.9;
+  const guestPenalty = !isMovie && episodeCount > 0 && episodeCount < 6 ? 0.2 : 1;
+
+  return (
+    (popularityScore + voteScore + voteAverage * 1.5 + roleScore + mediaScore) *
+    guestPenalty
+  );
+};
+
+const creditDisplayKey = (item) => `${item?.media_type || "movie"}-${item?.id}`;
+
+const creditRelevanceTier = (item) => {
+  if (isSelfLikeCredit(item?.character)) return 2;
+  if (
+    item?.media_type === "tv" &&
+    Number(item?.episode_count || 0) > 0 &&
+    Number(item?.episode_count || 0) < 3
+  ) {
+    return 1;
+  }
+  return 0;
+};
+
+const creditTimestamp = (item) =>
+  item?.date ? new Date(item.date).getTime() || -Infinity : -Infinity;
+
+const creditPopularityScore = (item) => {
+  const popularity = Number(item?.popularity || 0);
+  const voteCount = Number(item?.vote_count || 0);
+  const voteAverage = Number(item?.vote_average || 0);
+  const order = Number.isFinite(Number(item?.order)) ? Number(item.order) : 99;
+  const episodeCount = Number(item?.episode_count || 0);
+  const roleWeight = Math.max(0, 18 - Math.min(order, 18));
+  const episodeWeight =
+    item?.media_type === "tv" ? Math.min(episodeCount, 30) * 0.35 : 4;
+
+  return (
+    Math.sqrt(Math.max(popularity, 0)) * 9 +
+    Math.log10(voteCount + 1) * 6 +
+    voteAverage +
+    roleWeight +
+    episodeWeight
+  );
+};
+
+const compareCreditsByRecentRelevance = (a, b) => {
+  const tierDiff = creditRelevanceTier(a) - creditRelevanceTier(b);
+  if (tierDiff !== 0) return tierDiff;
+
+  const yearDiff = Number(b?.year || 0) - Number(a?.year || 0);
+  if (yearDiff !== 0) return yearDiff;
+
+  const dateDiff = creditTimestamp(b) - creditTimestamp(a);
+  if (dateDiff !== 0) return dateDiff;
+
+  return creditPopularityScore(b) - creditPopularityScore(a);
+};
+
+const dedupeCreditsForDisplay = (items) => {
+  const byTitle = new Map();
+
+  items.forEach((item) => {
+    const key = creditDisplayKey(item);
+    const current = byTitle.get(key);
+    if (!current) {
+      byTitle.set(key, item);
+      return;
+    }
+
+    const currentTier = creditRelevanceTier(current);
+    const nextTier = creditRelevanceTier(item);
+    if (
+      nextTier < currentTier ||
+      (nextTier === currentTier &&
+        creditPopularityScore(item) > creditPopularityScore(current))
+    ) {
+      byTitle.set(key, item);
+    }
+  });
+
+  return Array.from(byTitle.values());
+};
+
 const formatHumanDate = (iso) => {
   if (!iso) return "";
   const d = new Date(iso);
@@ -89,6 +334,102 @@ async function fetchJson(url) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.status_message || "Error TMDb");
   return json;
+}
+
+const wikidataUrl = (params) =>
+  `https://www.wikidata.org/w/api.php?${params.toString()}`;
+
+const entityLabel = (entity, fallback = "") =>
+  entity?.labels?.es?.value || entity?.labels?.en?.value || fallback;
+
+const wikidataEntityIdFromSnak = (snak) => {
+  const value = snak?.datavalue?.value;
+  if (!value) return null;
+  if (value.id) return value.id;
+  if (value["numeric-id"]) return `Q${value["numeric-id"]}`;
+  return null;
+};
+
+const yearFromWikidataTime = (time) => {
+  if (!time || typeof time !== "string") return null;
+  const match = time.match(/[+-](\d{4})/);
+  return match ? Number(match[1]) : null;
+};
+
+async function fetchWikidataAwards(wikidataId) {
+  if (!wikidataId) return [];
+
+  const entityParams = new URLSearchParams({
+    action: "wbgetentities",
+    ids: wikidataId,
+    props: "claims",
+    format: "json",
+    origin: "*",
+  });
+  const entityRes = await fetch(wikidataUrl(entityParams), {
+    cache: "force-cache",
+  });
+  const entityJson = await entityRes.json().catch(() => ({}));
+  if (!entityRes.ok) throw new Error("No se pudieron cargar los premios");
+
+  const claims = entityJson?.entities?.[wikidataId]?.claims || {};
+  const rawItems = [
+    ...(claims.P166 || []).map((claim) => ({ claim, status: "winner" })),
+    ...(claims.P1411 || []).map((claim) => ({ claim, status: "nominee" })),
+  ];
+
+  const entityIds = new Set();
+  const normalized = rawItems
+    .map(({ claim, status }, index) => {
+      const awardId = wikidataEntityIdFromSnak(claim?.mainsnak);
+      if (!awardId) return null;
+      entityIds.add(awardId);
+
+      const year = yearFromWikidataTime(
+        claim?.qualifiers?.P585?.[0]?.datavalue?.value?.time,
+      );
+      const workId =
+        wikidataEntityIdFromSnak(claim?.qualifiers?.P1686?.[0]) ||
+        wikidataEntityIdFromSnak(claim?.qualifiers?.P805?.[0]) ||
+        wikidataEntityIdFromSnak(claim?.qualifiers?.P642?.[0]);
+      if (workId) entityIds.add(workId);
+
+      return {
+        id: `${status}-${awardId}-${index}`,
+        awardId,
+        workId,
+        status,
+        year,
+      };
+    })
+    .filter(Boolean);
+
+  if (!normalized.length) return [];
+
+  const labelParams = new URLSearchParams({
+    action: "wbgetentities",
+    ids: Array.from(entityIds).join("|"),
+    props: "labels",
+    languages: "es|en",
+    format: "json",
+    origin: "*",
+  });
+  const labelRes = await fetch(wikidataUrl(labelParams), {
+    cache: "force-cache",
+  });
+  const labelJson = await labelRes.json().catch(() => ({}));
+  const entities = labelJson?.entities || {};
+
+  return normalized
+    .map((item) => ({
+      ...item,
+      award: entityLabel(entities[item.awardId], item.awardId),
+      work: item.workId ? entityLabel(entities[item.workId], "") : "",
+    }))
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === "winner" ? -1 : 1;
+      return (b.year || 0) - (a.year || 0);
+    });
 }
 
 /* --- UI COMPONENTS --- */
@@ -155,6 +496,462 @@ function SelectInput({
   );
 }
 
+function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative w-full lg:w-auto lg:shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[145px]"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          {Icon && <Icon className="h-4 w-4 shrink-0 text-emerald-400" />}
+          <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-zinc-500">
+            {label}:
+          </span>
+          <span className="truncate font-semibold text-white">
+            {valueLabel}
+          </span>
+        </div>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="absolute left-0 top-full z-[100] mt-2 w-56 overflow-hidden rounded-xl border border-zinc-800 bg-[#121212] p-1 shadow-2xl"
+          >
+            {children({ close: () => setOpen(false) })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function DropdownItem({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
+        active
+          ? "bg-zinc-800 text-white"
+          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+      }`}
+    >
+      <span className="font-medium">{children}</span>
+      {active && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
+    </button>
+  );
+}
+
+function CreditsFilterDropdowns({
+  mediaFilter,
+  setMediaFilter,
+  creditFilter,
+  setCreditFilter,
+  deptFilter,
+  setDeptFilter,
+  deptOptions,
+  sort,
+  setSort,
+}) {
+  const mediaLabel =
+    mediaFilter === "all"
+      ? "Todo"
+      : mediaFilter === "movie"
+        ? "Películas"
+        : "Series";
+  const creditLabel =
+    creditFilter === "all"
+      ? "Todos"
+      : creditFilter === "crew"
+        ? "Equipo"
+        : "Actuación";
+  const deptLabel =
+    deptFilter === "all"
+      ? "Todos"
+      : deptOptions.find((d) => d.value === deptFilter)?.label || deptFilter;
+  const sortLabel =
+    sort === "date_asc"
+      ? "Antiguos"
+      : sort === "pop_desc"
+        ? "Popularidad"
+        : sort === "rating_desc"
+          ? "Mejor valorados"
+          : sort === "alpha"
+            ? "A-Z"
+            : "Recientes";
+
+  return (
+    <>
+      <InlineDropdown label="Tipo" valueLabel={mediaLabel} icon={Filter}>
+        {({ close }) => (
+          <>
+            <DropdownItem
+              active={mediaFilter === "all"}
+              onClick={() => {
+                setMediaFilter("all");
+                close();
+              }}
+            >
+              Todo
+            </DropdownItem>
+            <DropdownItem
+              active={mediaFilter === "movie"}
+              onClick={() => {
+                setMediaFilter("movie");
+                close();
+              }}
+            >
+              Películas
+            </DropdownItem>
+            <DropdownItem
+              active={mediaFilter === "tv"}
+              onClick={() => {
+                setMediaFilter("tv");
+                close();
+              }}
+            >
+              Series
+            </DropdownItem>
+          </>
+        )}
+      </InlineDropdown>
+
+      <InlineDropdown label="Rol" valueLabel={creditLabel} icon={Briefcase}>
+        {({ close }) => (
+          <>
+            <DropdownItem
+              active={creditFilter === "acting"}
+              onClick={() => {
+                setCreditFilter("acting");
+                setDeptFilter("all");
+                close();
+              }}
+            >
+              Actuación
+            </DropdownItem>
+            <DropdownItem
+              active={creditFilter === "crew"}
+              onClick={() => {
+                setCreditFilter("crew");
+                close();
+              }}
+            >
+              Equipo técnico
+            </DropdownItem>
+            <DropdownItem
+              active={creditFilter === "all"}
+              onClick={() => {
+                setCreditFilter("all");
+                setDeptFilter("all");
+                close();
+              }}
+            >
+              Todos
+            </DropdownItem>
+          </>
+        )}
+      </InlineDropdown>
+
+      {creditFilter === "crew" && (
+        <InlineDropdown
+          label="Depto."
+          valueLabel={deptLabel}
+          icon={SlidersHorizontal}
+        >
+          {({ close }) => (
+            <>
+              <DropdownItem
+                active={deptFilter === "all"}
+                onClick={() => {
+                  setDeptFilter("all");
+                  close();
+                }}
+              >
+                Todos
+              </DropdownItem>
+              {deptOptions.map((dept) => (
+                <DropdownItem
+                  key={dept.value}
+                  active={deptFilter === dept.value}
+                  onClick={() => {
+                    setDeptFilter(dept.value);
+                    close();
+                  }}
+                >
+                  {dept.label}
+                </DropdownItem>
+              ))}
+            </>
+          )}
+        </InlineDropdown>
+      )}
+
+      <InlineDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown}>
+        {({ close }) => (
+          <>
+            <DropdownItem
+              active={sort === "date_desc"}
+              onClick={() => {
+                setSort("date_desc");
+                close();
+              }}
+            >
+              Más recientes
+            </DropdownItem>
+            <DropdownItem
+              active={sort === "date_asc"}
+              onClick={() => {
+                setSort("date_asc");
+                close();
+              }}
+            >
+              Más antiguos
+            </DropdownItem>
+            <DropdownItem
+              active={sort === "pop_desc"}
+              onClick={() => {
+                setSort("pop_desc");
+                close();
+              }}
+            >
+              Popularidad
+            </DropdownItem>
+            <DropdownItem
+              active={sort === "rating_desc"}
+              onClick={() => {
+                setSort("rating_desc");
+                close();
+              }}
+            >
+              Mejor valorados
+            </DropdownItem>
+            <DropdownItem
+              active={sort === "alpha"}
+              onClick={() => {
+                setSort("alpha");
+                close();
+              }}
+            >
+              Título A-Z
+            </DropdownItem>
+          </>
+        )}
+      </InlineDropdown>
+    </>
+  );
+}
+
+function ActorRowCarousel({ children, variant = "poster" }) {
+  const swiperRef = useRef(null);
+  const [isHoveredRow, setIsHoveredRow] = useState(false);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+  const slides = Children.toArray(children);
+  const isWide = variant === "wide";
+  const isAward = variant === "award";
+
+  const breakpoints = isAward
+    ? {
+        0: { slidesPerView: 2.15, spaceBetween: 12 },
+        500: { slidesPerView: 3, spaceBetween: 14 },
+        768: { slidesPerView: 4, spaceBetween: 16 },
+        1024: { slidesPerView: 5, spaceBetween: 18 },
+        1280: { slidesPerView: 6, spaceBetween: 20 },
+      }
+    : isWide
+      ? {
+          0: { slidesPerView: 1.35, spaceBetween: 12 },
+          640: { slidesPerView: 2.25, spaceBetween: 14 },
+          900: { slidesPerView: 3.1, spaceBetween: 16 },
+          1280: { slidesPerView: 4.15, spaceBetween: 18 },
+        }
+      : {
+          0: { slidesPerView: 2.15, spaceBetween: 12 },
+          500: { slidesPerView: 3, spaceBetween: 14 },
+          768: { slidesPerView: 4, spaceBetween: 16 },
+          1024: { slidesPerView: 5, spaceBetween: 18 },
+          1280: { slidesPerView: 6, spaceBetween: 20 },
+        };
+
+  const updateNav = useCallback((swiper) => {
+    if (!swiper) return;
+    const hasOverflow = !swiper.isLocked;
+    setCanPrev(hasOverflow && !swiper.isBeginning);
+    setCanNext(hasOverflow && !swiper.isEnd);
+  }, []);
+
+  const handleSwiper = useCallback(
+    (swiper) => {
+      swiperRef.current = swiper;
+      updateNav(swiper);
+      requestAnimationFrame(() => {
+        swiper.update?.();
+        updateNav(swiper);
+      });
+    },
+    [updateNav],
+  );
+
+  useEffect(() => {
+    const swiper = swiperRef.current;
+    if (!swiper) return undefined;
+
+    const refresh = () => {
+      swiper.update?.();
+      updateNav(swiper);
+    };
+
+    const raf = requestAnimationFrame(refresh);
+    const t1 = window.setTimeout(refresh, 120);
+    const t2 = window.setTimeout(refresh, 450);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [slides.length, updateNav]);
+
+  const getStep = useCallback((swiper) => {
+    const current = swiper?.params?.slidesPerView;
+    return typeof current === "number" ? Math.max(1, Math.floor(current)) : 1;
+  }, []);
+
+  const handlePrevClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const swiper = swiperRef.current;
+      if (!swiper) return;
+      swiper.slideTo(Math.max((swiper.activeIndex || 0) - getStep(swiper), 0));
+    },
+    [getStep],
+  );
+
+  const handleNextClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const swiper = swiperRef.current;
+      if (!swiper) return;
+      const maxIndex = Math.max((swiper.slides?.length || 1) - 1, 0);
+      swiper.slideTo(
+        Math.min((swiper.activeIndex || 0) + getStep(swiper), maxIndex),
+      );
+    },
+    [getStep],
+  );
+
+  const showPrev = isHoveredRow && canPrev;
+  const showNext = isHoveredRow && canNext;
+
+  return (
+    <div className="-mx-4 sm:mx-0">
+      <div
+        className="relative px-4 sm:px-0"
+        onMouseEnter={() => setIsHoveredRow(true)}
+        onMouseLeave={() => setIsHoveredRow(false)}
+      >
+        <div
+          className="relative"
+          style={{ overflowX: "clip", overflowY: "visible" }}
+        >
+          <Swiper
+            slidesPerView={isAward ? 2.15 : isWide ? 1.35 : 2.15}
+            spaceBetween={12}
+            onSwiper={handleSwiper}
+            onSlideChange={updateNav}
+            onResize={updateNav}
+            onReachBeginning={updateNav}
+            onReachEnd={updateNav}
+            breakpoints={breakpoints}
+            loop={false}
+            watchOverflow
+            grabCursor
+            simulateTouch
+            allowTouchMove
+            freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
+            modules={[FreeMode]}
+            className="!overflow-visible pb-9 pt-5"
+          >
+            {slides.map((child, idx) => (
+              <SwiperSlide
+                key={child?.key || idx}
+                className="relative !h-auto !overflow-visible hover:z-[60] focus-within:z-[60]"
+              >
+                {child}
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        </div>
+
+        <AnimatePresence>
+          {showPrev && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              type="button"
+              onClick={handlePrevClick}
+              className="absolute inset-y-0 -left-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10"
+              aria-label="Anterior"
+            >
+              <motion.span
+                className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+                whileHover={{ x: -4 }}
+              >
+                ‹
+              </motion.span>
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showNext && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              type="button"
+              onClick={handleNextClick}
+              className="absolute inset-y-0 -right-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10"
+              aria-label="Siguiente"
+            >
+              <motion.span
+                className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+                whileHover={{ x: 4 }}
+              >
+                ›
+              </motion.span>
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
 /**
  * PosterCard (CRÉDITOS EN PANTALLA)
  * Solo muestra la portada por defecto
@@ -179,10 +976,18 @@ function PosterCard({ item }) {
     <Link
       href={href}
       prefetch={false}
-      className="group block relative w-full"
+      className="group relative z-0 block w-full hover:z-[60] focus:z-[60] focus:outline-none"
       aria-label={title}
     >
-      <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/5 group-hover:ring-emerald-500/35 transition-all duration-300">
+      <motion.div
+        whileHover={{
+          y: -7,
+          boxShadow:
+            "0 20px 45px -24px rgba(16,185,129,0.75), 0 18px 32px -28px rgba(0,0,0,0.9)",
+        }}
+        transition={{ type: "spring", stiffness: 360, damping: 26 }}
+        className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/5 transition-all duration-300 group-hover:ring-emerald-500/35"
+      >
         {poster ? (
           <img
             src={poster}
@@ -238,7 +1043,7 @@ function PosterCard({ item }) {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Accesibilidad (sin UI visible) */}
       <span className="sr-only">{title}</span>
@@ -246,25 +1051,204 @@ function PosterCard({ item }) {
   );
 }
 
+function AwardCard({ item }) {
+  const awardTitle = cleanAwardTitle(item?.award);
+  const visual = getAwardVisual(awardTitle);
+  const groupLabel = formatAwardGroupName(awardTitle);
+  const result = item?.status === "winner" ? "winner" : "nominee";
+
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      whileHover={{
+        y: -7,
+        boxShadow:
+          "0 22px 46px -24px rgba(234,179,8,0.7), 0 18px 32px -28px rgba(0,0,0,0.95)",
+      }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ type: "spring", stiffness: 360, damping: 26 }}
+      className="group relative z-0 block overflow-hidden rounded-xl border border-transparent bg-neutral-800/80 shadow-lg transition-all duration-300 hover:z-[60] hover:border-yellow-500/60"
+    >
+      <div className="relative flex aspect-[2/3] flex-col overflow-hidden bg-black">
+        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-2">
+          <span
+            className={`rounded-md border px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider shadow-sm backdrop-blur-md ${awardResultClass(
+              result,
+            )}`}
+          >
+            {awardResultLabel(result)}
+          </span>
+          {item?.year && (
+            <span className="rounded-md border border-white/10 bg-black/45 px-1.5 py-0.5 text-[9px] font-extrabold text-zinc-200 backdrop-blur-md">
+              {item.year}
+            </span>
+          )}
+        </div>
+
+        <div
+          className="relative flex min-h-0 flex-[1.12] items-center justify-center overflow-hidden p-6"
+          style={{ background: visual.background }}
+        >
+          <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.18)_48%,transparent_52%)]" />
+          <div className="absolute inset-x-5 top-12 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+          <div className="absolute inset-x-8 bottom-5 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+
+          <div className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-black/45 p-1.5 backdrop-blur-md">
+            {result === "winner" ? (
+              <Trophy className="h-full w-full text-yellow-300" />
+            ) : (
+              <Award className="h-full w-full text-sky-200" />
+            )}
+          </div>
+
+          <div className="absolute inset-x-4 bottom-14 text-center">
+            <div
+              className={`text-2xl font-black tracking-[0.18em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] ${visual.accent}`}
+            >
+              {visual.label}
+            </div>
+            <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-white/55 line-clamp-2">
+              {groupLabel}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-[0.9] flex-col justify-end border-t border-white/10 bg-gradient-to-t from-black via-black to-neutral-950 px-3 py-3">
+          <p className="line-clamp-2 text-sm font-extrabold leading-tight text-white">
+            {awardTitle}
+          </p>
+          <p className="mt-1 line-clamp-1 text-xs font-bold leading-tight text-yellow-400">
+            {groupLabel}
+          </p>
+          {item.work ? (
+            <p className="mt-1 line-clamp-2 text-xs leading-tight text-gray-300">
+              {item.work}
+            </p>
+          ) : (
+            <p className="mt-1 line-clamp-2 text-xs leading-tight text-gray-400">
+              Reconocimiento registrado en Wikidata
+            </p>
+          )}
+        </div>
+      </div>
+    </motion.article>
+  );
+}
+
+function PhotoCard({ image }) {
+  return (
+    <motion.a
+      href={tmdbImg(image.file_path, "original")}
+      target="_blank"
+      rel="noreferrer"
+      className="group relative z-0 block aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 hover:z-[60] focus:z-[60] focus:outline-none"
+      whileHover={{
+        y: -7,
+        boxShadow:
+          "0 20px 45px -24px rgba(16,185,129,0.72), 0 18px 32px -28px rgba(0,0,0,0.9)",
+      }}
+      transition={{ type: "spring", stiffness: 360, damping: 26 }}
+    >
+      <img
+        src={tmdbImg(image.file_path, "w500")}
+        alt=""
+        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+        loading="lazy"
+        decoding="async"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      <div className="absolute bottom-2 right-2 rounded bg-black/65 px-2 py-1 font-mono text-[10px] text-white opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
+        {image.width}x{image.height}
+      </div>
+    </motion.a>
+  );
+}
+
+function TaggedMediaCard({ image }) {
+  const title = image?.media?.title || image?.media?.name || "";
+
+  return (
+    <motion.a
+      href={tmdbImg(image.file_path, "original")}
+      target="_blank"
+      rel="noreferrer"
+      className="group relative z-0 block aspect-[16/10] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/60 hover:z-[60] focus:z-[60] focus:outline-none"
+      whileHover={{
+        y: -7,
+        boxShadow:
+          "0 20px 45px -24px rgba(16,185,129,0.72), 0 18px 32px -28px rgba(0,0,0,0.9)",
+      }}
+      transition={{ type: "spring", stiffness: 360, damping: 26 }}
+    >
+      <img
+        src={tmdbImg(image.file_path, "w780")}
+        alt=""
+        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+        loading="lazy"
+        decoding="async"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+        <ExternalLink className="h-6 w-6 text-white drop-shadow" />
+      </div>
+      {title && (
+        <div className="absolute bottom-0 left-0 right-0 translate-y-2 p-3 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+          <p className="line-clamp-1 text-xs font-bold text-white">{title}</p>
+        </div>
+      )}
+    </motion.a>
+  );
+}
+
 /* --- MAIN COMPONENT --- */
 
-export default function ActorDetails({ actorDetails, actorMovies }) {
+export default function ActorDetails({
+  actorDetails,
+  actorMovies,
+  initialKnownFor = [],
+}) {
   const personId = actorDetails?.id;
+  const initialExternalIds = actorDetails?.external_ids || null;
+  const hasInitialExtra = Boolean(
+    actorDetails?.combined_credits ||
+      actorDetails?.external_ids ||
+      actorDetails?.images ||
+      actorDetails?.tagged_images ||
+      actorDetails?.translations,
+  );
 
   // UI States
   const [showFullBio, setShowFullBio] = useState(false);
-  const [loadingExtra, setLoadingExtra] = useState(false);
+  const [loadingExtra, setLoadingExtra] = useState(
+    Boolean(personId && TMDB_API_KEY && !hasInitialExtra),
+  );
   const [extraErr, setExtraErr] = useState("");
 
   // Data States
-  const [externalIds, setExternalIds] = useState(null);
-  const [combinedCredits, setCombinedCredits] = useState(null);
-  const [images, setImages] = useState(null);
-  const [taggedImages, setTaggedImages] = useState(null);
-  const [translations, setTranslations] = useState(null);
+  const [externalIds, setExternalIds] = useState(initialExternalIds);
+  const [combinedCredits, setCombinedCredits] = useState(
+    actorDetails?.combined_credits || null,
+  );
+  const [images, setImages] = useState(actorDetails?.images || null);
+  const [taggedImages, setTaggedImages] = useState(
+    actorDetails?.tagged_images || null,
+  );
+  const [translations, setTranslations] = useState(
+    actorDetails?.translations || null,
+  );
+  const [awards, setAwards] = useState([]);
+  const [loadingAwards, setLoadingAwards] = useState(
+    Boolean(initialExternalIds?.wikidata_id),
+  );
+  const [awardsErr, setAwardsErr] = useState("");
+  const [tmdbKnownFor, setTmdbKnownFor] = useState(() =>
+    (initialKnownFor || []).map(normalizeKnownForItem).filter((item) => item?.poster_path),
+  );
 
   // Filter States (Créditos)
   const [q, setQ] = useState("");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mediaFilter, setMediaFilter] = useState("all");
   const [creditFilter, setCreditFilter] = useState("acting");
   const [deptFilter, setDeptFilter] = useState("all");
@@ -400,10 +1384,31 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
     };
   }, [poster3dEnabled, profileSrc]);
 
+  const loadAwardsForWikidata = useCallback((wikidataId) => {
+    if (!wikidataId) {
+      setLoadingAwards(false);
+      setAwards([]);
+      return;
+    }
+
+    setLoadingAwards(true);
+    setAwardsErr("");
+    fetchWikidataAwards(wikidataId)
+      .then((items) => setAwards(items))
+      .catch((err) => {
+        console.warn("No se pudieron cargar los premios de Wikidata:", err);
+        setAwardsErr("No se pudieron cargar los premios.");
+      })
+      .finally(() => setLoadingAwards(false));
+  }, []);
+
   const loadAll = useCallback(async () => {
     if (!TMDB_API_KEY || !personId) return;
     setLoadingExtra(true);
     setExtraErr("");
+    setAwardsErr("");
+    setAwards([]);
+    setTmdbKnownFor([]);
     const qs = `api_key=${encodeURIComponent(TMDB_API_KEY)}`;
     const lang = `&language=es-ES`;
 
@@ -413,6 +1418,11 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
       images: `${TMDB_BASE}/person/${personId}/images?${qs}`,
       tagged: `${TMDB_BASE}/person/${personId}/tagged_images?${qs}&page=1`,
       translations: `${TMDB_BASE}/person/${personId}/translations?${qs}`,
+      knownFor: actorDetails?.name
+        ? `${TMDB_BASE}/search/person?${qs}${lang}&query=${encodeURIComponent(
+            actorDetails.name,
+          )}&include_adult=false&page=1`
+        : null,
     };
 
     const settled = await Promise.allSettled([
@@ -421,21 +1431,33 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
       fetchJson(endpoints.images),
       fetchJson(endpoints.tagged),
       fetchJson(endpoints.translations),
+      endpoints.knownFor ? fetchJson(endpoints.knownFor) : Promise.resolve(null),
     ]);
 
-    const [ex, cc, im, tg, tr] = settled;
+    const [ex, cc, im, tg, tr, kf] = settled;
     const firstErr = settled.find((r) => r.status === "rejected")?.reason
       ?.message;
     if (firstErr) setExtraErr(firstErr);
 
-    if (ex.status === "fulfilled") setExternalIds(ex.value);
+    const nextExternal = ex.status === "fulfilled" ? ex.value : null;
+    if (nextExternal) setExternalIds(nextExternal);
     if (cc.status === "fulfilled") setCombinedCredits(cc.value);
     if (im.status === "fulfilled") setImages(im.value);
     if (tg.status === "fulfilled") setTaggedImages(tg.value);
     if (tr.status === "fulfilled") setTranslations(tr.value);
+    if (kf.status === "fulfilled") {
+      const match = (kf.value?.results || []).find(
+        (result) => String(result?.id) === String(personId),
+      );
+      const knownFor = (match?.known_for || [])
+        .map(normalizeKnownForItem)
+        .filter((item) => item?.poster_path);
+      setTmdbKnownFor(knownFor);
+    }
 
     setLoadingExtra(false);
-  }, [personId]);
+    loadAwardsForWikidata(nextExternal?.wikidata_id);
+  }, [actorDetails?.name, loadAwardsForWikidata, personId]);
 
   useEffect(() => {
     setQ("");
@@ -445,9 +1467,46 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
     setYearFrom("");
     setYearTo("");
     setSort("date_desc");
+    setMobileFiltersOpen(false);
     setShowFullBio(false);
-    if (personId && TMDB_API_KEY) loadAll();
-  }, [personId, loadAll]);
+    setExternalIds(initialExternalIds);
+    setCombinedCredits(actorDetails?.combined_credits || null);
+    setImages(actorDetails?.images || null);
+    setTaggedImages(actorDetails?.tagged_images || null);
+    setTranslations(actorDetails?.translations || null);
+    setTmdbKnownFor(
+      (initialKnownFor || [])
+        .map(normalizeKnownForItem)
+        .filter((item) => item?.poster_path),
+    );
+
+    if (!personId || !TMDB_API_KEY) {
+      setLoadingExtra(false);
+      setLoadingAwards(false);
+      return;
+    }
+
+    if (hasInitialExtra) {
+      setLoadingExtra(false);
+      setAwards([]);
+      setAwardsErr("");
+      loadAwardsForWikidata(initialExternalIds?.wikidata_id);
+      return;
+    }
+
+    loadAll();
+  }, [
+    actorDetails?.combined_credits,
+    actorDetails?.images,
+    actorDetails?.tagged_images,
+    actorDetails?.translations,
+    hasInitialExtra,
+    initialExternalIds,
+    initialKnownFor,
+    loadAll,
+    loadAwardsForWikidata,
+    personId,
+  ]);
 
   // --- Computed Data ---
   const creditsAll = useMemo(() => {
@@ -530,12 +1589,19 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
       });
     }
 
-    const byDate = (x) => (x.date ? new Date(x.date).getTime() : -Infinity);
-
-    if (sort === "date_desc") out.sort((a, b) => byDate(b) - byDate(a));
-    else if (sort === "date_asc") out.sort((a, b) => byDate(a) - byDate(b));
+    if (sort === "date_desc") out.sort(compareCreditsByRecentRelevance);
+    else if (sort === "date_asc")
+      out.sort((a, b) => {
+        const tierDiff = creditRelevanceTier(a) - creditRelevanceTier(b);
+        if (tierDiff !== 0) return tierDiff;
+        return creditTimestamp(a) - creditTimestamp(b);
+      });
     else if (sort === "pop_desc")
-      out.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      out.sort((a, b) => {
+        const tierDiff = creditRelevanceTier(a) - creditRelevanceTier(b);
+        if (tierDiff !== 0) return tierDiff;
+        return creditPopularityScore(b) - creditPopularityScore(a);
+      });
     else if (sort === "rating_desc")
       out.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
     else if (sort === "alpha")
@@ -557,6 +1623,29 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
     sort,
   ]);
 
+  const displayCreditGroups = useMemo(() => {
+    const unique = dedupeCreditsForDisplay(filteredCredits);
+    const shouldShowMovies = mediaFilter === "all" || mediaFilter === "movie";
+    const shouldShowSeries = mediaFilter === "all" || mediaFilter === "tv";
+    const groups = [];
+
+    if (shouldShowMovies) {
+      const movies = unique.filter((item) => item.media_type === "movie");
+      if (movies.length) {
+        groups.push({ key: "movies", title: "Películas", items: movies });
+      }
+    }
+
+    if (shouldShowSeries) {
+      const series = unique.filter((item) => item.media_type === "tv");
+      if (series.length) {
+        groups.push({ key: "series", title: "Series", items: series });
+      }
+    }
+
+    return groups;
+  }, [filteredCredits, mediaFilter]);
+
   const stats = useMemo(
     () => ({
       total: creditsAll.length,
@@ -566,6 +1655,37 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
       crew: creditsAll.filter((x) => x.kind === "crew").length,
     }),
     [creditsAll],
+  );
+
+  const careerYears = useMemo(() => {
+    const years = creditsAll.map((x) => x.year).filter((y) => y > 0);
+    if (!years.length) return "—";
+    const min = Math.min(...years);
+    const max = Math.max(...years);
+    return min === max ? String(min) : `${min} - ${max}`;
+  }, [creditsAll]);
+
+  const mostPopularCredit = useMemo(() => {
+    const knownForFirst = tmdbKnownFor.find((item) => item?.poster_path);
+    if (knownForFirst) return knownForFirst;
+
+    return [...creditsAll]
+      .filter(
+        (x) =>
+          x.poster_path &&
+          x.kind === "acting" &&
+          !isSelfLikeCredit(x.character),
+      )
+      .sort((a, b) => knownForFallbackScore(b) - knownForFallbackScore(a))[0];
+  }, [creditsAll, tmdbKnownFor]);
+
+  const awardStats = useMemo(
+    () => ({
+      total: awards.length,
+      wins: awards.filter((item) => item.status === "winner").length,
+      nominations: awards.filter((item) => item.status === "nominee").length,
+    }),
+    [awards],
   );
 
   const socials = useMemo(() => {
@@ -609,26 +1729,49 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
     setSort("date_desc");
   };
 
-  // --- “Más populares” (sin scrollbar, más compacto, con títulos con espacio) ---
+  // --- Títulos por los que se le conoce: 6 créditos únicos más populares ---
   const popularItems = useMemo(() => {
-    return creditsAll
-      .filter((x) => x.poster_path && x.kind === "acting")
-      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
-      .slice(0, 5);
-  }, [creditsAll]);
+    const byTitle = new Map();
 
-  // hero background
-  const heroBackgroundPath =
-    taggedImages?.results?.[0]?.file_path ||
-    images?.profiles?.[0]?.file_path ||
-    actorDetails?.profile_path;
-
-  const heroBackgroundStyle = useMemo(() => {
-    if (!heroBackgroundPath) return null;
-    return {
-      backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
+    const addItem = (item) => {
+      if (!item?.id || !item?.poster_path) return;
+      const key = knownForKey(item);
+      const current = byTitle.get(key);
+      if (
+        !current ||
+        knownForFallbackScore(item) > knownForFallbackScore(current)
+      ) {
+        byTitle.set(key, item);
+      }
     };
-  }, [heroBackgroundPath]);
+
+    tmdbKnownFor.forEach(addItem);
+
+    creditsAll
+      .filter(
+        (x) =>
+          x.poster_path &&
+          x.kind === "acting" &&
+          !isSelfLikeCredit(x.character),
+      )
+      .forEach(addItem);
+
+    const officialKeys = new Set(tmdbKnownFor.map(knownForKey));
+    const official = tmdbKnownFor
+      .filter((item) => byTitle.has(knownForKey(item)))
+      .map((item) => byTitle.get(knownForKey(item)));
+
+    const fallback = Array.from(byTitle.values())
+      .filter((item) => !officialKeys.has(knownForKey(item)))
+      .sort((a, b) => knownForFallbackScore(b) - knownForFallbackScore(a));
+
+    const movies = fallback.filter((item) => item.media_type !== "tv");
+    const tv = fallback.filter((item) => item.media_type === "tv");
+    const orderedFallback =
+      movies.length >= 6 - official.length ? movies : [...movies, ...tv];
+
+    return [...official, ...orderedFallback].slice(0, 6);
+  }, [creditsAll, tmdbKnownFor]);
 
   const sectionItems = useMemo(() => {
     const items = [];
@@ -641,6 +1784,12 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
         icon: Film,
         count: stats.total,
       });
+    items.push({
+      id: "awards",
+      label: "Premios",
+      icon: Trophy,
+      count: awardStats.total,
+    });
     if (photosCount > 0)
       items.push({
         id: "photos",
@@ -657,7 +1806,7 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
       });
     items.push({ id: "about", label: "Perfil", icon: User });
     return items;
-  }, [popularItems.length, stats.total, photosCount, taggedCount]);
+  }, [popularItems.length, stats.total, awardStats.total, photosCount, taggedCount]);
 
   const STICKY_TOP = 72;
   const sentinelRef = useRef(null);
@@ -756,39 +1905,6 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
-      {/* Background */}
-      <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a]">
-        {heroBackgroundStyle ? (
-          <>
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{
-                ...heroBackgroundStyle,
-                transform: "scale(1)",
-                filter: "blur(14px) brightness(0.65) saturate(1.05)",
-              }}
-            />
-            <div
-              className="absolute inset-0 bg-cover transition-opacity duration-1000"
-              style={{
-                ...heroBackgroundStyle,
-                backgroundPosition: "center top",
-                transform: "scale(1)",
-                transformOrigin: "center top",
-              }}
-            />
-          </>
-        ) : (
-          <div className="absolute inset-0 bg-[#0a0a0a]" />
-        )}
-
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20 backdrop-blur-[2px]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
-      </div>
-
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12 pb-24">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -926,56 +2042,93 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
             </FadeIn>
 
             <ScaleIn delay={0.18} className="mb-6">
-              <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden p-4 flex gap-4 overflow-x-auto no-scrollbar items-center">
-                <div className="shrink-0 flex flex-col">
-                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
-                    Conocido/a por
-                  </span>
-                  <span className="text-white text-sm font-semibold">
-                    {actorDetails?.known_for_department || "—"}
-                  </span>
-                </div>
-                <div className="w-px h-6 bg-white/10 shrink-0" />
-                <div className="shrink-0 flex flex-col">
-                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
-                    Créditos Totales
-                  </span>
-                  <span className="text-white text-sm font-semibold">
-                    {stats.total}
-                  </span>
-                </div>
-                <div className="w-px h-6 bg-white/10 shrink-0" />
-                <div className="shrink-0 flex flex-col">
-                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
-                    Actuación
-                  </span>
-                  <span className="text-white text-sm font-semibold">
-                    {stats.acting}
-                  </span>
-                </div>
-                <div className="w-px h-6 bg-white/10 shrink-0" />
-                <div className="shrink-0 flex flex-col">
-                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
-                    Equipo Técnico
-                  </span>
-                  <span className="text-white text-sm font-semibold">
-                    {stats.crew}
-                  </span>
-                </div>
-                <div className="w-px h-8 bg-white/10 shrink-0" />
-                <div className="shrink-0 flex items-center gap-3">
-                  <TrendingUp className="w-5 h-5 text-rose-400" />
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
-                      Popularidad
-                    </span>
-                    <span className="text-white text-sm font-semibold">
-                      {Math.round(actorDetails?.popularity || 0)}
-                    </span>
-                  </div>
-                </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {[
+                  {
+                    label: "Conocido/a por",
+                    value: actorDetails?.known_for_department || "—",
+                    icon: Briefcase,
+                    tone: "emerald",
+                  },
+                  {
+                    label: "Créditos",
+                    value: stats.total,
+                    sub: `${stats.movies} películas · ${stats.tv} series`,
+                    icon: Film,
+                    tone: "sky",
+                  },
+                  {
+                    label: "Trayectoria",
+                    value: careerYears,
+                    icon: Calendar,
+                    tone: "violet",
+                  },
+                  {
+                    label: "Premios",
+                    value: loadingAwards ? "..." : awardStats.total || "—",
+                    sub:
+                      awardStats.total > 0
+                        ? `${awardStats.wins} ganados · ${awardStats.nominations} nominaciones`
+                        : "Wikidata",
+                    icon: Trophy,
+                    tone: "yellow",
+                  },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const tones = {
+                    emerald: "from-emerald-500/18 text-emerald-300",
+                    sky: "from-sky-500/18 text-sky-300",
+                    violet: "from-violet-500/18 text-violet-300",
+                    yellow: "from-yellow-500/18 text-yellow-300",
+                  };
+                  return (
+                    <div
+                      key={item.label}
+                      className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.055] p-4 backdrop-blur-sm"
+                    >
+                      <div
+                        className={`absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${tones[item.tone]} to-transparent blur-2xl opacity-80`}
+                      />
+                      <div className="relative flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                            {item.label}
+                          </span>
+                          <span className="mt-1 block truncate text-lg font-black text-white">
+                            {item.value}
+                          </span>
+                          {item.sub ? (
+                            <span className="mt-0.5 block truncate text-xs font-semibold text-zinc-500">
+                              {item.sub}
+                            </span>
+                          ) : null}
+                        </div>
+                        <Icon className={`h-5 w-5 shrink-0 ${tones[item.tone].split(" ")[1]}`} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </ScaleIn>
+
+            {mostPopularCredit && (
+              <FadeIn delay={0.2} className="mb-5">
+                <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.06] p-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300">
+                    <Star className="h-5 w-5 fill-emerald-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-emerald-300/80">
+                      Crédito más popular
+                    </p>
+                    <p className="truncate text-sm font-bold text-white">
+                      {mostPopularCredit.title || mostPopularCredit.name}
+                      {mostPopularCredit.year ? ` · ${mostPopularCredit.year}` : ""}
+                    </p>
+                  </div>
+                </div>
+              </FadeIn>
+            )}
 
             <FadeIn delay={0.24}>
               <div className="p-5 rounded-2xl bg-white/5 border border-white/5 relative">
@@ -1035,24 +2188,15 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
               <section id="section-popular" ref={registerSection("popular")}>
                 <AnimatedSection delay={0.04}>
                   <section className="mb-16">
-                    <SectionTitle title="Destacados" icon={Star} />
-                    <Swiper
-                      spaceBetween={12}
-                      slidesPerView={3}
-                      breakpoints={{
-                        500: { slidesPerView: 3, spaceBetween: 14 },
-                        768: { slidesPerView: 4, spaceBetween: 16 },
-                        1024: { slidesPerView: 5, spaceBetween: 18 },
-                        1280: { slidesPerView: 6, spaceBetween: 20 },
-                      }}
-                      className="pb-8"
-                    >
-                      {popularItems.map((item) => (
-                        <SwiperSlide key={`popular-${item.id}`}>
-                          <PosterCard item={item} />
-                        </SwiperSlide>
+                    <SectionTitle title="Conocido por" icon={Star} />
+                    <ActorRowCarousel>
+                      {popularItems.map((item, index) => (
+                        <PosterCard
+                          key={`popular-${item.id}-${item.credit_id || index}`}
+                          item={item}
+                        />
                       ))}
-                    </Swiper>
+                    </ActorRowCarousel>
                   </section>
                 </AnimatedSection>
               </section>
@@ -1063,7 +2207,7 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
                 <section className="mb-16">
                   <SectionTitle
                     title="Créditos en pantalla"
-                    subtitle={`${filteredCredits.length} de ${stats.total} resultados`}
+                    subtitle={`${displayCreditGroups.reduce((total, group) => total + group.items.length, 0)} de ${stats.total} títulos`}
                     icon={Film}
                     right={
                       <button
@@ -1078,104 +2222,165 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
                   />
 
                   {/* Filters */}
-                  <div className="bg-zinc-900/45 border border-white/5 rounded-2xl p-4 mb-6 backdrop-blur-sm">
-                    {/* Search */}
-                    <div className="relative group">
-                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-emerald-400 transition-colors" />
-                      <input
-                        type="text"
-                        value={q}
-                        onChange={(e) => setQ(e.target.value)}
-                        placeholder="Buscar por título o rol…"
-                        className="w-full bg-black/35 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                      />
+                  <div className="mb-6 space-y-3">
+                    <div className="flex gap-3 lg:hidden">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                        <input
+                          type="text"
+                          value={q}
+                          onChange={(e) => setQ(e.target.value)}
+                          placeholder="Buscar por título o rol..."
+                          className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-900 py-2.5 pl-10 pr-10 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all focus:outline-none focus:border-emerald-500/50"
+                        />
+                        {q && (
+                          <button
+                            type="button"
+                            onClick={() => setQ("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-zinc-800"
+                            aria-label="Limpiar búsqueda"
+                          >
+                            <X className="h-3.5 w-3.5 text-zinc-500" />
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMobileFiltersOpen((v) => !v)}
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
+                          mobileFiltersOpen
+                            ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
+                            : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                        }`}
+                        aria-label="Filtros"
+                      >
+                        <SlidersHorizontal className="h-4 w-4" />
+                      </button>
                     </div>
 
-                    {/* One-line controls */}
-                    <div className="mt-3 flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
-                      <SelectInput
-                        className="min-w-[165px] shrink-0"
-                        value={mediaFilter}
-                        onChange={(e) => setMediaFilter(e.target.value)}
-                        options={[
-                          { label: "Tipo (todos)", value: "all" },
-                          { label: "Películas", value: "movie" },
-                          { label: "Series", value: "tv" },
-                        ]}
-                        placeholder="Tipo"
+                    <AnimatePresence>
+                      {mobileFiltersOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          className="overflow-visible lg:hidden"
+                        >
+                          <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
+                            <CreditsFilterDropdowns
+                              mediaFilter={mediaFilter}
+                              setMediaFilter={setMediaFilter}
+                              creditFilter={creditFilter}
+                              setCreditFilter={setCreditFilter}
+                              deptFilter={deptFilter}
+                              setDeptFilter={setDeptFilter}
+                              deptOptions={deptOptions}
+                              sort={sort}
+                              setSort={setSort}
+                            />
+                            <SelectInput
+                              value={yearFrom}
+                              onChange={(e) => setYearFrom(e.target.value)}
+                              options={yearOptions}
+                              icon={Calendar}
+                              placeholder="Desde"
+                            />
+                            <SelectInput
+                              value={yearTo}
+                              onChange={(e) => setYearTo(e.target.value)}
+                              options={yearOptions}
+                              icon={Calendar}
+                              placeholder="Hasta"
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <div className="hidden flex-nowrap items-center gap-3 overflow-x-auto pb-1 lg:flex">
+                      <div className="relative min-w-[240px] flex-1">
+                        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                        <input
+                          type="text"
+                          value={q}
+                          onChange={(e) => setQ(e.target.value)}
+                          placeholder="Buscar por título o rol..."
+                          className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-900 py-2.5 pl-10 pr-10 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all focus:border-emerald-500/50 focus:outline-none"
+                        />
+                        {q && (
+                          <button
+                            type="button"
+                            onClick={() => setQ("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-zinc-800"
+                            aria-label="Limpiar búsqueda"
+                          >
+                            <X className="h-3.5 w-3.5 text-zinc-500" />
+                          </button>
+                        )}
+                      </div>
+
+                      <CreditsFilterDropdowns
+                        mediaFilter={mediaFilter}
+                        setMediaFilter={setMediaFilter}
+                        creditFilter={creditFilter}
+                        setCreditFilter={setCreditFilter}
+                        deptFilter={deptFilter}
+                        setDeptFilter={setDeptFilter}
+                        deptOptions={deptOptions}
+                        sort={sort}
+                        setSort={setSort}
                       />
 
                       <SelectInput
-                        className="min-w-[175px] shrink-0"
-                        value={sort}
-                        onChange={(e) => setSort(e.target.value)}
-                        options={[
-                          { label: "Más recientes", value: "date_desc" },
-                          { label: "Más antiguos", value: "date_asc" },
-                          { label: "Popularidad", value: "pop_desc" },
-                          { label: "Mejor valorados", value: "rating_desc" },
-                          { label: "A-Z", value: "alpha" },
-                        ]}
-                        icon={ArrowUpRight}
-                        placeholder="Orden"
-                      />
-
-                      <SelectInput
-                        className="min-w-[165px] shrink-0"
+                        className="w-[150px] shrink-0"
                         value={yearFrom}
                         onChange={(e) => setYearFrom(e.target.value)}
                         options={yearOptions}
                         icon={Calendar}
-                        placeholder="Desde (cualquiera)"
+                        placeholder="Desde"
                       />
 
                       <SelectInput
-                        className="min-w-[165px] shrink-0"
+                        className="w-[150px] shrink-0"
                         value={yearTo}
                         onChange={(e) => setYearTo(e.target.value)}
                         options={yearOptions}
                         icon={Calendar}
-                        placeholder="Hasta (cualquiera)"
+                        placeholder="Hasta"
                       />
-
-                      <SelectInput
-                        className="min-w-[170px] shrink-0"
-                        value={creditFilter}
-                        onChange={(e) => {
-                          setCreditFilter(e.target.value);
-                          if (e.target.value !== "crew") setDeptFilter("all");
-                        }}
-                        options={[
-                          { label: "Actuación", value: "acting" },
-                          { label: "Equipo", value: "crew" },
-                          { label: "Todos", value: "all" },
-                        ]}
-                        placeholder="Rol"
-                      />
-
-                      {creditFilter === "crew" && (
-                        <SelectInput
-                          className="min-w-[200px] shrink-0"
-                          value={deptFilter}
-                          onChange={(e) => setDeptFilter(e.target.value)}
-                          options={[
-                            { label: "Dept. (todos)", value: "all" },
-                            ...deptOptions,
-                          ]}
-                          placeholder="Departamento"
-                        />
-                      )}
                     </div>
                   </div>
 
-                  {/* Grid */}
-                  {filteredCredits.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
-                      {filteredCredits.map((c) => (
-                        <PosterCard
-                          key={`${c.id}-${c.credit_id || "x"}-${c.media_type || "m"}`}
-                          item={c}
-                        />
+                  {/* Results */}
+                  {displayCreditGroups.length > 0 ? (
+                    <div className="space-y-8">
+                      {displayCreditGroups.map((group) => (
+                        <div key={group.key}>
+                          <div className="mb-2 flex items-center gap-2 text-white">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-emerald-400/25 bg-emerald-400/10 text-emerald-300">
+                              {group.key === "movies" ? (
+                                <Film className="h-3.5 w-3.5" />
+                              ) : (
+                                <TvIcon className="h-3.5 w-3.5" />
+                              )}
+                            </span>
+                            <h3 className="text-lg font-black">
+                              {group.title}
+                            </h3>
+                            <span className="text-xs font-semibold text-zinc-500">
+                              {group.items.length}
+                            </span>
+                          </div>
+                          <ActorRowCarousel>
+                            {group.items.map((c, index) => (
+                              <PosterCard
+                                key={`${group.key}-${c.id}-${c.credit_id || index}-${c.media_type || "m"}`}
+                                item={c}
+                              />
+                            ))}
+                          </ActorRowCarousel>
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -1196,6 +2401,52 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
               </AnimatedSection>
             </section>
 
+            <section id="section-awards" ref={registerSection("awards")}>
+              <AnimatedSection delay={0.04}>
+                <section className="mb-16">
+                  <SectionTitle
+                    title="Premios"
+                    subtitle={
+                      loadingAwards
+                        ? "Cargando reconocimientos..."
+                        : awardStats.total > 0
+                          ? `${awardStats.wins} ganados · ${awardStats.nominations} nominaciones`
+                          : "Reconocimientos públicos disponibles"
+                    }
+                    icon={Trophy}
+                  />
+
+                  {loadingAwards ? (
+                    <ActorRowCarousel variant="award">
+                      {Array.from({ length: 3 }).map((_, idx) => (
+                        <div
+                          key={`award-loading-${idx}`}
+                          className="h-32 rounded-2xl border border-white/5 bg-white/[0.04] animate-pulse"
+                        />
+                      ))}
+                    </ActorRowCarousel>
+                  ) : awards.length > 0 ? (
+                    <ActorRowCarousel variant="award">
+                      {awards.map((item) => (
+                        <AwardCard key={item.id} item={item} />
+                      ))}
+                    </ActorRowCarousel>
+                  ) : (
+                    <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.04] px-6 py-12 text-center">
+                      <Trophy className="mx-auto mb-3 h-12 w-12 text-zinc-600" />
+                      <p className="font-semibold text-zinc-300">
+                        No hay premios públicos disponibles para esta persona.
+                      </p>
+                      <p className="mx-auto mt-2 max-w-lg text-sm text-zinc-500">
+                        {awardsErr ||
+                          "Cuando TMDb incluye un identificador de Wikidata, se muestran aquí premios y nominaciones registrados públicamente."}
+                      </p>
+                    </div>
+                  )}
+                </section>
+              </AnimatedSection>
+            </section>
+
             {photos.length > 0 && (
               <section id="section-photos" ref={registerSection("photos")}>
                 <AnimatedSection delay={0.04}>
@@ -1205,27 +2456,14 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
                       subtitle={`${photos.length} imágenes`}
                       icon={Images}
                     />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    <ActorRowCarousel>
                       {photos.map((p) => (
-                        <a
+                        <PhotoCard
                           key={p.file_path}
-                          href={tmdbImg(p.file_path, "original")}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="group relative aspect-[2/3] rounded-xl overflow-hidden bg-zinc-900 border border-white/10 hover:border-emerald-500/50 transition-colors"
-                        >
-                          <img
-                            src={tmdbImg(p.file_path, "w500")}
-                            alt=""
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            loading="lazy"
-                          />
-                          <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 backdrop-blur rounded text-[10px] text-white font-mono opacity-0 group-hover:opacity-100 transition-opacity">
-                            {p.width}x{p.height}
-                          </div>
-                        </a>
+                          image={p}
+                        />
                       ))}
-                    </div>
+                    </ActorRowCarousel>
                   </section>
                 </AnimatedSection>
               </section>
@@ -1240,32 +2478,14 @@ export default function ActorDetails({ actorDetails, actorMovies }) {
                       subtitle="Imágenes donde aparece etiquetado/a"
                       icon={Tags}
                     />
-                    <div className="columns-2 sm:columns-3 lg:columns-4 gap-4 space-y-4">
+                    <ActorRowCarousel variant="wide">
                       {taggedImages.results.map((t) => (
-                        <a
+                        <TaggedMediaCard
                           key={t.file_path}
-                          href={tmdbImg(t.file_path, "original")}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="break-inside-avoid relative group rounded-xl overflow-hidden border border-white/10 bg-zinc-900/40 hover:border-emerald-500/40 transition-colors block"
-                        >
-                          <img
-                            src={tmdbImg(t.file_path, "w500")}
-                            alt=""
-                            className="w-full h-auto"
-                            loading="lazy"
-                          />
-                          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <ExternalLink className="w-6 h-6 text-white" />
-                          </div>
-                          {(t.media?.title || t.media?.name) && (
-                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent text-xs text-white line-clamp-1">
-                              {t.media.title || t.media.name}
-                            </div>
-                          )}
-                        </a>
+                          image={t}
+                        />
                       ))}
-                    </div>
+                    </ActorRowCarousel>
                   </section>
                 </AnimatedSection>
               </section>

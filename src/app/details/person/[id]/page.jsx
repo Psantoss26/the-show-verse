@@ -1,41 +1,21 @@
-// /src/app/details/person/[id]/page.jsx
-'use client'
+import { notFound } from "next/navigation";
+import ActorDetails from "@/components/ActorDetails";
+import { getActorDetailsFull, getActorKnownFor } from "@/lib/api/tmdb";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';  // Asegúrate de usar el hook `useParams` de Next.js
-import { getActorDetails, getActorMovies } from '@/lib/api/tmdb'; // Asegúrate de tener estas funciones implementadas
-import ActorDetails from '@/components/ActorDetails'; // Importa el nuevo componente ActorDetails
+export default async function ActorDetailsPage({ params }) {
+  const { id } = await params;
+  const actorDetails = await getActorDetailsFull(id);
 
-// Componente para mostrar los detalles de un actor
-export default function ActorDetailsPage() {
-  const { id } = useParams(); // Obtener el ID del actor desde la URL
-  const [actorDetails, setActorDetails] = useState(null);
-  const [actorMovies, setActorMovies] = useState([]);
+  if (!actorDetails) notFound();
 
-  useEffect(() => {
-    const fetchActorDetails = async () => {
-      try {
-        // Obtener detalles del actor
-        const details = await getActorDetails(id);
-        setActorDetails(details);
-
-        // Obtener la filmografía del actor
-        const movies = await getActorMovies(id);
-        setActorMovies(movies.cast || []);  // Usamos `cast` en caso de que los resultados vengan en esa clave
-      } catch (error) {
-        console.error('Error fetching actor details:', error);
-      }
-    };
-
-    if (id) {
-      fetchActorDetails();
-    }
-  }, [id]);
+  const knownFor = await getActorKnownFor(id, actorDetails.name);
+  const actorMovies = actorDetails?.combined_credits?.cast || [];
 
   return (
     <ActorDetails
       actorDetails={actorDetails}
       actorMovies={actorMovies}
+      initialKnownFor={knownFor}
     />
   );
 }
