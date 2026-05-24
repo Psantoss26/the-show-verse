@@ -774,6 +774,14 @@ export default function EpisodeRatingsGrid({
     if (isHeavyGrid) setLayoutMode("wrapped");
   }, [isTouchLike, layoutMode, isHeavyGrid]);
 
+  // Una sola temporada real con muchos episodios → wrapped por defecto
+  useEffect(() => {
+    if (userPickedLayoutRef.current) return;
+    if (singleSeasonView) return; // vista aplanada de multi-temporadas, no aplica
+    if (seasonsSorted.length !== 1 || maxEpisodes < 12) return;
+    setLayoutMode("wrapped");
+  }, [singleSeasonView, seasonsSorted.length, maxEpisodes]);
+
   const setLayoutModeSafe = (mode) => {
     userPickedLayoutRef.current = true;
     setLayoutMode(mode);
