@@ -133,15 +133,21 @@ export async function GET(request) {
     const rawCollection = collectionMoviesRes.status === "fulfilled" && collectionMoviesRes.value?.ok
       ? (await safeJson(collectionMoviesRes.value)) || [] : [];
 
-    // Also fetch followers/following counts
-    const [followersRes, followingRes] = await Promise.allSettled([
+    // Also fetch followers/following counts and top watched
+    const [followersRes, followingRes, watchedMoviesRes, watchedShowsRes] = await Promise.allSettled([
       fetch(`${TRAKT_API}/users/${username}/followers`, { headers: h, cache: "no-store" }),
       fetch(`${TRAKT_API}/users/${username}/following`, { headers: h, cache: "no-store" }),
+      fetch(`${TRAKT_API}/users/${username}/watched/movies`, { headers: h, cache: "no-store" }),
+      fetch(`${TRAKT_API}/users/${username}/watched/shows`, { headers: h, cache: "no-store" }),
     ]);
     const followers = followersRes.status === "fulfilled" && followersRes.value?.ok
       ? (await safeJson(followersRes.value)) || [] : [];
     const following = followingRes.status === "fulfilled" && followingRes.value?.ok
       ? (await safeJson(followingRes.value)) || [] : [];
+    const rawWatchedMovies = watchedMoviesRes.status === "fulfilled" && watchedMoviesRes.value?.ok
+      ? (await safeJson(watchedMoviesRes.value)) || [] : [];
+    const rawWatchedShows = watchedShowsRes.status === "fulfilled" && watchedShowsRes.value?.ok
+      ? (await safeJson(watchedShowsRes.value)) || [] : [];
 
     // Normalize history entries
     const normalizedHistory = rawHistory
@@ -231,6 +237,7 @@ export async function GET(request) {
         title: tmdb?.title || item.title,
         year: tmdb?.year || item.year,
         vote_average: tmdb?.vote_average || null,
+        genres: tmdb?.genres || [],
       };
     });
 
@@ -242,7 +249,30 @@ export async function GET(request) {
         poster_path: tmdb?.poster_path || null,
         title: tmdb?.title || item.title,
         year: tmdb?.year || item.year,
+        vote_average: tmdb?.vote_average || null,
+        genres: tmdb?.genres || [],
       };
+    });
+
+    // Build top movies/shows (Trakt returns watched sorted by plays desc by default)
+    const normalizedTopMovies = rawWatchedMovies.slice(0, 6).map((item) => ({
+      movie: { ...item.movie, plays: item.plays },
+      plays: item.plays,
+    }));
+    const normalizedTopShows = rawWatchedShows.slice(0, 6).map((item) => ({
+      show: { ...item.show, plays: item.plays },
+      plays: item.plays,
+    }));
+
+    const enrichedTopMovies = await parallelLimit(normalizedTopMovies, 6, async (item) => {
+      const tmdbId = item.movie?.ids?.tmdb;
+      const tmdb = await fetchTmdbPoster(tmdbId, "movie");
+      return { ...item, movie: { ...item.movie, poster_path: tmdb?.poster_path || null, title: tmdb?.title || item.movie?.title } };
+    });
+    const enrichedTopShows = await parallelLimit(normalizedTopShows, 6, async (item) => {
+      const tmdbId = item.show?.ids?.tmdb;
+      const tmdb = await fetchTmdbPoster(tmdbId, "tv");
+      return { ...item, show: { ...item.show, poster_path: tmdb?.poster_path || null, title: tmdb?.title || item.show?.title } };
     });
 
     // Enrich watchlist
@@ -254,6 +284,8 @@ export async function GET(request) {
         backdrop_path: tmdb?.backdrop_path || null,
         title: tmdb?.title || item.title,
         year: tmdb?.year || item.year,
+        vote_average: tmdb?.vote_average || null,
+        genres: tmdb?.genres || [],
       };
     });
 
@@ -283,6 +315,8 @@ export async function GET(request) {
       recentHistory: enrichedHistory,
       recentRatings: enrichedRatings,
       watchlist: enrichedWatchlist,
+      topMovies: enrichedTopMovies,
+      topShows: enrichedTopShows,
       collectionCount: Array.isArray(rawCollection) ? rawCollection.length : 0,
     };
 

@@ -48,6 +48,8 @@ async function getTMDbDetails(tmdbId, type) {
             0,
             4,
           ) || null,
+        vote_average: data.vote_average || null,
+        genres: data.genres || [],
       };
     }
   } catch (err) {
@@ -185,6 +187,8 @@ export async function GET(request) {
                     year: tmdb.year || item.movie?.year,
                     poster_path: tmdb.poster_path,
                     backdrop_path: tmdb.backdrop_path,
+                    vote_average: tmdb.vote_average,
+                    genres: tmdb.genres,
                   },
                 };
               }
@@ -209,6 +213,8 @@ export async function GET(request) {
                     year: tmdb.year || item.show?.year,
                     poster_path: tmdb.poster_path,
                     backdrop_path: tmdb.backdrop_path,
+                    vote_average: tmdb.vote_average,
+                    genres: tmdb.genres,
                   },
                 };
               }
