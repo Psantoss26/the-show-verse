@@ -283,12 +283,12 @@ export async function GET(request) {
     const topActors = Object.entries(actorCount)
       .map(([id, data]) => ({ id: parseInt(id), ...data }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 12);
+      .slice(0, 15);
 
     const topDirectors = Object.entries(directorCount)
       .map(([id, data]) => ({ id: parseInt(id), ...data }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
+      .slice(0, 15);
 
     const payload = peopleOnly
       ? { username, topActors, topDirectors }
