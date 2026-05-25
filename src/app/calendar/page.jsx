@@ -104,7 +104,7 @@ function Dropdown({ label, valueLabel, icon: Icon, children, className = "" }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
-            className="absolute left-0 top-full z-[99999] mt-2 w-full min-w-[160px] rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden"
+            className="absolute left-0 top-full z-[99999] mt-2 w-full rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden"
           >
             <div className="p-1 space-y-0.5">
               {children({ close: () => setOpen(false) })}

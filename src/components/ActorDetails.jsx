@@ -11,6 +11,7 @@ import {
   useRef,
 } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { FreeMode } from "swiper";
 import "swiper/swiper-bundle.css";
@@ -504,22 +505,71 @@ function SelectInput({
   );
 }
 
-function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+function InlineDropdown({
+  label,
+  valueLabel,
+  icon: Icon,
+  children,
+  className = "",
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - menuWidth - 12),
+    );
+
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: menuWidth,
+      zIndex: 1000,
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      const target = e.target;
+      if (
+        ref.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
   return (
-    <div ref={ref} className="relative w-full lg:w-auto lg:shrink-0">
+    <div
+      ref={ref}
+      className={`relative w-full lg:w-auto lg:shrink-0 ${className}`}
+    >
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[145px]"
@@ -538,18 +588,25 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 w-56 overflow-hidden rounded-xl border border-zinc-800 bg-[#121212] p-1 shadow-2xl"
-          >
-            {children({ close: () => setOpen(false) })}
-          </motion.div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                style={menuStyle}
+                className="sv-scroll max-h-[min(360px,calc(100vh-96px))] overflow-y-auto rounded-xl border border-zinc-800 bg-[#121212] p-1 shadow-2xl"
+              >
+                {children({ close: () => setOpen(false) })}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -568,6 +625,49 @@ function DropdownItem({ active, onClick, children }) {
       <span className="font-medium">{children}</span>
       {active && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
     </button>
+  );
+}
+
+function YearFilterDropdown({
+  label,
+  value,
+  setValue,
+  options,
+  className = "",
+}) {
+  return (
+    <InlineDropdown
+      label={label}
+      valueLabel={value || "Todos"}
+      icon={Calendar}
+      className={className}
+    >
+      {({ close }) => (
+        <>
+          <DropdownItem
+            active={!value}
+            onClick={() => {
+              setValue("");
+              close();
+            }}
+          >
+            Todos
+          </DropdownItem>
+          {options.map((option) => (
+            <DropdownItem
+              key={`${label}-${option.value}`}
+              active={value === option.value}
+              onClick={() => {
+                setValue(option.value);
+                close();
+              }}
+            >
+              {option.label}
+            </DropdownItem>
+          ))}
+        </>
+      )}
+    </InlineDropdown>
   );
 }
 
@@ -2330,19 +2430,17 @@ export default function ActorDetails({
                               sort={sort}
                               setSort={setSort}
                             />
-                            <SelectInput
+                            <YearFilterDropdown
+                              label="Desde"
                               value={yearFrom}
-                              onChange={(e) => setYearFrom(e.target.value)}
+                              setValue={setYearFrom}
                               options={yearOptions}
-                              icon={Calendar}
-                              placeholder="Desde"
                             />
-                            <SelectInput
+                            <YearFilterDropdown
+                              label="Hasta"
                               value={yearTo}
-                              onChange={(e) => setYearTo(e.target.value)}
+                              setValue={setYearTo}
                               options={yearOptions}
-                              icon={Calendar}
-                              placeholder="Hasta"
                             />
                           </div>
                         </motion.div>
@@ -2383,22 +2481,20 @@ export default function ActorDetails({
                         setSort={setSort}
                       />
 
-                      <SelectInput
+                      <YearFilterDropdown
                         className="w-[150px] shrink-0"
+                        label="Desde"
                         value={yearFrom}
-                        onChange={(e) => setYearFrom(e.target.value)}
+                        setValue={setYearFrom}
                         options={yearOptions}
-                        icon={Calendar}
-                        placeholder="Desde"
                       />
 
-                      <SelectInput
+                      <YearFilterDropdown
                         className="w-[150px] shrink-0"
+                        label="Hasta"
                         value={yearTo}
-                        onChange={(e) => setYearTo(e.target.value)}
+                        setValue={setYearTo}
                         options={yearOptions}
-                        icon={Calendar}
-                        placeholder="Hasta"
                       />
                     </div>
                   </div>
