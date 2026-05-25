@@ -1,7 +1,15 @@
 // ActorDetails.jsx
 "use client";
 
-import { Children, useCallback, useEffect, useMemo, useState, useRef } from "react";
+import {
+  Children,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import Link from "next/link";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { FreeMode } from "swiper";
@@ -1220,6 +1228,7 @@ export default function ActorDetails({
   initialKnownFor = [],
 }) {
   const personId = actorDetails?.id;
+  const contentTopRef = useRef(null);
   const initialExternalIds = actorDetails?.external_ids || null;
   const hasInitialExtra = Boolean(
     actorDetails?.combined_credits ||
@@ -1518,6 +1527,34 @@ export default function ActorDetails({
     loadAwardsForWikidata,
     personId,
   ]);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    let raf = 0;
+    raf = window.requestAnimationFrame(() => {
+      const contentEl = contentTopRef.current;
+      if (!contentEl) {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        return;
+      }
+
+      const navHeight =
+        document.querySelector("nav")?.getBoundingClientRect().height || 64;
+      const nextTop =
+        window.scrollY + contentEl.getBoundingClientRect().top - navHeight;
+
+      window.scrollTo({
+        top: Math.max(0, nextTop),
+        left: 0,
+        behavior: "auto",
+      });
+    });
+
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, [personId]);
 
   // --- Computed Data ---
   const creditsAll = useMemo(() => {
@@ -1916,7 +1953,10 @@ export default function ActorDetails({
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12 pb-24">
+      <div
+        ref={contentTopRef}
+        className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12 pb-24"
+      >
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
