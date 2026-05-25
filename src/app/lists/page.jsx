@@ -14,6 +14,7 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
+import { FreeMode } from "swiper";
 import "swiper/swiper-bundle.css";
 
 import useTmdbLists from "@/lib/hooks/useTmdbLists";
@@ -40,8 +41,11 @@ import {
   Layers,
   Filter,
   SlidersHorizontal,
+  Film,
+  Tv,
 } from "lucide-react";
 import useTraktLists from "@/lib/hooks/useTraktLists";
+import ListPosterCard from "@/components/lists/ListPosterCard";
 
 // ================== UTILS & CACHE ==================
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -59,6 +63,29 @@ const VALID_SORT_MODES = new Set([
 const VALID_VIEW_MODES = new Set(["grid", "rows", "list"]);
 const VALID_SOURCES = new Set(["tmdb", "trakt", "collections"]);
 const VALID_TRAKT_MODES = new Set(["trending", "popular"]);
+
+const LIST_ROW_ACCENTS = {
+  tmdb: {
+    borderColor: "rgba(59, 130, 246, 0.44)",
+    shadowColor: "59, 130, 246",
+    textClass: "text-blue-400",
+  },
+  trakt: {
+    borderColor: "rgba(168, 85, 247, 0.44)",
+    shadowColor: "168, 85, 247",
+    textClass: "text-purple-400",
+  },
+  collections: {
+    borderColor: "rgba(234, 179, 8, 0.44)",
+    shadowColor: "234, 179, 8",
+    textClass: "text-yellow-400",
+  },
+  default: {
+    borderColor: "rgba(168, 85, 247, 0.44)",
+    shadowColor: "168, 85, 247",
+    textClass: "text-purple-400",
+  },
+};
 
 const readOmdbCache = (imdbId) => {
   if (!imdbId || typeof window === "undefined") return null;
@@ -530,8 +557,9 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
   );
 }
 
-const ListItemCard = memo(function ListItemCard({ item, isMobile }) {
+const ListItemCard = memo(function ListItemCard({ item, isMobile, accent = "trakt" }) {
   const [imdbScore, setImdbScore] = useState(null);
+  const [imgFailed, setImgFailed] = useState(false);
 
   const title = item?.title || item?.name || "—";
   const date = item?.release_date || item?.first_air_date;
@@ -539,6 +567,21 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile }) {
   const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
   const href = `/details/${mediaType}/${item.id}`;
   const posterPath = item?.poster_path || item?.backdrop_path || null;
+  const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w342${posterPath}` : null;
+  const accentStyle = LIST_ROW_ACCENTS[accent] || LIST_ROW_ACCENTS.default;
+  const hoverShadow = [
+    `0 18px 48px -24px rgba(${accentStyle.shadowColor}, 0.72)`,
+    `0 10px 24px -18px rgba(${accentStyle.shadowColor}, 0.58)`,
+    "0 16px 30px -24px rgba(0, 0, 0, 0.75)",
+  ].join(", ");
+  const tmdbScore =
+    typeof item?.vote_average === "number" && item.vote_average > 0
+      ? item.vote_average.toFixed(1)
+      : null;
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [posterPath]);
 
   const prefetchImdb = useCallback(async () => {
     if (!item?.id) return;
@@ -584,76 +627,85 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile }) {
   return (
     <Link
       href={href}
-      className="block group/card relative w-full select-none"
+      className="relative z-0 block w-full select-none hover:z-[300] focus:z-[300] focus:outline-none"
+      draggable={false}
+      onDragStart={(e) => e.preventDefault()}
       onMouseEnter={prefetchEnabled ? prefetchImdb : undefined}
       onFocus={prefetchEnabled ? prefetchImdb : undefined}
-      draggable={false}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-lg ring-1 ring-white/5 transition-transform duration-300 md:group-hover/card:scale-[1.02]">
-        <TmdbImg
-          filePath={posterPath}
-          size="w500"
-          alt={title}
-          className="w-full h-full object-cover"
-        />
-
-        {/* overlay: en móvil OCULTO, solo visible en desktop con hover */}
-        <div
-          className={[
-            "pointer-events-none absolute inset-0 transition-opacity duration-200",
-            isMobile
-              ? "opacity-0"
-              : "opacity-0 md:group-hover/card:opacity-100",
-          ].join(" ")}
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-
-          {/* ratings arriba derecha */}
-          <div className="absolute top-2 right-2 flex flex-col items-end gap-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-            {typeof item?.vote_average === "number" &&
-              item.vote_average > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-emerald-300 text-[11px] font-black font-mono tracking-tight">
-                    {item.vote_average.toFixed(1)}
-                  </span>
-                  <img
-                    src="/logo-TMDb.png"
-                    alt="TMDb"
-                    className="w-auto h-2.5"
-                    draggable={false}
-                  />
-                </div>
-              )}
-            {!isMobile && typeof imdbScore === "number" && imdbScore > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-yellow-300 text-[11px] font-black font-mono tracking-tight">
-                  {imdbScore.toFixed(1)}
-                </span>
-                <img
-                  src="/logo-IMDb.png"
-                  alt="IMDb"
-                  className="w-auto h-2.5"
-                  draggable={false}
-                />
-              </div>
+      <motion.div
+        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/5 bg-neutral-800/80 shadow-lg transition-colors duration-300 transform-gpu will-change-transform"
+        whileHover={{
+          y: -6,
+          zIndex: 300,
+          boxShadow: hoverShadow,
+          borderColor: accentStyle.borderColor,
+        }}
+        whileTap={{ y: -2 }}
+        transition={{ type: "spring", stiffness: 360, damping: 26 }}
+      >
+        {posterUrl && !imgFailed ? (
+          <img
+            src={posterUrl}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            className="h-full w-full object-cover grayscale-[18%] transition-transform duration-500 transform-gpu group-hover:scale-[1.08] group-hover:-translate-y-1 group-hover:grayscale-0"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-neutral-900 text-zinc-600">
+            {mediaType === "movie" ? (
+              <Film className="h-8 w-8 opacity-60" />
+            ) : (
+              <Tv className="h-8 w-8 opacity-60" />
             )}
           </div>
+        )}
 
-          {/* título + año */}
-          <div className="absolute inset-x-0 bottom-0 p-3">
-            <div className="flex items-end justify-between gap-3">
-              <h3 className="text-white font-bold text-xs sm:text-sm leading-tight line-clamp-2">
-                {title}
-              </h3>
-              {year && (
-                <span className="shrink-0 text-[10px] sm:text-xs font-black text-yellow-300">
-                  {year}
+        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-3 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <span
+            className={
+              mediaType === "tv"
+                ? "rounded-md border border-purple-500/30 bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-purple-300 shadow-sm backdrop-blur-md"
+                : "rounded-md border border-sky-500/30 bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-sky-300 shadow-sm backdrop-blur-md"
+            }
+          >
+            {mediaType === "tv" ? "SERIE" : "PELÍCULA"}
+          </span>
+
+          <div className="flex flex-col items-end gap-1">
+            {tmdbScore ? (
+              <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                <span className="font-mono text-[10px] font-black tracking-tight text-emerald-400 sm:text-xs">
+                  {tmdbScore}
                 </span>
-              )}
-            </div>
+                <img src="/logo-TMDb.png" alt="" className="h-2 w-auto sm:h-2.5" />
+              </div>
+            ) : null}
+            {!isMobile && imdbScore ? (
+              <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                <span className="font-mono text-[10px] font-black tracking-tight text-yellow-400 sm:text-xs">
+                  {typeof imdbScore === "number" ? imdbScore.toFixed(1) : imdbScore}
+                </span>
+                <img src="/logo-IMDb.png" alt="" className="h-2.5 w-auto sm:h-3" />
+              </div>
+            ) : null}
           </div>
         </div>
-      </div>
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100" />
+
+        <div className="absolute bottom-0 left-0 right-0 z-10 p-3 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <h3 className="line-clamp-2 text-xs font-bold leading-tight text-white drop-shadow-md sm:text-sm">
+            {title}
+          </h3>
+          <p className={`mt-0.5 text-[10px] font-bold drop-shadow-md ${accentStyle.textClass}`}>
+            {year || "—"} · {mediaType === "tv" ? "Serie" : "Película"}
+          </p>
+        </div>
+      </motion.div>
     </Link>
   );
 });
@@ -737,68 +789,172 @@ function normalizeTraktItemsToCards(items) {
         name: t.media_type !== "movie" ? title : undefined,
         poster_path: t.poster_path || null,
         backdrop_path: t.backdrop_path || null,
+        vote_average: t.vote_average || null,
+        release_date: t.release_date || null,
+        first_air_date: t.first_air_date || null,
       };
     })
     .filter(Boolean);
 }
 
 /* ========= fila tipo Dashboard: drag con ratón + 3 completas en móvil ========= */
-function ListItemsRow({ items, isMobile }) {
+function ListItemsRow({ items, isMobile, accent = "trakt" }) {
+  const swiperRef = useRef(null);
+  const [isHoveredRow, setIsHoveredRow] = useState(false);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+
   if (!Array.isArray(items) || items.length === 0) return null;
 
   const breakpointsRow = {
     0: { slidesPerView: 3, spaceBetween: 12 },
     640: { slidesPerView: 4, spaceBetween: 14 },
-    768: { slidesPerView: "auto", spaceBetween: 14 },
-    1024: { slidesPerView: "auto", spaceBetween: 18 },
-    1280: { slidesPerView: "auto", spaceBetween: 20 },
+    768: { slidesPerView: 5, spaceBetween: 16 },
+    1024: { slidesPerView: 6, spaceBetween: 18 },
+    1280: { slidesPerView: 7, spaceBetween: 20 },
   };
+
+  const updateNav = (swiper) => {
+    if (!swiper) return;
+    const hasOverflow = !swiper.isLocked;
+    setCanPrev(hasOverflow && !swiper.isBeginning);
+    setCanNext(hasOverflow && !swiper.isEnd);
+  };
+
+  const handleSwiper = (swiper) => {
+    swiperRef.current = swiper;
+    updateNav(swiper);
+  };
+
+  const handlePrevClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const swiper = swiperRef.current;
+    if (!swiper) return;
+    const target = Math.max((swiper.activeIndex || 0) - 7, 0);
+    swiper.slideTo(target);
+  };
+
+  const handleNextClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const swiper = swiperRef.current;
+    if (!swiper) return;
+    const maxIndex = swiper.slides.length - 1;
+    const target = Math.min((swiper.activeIndex || 0) + 7, maxIndex);
+    swiper.slideTo(target);
+  };
+
+  const showPrev = isHoveredRow && canPrev;
+  const showNext = isHoveredRow && canNext;
 
   return (
     <div className="-mx-4 sm:mx-0">
-      <div className="px-3 sm:px-0">
-        <Swiper
-          slidesPerView={3}
-          spaceBetween={12}
-          breakpoints={breakpointsRow}
-          loop={false}
-          watchOverflow
-          allowTouchMove
-          simulateTouch
-          grabCursor={!isMobile}
-          threshold={6}
-          preventClicks
-          preventClicksPropagation
-          touchStartPreventDefault={false}
-          className="group relative"
+      <div
+        className="relative z-0 px-3 hover:z-[200] sm:px-0"
+        onMouseEnter={() => setIsHoveredRow(true)}
+        onMouseLeave={() => setIsHoveredRow(false)}
+      >
+        <div
+          className="relative z-0"
+          style={{ overflowX: "clip", overflowY: "visible" }}
         >
-          {items.map((item, idx) => {
-            const mt = item?.media_type || (item?.title ? "movie" : "tv");
-            return (
-              <SwiperSlide
-                key={`${mt}-${item?.id}-${idx}`}
-                className="select-none md:!w-[140px] lg:!w-[140px] xl:!w-[168px] 2xl:!w-[201px]"
+          <Swiper
+            slidesPerView={3}
+            spaceBetween={12}
+            onSwiper={handleSwiper}
+            onSlideChange={updateNav}
+            onResize={updateNav}
+            onReachBeginning={updateNav}
+            onReachEnd={updateNav}
+            breakpoints={breakpointsRow}
+            loop={false}
+            watchOverflow
+            allowTouchMove
+            simulateTouch
+            grabCursor={!isMobile}
+            threshold={isMobile ? 2 : 5}
+            touchRatio={isMobile ? 1.5 : 1}
+            preventClicks
+            preventClicksPropagation
+            touchStartPreventDefault={false}
+            freeMode={
+              !isMobile
+                ? { enabled: true, momentum: true, momentumRatio: 0.5 }
+                : false
+            }
+            modules={[FreeMode]}
+            className="relative z-0 !overflow-visible pb-8 pt-7"
+          >
+            {items.map((item, idx) => {
+              const mt = item?.media_type || (item?.title ? "movie" : "tv");
+              return (
+                <SwiperSlide
+                  key={`${mt}-${item?.id}-${idx}`}
+                  className="relative !h-auto select-none !overflow-visible !z-0 hover:!z-[300] focus-within:!z-[300]"
+                >
+                  <ListItemCard item={item} isMobile={isMobile} accent={accent} />
+                </SwiperSlide>
+              );
+            })}
+          </Swiper>
+        </div>
+
+        <AnimatePresence>
+          {showPrev && !isMobile && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              type="button"
+              onClick={handlePrevClick}
+              className="absolute inset-y-0 -left-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10"
+              aria-label="Anterior"
+            >
+              <motion.span
+                className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+                whileHover={{ x: -4 }}
               >
-                {/* ✅ IMPORTANTE: pasamos isMobile */}
-                <ListItemCard item={item} isMobile={isMobile} />
-              </SwiperSlide>
-            );
-          })}
-        </Swiper>
+                ‹
+              </motion.span>
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showNext && !isMobile && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              type="button"
+              onClick={handleNextClick}
+              className="absolute inset-y-0 -right-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10"
+              aria-label="Siguiente"
+            >
+              <motion.span
+                className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+                whileHover={{ x: 4 }}
+              >
+                ›
+              </motion.span>
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 }
 
 function ListItemsRowSkeleton({ isMobile }) {
-  const n = isMobile ? 3 : 6;
+  const n = isMobile ? 3 : 7;
   return (
-    <div className="-mx-4 sm:mx-0 px-[10px] sm:px-0">
+    <div className="-mx-4 px-3 pt-7 sm:mx-0 sm:px-0">
       <div className="flex gap-[10px] overflow-hidden">
         {Array.from({ length: n }).map((_, i) => (
           <div
             key={i}
-            className="w-[30%] sm:w-[140px] md:w-[150px] lg:w-[160px] aspect-[2/3] rounded-2xl bg-zinc-900/40 border border-white/5 animate-pulse"
+            className="w-[30%] sm:w-[22%] md:w-[18%] lg:w-[14%] aspect-[2/3] shrink-0 rounded-2xl bg-zinc-900/40 border border-white/5 animate-pulse"
           />
         ))}
       </div>
@@ -970,7 +1126,7 @@ const RowListSection = memo(function RowListSection({
       {isLoading ? (
         <ListItemsRowSkeleton isMobile={isMobile} />
       ) : items.length > 0 ? (
-        <ListItemsRow items={items} isMobile={isMobile} />
+        <ListItemsRow items={items} isMobile={isMobile} accent={list?.source} />
       ) : (
         <div className="h-40 flex items-center justify-center bg-zinc-900/20 rounded-2xl border border-dashed border-white/5 text-zinc-600 text-sm">
           Lista vacía
@@ -1553,7 +1709,7 @@ export default function ListsPage() {
                 <div className="h-px w-12 bg-purple-500" />
                 <span className="text-purple-400 font-bold uppercase tracking-widest text-xs">
                   {source === "collections"
-                    ? "COLECCIONES"
+                    ? "SAGAS"
                     : source === "trakt"
                       ? "TRAKT"
                       : "TUS LISTAS"}

@@ -3,9 +3,12 @@
 import Link from 'next/link'
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, ArrowLeft, Film, ExternalLink, Clock, Calendar, Sparkles } from 'lucide-react'
+import { Loader2, ArrowLeft, Film, ExternalLink, Clock, Sparkles } from 'lucide-react'
 import { getExternalIds } from '@/lib/api/tmdb'
 import { fetchOmdbByImdb } from '@/lib/api/omdb'
+import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPosterCard'
+import FilterableListItems from '@/components/lists/ListDetailsTools'
+import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 
 function Poster({ posterPath, alt }) {
     const [failed, setFailed] = useState(false)
@@ -36,143 +39,30 @@ function Poster({ posterPath, alt }) {
     )
 }
 
-function MovieCard({ movie, idx, imdbRating }) {
-    const [isActive, setIsActive] = useState(false)
+function MovieCard({ movie, idx, imdbRating, disableHover = false }) {
     const href = `/details/movie/${movie.id}`
     const poster = movie.poster_path || movie.backdrop_path || null
     const title = movie.title || 'Película sin título'
-    const year = movie.release_date ? new Date(movie.release_date).getFullYear() : null
-    const rating = movie.vote_average ? movie.vote_average.toFixed(1) : null
-
-    const handleClick = (e) => {
-        // En móvil: primer tap muestra overlay, segundo navega
-        if (!isActive && window.innerWidth < 768) {
-            e.preventDefault()
-            setIsActive(true)
-            setTimeout(() => setIsActive(false), 3000)
-        }
-    }
-
-    const overlayOpacity = isActive
-        ? "opacity-100"
-        : "opacity-0 md:group-hover:opacity-100"
-
-    const topTransform = isActive
-        ? "translate-y-0"
-        : "-translate-y-2 md:group-hover:translate-y-0"
-
-    const bottomTransform = isActive
-        ? "translate-y-0"
-        : "translate-y-2 md:group-hover:translate-y-0"
+    const year = movie.release_date ? String(new Date(movie.release_date).getFullYear()) : null
 
     return (
         <div
-            className="group relative animate-fade-in-up"
+            className="animate-fade-in-up"
             style={{
                 animationDelay: `${Math.min(idx * 50, 800)}ms`,
                 animationFillMode: 'both'
             }}
         >
-            <Link
+            <ListPosterCard
                 href={href}
-                className="block relative w-full h-full"
-                onClick={handleClick}
-            >
-                <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 md:group-hover:shadow-[0_0_30px_rgba(168,85,247,0.25)] md:group-hover:ring-purple-500/30 md:group-hover:scale-[1.03] md:group-hover:-translate-y-1">
-                    
-                    {/* Poster image */}
-                    <div className="absolute inset-0">
-                        <Poster posterPath={poster} alt={title} />
-                    </div>
-
-                    {/* Shine effect on hover */}
-                    <div className="absolute inset-0 opacity-0 md:group-hover:opacity-100 transition-opacity duration-700 pointer-events-none">
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full md:group-hover:translate-x-full transition-transform duration-[1200ms] ease-out" />
-                    </div>
-
-                    {/* Overlay content */}
-                    <div className={`absolute inset-0 transition-opacity duration-300 flex flex-col justify-between ${overlayOpacity}`}>
-                        
-                        {/* Top section with rating */}
-                        <div className={`p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-end items-start transform ${topTransform} transition-transform duration-300`}>
-                            <div className="flex flex-col items-end gap-1">
-                                {rating && (
-                                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                        <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                                            {rating}
-                                        </span>
-                                        <img
-                                            src="/logo-TMDb.png"
-                                            alt="TMDb"
-                                            className="w-auto h-2.5 opacity-100"
-                                        />
-                                    </div>
-                                )}
-                                {imdbRating && (
-                                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                        <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                                            {imdbRating.toFixed(1)}
-                                        </span>
-                                        <img
-                                            src="/logo-IMDb.png"
-                                            alt="IMDb"
-                                            className="w-auto h-3 opacity-100"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Bottom section with title and year */}
-                        <div className={`p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform ${bottomTransform} transition-transform duration-300`}>
-                            <div className="flex items-end justify-between gap-3">
-                                <div className="min-w-0 text-left flex-1">
-                                    <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">
-                                        {title}
-                                    </h3>
-                                </div>
-
-                                {/* Year badge in bottom right corner */}
-                                {year && (
-                                    <div className="shrink-0 self-end">
-                                        <p className="text-yellow-500 text-[10px] sm:text-xs font-bold drop-shadow-md flex items-center gap-1">
-                                            <Calendar className="w-3 h-3" />
-                                            {year}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Gradient border glow on hover */}
-                    <div className="absolute -inset-[1px] rounded-xl opacity-0 md:group-hover:opacity-100 transition-opacity duration-500 pointer-events-none -z-10">
-                        <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 blur-sm animate-border-rotate" />
-                    </div>
-                </div>
-
-                {/* Outer glow */}
-                <div className="absolute -inset-3 bg-gradient-to-r from-purple-600/0 via-purple-600/20 to-pink-600/0 rounded-2xl blur-xl opacity-0 md:group-hover:opacity-100 transition-opacity duration-500 -z-20" />
-            </Link>
-
-            <style jsx>{`
-                @keyframes border-rotate {
-                    0% {
-                        background-position: 0% 50%;
-                    }
-                    50% {
-                        background-position: 100% 50%;
-                    }
-                    100% {
-                        background-position: 0% 50%;
-                    }
-                }
-
-                .animate-border-rotate {
-                    background-size: 200% 200%;
-                    animation: border-rotate 3s linear infinite;
-                }
-            `}</style>
+                title={title}
+                year={year}
+                mediaType="movie"
+                posterPath={poster}
+                voteAverage={movie.vote_average}
+                imdbRating={imdbRating}
+                disableHover={disableHover}
+            />
         </div>
     )
 }
@@ -197,7 +87,7 @@ function LoadingSkeleton() {
             </div>
 
             {/* Grid skeleton */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+            <div className={listPosterGridClass}>
                 {Array.from({ length: 12 }).map((_, i) => (
                     <div
                         key={i}
@@ -334,6 +224,88 @@ export default function CollectionDetailsClient({ collectionId }) {
         router.back()
     }, [router])
 
+    if (state.loading) {
+        return (
+            <div className="min-h-screen bg-[#101010] text-gray-100">
+                <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+                    <LoadingSkeleton />
+                </div>
+            </div>
+        )
+    }
+
+    if (state.error) {
+        return (
+            <UnifiedListDetailsLayout title="Colección" sourceLabel="Colección TMDb" backHref="/lists">
+                <div className="rounded-2xl border border-red-500/20 bg-red-950/20 p-6 text-zinc-300">
+                    <p className="font-bold text-red-300 text-lg">Error al cargar la colección</p>
+                    <p className="mt-1 text-sm text-zinc-400">{state.error}</p>
+                </div>
+            </UnifiedListDetailsLayout>
+        )
+    }
+
+    const collectionPoster = collection?.poster_path || parts.find((movie) => movie?.poster_path)?.poster_path || null
+    const collectionBackdrop = collection?.backdrop_path || parts.find((movie) => movie?.backdrop_path)?.backdrop_path || collectionPoster
+
+    return (
+        <UnifiedListDetailsLayout
+            title={collection?.name || 'Colección'}
+            description={collection?.description || ''}
+            sourceLabel="Colección TMDb"
+            posterImage={collectionPoster ? `https://image.tmdb.org/t/p/w500${collectionPoster}` : null}
+            backdropImage={collectionBackdrop ? `https://image.tmdb.org/t/p/original${collectionBackdrop}` : null}
+            badges={[`${parts.length} películas`, totalRuntime > 0 ? `${Math.round(totalRuntime / 60)}h total` : 'TMDb']}
+            stats={[
+                { label: 'Películas', value: parts.length },
+                { label: 'Duración', value: totalRuntime > 0 ? `${Math.round(totalRuntime / 60)}h` : '—' },
+                { label: 'Fuente', value: 'TMDb' },
+            ]}
+            backHref="/lists"
+            rightActions={
+                tmdbUrl ? (
+                    <a
+                        href={tmdbUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-blue-400 hover:border-blue-500/50 transition"
+                        title="Ver en TMDb"
+                    >
+                        <ExternalLink className="w-5 h-5" />
+                    </a>
+                ) : null
+            }
+        >
+            {parts.length > 0 ? (
+                <FilterableListItems
+                    items={parts.map((movie) => ({
+                        ...movie,
+                        media_type: 'movie',
+                        imdbRating: imdbRatings[`movie:${movie.id}`],
+                    }))}
+                    renderCard={(movie, meta, viewMode) => (
+                        <MovieCard
+                            key={`collection-${movie.id}`}
+                            movie={movie}
+                            idx={0}
+                            imdbRating={meta.imdbRating}
+                            disableHover={viewMode === 'compact'}
+                        />
+                    )}
+                    emptyTitle="Sin resultados"
+                    emptyText="No hay películas que coincidan con los filtros."
+                />
+            ) : (
+                <div className="py-20 text-center text-zinc-500">
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/5 border border-white/10 mb-4">
+                        <Film className="h-10 w-10 opacity-40" />
+                    </div>
+                    <p className="text-sm font-medium">No hay películas en esta colección</p>
+                </div>
+            )}
+        </UnifiedListDetailsLayout>
+    )
+
     return (
         <div className="min-h-screen bg-[#101010] text-gray-100 overflow-hidden">
             {/* Animated backdrop */}
@@ -461,18 +433,26 @@ export default function CollectionDetailsClient({ collectionId }) {
                             </div>
                         </div>
 
-                        {/* Grid */}
+                        {/* Filtros + contenido */}
                         {parts.length > 0 ? (
-                            <div className="relative z-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
-                                {parts.map((movie, idx) => (
-                                    <MovieCard 
-                                        key={`${movie.id}-${idx}`} 
-                                        movie={movie} 
-                                        idx={idx}
-                                        imdbRating={imdbRatings[`movie:${movie.id}`]}
+                            <FilterableListItems
+                                items={parts.map((movie) => ({
+                                    ...movie,
+                                    media_type: 'movie',
+                                    imdbRating: imdbRatings[`movie:${movie.id}`],
+                                }))}
+                                renderCard={(movie, meta, viewMode) => (
+                                    <MovieCard
+                                        key={`collection-${movie.id}`}
+                                        movie={movie}
+                                        idx={0}
+                                        imdbRating={meta.imdbRating}
+                                        disableHover={viewMode === 'compact'}
                                     />
-                                ))}
-                            </div>
+                                )}
+                                emptyTitle="Sin resultados"
+                                emptyText="No hay películas que coincidan con los filtros."
+                            />
                         ) : (
                             <div className="py-20 text-center text-zinc-500 animate-fade-in">
                                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/5 border border-white/10 mb-4">

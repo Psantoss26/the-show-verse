@@ -8,6 +8,8 @@ import { useAuth } from '@/context/AuthContext'
 import { AnimatePresence, motion } from 'framer-motion'
 
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
+import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPosterCard'
+import FilterableListItems from '@/components/lists/ListDetailsTools'
 
 import {
     getListDetails,
@@ -414,12 +416,23 @@ export default function ListDetailsPage() {
 
     const tmdbListUrl = `https://www.themoviedb.org/list/${listId}`
     const gridItems = tab === 'items' ? items : addMode === 'search' ? searchRes : catRes
+    const coverItem = items.find((item) => item?.poster_path || item?.backdrop_path) || gridItems.find((item) => item?.poster_path || item?.backdrop_path)
+    const coverPath = coverItem?.poster_path || coverItem?.backdrop_path || null
+    const backdropPath = coverItem?.backdrop_path || coverItem?.poster_path || null
 
     return (
         <UnifiedListDetailsLayout
             title={!editing ? (data?.name || 'Lista') : editName}
             description={!editing ? (data?.description || '') : editDesc}
-            badges={[`${items.length} Items`]}
+            sourceLabel="Lista de TMDb"
+            posterImage={coverPath ? `https://image.tmdb.org/t/p/w500${coverPath}` : null}
+            backdropImage={backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null}
+            badges={[`${items.length} items`, 'TMDb']}
+            stats={[
+                { label: 'Elementos', value: items.length },
+                { label: 'Fuente', value: 'TMDb' },
+                { label: 'Modo', value: tab === 'items' ? 'Lista' : 'Añadir' },
+            ]}
             backHref="/lists"
             rightActions={
                 <>
@@ -566,7 +579,7 @@ export default function ListDetailsPage() {
                 </div>
             ) : null}
 
-            {/* Empty / Grid */}
+            {/* Empty / Filtros / Grid */}
             {tab === 'items' && items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
                     <ListVideo className="w-12 h-12 text-zinc-700 mb-4" />
@@ -575,33 +588,66 @@ export default function ListDetailsPage() {
                         Usa la pestaña <b>Añadir</b> para agregar películas.
                     </p>
                 </div>
+            ) : tab === 'items' ? (
+                <FilterableListItems
+                    items={items.map((item) => ({ ...item, media_type: item?.media_type || 'movie' }))}
+                    renderCard={(it, meta, viewMode) => {
+                        const id = it?.id
+                        const posterPath = it?.poster_path || it?.backdrop_path || null
+                        const mediaType = it?.media_type || 'movie'
+                        const title = it?.title || it?.name || 'Poster'
+                        const year = (it?.release_date || it?.first_air_date || '').slice(0, 4)
+
+                        return (
+                            <div key={`items-${id}`} className="group relative">
+                                <ListPosterCard
+                                    href={`/details/${mediaType}/${id}`}
+                                    title={title}
+                                    year={year}
+                                    mediaType={mediaType}
+                                    posterPath={posterPath}
+                                    voteAverage={it?.vote_average}
+                                    disableHover={viewMode === 'compact'}
+                                />
+                                <button
+                                    type="button"
+                                    disabled={busyId === id}
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        handleRemove(id)
+                                    }}
+                                    className={`absolute top-2 right-2 z-20 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all shadow-lg bg-black/60 border-white/10 text-zinc-400 hover:bg-red-500 hover:border-red-400 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
+                                >
+                                    {busyId === id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                </button>
+                            </div>
+                        )
+                    }}
+                    emptyTitle="Sin resultados"
+                    emptyText="No hay títulos que coincidan con los filtros."
+                />
             ) : (
-                <div className="relative z-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                <div className={listPosterGridClass}>
                     {gridItems.map((it) => {
                         const id = it?.id
                         const inList = idsInList.has(id)
                         const posterPath = it?.poster_path || it?.backdrop_path || null
                         const href = `/details/${it?.media_type || 'movie'}/${id}`
+                        const mediaType = it?.media_type || 'movie'
+                        const title = it?.title || it?.name || 'Poster'
+                        const year = (it?.release_date || it?.first_air_date || '').slice(0, 4)
 
                         return (
-                            <div key={`${tab}-${addMode}-${id}`} className="group relative">
-                                <Link
+                            <div key={`${tab}-${addMode}-${id}`} className="relative">
+                                <ListPosterCard
                                     href={href}
-                                    className="block relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(255,255,255,0.08)] group-hover:scale-[1.03] z-0 group-hover:z-10"
-                                >
-                                    <TmdbPoster
-                                        path={posterPath}
-                                        alt={it?.title || it?.name || 'Poster'}
-                                        className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                    <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                                        <p className="text-white font-bold text-xs sm:text-sm line-clamp-2 leading-tight drop-shadow-md">
-                                            {it?.title || it?.name}
-                                        </p>
-                                    </div>
-                                </Link>
-
+                                    title={title}
+                                    year={year}
+                                    mediaType={mediaType}
+                                    posterPath={posterPath}
+                                    voteAverage={it?.vote_average}
+                                />
                                 {tab === 'add' && inList && (
                                     <div className="absolute top-2 left-2 z-20 px-2 py-0.5 rounded-md bg-emerald-500/90 text-white text-[10px] font-bold shadow-lg backdrop-blur-sm flex items-center gap-1">
                                         <Check className="w-3 h-3" /> Añadido
