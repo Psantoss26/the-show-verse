@@ -1071,7 +1071,7 @@ function AwardCard({ item }) {
       className="group relative z-0 block overflow-hidden rounded-xl border border-transparent bg-neutral-800/80 shadow-lg transition-all duration-300 hover:z-[60] hover:border-yellow-500/60"
     >
       <div className="relative flex aspect-[2/3] flex-col overflow-hidden bg-black">
-        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-2">
+        <div className="absolute inset-x-0 top-0 z-10 hidden items-start justify-between gap-2 p-2 sm:flex">
           <span
             className={`rounded-md border px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider shadow-sm backdrop-blur-md ${awardResultClass(
               result,
@@ -1087,14 +1087,14 @@ function AwardCard({ item }) {
         </div>
 
         <div
-          className="relative flex min-h-0 flex-[1.12] items-center justify-center overflow-hidden p-6"
+          className="relative flex min-h-0 flex-[1.28] items-center justify-center overflow-hidden p-3 sm:flex-[1.12] sm:p-6"
           style={{ background: visual.background }}
         >
           <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.18)_48%,transparent_52%)]" />
           <div className="absolute inset-x-5 top-12 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
           <div className="absolute inset-x-8 bottom-5 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
-          <div className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-black/45 p-1.5 backdrop-blur-md">
+          <div className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/45 p-1 backdrop-blur-md sm:bottom-3 sm:right-3 sm:h-10 sm:w-10 sm:rounded-lg sm:p-1.5">
             {result === "winner" ? (
               <Trophy className="h-full w-full text-yellow-300" />
             ) : (
@@ -1102,34 +1102,45 @@ function AwardCard({ item }) {
             )}
           </div>
 
-          <div className="absolute inset-x-4 bottom-14 text-center">
+          <div className="absolute inset-x-2 bottom-8 text-center sm:inset-x-4 sm:bottom-14">
             <div
-              className={`text-2xl font-black tracking-[0.18em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] ${visual.accent}`}
+              className={`text-base font-black tracking-[0.14em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] sm:text-2xl sm:tracking-[0.18em] ${visual.accent}`}
             >
               {visual.label}
             </div>
-            <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-white/55 line-clamp-2">
+            <div className="mt-1 hidden text-[9px] font-bold uppercase tracking-[0.18em] text-white/55 line-clamp-1 sm:block">
               {groupLabel}
             </div>
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-[0.9] flex-col justify-end border-t border-white/10 bg-gradient-to-t from-black via-black to-neutral-950 px-3 py-3">
-          <p className="line-clamp-2 text-sm font-extrabold leading-tight text-white">
-            {awardTitle}
-          </p>
-          <p className="mt-1 line-clamp-1 text-xs font-bold leading-tight text-yellow-400">
-            {groupLabel}
-          </p>
-          {item.work ? (
-            <p className="mt-1 line-clamp-2 text-xs leading-tight text-gray-300">
-              {item.work}
+        <div className="flex min-h-0 flex-[0.72] flex-col justify-end border-t border-white/10 bg-gradient-to-t from-black via-black to-neutral-950 px-2 py-2 sm:flex-[0.9] sm:px-3 sm:py-3">
+          <div className="sm:hidden">
+            <p className="line-clamp-2 text-center text-[10px] font-extrabold leading-tight text-white">
+              {awardTitle}
             </p>
-          ) : (
-            <p className="mt-1 line-clamp-2 text-xs leading-tight text-gray-400">
-              Reconocimiento registrado en Wikidata
+            <p className="mt-1 line-clamp-1 text-center text-[9px] font-bold leading-tight text-yellow-400">
+              {groupLabel}
             </p>
-          )}
+          </div>
+
+          <div className="hidden sm:block">
+            <p className="line-clamp-2 text-sm font-extrabold leading-tight text-white">
+              {awardTitle}
+            </p>
+            <p className="mt-1 line-clamp-1 text-xs font-bold leading-tight text-yellow-400">
+              {groupLabel}
+            </p>
+            {item.work ? (
+              <p className="mt-1 line-clamp-2 text-xs leading-tight text-gray-300">
+                {item.work}
+              </p>
+            ) : (
+              <p className="mt-1 line-clamp-2 text-xs leading-tight text-gray-400">
+                Reconocimiento registrado en Wikidata
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </motion.article>
