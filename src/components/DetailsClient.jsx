@@ -455,7 +455,11 @@ function normalizeProviderName(name = "") {
 function getProviderFamilyKey(provider) {
   const normalizedName = normalizeProviderName(provider?.provider_name || "");
 
-  if (/\bmovistar\b|^m\+/.test(normalizedName)) {
+  if (
+    provider?.provider_id === 149 ||
+    provider?.provider_id === 2241 ||
+    /\bmovistar\b|^m\+/.test(normalizedName)
+  ) {
     return "movistar";
   }
 
@@ -479,13 +483,29 @@ function providerPreferenceScore(provider, familyKey) {
   return score;
 }
 
+function canonicalizeStreamingProvider(provider) {
+  if (!provider) return provider;
+
+  if (getProviderFamilyKey(provider) === "movistar") {
+    return {
+      ...provider,
+      provider_id: 2241,
+      provider_name: "Movistar +",
+      logo_path: "/jse4MOi92Jgetym7nbXFZZBI6LK.jpg",
+    };
+  }
+
+  return provider;
+}
+
 function dedupeStreamingProviders(providers) {
   const deduped = [];
   const indexByFamily = new Map();
 
-  for (const provider of providers) {
-    if (!provider) continue;
+  for (const rawProvider of providers) {
+    if (!rawProvider) continue;
 
+    const provider = canonicalizeStreamingProvider(rawProvider);
     const familyKey = getProviderFamilyKey(provider);
     const existingIndex = indexByFamily.get(familyKey);
 
