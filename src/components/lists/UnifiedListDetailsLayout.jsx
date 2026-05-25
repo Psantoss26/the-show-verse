@@ -3,13 +3,36 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Film, Heart, ListVideo, Star } from 'lucide-react'
 
 function Badge({ children }) {
     return (
         <span className="text-xs font-bold text-zinc-400 bg-black/30 px-3 py-1 rounded-full border border-white/5">
             {children}
         </span>
+    )
+}
+
+function DescriptionBlock({ description }) {
+    if (!description) {
+        return (
+            <p className="text-base text-neutral-400 sm:text-lg">
+                <span className="italic opacity-50">Sin descripción</span>
+            </p>
+        )
+    }
+
+    return (
+        <div className="relative rounded-2xl border border-white/5 bg-white/[0.055] p-5 backdrop-blur-sm">
+            <div className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
+                Descripción
+            </div>
+            <div className="sv-scroll max-h-36 overflow-y-auto pr-3 text-sm leading-6 text-zinc-200 sm:max-h-44 sm:text-base">
+                <p className="whitespace-pre-wrap break-words text-left">
+                    {description}
+                </p>
+            </div>
+        </div>
     )
 }
 
@@ -51,6 +74,10 @@ export default function UnifiedListDetailsLayout({
     title,
     description,
     badges = [],
+    posterImage,
+    backdropImage,
+    sourceLabel = 'Lista',
+    stats = [],
     backHref,
     rightActions,
     tabs,
@@ -64,13 +91,19 @@ export default function UnifiedListDetailsLayout({
 
     return (
         <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30">
-            {/* Ambient */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute top-[-10%] left-1/4 w-[600px] h-[600px] bg-purple-600/5 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-10%] right-1/4 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[100px]" />
+                {backdropImage ? (
+                    <img
+                        src={backdropImage}
+                        alt=""
+                        className="h-full w-full scale-105 object-cover opacity-25 blur-sm"
+                    />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-[#101010]/90 to-[#101010]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(168,85,247,0.16),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(234,179,8,0.11),transparent_32%)]" />
             </div>
 
-            <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+            <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
                 {/* --- TOP BAR --- */}
                 <div className="mb-8 flex items-center gap-4">
                     {backHref ? (
@@ -96,34 +129,99 @@ export default function UnifiedListDetailsLayout({
                     <div className="flex gap-2 ml-auto">{rightActions}</div>
                 </div>
 
-                {/* --- HERO --- */}
-                <div className="bg-neutral-900/60 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md mb-8 relative z-40">
-                    <div className="flex flex-col lg:flex-row gap-8 lg:items-start">
-                        <div className="flex-1 min-w-0 space-y-4">
-                            <div className="space-y-2">
-                                <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight break-words">
-                                    {title || 'Lista'}
-                                </h1>
-
-                                <p className="text-lg text-neutral-400 leading-relaxed max-w-2xl">
-                                    {description ? description : <span className="italic opacity-50">Sin descripción</span>}
-                                </p>
-
-                                {badges?.length ? (
-                                    <div className="flex flex-wrap items-center gap-3 pt-2">
-                                        {badges.map((b, i) => (
-                                            <Badge key={`${b}-${i}`}>{b}</Badge>
-                                        ))}
+                {/* --- HERO, misma base visual que ActorDetails --- */}
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                    className="mb-12 flex flex-col items-start gap-8 lg:flex-row lg:gap-12"
+                >
+                    <div className="relative z-10 mx-auto flex w-full max-w-[280px] flex-shrink-0 flex-col gap-5 lg:mx-0 lg:max-w-[320px]">
+                        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40 shadow-2xl shadow-black/80 aspect-[2/3]">
+                            <div className="pointer-events-none absolute inset-0 z-20 rounded-2xl ring-1 ring-white/10" />
+                            <div className="relative z-10 h-full w-full bg-neutral-950">
+                                {posterImage ? (
+                                    <img src={posterImage} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-zinc-700">
+                                        <ListVideo className="h-16 w-16" />
                                     </div>
-                                ) : null}
+                                )}
                             </div>
                         </div>
 
-                        {/* --- Right side: tabs + controls --- */}
+                    </div>
+
+                    <div className="flex min-w-0 flex-1 flex-col w-full">
+                        <div className="mb-5 px-1">
+                            <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-yellow-300">
+                                <Film className="h-4 w-4" />
+                                {sourceLabel}
+                            </div>
+                            <h1 className="mb-3 text-center text-4xl font-black leading-[1] tracking-tight text-white drop-shadow-xl text-balance md:text-left md:text-5xl lg:text-6xl">
+                                {title || 'Lista'}
+                            </h1>
+
+                            {badges?.length ? (
+                                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm font-medium text-zinc-300 md:justify-start md:text-base">
+                                    {badges.map((b, i) => (
+                                        <span key={`${b}-${i}`} className="inline-flex items-center gap-2">
+                                            {i > 0 ? <span className="h-1 w-1 rounded-full bg-zinc-700" /> : null}
+                                            {b}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : null}
+                        </div>
+
+                        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+                            {(stats.length ? stats : [
+                                { label: 'Títulos', value: badges?.[0] || '—', icon: ListVideo, tone: 'yellow' },
+                                { label: 'Fuente', value: sourceLabel, icon: Star, tone: 'emerald' },
+                            ]).map((stat, index) => {
+                                const Icon = stat.icon || (index % 2 ? Heart : ListVideo)
+                                const tones = {
+                                    emerald: 'from-emerald-500/18 text-emerald-300',
+                                    sky: 'from-sky-500/18 text-sky-300',
+                                    violet: 'from-violet-500/18 text-violet-300',
+                                    yellow: 'from-yellow-500/18 text-yellow-300',
+                                }
+                                const tone = tones[stat.tone] || tones.yellow
+                                return (
+                                    <div
+                                        key={`${stat.label}-${index}`}
+                                        className="relative min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.055] p-4 backdrop-blur-sm"
+                                    >
+                                        <div className={`absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${tone} to-transparent blur-2xl opacity-80`} />
+                                        <div className="relative flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <span className="block truncate text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                                                    {stat.label}
+                                                </span>
+                                                <span className="mt-1 block truncate text-lg font-black text-white">
+                                                    {stat.value}
+                                                </span>
+                                                {stat.sub ? (
+                                                    <span className="mt-0.5 block truncate text-xs font-semibold text-zinc-500">
+                                                        {stat.sub}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                            <Icon className={`h-5 w-5 shrink-0 ${tone.split(' ')[1]}`} />
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+
+                        <div className="mb-5">
+                            <DescriptionBlock description={description} />
+                        </div>
+
                         {(hasTabs || topControls) && (
-                            <div className="flex flex-col gap-4 w-full lg:w-auto lg:min-w-[340px]">
+                            <div className="flex w-full flex-col gap-4">
                                 {hasTabs && (
-                                    <div className="p-1.5 bg-zinc-900/80 border border-zinc-800 rounded-2xl w-full">
+                                    <div className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 p-1.5">
                                         <div className="flex w-full gap-1">
                                             {tabs.map((t) => (
                                                 <TabButton
@@ -144,9 +242,9 @@ export default function UnifiedListDetailsLayout({
                                     {topControls ? (
                                         <motion.div
                                             key="topControls"
-                                            initial={{ opacity: 0, x: 10 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: 10 }}
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 8 }}
                                             transition={{ duration: 0.15 }}
                                             className="space-y-3"
                                         >
@@ -157,7 +255,7 @@ export default function UnifiedListDetailsLayout({
                             </div>
                         )}
                     </div>
-                </div>
+                </motion.div>
 
                 {/* --- BODY --- */}
                 <div className="relative z-0">{children}</div>
