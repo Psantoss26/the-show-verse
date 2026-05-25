@@ -9052,15 +9052,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               />
                             ) : null}
 
-                            {type !== "movie" && episodeRuntimeValue ? (
-                              <VisualMetaCard
-                                icon={ClockIcon}
-                                label="Duración por episodio"
-                                value={episodeRuntimeValue}
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                              />
-                            ) : null}
-
                             {/* Tarjeta: Fecha de Estreno/Inicio - Película: fecha de estreno, Serie: fecha de inicio */}
                             <VisualMetaCard
                               icon={CalendarIcon}
@@ -9257,15 +9248,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
                               : "—"
                           }
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                      ) : null}
-
-                      {type !== "movie" && episodeRuntimeValue ? (
-                        <VisualMetaCard
-                          icon={ClockIcon}
-                          label="Duración por episodio"
-                          value={episodeRuntimeValue}
                           className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
                       ) : null}

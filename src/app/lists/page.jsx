@@ -701,9 +701,11 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile, accent = "trak
           <h3 className="line-clamp-2 text-xs font-bold leading-tight text-white drop-shadow-md sm:text-sm">
             {title}
           </h3>
-          <p className={`mt-0.5 text-[10px] font-bold drop-shadow-md ${accentStyle.textClass}`}>
-            {year || "—"} · {mediaType === "tv" ? "Serie" : "Película"}
-          </p>
+          {year ? (
+            <p className={`mt-0.5 text-[10px] font-bold drop-shadow-md ${accentStyle.textClass}`}>
+              {year}
+            </p>
+          ) : null}
         </div>
       </motion.div>
     </Link>
@@ -765,11 +767,35 @@ function buildExternalUrl(list) {
   return null;
 }
 
+function dedupePreviewItems(items) {
+  const seenIdentity = new Set();
+  const seenDisplay = new Set();
+  const out = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
+    const title = String(item?.title || item?.name || "").trim().toLowerCase();
+    const poster = item?.poster_path || item?.backdrop_path || "";
+    const identityKey =
+      item?.id !== undefined && item?.id !== null
+        ? `${mediaType}:${item.id}`
+        : `${mediaType}:${title}:${poster}`;
+    const displayKey = `${mediaType}:${title || poster}`;
+
+    if (seenIdentity.has(identityKey) || seenDisplay.has(displayKey)) continue;
+    seenIdentity.add(identityKey);
+    seenDisplay.add(displayKey);
+    out.push(item);
+  }
+
+  return out;
+}
+
 function normalizeTraktItemsToCards(items) {
   // Convierte items de Trakt (con _tmdb) al shape que usan tus previews (ListItemCard)
   if (!Array.isArray(items)) return [];
 
-  return items
+  const normalized = items
     .map((it) => {
       const t = it?._tmdb;
       if (!t?.id || !t?.media_type) return null;
@@ -795,6 +821,8 @@ function normalizeTraktItemsToCards(items) {
       };
     })
     .filter(Boolean);
+
+  return dedupePreviewItems(normalized);
 }
 
 /* ========= fila tipo Dashboard: drag con ratón + 3 completas en móvil ========= */
@@ -1501,7 +1529,7 @@ export default function ListsPage() {
             language: "es-ES",
             signal: ctrl.signal,
           });
-          const items = Array.isArray(json?.items) ? json.items : [];
+          const items = dedupePreviewItems(Array.isArray(json?.items) ? json.items : []);
           setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
           return;
         }
@@ -1530,7 +1558,7 @@ export default function ListsPage() {
           },
         );
         const j = await res.json().catch(() => ({}));
-        const items = Array.isArray(j?.items) ? j.items : [];
+        const items = dedupePreviewItems(Array.isArray(j?.items) ? j.items : []);
         setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
       } catch (e) {
         if (e?.name === "AbortError") {
