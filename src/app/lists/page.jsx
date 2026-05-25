@@ -47,7 +47,7 @@ import useTraktLists from "@/lib/hooks/useTraktLists";
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const imdbRatingsCache = new Map();
 const PRELOAD_FIRST_N_LISTS = 3;
-const LISTS_MENU_PREFS_KEY = "showverse:lists:menu:v1";
+const LISTS_MENU_PREFS_KEY = "showverse:lists:menu:v2";
 const VALID_SORT_MODES = new Set([
   "items_desc",
   "items_asc",
@@ -134,7 +134,7 @@ function readListsMenuPrefs() {
       source: VALID_SOURCES.has(parsed?.source) ? parsed.source : "trakt",
       traktMode: VALID_TRAKT_MODES.has(parsed?.traktMode)
         ? parsed.traktMode
-        : "trending",
+        : "popular",
     };
   } catch {
     return null;
@@ -375,7 +375,7 @@ function Dropdown({ valueLabel, icon: Icon, children, className = "" }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
-            className="absolute right-0 top-full z-50 mt-2 w-48 rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden"
+            className="absolute right-0 top-full z-50 mt-2 w-full rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden"
           >
             <div className="p-1 space-y-0.5">
               {children({ close: () => setOpen(false) })}
@@ -441,7 +441,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 w-48 rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden p-1"
+            className="absolute left-0 top-full z-[100] mt-2 w-full rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden p-1"
           >
             {children({ close: () => setOpen(false) })}
           </motion.div>
@@ -1086,7 +1086,7 @@ export default function ListsPage() {
 
   // ✅ NUEVO: selector de fuente
   const [source, setSource] = useState("trakt"); // 'tmdb' | 'trakt' | 'collections'
-  const [traktMode, setTraktMode] = useState("trending"); // trending | popular
+  const [traktMode, setTraktMode] = useState("popular"); // trending | popular
   const [prefsHydrated, setPrefsHydrated] = useState(false);
 
   const trakt = useTraktLists({ mode: traktMode });
