@@ -773,7 +773,7 @@ function ActorRowCarousel({ children, variant = "poster" }) {
 
   const breakpoints = isAward
     ? {
-        0: { slidesPerView: 2.15, spaceBetween: 12 },
+        0: { slidesPerView: 3, spaceBetween: 8 },
         500: { slidesPerView: 3, spaceBetween: 14 },
         768: { slidesPerView: 4, spaceBetween: 16 },
         1024: { slidesPerView: 5, spaceBetween: 18 },
@@ -781,13 +781,13 @@ function ActorRowCarousel({ children, variant = "poster" }) {
       }
     : isWide
       ? {
-          0: { slidesPerView: 1.35, spaceBetween: 12 },
-          640: { slidesPerView: 2.25, spaceBetween: 14 },
-          900: { slidesPerView: 3.1, spaceBetween: 16 },
-          1280: { slidesPerView: 4.15, spaceBetween: 18 },
+          0: { slidesPerView: 3, spaceBetween: 8 },
+          640: { slidesPerView: 3, spaceBetween: 14 },
+          900: { slidesPerView: 4, spaceBetween: 16 },
+          1280: { slidesPerView: 4, spaceBetween: 18 },
         }
       : {
-          0: { slidesPerView: 2.15, spaceBetween: 12 },
+          0: { slidesPerView: 3, spaceBetween: 8 },
           500: { slidesPerView: 3, spaceBetween: 14 },
           768: { slidesPerView: 4, spaceBetween: 16 },
           1024: { slidesPerView: 5, spaceBetween: 18 },
@@ -878,8 +878,8 @@ function ActorRowCarousel({ children, variant = "poster" }) {
           style={{ overflowX: "clip", overflowY: "visible" }}
         >
           <Swiper
-            slidesPerView={isAward ? 2.15 : isWide ? 1.35 : 2.15}
-            spaceBetween={12}
+            slidesPerView={3}
+            spaceBetween={8}
             onSwiper={handleSwiper}
             onSlideChange={updateNav}
             onResize={updateNav}
