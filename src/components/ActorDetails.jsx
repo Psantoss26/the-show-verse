@@ -1365,6 +1365,7 @@ export default function ActorDetails({
   const [tmdbKnownFor, setTmdbKnownFor] = useState(() =>
     (initialKnownFor || []).map(normalizeKnownForItem).filter((item) => item?.poster_path),
   );
+  const [watchedCredits, setWatchedCredits] = useState([]);
 
   // Filter States (Créditos)
   const [q, setQ] = useState("");
@@ -1594,6 +1595,7 @@ export default function ActorDetails({
     setImages(actorDetails?.images || null);
     setTaggedImages(actorDetails?.tagged_images || null);
     setTranslations(actorDetails?.translations || null);
+    setWatchedCredits([]);
     setTmdbKnownFor(
       (initialKnownFor || [])
         .map(normalizeKnownForItem)
@@ -1627,6 +1629,34 @@ export default function ActorDetails({
     loadAwardsForWikidata,
     personId,
   ]);
+
+  useEffect(() => {
+    if (!personId) {
+      setWatchedCredits([]);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    fetch(`/api/trakt/person/${encodeURIComponent(personId)}/watched`, {
+      cache: "no-store",
+      credentials: "include",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (controller.signal.aborted) return;
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+        setWatchedCredits(items.filter((item) => item?.poster_path));
+      })
+      .catch((error) => {
+        if (error?.name !== "AbortError") {
+          setWatchedCredits([]);
+        }
+      });
+
+    return () => controller.abort();
+  }, [personId]);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -1925,6 +1955,13 @@ export default function ActorDetails({
     const items = [];
     if (popularItems.length > 0)
       items.push({ id: "popular", label: "Destacados", icon: Star });
+    if (watchedCredits.length > 0)
+      items.push({
+        id: "watched",
+        label: "Vistos",
+        icon: CheckCircle2,
+        count: watchedCredits.length,
+      });
     if (stats.total > 0)
       items.push({
         id: "credits",
@@ -1954,7 +1991,14 @@ export default function ActorDetails({
       });
     items.push({ id: "about", label: "Perfil", icon: User });
     return items;
-  }, [popularItems.length, stats.total, awardStats.total, photosCount, taggedCount]);
+  }, [
+    popularItems.length,
+    watchedCredits.length,
+    stats.total,
+    awardStats.total,
+    photosCount,
+    taggedCount,
+  ]);
 
   const STICKY_TOP = 72;
   const sentinelRef = useRef(null);
@@ -2344,6 +2388,28 @@ export default function ActorDetails({
                       {popularItems.map((item, index) => (
                         <PosterCard
                           key={`popular-${item.id}-${item.credit_id || index}`}
+                          item={item}
+                        />
+                      ))}
+                    </ActorRowCarousel>
+                  </section>
+                </AnimatedSection>
+              </section>
+            )}
+
+            {watchedCredits.length > 0 && (
+              <section id="section-watched" ref={registerSection("watched")}>
+                <AnimatedSection delay={0.04}>
+                  <section className="mb-16">
+                    <SectionTitle
+                      title="Ya vistos"
+                      subtitle={`${watchedCredits.length} títulos vistos de ${safeText(actorDetails?.name)}`}
+                      icon={CheckCircle2}
+                    />
+                    <ActorRowCarousel>
+                      {watchedCredits.map((item, index) => (
+                        <PosterCard
+                          key={`watched-${item.media_type || "movie"}-${item.id}-${index}`}
                           item={item}
                         />
                       ))}
