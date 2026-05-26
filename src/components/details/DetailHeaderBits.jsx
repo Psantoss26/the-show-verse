@@ -96,6 +96,7 @@ export function ExternalLinkButton({
   onClick,
   size,
   iconSize,
+  iconClassName = "",
   className = "",
   loading = false,
   fallbackHref = null,
@@ -131,8 +132,14 @@ export function ExternalLinkButton({
       <img
         src={icon}
         alt=""
-        style={iconSize ? { width: iconSize, height: iconSize } : undefined}
-        className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isWebIcon ? "relative top-[3px]" : ""} ${isLetterboxdIcon ? "scale-[1.2]" : ""}`}
+        style={
+          iconSize
+            ? typeof iconSize === "object"
+              ? iconSize
+              : { width: iconSize, height: iconSize }
+            : undefined
+        }
+        className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isWebIcon ? "relative top-[3px]" : ""} ${isLetterboxdIcon ? "scale-[1.2]" : ""} ${iconClassName}`}
         draggable="false"
       />
 
