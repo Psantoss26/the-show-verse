@@ -858,10 +858,13 @@ function formatRatingBucketLabel(bucket) {
   return Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
 }
 
-function ratingRangeMeta(rating, emptyKey, emptyLabel, step = 0.5) {
+function ratingRangeMeta(rating, emptyKey, emptyLabel, step = 0.5, offset = 0) {
   if (!rating && emptyKey) return { key: emptyKey, label: emptyLabel };
-  const bucket = Math.floor(rating / step) * step;
-  const next = bucket + step;
+  const normalized = Math.max(0, Math.min(10, Number(rating) || 0));
+  const maxBucket = Math.max(0, 10 - step + offset);
+  const rawBucket = Math.floor((normalized - offset) / step) * step + offset;
+  const bucket = Math.max(0, Math.min(maxBucket, rawBucket));
+  const next = Math.min(10, bucket + step);
   return {
     key: bucket.toString(),
     label: `${formatRatingBucketLabel(bucket)} - ${formatRatingBucketLabel(next)}`,
@@ -877,7 +880,14 @@ function singleRatingMeta(rating, step = 0.5) {
 function buildFavoriteGroupMetas(
   item,
   groupBy,
-  { imdbScores, traktScores, providersByItem, ratingStep = 0.5 },
+  {
+    imdbScores,
+    traktScores,
+    providersByItem,
+    ratingStep = 0.5,
+    ratingOffset = 0,
+    forceUserRatingRange = false,
+  },
 ) {
   if (groupBy === "none") return [];
 
@@ -917,7 +927,15 @@ function buildFavoriteGroupMetas(
   }
 
   if (groupBy === "tmdb_rating") {
-    return [ratingRangeMeta(item.vote_average || 0, null, null, ratingStep)];
+    return [
+      ratingRangeMeta(
+        item.vote_average || 0,
+        null,
+        null,
+        ratingStep,
+        ratingOffset,
+      ),
+    ];
   }
 
   if (groupBy === "imdb_rating") {
@@ -927,6 +945,7 @@ function buildFavoriteGroupMetas(
         "no_imdb",
         "Sin puntuación IMDb",
         ratingStep,
+        ratingOffset,
       ),
     ];
   }
@@ -938,15 +957,36 @@ function buildFavoriteGroupMetas(
         "no_trakt",
         "Sin puntuación Trakt",
         ratingStep,
+        ratingOffset,
       ),
     ];
   }
 
   if (groupBy === "user_rating") {
+    if (forceUserRatingRange) {
+      return [
+        ratingRangeMeta(
+          item.user_rating || 0,
+          "unrated",
+          "Sin puntuar",
+          ratingStep,
+          ratingOffset,
+        ),
+      ];
+    }
     return [singleRatingMeta(item.user_rating || 0, ratingStep)];
   }
 
   return [];
+}
+
+function isRatingGroupKey(groupBy) {
+  return (
+    groupBy === "tmdb_rating" ||
+    groupBy === "imdb_rating" ||
+    groupBy === "trakt_rating" ||
+    groupBy === "user_rating"
+  );
 }
 
 function createFavoriteGroupStats() {
@@ -1021,6 +1061,57 @@ function sortFavoriteGroups(groupsArray, groupBy) {
     });
   }
   return groupsArray;
+}
+
+function buildSmartFavoriteRatingSubgroups(items, subGroupBy, groupContext) {
+  const candidates = [0, 0.5].map((ratingOffset) => {
+    const subgroups = new Map();
+    const context = {
+      ...groupContext,
+      ratingStep: 1,
+      ratingOffset,
+      forceUserRatingRange: true,
+    };
+
+    for (const item of items) {
+      const [meta] = buildFavoriteGroupMetas(item, subGroupBy, context);
+      if (!meta) continue;
+      if (!subgroups.has(meta.key)) {
+        subgroups.set(meta.key, {
+          key: meta.key,
+          label: meta.label,
+          items: [],
+        });
+      }
+      subgroups.get(meta.key).items.push(item);
+    }
+
+    const groups = Array.from(subgroups.values());
+    const numericGroups = groups.filter(
+      (group) =>
+        !["unrated", "no_tmdb", "no_imdb", "no_trakt"].includes(group.key),
+    );
+    const counts = numericGroups.map((group) => group.items.length);
+    const largestGroup = counts.length ? Math.max(...counts) : 0;
+    const singletons = counts.filter((count) => count === 1).length;
+
+    return {
+      ratingOffset,
+      groups,
+      largestGroup,
+      singletons,
+      groupCount: numericGroups.length,
+    };
+  });
+
+  const best = candidates.sort((a, b) => {
+    if (b.largestGroup !== a.largestGroup) return b.largestGroup - a.largestGroup;
+    if (a.singletons !== b.singletons) return a.singletons - b.singletons;
+    if (a.groupCount !== b.groupCount) return a.groupCount - b.groupCount;
+    return b.ratingOffset - a.ratingOffset;
+  })[0];
+
+  return sortFavoriteGroups(best?.groups || [], subGroupBy);
 }
 
 // ================== UI COMPONENTS ==================
@@ -2550,30 +2641,37 @@ export default function FavoritesClient() {
       finalizeFavoriteGroupStats(group.stats);
 
       if (subGroupBy && subGroupBy !== "none") {
-        const subgroups = new Map();
-        const subgroupContext = { ...groupContext, ratingStep: 1 };
-
-        for (const item of group.items) {
-          const [meta] = buildFavoriteGroupMetas(
-            item,
+        if (isRatingGroupKey(subGroupBy)) {
+          group.subgroups = buildSmartFavoriteRatingSubgroups(
+            group.items,
             subGroupBy,
-            subgroupContext,
+            groupContext,
           );
-          if (!meta) continue;
-          if (!subgroups.has(meta.key)) {
-            subgroups.set(meta.key, {
-              key: meta.key,
-              label: meta.label,
-              items: [],
-            });
-          }
-          subgroups.get(meta.key).items.push(item);
-        }
+        } else {
+          const subgroups = new Map();
 
-        group.subgroups = sortFavoriteGroups(
-          Array.from(subgroups.values()),
-          subGroupBy,
-        );
+          for (const item of group.items) {
+            const [meta] = buildFavoriteGroupMetas(
+              item,
+              subGroupBy,
+              groupContext,
+            );
+            if (!meta) continue;
+            if (!subgroups.has(meta.key)) {
+              subgroups.set(meta.key, {
+                key: meta.key,
+                label: meta.label,
+                items: [],
+              });
+            }
+            subgroups.get(meta.key).items.push(item);
+          }
+
+          group.subgroups = sortFavoriteGroups(
+            Array.from(subgroups.values()),
+            subGroupBy,
+          );
+        }
       }
     }
 
