@@ -117,7 +117,11 @@ const USER_RATING_TTL_MS = 10 * 60 * 1000;
 const USER_RATING_TTL_NULL_MS = 45 * 1000;
 const TRAKT_SCORE_TTL_MS = 24 * 60 * 60 * 1000;
 
-// Persistent score cache - 30 days TTL
+// Persistent score cache: recent titles change faster, older titles can stay cached longer.
+const SCORE_CACHE_RECENT_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
+const SCORE_CACHE_ACTIVE_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
+const SCORE_CACHE_RECENT_TTL_MS = 12 * 60 * 60 * 1000;
+const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const FAVORITES_CACHE_KEY = "showverse:favorites:items:v1";
 const FAVORITES_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -208,8 +212,22 @@ function writeProvidersCache(providersMap) {
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
-// Cache management for scores
-function readScoreCache(source) {
+function getItemReleaseTime(item) {
+  const date = item?.release_date || item?.first_air_date;
+  const time = date ? Date.parse(date) : NaN;
+  return Number.isNaN(time) ? null : time;
+}
+
+function getScoreCacheTtlForItem(item, now = Date.now()) {
+  const releaseTime = getItemReleaseTime(item);
+  if (!releaseTime) return SCORE_CACHE_TTL_MS;
+  const age = now - releaseTime;
+  if (age < SCORE_CACHE_RECENT_WINDOW_MS) return SCORE_CACHE_RECENT_TTL_MS;
+  if (age < SCORE_CACHE_ACTIVE_WINDOW_MS) return SCORE_CACHE_ACTIVE_TTL_MS;
+  return SCORE_CACHE_TTL_MS;
+}
+
+function readScoreCacheEntries(source) {
   if (typeof window === "undefined") return new Map();
   try {
     const key = `showverse:scores:${source}`;
@@ -220,10 +238,9 @@ function readScoreCache(source) {
     const now = Date.now();
     const cache = new Map();
 
-    // Filter out expired entries
     Object.entries(parsed).forEach(([id, entry]) => {
-      if (entry.t && now - entry.t < SCORE_CACHE_TTL_MS) {
-        cache.set(id, entry.score);
+      if (entry?.t && now - entry.t < SCORE_CACHE_TTL_MS) {
+        cache.set(id, { score: entry.score, t: entry.t });
       }
     });
 
@@ -233,16 +250,47 @@ function readScoreCache(source) {
   }
 }
 
-function writeScoreCache(source, scoresMap) {
+// Cache management for scores
+function readScoreCache(source) {
+  const entries = readScoreCacheEntries(source);
+  const cache = new Map();
+  entries.forEach((entry, id) => {
+    cache.set(id, entry.score);
+  });
+  return cache;
+}
+
+function shouldRefreshScore(item, entry, now = Date.now()) {
+  if (!entry || typeof entry.score !== "number" || Number.isNaN(entry.score)) {
+    return true;
+  }
+  return now - Number(entry.t || 0) >= getScoreCacheTtlForItem(item, now);
+}
+
+function writeScoreCache(source, scoresMap, refreshedIds = null) {
   if (typeof window === "undefined") return;
   try {
     const key = `showverse:scores:${source}`;
     const now = Date.now();
+    const raw = window.localStorage.getItem(key);
+    const previous = raw ? JSON.parse(raw) : {};
     const data = {};
 
-    scoresMap.forEach((score, id) => {
-      data[id] = { score, t: now };
+    Object.entries(previous || {}).forEach(([id, entry]) => {
+      if (entry?.t && now - entry.t < SCORE_CACHE_TTL_MS) {
+        data[id] = entry;
+      }
     });
+
+    if (refreshedIds instanceof Set) {
+      refreshedIds.forEach((id) => {
+        if (scoresMap.has(id)) data[id] = { score: scoresMap.get(id), t: now };
+      });
+    } else {
+      scoresMap.forEach((score, id) => {
+        data[id] = { score, t: now };
+      });
+    }
 
     window.localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
@@ -765,7 +813,7 @@ const FAVORITES_GROUP_OPTIONS = [
   { key: "trakt_rating", label: "Trakt", itemLabel: "Puntuación Trakt" },
   {
     key: "user_rating",
-    label: "Mis puntuaciones",
+    label: "Mis notas",
     itemLabel: "Mis puntuaciones",
   },
 ];
@@ -784,30 +832,52 @@ function getGroupingValueLabel(groupBy, subGroupBy) {
   return `${groupLabel} / ${getGroupOptionLabel(subGroupBy)}`;
 }
 
+function getCompactGroupOptionLabel(key) {
+  const labels = {
+    none: "Sin",
+    year: "Año",
+    decade: "Déc",
+    genre: "Gén",
+    provider: "Plat",
+    tmdb_rating: "TMDb",
+    imdb_rating: "IMDb",
+    trakt_rating: "Trakt",
+    user_rating: "Notas",
+  };
+  return labels[key] || getGroupOptionLabel(key);
+}
+
+function getCompactGroupingValueLabel(groupBy, subGroupBy) {
+  if (groupBy === "none") return "Sin agr.";
+  const groupLabel = getCompactGroupOptionLabel(groupBy);
+  if (!subGroupBy || subGroupBy === "none") return groupLabel;
+  return `${groupLabel}/${getCompactGroupOptionLabel(subGroupBy)}`;
+}
+
 function formatRatingBucketLabel(bucket) {
   return Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
 }
 
-function ratingRangeMeta(rating, emptyKey, emptyLabel) {
+function ratingRangeMeta(rating, emptyKey, emptyLabel, step = 0.5) {
   if (!rating && emptyKey) return { key: emptyKey, label: emptyLabel };
-  const bucket = Math.floor(rating * 2) / 2;
-  const next = bucket + 0.5;
+  const bucket = Math.floor(rating / step) * step;
+  const next = bucket + step;
   return {
     key: bucket.toString(),
     label: `${formatRatingBucketLabel(bucket)} - ${formatRatingBucketLabel(next)}`,
   };
 }
 
-function singleRatingMeta(rating) {
+function singleRatingMeta(rating, step = 0.5) {
   if (!rating) return { key: "unrated", label: "Sin puntuar" };
-  const bucket = Math.floor(rating * 2) / 2;
+  const bucket = Math.floor(rating / step) * step;
   return { key: bucket.toString(), label: formatRatingBucketLabel(bucket) };
 }
 
 function buildFavoriteGroupMetas(
   item,
   groupBy,
-  { imdbScores, traktScores, providersByItem },
+  { imdbScores, traktScores, providersByItem, ratingStep = 0.5 },
 ) {
   if (groupBy === "none") return [];
 
@@ -847,7 +917,7 @@ function buildFavoriteGroupMetas(
   }
 
   if (groupBy === "tmdb_rating") {
-    return [ratingRangeMeta(item.vote_average || 0)];
+    return [ratingRangeMeta(item.vote_average || 0, null, null, ratingStep)];
   }
 
   if (groupBy === "imdb_rating") {
@@ -856,6 +926,7 @@ function buildFavoriteGroupMetas(
         imdbScores.get(String(item.id)) || 0,
         "no_imdb",
         "Sin puntuación IMDb",
+        ratingStep,
       ),
     ];
   }
@@ -866,12 +937,13 @@ function buildFavoriteGroupMetas(
         traktScores.get(String(item.id)) || 0,
         "no_trakt",
         "Sin puntuación Trakt",
+        ratingStep,
       ),
     ];
   }
 
   if (groupBy === "user_rating") {
-    return [singleRatingMeta(item.user_rating || 0)];
+    return [singleRatingMeta(item.user_rating || 0, ratingStep)];
   }
 
   return [];
@@ -952,33 +1024,64 @@ function sortFavoriteGroups(groupsArray, groupBy) {
 }
 
 // ================== UI COMPONENTS ==================
-function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+function InlineDropdown({
+  label,
+  valueLabel,
+  mobileValueLabel,
+  compactMobile = false,
+  icon: Icon,
+  children,
+}) {
   const [open, setOpen] = useState(false);
+  const [menuMaxHeight, setMenuMaxHeight] = useState(448);
   const ref = useRef(null);
 
   useEffect(() => {
     if (!open) return;
+    const updateMenuSize = () => {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const availableBelow = window.innerHeight - rect.bottom - 12;
+      setMenuMaxHeight(Math.max(64, Math.min(448, availableBelow)));
+    };
+
+    updateMenuSize();
+    const frame = window.requestAnimationFrame(updateMenuSize);
     const onDown = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
+    window.addEventListener("resize", updateMenuSize);
+    window.addEventListener("scroll", updateMenuSize, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("resize", updateMenuSize);
+      window.removeEventListener("scroll", updateMenuSize, true);
+    };
   }, [open]);
 
   return (
-    <div ref={ref} className="relative w-full lg:w-auto lg:shrink-0">
+    <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[140px]"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[140px] lg:max-w-[230px]"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-red-500" />}
-          <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider">
+          <span
+            className={`text-zinc-500 font-bold text-xs uppercase tracking-wider ${
+              compactMobile ? "hidden sm:inline" : ""
+            }`}
+          >
             {label}:
           </span>
-          <span className="font-semibold text-white truncate">
+          <span className="hidden min-w-0 truncate font-semibold text-white sm:inline">
             {valueLabel}
+          </span>
+          <span className="min-w-0 truncate font-semibold text-white sm:hidden">
+            {mobileValueLabel || valueLabel}
           </span>
         </div>
         <ChevronDown
@@ -993,6 +1096,12 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-xl border border-zinc-800 bg-[#121212] p-1 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+            style={{
+              maxHeight: `${menuMaxHeight}px`,
+              scrollbarWidth: "thin",
+              scrollbarGutter: "stable",
+              overscrollBehavior: "contain",
+            }}
           >
             {children({ close: () => setOpen(false) })}
           </motion.div>
@@ -1949,14 +2058,20 @@ export default function FavoritesClient() {
     let cancelled = false;
 
     const loadImdbScores = async () => {
-      const cachedScores = readScoreCache("imdb");
-      const scores = new Map(cachedScores);
+      const cachedEntries = readScoreCacheEntries("imdb");
+      const scores = new Map();
+      cachedEntries.forEach((entry, id) => {
+        scores.set(id, entry.score);
+      });
 
-      if (cachedScores.size > 0) {
+      if (scores.size > 0) {
         startTransition(() => setImdbScores(new Map(scores)));
       }
 
-      const itemsToFetch = items.filter((item) => !scores.has(String(item.id)));
+      const now = Date.now();
+      const itemsToFetch = items.filter((item) =>
+        shouldRefreshScore(item, cachedEntries.get(String(item.id)), now),
+      );
 
       // Fallback temprano a TMDb para que los grupos por IMDb no esperen
       for (const item of itemsToFetch) {
@@ -1981,6 +2096,7 @@ export default function FavoritesClient() {
 
       try {
         let fetchedCount = 0;
+        const refreshedIds = new Set();
         const batchSize = 4;
 
         const processItem = async (item) => {
@@ -1999,6 +2115,7 @@ export default function FavoritesClient() {
             if (isNaN(numRating)) return false;
 
             scores.set(String(item.id), numRating);
+            refreshedIds.add(String(item.id));
             fetchedCount++;
             return true;
           } catch (err) {
@@ -2021,7 +2138,7 @@ export default function FavoritesClient() {
         }
 
         if (!cancelled && fetchedCount > 0) {
-          writeScoreCache("imdb", scores);
+          writeScoreCache("imdb", scores, refreshedIds);
         }
       } catch (error) {
         console.error("Error loading IMDb scores:", error);
@@ -2045,14 +2162,20 @@ export default function FavoritesClient() {
     let cancelled = false;
 
     const loadTraktScores = async () => {
-      const cachedScores = readScoreCache("trakt");
-      const scores = new Map(cachedScores);
+      const cachedEntries = readScoreCacheEntries("trakt");
+      const scores = new Map();
+      cachedEntries.forEach((entry, id) => {
+        scores.set(id, entry.score);
+      });
 
-      if (cachedScores.size > 0) {
+      if (scores.size > 0) {
         startTransition(() => setTraktScores(new Map(scores)));
       }
 
-      const itemsToFetch = items.filter((item) => !scores.has(String(item.id)));
+      const now = Date.now();
+      const itemsToFetch = items.filter((item) =>
+        shouldRefreshScore(item, cachedEntries.get(String(item.id)), now),
+      );
 
       // Fallback temprano a TMDb para que los grupos por Trakt no esperen
       for (const item of itemsToFetch) {
@@ -2075,6 +2198,7 @@ export default function FavoritesClient() {
 
       try {
         let fetchedCount = 0;
+        const refreshedIds = new Set();
         const batchSize = 4;
 
         const processItem = async (item) => {
@@ -2091,6 +2215,7 @@ export default function FavoritesClient() {
             }
 
             scores.set(String(item.id), rating);
+            refreshedIds.add(String(item.id));
             fetchedCount++;
             return true;
           } catch (err) {
@@ -2116,7 +2241,7 @@ export default function FavoritesClient() {
         }
 
         if (!cancelled && fetchedCount > 0) {
-          writeScoreCache("trakt", scores);
+          writeScoreCache("trakt", scores, refreshedIds);
         }
       } catch (error) {
         console.error("Error loading Trakt scores:", error);
@@ -2426,9 +2551,14 @@ export default function FavoritesClient() {
 
       if (subGroupBy && subGroupBy !== "none") {
         const subgroups = new Map();
+        const subgroupContext = { ...groupContext, ratingStep: 1 };
 
         for (const item of group.items) {
-          const [meta] = buildFavoriteGroupMetas(item, subGroupBy, groupContext);
+          const [meta] = buildFavoriteGroupMetas(
+            item,
+            subGroupBy,
+            subgroupContext,
+          );
           if (!meta) continue;
           if (!subgroups.has(meta.key)) {
             subgroups.set(meta.key, {
@@ -2715,6 +2845,11 @@ export default function FavoritesClient() {
                       <InlineDropdown
                         label="Agrupar"
                         valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
+                        mobileValueLabel={getCompactGroupingValueLabel(
+                          groupBy,
+                          subGroupBy,
+                        )}
+                        compactMobile
                         icon={Layers3}
                       >
                         {({ close }) => (
@@ -3064,6 +3199,11 @@ export default function FavoritesClient() {
             <InlineDropdown
               label="Agrupar"
               valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
+              mobileValueLabel={getCompactGroupingValueLabel(
+                groupBy,
+                subGroupBy,
+              )}
+              compactMobile
               icon={Layers3}
             >
               {({ close }) => (
