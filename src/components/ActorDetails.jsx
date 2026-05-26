@@ -20,13 +20,7 @@ import {
   Award,
   CheckCircle2,
   ImageOff,
-  Link as LinkIcon,
   ExternalLink,
-  Instagram,
-  Twitter,
-  Facebook,
-  Youtube,
-  Globe,
   Film,
   Tv as TvIcon,
   User,
@@ -52,6 +46,7 @@ import {
   ScaleIn,
   StaggerContainer,
 } from "@/components/details/AnimatedSection";
+import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
 import DetailsSectionMenu from "./DetailsSectionMenu";
 
 /* --- CONFIG & UTILS --- */
@@ -108,6 +103,16 @@ const isSelfLikeCredit = (character = "") =>
   /\b(self|himself|herself|host|archive footage|uncredited)\b/i.test(
     String(character),
   );
+
+const getDefaultCreditFilters = (person) => {
+  const department = String(person?.known_for_department || "").toLowerCase();
+  const isActingPrimary = !department || department === "acting";
+
+  return {
+    creditFilter: isActingPrimary ? "acting" : "crew",
+    deptFilter: "all",
+  };
+};
 
 const knownForKey = (item) => `${item?.media_type || "movie"}-${item?.id}`;
 
@@ -676,9 +681,6 @@ function CreditsFilterDropdowns({
   setMediaFilter,
   creditFilter,
   setCreditFilter,
-  deptFilter,
-  setDeptFilter,
-  deptOptions,
   sort,
   setSort,
 }) {
@@ -694,10 +696,6 @@ function CreditsFilterDropdowns({
       : creditFilter === "crew"
         ? "Equipo"
         : "Actuación";
-  const deptLabel =
-    deptFilter === "all"
-      ? "Todos"
-      : deptOptions.find((d) => d.value === deptFilter)?.label || deptFilter;
   const sortLabel =
     sort === "date_asc"
       ? "Antiguos"
@@ -752,7 +750,6 @@ function CreditsFilterDropdowns({
               active={creditFilter === "acting"}
               onClick={() => {
                 setCreditFilter("acting");
-                setDeptFilter("all");
                 close();
               }}
             >
@@ -771,7 +768,6 @@ function CreditsFilterDropdowns({
               active={creditFilter === "all"}
               onClick={() => {
                 setCreditFilter("all");
-                setDeptFilter("all");
                 close();
               }}
             >
@@ -780,40 +776,6 @@ function CreditsFilterDropdowns({
           </>
         )}
       </InlineDropdown>
-
-      {creditFilter === "crew" && (
-        <InlineDropdown
-          label="Depto."
-          valueLabel={deptLabel}
-          icon={SlidersHorizontal}
-        >
-          {({ close }) => (
-            <>
-              <DropdownItem
-                active={deptFilter === "all"}
-                onClick={() => {
-                  setDeptFilter("all");
-                  close();
-                }}
-              >
-                Todos
-              </DropdownItem>
-              {deptOptions.map((dept) => (
-                <DropdownItem
-                  key={dept.value}
-                  active={deptFilter === dept.value}
-                  onClick={() => {
-                    setDeptFilter(dept.value);
-                    close();
-                  }}
-                >
-                  {dept.label}
-                </DropdownItem>
-              ))}
-            </>
-          )}
-        </InlineDropdown>
-      )}
 
       <InlineDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown}>
         {({ close }) => (
@@ -1371,8 +1333,11 @@ export default function ActorDetails({
   const [q, setQ] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mediaFilter, setMediaFilter] = useState("all");
-  const [creditFilter, setCreditFilter] = useState("acting");
-  const [deptFilter, setDeptFilter] = useState("all");
+  const initialCreditFilters = getDefaultCreditFilters(actorDetails);
+  const [creditFilter, setCreditFilter] = useState(
+    initialCreditFilters.creditFilter,
+  );
+  const [deptFilter, setDeptFilter] = useState(initialCreditFilters.deptFilter);
   const [yearFrom, setYearFrom] = useState("");
   const [yearTo, setYearTo] = useState("");
   const [sort, setSort] = useState("date_desc");
@@ -1581,10 +1546,11 @@ export default function ActorDetails({
   }, [actorDetails?.name, loadAwardsForWikidata, personId]);
 
   useEffect(() => {
+    const defaultCreditFilters = getDefaultCreditFilters(actorDetails);
     setQ("");
     setMediaFilter("all");
-    setCreditFilter("acting");
-    setDeptFilter("all");
+    setCreditFilter(defaultCreditFilters.creditFilter);
+    setDeptFilter(defaultCreditFilters.deptFilter);
     setYearFrom("");
     setYearTo("");
     setSort("date_desc");
@@ -1618,6 +1584,7 @@ export default function ActorDetails({
 
     loadAll();
   }, [
+    actorDetails?.known_for_department,
     actorDetails?.combined_credits,
     actorDetails?.images,
     actorDetails?.tagged_images,
@@ -1738,7 +1705,7 @@ export default function ActorDetails({
       .sort()
       .map((d) => ({ value: d, label: d }));
   }, [creditsAll]);
-
+ 
   const yearOptions = useMemo(() => {
     const set = new Set(creditsAll.map((c) => c.year).filter((y) => y > 0));
     return Array.from(set)
@@ -1886,6 +1853,42 @@ export default function ActorDetails({
     };
   }, [externalIds, actorDetails, tmdbUrl]);
 
+  const actorExternalLinks = useMemo(
+    () =>
+      [
+        socials.homepage
+          ? {
+              id: "web",
+              label: "Web oficial",
+              icon: "/logo-Web.png",
+              href: socials.homepage,
+            }
+          : null,
+        socials.imdb
+          ? {
+              id: "imdb",
+              label: "IMDb",
+              icon: "/logo-IMDb.png",
+              href: socials.imdb,
+              iconSize: 34,
+              iconClassName: "lg:!h-[36px] lg:!w-[36px]",
+            }
+          : null,
+        socials.tmdb
+          ? {
+              id: "tmdb",
+              label: "TMDb",
+              icon: "/logo-TMDb.png",
+              href: socials.tmdb,
+              iconSize: { width: 58, height: 42 },
+              iconClassName:
+                "!w-[58px] !h-[42px] lg:!w-[64px] lg:!h-[46px] rounded-none shadow-none",
+            }
+          : null,
+      ].filter(Boolean),
+    [socials],
+  );
+
   const age = calcAge(actorDetails?.birthday, actorDetails?.deathday);
   const esBio = translations?.translations?.find((t) => t.iso_639_1 === "es")
     ?.data?.biography;
@@ -1898,10 +1901,11 @@ export default function ActorDetails({
   const photosCount = photos.length;
 
   const clearFilters = () => {
+    const defaultCreditFilters = getDefaultCreditFilters(actorDetails);
     setQ("");
     setMediaFilter("all");
-    setCreditFilter("acting");
-    setDeptFilter("all");
+    setCreditFilter(defaultCreditFilters.creditFilter);
+    setDeptFilter(defaultCreditFilters.deptFilter);
     setYearFrom("");
     setYearTo("");
     setSort("date_desc");
@@ -2162,42 +2166,24 @@ export default function ActorDetails({
               </div>
             </div>
 
-            {/* Social Links under profile picture like DetailsClient providers */}
-            {socials && Object.values(socials).some(Boolean) && (
+            {/* External links under profile picture using the same icon format as DetailsClient */}
+            {actorExternalLinks.length > 0 && (
               <StaggerContainer
-                className="flex flex-row flex-wrap justify-center items-center gap-3 w-full px-1 py-2"
+                className="flex flex-row flex-wrap justify-center items-center gap-2.5 w-full px-1 py-2"
                 staggerDelay={0.05}
               >
-                {Object.entries(socials).map(([key, url], index) => {
-                  if (!url) return null;
-                  let Icon = Globe;
-                  if (key === "imdb") Icon = LinkIcon;
-                  if (key === "instagram") Icon = Instagram;
-                  if (key === "twitter") Icon = Twitter;
-                  if (key === "facebook") Icon = Facebook;
-                  if (key === "youtube") Icon = Youtube;
-                  if (key === "tmdb") Icon = ExternalLink;
-
-                  return (
-                    <motion.a
-                      key={key}
-                      href={url}
-                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{
-                        duration: 0.28,
-                        delay: 0.03 + index * 0.04,
-                        ease: [0.22, 1, 0.36, 1],
-                      }}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={key.charAt(0).toUpperCase() + key.slice(1)}
-                      className="group relative flex items-center justify-center w-10 h-10 lg:w-11 lg:h-11 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 transition-all duration-300 transform hover:scale-110"
-                    >
-                      <Icon className="w-4 h-4 lg:w-5 lg:h-5" />
-                    </motion.a>
-                  );
-                })}
+                {actorExternalLinks.map((link) => (
+                  <ExternalLinkButton
+                    key={link.id}
+                    icon={link.icon}
+                    href={link.href}
+                    title={link.label}
+                    size={link.size}
+                    iconSize={link.iconSize}
+                    iconClassName={link.iconClassName}
+                    className={link.id === "tmdb" ? "mx-1" : ""}
+                  />
+                ))}
               </StaggerContainer>
             )}
           </div>
@@ -2490,9 +2476,6 @@ export default function ActorDetails({
                               setMediaFilter={setMediaFilter}
                               creditFilter={creditFilter}
                               setCreditFilter={setCreditFilter}
-                              deptFilter={deptFilter}
-                              setDeptFilter={setDeptFilter}
-                              deptOptions={deptOptions}
                               sort={sort}
                               setSort={setSort}
                             />
@@ -2540,9 +2523,6 @@ export default function ActorDetails({
                         setMediaFilter={setMediaFilter}
                         creditFilter={creditFilter}
                         setCreditFilter={setCreditFilter}
-                        deptFilter={deptFilter}
-                        setDeptFilter={setDeptFilter}
-                        deptOptions={deptOptions}
                         sort={sort}
                         setSort={setSort}
                       />

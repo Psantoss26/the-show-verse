@@ -391,28 +391,28 @@ function KPICard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.5 }}
-      className="relative overflow-hidden p-6 rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl group hover:bg-zinc-900/80 transition-all duration-300"
+      className="relative overflow-hidden rounded-3xl border border-white/5 bg-zinc-900/50 p-4 backdrop-blur-xl transition-all duration-300 group hover:bg-zinc-900/80 sm:p-6"
     >
       <div
         className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity ${styles.iconText}`}
       >
-        <Icon className="w-24 h-24 transform rotate-12 -translate-y-4 translate-x-4" />
+        <Icon className="h-16 w-16 translate-x-4 -translate-y-4 rotate-12 transform sm:h-24 sm:w-24" />
       </div>
 
       <div className="relative z-10 flex flex-col h-full justify-between">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="mb-4 flex items-center gap-2 sm:gap-3">
           <div
             className={`p-2.5 rounded-xl ${styles.iconBg} ${styles.iconText} ring-1 ${styles.ring}`}
           >
             <Icon className="w-6 h-6" />
           </div>
-          <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 sm:text-sm">
             {title}
           </h3>
         </div>
 
         <div>
-          <div className="text-4xl font-black text-white tracking-tight leading-none mb-1">
+          <div className="mb-1 text-3xl font-black leading-none tracking-tight text-white sm:text-4xl">
             {loading ? (
               <span className="inline-block h-9 w-24 rounded-xl bg-white/10 animate-pulse" />
             ) : (
@@ -1534,7 +1534,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
               >
                 {/* KPIs */}
                 {stats && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                     <KPICard
                       title="Tiempo Total"
                       value={`${stats.totalDays}d ${stats.totalHours % 24}h`}
