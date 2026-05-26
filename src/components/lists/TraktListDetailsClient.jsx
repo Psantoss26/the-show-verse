@@ -1,12 +1,42 @@
 'use client'
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
-import { Loader2, ExternalLink, ChevronDown, UserRound } from 'lucide-react'
+import { Loader2, ExternalLink, ChevronDown, UserRound, ListVideo } from 'lucide-react'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import { formatPageTitle } from '@/lib/pageTitle'
 
 const PAGE_SIZE = 48
+const TRAKT_LIST_DETAILS_CACHE_TTL_MS = 20 * 60 * 1000
+
+function getDetailsCacheKey(username, listId) {
+    if (!username || !listId) return null
+    return `showverse:list-details:trakt:${username}:${listId}:v1`
+}
+
+function readDetailsCache(username, listId) {
+    const key = getDetailsCacheKey(username, listId)
+    if (!key || typeof window === 'undefined') return null
+    try {
+        const raw = window.sessionStorage.getItem(key)
+        if (!raw) return null
+        const parsed = JSON.parse(raw)
+        if (Date.now() - Number(parsed?.t || 0) > TRAKT_LIST_DETAILS_CACHE_TTL_MS) return null
+        return parsed?.data || null
+    } catch {
+        return null
+    }
+}
+
+function writeDetailsCache(username, listId, data) {
+    const key = getDetailsCacheKey(username, listId)
+    if (!key || typeof window === 'undefined') return
+    try {
+        window.sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data }))
+    } catch {
+        // ignore
+    }
+}
 
 function Poster({ posterPath, alt }) {
     const [failed, setFailed] = useState(false)
@@ -106,14 +136,17 @@ export default function TraktListDetailsClient({ username, listId }) {
     const stateRef = useRef(null)
     const loadingMoreRef = useRef(false)
 
-    const [state, setState] = useState({
-        loading: true,
-        loadingMore: false,
-        error: null,
-        list: null,
-        items: [],
-        page: 1,
-        hasMore: false,
+    const [state, setState] = useState(() => {
+        const cached = readDetailsCache(username, listId)
+        return {
+            loading: !cached,
+            loadingMore: false,
+            error: null,
+            list: cached?.list || null,
+            items: Array.isArray(cached?.items) ? cached.items : [],
+            page: cached?.page || 1,
+            hasMore: !!cached?.hasMore,
+        }
     })
 
     useEffect(() => {
@@ -150,32 +183,44 @@ export default function TraktListDetailsClient({ username, listId }) {
     useEffect(() => {
         let cancelled = false
         if (!baseApiUrl) return
+        const cached = readDetailsCache(username, listId)
+        setState({
+            loading: !cached,
+            loadingMore: false,
+            error: null,
+            list: cached?.list || null,
+            items: Array.isArray(cached?.items) ? cached.items : [],
+            page: cached?.page || 1,
+            hasMore: !!cached?.hasMore,
+        })
 
             ; (async () => {
                 try {
-                    setState((p) => ({ ...p, loading: true, error: null, items: [], page: 1 }))
                     const json = await fetchPage(1)
                     if (cancelled) return
-
-                    setState((p) => ({
-                        ...p,
+                    const nextState = {
                         loading: false,
+                        loadingMore: false,
                         error: null,
                         list: json?.list || null,
                         items: dedupeItems(json?.items),
                         page: json?.page || 1,
                         hasMore: !!json?.hasMore,
-                    }))
+                    }
+
+                    writeDetailsCache(username, listId, nextState)
+
+                    setState(nextState)
                 } catch (e) {
                     if (cancelled) return
                     setState((p) => ({
                         ...p,
                         loading: false,
                         error: e?.message || 'Error',
-                        list: null,
-                        items: [],
-                        page: 1,
-                        hasMore: false,
+                        list: p.list,
+                        items: p.items,
+                        page: p.page || 1,
+                        hasMore: p.hasMore,
                     }))
                 }
             })()
@@ -183,7 +228,7 @@ export default function TraktListDetailsClient({ username, listId }) {
         return () => {
             cancelled = true
         }
-    }, [baseApiUrl, fetchPage])
+    }, [baseApiUrl, fetchPage, username, listId])
 
     const handleLoadMore = useCallback(async () => {
         const current = stateRef.current
@@ -202,15 +247,19 @@ export default function TraktListDetailsClient({ username, listId }) {
             const nextPage = (current?.page || 1) + 1
             const json = await fetchPage(nextPage)
 
-            setState((p) => ({
-                ...p,
-                loadingMore: false,
-                error: null,
-                // list: lo dejamos como el que ya tenemos
-                items: dedupeItems([...(p.items || []), ...(Array.isArray(json?.items) ? json.items : [])]),
-                page: json?.page || nextPage,
-                hasMore: !!json?.hasMore,
-            }))
+            setState((p) => {
+                const nextState = {
+                    ...p,
+                    loadingMore: false,
+                    error: null,
+                    // list: lo dejamos como el que ya tenemos
+                    items: dedupeItems([...(p.items || []), ...(Array.isArray(json?.items) ? json.items : [])]),
+                    page: json?.page || nextPage,
+                    hasMore: !!json?.hasMore,
+                }
+                writeDetailsCache(username, listId, nextState)
+                return nextState
+            })
         } catch (e) {
             setState((p) => ({ ...p, loadingMore: false, error: e?.message || 'Error' }))
         } finally {
@@ -251,16 +300,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                 : `https://trakt.tv/users/${username}/lists/${slugOrId}`)
             : null
 
-    if (state.loading) {
-        return (
-            <div className="min-h-screen bg-[#101010] text-gray-100 flex flex-col items-center justify-center gap-3">
-                <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
-                <span className="text-sm font-medium text-zinc-500 animate-pulse">Cargando lista...</span>
-            </div>
-        )
-    }
-
-    if (state.error) {
+    if (state.error && !list && items.length === 0) {
         return (
             <UnifiedListDetailsLayout title="Lista" sourceLabel="Trakt" backHref="/lists">
                 <div className="rounded-2xl border border-white/10 bg-black/40 p-6 text-zinc-300">
@@ -319,12 +359,14 @@ export default function TraktListDetailsClient({ username, listId }) {
                 ) : null
             }
         >
-            <FilterableListItems
-                items={items}
-                getMeta={getTraktMeta}
-                emptyTitle="Lista vacía"
-                emptyText="No hay títulos disponibles en esta lista."
-            />
+            {items.length > 0 || !state.loading ? (
+                <FilterableListItems
+                    items={items}
+                    getMeta={getTraktMeta}
+                    emptyTitle="Lista vacía"
+                    emptyText="No hay títulos disponibles en esta lista."
+                />
+            ) : null}
 
             {state.hasMore && (
                 <div ref={loadMoreRef} className="mt-10 flex min-h-14 justify-center">

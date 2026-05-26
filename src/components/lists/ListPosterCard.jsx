@@ -118,7 +118,7 @@ export default function ListPosterCard({
                   <span className="font-mono text-xs font-black tracking-tight text-yellow-400">
                     {imdb}
                   </span>
-                  <img src="/logo-IMDb.png" alt="IMDb" className="h-3 w-auto" draggable={false} />
+                  <img src="/logo-IMDb.svg" alt="IMDb" className="h-3 w-auto" draggable={false} />
                 </div>
               ) : null}
             </div>

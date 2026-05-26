@@ -22,7 +22,13 @@ function CompactBadge({
 }) {
   const inner = (
     <div className="flex items-center gap-2">
-      <img src={logo} alt="" className={`${logoClassName} w-auto opacity-95`} />
+      <span className="grid h-6 w-6 shrink-0 place-items-center">
+        <img
+          src={logo}
+          alt=""
+          className={`${logoClassName} max-h-5 max-w-6 w-auto object-contain opacity-95`}
+        />
+      </span>
       <div className="leading-tight">
         <div className="text-white font-black text-sm sm:text-base">
           {value != null ? value : "—"}
@@ -342,7 +348,7 @@ export default function ScoreboardBar({
 
           {imdb?.rating != null || imdb?.id ? (
             <CompactBadge
-              logo="/logo-IMDb.png"
+              logo="/logo-IMDb.svg"
               logoClassName="h-5"
               value={
                 imdb?.rating != null ? Number(imdb.rating).toFixed(1) : null

@@ -891,7 +891,7 @@ function ProfileUnifiedCard({
             <span className="text-yellow-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
               {typeof imdbScore === "number" ? imdbScore.toFixed(1) : imdbScore}
             </span>
-            <img src="/logo-IMDb.png" alt="" className="w-auto h-2.5 sm:h-3 opacity-100" />
+            <img src="/logo-IMDb.svg" alt="" className="w-auto h-2.5 sm:h-3 opacity-100" />
           </div>
         )}
         {traktScore && (

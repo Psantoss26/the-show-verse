@@ -11,6 +11,36 @@ import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import { formatPageTitle } from '@/lib/pageTitle'
 
+const COLLECTION_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000
+
+function getCollectionDetailsCacheKey(collectionId) {
+    return collectionId ? `showverse:list-details:collection:${collectionId}:v1` : null
+}
+
+function readCollectionDetailsCache(collectionId) {
+    const key = getCollectionDetailsCacheKey(collectionId)
+    if (!key || typeof window === 'undefined') return null
+    try {
+        const raw = window.sessionStorage.getItem(key)
+        if (!raw) return null
+        const parsed = JSON.parse(raw)
+        if (Date.now() - Number(parsed?.t || 0) > COLLECTION_DETAILS_CACHE_TTL_MS) return null
+        return parsed?.data || null
+    } catch {
+        return null
+    }
+}
+
+function writeCollectionDetailsCache(collectionId, data) {
+    const key = getCollectionDetailsCacheKey(collectionId)
+    if (!key || typeof window === 'undefined') return
+    try {
+        window.sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data }))
+    } catch {
+        // ignore
+    }
+}
+
 function Poster({ posterPath, alt }) {
     const [failed, setFailed] = useState(false)
     const [loaded, setLoaded] = useState(false)
@@ -107,11 +137,14 @@ function LoadingSkeleton() {
 export default function CollectionDetailsClient({ collectionId }) {
     const router = useRouter()
 
-    const [state, setState] = useState({
-        loading: true,
-        error: null,
-        collection: null,
-        parts: [],
+    const [state, setState] = useState(() => {
+        const cached = readCollectionDetailsCache(collectionId)
+        return {
+            loading: !cached,
+            error: null,
+            collection: cached?.collection || null,
+            parts: Array.isArray(cached?.parts) ? cached.parts : [],
+        }
     })
 
     const [mounted, setMounted] = useState(false)
@@ -179,10 +212,16 @@ export default function CollectionDetailsClient({ collectionId }) {
     useEffect(() => {
         let cancelled = false
         if (!collectionId) return
+        const cached = readCollectionDetailsCache(collectionId)
+        setState({
+            loading: !cached,
+            error: null,
+            collection: cached?.collection || null,
+            parts: Array.isArray(cached?.parts) ? cached.parts : [],
+        })
 
         ; (async () => {
             try {
-                setState((p) => ({ ...p, loading: true, error: null }))
                 const res = await fetch(`/api/tmdb/collection?id=${collectionId}`, { cache: 'no-store' })
                 const json = await res.json().catch(() => ({}))
                 
@@ -191,21 +230,23 @@ export default function CollectionDetailsClient({ collectionId }) {
                 }
                 
                 if (cancelled) return
-
-                setState({
+                const nextState = {
                     loading: false,
                     error: null,
                     collection: json?.collection || null,
                     parts: Array.isArray(json?.items) ? json.items : [],
-                })
+                }
+
+                writeCollectionDetailsCache(collectionId, nextState)
+                setState(nextState)
             } catch (e) {
                 if (cancelled) return
-                setState({
+                setState((p) => ({
                     loading: false,
                     error: e?.message || 'Error al cargar la colección',
-                    collection: null,
-                    parts: [],
-                })
+                    collection: p.collection,
+                    parts: p.parts,
+                }))
             }
         })()
 
@@ -229,17 +270,7 @@ export default function CollectionDetailsClient({ collectionId }) {
         router.back()
     }, [router])
 
-    if (state.loading) {
-        return (
-            <div className="min-h-screen bg-[#101010] text-gray-100">
-                <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-                    <LoadingSkeleton />
-                </div>
-            </div>
-        )
-    }
-
-    if (state.error) {
+    if (state.error && !collection && parts.length === 0) {
         return (
             <UnifiedListDetailsLayout title="Colección" sourceLabel="Colección TMDb" backHref="/lists">
                 <div className="rounded-2xl border border-red-500/20 bg-red-950/20 p-6 text-zinc-300">
@@ -300,14 +331,14 @@ export default function CollectionDetailsClient({ collectionId }) {
                     emptyTitle="Sin resultados"
                     emptyText="No hay películas que coincidan con los filtros."
                 />
-            ) : (
+            ) : !state.loading ? (
                 <div className="py-20 text-center text-zinc-500">
                     <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/5 border border-white/10 mb-4">
                         <Film className="h-10 w-10 opacity-40" />
                     </div>
                     <p className="text-sm font-medium">No hay películas en esta colección</p>
                 </div>
-            )}
+            ) : null}
         </UnifiedListDetailsLayout>
     )
 

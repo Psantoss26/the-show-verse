@@ -1069,7 +1069,7 @@ export default function SeasonDetailsClient({
 
                   {imdbData?.rating != null && (
                     <CompactBadge
-                      logo="/logo-IMDb.png"
+                      logo="/logo-IMDb.svg"
                       logoClassName="h-5 sm:h-5"
                       value={Number(imdbData.rating).toFixed(1)}
                       sub={

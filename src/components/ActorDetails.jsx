@@ -1868,10 +1868,11 @@ export default function ActorDetails({
           ? {
               id: "imdb",
               label: "IMDb",
-              icon: "/logo-IMDb.png",
+              icon: "/logo-IMDb.svg",
               href: socials.imdb,
-              iconSize: 34,
-              iconClassName: "lg:!h-[36px] lg:!w-[36px]",
+              iconSize: { width: 42, height: 22 },
+              iconClassName:
+                "!w-[42px] !h-[22px] lg:!w-[44px] lg:!h-[22px] rounded-md shadow-lg object-contain",
             }
           : null,
         socials.tmdb
@@ -1880,9 +1881,10 @@ export default function ActorDetails({
               label: "TMDb",
               icon: "/logo-TMDb.png",
               href: socials.tmdb,
-              iconSize: { width: 58, height: 42 },
+              size: 38,
+              iconSize: { width: 34, height: 34 },
               iconClassName:
-                "!w-[58px] !h-[42px] lg:!w-[64px] lg:!h-[46px] rounded-none shadow-none",
+                "!w-[34px] !h-[34px] lg:!w-[36px] lg:!h-[36px] rounded-lg shadow-none object-contain",
             }
           : null,
       ].filter(Boolean),

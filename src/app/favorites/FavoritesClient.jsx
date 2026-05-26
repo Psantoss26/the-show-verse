@@ -1452,7 +1452,7 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
                 <StatBox
                   label="IMDb"
                   value={formatAvg(stats.imdb.avg)}
-                  imgSrc="/logo-IMDb.png"
+                  imgSrc="/logo-IMDb.svg"
                 />
               )}
             {stats?.trakt?.avg != null &&
@@ -1756,7 +1756,7 @@ function FavoriteCard({
                           : imdbScore}
                       </span>
                       <img
-                        src="/logo-IMDb.png"
+                        src="/logo-IMDb.svg"
                         alt=""
                         className="w-auto h-3 opacity-100"
                       />
@@ -1887,7 +1887,7 @@ function FavoriteCard({
                         : imdbScore}
                     </span>
                     <img
-                      src="/logo-IMDb.png"
+                      src="/logo-IMDb.svg"
                       alt=""
                       className="w-auto h-3 opacity-100"
                     />

@@ -1008,7 +1008,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
               {typeof extras?.imdbRating === "number" && (
                 <span className="inline-flex items-center gap-1.5">
                   <img
-                    src="/logo-IMDb.png"
+                    src="/logo-IMDb.svg"
                     alt="IMDb"
                     className="h-4 w-auto"
                     loading="lazy"
