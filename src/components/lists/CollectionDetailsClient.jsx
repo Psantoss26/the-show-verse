@@ -9,6 +9,7 @@ import { fetchOmdbByImdb } from '@/lib/api/omdb'
 import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
+import { formatPageTitle } from '@/lib/pageTitle'
 
 function Poster({ posterPath, alt }) {
     const [failed, setFailed] = useState(false)
@@ -125,6 +126,10 @@ export default function CollectionDetailsClient({ collectionId }) {
         if (typeof window === 'undefined') return
         window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     }, [collectionId])
+
+    useEffect(() => {
+        document.title = formatPageTitle(state.collection?.name || 'Colección')
+    }, [state.collection?.name])
 
     // Fetch IMDb ratings for movies
     useEffect(() => {

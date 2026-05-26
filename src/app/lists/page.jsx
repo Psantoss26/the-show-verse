@@ -22,6 +22,7 @@ import { getListDetails } from "@/lib/api/tmdbLists";
 import { getExternalIds } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { useAuth } from "@/context/AuthContext";
+import { formatPageTitle } from "@/lib/pageTitle";
 
 import {
   Loader2,
@@ -1263,6 +1264,10 @@ export default function ListsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    document.title = formatPageTitle("Listas");
+  }, []);
   const deferredQuery = useDeferredValue(query);
   const [sortMode, setSortMode] = useState("items_desc");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);

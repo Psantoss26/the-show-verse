@@ -1,7 +1,7 @@
 import StatsClient from "../stats/StatsClient";
 
 export const metadata = {
-  title: "Mi Perfil · The Show Verse",
+  title: "Perfil",
   description: "Tu perfil de Trakt: estadísticas, historial reciente, valoraciones y más.",
 };
 

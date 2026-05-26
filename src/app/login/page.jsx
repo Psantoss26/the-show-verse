@@ -5,6 +5,10 @@ import LoginClient from './LoginClient'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+export const metadata = {
+  title: 'Iniciar sesión',
+}
+
 export default async function LoginPage({ searchParams }) {
   // Next (App Router) puede pasar searchParams como Promise
   const sp = await Promise.resolve(searchParams)

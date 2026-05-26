@@ -2,6 +2,15 @@ import { notFound } from "next/navigation";
 import ActorDetails from "@/components/ActorDetails";
 import { getActorDetailsFull, getActorKnownFor } from "@/lib/api/tmdb";
 
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const actorDetails = await getActorDetailsFull(id).catch(() => null);
+
+  return {
+    title: actorDetails?.name || "Actor",
+  };
+}
+
 export default async function ActorDetailsPage({ params }) {
   const { id } = await params;
   const actorDetails = await getActorDetailsFull(id);

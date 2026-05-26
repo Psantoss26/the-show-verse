@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle2, Loader2, Trash2 } from 'lucide-react'
+import { formatPageTitle } from '@/lib/pageTitle'
 
 export default function TraktDiagnosticPage() {
     const [tmdbId, setTmdbId] = useState('550') // Fight Club por defecto
@@ -14,6 +15,10 @@ export default function TraktDiagnosticPage() {
     
     const [history, setHistory] = useState([])
     const [historyLoading, setHistoryLoading] = useState(false)
+
+    useEffect(() => {
+        document.title = formatPageTitle('Diagnóstico Trakt')
+    }, [])
 
     const addWatch = async () => {
         setLoading(true)

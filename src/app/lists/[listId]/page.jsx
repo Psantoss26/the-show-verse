@@ -10,6 +10,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
+import { formatPageTitle } from '@/lib/pageTitle'
 
 import {
     getListDetails,
@@ -229,6 +230,10 @@ export default function ListDetailsPage() {
         load()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [listId])
+
+    useEffect(() => {
+        document.title = formatPageTitle(data?.name || 'Lista')
+    }, [data?.name])
 
     useEffect(() => {
         if (typeof window === 'undefined') return

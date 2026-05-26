@@ -1,7 +1,7 @@
 import BibliotecaClient from "./BibliotecaClient";
 
 export const metadata = {
-  title: "Biblioteca Plex - ShowVerse",
+  title: "Biblioteca Plex",
   description:
     "Dashboard de tu biblioteca Plex con contenido y resoluciones disponibles.",
 };

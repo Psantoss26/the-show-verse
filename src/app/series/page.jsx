@@ -11,6 +11,10 @@ import {
 
 export const revalidate = 1800; // 30 min
 
+export const metadata = {
+  title: "Series",
+};
+
 /* ========= Utilidad para obtener la URL base en servidor ========= */
 function getBaseUrl() {
   if (process.env.NEXT_PUBLIC_APP_URL)
