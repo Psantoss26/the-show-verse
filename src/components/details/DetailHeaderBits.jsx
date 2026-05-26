@@ -43,14 +43,16 @@ export function CompactBadge({
       `}
       title={sub ? `${label || ""} ${value ?? ""} · ${sub}`.trim() : undefined}
     >
-      <img
-        src={logo}
-        alt={label || "Provider"}
-        className={`
-          h-5 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110
-          ${logoClassName}
-        `}
-      />
+      <span className="grid h-6 w-6 shrink-0 place-items-center">
+        <img
+          src={logo}
+          alt={label || "Provider"}
+          className={`
+            max-h-5 max-w-6 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110
+            ${logoClassName}
+          `}
+        />
+      </span>
 
       <div className="flex flex-col justify-center leading-none min-w-0">
         <div className="flex items-baseline gap-1 min-w-0">

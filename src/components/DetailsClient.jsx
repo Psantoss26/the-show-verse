@@ -8748,7 +8748,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* Badge de IMDb - Muestra rating y votos, enlaza al título en IMDb */}
                     {extras.imdbRating && (
                       <CompactBadge
-                        logo="/logo-IMDb.png"
+                        logo="/logo-IMDb.svg"
                         logoClassName="h-5 sm:h-5"
                         value={Number(extras.imdbRating).toFixed(1)}
                         sub={formatCountShort(extras.imdbVotes)}
@@ -9565,7 +9565,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             {Number(imdbScore).toFixed(1)}
                                           </span>
                                           <img
-                                            src="/logo-IMDb.png"
+                                            src="/logo-IMDb.svg"
                                             alt=""
                                             className="w-auto h-3 opacity-100"
                                             loading="lazy"

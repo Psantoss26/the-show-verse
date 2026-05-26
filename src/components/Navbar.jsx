@@ -24,6 +24,7 @@ import {
   FolderKanban,
 } from "lucide-react";
 import TraktHistoryNavButton from "@/components/trakt/TraktHistoryNavButton";
+import WatchNextAssistant from "@/components/WatchNextAssistant";
 
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
@@ -114,7 +115,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
 
   return (
     <div
-      className={`relative w-full ${isMobile ? "max-w-full" : "max-w-lg"}`}
+      className={`relative min-w-0 w-full ${isMobile ? "max-w-full" : "max-w-lg"}`}
       ref={searchRef}
     >
       <form onSubmit={(e) => e.preventDefault()} className="relative w-full">
@@ -450,8 +451,9 @@ export default function Navbar() {
           </div>
 
           {/* Centro */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg px-4 flex justify-center">
+          <div className="absolute left-1/2 top-1/2 flex w-full max-w-[620px] -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-2 px-4">
             <SearchBar />
+            <WatchNextAssistant />
           </div>
         </div>
 
@@ -484,6 +486,8 @@ export default function Navbar() {
 
           {/* Derecha: búsqueda + perfil */}
           <div className="flex items-center gap-2 flex-shrink-0 pr-1">
+            <WatchNextAssistant isMobile />
+
             <button
               onClick={() => setShowMobileSearch(true)}
               className="p-2 rounded-full transition-colors text-white hover:bg-white/10"

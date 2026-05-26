@@ -95,6 +95,36 @@ const CATS = [
     { id: 'upcoming', label: 'Próximamente', icon: CalendarClock }
 ]
 
+const TMDB_LIST_DETAILS_CACHE_TTL_MS = 20 * 60 * 1000
+
+function getTmdbListDetailsCacheKey(listId) {
+    return listId ? `showverse:list-details:tmdb:${listId}:v1` : null
+}
+
+function readTmdbListDetailsCache(listId) {
+    const key = getTmdbListDetailsCacheKey(listId)
+    if (!key || typeof window === 'undefined') return null
+    try {
+        const raw = window.sessionStorage.getItem(key)
+        if (!raw) return null
+        const parsed = JSON.parse(raw)
+        if (Date.now() - Number(parsed?.t || 0) > TMDB_LIST_DETAILS_CACHE_TTL_MS) return null
+        return parsed?.data || null
+    } catch {
+        return null
+    }
+}
+
+function writeTmdbListDetailsCache(listId, data) {
+    const key = getTmdbListDetailsCacheKey(listId)
+    if (!key || typeof window === 'undefined') return
+    try {
+        window.sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data }))
+    } catch {
+        // ignore
+    }
+}
+
 function CatalogDropdown({ value, onChange }) {
     const [open, setOpen] = useState(false)
     const wrapRef = useRef(null)
@@ -178,8 +208,8 @@ export default function ListDetailsPage() {
     const { session, account } = useAuth()
     const canUse = useMemo(() => !!session && !!account?.id, [session, account])
 
-    const [data, setData] = useState(null)
-    const [loading, setLoading] = useState(true)
+    const [data, setData] = useState(() => readTmdbListDetailsCache(listId))
+    const [loading, setLoading] = useState(() => !readTmdbListDetailsCache(listId))
     const [err, setErr] = useState('')
     const [busyId, setBusyId] = useState(null)
     const [clearing, setClearing] = useState(false)
@@ -210,16 +240,23 @@ export default function ListDetailsPage() {
 
     const load = async () => {
         if (!listId) return
-        setLoading(true)
+        const cached = readTmdbListDetailsCache(listId)
+        if (cached) {
+            setData(cached)
+            setEditName(cached?.name || '')
+            setEditDesc(cached?.description || '')
+        }
+        setLoading(!cached)
         setErr('')
         try {
             const json = await getListDetails({ listId, page: 1, language: 'es-ES', sessionId: session })
+            writeTmdbListDetailsCache(listId, json)
             setData(json)
             setEditName(json?.name || '')
             setEditDesc(json?.description || '')
         } catch (e) {
             setErr(e?.message || 'Error cargando lista')
-            setData(null)
+            if (!cached) setData(null)
         } finally {
             setLoading(false)
         }
@@ -306,11 +343,13 @@ export default function ListDetailsPage() {
             setData((prev) => {
                 if (!prev) return prev
                 const nextItems = (prev.items || []).filter((x) => x?.id !== movieId)
-                return {
+                const next = {
                     ...prev,
                     items: nextItems,
                     item_count: Math.max(0, (prev.item_count || nextItems.length) - 1)
                 }
+                writeTmdbListDetailsCache(listId, next)
+                return next
             })
         } catch (e) {
             setErr(e?.message || 'Error quitando película')
@@ -332,7 +371,9 @@ export default function ListDetailsPage() {
             setData((prev) => {
                 if (!prev) return prev
                 const nextItems = [{ ...movie, media_type: 'movie' }, ...(prev.items || [])]
-                return { ...prev, items: nextItems, item_count: (prev.item_count || 0) + 1 }
+                const next = { ...prev, items: nextItems, item_count: (prev.item_count || 0) + 1 }
+                writeTmdbListDetailsCache(listId, next)
+                return next
             })
         } catch (e) {
             setErr(e?.message || 'Error añadiendo película')
@@ -410,15 +451,6 @@ export default function ListDetailsPage() {
     // Si no hay sesión, no renderizamos (como ya hacías)
     if (!canUse) return null
 
-    // Loading inicial
-    if (loading && !data) {
-        return (
-            <div className="min-h-screen bg-[#101010] flex items-center justify-center">
-                <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
-            </div>
-        )
-    }
-
     const tmdbListUrl = `https://www.themoviedb.org/list/${listId}`
     const gridItems = tab === 'items' ? items : addMode === 'search' ? searchRes : catRes
     const coverItem = items.find((item) => item?.poster_path || item?.backdrop_path) || gridItems.find((item) => item?.poster_path || item?.backdrop_path)
@@ -432,7 +464,7 @@ export default function ListDetailsPage() {
             sourceLabel="Lista de TMDb"
             posterImage={coverPath ? `https://image.tmdb.org/t/p/w500${coverPath}` : null}
             backdropImage={backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null}
-            badges={[`${items.length} items`, 'TMDb']}
+            badges={data ? [`${items.length} items`, 'TMDb'] : ['TMDb']}
             stats={[
                 { label: 'Elementos', value: items.length },
                 { label: 'Fuente', value: 'TMDb' },
@@ -585,7 +617,7 @@ export default function ListDetailsPage() {
             ) : null}
 
             {/* Empty / Filtros / Grid */}
-            {tab === 'items' && items.length === 0 ? (
+            {tab === 'items' && items.length === 0 && !loading ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
                     <ListVideo className="w-12 h-12 text-zinc-700 mb-4" />
                     <h3 className="text-lg font-bold text-zinc-300">Lista vacía</h3>
@@ -593,7 +625,7 @@ export default function ListDetailsPage() {
                         Usa la pestaña <b>Añadir</b> para agregar películas.
                     </p>
                 </div>
-            ) : tab === 'items' ? (
+            ) : tab === 'items' && items.length > 0 ? (
                 <FilterableListItems
                     items={items.map((item) => ({ ...item, media_type: item?.media_type || 'movie' }))}
                     renderCard={(it, meta, viewMode) => {
@@ -632,7 +664,7 @@ export default function ListDetailsPage() {
                     emptyTitle="Sin resultados"
                     emptyText="No hay títulos que coincidan con los filtros."
                 />
-            ) : (
+            ) : tab === 'add' ? (
                 <div className={listPosterGridClass}>
                     {gridItems.map((it) => {
                         const id = it?.id
@@ -689,7 +721,7 @@ export default function ListDetailsPage() {
                         )
                     })}
                 </div>
-            )}
+            ) : null}
         </UnifiedListDetailsLayout>
     )
 }

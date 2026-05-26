@@ -50,6 +50,8 @@ import ListPosterCard from "@/components/lists/ListPosterCard";
 
 // ================== UTILS & CACHE ==================
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const LISTS_SOURCE_CACHE_TTL_MS = 20 * 60 * 1000;
+const LIST_PREVIEW_CACHE_TTL_MS = 30 * 60 * 1000;
 const imdbRatingsCache = new Map();
 const PRELOAD_FIRST_N_LISTS = 3;
 const LISTS_MENU_PREFS_KEY = "showverse:lists:menu:v2";
@@ -173,6 +175,32 @@ function writeListsMenuPrefs(prefs) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(LISTS_MENU_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // ignore
+  }
+}
+
+function readSessionJsonCache(key, ttlMs) {
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const t = Number(parsed?.t || 0);
+    if (!t || Date.now() - t > ttlMs) return null;
+    return parsed?.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionJsonCache(key, data) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      key,
+      JSON.stringify({ t: Date.now(), data }),
+    );
   } catch {
     // ignore
   }
@@ -690,7 +718,7 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile, accent = "trak
                 <span className="font-mono text-[10px] font-black tracking-tight text-yellow-400 sm:text-xs">
                   {typeof imdbScore === "number" ? imdbScore.toFixed(1) : imdbScore}
                 </span>
-                <img src="/logo-IMDb.png" alt="" className="h-2.5 w-auto sm:h-3" />
+                <img src="/logo-IMDb.svg" alt="" className="h-2.5 w-auto sm:h-3" />
               </div>
             ) : null}
           </div>
@@ -1029,7 +1057,7 @@ const GridListCard = memo(function GridListCard({
     if (inView) ensureListItems(cacheKey);
   }, [inView, ensureListItems, cacheKey]);
 
-  const isLoading = itemsState === null || itemsState === undefined;
+  const isLoading = itemsState === null;
   const items = Array.isArray(itemsState) ? itemsState : [];
 
   return (
@@ -1094,8 +1122,9 @@ const RowListSection = memo(function RowListSection({
     if (inView) ensureListItems(cacheKey);
   }, [inView, ensureListItems, cacheKey]);
 
-  const isLoading = itemsState === null || itemsState === undefined;
+  const isLoading = itemsState === null;
   const items = Array.isArray(itemsState) ? itemsState : [];
+  const hasResolvedItems = itemsState !== undefined;
 
   return (
     <section ref={ref} className="space-y-4">
@@ -1156,11 +1185,11 @@ const RowListSection = memo(function RowListSection({
         <ListItemsRowSkeleton isMobile={isMobile} />
       ) : items.length > 0 ? (
         <ListItemsRow items={items} isMobile={isMobile} accent={list?.source} />
-      ) : (
+      ) : hasResolvedItems ? (
         <div className="h-40 flex items-center justify-center bg-zinc-900/20 rounded-2xl border border-dashed border-white/5 text-zinc-600 text-sm">
           Lista vacía
         </div>
-      )}
+      ) : null}
     </section>
   );
 });
@@ -1179,7 +1208,7 @@ const ListModeRow = memo(function ListModeRow({
     if (inView) ensureListItems(cacheKey);
   }, [inView, ensureListItems, cacheKey]);
 
-  const isLoading = itemsState === null || itemsState === undefined;
+  const isLoading = itemsState === null;
   const items = Array.isArray(itemsState) ? itemsState : [];
   const firstItem = items[0];
 
@@ -1283,6 +1312,7 @@ export default function ListsPage() {
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [collectionsResolvedKey, setCollectionsResolvedKey] = useState(null);
   const [searchedCollections, setSearchedCollections] = useState([]);
+  const [cachedActiveLists, setCachedActiveLists] = useState([]);
 
   // Map: `${source}:${id}` -> undefined (no pedido) | null (cargando) | Array(items)
   const [itemsMap, setItemsMap] = useState({});
@@ -1331,6 +1361,23 @@ export default function ListsPage() {
       : deferredQuery.trim()
         ? `search:${deferredQuery.trim().toLowerCase()}`
         : "featured";
+  const activeListsCacheKey = useMemo(() => {
+    const scope =
+      source === "trakt"
+        ? traktMode
+        : source === "collections"
+          ? collectionsQueryKey || "featured"
+          : "personal";
+    return `showverse:lists:index:${source}:${scope}:v1`;
+  }, [source, traktMode, collectionsQueryKey]);
+
+  useEffect(() => {
+    const cached = readSessionJsonCache(
+      activeListsCacheKey,
+      LISTS_SOURCE_CACHE_TTL_MS,
+    );
+    setCachedActiveLists(Array.isArray(cached) ? cached : []);
+  }, [activeListsCacheKey]);
 
   // ✅ carga colecciones destacadas cuando toca
   useEffect(() => {
@@ -1413,7 +1460,7 @@ export default function ListsPage() {
   }, [source, deferredQuery]);
 
   // ✅ lista activa según fuente
-  const activeLists = useMemo(() => {
+  const fetchedActiveLists = useMemo(() => {
     if (source === "tmdb") {
       return safeTmdbLists.map((l) => ({
         ...l,
@@ -1456,6 +1503,24 @@ export default function ListsPage() {
     searchedCollections,
     deferredQuery,
   ]);
+
+  useEffect(() => {
+    if (!Array.isArray(fetchedActiveLists) || fetchedActiveLists.length === 0) {
+      return;
+    }
+    setCachedActiveLists(fetchedActiveLists);
+    writeSessionJsonCache(activeListsCacheKey, fetchedActiveLists);
+  }, [activeListsCacheKey, fetchedActiveLists]);
+
+  const activeLists = useMemo(
+    () =>
+      fetchedActiveLists.length > 0
+        ? fetchedActiveLists
+        : Array.isArray(cachedActiveLists)
+          ? cachedActiveLists
+          : [],
+    [fetchedActiveLists, cachedActiveLists],
+  );
 
   const filtered = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
@@ -1519,9 +1584,19 @@ export default function ListsPage() {
       if (inFlight.current.has(cacheKey)) return;
 
       const src = listObj?.source || source;
+      const previewCacheKey = `showverse:lists:preview:${cacheKey}:v1`;
+      const cachedPreview = readSessionJsonCache(
+        previewCacheKey,
+        LIST_PREVIEW_CACHE_TTL_MS,
+      );
 
       inFlight.current.add(cacheKey);
-      setItemsMap((prev) => ({ ...prev, [cacheKey]: null }));
+      if (Array.isArray(cachedPreview)) {
+        setItemsMap((prev) => ({
+          ...prev,
+          [cacheKey]: cachedPreview,
+        }));
+      }
 
       const ctrl = new AbortController();
       controllersRef.current.set(cacheKey, ctrl);
@@ -1535,6 +1610,7 @@ export default function ListsPage() {
             signal: ctrl.signal,
           });
           const items = dedupePreviewItems(Array.isArray(json?.items) ? json.items : []);
+          writeSessionJsonCache(previewCacheKey, items);
           setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
           return;
         }
@@ -1550,6 +1626,7 @@ export default function ListsPage() {
           const j = await res.json().catch(() => ({}));
 
           const normalized = normalizeTraktItemsToCards(j?.items);
+          writeSessionJsonCache(previewCacheKey, normalized);
           setItemsMap((prev) => ({ ...prev, [cacheKey]: normalized }));
           return;
         }
@@ -1564,6 +1641,7 @@ export default function ListsPage() {
         );
         const j = await res.json().catch(() => ({}));
         const items = dedupePreviewItems(Array.isArray(j?.items) ? j.items : []);
+        writeSessionJsonCache(previewCacheKey, items);
         setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
       } catch (e) {
         if (e?.name === "AbortError") {
@@ -1656,7 +1734,9 @@ export default function ListsPage() {
         : collectionsLoading;
 
   const sourceInitialized =
-    !prefsHydrated
+    cachedActiveLists.length > 0
+      ? true
+      : !prefsHydrated
       ? false
       : source === "tmdb"
         ? !!tmdbInitialized
@@ -1682,23 +1762,15 @@ export default function ListsPage() {
         : "Cargando listas...";
 
   const showInitialLoader =
-    authStatus === "checking" ||
-    (authStatus === "authenticated" &&
-      !hasCompletedInitialLoad &&
-      !sourceInitialized);
+    false;
 
   const showContentLoader =
-    hasCompletedInitialLoad &&
-    (!sourceInitialized || (loadingUnified && visibleCount === 0));
+    false;
 
   // ✅ readonly: Trakt y Colecciones no crean/borran ni loadMore
   const canEdit = !!canUse && source === "tmdb";
 
-  if (showInitialLoader) {
-    return <ListsLoaderState fullscreen message={loadingMessage} />;
-  }
-
-  if (authStatus === "anonymous") {
+  if (authStatus === "anonymous" && source === "tmdb") {
     return (
       <div className="min-h-screen bg-[#101010] text-gray-100 flex items-center justify-center">
         <div className="max-w-md text-center px-4">
@@ -2070,9 +2142,7 @@ export default function ListsPage() {
                       className="h-11 w-11 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex items-center justify-center shrink-0"
                       title="Refrescar"
                     >
-                      <RefreshCcw
-                        className={`w-4 h-4 ${loadingUnified && !showContentLoader ? "animate-spin text-purple-500" : ""}`}
-                      />
+                      <RefreshCcw className="w-4 h-4" />
                     </button>
 
                     {canEdit && (
@@ -2313,9 +2383,7 @@ export default function ListsPage() {
               className="h-11 w-11 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex items-center justify-center shrink-0"
               title="Refrescar"
             >
-              <RefreshCcw
-                className={`w-4 h-4 ${loadingUnified && !showContentLoader ? "animate-spin text-purple-500" : ""}`}
-              />
+              <RefreshCcw className="w-4 h-4" />
             </button>
 
             {canEdit && (
@@ -2349,9 +2417,7 @@ export default function ListsPage() {
         ) : null}
 
         {/* CONTENT */}
-        {showContentLoader ? (
-          <ListsLoaderState message={loadingMessage} />
-        ) : filtered.length === 0 ? (
+        {!sourceInitialized && filtered.length === 0 ? null : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
             <ListVideo className="w-16 h-16 text-neutral-700 mb-4" />
             <h3 className="text-xl font-bold text-neutral-300">
