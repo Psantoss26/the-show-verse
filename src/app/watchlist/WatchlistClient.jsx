@@ -280,6 +280,179 @@ function providerGroupKey(provider) {
   return `provider-${provider?.platform_key ?? normText(provider?.provider_name)}`;
 }
 
+const WATCHLIST_GROUP_OPTIONS = [
+  { key: "none", label: "Sin agrupar", itemLabel: "Sin agrupar" },
+  { key: "year", label: "Año", itemLabel: "Por año" },
+  { key: "decade", label: "Década", itemLabel: "Por década" },
+  { key: "genre", label: "Género", itemLabel: "Por género" },
+  { key: "provider", label: "Plataformas", itemLabel: "Por plataforma" },
+  { key: "tmdb_rating", label: "TMDb", itemLabel: "Puntuación TMDb" },
+  { key: "imdb_rating", label: "IMDb", itemLabel: "Puntuación IMDb" },
+  { key: "trakt_rating", label: "Trakt", itemLabel: "Puntuación Trakt" },
+];
+
+function getGroupOptionLabel(key) {
+  return (
+    WATCHLIST_GROUP_OPTIONS.find((option) => option.key === key)?.label ||
+    "Sin agrupar"
+  );
+}
+
+function getGroupingValueLabel(groupBy, subGroupBy) {
+  if (groupBy === "none") return "Sin agrupar";
+  const groupLabel = getGroupOptionLabel(groupBy);
+  if (!subGroupBy || subGroupBy === "none") return groupLabel;
+  return `${groupLabel} / ${getGroupOptionLabel(subGroupBy)}`;
+}
+
+function formatRatingBucketLabel(bucket) {
+  return Number.isInteger(bucket) ? `${bucket}` : bucket.toFixed(1);
+}
+
+function ratingRangeMeta(rating, emptyKey, emptyLabel) {
+  if (!rating && emptyKey) return { key: emptyKey, label: emptyLabel };
+  const bucket = Math.floor(rating * 2) / 2;
+  const next = bucket + 0.5;
+  return {
+    key: bucket.toString(),
+    label: `${formatRatingBucketLabel(bucket)} - ${formatRatingBucketLabel(next)}`,
+  };
+}
+
+function buildWatchlistGroupMetas(
+  item,
+  groupBy,
+  { imdbScores, traktScores, providersByItem },
+) {
+  if (groupBy === "none") return [];
+
+  if (groupBy === "genre") {
+    const type = item.media_type || (item.title ? "movie" : "tv");
+    const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
+    const genreIds = item.genre_ids || [];
+    if (genreIds.length === 0) return [{ key: "no_genre", label: "Sin género" }];
+    return genreIds.map((genreId) => ({
+      key: String(genreId),
+      label: genreMap[genreId] || `Género ${genreId}`,
+    }));
+  }
+
+  if (groupBy === "provider") {
+    const providers = providersByItem.get(getProviderMediaKey(item));
+    if (!providers)
+      return [{ key: "loading_providers", label: "Cargando plataformas..." }];
+    if (providers.length === 0)
+      return [{ key: "no_provider", label: "Sin plataforma disponible" }];
+    return providers.map((provider) => ({
+      key: providerGroupKey(provider),
+      label: provider.provider_name,
+    }));
+  }
+
+  if (groupBy === "year") {
+    const year = (item.release_date || item.first_air_date || "").slice(0, 4);
+    return [{ key: year || "Sin año", label: year || "Sin año" }];
+  }
+
+  if (groupBy === "decade") {
+    const year = (item.release_date || item.first_air_date || "").slice(0, 4);
+    if (!year) return [{ key: "Sin década", label: "Sin década" }];
+    const decade = Math.floor(parseInt(year) / 10) * 10;
+    return [{ key: decade.toString(), label: `${decade}s` }];
+  }
+
+  if (groupBy === "tmdb_rating") {
+    return [ratingRangeMeta(item.vote_average || 0)];
+  }
+
+  if (groupBy === "imdb_rating") {
+    return [
+      ratingRangeMeta(
+        imdbScores.get(String(item.id)) || 0,
+        "no_imdb",
+        "Sin puntuación IMDb",
+      ),
+    ];
+  }
+
+  if (groupBy === "trakt_rating") {
+    return [
+      ratingRangeMeta(
+        traktScores.get(String(item.id)) || 0,
+        "no_trakt",
+        "Sin puntuación Trakt",
+      ),
+    ];
+  }
+
+  return [];
+}
+
+function createWatchlistGroupStats() {
+  return {
+    tmdb: { sum: 0, count: 0, avg: 0 },
+    imdb: { sum: 0, count: 0, avg: 0 },
+    trakt: { sum: 0, count: 0, avg: 0 },
+  };
+}
+
+function addWatchlistGroupStats(stats, item, imdbScores, traktScores) {
+  if (item.vote_average) {
+    stats.tmdb.sum += item.vote_average;
+    stats.tmdb.count++;
+  }
+  const imdbRating = imdbScores.get(String(item.id));
+  if (imdbRating) {
+    stats.imdb.sum += imdbRating;
+    stats.imdb.count++;
+  }
+  const traktRating = traktScores.get(String(item.id));
+  if (traktRating) {
+    stats.trakt.sum += traktRating;
+    stats.trakt.count++;
+  }
+}
+
+function finalizeWatchlistGroupStats(stats) {
+  for (const stat of Object.values(stats)) {
+    if (stat.count > 0) stat.avg = stat.sum / stat.count;
+  }
+}
+
+function sortWatchlistGroups(groupsArray, groupBy) {
+  if (groupBy === "year" || groupBy === "decade") {
+    groupsArray.sort((a, b) => {
+      if (a.key === "Sin año" || a.key === "Sin década") return 1;
+      if (b.key === "Sin año" || b.key === "Sin década") return -1;
+      return parseInt(b.key) - parseInt(a.key);
+    });
+  } else if (groupBy.includes("rating")) {
+    groupsArray.sort((a, b) => {
+      const aNoRating = ["no_tmdb", "no_imdb", "no_trakt"].includes(a.key);
+      const bNoRating = ["no_tmdb", "no_imdb", "no_trakt"].includes(b.key);
+      if (aNoRating && !bNoRating) return 1;
+      if (!aNoRating && bNoRating) return -1;
+      if (aNoRating && bNoRating) return 0;
+      return parseFloat(b.key) - parseFloat(a.key);
+    });
+  } else if (groupBy === "genre") {
+    groupsArray.sort((a, b) => {
+      if (a.key === "no_genre") return 1;
+      if (b.key === "no_genre") return -1;
+      return a.label.localeCompare(b.label);
+    });
+  } else if (groupBy === "provider") {
+    groupsArray.sort((a, b) => {
+      const aSpecial = ["loading_providers", "no_provider"].includes(a.key);
+      const bSpecial = ["loading_providers", "no_provider"].includes(b.key);
+      if (aSpecial && !bSpecial) return 1;
+      if (!aSpecial && bSpecial) return -1;
+      return a.label.localeCompare(b.label);
+    });
+  }
+  return groupsArray;
+}
+
 function canonicalPlatformFromProvider(provider) {
   const id = Number(provider?.provider_id);
   const name = normText(provider?.provider_name);
@@ -777,7 +950,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         onClick={() => setOpen((v) => !v)}
         className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[140px]"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-blue-500" />}
           <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider">
             {label}:
@@ -787,7 +960,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
           </span>
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -797,7 +970,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 w-full rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden p-1"
+            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-xl border border-zinc-800 bg-[#121212] p-1 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
           >
             {children({ close: () => setOpen(false) })}
           </motion.div>
@@ -818,6 +991,85 @@ function DropdownItem({ active, onClick, children }) {
       <span className="font-medium">{children}</span>
       {active && <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />}
     </button>
+  );
+}
+
+function GroupingDropdownContent({
+  groupBy,
+  subGroupBy,
+  onGroupChange,
+  onSubGroupChange,
+  close,
+}) {
+  const subgroupOptions = WATCHLIST_GROUP_OPTIONS.filter(
+    (option) => option.key !== "none" && option.key !== groupBy,
+  );
+
+  return (
+    <>
+      <div className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
+        Agrupación
+      </div>
+      {WATCHLIST_GROUP_OPTIONS.map((option) => (
+        <DropdownItem
+          key={option.key}
+          active={groupBy === option.key}
+          onClick={() => {
+            onGroupChange(option.key);
+            if (option.key === "none") close();
+          }}
+        >
+          {option.itemLabel}
+        </DropdownItem>
+      ))}
+
+      {groupBy !== "none" && (
+        <>
+          <div className="mx-2 my-2 h-px bg-zinc-800" />
+          <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
+            Subagrupación
+          </div>
+          <DropdownItem
+            active={!subGroupBy || subGroupBy === "none"}
+            onClick={() => {
+              onSubGroupChange("none");
+              close();
+            }}
+          >
+            Sin subagrupación
+          </DropdownItem>
+          {subgroupOptions.map((option) => (
+            <DropdownItem
+              key={option.key}
+              active={subGroupBy === option.key}
+              onClick={() => {
+                onSubGroupChange(option.key);
+                close();
+              }}
+            >
+              {option.itemLabel}
+            </DropdownItem>
+          ))}
+        </>
+      )}
+    </>
+  );
+}
+
+function SubGroupDivider({ title, count }) {
+  return (
+    <div className="flex items-center gap-3 py-1.5 sm:py-2">
+      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-500/40 to-blue-500/15" />
+      <div className="inline-flex max-w-[70%] items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs sm:text-sm">
+        <span className="truncate font-black uppercase tracking-wide text-blue-100">
+          {title}
+        </span>
+        <span className="shrink-0 text-[10px] font-bold text-blue-300/80">
+          {count}
+        </span>
+      </div>
+      <div className="h-px flex-1 bg-gradient-to-l from-transparent via-blue-500/40 to-blue-500/15" />
+    </div>
   );
 }
 
@@ -1379,6 +1631,14 @@ export default function WatchlistClient() {
     return saved || "none";
   });
 
+  const [subGroupBy, setSubGroupBy] = useState(() => {
+    if (typeof window === "undefined") return "none";
+    const saved = window.localStorage.getItem(
+      "showverse:watchlist:subGroupBy",
+    );
+    return saved || "none";
+  });
+
   const [q, setQ] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -1407,6 +1667,28 @@ export default function WatchlistClient() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("showverse:watchlist:groupBy", groupBy);
   }, [groupBy]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("showverse:watchlist:subGroupBy", subGroupBy);
+  }, [subGroupBy]);
+
+  const handleGroupChange = useCallback(
+    (nextGroupBy) => {
+      setGroupBy(nextGroupBy);
+      if (nextGroupBy === "none" || nextGroupBy === subGroupBy) {
+        setSubGroupBy("none");
+      }
+    },
+    [subGroupBy],
+  );
+
+  const handleSubGroupChange = useCallback(
+    (nextSubGroupBy) => {
+      setSubGroupBy(nextSubGroupBy === groupBy ? "none" : nextSubGroupBy);
+    },
+    [groupBy],
+  );
 
   // Load watchlist
   useEffect(() => {
@@ -1726,7 +2008,11 @@ export default function WatchlistClient() {
   }, [filtered, sortBy, groupBy, imdbScores, traktScores]);
 
   useEffect(() => {
-    if (groupBy !== "provider" || sorted.length === 0) return;
+    if (
+      (groupBy !== "provider" && subGroupBy !== "provider") ||
+      sorted.length === 0
+    )
+      return;
 
     let cancelled = false;
 
@@ -1803,7 +2089,7 @@ export default function WatchlistClient() {
     return () => {
       cancelled = true;
     };
-  }, [groupBy, sorted]);
+  }, [groupBy, subGroupBy, sorted]);
 
   const stats = useMemo(() => {
     let movies = 0;
@@ -1820,194 +2106,68 @@ export default function WatchlistClient() {
   const grouped = useMemo(() => {
     if (groupBy === "none") return null;
 
-    // Show grouped view with available scores (progressive loading)
-    // No need to block rendering while loading external scores
-
     const groups = new Map();
+    const groupContext = { imdbScores, traktScores, providersByItem };
 
     for (const item of sorted) {
-      const processGroup = (groupKey, groupLabel) => {
-        if (!groups.has(groupKey)) {
-          groups.set(groupKey, {
-            key: groupKey,
-            label: groupLabel,
+      const metas = buildWatchlistGroupMetas(item, groupBy, groupContext);
+      for (const meta of metas) {
+        if (!groups.has(meta.key)) {
+          groups.set(meta.key, {
+            key: meta.key,
+            label: meta.label,
             items: [],
-            stats: {
-              tmdb: { sum: 0, count: 0, avg: 0 },
-              imdb: { sum: 0, count: 0, avg: 0 },
-              trakt: { sum: 0, count: 0, avg: 0 },
-            },
+            stats: createWatchlistGroupStats(),
+            subgroups: null,
           });
         }
 
-        const group = groups.get(groupKey);
+        const group = groups.get(meta.key);
         group.items.push(item);
-
-        // Calculate stats
-        if (item.vote_average) {
-          group.stats.tmdb.sum += item.vote_average;
-          group.stats.tmdb.count++;
-        }
-        const imdbRating = imdbScores.get(String(item.id));
-        if (imdbRating) {
-          group.stats.imdb.sum += imdbRating;
-          group.stats.imdb.count++;
-        }
-        const traktRating = traktScores.get(String(item.id));
-        if (traktRating) {
-          group.stats.trakt.sum += traktRating;
-          group.stats.trakt.count++;
-        }
-      };
-
-      if (groupBy === "genre") {
-        const type = item.media_type || (item.title ? "movie" : "tv");
-        const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
-        const genreIds = item.genre_ids || [];
-
-        if (genreIds.length === 0) {
-          processGroup("no_genre", "Sin género");
-        } else {
-          // Add item to each genre group it belongs to
-          genreIds.forEach((genreId) => {
-            const genreName = genreMap[genreId] || `Género ${genreId}`;
-            processGroup(String(genreId), genreName);
-          });
-        }
-      } else if (groupBy === "provider") {
-        const providers = providersByItem.get(getProviderMediaKey(item));
-
-        if (!providers) {
-          processGroup("loading_providers", "Cargando plataformas...");
-        } else if (providers.length === 0) {
-          processGroup("no_provider", "Sin plataforma disponible");
-        } else {
-          providers.forEach((provider) => {
-            processGroup(providerGroupKey(provider), provider.provider_name);
-          });
-        }
-      } else {
-        let groupKey = "";
-        let groupLabel = "";
-
-        if (groupBy === "year") {
-          const year = (item.release_date || item.first_air_date || "").slice(
-            0,
-            4,
-          );
-          groupKey = year || "Sin año";
-          groupLabel = year || "Sin año";
-        } else if (groupBy === "decade") {
-          const year = (item.release_date || item.first_air_date || "").slice(
-            0,
-            4,
-          );
-          if (year) {
-            const decade = Math.floor(parseInt(year) / 10) * 10;
-            groupKey = decade.toString();
-            groupLabel = `${decade}s`;
-          } else {
-            groupKey = "Sin década";
-            groupLabel = "Sin década";
-          }
-        } else if (groupBy === "tmdb_rating") {
-          const rating = item.vote_average || 0;
-          const bucket = Math.floor(rating * 2) / 2;
-          const next = bucket + 0.5;
-          const fmtB = Number.isInteger(bucket)
-            ? `${bucket}`
-            : bucket.toFixed(1);
-          const fmtN = Number.isInteger(next) ? `${next}` : next.toFixed(1);
-          groupKey = bucket.toString();
-          groupLabel = `${fmtB} - ${fmtN}`;
-        } else if (groupBy === "imdb_rating") {
-          const rating = imdbScores.get(String(item.id)) || 0;
-          if (!rating) {
-            groupKey = "no_imdb";
-            groupLabel = "Sin puntuación IMDb";
-          } else {
-            const bucket = Math.floor(rating * 2) / 2;
-            const next = bucket + 0.5;
-            const fmtB = Number.isInteger(bucket)
-              ? `${bucket}`
-              : bucket.toFixed(1);
-            const fmtN = Number.isInteger(next) ? `${next}` : next.toFixed(1);
-            groupKey = bucket.toString();
-            groupLabel = `${fmtB} - ${fmtN}`;
-          }
-        } else if (groupBy === "trakt_rating") {
-          const rating = traktScores.get(String(item.id)) || 0;
-          if (!rating) {
-            groupKey = "no_trakt";
-            groupLabel = "Sin puntuación Trakt";
-          } else {
-            const bucket = Math.floor(rating * 2) / 2;
-            const next = bucket + 0.5;
-            const fmtB = Number.isInteger(bucket)
-              ? `${bucket}`
-              : bucket.toFixed(1);
-            const fmtN = Number.isInteger(next) ? `${next}` : next.toFixed(1);
-            groupKey = bucket.toString();
-            groupLabel = `${fmtB} - ${fmtN}`;
-          }
-        }
-
-        processGroup(groupKey, groupLabel);
+        addWatchlistGroupStats(group.stats, item, imdbScores, traktScores);
       }
     }
 
-    // Calculate averages
     for (const group of groups.values()) {
-      if (group.stats.tmdb.count > 0) {
-        group.stats.tmdb.avg = group.stats.tmdb.sum / group.stats.tmdb.count;
-      }
-      if (group.stats.imdb.count > 0) {
-        group.stats.imdb.avg = group.stats.imdb.sum / group.stats.imdb.count;
-      }
-      if (group.stats.trakt.count > 0) {
-        group.stats.trakt.avg = group.stats.trakt.sum / group.stats.trakt.count;
+      finalizeWatchlistGroupStats(group.stats);
+
+      if (subGroupBy && subGroupBy !== "none") {
+        const subgroups = new Map();
+
+        for (const item of group.items) {
+          const [meta] = buildWatchlistGroupMetas(
+            item,
+            subGroupBy,
+            groupContext,
+          );
+          if (!meta) continue;
+          if (!subgroups.has(meta.key)) {
+            subgroups.set(meta.key, {
+              key: meta.key,
+              label: meta.label,
+              items: [],
+            });
+          }
+          subgroups.get(meta.key).items.push(item);
+        }
+
+        group.subgroups = sortWatchlistGroups(
+          Array.from(subgroups.values()),
+          subGroupBy,
+        );
       }
     }
 
-    // Sort groups
-    const groupsArray = Array.from(groups.values());
-    if (groupBy === "year" || groupBy === "decade") {
-      groupsArray.sort((a, b) => {
-        if (a.key === "Sin año" || a.key === "Sin década") return 1;
-        if (b.key === "Sin año" || b.key === "Sin década") return -1;
-        return parseInt(b.key) - parseInt(a.key);
-      });
-    } else if (groupBy.includes("rating")) {
-      groupsArray.sort((a, b) => {
-        // Put groups without ratings at the end
-        const aNoRating = ["no_imdb", "no_trakt"].includes(a.key);
-        const bNoRating = ["no_imdb", "no_trakt"].includes(b.key);
-
-        if (aNoRating && !bNoRating) return 1;
-        if (!aNoRating && bNoRating) return -1;
-        if (aNoRating && bNoRating) return 0;
-
-        return parseInt(b.key) - parseInt(a.key);
-      });
-    } else if (groupBy === "genre") {
-      // Sort alphabetically by genre name, but "Sin género" at the end
-      groupsArray.sort((a, b) => {
-        if (a.key === "no_genre") return 1;
-        if (b.key === "no_genre") return -1;
-        return a.label.localeCompare(b.label);
-      });
-    } else if (groupBy === "provider") {
-      groupsArray.sort((a, b) => {
-        const aSpecial = ["loading_providers", "no_provider"].includes(a.key);
-        const bSpecial = ["loading_providers", "no_provider"].includes(b.key);
-        if (aSpecial && !bSpecial) return 1;
-        if (!aSpecial && bSpecial) return -1;
-        return a.label.localeCompare(b.label);
-      });
-    }
-
-    return groupsArray;
-  }, [sorted, groupBy, imdbScores, traktScores, providersByItem, loadingProviders]);
+    return sortWatchlistGroups(Array.from(groups.values()), groupBy);
+  }, [
+    sorted,
+    groupBy,
+    subGroupBy,
+    imdbScores,
+    traktScores,
+    providersByItem,
+    loadingProviders,
+  ]);
 
   const scoreLoadingLabel =
     loadingImdb && loadingTrakt
@@ -2265,100 +2425,17 @@ export default function WatchlistClient() {
                     <div className="flex-1">
                       <InlineDropdown
                         label="Agrupar"
-                        valueLabel={
-                          groupBy === "none"
-                            ? "Sin agrupar"
-                            : groupBy === "year"
-                              ? "Año"
-                              : groupBy === "decade"
-                                ? "Década"
-                                : groupBy === "genre"
-                                  ? "Género"
-                                  : groupBy === "provider"
-                                    ? "Plataformas"
-                                    : groupBy === "tmdb_rating"
-                                      ? "TMDb"
-                                      : groupBy === "imdb_rating"
-                                        ? "IMDb"
-                                        : "Trakt"
-                        }
+                        valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
                         icon={Layers3}
                       >
                         {({ close }) => (
-                          <>
-                            <DropdownItem
-                              active={groupBy === "none"}
-                              onClick={() => {
-                                setGroupBy("none");
-                                close();
-                              }}
-                            >
-                              Sin agrupar
-                            </DropdownItem>
-                            <DropdownItem
-                              active={groupBy === "year"}
-                              onClick={() => {
-                                setGroupBy("year");
-                                close();
-                              }}
-                            >
-                              Por año
-                            </DropdownItem>
-                            <DropdownItem
-                              active={groupBy === "decade"}
-                              onClick={() => {
-                                setGroupBy("decade");
-                                close();
-                              }}
-                            >
-                              Por década
-                            </DropdownItem>
-                            <DropdownItem
-                              active={groupBy === "genre"}
-                              onClick={() => {
-                                setGroupBy("genre");
-                                close();
-                              }}
-                            >
-                              Por género
-                            </DropdownItem>
-                            <DropdownItem
-                              active={groupBy === "provider"}
-                              onClick={() => {
-                                setGroupBy("provider");
-                                close();
-                              }}
-                            >
-                              Por plataforma
-                            </DropdownItem>
-                            <DropdownItem
-                              active={groupBy === "tmdb_rating"}
-                              onClick={() => {
-                                setGroupBy("tmdb_rating");
-                                close();
-                              }}
-                            >
-                              Puntuación TMDb
-                            </DropdownItem>
-                            <DropdownItem
-                              active={groupBy === "imdb_rating"}
-                              onClick={() => {
-                                setGroupBy("imdb_rating");
-                                close();
-                              }}
-                            >
-                              Puntuación IMDb
-                            </DropdownItem>
-                            <DropdownItem
-                              active={groupBy === "trakt_rating"}
-                              onClick={() => {
-                                setGroupBy("trakt_rating");
-                                close();
-                              }}
-                            >
-                              Puntuación Trakt
-                            </DropdownItem>
-                          </>
+                          <GroupingDropdownContent
+                            groupBy={groupBy}
+                            subGroupBy={subGroupBy}
+                            onGroupChange={handleGroupChange}
+                            onSubGroupChange={handleSubGroupChange}
+                            close={close}
+                          />
                         )}
                       </InlineDropdown>
                     </div>
@@ -2653,100 +2730,17 @@ export default function WatchlistClient() {
 
             <InlineDropdown
               label="Agrupar"
-              valueLabel={
-                groupBy === "none"
-                  ? "Sin agrupar"
-                  : groupBy === "year"
-                    ? "Por año"
-                    : groupBy === "decade"
-                      ? "Por década"
-                      : groupBy === "genre"
-                        ? "Por género"
-                        : groupBy === "provider"
-                          ? "Por plataforma"
-                          : groupBy === "tmdb_rating"
-                            ? "TMDb"
-                            : groupBy === "imdb_rating"
-                              ? "IMDb"
-                              : "Trakt"
-              }
+              valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
               icon={Layers3}
             >
               {({ close }) => (
-                <>
-                  <DropdownItem
-                    active={groupBy === "none"}
-                    onClick={() => {
-                      setGroupBy("none");
-                      close();
-                    }}
-                  >
-                    Sin agrupar
-                  </DropdownItem>
-                  <DropdownItem
-                    active={groupBy === "year"}
-                    onClick={() => {
-                      setGroupBy("year");
-                      close();
-                    }}
-                  >
-                    Por año
-                  </DropdownItem>
-                  <DropdownItem
-                    active={groupBy === "decade"}
-                    onClick={() => {
-                      setGroupBy("decade");
-                      close();
-                    }}
-                  >
-                    Por década
-                  </DropdownItem>
-                  <DropdownItem
-                    active={groupBy === "genre"}
-                    onClick={() => {
-                      setGroupBy("genre");
-                      close();
-                    }}
-                  >
-                    Por género
-                  </DropdownItem>
-                  <DropdownItem
-                    active={groupBy === "provider"}
-                    onClick={() => {
-                      setGroupBy("provider");
-                      close();
-                    }}
-                  >
-                    Por plataforma
-                  </DropdownItem>
-                  <DropdownItem
-                    active={groupBy === "tmdb_rating"}
-                    onClick={() => {
-                      setGroupBy("tmdb_rating");
-                      close();
-                    }}
-                  >
-                    Puntuación TMDb
-                  </DropdownItem>
-                  <DropdownItem
-                    active={groupBy === "imdb_rating"}
-                    onClick={() => {
-                      setGroupBy("imdb_rating");
-                      close();
-                    }}
-                  >
-                    Puntuación IMDb
-                  </DropdownItem>
-                  <DropdownItem
-                    active={groupBy === "trakt_rating"}
-                    onClick={() => {
-                      setGroupBy("trakt_rating");
-                      close();
-                    }}
-                  >
-                    Puntuación Trakt
-                  </DropdownItem>
-                </>
+                <GroupingDropdownContent
+                  groupBy={groupBy}
+                  subGroupBy={subGroupBy}
+                  onGroupChange={handleGroupChange}
+                  onSubGroupChange={handleSubGroupChange}
+                  close={close}
+                />
               )}
             </InlineDropdown>
 
@@ -2845,28 +2839,63 @@ export default function WatchlistClient() {
                   stats={group.stats}
                   groupBy={groupBy}
                 />
-                <motion.div
-                  key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
-                  className={getItemsGridClass(true)}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {group.items.map((item, idx) => (
-                    <WatchlistCard
-                      key={getMediaKey(item)}
-                      item={item}
-                      index={idx}
-                      totalItems={group.items.length}
-                      viewMode={viewMode}
-                      imageMode={imageMode}
-                      imdbScore={imdbScores.get(String(item.id))}
-                      traktScore={traktScores.get(String(item.id))}
-                      userRating={item.user_rating}
-                    />
-                  ))}
-                </motion.div>
+                {group.subgroups?.length ? (
+                  <div className="space-y-6">
+                    {group.subgroups.map((subgroup) => (
+                      <div key={`${group.key}-${subgroup.key}`} className="space-y-3">
+                        <SubGroupDivider
+                          title={subgroup.label}
+                          count={subgroup.items.length}
+                        />
+                        <motion.div
+                          key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
+                          className={getItemsGridClass(true)}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {subgroup.items.map((item, idx) => (
+                            <WatchlistCard
+                              key={getMediaKey(item)}
+                              item={item}
+                              index={idx}
+                              totalItems={subgroup.items.length}
+                              viewMode={viewMode}
+                              imageMode={imageMode}
+                              imdbScore={imdbScores.get(String(item.id))}
+                              traktScore={traktScores.get(String(item.id))}
+                              userRating={item.user_rating}
+                            />
+                          ))}
+                        </motion.div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <motion.div
+                    key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
+                    className={getItemsGridClass(true)}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {group.items.map((item, idx) => (
+                      <WatchlistCard
+                        key={getMediaKey(item)}
+                        item={item}
+                        index={idx}
+                        totalItems={group.items.length}
+                        viewMode={viewMode}
+                        imageMode={imageMode}
+                        imdbScore={imdbScores.get(String(item.id))}
+                        traktScore={traktScores.get(String(item.id))}
+                        userRating={item.user_rating}
+                      />
+                    ))}
+                  </motion.div>
+                )}
               </div>
             ))}
           </div>
