@@ -44,6 +44,7 @@ import { traktGetScoreboard } from "@/lib/api/traktClient";
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PROFILE_STATS_CACHE_KEY = "showverse:profile:stats:v2";
 const PROFILE_DATA_CACHE_KEY = "showverse:profile:data:v2";
+const PROFILE_USER_CACHE_KEY = "showverse:profile:user:v1";
 const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
 
 function readProfileSessionCache(key) {
@@ -75,6 +76,7 @@ function clearProfileSessionCache() {
   try {
     window.sessionStorage.removeItem(PROFILE_STATS_CACHE_KEY);
     window.sessionStorage.removeItem(PROFILE_DATA_CACHE_KEY);
+    window.sessionStorage.removeItem(PROFILE_USER_CACHE_KEY);
   } catch {}
 }
 
@@ -668,7 +670,16 @@ function ProfileHero({ user }) {
     >
       <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-3xl ring-2 ring-indigo-500/35 shadow-2xl shadow-indigo-500/10 sm:h-28 sm:w-28">
         {avatarUrl ? (
-          <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+          <img
+            src={avatarUrl}
+            alt={displayName}
+            width={112}
+            height={112}
+            loading="eager"
+            fetchPriority="high"
+            decoding="sync"
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
             <span className="text-4xl font-black text-white">
@@ -1073,6 +1084,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
     const cachedStats = readProfileSessionCache(PROFILE_STATS_CACHE_KEY);
     const cachedProfile = readProfileSessionCache(PROFILE_DATA_CACHE_KEY);
+    const cachedUser = readProfileSessionCache(PROFILE_USER_CACHE_KEY);
 
     if (cachedStats) {
       setData(cachedStats);
@@ -1080,6 +1092,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
     }
     if (cachedProfile) {
       setProfileData(cachedProfile);
+    } else if (cachedUser?.user) {
+      setProfileData(cachedUser);
     }
 
     const mergeStatsData = (json) => {
@@ -1152,6 +1166,32 @@ export default function StatsClient({ connectNext = "/profile" }) {
       setError("");
       if (!cachedStats) setLoading(true);
 
+      const userPromise =
+        cachedProfile?.user || cachedUser?.user
+          ? Promise.resolve()
+          : (async () => {
+              try {
+                const res = await fetch("/api/trakt/profile?userOnly=1", {
+                  cache: "no-store",
+                });
+                if (ignore) return;
+                if (res.status === 401) {
+                  clearProfileSessionCache();
+                  setNotConnected(true);
+                  return;
+                }
+                if (!res.ok) return;
+                const json = await res.json();
+                if (ignore || !json?.user) return;
+                setProfileData((prev) => ({ ...(prev || {}), user: json.user }));
+                writeProfileSessionCache(PROFILE_USER_CACHE_KEY, {
+                  user: json.user,
+                });
+              } catch (e) {
+                console.error(e);
+              }
+            })();
+
       const statsPromise = (async () => {
         try {
           const res = await fetch(
@@ -1193,17 +1233,28 @@ export default function StatsClient({ connectNext = "/profile" }) {
           const res = await fetch("/api/trakt/profile?compact=1", {
             cache: "no-store",
           });
-          if (ignore || !res.ok) return;
+          if (ignore) return;
+          if (res.status === 401) {
+            clearProfileSessionCache();
+            setNotConnected(true);
+            return;
+          }
+          if (!res.ok) return;
           const json = await res.json();
           if (ignore) return;
           setProfileData(json);
           writeProfileSessionCache(PROFILE_DATA_CACHE_KEY, json);
+          if (json?.user) {
+            writeProfileSessionCache(PROFILE_USER_CACHE_KEY, {
+              user: json.user,
+            });
+          }
         } catch (e) {
           console.error(e);
         }
       })();
 
-      await Promise.allSettled([statsPromise, profilePromise]);
+      await Promise.allSettled([userPromise, statsPromise, profilePromise]);
     };
     fetchData();
 
@@ -1342,6 +1393,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
   const recentHistory = profileData?.recentHistory || [];
   const recentRatings = profileData?.recentRatings || [];
   const watchlist = profileData?.watchlist || [];
+  const headerReady = !!profileUser;
 
   if (notConnected) {
     return (
@@ -1425,34 +1477,41 @@ export default function StatsClient({ connectNext = "/profile" }) {
           <ProfileHero user={profileUser} />
 
           <div className="flex justify-start lg:justify-end">
-            <div className="flex p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-x-auto">
-              {[
-                { id: "overview", label: "General", icon: PieChartIcon },
-                { id: "patterns", label: "Patrones", icon: TrendingUp },
-                { id: "yearly", label: "Histórico", icon: CalendarIcon },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setViewMode(tab.id)}
-                  className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === tab.id
-                      ? "text-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
-                    }`}
-                >
-                  {viewMode === tab.id && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute inset-0 bg-white rounded-xl"
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-2">
-                    <tab.icon className="w-4 h-4" />
-                    {tab.label}
-                  </span>
-                </button>
-              ))}
-            </div>
+            {headerReady ? (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className="flex p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-x-auto"
+              >
+                {[
+                  { id: "overview", label: "General", icon: PieChartIcon },
+                  { id: "patterns", label: "Patrones", icon: TrendingUp },
+                  { id: "yearly", label: "Histórico", icon: CalendarIcon },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setViewMode(tab.id)}
+                    className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === tab.id
+                        ? "text-black"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      }`}
+                  >
+                    {viewMode === tab.id && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="absolute inset-0 bg-white rounded-xl"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                    <span className="relative z-10 flex items-center gap-2">
+                      <tab.icon className="w-4 h-4" />
+                      {tab.label}
+                    </span>
+                  </button>
+                ))}
+              </motion.div>
+            ) : null}
           </div>
         </motion.div>
 

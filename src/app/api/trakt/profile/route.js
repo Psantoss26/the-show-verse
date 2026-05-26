@@ -96,6 +96,7 @@ export async function GET(request) {
   try {
     const searchParams = request?.nextUrl?.searchParams || new URLSearchParams();
     const compact = searchParams.get("compact") === "1";
+    const userOnly = searchParams.get("userOnly") === "1";
     const cookieStore = await cookies();
     const { token, refreshedTokens, shouldClear } = await getValidTraktToken(cookieStore);
 
@@ -139,6 +140,28 @@ export async function GET(request) {
     const settings = await safeJson(settingsRes.value);
     const userInfo = settings?.user || {};
     const username = userInfo?.ids?.slug || userInfo?.username || "me";
+    const avatarPath = userInfo?.images?.avatar?.full || null;
+    const baseUser = {
+      username: userInfo?.username || username,
+      name: userInfo?.name || userInfo?.username || "Usuario",
+      about: userInfo?.about || null,
+      location: userInfo?.location || null,
+      joined_at: userInfo?.joined_at || null,
+      age: userInfo?.age || null,
+      gender: userInfo?.gender || null,
+      avatarUrl: avatarPath || null,
+      private: userInfo?.private || false,
+      vip: userInfo?.vip || false,
+      vip_ep: userInfo?.vip_ep || false,
+      slug: userInfo?.ids?.slug || username,
+      traktUrl: `https://trakt.tv/users/${userInfo?.ids?.slug || username}`,
+    };
+
+    if (userOnly) {
+      const response = NextResponse.json({ user: baseUser });
+      if (refreshedTokens) setTraktCookies(response, refreshedTokens);
+      return response;
+    }
 
     // Parse stats
     const stats = statsRes.status === "fulfilled" && statsRes.value?.ok
@@ -350,25 +373,9 @@ export async function GET(request) {
       };
     });
 
-    // Build avatar URL
-    const avatarPath = userInfo?.images?.avatar?.full || null;
-    const avatarUrl = avatarPath || null;
-
     const payload = {
       user: {
-        username: userInfo?.username || username,
-        name: userInfo?.name || userInfo?.username || "Usuario",
-        about: userInfo?.about || null,
-        location: userInfo?.location || null,
-        joined_at: userInfo?.joined_at || null,
-        age: userInfo?.age || null,
-        gender: userInfo?.gender || null,
-        avatarUrl,
-        private: userInfo?.private || false,
-        vip: userInfo?.vip || false,
-        vip_ep: userInfo?.vip_ep || false,
-        slug: userInfo?.ids?.slug || username,
-        traktUrl: `https://trakt.tv/users/${userInfo?.ids?.slug || username}`,
+        ...baseUser,
         followers: Array.isArray(followers) ? followers.length : 0,
         following: Array.isArray(following) ? following.length : 0,
       },
