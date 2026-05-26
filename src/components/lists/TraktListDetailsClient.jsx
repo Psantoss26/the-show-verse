@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Loader2, ExternalLink, ChevronDown, UserRound } from 'lucide-react'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
+import { formatPageTitle } from '@/lib/pageTitle'
 
 const PAGE_SIZE = 48
 
@@ -128,6 +129,10 @@ export default function TraktListDetailsClient({ username, listId }) {
         if (typeof window === 'undefined') return
         window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     }, [username, listId])
+
+    useEffect(() => {
+        document.title = formatPageTitle(state.list?.name || 'Lista')
+    }, [state.list?.name])
 
     const fetchPage = useCallback(
         async (pageToLoad) => {

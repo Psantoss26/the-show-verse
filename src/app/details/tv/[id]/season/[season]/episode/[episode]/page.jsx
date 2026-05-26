@@ -14,6 +14,35 @@ async function tmdbFetch(path) {
   return json;
 }
 
+export async function generateMetadata({ params }) {
+  const p = await params;
+  const showId = Number(p?.id);
+  const seasonNumber = Number(p?.season);
+  const episodeNumber = Number(p?.episode);
+
+  if (
+    !Number.isFinite(showId) ||
+    !Number.isFinite(seasonNumber) ||
+    !Number.isFinite(episodeNumber)
+  ) {
+    return { title: "Episodio" };
+  }
+
+  const [show, episode] = await Promise.all([
+    tmdbFetch(`/tv/${showId}`).catch(() => null),
+    tmdbFetch(
+      `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
+    ).catch(() => null),
+  ]);
+
+  const showName = show?.name || show?.title || "Serie";
+  const episodeName = episode?.name || `Episodio ${episodeNumber}`;
+
+  return {
+    title: `${showName} - ${episodeName}`,
+  };
+}
+
 export default async function EpisodePage({ params }) {
   if (!TMDB_API_KEY)
     throw new Error("Missing TMDB_API_KEY or NEXT_PUBLIC_TMDB_API_KEY");

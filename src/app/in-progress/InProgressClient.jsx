@@ -32,6 +32,7 @@ import {
   traktGetCompleted,
   traktDisconnect,
 } from "@/lib/api/traktClient";
+import { formatPageTitle } from "@/lib/pageTitle";
 
 // ----------------------------
 // HELPERS
@@ -1183,8 +1184,8 @@ export default function InProgressClient() {
   useEffect(() => {
     document.title =
       activeTab === "completed"
-        ? "Completadas - ShowVerse"
-        : "En Progreso - ShowVerse";
+        ? formatPageTitle("Completadas")
+        : formatPageTitle("En progreso");
   }, [activeTab]);
 
   useEffect(() => {

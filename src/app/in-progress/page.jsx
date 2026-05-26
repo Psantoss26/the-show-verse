@@ -2,7 +2,7 @@
 import InProgressClient from './InProgressClient'
 
 export const metadata = {
-    title: 'En Progreso - ShowVerse',
+    title: 'En progreso',
     description: 'Series que estás viendo actualmente con su progreso detallado',
 }
 

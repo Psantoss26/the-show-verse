@@ -19,6 +19,10 @@ import {
 export const revalidate = 3600; // 1 hora — reduce cold starts en Vercel
 export const maxDuration = 60; // Vercel Pro = 60s; Hobby = 10s (máximo posible)
 
+export const metadata = {
+  title: "Inicio",
+};
+
 /* ======== Curado de listas (mismo criterio que Películas/Series) ======== */
 const sortByVotes = (list = []) =>
   [...list].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));

@@ -2,7 +2,7 @@
 import WatchlistClient from './WatchlistClient'
 
 export const metadata = {
-    title: 'Pendientes - ShowVerse',
+    title: 'Pendientes',
     description: 'Títulos guardados para ver más tarde',
 }
 

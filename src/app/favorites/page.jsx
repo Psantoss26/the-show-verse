@@ -2,7 +2,7 @@
 import FavoritesClient from './FavoritesClient'
 
 export const metadata = {
-    title: 'Favoritos - ShowVerse',
+    title: 'Favoritos',
     description: 'Tu colección personal de películas y series favoritas',
 }
 

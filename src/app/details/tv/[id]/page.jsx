@@ -3,6 +3,18 @@ import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
 export const revalidate = 600;
 
+export async function generateMetadata({ params }) {
+  const p = await params;
+  const id = p?.id;
+
+  if (!id) return { title: "Detalles" };
+
+  const data = await getDetails("tv", id).catch(() => null);
+  return {
+    title: data?.name || data?.title || "Detalles",
+  };
+}
+
 export default async function TvDetailsPage({ params }) {
   const p = await params;
   const id = p?.id;

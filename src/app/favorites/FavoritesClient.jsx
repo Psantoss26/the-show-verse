@@ -1066,7 +1066,7 @@ function InlineDropdown({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[140px] lg:max-w-[230px]"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[140px] lg:w-auto lg:max-w-none"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-red-500" />}
@@ -1077,7 +1077,7 @@ function InlineDropdown({
           >
             {label}:
           </span>
-          <span className="hidden min-w-0 truncate font-semibold text-white sm:inline">
+          <span className="hidden min-w-0 truncate font-semibold text-white sm:inline lg:overflow-visible lg:whitespace-nowrap">
             {valueLabel}
           </span>
           <span className="min-w-0 truncate font-semibold text-white sm:hidden">

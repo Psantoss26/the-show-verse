@@ -3,6 +3,7 @@ import Navbar from '@/components/Navbar'
 import { AuthProvider } from '@/context/AuthContext'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { SITE_TITLE_SHORT } from '@/lib/pageTitle'
 // 1. Importamos la fuente de Google
 import { PT_Sans } from 'next/font/google'
 
@@ -14,7 +15,10 @@ const ptSans = PT_Sans({
 })
 
 export const metadata = {
-  title: 'The Show Verse',
+  title: {
+    default: SITE_TITLE_SHORT,
+    template: `%s • ${SITE_TITLE_SHORT}`,
+  },
   description: 'Tu plataforma de películas y series',
   manifest: '/site.webmanifest',
   icons: {

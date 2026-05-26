@@ -15,6 +15,10 @@ import {
 // Ajusta el revalidate según lo fresco que quieras el contenido
 export const revalidate = 1800; // 30 minutos
 
+export const metadata = {
+  title: "Películas",
+};
+
 /* ========= Utilidad para obtener la URL base en servidor ========= */
 function getBaseUrl() {
   if (process.env.NEXT_PUBLIC_APP_URL)

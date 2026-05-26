@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import LiquidButton from "@/components/LiquidButton";
 import { Heart, Star, Bookmark, Play, Share2 } from "lucide-react";
+import { formatPageTitle } from "@/lib/pageTitle";
 
 export default function LiquidButtonsDemo() {
   const [states, setStates] = useState({
@@ -10,6 +11,10 @@ export default function LiquidButtonsDemo() {
     star: false,
     bookmark: false,
   });
+
+  useEffect(() => {
+    document.title = formatPageTitle("Demo");
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white p-8">

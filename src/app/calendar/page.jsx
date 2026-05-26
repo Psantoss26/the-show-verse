@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 
 import { getMoviesByDate, getMoviesByDateRange } from "@/lib/api/calendar";
+import { formatPageTitle } from "@/lib/pageTitle";
 
 // --- COMPONENTES UI AUXILIARES ---
 
@@ -289,6 +290,10 @@ export default function CalendarPage() {
   const [selectedMovies, setSelectedMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    document.title = formatPageTitle("Calendario");
+  }, []);
 
   // Cargar modo de vista guardado solo en el cliente
   useEffect(() => {
