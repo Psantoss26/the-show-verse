@@ -22,6 +22,13 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       # La URL pública que verá la app (ajusta al subdominio de Cloudflare)
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://192.168.1.126:3000}
+      # Ollama — LLM local gratuito (accesible dentro de la red Docker)
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+      WATCH_NEXT_AI_PROVIDER: ${WATCH_NEXT_AI_PROVIDER:-ollama}
+    depends_on:
+      ollama:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health", "||", "exit", "1"]
       interval: 30s
@@ -43,6 +50,53 @@ services:
   #     app:
   #       condition: service_healthy
 
+  # ── Ollama — LLM local gratuito para watch-next ───────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"        # API REST local: http://192.168.1.126:11434
+    volumes:
+      - ollama_data:/root/.ollama   # persiste los modelos descargados
+    environment:
+      OLLAMA_KEEP_ALIVE: "24h"      # mantiene el modelo en memoria
+      OLLAMA_NUM_PARALLEL: "1"      # 1 petición a la vez (NAS)
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── Init: descarga el modelo al arrancar (solo si no está ya) ─────────────
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Comprobando modelo qwen2.5:3b..."
+        if ollama list | grep -q "qwen2.5:3b"; then
+          echo "✓ Modelo qwen2.5:3b ya disponible"
+        else
+          echo "⬇ Descargando qwen2.5:3b (~2GB, espera unos minutos)..."
+          OLLAMA_HOST=http://ollama:11434 ollama pull qwen2.5:3b
+          echo "✓ Modelo descargado correctamente"
+        fi
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+
 networks:
   default:
     name: showverse-net
+
+volumes:
+  ollama_data:
+    name: showverse-ollama-data
