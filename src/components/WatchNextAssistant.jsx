@@ -7,12 +7,14 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
   Bot,
+  Brain,
   Film,
   Loader2,
   Send,
   Sparkles,
   Tv,
   X,
+  Zap,
 } from "lucide-react";
 
 const PROMPT_SUGGESTIONS = [
@@ -125,6 +127,7 @@ export default function WatchNextAssistant({ isMobile = false }) {
     },
   ]);
   const inputRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const titleId = "watch-next-assistant-title";
   const reduceMotion = useReducedMotion();
 
@@ -139,7 +142,21 @@ export default function WatchNextAssistant({ isMobile = false }) {
     return last?.recommendations || [];
   }, [messages]);
 
+  const latestProvider = useMemo(() => {
+    const last = [...messages]
+      .reverse()
+      .find((msg) => msg.role === "assistant" && msg.provider !== undefined);
+    return last?.provider || null;
+  }, [messages]);
+
   const close = () => setOpen(false);
+
+  // Auto-scroll chat to bottom on new messages
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [messages, loading]);
 
   useEffect(() => {
     if (!open) return;
@@ -190,6 +207,8 @@ export default function WatchNextAssistant({ isMobile = false }) {
             ? json.recommendations
             : [],
           contextSummary: json?.contextSummary || null,
+          provider: json?.provider || null,
+          mode: json?.mode || null,
         },
       ]);
     } catch (error) {
@@ -334,6 +353,19 @@ export default function WatchNextAssistant({ isMobile = false }) {
                                 ].join(" ")}
                               >
                                 {message.text}
+                                {/* Provider badge on assistant messages */}
+                                {!isUser && message.provider && message.provider !== "ranking" && (
+                                  <span className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-cyan-300/60">
+                                    <Brain className="h-3 w-3" />
+                                    {message.provider === "gemini" ? "Gemini AI" : message.provider === "openai" ? "OpenAI" : message.provider}
+                                  </span>
+                                )}
+                                {!isUser && message.mode === "ranking" && (
+                                  <span className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-zinc-500">
+                                    <Zap className="h-3 w-3" />
+                                    Ranking local
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );
@@ -343,10 +375,14 @@ export default function WatchNextAssistant({ isMobile = false }) {
                           <div className="flex justify-start">
                             <div className="inline-flex items-center gap-2 rounded-3xl border border-white/10 bg-white/[0.045] px-4 py-3 text-sm text-zinc-300">
                               <Loader2 className="h-4 w-4 animate-spin text-cyan-200" />
-                              Pensando opciones con tus datos...
+                              <span>
+                                Consultando IA local
+                                <span className="animate-pulse">...</span>
+                              </span>
                             </div>
                           </div>
                         ) : null}
+                        <div ref={messagesEndRef} />
                       </div>
                     </div>
 
@@ -405,11 +441,30 @@ export default function WatchNextAssistant({ isMobile = false }) {
                           Próximas opciones
                         </h3>
                       </div>
-                      {latestRecommendations.length ? (
-                        <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-xs font-bold text-zinc-400">
-                          {latestRecommendations.length} títulos
-                        </span>
-                      ) : null}
+                      <div className="flex items-center gap-2">
+                        {latestProvider && (
+                          <span className={[
+                            "flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold",
+                            latestProvider === "gemini" ? "bg-violet-500/15 text-violet-300 border border-violet-500/20" :
+                            latestProvider === "openai" ? "bg-green-500/15 text-green-300 border border-green-500/20" :
+                            latestProvider === "ollama" ? "bg-orange-500/15 text-orange-300 border border-orange-500/20" :
+                            "bg-zinc-800 text-zinc-400 border border-white/10"
+                          ].join(" ")}>
+                            {latestProvider === "ollama" ? <Zap className="h-3 w-3" /> :
+                             latestProvider === "gemini" ? <Brain className="h-3 w-3" /> :
+                             latestProvider === "openai" ? <Brain className="h-3 w-3" /> :
+                             <Zap className="h-3 w-3" />}
+                            {latestProvider === "gemini" ? "Gemini AI" :
+                             latestProvider === "openai" ? "OpenAI" :
+                             latestProvider === "ollama" ? "IA Local" : "Ranking"}
+                          </span>
+                        )}
+                        {latestRecommendations.length ? (
+                          <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-xs font-bold text-zinc-400">
+                            {latestRecommendations.length} títulos
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
 
                     {latestRecommendations.length > 0 ? (

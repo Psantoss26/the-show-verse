@@ -35,8 +35,12 @@ const GEMINI_MODEL =
   process.env.GEMINI_WATCH_NEXT_MODEL ||
   process.env.GEMINI_MODEL ||
   "gemini-2.5-flash";
+// Ollama — LLM local gratuito (por defecto: qwen2.5:3b)
+const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || "").replace(/\/$/, "");
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:3b";
 const WATCH_NEXT_AI_PROVIDER =
-  process.env.WATCH_NEXT_AI_PROVIDER || "gemini,openai";
+  process.env.WATCH_NEXT_AI_PROVIDER ||
+  (OLLAMA_BASE_URL ? "ollama" : GEMINI_API_KEY ? "gemini" : "openai");
 
 const WATCH_NEXT_RESPONSE_FORMAT = {
   type: "json_schema",
@@ -679,23 +683,39 @@ function compactCandidatesForAi(candidates) {
 
 function buildAiSystemPrompt() {
   return [
-    "Eres un recomendador experto de cine y series para The Show Verse.",
-    "Elige solo elementos de la lista de candidatos. No inventes títulos.",
-    "No limites la respuesta a la watchlist o pendientes del usuario.",
-    "Prioriza novedades, estrenos recientes, títulos en emisión y tendencias actuales cuando encajen con lo que pide.",
-    "Usa favoritos, historial, valoraciones y pendientes solo como señales de afinidad.",
-    "Devuelve exclusivamente JSON válido con esta forma exacta:",
+    "Eres un recomendador experto de cine y series para The Show Verse. Tu misión es seleccionar exactamente entre 4 y 6 títulos de la lista de candidatos.",
+    "REGLAS ESTRICTAS:",
+    "1. Elige ÚNICAMENTE títulos que aparezcan en la lista 'candidates' con su campo 'key' exacto.",
+    "2. NO inventes títulos ni uses IDs de tu memoria. Solo los candidatos provistos.",
+    "3. Prioriza novedades recientes, estrenos, series en emisión y tendencias cuando el usuario lo pide.",
+    "4. Usa el historial, favoritos, valoraciones y watchlist ÚNICAMENTE como señales de afinidad personal.",
+    "5. Selecciona variedad: mezcla películas y series salvo que el usuario pida explícitamente un tipo.",
+    "6. El campo 'reason' debe ser específico, máximo 2 frases, explicando POR QUÉ ese título encaja con lo que pide el usuario.",
+    "7. 'matchTags' deben ser 2-3 etiquetas cortas en español (ej: 'Tendencia', 'Sci-Fi', 'Valoración alta', 'En emisión', 'Tu perfil').",
+    "8. El campo 'reply' es una frase de 1-2 oraciones en español explicando el criterio general de selección.",
+    "FORMATO DE RESPUESTA (JSON estricto):",
     '{"reply":"string","recommendations":[{"key":"movie:123","reason":"string","matchTags":["string"]}]}',
-    "Razona con criterios sólidos: gustos previos, pendientes, historial, estado de ánimo y calidad.",
     "Todo debe estar en español.",
   ].join(" ");
 }
 
 function buildAiUserPayload({ message, candidates, contextSummary }) {
+  const compactCandidates = compactCandidatesForAi(candidates);
+  const userContext = [
+    contextSummary.traktConnected || contextSummary.tmdbConnected
+      ? `El usuario tiene ${contextSummary.historyCount} títulos en historial, ${contextSummary.favoritesCount} favoritos, ${contextSummary.watchlistCount} pendientes y ${contextSummary.ratedCount} valorados.`
+      : "No hay datos personales del usuario disponibles.",
+    message
+      ? `PETICIÓN DEL USUARIO: "${message}". Prioriza candidatos que cumplan esta petición.`
+      : "El usuario no especificó preferencias concretas.",
+    `Hay ${compactCandidates.length} candidatos disponibles. Selecciona entre 4 y 6.`,
+  ].join(" ");
+
   return JSON.stringify({
-    mood: message,
+    userRequest: message,
+    context: userContext,
     contextSummary,
-    candidates: compactCandidatesForAi(candidates),
+    candidates: compactCandidates,
   });
 }
 
@@ -828,79 +848,108 @@ async function getOpenAiRecommendation({ message, candidates, contextSummary }) 
 }
 
 function extractGeminiText(json) {
-  const parts = safeArray(json?.candidates?.[0]?.content?.parts);
-  return parts
-    .map((part) => (typeof part?.text === "string" ? part.text : ""))
+  // Handle direct JSON object response (when responseMimeType is application/json)
+  const candidate = json?.candidates?.[0];
+  if (!candidate) return "";
+
+  const parts = safeArray(candidate?.content?.parts);
+  const text = parts
+    .map((part) => {
+      // Parts can have 'text' directly (for JSON mime type responses, the text IS the JSON)
+      if (typeof part?.text === "string") return part.text;
+      return "";
+    })
     .filter(Boolean)
     .join("\n")
     .trim();
+
+  return text;
 }
 
 async function getGeminiRecommendation({ message, candidates, contextSummary }) {
   if (!GEMINI_API_KEY) return null;
 
   const model = encodeURIComponent(GEMINI_MODEL);
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY,
+
+  // Build generation config — thinkingBudget only for models that support it
+  const isThinkingModel = /thinking|exp/i.test(GEMINI_MODEL);
+  const generationConfig = {
+    temperature: 0.4,
+    maxOutputTokens: 2048,
+    responseMimeType: "application/json",
+    ...(isThinkingModel ? { thinkingConfig: { thinkingBudget: 512 } } : {}),
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+  let res;
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY,
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: buildAiSystemPrompt() }],
+          },
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: buildAiUserPayload({
+                    message,
+                    candidates,
+                    contextSummary,
+                  }),
+                },
+              ],
+            },
+          ],
+          generationConfig,
+        }),
+        cache: "no-store",
+        signal: controller.signal,
       },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: buildAiSystemPrompt() }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: buildAiUserPayload({
-                  message,
-                  candidates,
-                  contextSummary,
-                }),
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.35,
-          maxOutputTokens: 4096,
-          responseMimeType: "application/json",
-          thinkingConfig: {
-            thinkingBudget: 0,
-          },
-        },
-      }),
-      cache: "no-store",
-    },
-  );
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const json = await safeJson(res);
   if (!res.ok) {
-    console.warn("[watch-next] Gemini fallback:", {
+    console.warn("[watch-next] Gemini error:", {
       status: res.status,
       code: json?.error?.status || json?.error?.code || "unknown",
+      message: json?.error?.message?.slice(0, 120) || "unknown",
     });
     return null;
   }
 
-  const parsed = parseJsonLoose(extractGeminiText(json));
+  const rawText = extractGeminiText(json);
+  if (!rawText) {
+    // Log finish reason for debugging
+    const finishReason = json?.candidates?.[0]?.finishReason;
+    console.warn("[watch-next] Gemini empty response:", { finishReason });
+    return null;
+  }
+
+  const parsed = parseJsonLoose(rawText);
   if (!parsed?.recommendations?.length) {
-    console.warn("[watch-next] Gemini fallback:", {
-      status: res.status,
-      code: "invalid_json",
+    console.warn("[watch-next] Gemini invalid JSON:", {
+      rawText: rawText.slice(0, 200),
     });
     return null;
   }
   const normalized = normalizeAiSelection({ parsed, candidates, message });
   if (!normalized) {
-    console.warn("[watch-next] Gemini fallback:", {
-      status: res.status,
-      code: "no_candidate_match",
+    console.warn("[watch-next] Gemini no candidate match:", {
+      keys: parsed.recommendations.map((r) => r?.key).join(", "),
     });
     return null;
   }
@@ -918,30 +967,141 @@ async function getGeminiRecommendation({ message, candidates, contextSummary }) 
   };
 }
 
+// ─── Ollama ───────────────────────────────────────────────────────────────────
+async function getOllamaRecommendation({ message, candidates, contextSummary }) {
+  if (!OLLAMA_BASE_URL) return null;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // NAS puede tardar más
+
+  let res;
+  try {
+    // Payload compacto para Ollama (menos tokens = respuesta más rápida en NAS)
+    const compactPayload = JSON.stringify({
+      userRequest: message,
+      context: [
+        contextSummary.traktConnected || contextSummary.tmdbConnected
+          ? `Usuario: ${contextSummary.historyCount} vistos, ${contextSummary.favoritesCount} favoritos, ${contextSummary.watchlistCount} pendientes.`
+          : "Sin datos personales del usuario.",
+        message ? `PETICIÓN: "${message}". Prioriza candidatos que la cumplan.` : "Sin preferencias concretas.",
+        `Candidatos disponibles: ${candidates.length}. Selecciona 4-6.`,
+      ].join(" "),
+      candidates: candidates.slice(0, 20).map((c) => ({
+        key: `${c.mediaType}:${c.id}`,
+        title: c.title,
+        mediaType: c.mediaType,
+        id: c.id,
+        genres: c.genres?.slice(0, 3),
+        year: c.year,
+        score: c.score,
+      })),
+    });
+
+    // Ollama expone una API compatible con OpenAI en /v1/chat/completions
+    res = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages: [
+          { role: "system", content: buildAiSystemPrompt() },
+          {
+            role: "user",
+            content: compactPayload,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 1024,   // menos tokens = respuesta más rápida en NAS
+        num_predict: 1024,  // parámetro nativo de Ollama
+        // Forzar respuesta JSON — soportado por Ollama 0.3+
+        response_format: { type: "json_object" },
+        stream: false,
+      }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  const json = await safeJson(res);
+  if (!res.ok) {
+    console.warn("[watch-next] Ollama error:", {
+      status: res.status,
+      error: json?.error || "unknown",
+    });
+    return null;
+  }
+
+  // Respuesta compatible con OpenAI: choices[0].message.content
+  const rawContent = json?.choices?.[0]?.message?.content;
+  if (!rawContent) {
+    console.warn("[watch-next] Ollama empty response", {
+      finishReason: json?.choices?.[0]?.finish_reason,
+    });
+    return null;
+  }
+
+  const parsed = parseJsonLoose(rawContent);
+  if (!parsed?.recommendations?.length) {
+    console.warn("[watch-next] Ollama invalid JSON:", {
+      rawContent: String(rawContent).slice(0, 200),
+    });
+    return null;
+  }
+
+  const normalized = normalizeAiSelection({ parsed, candidates, message });
+  if (!normalized) {
+    console.warn("[watch-next] Ollama no candidate match:", {
+      keys: parsed.recommendations.map((r) => r?.key).join(", "),
+    });
+    return null;
+  }
+
+  return {
+    reply:
+      normalized.reply ||
+      buildFallbackReply({
+        message,
+        ranked: normalized.recommendations,
+        contextSummary,
+      }),
+    recommendations: normalized.recommendations,
+    provider: "ollama",
+    model: OLLAMA_MODEL,
+  };
+}
+
 async function getAiRecommendation({ message, candidates, contextSummary }) {
   const providers = String(WATCH_NEXT_AI_PROVIDER)
     .split(",")
     .map((provider) => provider.trim().toLowerCase())
     .filter(Boolean);
 
-  const orderedProviders = providers.length ? providers : ["gemini", "openai"];
+  const orderedProviders = providers.length ? providers : ["ollama", "gemini", "openai"];
   for (const provider of orderedProviders) {
     let result = null;
     try {
       result =
-        provider === "openai"
-          ? await getOpenAiRecommendation({
+        provider === "ollama"
+          ? await getOllamaRecommendation({
               message,
               candidates,
               contextSummary,
             })
-          : provider === "gemini"
-            ? await getGeminiRecommendation({
+          : provider === "openai"
+            ? await getOpenAiRecommendation({
                 message,
                 candidates,
                 contextSummary,
               })
-            : null;
+            : provider === "gemini"
+              ? await getGeminiRecommendation({
+                  message,
+                  candidates,
+                  contextSummary,
+                })
+              : null;
     } catch (error) {
       console.warn("[watch-next] AI provider exception:", {
         provider,
@@ -1029,8 +1189,10 @@ export async function POST(request) {
     favoritesCount: tmdbContext.favorites.length,
     watchlistCount: tmdbContext.watchlist.length,
     ratedCount: tmdbContext.rated.length + traktContext.ratings.length,
-    aiEnabled: !!(GEMINI_API_KEY || OPENAI_API_KEY),
+    aiEnabled: !!(OLLAMA_BASE_URL || GEMINI_API_KEY || OPENAI_API_KEY),
     aiProviders: {
+      ollama: !!OLLAMA_BASE_URL,
+      ollamaModel: OLLAMA_BASE_URL ? OLLAMA_MODEL : null,
       gemini: !!GEMINI_API_KEY,
       openai: !!OPENAI_API_KEY,
     },
