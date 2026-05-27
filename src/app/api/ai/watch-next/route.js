@@ -12,6 +12,7 @@ import {
   traktFetch,
 } from "@/lib/trakt/server";
 import {
+  getTraktAnticipated,
   getTraktPopular,
   getTraktRecommended,
   getTraktTrending,
@@ -25,9 +26,17 @@ const TMDB_API_KEY =
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL =
-  process.env.OPENAI_WATCH_NEXT_MODEL || process.env.OPENAI_MODEL || "gpt-5.4-mini";
+  process.env.OPENAI_WATCH_NEXT_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const OPENAI_WATCH_NEXT_REASONING_EFFORT =
   process.env.OPENAI_WATCH_NEXT_REASONING_EFFORT || "low";
+const GEMINI_API_KEY =
+  process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || "";
+const GEMINI_MODEL =
+  process.env.GEMINI_WATCH_NEXT_MODEL ||
+  process.env.GEMINI_MODEL ||
+  "gemini-2.5-flash";
+const WATCH_NEXT_AI_PROVIDER =
+  process.env.WATCH_NEXT_AI_PROVIDER || "gemini,openai";
 
 const WATCH_NEXT_RESPONSE_FORMAT = {
   type: "json_schema",
@@ -72,6 +81,33 @@ const WATCH_NEXT_RESPONSE_FORMAT = {
   },
 };
 
+const GEMINI_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    reply: { type: "STRING" },
+    recommendations: {
+      type: "ARRAY",
+      minItems: 3,
+      maxItems: 6,
+      items: {
+        type: "OBJECT",
+        properties: {
+          key: { type: "STRING" },
+          reason: { type: "STRING" },
+          matchTags: {
+            type: "ARRAY",
+            minItems: 1,
+            maxItems: 4,
+            items: { type: "STRING" },
+          },
+        },
+        required: ["key", "reason", "matchTags"],
+      },
+    },
+  },
+  required: ["reply", "recommendations"],
+};
+
 const GENRE_HINTS = [
   { id: 28, words: ["acción", "accion", "peleas", "explosiones"] },
   { id: 12, words: ["aventura", "épica", "epica"] },
@@ -113,6 +149,10 @@ function yearOf(item) {
   return /^\d{4}$/.test(String(year)) ? String(year) : "";
 }
 
+function releaseDateOf(item) {
+  return item?.release_date || item?.first_air_date || null;
+}
+
 function normalizeItem(item, source = "base") {
   if (!item?.id) return null;
   const mediaType = mediaTypeOf(item);
@@ -127,6 +167,7 @@ function normalizeItem(item, source = "base") {
     posterPath: item?.poster_path || null,
     backdropPath: item?.backdrop_path || null,
     overview: item?.overview || "",
+    releaseDate: releaseDateOf(item),
     voteAverage:
       typeof item?.vote_average === "number" ? Number(item.vote_average) : null,
     popularity: typeof item?.popularity === "number" ? item.popularity : 0,
@@ -205,13 +246,80 @@ async function tmdbList(path, params = {}) {
 }
 
 async function getTmdbFallbackCandidates(limit = 30) {
-  const [movies, shows, trending] = await Promise.all([
+  const [movies, shows] = await Promise.all([
     tmdbList("/movie/popular", { page: 1 }).catch(() => []),
     tmdbList("/tv/popular", { page: 1 }).catch(() => []),
+  ]);
+
+  return [...movies, ...shows]
+    .filter((item) => item?.media_type !== "person")
+    .slice(0, limit);
+}
+
+async function getTmdbNoveltyCandidates(limit = 40) {
+  const [
+    nowPlaying,
+    upcoming,
+    onTheAir,
+    airingToday,
+    weeklyTrending,
+  ] = await Promise.all([
+    tmdbList("/movie/now_playing", { page: 1, region: "ES" }).catch(() => []),
+    tmdbList("/movie/upcoming", { page: 1, region: "ES" }).catch(() => []),
+    tmdbList("/tv/on_the_air", { page: 1 }).catch(() => []),
+    tmdbList("/tv/airing_today", { page: 1 }).catch(() => []),
     tmdbList("/trending/all/week", { page: 1 }).catch(() => []),
   ]);
 
-  return [...movies, ...shows, ...trending]
+  return {
+    nowPlaying: nowPlaying.slice(0, limit),
+    upcoming: upcoming.slice(0, limit),
+    onTheAir: onTheAir.slice(0, limit),
+    airingToday: airingToday.slice(0, limit),
+    weeklyTrending: weeklyTrending
+      .filter((item) => item?.media_type !== "person")
+      .slice(0, limit),
+  };
+}
+
+async function getTmdbQualityCandidates(limit = 30) {
+  const [movies, shows] = await Promise.all([
+    tmdbList("/movie/top_rated", { page: 1, region: "ES" }).catch(() => []),
+    tmdbList("/tv/top_rated", { page: 1 }).catch(() => []),
+  ]);
+
+  return [...movies, ...shows]
+    .filter((item) => item?.media_type !== "person")
+    .slice(0, limit);
+}
+
+async function getTmdbDiscoveryCandidates(message, limit = 32) {
+  const wantedGenres = getWantedGenreIds(message);
+  const wantedType = getWantedMediaType(message);
+  const genreParam = wantedGenres.length ? wantedGenres.slice(0, 4).join("|") : null;
+  const commonParams = {
+    page: 1,
+    sort_by: "popularity.desc",
+    "vote_count.gte": 80,
+    "vote_average.gte": 6,
+  };
+  const movieParams = genreParam
+    ? { ...commonParams, with_genres: genreParam, region: "ES" }
+    : { ...commonParams, region: "ES" };
+  const tvParams = genreParam
+    ? { ...commonParams, with_genres: genreParam }
+    : commonParams;
+
+  const [movies, shows] = await Promise.all([
+    wantedType === "tv"
+      ? Promise.resolve([])
+      : tmdbList("/discover/movie", movieParams).catch(() => []),
+    wantedType === "movie"
+      ? Promise.resolve([])
+      : tmdbList("/discover/tv", tvParams).catch(() => []),
+  ]);
+
+  return [...movies, ...shows]
     .filter((item) => item?.media_type !== "person")
     .slice(0, limit);
 }
@@ -330,6 +438,12 @@ function getWantedGenreIds(message) {
   return Array.from(ids);
 }
 
+function wantsFutureReleases(message) {
+  return /\b(pr[oó]xim[oa]s?|futur[oa]s?|cuando salga|estrenos? futuros?|esperad[oa]s?)\b/i.test(
+    String(message || ""),
+  );
+}
+
 function inferFavoriteGenres({ favorites, rated, traktRatings }) {
   const counts = new Map();
   const add = (item, weight = 1) => {
@@ -368,11 +482,34 @@ function scoreCandidates({ candidates, message, profileGenres, watchedSet }) {
       const key = itemKey(item);
       const genreIds = new Set(item.genreIds || []);
 
-      if (item.sources.includes("watchlist")) score += 48;
+      const daysFromRelease = item.releaseDate
+        ? Math.round(
+            (new Date(`${item.releaseDate}T00:00:00Z`).getTime() - Date.now()) /
+              86400000,
+          )
+        : null;
+      const isRecentRelease =
+        Number.isFinite(daysFromRelease) &&
+        daysFromRelease <= 45 &&
+        daysFromRelease >= -180;
+      const isNearRelease =
+        Number.isFinite(daysFromRelease) &&
+        daysFromRelease > 45 &&
+        daysFromRelease <= 120;
+
+      if (item.sources.includes("watchlist")) score += 20;
       if (item.sources.includes("trakt_recommended")) score += 28;
-      if (item.sources.includes("trakt_trending")) score += 12;
+      if (item.sources.includes("trakt_trending")) score += 18;
+      if (item.sources.includes("trakt_anticipated")) score += 18;
       if (item.sources.includes("trakt_popular")) score += 8;
-      if (item.sources.includes("tmdb_fallback")) score += 6;
+      if (item.sources.includes("tmdb_now_playing")) score += 24;
+      if (item.sources.includes("tmdb_upcoming")) score += 18;
+      if (item.sources.includes("tmdb_on_the_air")) score += 22;
+      if (item.sources.includes("tmdb_airing_today")) score += 18;
+      if (item.sources.includes("tmdb_weekly_trending")) score += 20;
+      if (item.sources.includes("tmdb_fallback")) score += 5;
+      if (isRecentRelease) score += item.mediaType === "movie" ? 18 : 12;
+      if (isNearRelease) score += 8;
       if (item.voteAverage) score += item.voteAverage * (wantsQuality ? 3 : 1.7);
       if (item.popularity) score += Math.min(16, Math.log10(item.popularity + 1) * 7);
       if (wantedType && item.mediaType === wantedType) score += 22;
@@ -394,11 +531,23 @@ function scoreCandidates({ candidates, message, profileGenres, watchedSet }) {
 
 function buildReason(item, message, source = "ranking") {
   const bits = [];
-  if (item.sources.includes("watchlist")) {
-    bits.push("ya la tienes pendiente, así que es una opción directa para ver ahora");
+  if (item.sources.includes("tmdb_now_playing")) {
+    bits.push("es una novedad reciente de cine");
+  }
+  if (item.sources.includes("tmdb_on_the_air") || item.sources.includes("tmdb_airing_today")) {
+    bits.push("está entre las series activas ahora mismo");
+  }
+  if (item.sources.includes("tmdb_weekly_trending") || item.sources.includes("trakt_trending")) {
+    bits.push("está funcionando muy bien en tendencia");
+  }
+  if (item.sources.includes("tmdb_upcoming") || item.sources.includes("trakt_anticipated")) {
+    bits.push("aparece entre los próximos estrenos más relevantes");
   }
   if (item.sources.includes("trakt_recommended")) {
     bits.push("también aparece entre recomendaciones de Trakt");
+  }
+  if (item.sources.includes("watchlist")) {
+    bits.push("además ya la tienes pendiente");
   }
   if (item.voteAverage && item.voteAverage >= 7.5) {
     bits.push(`tiene una valoración sólida (${item.voteAverage.toFixed(1)})`);
@@ -412,6 +561,21 @@ function buildReason(item, message, source = "ranking") {
 }
 
 function serializeRecommendation(item, message, source = "ranking") {
+  const sourceTags = item.sources.map((s) => {
+    if (s === "watchlist") return "Pendiente";
+    if (s === "trakt_recommended") return "Trakt";
+    if (s === "trakt_trending") return "Tendencia";
+    if (s === "trakt_anticipated") return "Esperada";
+    if (s === "trakt_popular") return "Popular";
+    if (s === "tmdb_now_playing") return "Novedad";
+    if (s === "tmdb_upcoming") return "Estreno";
+    if (s === "tmdb_on_the_air") return "En emisión";
+    if (s === "tmdb_airing_today") return "Hoy";
+    if (s === "tmdb_weekly_trending") return "Tendencia";
+    if (s === "tmdb_fallback") return "TMDb";
+    return s;
+  });
+
   return {
     id: item.id,
     mediaType: item.mediaType,
@@ -422,14 +586,7 @@ function serializeRecommendation(item, message, source = "ranking") {
     voteAverage: item.voteAverage,
     href: `/details/${item.mediaType}/${item.id}`,
     reason: item.reason || buildReason(item, message, source),
-    matchTags: item.matchTags || item.sources.map((s) => {
-      if (s === "watchlist") return "Pendiente";
-      if (s === "trakt_recommended") return "Trakt";
-      if (s === "trakt_trending") return "Tendencia";
-      if (s === "trakt_popular") return "Popular";
-      if (s === "tmdb_fallback") return "TMDb";
-      return s;
-    }).slice(0, 3),
+    matchTags: item.matchTags || Array.from(new Set(sourceTags)).slice(0, 3),
   };
 }
 
@@ -440,8 +597,8 @@ function buildFallbackReply({ message, ranked, contextSummary }) {
     contextSummary.historyCount ||
     contextSummary.ratedCount;
   const intro = hasPersonal
-    ? "He cruzado lo que te apetece con tus pendientes, favoritos, valoraciones e historial."
-    : "No tengo mucho contexto personal todavía, así que he priorizado opciones fuertes y populares.";
+    ? "He cruzado lo que te apetece con novedades, tendencias y tu perfil, sin limitarme a tus pendientes."
+    : "No tengo mucho contexto personal todavía, así que he priorizado novedades, tendencias y opciones fuertes.";
   const mood = String(message || "").trim()
     ? ` Para "${String(message).trim()}", empezaría por estas opciones.`
     : " Estas son buenas candidatas para decidir rápido.";
@@ -474,6 +631,132 @@ function parseJsonLoose(text) {
   }
 }
 
+function isNoveltyCandidate(item) {
+  return safeArray(item?.sources).some((source) =>
+    [
+      "tmdb_now_playing",
+      "tmdb_upcoming",
+      "tmdb_on_the_air",
+      "tmdb_airing_today",
+      "tmdb_weekly_trending",
+      "trakt_trending",
+      "trakt_anticipated",
+    ].includes(source),
+  );
+}
+
+function selectCandidatesForAi(candidates) {
+  const selected = new Map();
+  const add = (items, limit) => {
+    for (const item of safeArray(items)) {
+      if (selected.size >= limit) break;
+      selected.set(itemKey(item), item);
+    }
+  };
+
+  add(candidates.slice(0, 18), 36);
+  add(candidates.filter(isNoveltyCandidate).slice(0, 18), 36);
+  add(candidates.filter((item) => item.sources.includes("watchlist")).slice(0, 6), 36);
+  add(candidates, 36);
+
+  return [...selected.values()];
+}
+
+function compactCandidatesForAi(candidates) {
+  return selectCandidatesForAi(candidates).map((item) => ({
+    key: itemKey(item),
+    id: item.id,
+    mediaType: item.mediaType,
+    title: item.title,
+    year: item.year,
+    voteAverage: item.voteAverage,
+    releaseDate: item.releaseDate,
+    sources: item.sources,
+    overview: item.overview ? item.overview.slice(0, 280) : "",
+    score: Math.round(item.score),
+  }));
+}
+
+function buildAiSystemPrompt() {
+  return [
+    "Eres un recomendador experto de cine y series para The Show Verse.",
+    "Elige solo elementos de la lista de candidatos. No inventes títulos.",
+    "No limites la respuesta a la watchlist o pendientes del usuario.",
+    "Prioriza novedades, estrenos recientes, títulos en emisión y tendencias actuales cuando encajen con lo que pide.",
+    "Usa favoritos, historial, valoraciones y pendientes solo como señales de afinidad.",
+    "Devuelve exclusivamente JSON válido con esta forma exacta:",
+    '{"reply":"string","recommendations":[{"key":"movie:123","reason":"string","matchTags":["string"]}]}',
+    "Razona con criterios sólidos: gustos previos, pendientes, historial, estado de ánimo y calidad.",
+    "Todo debe estar en español.",
+  ].join(" ");
+}
+
+function buildAiUserPayload({ message, candidates, contextSummary }) {
+  return JSON.stringify({
+    mood: message,
+    contextSummary,
+    candidates: compactCandidatesForAi(candidates),
+  });
+}
+
+function normalizeAiSelection({ parsed, candidates, message }) {
+  if (!parsed?.recommendations?.length) return null;
+
+  const byKey = new Map(candidates.map((item) => [itemKey(item), item]));
+  const byId = new Map(
+    candidates.map((item) => [`${item.mediaType}:${Number(item.id)}`, item]),
+  );
+  const byBareId = new Map(
+    candidates.map((item) => [String(Number(item.id)), item]),
+  );
+  const byBareTitle = new Map(
+    candidates.map((item) => [String(item.title || "").trim().toLowerCase(), item]),
+  );
+  const byTitle = new Map(
+    candidates.map((item) => [
+      `${item.mediaType}:${String(item.title || "").trim().toLowerCase()}`,
+      item,
+    ]),
+  );
+  const selected = parsed.recommendations
+    .map((rec) => {
+      const explicitKey = String(rec?.key || "").trim();
+      const derivedKey =
+        rec?.mediaType && rec?.id
+          ? `${rec.mediaType === "show" ? "tv" : rec.mediaType}:${Number(rec.id)}`
+          : "";
+      const titleKey =
+        rec?.mediaType && rec?.title
+          ? `${rec.mediaType === "show" ? "tv" : rec.mediaType}:${String(rec.title).trim().toLowerCase()}`
+          : "";
+      const item =
+        byKey.get(explicitKey) ||
+        byKey.get(derivedKey) ||
+        byId.get(derivedKey) ||
+        byBareId.get(explicitKey) ||
+        byTitle.get(titleKey) ||
+        byBareTitle.get(String(rec?.title || "").trim().toLowerCase());
+      if (!item) return null;
+      return {
+        ...item,
+        reason: String(rec.reason || "").trim() || buildReason(item, message, "ai"),
+        matchTags: safeArray(rec.matchTags).slice(0, 4),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 6);
+
+  if (!selected.length) return null;
+
+  return {
+    reply:
+      typeof parsed.reply === "string" && parsed.reply.trim()
+        ? parsed.reply.trim()
+        : null,
+    recommendations: selected,
+  };
+}
+
 function openAiRequestBody(input) {
   const body = {
     model: OPENAI_MODEL,
@@ -498,18 +781,6 @@ function openAiRequestBody(input) {
 async function getOpenAiRecommendation({ message, candidates, contextSummary }) {
   if (!OPENAI_API_KEY) return null;
 
-  const compactCandidates = candidates.slice(0, 28).map((item) => ({
-    key: itemKey(item),
-    id: item.id,
-    mediaType: item.mediaType,
-    title: item.title,
-    year: item.year,
-    voteAverage: item.voteAverage,
-    sources: item.sources,
-    overview: item.overview ? item.overview.slice(0, 280) : "",
-    score: Math.round(item.score),
-  }));
-
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -520,16 +791,11 @@ async function getOpenAiRecommendation({ message, candidates, contextSummary }) 
       openAiRequestBody([
         {
           role: "system",
-          content:
-            "Eres un recomendador experto de cine y series para The Show Verse. Elige solo elementos de la lista de candidatos. Responde exclusivamente JSON válido con: {\"reply\": string, \"recommendations\": [{\"key\": string, \"reason\": string, \"matchTags\": string[]}]} . Razona con criterios sólidos: gustos previos, pendientes, historial, estado de ánimo y calidad. Todo en español.",
+          content: buildAiSystemPrompt(),
         },
         {
           role: "user",
-          content: JSON.stringify({
-            mood: message,
-            contextSummary,
-            candidates: compactCandidates,
-          }),
+          content: buildAiUserPayload({ message, candidates, contextSummary }),
         },
       ]),
     ),
@@ -545,31 +811,149 @@ async function getOpenAiRecommendation({ message, candidates, contextSummary }) 
     return null;
   }
   const parsed = parseJsonLoose(extractOutputText(json));
-  if (!parsed?.recommendations?.length) return null;
-
-  const byKey = new Map(candidates.map((item) => [itemKey(item), item]));
-  const selected = parsed.recommendations
-    .map((rec) => {
-      const item = byKey.get(rec?.key);
-      if (!item) return null;
-      return {
-        ...item,
-        reason: String(rec.reason || "").trim() || buildReason(item, message, "ai"),
-        matchTags: safeArray(rec.matchTags).slice(0, 4),
-      };
-    })
-    .filter(Boolean)
-    .slice(0, 6);
-
-  if (!selected.length) return null;
+  const normalized = normalizeAiSelection({ parsed, candidates, message });
+  if (!normalized) return null;
 
   return {
     reply:
-      typeof parsed.reply === "string" && parsed.reply.trim()
-        ? parsed.reply.trim()
-        : buildFallbackReply({ message, ranked: selected, contextSummary }),
-    recommendations: selected,
+      normalized.reply ||
+      buildFallbackReply({
+        message,
+        ranked: normalized.recommendations,
+        contextSummary,
+      }),
+    recommendations: normalized.recommendations,
+    provider: "openai",
   };
+}
+
+function extractGeminiText(json) {
+  const parts = safeArray(json?.candidates?.[0]?.content?.parts);
+  return parts
+    .map((part) => (typeof part?.text === "string" ? part.text : ""))
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+async function getGeminiRecommendation({ message, candidates, contextSummary }) {
+  if (!GEMINI_API_KEY) return null;
+
+  const model = encodeURIComponent(GEMINI_MODEL);
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY,
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: buildAiSystemPrompt() }],
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: buildAiUserPayload({
+                  message,
+                  candidates,
+                  contextSummary,
+                }),
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.35,
+          maxOutputTokens: 4096,
+          responseMimeType: "application/json",
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      }),
+      cache: "no-store",
+    },
+  );
+
+  const json = await safeJson(res);
+  if (!res.ok) {
+    console.warn("[watch-next] Gemini fallback:", {
+      status: res.status,
+      code: json?.error?.status || json?.error?.code || "unknown",
+    });
+    return null;
+  }
+
+  const parsed = parseJsonLoose(extractGeminiText(json));
+  if (!parsed?.recommendations?.length) {
+    console.warn("[watch-next] Gemini fallback:", {
+      status: res.status,
+      code: "invalid_json",
+    });
+    return null;
+  }
+  const normalized = normalizeAiSelection({ parsed, candidates, message });
+  if (!normalized) {
+    console.warn("[watch-next] Gemini fallback:", {
+      status: res.status,
+      code: "no_candidate_match",
+    });
+    return null;
+  }
+
+  return {
+    reply:
+      normalized.reply ||
+      buildFallbackReply({
+        message,
+        ranked: normalized.recommendations,
+        contextSummary,
+      }),
+    recommendations: normalized.recommendations,
+    provider: "gemini",
+  };
+}
+
+async function getAiRecommendation({ message, candidates, contextSummary }) {
+  const providers = String(WATCH_NEXT_AI_PROVIDER)
+    .split(",")
+    .map((provider) => provider.trim().toLowerCase())
+    .filter(Boolean);
+
+  const orderedProviders = providers.length ? providers : ["gemini", "openai"];
+  for (const provider of orderedProviders) {
+    let result = null;
+    try {
+      result =
+        provider === "openai"
+          ? await getOpenAiRecommendation({
+              message,
+              candidates,
+              contextSummary,
+            })
+          : provider === "gemini"
+            ? await getGeminiRecommendation({
+                message,
+                candidates,
+                contextSummary,
+              })
+            : null;
+    } catch (error) {
+      console.warn("[watch-next] AI provider exception:", {
+        provider,
+        code: error?.name || "error",
+        message: String(error?.message || "unknown").slice(0, 140),
+      });
+    }
+
+    if (result?.recommendations?.length) return result;
+  }
+
+  return null;
 }
 
 export async function POST(request) {
@@ -577,13 +961,30 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const message = String(body?.message || "").trim().slice(0, 800);
 
-  const [tmdbContext, traktContext, baseRecommended, trending, popular, tmdbFallback] =
+  const [
+    tmdbContext,
+    traktContext,
+    baseRecommended,
+    trending,
+    anticipated,
+    popular,
+    tmdbNovelty,
+    tmdbFallback,
+  ] =
     await Promise.all([
       getTmdbContext(cookieStore),
       getTraktContext(cookieStore),
       getTraktRecommended(30).catch(() => []),
       getTraktTrending(24).catch(() => []),
+      getTraktAnticipated(24).catch(() => []),
       getTraktPopular(24).catch(() => []),
+      getTmdbNoveltyCandidates(36).catch(() => ({
+        nowPlaying: [],
+        upcoming: [],
+        onTheAir: [],
+        airingToday: [],
+        weeklyTrending: [],
+      })),
       getTmdbFallbackCandidates(30).catch(() => []),
     ]);
 
@@ -597,9 +998,20 @@ export async function POST(request) {
   });
 
   const candidateMap = new Map();
-  addCandidates(candidateMap, tmdbContext.watchlist, "watchlist", 45);
-  addCandidates(candidateMap, baseRecommended, "trakt_recommended", 28);
-  addCandidates(candidateMap, trending, "trakt_trending", 16);
+  addCandidates(candidateMap, safeArray(tmdbNovelty.nowPlaying), "tmdb_now_playing", 24);
+  addCandidates(candidateMap, safeArray(tmdbNovelty.upcoming), "tmdb_upcoming", 18);
+  addCandidates(candidateMap, safeArray(tmdbNovelty.onTheAir), "tmdb_on_the_air", 22);
+  addCandidates(candidateMap, safeArray(tmdbNovelty.airingToday), "tmdb_airing_today", 18);
+  addCandidates(
+    candidateMap,
+    safeArray(tmdbNovelty.weeklyTrending),
+    "tmdb_weekly_trending",
+    20,
+  );
+  addCandidates(candidateMap, tmdbContext.watchlist, "watchlist", 18);
+  addCandidates(candidateMap, baseRecommended, "trakt_recommended", 22);
+  addCandidates(candidateMap, trending, "trakt_trending", 18);
+  addCandidates(candidateMap, anticipated, "trakt_anticipated", 18);
   addCandidates(candidateMap, popular, "trakt_popular", 10);
   addCandidates(candidateMap, tmdbFallback, "tmdb_fallback", 6);
 
@@ -617,10 +1029,14 @@ export async function POST(request) {
     favoritesCount: tmdbContext.favorites.length,
     watchlistCount: tmdbContext.watchlist.length,
     ratedCount: tmdbContext.rated.length + traktContext.ratings.length,
-    aiEnabled: !!OPENAI_API_KEY,
+    aiEnabled: !!(GEMINI_API_KEY || OPENAI_API_KEY),
+    aiProviders: {
+      gemini: !!GEMINI_API_KEY,
+      openai: !!OPENAI_API_KEY,
+    },
   };
 
-  const ai = await getOpenAiRecommendation({
+  const ai = await getAiRecommendation({
     message,
     candidates: ranked,
     contextSummary,
@@ -636,6 +1052,7 @@ export async function POST(request) {
     ),
     contextSummary,
     mode: ai ? "ai" : "ranking",
+    provider: ai?.provider || "ranking",
   };
 
   const res = NextResponse.json(payload);
