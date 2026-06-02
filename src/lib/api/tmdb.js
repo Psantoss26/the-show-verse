@@ -495,63 +495,55 @@ export async function getMediaAccountStates(type, id, sessionOrOpts) {
 }
 
 export async function markAsFavorite({
-  accountId,
-  sessionId,
+  // accountId and sessionId kept for backwards-compat but not used here:
+  // the server route reads them from cookies.
+  accountId: _accountId,
+  sessionId: _sessionId,
   type,
   mediaId,
   favorite,
 }) {
-  if (!accountId || !sessionId)
-    throw new Error("Faltan accountId o sessionId para marcar favorito");
-
-  const res = await fetch(
-    buildUrl(`/account/${accountId}/favorite`, { session_id: sessionId }),
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        media_type: type,
-        media_id: mediaId,
-        favorite,
-      }),
-    },
-  );
+  // Route through our Next.js API so Trakt sync happens server-side
+  const res = await fetch('/api/tmdb/account/favorite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mediaType: type,
+      mediaId,
+      favorite,
+    }),
+  });
   const data = await res.json();
-  if (!res.ok || data?.success === false) {
-    console.error("TMDb markAsFavorite error:", data);
-    throw new Error(data?.status_message || "No se pudo actualizar favorito");
+  if (!res.ok) {
+    console.error('markAsFavorite error:', data);
+    throw new Error(data?.error || 'No se pudo actualizar favorito');
   }
   return data;
 }
 
 export async function markInWatchlist({
-  accountId,
-  sessionId,
+  // accountId and sessionId kept for backwards-compat but not used here:
+  // the server route reads them from cookies.
+  accountId: _accountId,
+  sessionId: _sessionId,
   type,
   mediaId,
   watchlist,
 }) {
-  if (!accountId || !sessionId)
-    throw new Error("Faltan accountId o sessionId para watchlist");
-
-  const res = await fetch(
-    buildUrl(`/account/${accountId}/watchlist`, { session_id: sessionId }),
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        media_type: type,
-        media_id: mediaId,
-        watchlist,
-      }),
-    },
-  );
+  // Route through our Next.js API so Trakt sync happens server-side
+  const res = await fetch('/api/tmdb/account/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mediaType: type,
+      mediaId,
+      watchlist,
+    }),
+  });
   const data = await res.json();
-  if (!res.ok || data?.success === false) {
-    console.error("TMDb markInWatchlist error:", data);
-    throw new Error(
-      data?.status_message || "No se pudo actualizar la lista de pendientes",
-    );
+  if (!res.ok) {
+    console.error('markInWatchlist error:', data);
+    throw new Error(data?.error || 'No se pudo actualizar la lista de pendientes');
   }
   return data;
 }
