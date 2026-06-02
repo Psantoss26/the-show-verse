@@ -237,7 +237,7 @@ export default function WatchNextAssistant({ isMobile = false }) {
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[9999] overflow-hidden bg-black/90 p-0 sm:p-3"
+          className="fixed inset-0 z-[9999] overflow-hidden bg-black/80 lg:bg-black/90 p-0 sm:p-3"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -245,64 +245,14 @@ export default function WatchNextAssistant({ isMobile = false }) {
           onMouseDown={close}
         >
           <motion.div
-            aria-hidden="true"
-            className="absolute inset-0 bg-black"
-            initial={
-              reduceMotion
-                ? { opacity: 0 }
-                : { clipPath: "circle(0% at 50% 50%)" }
-            }
-            animate={
-              reduceMotion
-                ? { opacity: 1 }
-                : { clipPath: "circle(150% at 50% 50%)" }
-            }
-            exit={
-              reduceMotion
-                ? { opacity: 0 }
-                : { clipPath: "circle(0% at 50% 50%)" }
-            }
-            transition={{
-              duration: reduceMotion ? 0.12 : 0.55,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-          />
-          <motion.div
-            aria-hidden="true"
-            className="absolute inset-0 backdrop-blur-2xl"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{
-              duration: reduceMotion ? 0.12 : 0.38,
-              delay: reduceMotion ? 0 : 0.08,
-            }}
-          />
-          <motion.div
-            aria-hidden="true"
-            className="absolute inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,rgba(34,211,238,0.12),transparent)]"
-            initial={{ y: -160, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -160, opacity: 0 }}
-            transition={{
-              duration: reduceMotion ? 0.12 : 0.6,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-          />
-
-          <motion.div
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
             initial={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, y: 32, scale: 0.94, borderRadius: 48 }
+              reduceMotion ? { opacity: 0 } : { opacity: 0, y: 32, scale: 0.94 }
             }
             animate={
-              reduceMotion
-                ? { opacity: 1 }
-                : { opacity: 1, y: 0, scale: 1, borderRadius: 28 }
+              reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }
             }
             exit={
               reduceMotion
@@ -310,201 +260,103 @@ export default function WatchNextAssistant({ isMobile = false }) {
                 : { opacity: 0, y: 22, scale: 0.985 }
             }
             transition={{
-              duration: reduceMotion ? 0.12 : 0.42,
-              delay: reduceMotion ? 0 : 0.18,
+              duration: reduceMotion ? 0.12 : 0.32,
+              delay: reduceMotion ? 0 : 0.08,
               ease: [0.22, 1, 0.36, 1],
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="relative mx-auto flex h-[100dvh] w-full max-w-[1540px] overflow-hidden border border-white/10 bg-[#080808] shadow-2xl shadow-black sm:h-[calc(100dvh-24px)] sm:w-[calc(100vw-24px)] sm:rounded-[28px]"
+            className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden border border-white/10 bg-[#0a0a0a] lg:rounded-2xl lg:shadow-2xl lg:shadow-black sm:h-[calc(100dvh-24px)] sm:w-[calc(100vw-24px)]"
           >
-            <section className="flex min-w-0 flex-1 flex-col">
-              <header className="flex items-center justify-between gap-4 border-b border-white/10 bg-black/35 px-4 py-4 backdrop-blur-xl sm:px-6">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.12)]">
-                    <Bot className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h2
-                      id={titleId}
-                      className="truncate text-base font-black text-white sm:text-lg"
-                    >
-                      Qué ver ahora
-                    </h2>
-                    <p className="truncate text-xs text-zinc-500">
-                      Recomendaciones cruzando tu actividad, pendientes y
-                      favoritos
-                    </p>
-                  </div>
+            {/* Header */}
+            <header className="flex items-center justify-between gap-4 border-b border-white/10 bg-black/40 px-4 py-3 sm:px-6 backdrop-blur-sm flex-shrink-0">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
+                  <Bot className="h-5 w-5" />
                 </div>
-                <button
-                  type="button"
-                  onClick={close}
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-zinc-400 transition hover:bg-white/10 hover:text-white"
-                  aria-label="Cerrar recomendador"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </header>
-
-              <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(360px,0.78fr)_minmax(520px,1.22fr)]">
-                <div className="flex min-h-0 flex-col border-white/10 lg:border-r">
-                  <div
-                    className="flex-1 overflow-y-auto px-4 py-5 sm:px-6"
-                    aria-live="polite"
+                <div className="min-w-0">
+                  <h2
+                    id={titleId}
+                    className="truncate text-sm font-bold text-white sm:text-base"
                   >
-                    <div className="space-y-4">
-                      {messages.map((message, index) => {
-                        const isUser = message.role === "user";
-                        return (
-                          <div
-                            key={`${message.role}-${index}`}
-                            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                          >
-                            <div
-                              className={[
-                                "max-w-[92%] rounded-3xl px-4 py-3 text-sm leading-relaxed",
-                                isUser
-                                  ? "bg-cyan-300 text-black shadow-[0_14px_36px_rgba(34,211,238,0.16)]"
-                                  : "border border-white/10 bg-white/[0.045] text-zinc-200",
-                              ].join(" ")}
-                            >
-                              {message.text}
-                              {/* Provider badge on assistant messages */}
-                              {!isUser &&
-                                message.provider &&
-                                message.provider !== "ranking" && (
-                                  <span className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-cyan-300/60">
-                                    <Brain className="h-3 w-3" />
-                                    {message.provider === "gemini"
-                                      ? "Gemini AI"
-                                      : message.provider === "openai"
-                                        ? "OpenAI"
-                                        : message.provider}
-                                  </span>
-                                )}
-                              {!isUser && message.mode === "ranking" && (
-                                <span className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-zinc-500">
-                                  <Zap className="h-3 w-3" />
-                                  Ranking local
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {loading ? (
-                        <div className="flex justify-start">
-                          <div className="inline-flex items-center gap-2 rounded-3xl border border-white/10 bg-white/[0.045] px-4 py-3 text-sm text-zinc-300">
-                            <Loader2 className="h-4 w-4 animate-spin text-cyan-200" />
-                            <span>
-                              Consultando IA local
-                              <span className="animate-pulse">...</span>
-                            </span>
-                          </div>
-                        </div>
-                      ) : null}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  </div>
-
-                  <footer className="border-t border-white/10 bg-black/30 p-4 backdrop-blur-xl sm:p-5">
-                    <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {PROMPT_SUGGESTIONS.map((suggestion) => (
-                        <button
-                          key={suggestion}
-                          type="button"
-                          onClick={() => sendPrompt(suggestion)}
-                          disabled={loading}
-                          className="shrink-0 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-cyan-300/30 hover:text-white disabled:opacity-50"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
-                    </div>
-
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        sendPrompt();
-                      }}
-                      className="flex items-center gap-2 rounded-3xl border border-cyan-300/25 bg-white/[0.055] p-2 shadow-[0_0_28px_rgba(34,211,238,0.07)] focus-within:border-cyan-300/50"
-                    >
-                      <input
-                        ref={inputRef}
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Me apetece algo..."
-                        className="min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none placeholder:text-zinc-500"
-                      />
-                      <button
-                        type="submit"
-                        disabled={loading || !input.trim()}
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-cyan-300 text-black transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
-                        aria-label="Enviar preferencia"
-                      >
-                        {loading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                      </button>
-                    </form>
-                  </footer>
+                    Qué ver ahora
+                  </h2>
                 </div>
+              </div>
+              <button
+                type="button"
+                onClick={close}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                aria-label="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
 
-                <aside className="min-h-0 overflow-y-auto px-4 py-5 sm:px-6 lg:px-7">
-                  <div className="mb-5 flex items-end justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-200/75">
-                        Selección
-                      </p>
-                      <h3 className="mt-2 text-2xl font-black text-white sm:text-3xl">
-                        Próximas opciones
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {latestProvider && (
-                        <span
-                          className={[
-                            "flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold",
-                            latestProvider === "gemini"
-                              ? "bg-violet-500/15 text-violet-300 border border-violet-500/20"
-                              : latestProvider === "openai"
-                                ? "bg-green-500/15 text-green-300 border border-green-500/20"
-                                : latestProvider === "ollama"
-                                  ? "bg-orange-500/15 text-orange-300 border border-orange-500/20"
-                                  : "bg-zinc-800 text-zinc-400 border border-white/10",
-                          ].join(" ")}
+            {/* Content - Responsive Layout */}
+            <div className="min-h-0 flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_340px] gap-0 lg:gap-4 lg:p-4 lg:overflow-hidden">
+              {/* Chat Section - Solo visible en mobile */}
+              <div className="lg:hidden flex flex-col min-h-0 overflow-hidden">
+                <div
+                  className="flex-1 overflow-y-auto px-4 py-4 space-y-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]"
+                  aria-live="polite"
+                  style={{
+                    scrollbarColor: "rgba(255,255,255,0.1) transparent",
+                  }}
+                >
+                  {messages.map((message, index) => {
+                    const isUser = message.role === "user";
+                    return (
+                      <div
+                        key={`${message.role}-${index}`}
+                        className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                            isUser
+                              ? "bg-cyan-500 text-white shadow-lg shadow-cyan-500/20"
+                              : "bg-white/8 text-zinc-100 border border-white/10"
+                          }`}
                         >
-                          {latestProvider === "ollama" ? (
-                            <Zap className="h-3 w-3" />
-                          ) : latestProvider === "gemini" ? (
-                            <Brain className="h-3 w-3" />
-                          ) : latestProvider === "openai" ? (
-                            <Brain className="h-3 w-3" />
-                          ) : (
-                            <Zap className="h-3 w-3" />
-                          )}
-                          {latestProvider === "gemini"
-                            ? "Gemini AI"
-                            : latestProvider === "openai"
-                              ? "OpenAI"
-                              : latestProvider === "ollama"
-                                ? "IA Local"
-                                : "Ranking"}
-                        </span>
-                      )}
-                      {latestRecommendations.length ? (
-                        <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-xs font-bold text-zinc-400">
-                          {latestRecommendations.length} títulos
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
+                          <p>{message.text}</p>
+                          {!isUser &&
+                            message.provider &&
+                            message.provider !== "ranking" && (
+                              <span className="mt-2 flex items-center gap-1.5 text-xs text-cyan-300/70 font-medium">
+                                <Brain className="h-3 w-3" />
+                                {message.provider === "gemini"
+                                  ? "Gemini"
+                                  : message.provider === "openai"
+                                    ? "OpenAI"
+                                    : message.provider}
+                              </span>
+                            )}
+                        </div>
+                      </div>
+                    );
+                  })}
 
+                  {loading && (
+                    <div className="flex justify-start">
+                      <div className="inline-flex items-center gap-2 rounded-2xl bg-white/8 border border-white/10 px-4 py-2.5 text-sm text-zinc-300">
+                        <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                        <span>Pensando...</span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+
+              {/* Desktop Recommendations Grid - Main content */}
+              <div className="hidden lg:flex lg:flex-col min-h-0 lg:border lg:border-white/10 lg:rounded-lg lg:bg-black/30 lg:overflow-hidden">
+                <div
+                  className="flex-1 overflow-y-auto px-4 py-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]"
+                  style={{
+                    scrollbarColor: "rgba(255,255,255,0.1) transparent",
+                  }}
+                >
                   {latestRecommendations.length > 0 ? (
-                    <div className="grid gap-4 xl:grid-cols-2">
+                    <div className="grid gap-3 auto-rows-max">
                       {latestRecommendations.map((item) => (
                         <RecommendationCard
                           key={`${item.mediaType}-${item.id}`}
@@ -514,22 +366,131 @@ export default function WatchNextAssistant({ isMobile = false }) {
                       ))}
                     </div>
                   ) : (
-                    <div className="grid min-h-[360px] place-items-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.025] p-8 text-center">
-                      <div className="max-w-md">
-                        <Sparkles className="mx-auto h-10 w-10 text-cyan-200/80" />
-                        <h3 className="mt-4 text-xl font-black text-white">
-                          Dime qué te apetece ver
-                        </h3>
-                        <p className="mt-2 text-sm leading-relaxed text-zinc-500">
-                          El asistente buscará opciones con tus pendientes,
-                          favoritos, historial y valoraciones.
-                        </p>
+                    <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                      <Sparkles className="h-8 w-8 text-cyan-300/60 mb-3" />
+                      <p className="text-sm font-semibold text-zinc-400">
+                        Dime qué te apetece ver
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Desktop Chat Sidebar */}
+              <div className="hidden lg:flex lg:flex-col min-h-0 lg:border lg:border-white/10 lg:rounded-lg lg:bg-black/30 lg:overflow-hidden">
+                <div
+                  className="flex-1 overflow-y-auto px-4 py-4 space-y-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]"
+                  aria-live="polite"
+                  style={{
+                    scrollbarColor: "rgba(255,255,255,0.1) transparent",
+                  }}
+                >
+                  {messages.map((message, index) => {
+                    const isUser = message.role === "user";
+                    return (
+                      <div
+                        key={`${message.role}-${index}`}
+                        className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-full rounded-lg px-3 py-2 text-xs leading-relaxed ${
+                            isUser
+                              ? "bg-cyan-500/80 text-white"
+                              : "bg-white/8 text-zinc-200 border border-white/10"
+                          }`}
+                        >
+                          <p>{message.text}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {loading && (
+                    <div className="flex justify-start">
+                      <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/8 border border-white/10 px-3 py-2 text-xs text-zinc-300">
+                        <Loader2 className="h-3 w-3 animate-spin text-cyan-400" />
+                        <span>Pensando...</span>
                       </div>
                     </div>
                   )}
-                </aside>
+                  <div ref={messagesEndRef} />
+                </div>
               </div>
-            </section>
+            </div>
+
+            {/* Mobile Recommendations Grid - Between chat and input */}
+            {latestRecommendations.length > 0 && (
+              <div className="lg:hidden flex-shrink-0 border-t border-white/10 bg-black/20 overflow-x-auto">
+                <div className="grid grid-cols-2 gap-2 p-3 auto-cols-max w-full">
+                  {latestRecommendations.slice(0, 6).map((item) => {
+                    const poster = tmdbImg(item?.posterPath, "w342");
+                    const Icon = item?.mediaType === "tv" ? Tv : Film;
+                    return (
+                      <Link
+                        key={`${item.mediaType}-${item.id}`}
+                        href={item?.href || "#"}
+                        onClick={close}
+                        className="group relative overflow-hidden rounded-lg flex-shrink-0"
+                      >
+                        {poster ? (
+                          <img
+                            src={poster}
+                            alt={item?.title}
+                            className="w-16 aspect-[2/3] object-cover rounded-lg group-hover:scale-105 transition"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-16 aspect-[2/3] bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Icon className="h-6 w-6 text-zinc-600" />
+                          </div>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Input Area - Fixed at bottom */}
+            <div className="border-t border-white/10 bg-black/40 p-3 sm:p-4 backdrop-blur-sm flex-shrink-0">
+              <div className="mb-2 flex gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {PROMPT_SUGGESTIONS.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => sendPrompt(suggestion)}
+                    disabled={loading}
+                    className="shrink-0 rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs font-medium text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-white disabled:opacity-50"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  sendPrompt();
+                }}
+                className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.08] p-2.5 focus-within:border-cyan-400/50 focus-within:bg-white/[0.12]"
+              >
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="¿Qué te apetece ver?"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
+                />
+                <button
+                  type="submit"
+                  disabled={loading || !input.trim()}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-500 text-white transition hover:bg-cyan-600 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Enviar"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </form>
+            </div>
           </motion.div>
         </motion.div>
       )}
