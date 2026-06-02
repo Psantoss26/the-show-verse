@@ -556,7 +556,9 @@ export default function WatchNextAssistant({ isMobile = false }) {
         aria-label="Abrir recomendador de qué ver"
         title="Qué ver ahora"
       >
-        <Sparkles className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+        <Sparkles
+          className={`transition-transform duration-200 group-hover:scale-110 ${isMobile ? "h-5 w-5" : "h-[22px] w-[22px]"}`}
+        />
       </button>
 
       {mounted ? createPortal(modal, document.body) : null}
