@@ -57,7 +57,7 @@ const WATCH_NEXT_RESPONSE_FORMAT = {
       recommendations: {
         type: "array",
         minItems: 1,
-        maxItems: 6,
+        maxItems: 8,
         items: {
           type: "object",
           additionalProperties: false,
@@ -92,7 +92,7 @@ const GEMINI_RESPONSE_SCHEMA = {
     recommendations: {
       type: "ARRAY",
       minItems: 3,
-      maxItems: 6,
+      maxItems: 8,
       items: {
         type: "OBJECT",
         properties: {
@@ -316,19 +316,42 @@ async function getTmdbQualityCandidates(limit = 30) {
 async function getTmdbDiscoveryCandidates(message, limit = 32) {
   const wantedGenres = getWantedGenreIds(message);
   const wantedType = getWantedMediaType(message);
+  const yearIntent = extractYearIntent(message);
   const genreParam = wantedGenres.length ? wantedGenres.slice(0, 4).join("|") : null;
+
   const commonParams = {
     page: 1,
-    sort_by: "popularity.desc",
-    "vote_count.gte": 80,
-    "vote_average.gte": 6,
+    sort_by: yearIntent ? "vote_count.desc" : "popularity.desc",
+    "vote_count.gte": yearIntent ? 30 : 80,
+    "vote_average.gte": 5.5,
   };
+
+  // When a specific year is requested, use primary_release_year (exact match)
+  // When a decade range is requested, use primary_release_date.gte/lte
+  if (yearIntent?.specificYear) {
+    commonParams["primary_release_year"] = yearIntent.specificYear;
+  } else if (yearIntent?.yearMin) {
+    commonParams["primary_release_date.gte"] = `${yearIntent.yearMin}-01-01`;
+    commonParams["primary_release_date.lte"] = `${yearIntent.yearMax || yearIntent.yearMin + 9}-12-31`;
+  }
+
   const movieParams = genreParam
     ? { ...commonParams, with_genres: genreParam, region: "ES" }
     : { ...commonParams, region: "ES" };
   const tvParams = genreParam
     ? { ...commonParams, with_genres: genreParam }
     : commonParams;
+
+  // For TV year filtering use first_air_date instead of primary_release_date
+  if (yearIntent?.specificYear) {
+    tvParams["first_air_date_year"] = yearIntent.specificYear;
+    delete tvParams["primary_release_year"];
+  } else if (yearIntent?.yearMin) {
+    tvParams["first_air_date.gte"] = `${yearIntent.yearMin}-01-01`;
+    tvParams["first_air_date.lte"] = `${yearIntent.yearMax || yearIntent.yearMin + 9}-12-31`;
+    delete tvParams["primary_release_date.gte"];
+    delete tvParams["primary_release_date.lte"];
+  }
 
   const [movies, shows] = await Promise.all([
     wantedType === "tv"
@@ -464,6 +487,44 @@ function wantsFutureReleases(message) {
   );
 }
 
+/**
+ * Extract a specific year or decade range from the user message.
+ * Returns { yearMin, yearMax, specificYear } or null if nothing found.
+ */
+function extractYearIntent(message) {
+  const text = String(message || "");
+
+  // Specific 4-digit year: "del año 1996", "de 1996", "año 1996", "1996"
+  const specificYearMatch = text.match(/\b(19[0-9]{2}|20[0-2][0-9])\b/);
+  if (specificYearMatch) {
+    const year = parseInt(specificYearMatch[1], 10);
+    return { yearMin: year, yearMax: year, specificYear: year };
+  }
+
+  // Decade patterns: "años 90", "los 90", "los 80s", "de los 2000s"
+  const decadeMatch = text.match(/\b(?:a[ñn]os?\s+|los\s+|de\s+los\s+|de\s+)([12][0-9]){0,1}([0-9]{2})(?:s|'s)?\b/i);
+  if (decadeMatch) {
+    const raw = decadeMatch[0].replace(/[^0-9]/g, "");
+    const decade = parseInt(raw.slice(-2), 10);
+    if (decade >= 20 && decade <= 99) {
+      // Two-digit decade like "90" → 1990s, "80" → 1980s, "70" → 1970s
+      const century = decade >= 20 && decade <= 29 ? 2000 : 1900;
+      const yearMin = century + Math.floor(decade / 10) * 10;
+      return { yearMin, yearMax: yearMin + 9, specificYear: null };
+    }
+  }
+
+  // Named decade patterns
+  if (/\b(noventa|90s|'?90s?)\b/i.test(text)) return { yearMin: 1990, yearMax: 1999, specificYear: null };
+  if (/\b(ochenta|80s|'?80s?)\b/i.test(text)) return { yearMin: 1980, yearMax: 1989, specificYear: null };
+  if (/\b(setenta|70s|'?70s?)\b/i.test(text)) return { yearMin: 1970, yearMax: 1979, specificYear: null };
+  if (/\b(dos\s*mil|2000s|'?00s?)\b/i.test(text)) return { yearMin: 2000, yearMax: 2009, specificYear: null };
+  if (/\b(2010s|'?10s?)\b/i.test(text)) return { yearMin: 2010, yearMax: 2019, specificYear: null };
+  if (/\b(2020s|'?20s?)\b/i.test(text)) return { yearMin: 2020, yearMax: 2029, specificYear: null };
+
+  return null;
+}
+
 function inferFavoriteGenres({ favorites, rated, traktRatings }) {
   const counts = new Map();
   const add = (item, weight = 1) => {
@@ -492,9 +553,14 @@ function inferFavoriteGenres({ favorites, rated, traktRatings }) {
 function scoreCandidates({ candidates, message, profileGenres, watchedSet }) {
   const wantedType = getWantedMediaType(message);
   const wantedGenres = getWantedGenreIds(message);
+  const yearIntent = extractYearIntent(message);
   const text = String(message || "").toLowerCase();
   const wantsShort = /corta|corto|rápida|rapida|poco tiempo|algo breve/.test(text);
   const wantsQuality = /buena|mejor|obra maestra|top|calidad|notaza/.test(text);
+
+  // Has ANY specific user intent (genre, type, year) — if so, we should suppress
+  // novelty bonuses so discovery candidates (filtered by intent) can compete.
+  const hasSpecificIntent = !!(yearIntent || wantedGenres.length > 0 || wantedType);
 
   return candidates
     .map((item) => {
@@ -517,27 +583,55 @@ function scoreCandidates({ candidates, message, profileGenres, watchedSet }) {
         daysFromRelease > 45 &&
         daysFromRelease <= 120;
 
-      if (item.sources.includes("watchlist")) score += 20;
-      if (item.sources.includes("trakt_recommended")) score += 28;
-      if (item.sources.includes("trakt_trending")) score += 18;
-      if (item.sources.includes("trakt_anticipated")) score += 18;
-      if (item.sources.includes("trakt_popular")) score += 8;
-      if (item.sources.includes("tmdb_now_playing")) score += 24;
-      if (item.sources.includes("tmdb_upcoming")) score += 18;
-      if (item.sources.includes("tmdb_on_the_air")) score += 22;
-      if (item.sources.includes("tmdb_airing_today")) score += 18;
-      if (item.sources.includes("tmdb_weekly_trending")) score += 20;
-      if (item.sources.includes("tmdb_fallback")) score += 5;
-      if (isRecentRelease) score += item.mediaType === "movie" ? 18 : 12;
-      if (isNearRelease) score += 8;
+      if (!hasSpecificIntent) {
+        // No specific request — full novelty/trending bonuses ("recomiéndame algo")
+        if (item.sources.includes("watchlist")) score += 20;
+        if (item.sources.includes("trakt_recommended")) score += 28;
+        if (item.sources.includes("trakt_trending")) score += 18;
+        if (item.sources.includes("trakt_anticipated")) score += 18;
+        if (item.sources.includes("trakt_popular")) score += 8;
+        if (item.sources.includes("tmdb_now_playing")) score += 24;
+        if (item.sources.includes("tmdb_upcoming")) score += 18;
+        if (item.sources.includes("tmdb_on_the_air")) score += 22;
+        if (item.sources.includes("tmdb_airing_today")) score += 18;
+        if (item.sources.includes("tmdb_weekly_trending")) score += 20;
+        if (item.sources.includes("tmdb_fallback")) score += 5;
+        if (isRecentRelease) score += item.mediaType === "movie" ? 18 : 12;
+        if (isNearRelease) score += 8;
+      } else {
+        // Specific request — suppress novelty bonuses so intent-matching content wins.
+        // Only keep watchlist/personal signals.
+        if (item.sources.includes("watchlist")) score += 20;
+        if (item.sources.includes("trakt_recommended")) score += 10;
+        // Small recency bonus so recent content in the right category still shows
+        if (isRecentRelease && !yearIntent) score += item.mediaType === "movie" ? 6 : 4;
+      }
+
       if (item.voteAverage) score += item.voteAverage * (wantsQuality ? 3 : 1.7);
       if (item.popularity) score += Math.min(16, Math.log10(item.popularity + 1) * 7);
-      if (wantedType && item.mediaType === wantedType) score += 22;
-      if (wantedType && item.mediaType !== wantedType) score -= 18;
 
+      if (wantedType && item.mediaType === wantedType) score += 30;
+      if (wantedType && item.mediaType !== wantedType) score -= 40;
+
+      // Genre matching — strong signal when user has asked for specific genres
       for (const id of wantedGenres) {
-        if (genreIds.has(id)) score += 18;
+        if (genreIds.has(id)) score += hasSpecificIntent ? 35 : 18;
       }
+
+      // Year/decade matching — strongly boost items from requested period
+      if (yearIntent) {
+        const itemYear = parseInt(item.year, 10);
+        if (!isNaN(itemYear)) {
+          if (yearIntent.specificYear) {
+            if (itemYear === yearIntent.specificYear) score += 60;
+            else score -= Math.min(80, Math.abs(itemYear - yearIntent.specificYear) * 8);
+          } else {
+            if (itemYear >= yearIntent.yearMin && itemYear <= yearIntent.yearMax) score += 40;
+            else score -= 30;
+          }
+        }
+      }
+
       for (const id of profileGenres) {
         if (genreIds.has(id)) score += 5;
       }
@@ -593,6 +687,7 @@ function serializeRecommendation(item, message, source = "ranking") {
     if (s === "tmdb_airing_today") return "Hoy";
     if (s === "tmdb_weekly_trending") return "Tendencia";
     if (s === "tmdb_fallback") return "TMDb";
+    if (s === "tmdb_discovery") return "TMDb";
     return s;
   });
 
@@ -718,7 +813,9 @@ function buildAiSystemPrompt() {
 function buildOllamaIntentPrompt() {
   return (
     "Extract viewing intent from user message. Reply ONLY with compact JSON, nothing else.\n" +
-    'Schema: {"t":"movie"|"show"|"any","g":["comedy",...],"y":"1990s"|"2000s"|"2010s"|"2020s"|"recent"|"classic"}\n' +
+    'Schema: {"t":"movie"|"show"|"any","g":["comedy",...],"y":"1990s"|"2000s"|"2010s"|"2020s"|"recent"|"classic","year":1996}\n' +
+    "- 'year' is an exact 4-digit year if the user mentions a specific year (e.g. 1996, 2003). Overrides 'y'.\n" +
+    "- 'y' is a decade string only if no specific year is mentioned.\n" +
     "Genres (use only these): action,comedy,drama,thriller,horror,romance,sci-fi,animation,crime,documentary,fantasy,mystery,adventure\n" +
     "Omit fields that are not specified. Reply with {} if no intent is clear."
   );
@@ -789,7 +886,7 @@ function normalizeAiSelection({ parsed, candidates, message }) {
       };
     })
     .filter(Boolean)
-    .slice(0, 6);
+    .slice(0, 8);
 
   if (!selected.length) return null;
 
@@ -993,8 +1090,8 @@ async function getGeminiRecommendation({ message, candidates, contextSummary }) 
 }
 
 // ─── Ollama ───────────────────────────────────────────────────────────────────
-// Uses intent extraction instead of candidate selection to keep output ≤ 80 tokens
-// (~5-10 s at 3.5 tok/s). The server's ranking algorithm then applies the intent.
+// Uses intent extraction to boost/filter the already query-aware scored candidates.
+// Keeps LLM output ≤ 80 tokens (~5-10 s at 3.5 tok/s on NAS hardware).
 async function getOllamaRecommendation({ message, candidates }) {
   if (!OLLAMA_BASE_URL) return null;
 
@@ -1027,7 +1124,8 @@ async function getOllamaRecommendation({ message, candidates }) {
   const json = await safeJson(res);
   if (!res.ok) {
     console.warn("[watch-next] Ollama error:", { status: res.status, error: json?.error || "unknown" });
-    return null;
+    // Even on error, return top of already-scored candidates (better than null→same fallback)
+    return buildOllamaFallback({ candidates, message, reason: "error" });
   }
 
   const rawContent = json?.choices?.[0]?.message?.content;
@@ -1035,58 +1133,98 @@ async function getOllamaRecommendation({ message, candidates }) {
 
   if (!intent) {
     console.warn("[watch-next] Ollama intent parse failed:", { raw: String(rawContent || "").slice(0, 100) });
-    return null;
+    return buildOllamaFallback({ candidates, message, reason: "parse_failed" });
   }
 
-  // Map intent fields to score boosts and apply to candidates
+  // Map intent fields to additional score boosts on top of already-scored candidates
   const intentType = intent.t === "movie" ? "movie" : intent.t === "show" ? "tv" : null;
   const intentGenreIds = new Set();
   for (const g of safeArray(intent.g)) {
     for (const id of (OLLAMA_GENRE_MAP[String(g).toLowerCase()] || [])) intentGenreIds.add(id);
   }
 
+  // Support specific year (e.g. 1996) or decade range from Ollama intent
   let yearMin = null, yearMax = null;
-  if (intent.y === "recent" || intent.y === "2020s")      { yearMin = 2020; }
+  const specificYear = Number.isFinite(Number(intent.year)) && Number(intent.year) > 1900
+    ? Number(intent.year) : null;
+  if (specificYear) {
+    yearMin = specificYear;
+    yearMax = specificYear;
+  } else if (intent.y === "recent" || intent.y === "2020s") { yearMin = 2020; }
   else if (intent.y === "2010s") { yearMin = 2010; yearMax = 2019; }
   else if (intent.y === "2000s") { yearMin = 2000; yearMax = 2009; }
   else if (intent.y === "1990s") { yearMin = 1990; yearMax = 1999; }
   else if (intent.y === "1980s") { yearMin = 1980; yearMax = 1989; }
-  else if (intent.y === "classic")                        { yearMax = 2000; }
+  else if (intent.y === "classic") { yearMax = 2000; }
 
   const hasIntent = intentType || intentGenreIds.size > 0 || yearMin || yearMax;
-  if (!hasIntent) return null;
 
+  // No structured intent extracted — use already query-aware scoring from scoreCandidates.
+  // Do NOT return null here, as that would fall through to the always-same generic ranking.
+  if (!hasIntent) {
+    return buildOllamaFallback({ candidates, message, reason: "no_intent" });
+  }
+
+  // Apply additional refinement boosts on top of existing scores
   const rescored = candidates.map((item) => {
     let boost = 0;
     if (intentType) {
-      boost += item.mediaType === intentType ? 30 : -40;
+      boost += item.mediaType === intentType ? 20 : -30;
     }
     for (const id of intentGenreIds) {
-      if (safeArray(item.genreIds).includes(id)) boost += 20;
+      if (safeArray(item.genreIds).includes(id)) boost += 25;
     }
     const itemYear = parseInt(item.year, 10);
     if (!isNaN(itemYear)) {
-      if (yearMin && itemYear < yearMin) boost -= 25;
-      if (yearMax && itemYear > yearMax) boost -= 25;
-      if (yearMin && yearMax && itemYear >= yearMin && itemYear <= yearMax) boost += 15;
+      if (specificYear) {
+        if (itemYear === specificYear) boost += 50;
+        else boost -= Math.min(60, Math.abs(itemYear - specificYear) * 6);
+      } else {
+        if (yearMin && itemYear < yearMin) boost -= 30;
+        if (yearMax && itemYear > yearMax) boost -= 30;
+        if (yearMin && yearMax && itemYear >= yearMin && itemYear <= yearMax) boost += 20;
+      }
     }
     return { ...item, score: (item.score || 0) + boost };
   }).sort((a, b) => b.score - a.score);
 
-  const top = rescored.slice(0, 5);
-  if (!top.length) return null;
+  const top = rescored.slice(0, 8);
+  if (!top.length) return buildOllamaFallback({ candidates, message, reason: "empty_top" });
 
   const typeLabel = intentType === "movie" ? "películas" : intentType === "tv" ? "series" : "títulos";
   const genreLabel = safeArray(intent.g).slice(0, 2).join(" y ");
   const parts = [];
   if (genreLabel) parts.push(`de ${genreLabel}`);
-  if (intent.y === "recent")  parts.push("recientes");
+  if (specificYear)                parts.push(`del año ${specificYear}`);
+  else if (intent.y === "recent")  parts.push("recientes");
   else if (intent.y === "classic") parts.push("clásicos");
-  else if (intent.y)          parts.push(`de los ${intent.y}`);
+  else if (intent.y)               parts.push(`de los ${intent.y}`);
 
   const reply = parts.length
     ? `He seleccionado ${typeLabel} ${parts.join(", ")} que encajan con tu petición.`
     : `He seleccionado los ${typeLabel} que mejor encajan con lo que buscas.`;
+
+  return { reply, recommendations: top, provider: "ollama", model: OLLAMA_MODEL };
+}
+
+/**
+ * Fallback when Ollama can't extract structured intent.
+ * Returns the top of the already query-aware scored list rather than null,
+ * so the response is always influenced by the user's message.
+ */
+function buildOllamaFallback({ candidates, message, reason }) {
+  console.info("[watch-next] Ollama fallback (", reason, ") — using scored ranking");
+  const top = candidates.slice(0, 8);
+  if (!top.length) return null;
+
+  const wantedType = getWantedMediaType(message);
+  const wantedGenres = getWantedGenreIds(message);
+  const typeLabel = wantedType === "movie" ? "películas" : wantedType === "tv" ? "series" : "títulos";
+  const genreHint = wantedGenres.length === 0 ? "" : " según tu petición";
+
+  const reply = message?.trim()
+    ? `He seleccionado los ${typeLabel} que mejor encajan con lo que pides${genreHint}.`
+    : "He seleccionado los títulos que mejor encajan con tus gustos y las tendencias actuales.";
 
   return { reply, recommendations: top, provider: "ollama", model: OLLAMA_MODEL };
 }
@@ -1140,6 +1278,10 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const message = String(body?.message || "").trim().slice(0, 800);
 
+  // Check whether the user is requesting specific year/decade content upfront
+  // so we know whether to skip novelty sources and focus on discovery
+  const yearIntentForPool = extractYearIntent(message);
+
   const [
     tmdbContext,
     traktContext,
@@ -1149,6 +1291,7 @@ export async function POST(request) {
     popular,
     tmdbNovelty,
     tmdbFallback,
+    tmdbDiscovery,
   ] =
     await Promise.all([
       getTmdbContext(cookieStore),
@@ -1157,14 +1300,19 @@ export async function POST(request) {
       getTraktTrending(24).catch(() => []),
       getTraktAnticipated(24).catch(() => []),
       getTraktPopular(24).catch(() => []),
-      getTmdbNoveltyCandidates(36).catch(() => ({
-        nowPlaying: [],
-        upcoming: [],
-        onTheAir: [],
-        airingToday: [],
-        weeklyTrending: [],
-      })),
+      // Skip novelty sources when user explicitly requests a specific year/decade
+      yearIntentForPool
+        ? Promise.resolve({ nowPlaying: [], upcoming: [], onTheAir: [], airingToday: [], weeklyTrending: [] })
+        : getTmdbNoveltyCandidates(36).catch(() => ({
+            nowPlaying: [],
+            upcoming: [],
+            onTheAir: [],
+            airingToday: [],
+            weeklyTrending: [],
+          })),
       getTmdbFallbackCandidates(30).catch(() => []),
+      // Always fetch discovery candidates filtered by message intent (year, decade, genre)
+      getTmdbDiscoveryCandidates(message, 40).catch(() => []),
     ]);
 
   const watchedSet = new Set(
@@ -1193,6 +1341,14 @@ export async function POST(request) {
   addCandidates(candidateMap, anticipated, "trakt_anticipated", 18);
   addCandidates(candidateMap, popular, "trakt_popular", 10);
   addCandidates(candidateMap, tmdbFallback, "tmdb_fallback", 6);
+  // Discovery candidates get a strong base score whenever there is specific user intent
+  // (year, decade, genre, or type) so they can compete with generic trending content.
+  const hasAnyIntent = !!(
+    yearIntentForPool ||
+    getWantedGenreIds(message).length > 0 ||
+    getWantedMediaType(message)
+  );
+  addCandidates(candidateMap, tmdbDiscovery, "tmdb_discovery", hasAnyIntent ? 35 : 8);
 
   const ranked = scoreCandidates({
     candidates: [...candidateMap.values()],
@@ -1223,7 +1379,7 @@ export async function POST(request) {
     contextSummary,
   }).catch(() => null);
 
-  const selected = ai?.recommendations?.length ? ai.recommendations : ranked.slice(0, 6);
+  const selected = ai?.recommendations?.length ? ai.recommendations : ranked.slice(0, 8);
   const payload = {
     reply:
       ai?.reply ||
