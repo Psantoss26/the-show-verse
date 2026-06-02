@@ -138,7 +138,10 @@ export default function WatchNextAssistant({ isMobile = false }) {
   const latestRecommendations = useMemo(() => {
     const last = [...messages]
       .reverse()
-      .find((msg) => Array.isArray(msg.recommendations) && msg.recommendations.length);
+      .find(
+        (msg) =>
+          Array.isArray(msg.recommendations) && msg.recommendations.length,
+      );
     return last?.recommendations || [];
   }, [messages]);
 
@@ -154,7 +157,10 @@ export default function WatchNextAssistant({ isMobile = false }) {
   // Auto-scroll chat to bottom on new messages
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      messagesEndRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
     }
   }, [messages, loading]);
 
@@ -229,275 +235,305 @@ export default function WatchNextAssistant({ isMobile = false }) {
 
   const modal = (
     <AnimatePresence>
-        {open && (
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[9999] overflow-hidden bg-black/90 p-0 sm:p-3"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduceMotion ? 0.12 : 0.25 }}
+          onMouseDown={close}
+        >
           <motion.div
-            className="fixed inset-0 z-[9999] overflow-hidden bg-black/90 p-0 sm:p-3"
+            aria-hidden="true"
+            className="absolute inset-0 bg-black"
+            initial={
+              reduceMotion
+                ? { opacity: 0 }
+                : { clipPath: "circle(0% at 50% 50%)" }
+            }
+            animate={
+              reduceMotion
+                ? { opacity: 1 }
+                : { clipPath: "circle(150% at 50% 50%)" }
+            }
+            exit={
+              reduceMotion
+                ? { opacity: 0 }
+                : { clipPath: "circle(0% at 50% 50%)" }
+            }
+            transition={{
+              duration: reduceMotion ? 0.12 : 0.55,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+          />
+          <motion.div
+            aria-hidden="true"
+            className="absolute inset-0 backdrop-blur-2xl"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: reduceMotion ? 0.12 : 0.25 }}
-            onMouseDown={close}
+            transition={{
+              duration: reduceMotion ? 0.12 : 0.38,
+              delay: reduceMotion ? 0 : 0.08,
+            }}
+          />
+          <motion.div
+            aria-hidden="true"
+            className="absolute inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,rgba(34,211,238,0.12),transparent)]"
+            initial={{ y: -160, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -160, opacity: 0 }}
+            transition={{
+              duration: reduceMotion ? 0.12 : 0.6,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+          />
+
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            initial={
+              reduceMotion
+                ? { opacity: 0 }
+                : { opacity: 0, y: 32, scale: 0.94, borderRadius: 48 }
+            }
+            animate={
+              reduceMotion
+                ? { opacity: 1 }
+                : { opacity: 1, y: 0, scale: 1, borderRadius: 28 }
+            }
+            exit={
+              reduceMotion
+                ? { opacity: 0 }
+                : { opacity: 0, y: 22, scale: 0.985 }
+            }
+            transition={{
+              duration: reduceMotion ? 0.12 : 0.42,
+              delay: reduceMotion ? 0 : 0.18,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="relative mx-auto flex h-[100dvh] w-full max-w-[1540px] overflow-hidden border border-white/10 bg-[#080808] shadow-2xl shadow-black sm:h-[calc(100dvh-24px)] sm:w-[calc(100vw-24px)] sm:rounded-[28px]"
           >
-            <motion.div
-              aria-hidden="true"
-              className="absolute inset-0 bg-black"
-              initial={
-                reduceMotion
-                  ? { opacity: 0 }
-                  : { clipPath: "circle(0% at 50% 50%)" }
-              }
-              animate={
-                reduceMotion
-                  ? { opacity: 1 }
-                  : { clipPath: "circle(150% at 50% 50%)" }
-              }
-              exit={
-                reduceMotion
-                  ? { opacity: 0 }
-                  : { clipPath: "circle(0% at 50% 50%)" }
-              }
-              transition={{ duration: reduceMotion ? 0.12 : 0.55, ease: [0.22, 1, 0.36, 1] }}
-            />
-            <motion.div
-              aria-hidden="true"
-              className="absolute inset-0 backdrop-blur-2xl"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: reduceMotion ? 0.12 : 0.38, delay: reduceMotion ? 0 : 0.08 }}
-            />
-            <motion.div
-              aria-hidden="true"
-              className="absolute inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,rgba(34,211,238,0.12),transparent)]"
-              initial={{ y: -160, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -160, opacity: 0 }}
-              transition={{ duration: reduceMotion ? 0.12 : 0.6, ease: [0.22, 1, 0.36, 1] }}
-            />
-
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby={titleId}
-              initial={
-                reduceMotion
-                  ? { opacity: 0 }
-                  : { opacity: 0, y: 32, scale: 0.94, borderRadius: 48 }
-              }
-              animate={
-                reduceMotion
-                  ? { opacity: 1 }
-                  : { opacity: 1, y: 0, scale: 1, borderRadius: 28 }
-              }
-              exit={
-                reduceMotion
-                  ? { opacity: 0 }
-                  : { opacity: 0, y: 22, scale: 0.985 }
-              }
-              transition={{
-                duration: reduceMotion ? 0.12 : 0.42,
-                delay: reduceMotion ? 0 : 0.18,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="relative mx-auto flex h-[100dvh] w-full max-w-[1540px] overflow-hidden border border-white/10 bg-[#080808] shadow-2xl shadow-black sm:h-[calc(100dvh-24px)] sm:w-[calc(100vw-24px)] sm:rounded-[28px]"
-            >
-              <section className="flex min-w-0 flex-1 flex-col">
-                <header className="flex items-center justify-between gap-4 border-b border-white/10 bg-black/35 px-4 py-4 backdrop-blur-xl sm:px-6">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.12)]">
-                      <Bot className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <h2
-                        id={titleId}
-                        className="truncate text-base font-black text-white sm:text-lg"
-                      >
-                        Qué ver ahora
-                      </h2>
-                      <p className="truncate text-xs text-zinc-500">
-                        Recomendaciones cruzando tu actividad, pendientes y favoritos
-                      </p>
-                    </div>
+            <section className="flex min-w-0 flex-1 flex-col">
+              <header className="flex items-center justify-between gap-4 border-b border-white/10 bg-black/35 px-4 py-4 backdrop-blur-xl sm:px-6">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.12)]">
+                    <Bot className="h-5 w-5" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={close}
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-zinc-400 transition hover:bg-white/10 hover:text-white"
-                    aria-label="Cerrar recomendador"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </header>
-
-                <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(360px,0.78fr)_minmax(520px,1.22fr)]">
-                  <div className="flex min-h-0 flex-col border-white/10 lg:border-r">
-                    <div
-                      className="flex-1 overflow-y-auto px-4 py-5 sm:px-6"
-                      aria-live="polite"
+                  <div className="min-w-0">
+                    <h2
+                      id={titleId}
+                      className="truncate text-base font-black text-white sm:text-lg"
                     >
-                      <div className="space-y-4">
-                        {messages.map((message, index) => {
-                          const isUser = message.role === "user";
-                          return (
+                      Qué ver ahora
+                    </h2>
+                    <p className="truncate text-xs text-zinc-500">
+                      Recomendaciones cruzando tu actividad, pendientes y
+                      favoritos
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={close}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                  aria-label="Cerrar recomendador"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </header>
+
+              <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(360px,0.78fr)_minmax(520px,1.22fr)]">
+                <div className="flex min-h-0 flex-col border-white/10 lg:border-r">
+                  <div
+                    className="flex-1 overflow-y-auto px-4 py-5 sm:px-6"
+                    aria-live="polite"
+                  >
+                    <div className="space-y-4">
+                      {messages.map((message, index) => {
+                        const isUser = message.role === "user";
+                        return (
+                          <div
+                            key={`${message.role}-${index}`}
+                            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                          >
                             <div
-                              key={`${message.role}-${index}`}
-                              className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                              className={[
+                                "max-w-[92%] rounded-3xl px-4 py-3 text-sm leading-relaxed",
+                                isUser
+                                  ? "bg-cyan-300 text-black shadow-[0_14px_36px_rgba(34,211,238,0.16)]"
+                                  : "border border-white/10 bg-white/[0.045] text-zinc-200",
+                              ].join(" ")}
                             >
-                              <div
-                                className={[
-                                  "max-w-[92%] rounded-3xl px-4 py-3 text-sm leading-relaxed",
-                                  isUser
-                                    ? "bg-cyan-300 text-black shadow-[0_14px_36px_rgba(34,211,238,0.16)]"
-                                    : "border border-white/10 bg-white/[0.045] text-zinc-200",
-                                ].join(" ")}
-                              >
-                                {message.text}
-                                {/* Provider badge on assistant messages */}
-                                {!isUser && message.provider && message.provider !== "ranking" && (
+                              {message.text}
+                              {/* Provider badge on assistant messages */}
+                              {!isUser &&
+                                message.provider &&
+                                message.provider !== "ranking" && (
                                   <span className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-cyan-300/60">
                                     <Brain className="h-3 w-3" />
-                                    {message.provider === "gemini" ? "Gemini AI" : message.provider === "openai" ? "OpenAI" : message.provider}
+                                    {message.provider === "gemini"
+                                      ? "Gemini AI"
+                                      : message.provider === "openai"
+                                        ? "OpenAI"
+                                        : message.provider}
                                   </span>
                                 )}
-                                {!isUser && message.mode === "ranking" && (
-                                  <span className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-zinc-500">
-                                    <Zap className="h-3 w-3" />
-                                    Ranking local
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {loading ? (
-                          <div className="flex justify-start">
-                            <div className="inline-flex items-center gap-2 rounded-3xl border border-white/10 bg-white/[0.045] px-4 py-3 text-sm text-zinc-300">
-                              <Loader2 className="h-4 w-4 animate-spin text-cyan-200" />
-                              <span>
-                                Consultando IA local
-                                <span className="animate-pulse">...</span>
-                              </span>
+                              {!isUser && message.mode === "ranking" && (
+                                <span className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-zinc-500">
+                                  <Zap className="h-3 w-3" />
+                                  Ranking local
+                                </span>
+                              )}
                             </div>
                           </div>
-                        ) : null}
-                        <div ref={messagesEndRef} />
-                      </div>
+                        );
+                      })}
+
+                      {loading ? (
+                        <div className="flex justify-start">
+                          <div className="inline-flex items-center gap-2 rounded-3xl border border-white/10 bg-white/[0.045] px-4 py-3 text-sm text-zinc-300">
+                            <Loader2 className="h-4 w-4 animate-spin text-cyan-200" />
+                            <span>
+                              Consultando IA local
+                              <span className="animate-pulse">...</span>
+                            </span>
+                          </div>
+                        </div>
+                      ) : null}
+                      <div ref={messagesEndRef} />
                     </div>
-
-                    <footer className="border-t border-white/10 bg-black/30 p-4 backdrop-blur-xl sm:p-5">
-                      <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        {PROMPT_SUGGESTIONS.map((suggestion) => (
-                          <button
-                            key={suggestion}
-                            type="button"
-                            onClick={() => sendPrompt(suggestion)}
-                            disabled={loading}
-                            className="shrink-0 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-cyan-300/30 hover:text-white disabled:opacity-50"
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
-
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          sendPrompt();
-                        }}
-                        className="flex items-center gap-2 rounded-3xl border border-cyan-300/25 bg-white/[0.055] p-2 shadow-[0_0_28px_rgba(34,211,238,0.07)] focus-within:border-cyan-300/50"
-                      >
-                        <input
-                          ref={inputRef}
-                          value={input}
-                          onChange={(e) => setInput(e.target.value)}
-                          placeholder="Me apetece algo..."
-                          className="min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none placeholder:text-zinc-500"
-                        />
-                        <button
-                          type="submit"
-                          disabled={loading || !input.trim()}
-                          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-cyan-300 text-black transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
-                          aria-label="Enviar preferencia"
-                        >
-                          {loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Send className="h-4 w-4" />
-                          )}
-                        </button>
-                      </form>
-                    </footer>
                   </div>
 
-                  <aside className="min-h-0 overflow-y-auto px-4 py-5 sm:px-6 lg:px-7">
-                    <div className="mb-5 flex items-end justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-200/75">
-                          Selección
-                        </p>
-                        <h3 className="mt-2 text-2xl font-black text-white sm:text-3xl">
-                          Próximas opciones
-                        </h3>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {latestProvider && (
-                          <span className={[
-                            "flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold",
-                            latestProvider === "gemini" ? "bg-violet-500/15 text-violet-300 border border-violet-500/20" :
-                            latestProvider === "openai" ? "bg-green-500/15 text-green-300 border border-green-500/20" :
-                            latestProvider === "ollama" ? "bg-orange-500/15 text-orange-300 border border-orange-500/20" :
-                            "bg-zinc-800 text-zinc-400 border border-white/10"
-                          ].join(" ")}>
-                            {latestProvider === "ollama" ? <Zap className="h-3 w-3" /> :
-                             latestProvider === "gemini" ? <Brain className="h-3 w-3" /> :
-                             latestProvider === "openai" ? <Brain className="h-3 w-3" /> :
-                             <Zap className="h-3 w-3" />}
-                            {latestProvider === "gemini" ? "Gemini AI" :
-                             latestProvider === "openai" ? "OpenAI" :
-                             latestProvider === "ollama" ? "IA Local" : "Ranking"}
-                          </span>
-                        )}
-                        {latestRecommendations.length ? (
-                          <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-xs font-bold text-zinc-400">
-                            {latestRecommendations.length} títulos
-                          </span>
-                        ) : null}
-                      </div>
+                  <footer className="border-t border-white/10 bg-black/30 p-4 backdrop-blur-xl sm:p-5">
+                    <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {PROMPT_SUGGESTIONS.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => sendPrompt(suggestion)}
+                          disabled={loading}
+                          className="shrink-0 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-cyan-300/30 hover:text-white disabled:opacity-50"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
                     </div>
 
-                    {latestRecommendations.length > 0 ? (
-                      <div className="grid gap-4 xl:grid-cols-2">
-                        {latestRecommendations.map((item) => (
-                          <RecommendationCard
-                            key={`${item.mediaType}-${item.id}`}
-                            item={item}
-                            onNavigate={close}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="grid min-h-[360px] place-items-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.025] p-8 text-center">
-                        <div className="max-w-md">
-                          <Sparkles className="mx-auto h-10 w-10 text-cyan-200/80" />
-                          <h3 className="mt-4 text-xl font-black text-white">
-                            Dime qué te apetece ver
-                          </h3>
-                          <p className="mt-2 text-sm leading-relaxed text-zinc-500">
-                            El asistente buscará opciones con tus pendientes,
-                            favoritos, historial y valoraciones.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </aside>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        sendPrompt();
+                      }}
+                      className="flex items-center gap-2 rounded-3xl border border-cyan-300/25 bg-white/[0.055] p-2 shadow-[0_0_28px_rgba(34,211,238,0.07)] focus-within:border-cyan-300/50"
+                    >
+                      <input
+                        ref={inputRef}
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Me apetece algo..."
+                        className="min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none placeholder:text-zinc-500"
+                      />
+                      <button
+                        type="submit"
+                        disabled={loading || !input.trim()}
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-cyan-300 text-black transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
+                        aria-label="Enviar preferencia"
+                      >
+                        {loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </button>
+                    </form>
+                  </footer>
                 </div>
-              </section>
-            </motion.div>
+
+                <aside className="min-h-0 overflow-y-auto px-4 py-5 sm:px-6 lg:px-7">
+                  <div className="mb-5 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-200/75">
+                        Selección
+                      </p>
+                      <h3 className="mt-2 text-2xl font-black text-white sm:text-3xl">
+                        Próximas opciones
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {latestProvider && (
+                        <span
+                          className={[
+                            "flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold",
+                            latestProvider === "gemini"
+                              ? "bg-violet-500/15 text-violet-300 border border-violet-500/20"
+                              : latestProvider === "openai"
+                                ? "bg-green-500/15 text-green-300 border border-green-500/20"
+                                : latestProvider === "ollama"
+                                  ? "bg-orange-500/15 text-orange-300 border border-orange-500/20"
+                                  : "bg-zinc-800 text-zinc-400 border border-white/10",
+                          ].join(" ")}
+                        >
+                          {latestProvider === "ollama" ? (
+                            <Zap className="h-3 w-3" />
+                          ) : latestProvider === "gemini" ? (
+                            <Brain className="h-3 w-3" />
+                          ) : latestProvider === "openai" ? (
+                            <Brain className="h-3 w-3" />
+                          ) : (
+                            <Zap className="h-3 w-3" />
+                          )}
+                          {latestProvider === "gemini"
+                            ? "Gemini AI"
+                            : latestProvider === "openai"
+                              ? "OpenAI"
+                              : latestProvider === "ollama"
+                                ? "IA Local"
+                                : "Ranking"}
+                        </span>
+                      )}
+                      {latestRecommendations.length ? (
+                        <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-xs font-bold text-zinc-400">
+                          {latestRecommendations.length} títulos
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {latestRecommendations.length > 0 ? (
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      {latestRecommendations.map((item) => (
+                        <RecommendationCard
+                          key={`${item.mediaType}-${item.id}`}
+                          item={item}
+                          onNavigate={close}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid min-h-[360px] place-items-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.025] p-8 text-center">
+                      <div className="max-w-md">
+                        <Sparkles className="mx-auto h-10 w-10 text-cyan-200/80" />
+                        <h3 className="mt-4 text-xl font-black text-white">
+                          Dime qué te apetece ver
+                        </h3>
+                        <p className="mt-2 text-sm leading-relaxed text-zinc-500">
+                          El asistente buscará opciones con tus pendientes,
+                          favoritos, historial y valoraciones.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </aside>
+              </div>
+            </section>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 
   return (
@@ -509,16 +545,18 @@ export default function WatchNextAssistant({ isMobile = false }) {
           window.setTimeout(() => inputRef.current?.focus(), 120);
         }}
         className={[
-          "relative grid shrink-0 place-items-center rounded-full border border-white/10 bg-[#1A1A1A] text-cyan-100 shadow-lg transition duration-300",
-          "hover:border-white/20 hover:bg-[#202020] hover:text-white hover:shadow-[0_0_24px_rgba(34,211,238,0.18)] active:scale-95",
-          "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/10",
-          isMobile ? "h-10 w-10" : "h-11 w-11",
+          "group relative grid shrink-0 place-items-center rounded-full transition-all duration-200",
+          "text-neutral-400",
+          "hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95",
+          "hover:text-cyan-300 hover:bg-cyan-500/10 hover:ring-cyan-500/30 hover:shadow-[0_0_18px_rgba(34,211,238,0.16)]",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30",
+          isMobile ? "h-10 w-10 p-2" : "h-11 w-11 p-2",
+          "ring-1 ring-transparent",
         ].join(" ")}
         aria-label="Abrir recomendador de qué ver"
         title="Qué ver ahora"
       >
-        <Sparkles className={isMobile ? "h-5 w-5" : "h-5 w-5"} />
-        <span className="pointer-events-none absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-violet-300 shadow-[0_0_12px_rgba(196,181,253,0.95)]" />
+        <Sparkles className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
       </button>
 
       {mounted ? createPortal(modal, document.body) : null}

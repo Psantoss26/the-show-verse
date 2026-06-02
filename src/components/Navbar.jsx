@@ -257,9 +257,10 @@ export default function Navbar() {
     pathname === href || (href !== "/" && pathname?.startsWith(href));
 
   const navLinkClass = (href) =>
-    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(href)
-      ? "bg-white/10 text-white"
-      : "text-neutral-400 hover:text-white hover:bg-white/5"
+    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+      isActive(href)
+        ? "bg-white/10 text-white"
+        : "text-neutral-400 hover:text-white hover:bg-white/5"
     }`;
 
   const iconLinkClass = (href, tone = "neutral") => {
@@ -325,7 +326,8 @@ export default function Navbar() {
   };
 
   const navLinkClassMobileBottom = (href) =>
-    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${isActive(href) ? "text-blue-400" : "text-neutral-400 hover:text-white"
+    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${
+      isActive(href) ? "text-blue-400" : "text-neutral-400 hover:text-white"
     }`;
 
   // Menú inferior fijo: 4 secciones. Si no hay sesión, fav/watchlist llevan a login.
@@ -410,7 +412,10 @@ export default function Navbar() {
                 className={iconLinkClass("/in-progress", "green")}
                 title="En Progreso"
               >
-                <Play className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="currentColor" />
+                <Play
+                  className="w-5 h-5 transition-transform duration-200 group-hover:scale-110"
+                  fill="currentColor"
+                />
               </Link>
 
               <TraktHistoryNavButton />
@@ -459,7 +464,7 @@ export default function Navbar() {
 
         {/* ---------------- Mobile ---------------- */}
         <div className="lg:hidden relative flex items-center justify-between h-16 px-2">
-          {/* Izquierda: menú */}
+          {/* Izquierda: menú + IA */}
           <div className="flex items-center gap-1 flex-shrink-0">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -469,6 +474,7 @@ export default function Navbar() {
             >
               <MenuIcon className="w-6 h-6" />
             </button>
+            <WatchNextAssistant isMobile />
           </div>
 
           {/* Centro: logo */}
@@ -486,8 +492,6 @@ export default function Navbar() {
 
           {/* Derecha: búsqueda + perfil */}
           <div className="flex items-center gap-2 flex-shrink-0 pr-1">
-            <WatchNextAssistant isMobile />
-
             <button
               onClick={() => setShowMobileSearch(true)}
               className="p-2 rounded-full transition-colors text-white hover:bg-white/10"
@@ -583,10 +587,11 @@ export default function Navbar() {
                 <Link
                   href="/"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/")
-                    ? "bg-white/10 text-white"
-                    : "text-neutral-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <HomeIcon className="w-5 h-5" />
                   <span>Inicio</span>
@@ -595,10 +600,11 @@ export default function Navbar() {
                 <Link
                   href="/movies"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/movies")
-                    ? "bg-white/10 text-white"
-                    : "text-neutral-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/movies")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <FilmIcon className="w-5 h-5" />
                   <span>Películas</span>
@@ -607,10 +613,11 @@ export default function Navbar() {
                 <Link
                   href="/series"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/series")
-                    ? "bg-white/10 text-white"
-                    : "text-neutral-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/series")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <TvIcon className="w-5 h-5" />
                   <span>Series</span>
@@ -619,10 +626,11 @@ export default function Navbar() {
                 <Link
                   href="/discover"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/discover")
-                    ? "bg-white/10 text-white"
-                    : "text-neutral-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/discover")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <Compass className="w-5 h-5" />
                   <span>Descubrir</span>
@@ -646,10 +654,11 @@ export default function Navbar() {
                 <Link
                   href="/profile"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/profile")
-                    ? "bg-white/10 text-white"
-                    : "text-neutral-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/profile")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <BarChart3 className="w-5 h-5" />
                   <span>Perfil y estadísticas</span>
@@ -658,10 +667,11 @@ export default function Navbar() {
                 <Link
                   href="/in-progress"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/in-progress")
-                    ? "bg-white/10 text-white"
-                    : "text-neutral-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/in-progress")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <Play className="w-5 h-5" fill="currentColor" />
                   <span>En Progreso</span>
@@ -677,10 +687,11 @@ export default function Navbar() {
                 <Link
                   href={favHref}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/favorites")
-                    ? "bg-white/10 text-white"
-                    : "text-neutral-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/favorites")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <Heart className="w-5 h-5" />
                   <span>Favoritas</span>
@@ -689,10 +700,11 @@ export default function Navbar() {
                 <Link
                   href={watchHref}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/watchlist")
-                    ? "bg-white/10 text-white"
-                    : "text-neutral-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/watchlist")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <Bookmark className="w-5 h-5" />
                   <span>Pendientes</span>
@@ -703,10 +715,11 @@ export default function Navbar() {
                 <Link
                   href="/lists"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/lists")
-                    ? "bg-white/10 text-white"
-                    : "text-neutral-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/lists")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <ListVideo className="w-5 h-5" />
                   <span>Listas</span>
@@ -715,10 +728,11 @@ export default function Navbar() {
                 <Link
                   href="/calendar"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isActive("/calendar")
-                    ? "bg-white/10 text-white"
-                    : "text-neutral-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive("/calendar")
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
                 >
                   <CalendarDaysIcon className="w-5 h-5" />
                   <span>Calendario</span>
