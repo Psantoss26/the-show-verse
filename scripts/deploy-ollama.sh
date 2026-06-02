@@ -2,7 +2,7 @@
 # =============================================================================
 # deploy-ollama.sh — Despliega Ollama + The Show Verse en el NAS UGREEN
 # Uso: ./scripts/deploy-ollama.sh
-# Requiere: acceso SSH al NAS o ejecutar directamente en él
+# Requiere: ejecutar en el NAS o en un host con acceso al Docker local
 # =============================================================================
 set -euo pipefail
 
