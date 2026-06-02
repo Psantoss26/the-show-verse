@@ -311,9 +311,9 @@ export default function WatchNextAssistant({ isMobile = false }) {
                         className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                          className={`max-w-[85%] rounded-3xl px-4 py-3 text-sm leading-relaxed ${
                             isUser
-                              ? "bg-cyan-500 text-white shadow-lg shadow-cyan-500/20"
+                              ? "bg-cyan-500 text-white shadow-[0_12px_30px_rgba(34,211,238,0.18)]"
                               : "bg-white/8 text-zinc-100 border border-white/10"
                           }`}
                         >
@@ -321,7 +321,7 @@ export default function WatchNextAssistant({ isMobile = false }) {
                           {!isUser &&
                             message.provider &&
                             message.provider !== "ranking" && (
-                              <span className="mt-2 flex items-center gap-1.5 text-xs text-cyan-300/70 font-medium">
+                              <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/5 px-2 py-1 text-[10px] text-cyan-200">
                                 <Brain className="h-3 w-3" />
                                 {message.provider === "gemini"
                                   ? "Gemini"
@@ -337,12 +337,60 @@ export default function WatchNextAssistant({ isMobile = false }) {
 
                   {loading && (
                     <div className="flex justify-start">
-                      <div className="inline-flex items-center gap-2 rounded-2xl bg-white/8 border border-white/10 px-4 py-2.5 text-sm text-zinc-300">
+                      <div className="inline-flex items-center gap-2 rounded-3xl bg-white/8 border border-white/10 px-4 py-2.5 text-sm text-zinc-300">
                         <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
                         <span>Pensando...</span>
                       </div>
                     </div>
                   )}
+
+                  {latestRecommendations.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                      <div className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                        Recomendaciones
+                      </div>
+                      <div className="space-y-3">
+                        {latestRecommendations.slice(0, 5).map((item) => {
+                          const poster = tmdbImg(item?.posterPath, "w342");
+                          const Icon = item?.mediaType === "tv" ? Tv : Film;
+                          return (
+                            <Link
+                              key={`${item.mediaType}-${item.id}`}
+                              href={item?.href || "#"}
+                              onClick={close}
+                              className="group grid grid-cols-[84px_minmax(0,1fr)] gap-3 rounded-3xl border border-white/10 bg-white/[0.05] p-3 transition hover:border-cyan-300/30 hover:bg-white/[0.1]"
+                            >
+                              {poster ? (
+                                <img
+                                  src={poster}
+                                  alt={item?.title}
+                                  className="h-20 w-14 rounded-2xl object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="flex h-20 w-14 items-center justify-center rounded-2xl bg-white/10 text-zinc-400">
+                                  <Icon className="h-6 w-6" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="line-clamp-2 text-sm font-semibold text-white">
+                                  {item?.title}
+                                </p>
+                                <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-cyan-300/70">
+                                  {mediaLabel(item?.mediaType)}
+                                  {item?.year ? ` · ${item.year}` : ""}
+                                </p>
+                                <p className="mt-2 text-xs leading-relaxed text-zinc-300 line-clamp-3">
+                                  {item?.reason || "Una recomendación para ti."}
+                                </p>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div ref={messagesEndRef} />
                 </div>
               </div>
@@ -417,39 +465,6 @@ export default function WatchNextAssistant({ isMobile = false }) {
                 </div>
               </div>
             </div>
-
-            {/* Mobile Recommendations Grid - Between chat and input */}
-            {latestRecommendations.length > 0 && (
-              <div className="lg:hidden flex-shrink-0 border-t border-white/10 bg-black/20 overflow-x-auto">
-                <div className="grid grid-cols-2 gap-2 p-3 auto-cols-max w-full">
-                  {latestRecommendations.slice(0, 6).map((item) => {
-                    const poster = tmdbImg(item?.posterPath, "w342");
-                    const Icon = item?.mediaType === "tv" ? Tv : Film;
-                    return (
-                      <Link
-                        key={`${item.mediaType}-${item.id}`}
-                        href={item?.href || "#"}
-                        onClick={close}
-                        className="group relative overflow-hidden rounded-lg flex-shrink-0"
-                      >
-                        {poster ? (
-                          <img
-                            src={poster}
-                            alt={item?.title}
-                            className="w-16 aspect-[2/3] object-cover rounded-lg group-hover:scale-105 transition"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-16 aspect-[2/3] bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <Icon className="h-6 w-6 text-zinc-600" />
-                          </div>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Input Area - Fixed at bottom */}
             <div className="border-t border-white/10 bg-black/40 p-3 sm:p-4 backdrop-blur-sm flex-shrink-0">
