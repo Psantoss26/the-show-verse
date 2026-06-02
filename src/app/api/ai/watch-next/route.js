@@ -112,6 +112,22 @@ const GEMINI_RESPONSE_SCHEMA = {
   required: ["reply", "recommendations"],
 };
 
+const OLLAMA_GENRE_MAP = {
+  action:       [28, 10759],
+  comedy:       [35],
+  drama:        [18],
+  thriller:     [53],
+  horror:       [27],
+  romance:      [10749],
+  "sci-fi":     [878, 10765],
+  animation:    [16],
+  crime:        [80],
+  documentary:  [99],
+  fantasy:      [14, 10765],
+  mystery:      [9648],
+  adventure:    [12],
+};
+
 const GENRE_HINTS = [
   { id: 28, words: ["acción", "accion", "peleas", "explosiones"] },
   { id: 12, words: ["aventura", "épica", "epica"] },
@@ -699,6 +715,15 @@ function buildAiSystemPrompt() {
   ].join(" ");
 }
 
+function buildOllamaIntentPrompt() {
+  return (
+    "Extract viewing intent from user message. Reply ONLY with compact JSON, nothing else.\n" +
+    'Schema: {"t":"movie"|"show"|"any","g":["comedy",...],"y":"1990s"|"2000s"|"2010s"|"2020s"|"recent"|"classic"}\n' +
+    "Genres (use only these): action,comedy,drama,thriller,horror,romance,sci-fi,animation,crime,documentary,fantasy,mystery,adventure\n" +
+    "Omit fields that are not specified. Reply with {} if no intent is clear."
+  );
+}
+
 function buildAiUserPayload({ message, candidates, contextSummary }) {
   const compactCandidates = compactCandidatesForAi(candidates);
   const userContext = [
@@ -968,54 +993,29 @@ async function getGeminiRecommendation({ message, candidates, contextSummary }) 
 }
 
 // ─── Ollama ───────────────────────────────────────────────────────────────────
-async function getOllamaRecommendation({ message, candidates, contextSummary }) {
+// Uses intent extraction instead of candidate selection to keep output ≤ 80 tokens
+// (~5-10 s at 3.5 tok/s). The server's ranking algorithm then applies the intent.
+async function getOllamaRecommendation({ message, candidates }) {
   if (!OLLAMA_BASE_URL) return null;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 120000); // NAS puede tardar más
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
 
   let res;
   try {
-    // Payload compacto para Ollama (menos tokens = respuesta más rápida en NAS)
-    const compactPayload = JSON.stringify({
-      userRequest: message,
-      context: [
-        contextSummary.traktConnected || contextSummary.tmdbConnected
-          ? `Usuario: ${contextSummary.historyCount} vistos, ${contextSummary.favoritesCount} favoritos, ${contextSummary.watchlistCount} pendientes.`
-          : "Sin datos personales del usuario.",
-        message ? `PETICIÓN: "${message}". Prioriza candidatos que la cumplan.` : "Sin preferencias concretas.",
-        `Candidatos disponibles: ${candidates.length}. Selecciona 4-6.`,
-      ].join(" "),
-      candidates: candidates.slice(0, 20).map((c) => ({
-        key: `${c.mediaType}:${c.id}`,
-        title: c.title,
-        mediaType: c.mediaType,
-        id: c.id,
-        genres: c.genres?.slice(0, 3),
-        year: c.year,
-        score: c.score,
-      })),
-    });
-
-    // Ollama expone una API compatible con OpenAI en /v1/chat/completions
     res = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: OLLAMA_MODEL,
         messages: [
-          { role: "system", content: buildAiSystemPrompt() },
-          {
-            role: "user",
-            content: compactPayload,
-          },
+          { role: "system", content: buildOllamaIntentPrompt() },
+          { role: "user", content: message || "Recomiéndame algo interesante" },
         ],
-        temperature: 0.3,
-        max_tokens: 1024,   // menos tokens = respuesta más rápida en NAS
-        num_predict: 1024,  // parámetro nativo de Ollama
-        // Forzar respuesta JSON — soportado por Ollama 0.3+
-        response_format: { type: "json_object" },
+        temperature: 0.1,
+        max_tokens: 80,
         stream: false,
+        options: { num_thread: 4 },
       }),
       cache: "no-store",
       signal: controller.signal,
@@ -1026,50 +1026,69 @@ async function getOllamaRecommendation({ message, candidates, contextSummary }) 
 
   const json = await safeJson(res);
   if (!res.ok) {
-    console.warn("[watch-next] Ollama error:", {
-      status: res.status,
-      error: json?.error || "unknown",
-    });
+    console.warn("[watch-next] Ollama error:", { status: res.status, error: json?.error || "unknown" });
     return null;
   }
 
-  // Respuesta compatible con OpenAI: choices[0].message.content
   const rawContent = json?.choices?.[0]?.message?.content;
-  if (!rawContent) {
-    console.warn("[watch-next] Ollama empty response", {
-      finishReason: json?.choices?.[0]?.finish_reason,
-    });
+  const intent = parseJsonLoose(rawContent);
+
+  if (!intent) {
+    console.warn("[watch-next] Ollama intent parse failed:", { raw: String(rawContent || "").slice(0, 100) });
     return null;
   }
 
-  const parsed = parseJsonLoose(rawContent);
-  if (!parsed?.recommendations?.length) {
-    console.warn("[watch-next] Ollama invalid JSON:", {
-      rawContent: String(rawContent).slice(0, 200),
-    });
-    return null;
+  // Map intent fields to score boosts and apply to candidates
+  const intentType = intent.t === "movie" ? "movie" : intent.t === "show" ? "tv" : null;
+  const intentGenreIds = new Set();
+  for (const g of safeArray(intent.g)) {
+    for (const id of (OLLAMA_GENRE_MAP[String(g).toLowerCase()] || [])) intentGenreIds.add(id);
   }
 
-  const normalized = normalizeAiSelection({ parsed, candidates, message });
-  if (!normalized) {
-    console.warn("[watch-next] Ollama no candidate match:", {
-      keys: parsed.recommendations.map((r) => r?.key).join(", "),
-    });
-    return null;
-  }
+  let yearMin = null, yearMax = null;
+  if (intent.y === "recent" || intent.y === "2020s")      { yearMin = 2020; }
+  else if (intent.y === "2010s") { yearMin = 2010; yearMax = 2019; }
+  else if (intent.y === "2000s") { yearMin = 2000; yearMax = 2009; }
+  else if (intent.y === "1990s") { yearMin = 1990; yearMax = 1999; }
+  else if (intent.y === "1980s") { yearMin = 1980; yearMax = 1989; }
+  else if (intent.y === "classic")                        { yearMax = 2000; }
 
-  return {
-    reply:
-      normalized.reply ||
-      buildFallbackReply({
-        message,
-        ranked: normalized.recommendations,
-        contextSummary,
-      }),
-    recommendations: normalized.recommendations,
-    provider: "ollama",
-    model: OLLAMA_MODEL,
-  };
+  const hasIntent = intentType || intentGenreIds.size > 0 || yearMin || yearMax;
+  if (!hasIntent) return null;
+
+  const rescored = candidates.map((item) => {
+    let boost = 0;
+    if (intentType) {
+      boost += item.mediaType === intentType ? 30 : -40;
+    }
+    for (const id of intentGenreIds) {
+      if (safeArray(item.genreIds).includes(id)) boost += 20;
+    }
+    const itemYear = parseInt(item.year, 10);
+    if (!isNaN(itemYear)) {
+      if (yearMin && itemYear < yearMin) boost -= 25;
+      if (yearMax && itemYear > yearMax) boost -= 25;
+      if (yearMin && yearMax && itemYear >= yearMin && itemYear <= yearMax) boost += 15;
+    }
+    return { ...item, score: (item.score || 0) + boost };
+  }).sort((a, b) => b.score - a.score);
+
+  const top = rescored.slice(0, 5);
+  if (!top.length) return null;
+
+  const typeLabel = intentType === "movie" ? "películas" : intentType === "tv" ? "series" : "títulos";
+  const genreLabel = safeArray(intent.g).slice(0, 2).join(" y ");
+  const parts = [];
+  if (genreLabel) parts.push(`de ${genreLabel}`);
+  if (intent.y === "recent")  parts.push("recientes");
+  else if (intent.y === "classic") parts.push("clásicos");
+  else if (intent.y)          parts.push(`de los ${intent.y}`);
+
+  const reply = parts.length
+    ? `He seleccionado ${typeLabel} ${parts.join(", ")} que encajan con tu petición.`
+    : `He seleccionado los ${typeLabel} que mejor encajan con lo que buscas.`;
+
+  return { reply, recommendations: top, provider: "ollama", model: OLLAMA_MODEL };
 }
 
 async function getAiRecommendation({ message, candidates, contextSummary }) {
