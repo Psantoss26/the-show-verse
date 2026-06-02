@@ -326,11 +326,11 @@ export default function Navbar() {
   };
 
   const navLinkClassMobileBottom = (href) =>
-    `flex flex-col items-center justify-center gap-0.5 px-2 transition-colors w-full ${
+    `flex-1 flex items-center justify-center px-2 transition-colors ${
       isActive(href) ? "text-blue-400" : "text-neutral-400 hover:text-white"
     }`;
 
-  // Menú inferior fijo: 4 secciones. Si no hay sesión, fav/watchlist llevan a login.
+  // Menú inferior fijo: 6 iconos. Si no hay sesión, fav/watchlist llevan a login.
   const favHref = hydrated && account ? "/favorites" : "/login";
   const watchHref = hydrated && account ? "/watchlist" : "/login";
 
@@ -518,20 +518,27 @@ export default function Navbar() {
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
-      <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black/95 backdrop-blur-md border-t border-neutral-800 flex items-center justify-around">
+      <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black/95 backdrop-blur-md border-t border-neutral-800 flex items-center">
         <Link href="/movies" className={navLinkClassMobileBottom("/movies")}>
           <FilmIcon className="w-6 h-6" />
-          <span className="text-xs">Películas</span>
         </Link>
 
         <Link href="/series" className={navLinkClassMobileBottom("/series")}>
           <TvIcon className="w-6 h-6" />
-          <span className="text-xs">Series</span>
+        </Link>
+
+        <TraktHistoryNavButton
+          className="flex-1 flex items-center justify-center"
+          variant="icon"
+          iconSize={24}
+        />
+
+        <Link href="/profile" className={navLinkClassMobileBottom("/profile")}>
+          <BarChart3 className="w-6 h-6" />
         </Link>
 
         <Link href={favHref} className={navLinkClassMobileBottom("/favorites")}>
           <Heart className="w-6 h-6" />
-          <span className="text-xs">Favoritas</span>
         </Link>
 
         <Link
@@ -539,7 +546,6 @@ export default function Navbar() {
           className={navLinkClassMobileBottom("/watchlist")}
         >
           <Bookmark className="w-6 h-6" />
-          <span className="text-xs">Pendientes</span>
         </Link>
       </div>
 

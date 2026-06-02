@@ -1309,6 +1309,13 @@ export default function InProgressClient() {
       case "progress-low":
         list.sort((a, b) => a.pct - b.pct);
         break;
+      case "rating-high":
+        list.sort((a, b) => {
+          const ra = Number(a.user_rating ?? a.rating ?? -1);
+          const rb = Number(b.user_rating ?? b.rating ?? -1);
+          return rb - ra;
+        });
+        break;
       case "alpha":
         list.sort((a, b) =>
           (a.title_es || a.title || "").localeCompare(
@@ -1333,6 +1340,7 @@ export default function InProgressClient() {
     "progress-low": "Menos avanzadas",
     alpha: "Alfabético",
     "episodes-left": "Menos eps. restantes",
+    "rating-high": "Mi puntuación",
   };
 
   // For completed tab, filter out sort options that don't make sense
@@ -1341,6 +1349,7 @@ export default function InProgressClient() {
       ? {
           recent: allSortLabels.recent,
           oldest: allSortLabels.oldest,
+          "rating-high": allSortLabels["rating-high"],
           alpha: allSortLabels.alpha,
         }
       : allSortLabels;
@@ -1494,7 +1503,7 @@ export default function InProgressClient() {
   useEffect(() => {
     if (
       activeTab === "completed" &&
-      !["recent", "oldest", "alpha"].includes(sortBy)
+      !["recent", "oldest", "rating-high", "alpha"].includes(sortBy)
     ) {
       setSortBy("recent");
     }
