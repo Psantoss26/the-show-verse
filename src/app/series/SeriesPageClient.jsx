@@ -1071,6 +1071,12 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     labelText = "IMPRESCINDIBLES";
   } else if (title === "Top 10 hoy en España") {
     labelText = "TOP 10";
+  } else if (title === "Lo mejor de esta década") {
+    labelText = "AÑOS 2020";
+  } else if (title && title.toLowerCase().includes("2010")) {
+    labelText = "AÑOS 2010";
+  } else if (title && title.toLowerCase().includes("2020")) {
+    labelText = "AÑOS 2020";
   } else if (isGenreRow) {
     labelText = "GÉNERO";
   }

@@ -24,12 +24,97 @@ const PROMPT_SUGGESTIONS = [
   "Algo parecido a mis favoritas",
 ];
 
+const QUICK_PICK_PROMPT = "Recomiéndame 3 cosas para ver ahora";
+const RECENT_RECOMMENDATIONS_KEY = "watchNextRecent";
+const RECENT_RECOMMENDATIONS_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const RECENT_RECOMMENDATIONS_LIMIT = 40;
+
 function tmdbImg(path, size = "w342") {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
 }
 
 function mediaLabel(mediaType) {
   return mediaType === "tv" ? "Serie" : "Película";
+}
+
+function recommendationKey(item) {
+  return item?.mediaType && item?.id ? `${item.mediaType}:${Number(item.id)}` : null;
+}
+
+function readRecentRecommendationEntries() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(RECENT_RECOMMENDATIONS_KEY);
+    const parsed = JSON.parse(raw || "[]");
+    const now = Date.now();
+    const fresh = Array.isArray(parsed)
+      ? parsed.filter(
+          (entry) =>
+            entry?.key &&
+            Number.isFinite(Number(entry?.recommendedAt)) &&
+            now - Number(entry.recommendedAt) < RECENT_RECOMMENDATIONS_TTL_MS,
+        )
+      : [];
+    if (fresh.length !== parsed?.length) {
+      window.localStorage.setItem(
+        RECENT_RECOMMENDATIONS_KEY,
+        JSON.stringify(fresh.slice(0, RECENT_RECOMMENDATIONS_LIMIT)),
+      );
+    }
+    return fresh;
+  } catch {
+    return [];
+  }
+}
+
+function readRecentRecommendationKeys() {
+  return readRecentRecommendationEntries()
+    .map((entry) => entry.key)
+    .filter(Boolean)
+    .slice(0, RECENT_RECOMMENDATIONS_LIMIT);
+}
+
+function saveRecentRecommendations(items) {
+  if (typeof window === "undefined" || !Array.isArray(items) || !items.length) {
+    return;
+  }
+
+  try {
+    const now = Date.now();
+    const previous = readRecentRecommendationEntries();
+    const next = new Map(
+      previous.map((entry) => [
+        entry.key,
+        {
+          key: entry.key,
+          title: entry.title || "",
+          mediaType: entry.mediaType || "",
+          recommendedAt: Number(entry.recommendedAt) || now,
+        },
+      ]),
+    );
+
+    for (const item of items) {
+      const key = recommendationKey(item);
+      if (!key) continue;
+      next.set(key, {
+        key,
+        title: item?.title || "",
+        mediaType: item?.mediaType || "",
+        recommendedAt: now,
+      });
+    }
+
+    const sorted = [...next.values()]
+      .sort((a, b) => Number(b.recommendedAt) - Number(a.recommendedAt))
+      .slice(0, RECENT_RECOMMENDATIONS_LIMIT);
+    window.localStorage.setItem(
+      RECENT_RECOMMENDATIONS_KEY,
+      JSON.stringify(sorted),
+    );
+  } catch {
+    // localStorage can be unavailable in private browsing or strict modes.
+  }
 }
 
 function RecommendationCard({ item, onNavigate }) {
@@ -180,22 +265,34 @@ export default function WatchNextAssistant({ isMobile = false }) {
     };
   }, [open]);
 
-  const sendPrompt = async (value = input) => {
+  const sendPrompt = async (value = input, options = {}) => {
+    const isQuickPick = options.mode === "quick_pick";
     const prompt = String(value || "").trim();
-    if (!prompt || loading) return;
+    const displayPrompt = prompt || (isQuickPick ? QUICK_PICK_PROMPT : "");
+    if (!displayPrompt || loading) return;
 
     setInput("");
     setLoading(true);
-    setMessages((prev) => [...prev, { role: "user", text: prompt }]);
+    setMessages((prev) => [...prev, { role: "user", text: displayPrompt }]);
 
     try {
       const res = await fetch("/api/ai/watch-next", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({
+          message: prompt,
+          mode: isQuickPick ? "quick_pick" : "chat",
+          limit: isQuickPick ? 3 : 5,
+          recentKeys: readRecentRecommendationKeys(),
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || "No se pudo recomendar");
+
+      const recommendations = Array.isArray(json?.recommendations)
+        ? json.recommendations
+        : [];
+      saveRecentRecommendations(recommendations);
 
       const note =
         json?.mode === "ranking"
@@ -209,9 +306,7 @@ export default function WatchNextAssistant({ isMobile = false }) {
         {
           role: "assistant",
           text: `${json?.reply || "Estas opciones encajan bien para ahora."}${note}`,
-          recommendations: Array.isArray(json?.recommendations)
-            ? json.recommendations
-            : [],
+          recommendations,
           contextSummary: json?.contextSummary || null,
           provider: json?.provider || null,
           mode: json?.mode || null,
@@ -419,6 +514,20 @@ export default function WatchNextAssistant({ isMobile = false }) {
                       <p className="text-sm font-semibold text-zinc-400">
                         Dime qué te apetece ver
                       </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          sendPrompt("", {
+                            mode: "quick_pick",
+                          })
+                        }
+                        disabled={loading}
+                        className="mt-4 inline-flex items-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:border-cyan-300/50 hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Recomendar 3 películas o series sin escribir"
+                      >
+                        <Zap className="h-3.5 w-3.5" />
+                        Recomiéndame 3
+                      </button>
                     </div>
                   )}
                 </div>
@@ -468,14 +577,28 @@ export default function WatchNextAssistant({ isMobile = false }) {
 
             {/* Input Area - Fixed at bottom */}
             <div className="border-t border-white/10 bg-black/40 p-3 sm:p-4 backdrop-blur-sm flex-shrink-0">
-              <div className="mb-2 flex gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="mb-2 flex min-w-0 flex-wrap gap-1.5 pb-2 sm:flex-nowrap sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden">
+                <button
+                  type="button"
+                  onClick={() =>
+                    sendPrompt("", {
+                      mode: "quick_pick",
+                    })
+                  }
+                  disabled={loading}
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-left text-xs font-bold leading-snug text-cyan-100 transition hover:border-cyan-300/55 hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-50 sm:shrink-0 sm:whitespace-nowrap"
+                  aria-label="Recomendar 3 películas o series sin escribir"
+                >
+                  <Zap className="h-3.5 w-3.5" />
+                  Recomiéndame 3
+                </button>
                 {PROMPT_SUGGESTIONS.map((suggestion) => (
                   <button
                     key={suggestion}
                     type="button"
                     onClick={() => sendPrompt(suggestion)}
                     disabled={loading}
-                    className="shrink-0 rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs font-medium text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-white disabled:opacity-50"
+                    className="max-w-full rounded-full border border-white/20 bg-white/5 px-3 py-1 text-left text-xs font-medium leading-snug text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-white disabled:opacity-50 sm:shrink-0 sm:whitespace-nowrap"
                   >
                     {suggestion}
                   </button>

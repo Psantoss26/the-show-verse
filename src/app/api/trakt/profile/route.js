@@ -108,6 +108,8 @@ export async function GET(request) {
 
     const h = traktHeaders(token);
 
+    const recentHistoryLimit = compact ? 15 : 30;
+
     // Fetch all Trakt endpoints in parallel
     const [
       settingsRes,
@@ -122,7 +124,7 @@ export async function GET(request) {
       compact
         ? Promise.resolve(null)
         : fetch(`${TRAKT_API}/users/me/stats`, { headers: h, cache: "no-store" }),
-      fetch(`${TRAKT_API}/sync/history?limit=30&extended=full`, { headers: h, cache: "no-store" }),
+      fetch(`${TRAKT_API}/sync/history?limit=${recentHistoryLimit}&extended=full`, { headers: h, cache: "no-store" }),
       fetch(`${TRAKT_API}/sync/ratings/movies?limit=15&extended=full`, { headers: h, cache: "no-store" }),
       fetch(`${TRAKT_API}/sync/ratings/shows?limit=15&extended=full`, { headers: h, cache: "no-store" }),
       fetch(`${TRAKT_API}/sync/watchlist?extended=full&limit=15`, { headers: h, cache: "no-store" }),
@@ -292,10 +294,10 @@ export async function GET(request) {
       .slice(0, 15);
 
     // Enrich history with TMDb posters (parallel, limited concurrency)
-    const enrichedHistory = await parallelLimit(normalizedHistory, 6, async (item) => {
+    const enrichHistoryPromise = parallelLimit(normalizedHistory, 6, async (item) => {
       const [tmdb, episodeDetail] = await Promise.all([
         fetchTmdbPoster(item.tmdbId, item.type === "movie" ? "movie" : "tv"),
-        item.episode
+        item.episode && !compact
           ? fetchTmdbEpisode(item.tmdbId, item.episode.season, item.episode.number)
           : Promise.resolve(null),
       ]);
@@ -322,7 +324,7 @@ export async function GET(request) {
     });
 
     // Enrich recent ratings
-    const enrichedRatings = await parallelLimit(normalizedRatings, 6, async (item) => {
+    const enrichRatingsPromise = parallelLimit(normalizedRatings, 6, async (item) => {
       const tmdb = await fetchTmdbPoster(item.tmdbId, item.type === "movie" ? "movie" : "tv");
       return {
         ...item,
@@ -344,23 +346,23 @@ export async function GET(request) {
       plays: item.plays,
     }));
 
-    const enrichedTopMovies = compact
+    const enrichTopMoviesPromise = compact
       ? []
-      : await parallelLimit(normalizedTopMovies, 6, async (item) => {
+      : parallelLimit(normalizedTopMovies, 6, async (item) => {
           const tmdbId = item.movie?.ids?.tmdb;
           const tmdb = await fetchTmdbPoster(tmdbId, "movie");
           return { ...item, movie: { ...item.movie, poster_path: tmdb?.poster_path || null, title: tmdb?.title || item.movie?.title } };
         });
-    const enrichedTopShows = compact
+    const enrichTopShowsPromise = compact
       ? []
-      : await parallelLimit(normalizedTopShows, 6, async (item) => {
+      : parallelLimit(normalizedTopShows, 6, async (item) => {
           const tmdbId = item.show?.ids?.tmdb;
           const tmdb = await fetchTmdbPoster(tmdbId, "tv");
           return { ...item, show: { ...item.show, poster_path: tmdb?.poster_path || null, title: tmdb?.title || item.show?.title } };
         });
 
     // Enrich watchlist
-    const enrichedWatchlist = await parallelLimit(normalizedWatchlist, 4, async (item) => {
+    const enrichWatchlistPromise = parallelLimit(normalizedWatchlist, 4, async (item) => {
       const tmdb = await fetchTmdbPoster(item.tmdbId, item.type === "movie" ? "movie" : "tv");
       return {
         ...item,
@@ -372,6 +374,20 @@ export async function GET(request) {
         genres: tmdb?.genres || [],
       };
     });
+
+    const [
+      enrichedHistory,
+      enrichedRatings,
+      enrichedTopMovies,
+      enrichedTopShows,
+      enrichedWatchlist,
+    ] = await Promise.all([
+      enrichHistoryPromise,
+      enrichRatingsPromise,
+      enrichTopMoviesPromise,
+      enrichTopShowsPromise,
+      enrichWatchlistPromise,
+    ]);
 
     const payload = {
       user: {
