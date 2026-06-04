@@ -2400,21 +2400,24 @@ export default function WatchlistClient() {
     item?.media_type || (item?.title ? "movie" : "tv");
   const getMediaKey = (item) => `${resolveItemType(item)}-${item.id}`;
   const getItemsGridClass = (withTopMargin = false) => {
+    const hoverBleedSpace = withTopMargin
+      ? " -mx-3 overflow-visible px-3 pb-8 lg:-mx-5 lg:px-5 lg:pb-10"
+      : "";
     if (viewMode === "list") {
-      return `grid grid-cols-1 xl:grid-cols-2 gap-4${withTopMargin ? " mt-6" : ""}`;
+      return `grid grid-cols-1 xl:grid-cols-2 gap-4${withTopMargin ? " mt-6" : ""}${hoverBleedSpace}`;
     }
     if (viewMode === "compact") {
       const compactCols =
         imageMode === "backdrop"
           ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
           : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8";
-      return `grid gap-2 ${compactCols}${withTopMargin ? " mt-6" : ""}`;
+      return `grid gap-2 ${compactCols}${withTopMargin ? " mt-6" : ""}${hoverBleedSpace}`;
     }
     const gridCols =
       imageMode === "backdrop"
         ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
         : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6";
-    return `grid gap-3 ${gridCols}${withTopMargin ? " mt-6" : ""}`;
+    return `grid gap-3 ${gridCols}${withTopMargin ? " mt-6" : ""}${hoverBleedSpace}`;
   };
 
   if (!hydrated) {
@@ -3063,7 +3066,7 @@ export default function WatchlistClient() {
             {grouped.map((group) => (
               <div
                 key={group.key}
-                className="[content-visibility:auto] [contain-intrinsic-size:auto_720px]"
+                className="overflow-visible"
               >
                 <GroupDivider
                   title={group.label}
@@ -3077,7 +3080,7 @@ export default function WatchlistClient() {
                     {group.subgroups.map((subgroup) => (
                       <div
                         key={`${group.key}-${subgroup.key}`}
-                        className="space-y-3 [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
+                        className="space-y-3 overflow-visible"
                       >
                         <SubGroupDivider
                           title={subgroup.label}
