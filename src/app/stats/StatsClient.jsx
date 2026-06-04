@@ -1394,6 +1394,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
   const recentRatings = profileData?.recentRatings || [];
   const watchlist = profileData?.watchlist || [];
   const headerReady = !!profileUser;
+  const profileRowsReady = !!stats;
 
   if (notConnected) {
     return (
@@ -1521,6 +1522,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
             <BarChart3 className="w-10 h-10 text-zinc-700" />
             <p>{error || "No se pudieron cargar las estadísticas."}</p>
           </div>
+        ) : !stats ? (
+          <div className="min-h-[55vh]" aria-busy="true" />
         ) : (
           <AnimatePresence mode="wait">
             {viewMode === "overview" && (
@@ -1628,12 +1631,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   </div>
                 )}
 
-                {recentHistory.length > 0 && (
+                {profileRowsReady && recentHistory.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.18 }}
-                    className="relative order-2"
+                    className="relative order-2 [content-visibility:auto] [contain-intrinsic-size:auto_340px]"
                   >
                     <SectionTitle
                       icon={Activity}
@@ -1657,12 +1660,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   </motion.div>
                 )}
 
-                {recentRatings.length > 0 && (
+                {profileRowsReady && recentRatings.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.22 }}
-                    className="relative order-2"
+                    className="relative order-2 [content-visibility:auto] [contain-intrinsic-size:auto_340px]"
                   >
                     <SectionTitle
                       icon={Star}
@@ -1686,12 +1689,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   </motion.div>
                 )}
 
-                {watchlist.length > 0 && (
+                {profileRowsReady && watchlist.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.26 }}
-                    className="relative order-2"
+                    className="relative order-2 [content-visibility:auto] [contain-intrinsic-size:auto_340px]"
                   >
                     <SectionTitle
                       icon={BookMarked}
@@ -1860,7 +1863,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
                 {/* Top Content Row */}
                 {stats && (stats.topMoviesReady || stats.topShowsReady) && (
-                  <div className="order-3 space-y-8">
+                  <div className="order-3 space-y-8 [content-visibility:auto] [contain-intrinsic-size:auto_720px]">
                     {/* Top Movies */}
                     {stats.topMoviesReady && (
                       <motion.div
@@ -1935,7 +1938,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.65 }}
-                    className="relative order-4"
+                    className="relative order-4 [content-visibility:auto] [contain-intrinsic-size:auto_340px]"
                   >
                     <SectionTitle
                       icon={Users}
@@ -1965,7 +1968,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.7 }}
-                    className="relative order-4"
+                    className="relative order-4 [content-visibility:auto] [contain-intrinsic-size:auto_340px]"
                   >
                     <SectionTitle
                       icon={Film}

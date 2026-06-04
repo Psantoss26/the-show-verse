@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useCallback,
+  useDeferredValue,
   startTransition,
 } from "react";
 import Link from "next/link";
@@ -2002,6 +2003,16 @@ export default function FavoritesClient() {
 
   const [q, setQ] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const needsImdbScores =
+    groupBy === "imdb_rating" ||
+    subGroupBy === "imdb_rating" ||
+    sortBy === "rating-asc" ||
+    sortBy === "rating-desc";
+  const needsTraktScores =
+    groupBy === "trakt_rating" ||
+    subGroupBy === "trakt_rating" ||
+    sortBy === "rating-asc" ||
+    sortBy === "rating-desc";
 
   // Persist filter states
   useEffect(() => {
@@ -2145,6 +2156,7 @@ export default function FavoritesClient() {
   // Prefetch IMDb scores in background (non-blocking)
   useEffect(() => {
     if (items.length === 0) return;
+    if (!needsImdbScores) return;
 
     let cancelled = false;
 
@@ -2244,11 +2256,12 @@ export default function FavoritesClient() {
     return () => {
       cancelled = true;
     };
-  }, [items]);
+  }, [items, needsImdbScores]);
 
   // Prefetch Trakt scores in background (non-blocking)
   useEffect(() => {
     if (items.length === 0) return;
+    if (!needsTraktScores) return;
 
     let cancelled = false;
 
@@ -2347,7 +2360,7 @@ export default function FavoritesClient() {
     return () => {
       cancelled = true;
     };
-  }, [items]);
+  }, [items, needsTraktScores]);
 
   // Load watch history for sorting
   useEffect(() => {
@@ -2516,6 +2529,11 @@ export default function FavoritesClient() {
     return arr;
   }, [filtered, sortBy, watchDates, groupBy, imdbScores, traktScores]);
 
+  const deferredSorted = useDeferredValue(sorted);
+  const deferredImdbScores = useDeferredValue(imdbScores);
+  const deferredTraktScores = useDeferredValue(traktScores);
+  const deferredProvidersByItem = useDeferredValue(providersByItem);
+
   useEffect(() => {
     if (
       (groupBy !== "provider" && subGroupBy !== "provider") ||
@@ -2616,9 +2634,13 @@ export default function FavoritesClient() {
     if (groupBy === "none") return null;
 
     const groups = new Map();
-    const groupContext = { imdbScores, traktScores, providersByItem };
+    const groupContext = {
+      imdbScores: deferredImdbScores,
+      traktScores: deferredTraktScores,
+      providersByItem: deferredProvidersByItem,
+    };
 
-    for (const item of sorted) {
+    for (const item of deferredSorted) {
       const metas = buildFavoriteGroupMetas(item, groupBy, groupContext);
       for (const meta of metas) {
         if (!groups.has(meta.key)) {
@@ -2633,7 +2655,7 @@ export default function FavoritesClient() {
 
         const group = groups.get(meta.key);
         group.items.push(item);
-        addFavoriteGroupStats(group.stats, item, imdbScores, traktScores);
+        addFavoriteGroupStats(group.stats, item, deferredImdbScores, deferredTraktScores);
       }
     }
 
@@ -2677,12 +2699,12 @@ export default function FavoritesClient() {
 
     return sortFavoriteGroups(Array.from(groups.values()), groupBy);
   }, [
-    sorted,
+    deferredSorted,
     groupBy,
     subGroupBy,
-    imdbScores,
-    traktScores,
-    providersByItem,
+    deferredImdbScores,
+    deferredTraktScores,
+    deferredProvidersByItem,
     loadingProviders,
   ]);
 
@@ -3402,7 +3424,10 @@ export default function FavoritesClient() {
           // Grouped view
           <div className="space-y-8">
             {grouped.map((group) => (
-              <div key={group.key}>
+              <div
+                key={group.key}
+                className="[content-visibility:auto] [contain-intrinsic-size:auto_720px]"
+              >
                 <GroupDivider
                   title={group.label}
                   count={group.items.length}
@@ -3413,7 +3438,10 @@ export default function FavoritesClient() {
                 {group.subgroups?.length ? (
                   <div className="space-y-6">
                     {group.subgroups.map((subgroup) => (
-                      <div key={`${group.key}-${subgroup.key}`} className="space-y-3">
+                      <div
+                        key={`${group.key}-${subgroup.key}`}
+                        className="space-y-3 [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
+                      >
                         <SubGroupDivider
                           title={subgroup.label}
                           count={subgroup.items.length}

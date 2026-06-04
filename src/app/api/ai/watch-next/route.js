@@ -487,6 +487,28 @@ function wantsFutureReleases(message) {
   );
 }
 
+function wantsRewatch(message) {
+  return /\b(rever|revisionar|volver a ver|rewatch|repetir|otra vez)\b/i.test(
+    String(message || ""),
+  );
+}
+
+function normalizeRecentKeys(value) {
+  return [
+    ...new Set(
+      safeArray(value)
+        .map((key) => String(key || "").trim())
+        .filter((key) => /^(movie|tv):\d+$/.test(key)),
+    ),
+  ].slice(0, 80);
+}
+
+function clampRecommendationLimit(value, fallback = 5) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(1, Math.min(8, Math.trunc(n)));
+}
+
 /**
  * Extract a specific year or decade range from the user message.
  * Returns { yearMin, yearMax, specificYear } or null if nothing found.
@@ -550,13 +572,21 @@ function inferFavoriteGenres({ favorites, rated, traktRatings }) {
     .map(([id]) => id);
 }
 
-function scoreCandidates({ candidates, message, profileGenres, watchedSet }) {
+function scoreCandidates({
+  candidates,
+  message,
+  profileGenres,
+  watchedSet,
+  recentKeySet,
+  quickPick = false,
+}) {
   const wantedType = getWantedMediaType(message);
   const wantedGenres = getWantedGenreIds(message);
   const yearIntent = extractYearIntent(message);
   const text = String(message || "").toLowerCase();
   const wantsShort = /corta|corto|rápida|rapida|poco tiempo|algo breve/.test(text);
   const wantsQuality = /buena|mejor|obra maestra|top|calidad|notaza/.test(text);
+  const allowWatched = wantsRewatch(message);
 
   // Has ANY specific user intent (genre, type, year) — if so, we should suppress
   // novelty bonuses so discovery candidates (filtered by intent) can compete.
@@ -585,7 +615,7 @@ function scoreCandidates({ candidates, message, profileGenres, watchedSet }) {
 
       if (!hasSpecificIntent) {
         // No specific request — full novelty/trending bonuses ("recomiéndame algo")
-        if (item.sources.includes("watchlist")) score += 20;
+        if (item.sources.includes("watchlist")) score += quickPick ? 10 : 20;
         if (item.sources.includes("trakt_recommended")) score += 28;
         if (item.sources.includes("trakt_trending")) score += 18;
         if (item.sources.includes("trakt_anticipated")) score += 18;
@@ -636,11 +666,127 @@ function scoreCandidates({ candidates, message, profileGenres, watchedSet }) {
         if (genreIds.has(id)) score += 5;
       }
       if (wantsShort && item.mediaType === "movie") score += 10;
-      if (watchedSet.has(key) && !item.sources.includes("watchlist")) score -= 90;
+      if (recentKeySet?.has(key)) score -= quickPick ? 110 : 85;
+      if (watchedSet.has(key) && !allowWatched) {
+        score -= item.sources.includes("watchlist") ? 75 : 150;
+      }
+      if (watchedSet.has(key) && allowWatched) score += 15;
 
       return { ...item, score };
     })
     .sort((a, b) => b.score - a.score);
+}
+
+function primarySource(item) {
+  const sources = safeArray(item?.sources);
+  return (
+    sources.find((source) => source === "watchlist") ||
+    sources.find((source) => source.startsWith("tmdb_")) ||
+    sources.find((source) => source.startsWith("trakt_")) ||
+    sources[0] ||
+    "unknown"
+  );
+}
+
+function genreSimilarity(a, b) {
+  const aGenres = new Set(safeArray(a?.genreIds));
+  const bGenres = new Set(safeArray(b?.genreIds));
+  if (!aGenres.size || !bGenres.size) return 0;
+  let intersection = 0;
+  for (const id of aGenres) {
+    if (bGenres.has(id)) intersection += 1;
+  }
+  return intersection / new Set([...aGenres, ...bGenres]).size;
+}
+
+function normalizedTitle(value = "") {
+  return String(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function titleLooksTooSimilar(a, b) {
+  const left = normalizedTitle(a?.title);
+  const right = normalizedTitle(b?.title);
+  if (!left || !right) return false;
+  return (
+    left === right ||
+    left.startsWith(`${right} `) ||
+    right.startsWith(`${left} `)
+  );
+}
+
+function diversifyRecommendations({
+  candidates,
+  limit,
+  message,
+  recentKeySet,
+  quickPick = false,
+}) {
+  const wantedType = getWantedMediaType(message);
+  const allowWatched = wantsRewatch(message);
+  const selected = [];
+  const pool = safeArray(candidates)
+    .filter((item) => item?.id && item?.mediaType)
+    .filter((item) => {
+      if (wantedType && item.mediaType !== wantedType) return false;
+      if (!allowWatched && item.score < -80) return false;
+      return true;
+    });
+
+  const sourceCounts = new Map();
+  const typeCounts = new Map();
+
+  while (selected.length < limit && pool.length) {
+    let bestIndex = -1;
+    let bestScore = -Infinity;
+
+    for (let i = 0; i < pool.length; i++) {
+      const item = pool[i];
+      const key = itemKey(item);
+      const source = primarySource(item);
+      let penalty = 0;
+
+      if (recentKeySet?.has(key)) penalty += quickPick ? 95 : 70;
+      if (!wantedType) penalty += (typeCounts.get(item.mediaType) || 0) * 10;
+      penalty += (sourceCounts.get(source) || 0) * 8;
+
+      for (const picked of selected) {
+        penalty += genreSimilarity(item, picked) * 20;
+        if (titleLooksTooSimilar(item, picked)) penalty += 55;
+        if (item.year && picked.year && item.year === picked.year) penalty += 3;
+      }
+
+      const relevance = Number(item.score || 0);
+      const finalScore = relevance * 0.72 - penalty * 0.28;
+      if (finalScore > bestScore) {
+        bestScore = finalScore;
+        bestIndex = i;
+      }
+    }
+
+    if (bestIndex < 0) break;
+    const [picked] = pool.splice(bestIndex, 1);
+    selected.push(picked);
+    const source = primarySource(picked);
+    sourceCounts.set(source, (sourceCounts.get(source) || 0) + 1);
+    typeCounts.set(picked.mediaType, (typeCounts.get(picked.mediaType) || 0) + 1);
+  }
+
+  if (selected.length >= limit) return selected;
+
+  for (const item of safeArray(candidates)) {
+    if (selected.length >= limit) break;
+    const key = itemKey(item);
+    if (selected.some((picked) => itemKey(picked) === key)) continue;
+    if (wantedType && item.mediaType !== wantedType) continue;
+    selected.push(item);
+  }
+
+  return selected.slice(0, limit);
 }
 
 function buildReason(item, message, source = "ranking") {
@@ -718,6 +864,29 @@ function buildFallbackReply({ message, ranked, contextSummary }) {
     ? ` Para "${String(message).trim()}", empezaría por estas opciones.`
     : " Estas son buenas candidatas para decidir rápido.";
   return `${intro}${mood}`;
+}
+
+function buildSelectionReply({ message, selected, contextSummary, quickPick }) {
+  const count = safeArray(selected).length;
+  if (quickPick) {
+    return `He elegido ${count || 3} opciones variadas para decidir rápido, penalizando lo que ya te recomendé hace poco.`;
+  }
+
+  if (String(message || "").trim()) {
+    const hasSpecificIntent =
+      extractYearIntent(message) ||
+      getWantedGenreIds(message).length > 0 ||
+      getWantedMediaType(message);
+    if (hasSpecificIntent) {
+      const personal = contextSummary.traktConnected || contextSummary.tmdbConnected
+        ? " y tus señales personales"
+        : "";
+      return `He priorizado títulos que encajan con "${String(message).trim()}"${personal}, evitando repetirte lo recomendado hace poco.`;
+    }
+    return buildFallbackReply({ message, ranked: selected, contextSummary });
+  }
+
+  return "He elegido opciones variadas combinando tendencias, novedades y señales de tu perfil.";
 }
 
 function extractOutputText(json) {
@@ -1233,9 +1402,9 @@ async function getAiRecommendation({ message, candidates, contextSummary }) {
   const providers = String(WATCH_NEXT_AI_PROVIDER)
     .split(",")
     .map((provider) => provider.trim().toLowerCase())
-    .filter(Boolean);
+    .filter((provider) => provider === "ollama");
 
-  const orderedProviders = providers.length ? providers : ["ollama", "gemini", "openai"];
+  const orderedProviders = providers.length ? providers : ["ollama"];
   for (const provider of orderedProviders) {
     let result = null;
     try {
@@ -1276,7 +1445,16 @@ async function getAiRecommendation({ message, candidates, contextSummary }) {
 export async function POST(request) {
   const cookieStore = await cookies();
   const body = await request.json().catch(() => ({}));
-  const message = String(body?.message || "").trim().slice(0, 800);
+  const mode = body?.mode === "quick_pick" ? "quick_pick" : "chat";
+  const quickPick = mode === "quick_pick";
+  const message = String(
+    body?.message || (quickPick ? "Recomiéndame 3 cosas para ver ahora" : ""),
+  )
+    .trim()
+    .slice(0, 800);
+  const limit = clampRecommendationLimit(body?.limit, quickPick ? 3 : 5);
+  const recentKeys = normalizeRecentKeys(body?.recentKeys);
+  const recentKeySet = new Set(recentKeys);
 
   // Check whether the user is requesting specific year/decade content upfront
   // so we know whether to skip novelty sources and focus on discovery
@@ -1355,6 +1533,8 @@ export async function POST(request) {
     message,
     profileGenres,
     watchedSet,
+    recentKeySet,
+    quickPick,
   });
 
   const contextSummary = {
@@ -1364,13 +1544,15 @@ export async function POST(request) {
     favoritesCount: tmdbContext.favorites.length,
     watchlistCount: tmdbContext.watchlist.length,
     ratedCount: tmdbContext.rated.length + traktContext.ratings.length,
-    aiEnabled: !!(OLLAMA_BASE_URL || GEMINI_API_KEY || OPENAI_API_KEY),
+    aiEnabled: !!OLLAMA_BASE_URL,
     aiProviders: {
       ollama: !!OLLAMA_BASE_URL,
       ollamaModel: OLLAMA_BASE_URL ? OLLAMA_MODEL : null,
-      gemini: !!GEMINI_API_KEY,
-      openai: !!OPENAI_API_KEY,
+      gemini: false,
+      openai: false,
     },
+    quickPick,
+    recentKeysCount: recentKeys.length,
   };
 
   const ai = await getAiRecommendation({
@@ -1379,17 +1561,40 @@ export async function POST(request) {
     contextSummary,
   }).catch(() => null);
 
-  const selected = ai?.recommendations?.length ? ai.recommendations : ranked.slice(0, 8);
+  const aiRanked = ai?.recommendations?.length
+    ? [
+        ...ai.recommendations,
+        ...ranked.filter(
+          (item) =>
+            !ai.recommendations.some(
+              (recommended) => itemKey(recommended) === itemKey(item),
+            ),
+        ),
+      ]
+    : ranked;
+  const selected = diversifyRecommendations({
+    candidates: aiRanked,
+    limit,
+    message,
+    recentKeySet,
+    quickPick,
+  });
   const payload = {
-    reply:
-      ai?.reply ||
-      buildFallbackReply({ message, ranked: selected, contextSummary }),
+    reply: buildSelectionReply({
+      message,
+      selected,
+      contextSummary,
+      quickPick,
+    }),
     recommendations: selected.map((item) =>
       serializeRecommendation(item, message, ai ? "ai" : "ranking"),
     ),
     contextSummary,
     mode: ai ? "ai" : "ranking",
+    requestMode: mode,
     provider: ai?.provider || "ranking",
+    engine: ai ? "ollama-assisted" : "rules",
+    diversityApplied: true,
   };
 
   const res = NextResponse.json(payload);

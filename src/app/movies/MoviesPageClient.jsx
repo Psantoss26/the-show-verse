@@ -1107,6 +1107,12 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     labelText = "AÑOS 2010";
   } else if (title === "Recientes de 2020") {
     labelText = "AÑOS 2020";
+  } else if (title === "Lo mejor de esta década") {
+    labelText = "AÑOS 2020";
+  } else if (title && title.toLowerCase().includes("2010")) {
+    labelText = "AÑOS 2010";
+  } else if (title && title.toLowerCase().includes("2020")) {
+    labelText = "AÑOS 2020";
   } else if (isGenreRow) {
     labelText = "GÉNERO";
   }
