@@ -73,19 +73,27 @@ jobs:
 
       - name: Verificar que el contenedor está corriendo
         run: |
-          for attempt in $(seq 1 30); do
+          for attempt in $(seq 1 120); do
             if curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1 || wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
-              echo "✅ Contenedor online y healthcheck OK"
+              echo "✅ App online en el puerto publicado 3000"
               docker ps --filter name=the-show-verse --format '{{.Names}}: {{.Status}}'
               exit 0
             fi
-            echo "Esperando healthcheck... intento $attempt/30"
+
+            if docker exec the-show-verse wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
+              echo "App responde dentro del contenedor, esperando puerto publicado... intento $attempt/120"
+            else
+              echo "Esperando arranque de la app... intento $attempt/120"
+            fi
             sleep 2
           done
 
-          echo "❌ La app no respondió en /api/health"
+          echo "❌ La app no respondió desde el host en /api/health"
           docker ps --filter name=the-show-verse --format '{{.Names}}: {{.Status}}'
+          docker port the-show-verse || true
+          docker exec the-show-verse wget -qO- http://127.0.0.1:3000/api/health || true
           docker inspect the-show-verse --format '{{json .State}}' || true
+          docker inspect the-show-verse --format '{{json .NetworkSettings.Ports}}' || true
           docker logs the-show-verse --tail 80 || true
           exit 1
 

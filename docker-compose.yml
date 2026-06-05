@@ -28,10 +28,10 @@ services:
       WATCH_NEXT_AI_PROVIDER: ${WATCH_NEXT_AI_PROVIDER:-ollama}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 90s
 
   # ── Cloudflare Tunnel (acceso HTTPS desde internet sin abrir puertos) ──────
   # Descomenta este bloque cuando tengas el token del túnel de Cloudflare
