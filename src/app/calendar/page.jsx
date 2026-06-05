@@ -589,7 +589,7 @@ export default function CalendarPage() {
             <div className="flex items-center gap-3 mb-2">
               <div className="h-px w-12 bg-yellow-500" />
               <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">
-                AGENDA
+                ESTRENOS
               </span>
             </div>
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
@@ -866,8 +866,7 @@ export default function CalendarPage() {
                         ? item.release_date
                         : item.first_air_date;
                       const year = releaseDate?.slice(0, 4);
-                      const posterPath =
-                        item.poster_path || item.backdrop_path;
+                      const posterPath = item.poster_path || item.backdrop_path;
 
                       // Calcular info de fecha para badge en vistas semana/mes
                       let dateBadgeInfo = null;

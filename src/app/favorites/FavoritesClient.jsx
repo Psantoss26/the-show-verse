@@ -19,7 +19,6 @@ import {
 } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { traktGetScoreboard } from "@/lib/api/traktClient";
-import TwoApiSyncIcon from "@/components/TwoApiSyncIcon";
 import {
   Heart,
   Film,
@@ -114,7 +113,7 @@ const traktScoreCache = new Map();
 const traktScoreInFlight = new Map();
 
 let traktConnectedKnown = null;
-
+let favoritesListSyncInFlight = null;
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const USER_RATING_TTL_MS = 10 * 60 * 1000;
 const USER_RATING_TTL_NULL_MS = 45 * 1000;
@@ -213,51 +212,6 @@ function writeProvidersCache(providersMap) {
   }
 }
 
-function getTmdbSyncKey(item) {
-  const type = item?.media_type || (item?.title ? "movie" : "tv");
-  return `${type}:${item?.id}`;
-}
-
-async function fetchTraktPresence(kind) {
-  try {
-    const res = await fetch(`/api/trakt/sync/presence?kind=${kind}`, {
-      cache: "no-store",
-      credentials: "include",
-    });
-    const json = await res.json().catch(() => null);
-    if (!res.ok || !json?.connected || json?.degraded) {
-      return { known: false, keys: new Set() };
-    }
-    return {
-      known: true,
-      keys: new Set((Array.isArray(json.keys) ? json.keys : []).map(String)),
-    };
-  } catch {
-    return { known: false, keys: new Set() };
-  }
-}
-
-function TmdbOnlyBadge({ compact = false }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-md border border-red-400/30 bg-red-500/15 text-red-100 shadow-lg shadow-black/30 backdrop-blur-md ${
-        compact
-          ? "px-1.5 py-1 text-[0.55rem] font-black uppercase tracking-wider"
-          : "px-2 py-1 text-[0.6rem] font-black uppercase tracking-wider"
-      }`}
-      title="Solo está en TMDb. Falta sincronizarlo con Trakt."
-    >
-      <TwoApiSyncIcon
-        icon={Heart}
-        tmdbActive
-        traktActive={false}
-        className={compact ? "w-3.5 h-3.5" : "w-4 h-4"}
-      />
-      Solo TMDb
-    </span>
-  );
-}
-
 function buildLayoutScoreSnapshot(items, source) {
   const scores = new Map(readScoreCache(source));
   for (const item of Array.isArray(items) ? items : []) {
@@ -267,6 +221,37 @@ function buildLayoutScoreSnapshot(items, source) {
     }
   }
   return scores;
+}
+
+async function syncOverflowFavoritesToTraktList(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { connected: false, synced: 0, skipped: 0, list: null };
+  }
+
+  const res = await fetch("/api/trakt/sync/tmdb-favorites-list", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    priority: "low",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      items: items.map((item) => ({
+        id: item?.id,
+        media_type: item?.media_type || (item?.title ? "movie" : "tv"),
+      })),
+    }),
+  });
+
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.error || "Trakt favorites list sync failed");
+  return {
+    connected: !!json?.connected,
+    degraded: !!json?.degraded,
+    synced: Number(json?.synced || 0),
+    skipped: Number(json?.skipped || 0),
+    list: json?.list || null,
+    error: json?.error || "",
+  };
 }
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -1571,7 +1556,6 @@ function FavoriteCard({
   const genreIds = item.genre_ids || [];
   const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
   const firstGenre = genreIds.length > 0 ? genreMap[genreIds[0]] : null;
-  const missingTraktFavorite = item._traktSyncKnown && !item._traktFavorite;
 
   const [imdbScore, setImdbScore] = useState(initialImdbScore);
   const [traktScore, setTraktScore] = useState(initialTraktScore);
@@ -1697,11 +1681,6 @@ function FavoriteCard({
                 title={title}
                 mode={effectiveImageMode}
               />
-              {missingTraktFavorite && (
-                <div className="absolute left-2 top-2 z-20">
-                  <TmdbOnlyBadge compact />
-                </div>
-              )}
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               <div className="flex items-center gap-2">
@@ -1760,11 +1739,6 @@ function FavoriteCard({
             onMouseEnter={handleHover}
           >
             <SmartPoster item={item} title={title} mode={effectiveImageMode} />
-            {missingTraktFavorite && (
-              <div className="absolute left-2 top-2 z-20">
-                <TmdbOnlyBadge compact />
-              </div>
-            )}
             {/* Overlay con gradientes */}
             <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               {/* Top gradient con tipo y ratings */}
@@ -1858,11 +1832,6 @@ function FavoriteCard({
           onMouseEnter={handleHover}
         >
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
-          {missingTraktFavorite && (
-            <div className="absolute left-2 top-2 z-20">
-              <TmdbOnlyBadge />
-            </div>
-          )}
           {/* Mobile overlay - bottom only */}
           <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
             <div className="flex items-center gap-2 mb-1 -ml-0.5">
@@ -2127,13 +2096,12 @@ export default function FavoritesClient() {
         // Fetch favorites and rated items in parallel so user_rating
         // is available from the very first render — avoids the flash
         // of "Sin puntuar" when grouped by user_rating.
-        const [favResponse, rated, traktPresence] = await Promise.all([
+        const [favResponse, rated] = await Promise.all([
           fetch("/api/tmdb/account/favorite"),
           fetchRatedForUser(account.id, session).catch((err) => {
             console.error("Error loading rated items:", err);
             return [];
           }),
-          fetchTraktPresence("favorites"),
         ]);
 
         if (!favResponse.ok) {
@@ -2166,8 +2134,6 @@ export default function FavoritesClient() {
         const favoritesWithMeta = favorites.map((item, index) => ({
           ...item,
           user_rating: ratingMap.get(getRatingKey({ ...item })) ?? null,
-          _traktSyncKnown: traktPresence.known,
-          _traktFavorite: traktPresence.keys.has(getTmdbSyncKey(item)),
           _addedIndex: index,
         }));
 
@@ -2186,6 +2152,27 @@ export default function FavoritesClient() {
           );
           setItems(favoritesWithMeta);
           writeFavoritesCache(favoritesWithMeta, rated);
+
+          if (!favoritesListSyncInFlight) {
+            favoritesListSyncInFlight = syncOverflowFavoritesToTraktList(
+              favoritesWithMeta,
+            )
+              .then((result) => {
+                if (cancelled || !result.connected) return;
+                if (result.degraded) {
+                  console.warn(
+                    "TMDb favorites → Trakt list sync degraded:",
+                    result.error,
+                  );
+                }
+              })
+              .catch((error) => {
+                console.warn("TMDb favorites → Trakt list sync failed:", error);
+              })
+              .finally(() => {
+                favoritesListSyncInFlight = null;
+              });
+          }
         }
       } catch (error) {
         console.error("Error loading favorites:", error);
@@ -2668,14 +2655,12 @@ export default function FavoritesClient() {
   const stats = useMemo(() => {
     let movies = 0;
     let shows = 0;
-    let tmdbOnly = 0;
     for (const item of filtered) {
       const type = item.media_type || (item.title ? "movie" : "tv");
       if (type === "movie") movies++;
       else shows++;
-      if (item._traktSyncKnown && !item._traktFavorite) tmdbOnly++;
     }
-    return { total: filtered.length, movies, shows, tmdbOnly };
+    return { total: filtered.length, movies, shows };
   }, [filtered]);
 
   // Grouping logic
@@ -2948,28 +2933,6 @@ export default function FavoritesClient() {
                   <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
                     Total
                   </div>
-                </div>
-                <div
-                  className={`flex-1 lg:flex-none lg:min-w-[120px] rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1 ${
-                    stats.tmdbOnly > 0
-                      ? "bg-red-500/10 border border-red-400/20"
-                      : "bg-zinc-900/50 border border-white/5"
-                  }`}
-                >
-                    <div className="p-1.5 md:p-2 rounded-full bg-red-500/10 mb-1 text-red-200">
-                      <TwoApiSyncIcon
-                        icon={Heart}
-                        tmdbActive
-                        traktActive={false}
-                        className="w-4 h-4 md:w-5 md:h-5"
-                      />
-                    </div>
-                    <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
-                      {stats.tmdbOnly}
-                    </div>
-                    <div className="text-[9px] md:text-[10px] uppercase font-bold text-red-200/80 tracking-wider text-center leading-tight">
-                      Solo TMDb
-                    </div>
                 </div>
                 <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
