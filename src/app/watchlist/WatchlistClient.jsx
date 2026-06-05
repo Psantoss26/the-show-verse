@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useCallback,
-  useDeferredValue,
   startTransition,
 } from "react";
 import Link from "next/link";
@@ -16,6 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getExternalIds, getWatchProviders } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { traktGetScoreboard } from "@/lib/api/traktClient";
+import TwoApiSyncIcon from "@/components/TwoApiSyncIcon";
 import {
   Bookmark,
   Film,
@@ -194,6 +194,62 @@ function writeProvidersCache(providersMap) {
   } catch (e) {
     console.warn("Failed to write provider cache:", e);
   }
+}
+
+function getTmdbSyncKey(item) {
+  const type = item?.media_type || (item?.title ? "movie" : "tv");
+  return `${type}:${item?.id}`;
+}
+
+async function fetchTraktPresence(kind) {
+  try {
+    const res = await fetch(`/api/trakt/sync/presence?kind=${kind}`, {
+      cache: "no-store",
+      credentials: "include",
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.connected || json?.degraded) {
+      return { known: false, keys: new Set() };
+    }
+    return {
+      known: true,
+      keys: new Set((Array.isArray(json.keys) ? json.keys : []).map(String)),
+    };
+  } catch {
+    return { known: false, keys: new Set() };
+  }
+}
+
+function TmdbOnlyBadge({ compact = false }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-md border border-blue-300/30 bg-blue-500/15 text-blue-100 shadow-lg shadow-black/30 backdrop-blur-md ${
+        compact
+          ? "px-1.5 py-1 text-[0.55rem] font-black uppercase tracking-wider"
+          : "px-2 py-1 text-[0.6rem] font-black uppercase tracking-wider"
+      }`}
+      title="Solo está en TMDb. Falta sincronizarlo con Trakt."
+    >
+      <TwoApiSyncIcon
+        icon={Bookmark}
+        tmdbActive
+        traktActive={false}
+        className={compact ? "w-3.5 h-3.5" : "w-4 h-4"}
+      />
+      Solo TMDb
+    </span>
+  );
+}
+
+function buildLayoutScoreSnapshot(items, source) {
+  const scores = new Map(readScoreCache(source));
+  for (const item of Array.isArray(items) ? items : []) {
+    const key = String(item?.id);
+    if (!scores.has(key) && typeof item?.vote_average === "number") {
+      scores.set(key, item.vote_average);
+    }
+  }
+  return scores;
 }
 
 function getItemReleaseTime(item) {
@@ -1339,6 +1395,7 @@ function WatchlistCard({
   const genreIds = item.genre_ids || [];
   const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
   const firstGenre = genreIds.length > 0 ? genreMap[genreIds[0]] : null;
+  const missingTraktWatchlist = item._traktSyncKnown && !item._traktWatchlist;
 
   const [imdbScore, setImdbScore] = useState(initialImdbScore);
   const [traktScore, setTraktScore] = useState(initialTraktScore);
@@ -1356,12 +1413,6 @@ function WatchlistCard({
       setTraktScore(initialTraktScore);
     }
   }, [initialTraktScore]);
-
-  const animDelay =
-    totalItems > 30
-      ? Math.min(index * 0.01, 0.15)
-      : Math.min(index * 0.02, 0.3);
-  const shouldAnimate = index < 30;
 
   const href =
     type === "movie" ? `/details/movie/${item.id}` : `/details/tv/${item.id}`;
@@ -1458,17 +1509,7 @@ function WatchlistCard({
 
   if (viewMode === "list") {
     return (
-      <motion.div
-        layout
-        initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{
-          duration: 0.35,
-          delay: shouldAnimate ? animDelay : 0,
-          ease: "easeOut",
-        }}
-      >
+      <div>
         <Link
           href={href}
           className="block bg-zinc-900/40 border border-zinc-800/80 rounded-xl hover:border-blue-500/35 hover:bg-zinc-900/65 transition-[background-color,border-color] duration-300 group overflow-hidden"
@@ -1480,6 +1521,11 @@ function WatchlistCard({
                 title={title}
                 mode={effectiveImageMode}
               />
+              {missingTraktWatchlist && (
+                <div className="absolute left-2 top-2 z-20">
+                  <TmdbOnlyBadge compact />
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               <div className="flex items-center gap-2">
@@ -1516,23 +1562,13 @@ function WatchlistCard({
             </div>
           </div>
         </Link>
-      </motion.div>
+      </div>
     );
   }
 
   if (viewMode === "compact") {
     return (
-      <motion.div
-        layout
-        initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{
-          duration: 0.35,
-          delay: shouldAnimate ? animDelay : 0,
-          ease: "easeOut",
-        }}
-      >
+      <div>
         <Link href={href} className="block">
           <motion.div
             className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md transition-[border-color] duration-300`}
@@ -1548,6 +1584,11 @@ function WatchlistCard({
             onMouseEnter={handleHover}
           >
             <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+            {missingTraktWatchlist && (
+              <div className="absolute left-2 top-2 z-20">
+                <TmdbOnlyBadge compact />
+              </div>
+            )}
             {/* Overlay con gradientes */}
             <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               {/* Top gradient con tipo y ratings */}
@@ -1628,25 +1669,24 @@ function WatchlistCard({
             </div>
           </motion.div>
         </Link>
-      </motion.div>
+      </div>
     );
   }
 
   // Grid mode
   return (
-    <motion.div
-      layout
-      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
-    >
+    <div>
       <Link href={href} className="block">
         <div
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-blue-900/20 hover:border-blue-500/30 transition-[border-color,box-shadow] duration-300`}
           onMouseEnter={handleHover}
         >
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+          {missingTraktWatchlist && (
+            <div className="absolute left-2 top-2 z-20">
+              <TmdbOnlyBadge />
+            </div>
+          )}
           {/* Mobile overlay - bottom only */}
           <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
             <div className="flex items-center gap-2 mb-1 -ml-0.5">
@@ -1755,7 +1795,7 @@ function WatchlistCard({
           </div>
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
 }
 
@@ -1768,9 +1808,16 @@ export default function WatchlistClient() {
   const [traktScores, setTraktScores] = useState(() =>
     readScoreCache("trakt"),
   );
+  const [layoutImdbScores, setLayoutImdbScores] = useState(() =>
+    buildLayoutScoreSnapshot(readWatchlistCache()?.items || [], "imdb"),
+  );
+  const [layoutTraktScores, setLayoutTraktScores] = useState(() =>
+    buildLayoutScoreSnapshot(readWatchlistCache()?.items || [], "trakt"),
+  );
   const [providersByItem, setProvidersByItem] = useState(() =>
     readProvidersCache(),
   );
+  const [layoutProvidersByItem] = useState(() => readProvidersCache());
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
@@ -1887,7 +1934,10 @@ export default function WatchlistClient() {
 
       try {
         setLoading(items.length === 0);
-        const response = await fetch("/api/tmdb/account/watchlist");
+        const [response, traktPresence] = await Promise.all([
+          fetch("/api/tmdb/account/watchlist"),
+          fetchTraktPresence("watchlist"),
+        ]);
 
         if (!response.ok) {
           console.error("API error:", response.status, response.statusText);
@@ -1908,6 +1958,8 @@ export default function WatchlistClient() {
         // Add index for sorting by added date (most recent first from API)
         const watchlistWithIndex = watchlist.map((item, index) => ({
           ...item,
+          _traktSyncKnown: traktPresence.known,
+          _traktWatchlist: traktPresence.keys.has(getTmdbSyncKey(item)),
           _addedIndex: index,
         }));
 
@@ -1918,6 +1970,10 @@ export default function WatchlistClient() {
         const cachedTrakt = readScoreCache("trakt");
         if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
+        setLayoutImdbScores(buildLayoutScoreSnapshot(watchlistWithIndex, "imdb"));
+        setLayoutTraktScores(
+          buildLayoutScoreSnapshot(watchlistWithIndex, "trakt"),
+        );
         setItems(watchlistWithIndex);
         writeWatchlistCache(watchlistWithIndex);
       } catch (error) {
@@ -2174,14 +2230,14 @@ export default function WatchlistClient() {
     if (sortBy === "rating-desc" || sortBy === "rating-asc") {
       const getRating = (item) => {
         if (groupBy === "imdb_rating")
-          return imdbScores.get(String(item.id)) || 0;
+          return layoutImdbScores.get(String(item.id)) || 0;
         if (groupBy === "tmdb_rating") return item.vote_average || 0;
         if (groupBy === "trakt_rating")
-          return traktScores.get(String(item.id)) || 0;
+          return layoutTraktScores.get(String(item.id)) || 0;
         // Default: average of available ratings (IMDb, TMDb, Trakt)
         const tmdb = item.vote_average || 0;
-        const imdb = imdbScores.get(String(item.id)) || 0;
-        const trakt = traktScores.get(String(item.id)) || 0;
+        const imdb = layoutImdbScores.get(String(item.id)) || 0;
+        const trakt = layoutTraktScores.get(String(item.id)) || 0;
         let sum = 0,
           count = 0;
         if (tmdb > 0) {
@@ -2210,12 +2266,7 @@ export default function WatchlistClient() {
       return arr.sort((a, b) => (b._addedIndex || 0) - (a._addedIndex || 0));
     }
     return arr;
-  }, [filtered, sortBy, groupBy, imdbScores, traktScores]);
-
-  const deferredSorted = useDeferredValue(sorted);
-  const deferredImdbScores = useDeferredValue(imdbScores);
-  const deferredTraktScores = useDeferredValue(traktScores);
-  const deferredProvidersByItem = useDeferredValue(providersByItem);
+  }, [filtered, sortBy, groupBy, layoutImdbScores, layoutTraktScores]);
 
   useEffect(() => {
     if (
@@ -2304,12 +2355,14 @@ export default function WatchlistClient() {
   const stats = useMemo(() => {
     let movies = 0;
     let shows = 0;
+    let tmdbOnly = 0;
     for (const item of filtered) {
       const type = item.media_type || (item.title ? "movie" : "tv");
       if (type === "movie") movies++;
       else shows++;
+      if (item._traktSyncKnown && !item._traktWatchlist) tmdbOnly++;
     }
-    return { total: filtered.length, movies, shows };
+    return { total: filtered.length, movies, shows, tmdbOnly };
   }, [filtered]);
 
   // Grouping logic (sin user_rating)
@@ -2318,12 +2371,12 @@ export default function WatchlistClient() {
 
     const groups = new Map();
     const groupContext = {
-      imdbScores: deferredImdbScores,
-      traktScores: deferredTraktScores,
-      providersByItem: deferredProvidersByItem,
+      imdbScores: layoutImdbScores,
+      traktScores: layoutTraktScores,
+      providersByItem: layoutProvidersByItem,
     };
 
-    for (const item of deferredSorted) {
+    for (const item of sorted) {
       const metas = buildWatchlistGroupMetas(item, groupBy, groupContext);
       for (const meta of metas) {
         if (!groups.has(meta.key)) {
@@ -2338,7 +2391,12 @@ export default function WatchlistClient() {
 
         const group = groups.get(meta.key);
         group.items.push(item);
-        addWatchlistGroupStats(group.stats, item, deferredImdbScores, deferredTraktScores);
+        addWatchlistGroupStats(
+          group.stats,
+          item,
+          layoutImdbScores,
+          layoutTraktScores,
+        );
       }
     }
 
@@ -2382,12 +2440,12 @@ export default function WatchlistClient() {
 
     return sortWatchlistGroups(Array.from(groups.values()), groupBy);
   }, [
-    deferredSorted,
+    sorted,
     groupBy,
     subGroupBy,
-    deferredImdbScores,
-    deferredTraktScores,
-    deferredProvidersByItem,
+    layoutImdbScores,
+    layoutTraktScores,
+    layoutProvidersByItem,
     loadingProviders,
   ]);
 
@@ -2577,6 +2635,28 @@ export default function WatchlistClient() {
                   <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
                     Total
                   </div>
+                </div>
+                <div
+                  className={`flex-1 lg:flex-none lg:min-w-[120px] rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1 ${
+                    stats.tmdbOnly > 0
+                      ? "bg-blue-500/10 border border-blue-300/20"
+                      : "bg-zinc-900/50 border border-white/5"
+                  }`}
+                >
+                    <div className="p-1.5 md:p-2 rounded-full bg-blue-500/10 mb-1 text-blue-100">
+                      <TwoApiSyncIcon
+                        icon={Bookmark}
+                        tmdbActive
+                        traktActive={false}
+                        className="w-4 h-4 md:w-5 md:h-5"
+                      />
+                    </div>
+                    <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                      {stats.tmdbOnly}
+                    </div>
+                    <div className="text-[9px] md:text-[10px] uppercase font-bold text-blue-100/80 tracking-wider text-center leading-tight">
+                      Solo TMDb
+                    </div>
                 </div>
                 <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
@@ -3171,13 +3251,9 @@ export default function WatchlistClient() {
                           title={subgroup.label}
                           count={subgroup.items.length}
                         />
-                        <motion.div
+                        <div
                           key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
                           className={getItemsGridClass(true)}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.2 }}
                         >
                           {subgroup.items.map((item, idx) => (
                             <WatchlistCard
@@ -3192,18 +3268,14 @@ export default function WatchlistClient() {
                               userRating={item.user_rating}
                             />
                           ))}
-                        </motion.div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <motion.div
+                  <div
                     key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
                     className={getItemsGridClass(true)}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
                   >
                     {group.items.map((item, idx) => (
                       <WatchlistCard
@@ -3218,19 +3290,15 @@ export default function WatchlistClient() {
                         userRating={item.user_rating}
                       />
                     ))}
-                  </motion.div>
+                  </div>
                 )}
               </div>
             ))}
           </div>
         ) : (
-          <motion.div
+          <div
             key={`flat-grid-${viewMode}-${imageMode}`}
             className={getItemsGridClass(false)}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
           >
             {sorted.map((item, idx) => (
               <WatchlistCard
@@ -3245,7 +3313,7 @@ export default function WatchlistClient() {
                 userRating={item.user_rating}
               />
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
     </div>

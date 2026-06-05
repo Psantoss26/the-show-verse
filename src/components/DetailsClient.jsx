@@ -91,6 +91,10 @@ import {
 
 // Boton con efecto liquido para acciones principales
 import LiquidButton from "@/components/LiquidButton";
+import TwoApiSyncIcon, {
+  getTwoApiNextValue,
+  getTwoApiSyncTitle,
+} from "@/components/TwoApiSyncIcon";
 
 // -- Autenticacion y APIs de cuenta (TMDb) --
 import { useAuth } from "@/context/AuthContext";
@@ -219,6 +223,18 @@ const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 // Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
 const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
+
+const isMainDirectorCredit = (credit) =>
+  credit?.job === "Director" || credit?.job === "Co-Director";
+
+const getMovieDirectorsFromCrew = (crew) =>
+  Array.isArray(crew) ? crew.filter(isMainDirectorCredit) : [];
+
+const formatCreditNames = (list) =>
+  Array.isArray(list) && list.length
+    ? list.map((person) => person?.name).filter(Boolean).join(", ")
+    : null;
+
 /**
  * Obtiene el scoreboard publico (puntuaciones agregadas de multiples fuentes).
  * Llama al endpoint /api/scoreboard/public con type, id e imdbId.
@@ -2623,14 +2639,22 @@ export default function DetailsClient({
     if (requireLogin() || favLoading) return;
     try {
       setFavLoading(true);
-      const next = !favorite;
+      const traktFavorite = !!trakt?.connected && !!trakt?.favorite;
+      const next = getTwoApiNextValue(favorite, traktFavorite);
       setFavorite(next);
-      await markAsFavorite({
+      const result = await markAsFavorite({
         accountId: account.id,
         sessionId: session,
         type,
         mediaId: id,
         favorite: next,
+      });
+      setTrakt((prev) => {
+        if (!prev?.connected) return prev;
+        return {
+          ...prev,
+          favorite: result?.trakt?.synced ? next : !!prev.favorite,
+        };
       });
     } catch {
       setFavorite((v) => !v);
@@ -2644,14 +2668,22 @@ export default function DetailsClient({
     if (requireLogin() || wlLoading) return;
     try {
       setWlLoading(true);
-      const next = !watchlist;
+      const traktWatchlist = !!trakt?.connected && !!trakt?.inWatchlist;
+      const next = getTwoApiNextValue(watchlist, traktWatchlist);
       setWatchlist(next);
-      await markInWatchlist({
+      const result = await markInWatchlist({
         accountId: account.id,
         sessionId: session,
         type,
         mediaId: id,
         watchlist: next,
+      });
+      setTrakt((prev) => {
+        if (!prev?.connected) return prev;
+        return {
+          ...prev,
+          inWatchlist: result?.trakt?.synced ? next : !!prev.inWatchlist,
+        };
       });
     } catch {
       setWatchlist((v) => !v);
@@ -2833,6 +2865,7 @@ export default function DetailsClient({
         typeof initialTraktStatus?.rating === "number"
           ? initialTraktStatus.rating
           : null,
+      favorite: !!initialTraktStatus?.favorite,
       inWatchlist: !!initialTraktStatus?.inWatchlist,
       progress: initialTraktStatus?.progress || null,
       history: normalizedInitialStatus.history,
@@ -3929,6 +3962,7 @@ export default function DetailsClient({
               typeof normalizedJson.rating === "number"
                 ? normalizedJson.rating
                 : null,
+            favorite: !!normalizedJson.favorite,
             inWatchlist: !!normalizedJson.inWatchlist,
             progress: normalizedJson.progress || null,
             history: normalizedJson.history,
@@ -4040,6 +4074,12 @@ export default function DetailsClient({
             watched: !!normalizedPayload?.watched,
             plays: Number(normalizedPayload?.plays || 0),
             lastWatchedAt: normalizedPayload?.lastWatchedAt || null,
+            rating:
+              typeof normalizedPayload?.rating === "number"
+                ? normalizedPayload.rating
+                : prev.rating,
+            favorite: !!normalizedPayload?.favorite,
+            inWatchlist: !!normalizedPayload?.inWatchlist,
             history: Array.isArray(normalizedPayload?.history)
               ? normalizedPayload.history
               : [],
@@ -4392,6 +4432,7 @@ export default function DetailsClient({
               typeof cachedStatus.rating === "number"
                 ? cachedStatus.rating
                 : null;
+            nextTrakt.favorite = !!cachedStatus.favorite;
             nextTrakt.inWatchlist = !!cachedStatus.inWatchlist;
             nextTrakt.progress = cachedStatus.progress || null;
             nextTrakt.history = normalizedCachedStatus.history;
@@ -4483,6 +4524,7 @@ export default function DetailsClient({
             plays: Number(trakt.plays || 0),
             lastWatchedAt: trakt.lastWatchedAt || null,
             rating: typeof trakt.rating === "number" ? trakt.rating : null,
+            favorite: !!trakt.favorite,
             inWatchlist: !!trakt.inWatchlist,
             progress: trakt.progress || null,
             history: Array.isArray(trakt.history) ? trakt.history : [],
@@ -6831,39 +6873,39 @@ export default function DetailsClient({
       : null;
 
   // Director (movie) - fallback si data no trae credits
-  // Director (movie) - fallback si data no trae credits
-  const [movieDirector, setMovieDirector] = useState(null);
-  const [movieDirectorsCrew, setMovieDirectorsCrew] = useState([]);
+  const [movieDirector, setMovieDirector] = useState(() =>
+    formatCreditNames(getMovieDirectorsFromCrew(data?.credits?.crew)),
+  );
+  const [movieDirectorsCrew, setMovieDirectorsCrew] = useState(() =>
+    getMovieDirectorsFromCrew(data?.credits?.crew),
+  );
+  const [movieDirectorLoading, setMovieDirectorLoading] = useState(false);
 
   useEffect(() => {
     const isMovie = type === "movie";
     if (!isMovie || !id) {
       setMovieDirectorsCrew([]);
       setMovieDirector(null);
+      setMovieDirectorLoading(false);
       return;
     }
-
-    // Función helper para formatear nombres: "Nolan, Spielberg"
-    const formatDirectorNames = (list) => {
-      if (!list || !list.length) return null;
-      return list.map((d) => d.name).join(", ");
-    };
 
     // 1) CASO A: Si ya vienen credits en "data" (Server Side)
     const crew = data?.credits?.crew;
     if (Array.isArray(crew) && crew.length) {
-      const dirsCrew = crew.filter(
-        (c) => c?.job === "Director" || c?.job === "Co-Director",
-      );
+      const dirsCrew = getMovieDirectorsFromCrew(crew);
 
       setMovieDirectorsCrew(dirsCrew);
       // FIX: Actualizamos tambien el string del nombre aqui
-      setMovieDirector(formatDirectorNames(dirsCrew));
+      setMovieDirector(formatCreditNames(dirsCrew));
+      setMovieDirectorLoading(false);
       return;
     }
 
     // 2) CASO B: Si no vienen, pide credits a la API (Client Side Fallback)
     const ac = new AbortController();
+    let alive = true;
+    setMovieDirectorLoading(true);
 
     (async () => {
       try {
@@ -6872,36 +6914,45 @@ export default function DetailsClient({
           cache: "no-store",
         });
         const json = await res.json().catch(() => ({}));
+        if (!alive) return;
         if (!res.ok) {
           setMovieDirectorsCrew([]);
           setMovieDirector(null);
+          setMovieDirectorLoading(false);
           return;
         }
 
-        const dirsCrew = (json?.crew || []).filter(
-          (c) => c?.job === "Director" || c?.job === "Co-Director",
-        );
+        const dirsCrew = getMovieDirectorsFromCrew(json?.crew);
 
         setMovieDirectorsCrew(dirsCrew);
         // FIX: Actualizamos tambien el string del nombre tras el fetch
-        setMovieDirector(formatDirectorNames(dirsCrew));
+        setMovieDirector(formatCreditNames(dirsCrew));
       } catch (e) {
-        if (e?.name !== "AbortError") {
+        if (alive && e?.name !== "AbortError") {
           setMovieDirectorsCrew([]);
           setMovieDirector(null);
         }
+      } finally {
+        if (alive) setMovieDirectorLoading(false);
       }
     })();
 
-    return () => ac.abort();
+    return () => {
+      alive = false;
+      ac.abort();
+    };
   }, [type, id, data?.credits?.crew]);
 
-  const [tvCreators, setTvCreators] = useState([]);
+  const [tvCreators, setTvCreators] = useState(() =>
+    Array.isArray(data?.created_by) ? data.created_by : [],
+  );
+  const [tvCreatorsLoading, setTvCreatorsLoading] = useState(false);
 
   useEffect(() => {
     const isTv = type === "tv";
     if (!isTv || !id) {
       setTvCreators([]);
+      setTvCreatorsLoading(false);
       return;
     }
 
@@ -6909,11 +6960,14 @@ export default function DetailsClient({
     const creators = data?.created_by;
     if (Array.isArray(creators) && creators.length) {
       setTvCreators(creators);
+      setTvCreatorsLoading(false);
       return;
     }
 
     // 2) Si no viene, pide details a tu API route (ajusta la ruta si difiere)
     const ac = new AbortController();
+    let alive = true;
+    setTvCreatorsLoading(true);
 
     (async () => {
       try {
@@ -6922,18 +6976,25 @@ export default function DetailsClient({
           cache: "no-store",
         });
         const json = await res.json().catch(() => ({}));
+        if (!alive) return;
         if (!res.ok) {
           setTvCreators([]);
+          setTvCreatorsLoading(false);
           return;
         }
 
         setTvCreators(Array.isArray(json?.created_by) ? json.created_by : []);
       } catch (e) {
-        if (e?.name !== "AbortError") setTvCreators([]);
+        if (alive && e?.name !== "AbortError") setTvCreators([]);
+      } finally {
+        if (alive) setTvCreatorsLoading(false);
       }
     })();
 
-    return () => ac.abort();
+    return () => {
+      alive = false;
+      ac.abort();
+    };
   }, [type, id, data?.created_by]);
 
   // Menu global (nuevo)
@@ -7099,6 +7160,25 @@ export default function DetailsClient({
     };
   }, [id, endpointType]);
 
+  const creativeCreditsForUI = useMemo(() => {
+    const source =
+      type === "movie"
+        ? movieDirectorsCrew
+        : type === "tv"
+          ? tvCreators
+          : [];
+
+    const role = type === "movie" ? "Director" : "Creador";
+
+    return (Array.isArray(source) ? source : [])
+      .filter((person) => person?.id && person?.name)
+      .map((person, idx) => ({
+        ...person,
+        character: person?.job || role,
+        order: -1000 + idx,
+      }));
+  }, [type, movieDirectorsCrew, tvCreators]);
+
   const castDataForUI = useMemo(() => {
     // 1) Base cast: preferimos TMDb (más completo); si no, usamos castData tal cual
     const base =
@@ -7108,26 +7188,9 @@ export default function DetailsClient({
           ? castData
           : [];
 
-    // 2) Extras (Director / Creador)
-    const extras =
-      type === "movie"
-        ? (Array.isArray(movieDirectorsCrew) ? movieDirectorsCrew : [])
-            .filter((d) => d?.id && d?.name)
-            .map((d, idx) => ({
-              ...d,
-              character: "Director",
-              // orden negativo para que vaya arriba si luego hay sort por order
-              order: -1000 + idx,
-            }))
-        : type === "tv"
-          ? (Array.isArray(tvCreators) ? tvCreators : [])
-              .filter((c) => c?.id && c?.name)
-              .map((c, idx) => ({
-                ...c,
-                character: "Creador",
-                order: -1000 + idx,
-              }))
-          : [];
+    const creativeIds = new Set(
+      creativeCreditsForUI.map((person) => person?.id).filter(Boolean),
+    );
 
     // 3) ¿Hay order real en el base? (si viene de TMDb normalmente sí)
     const baseHasOrder = base.some((p) => Number.isFinite(Number(p?.order)));
@@ -7135,6 +7198,7 @@ export default function DetailsClient({
     // 4) Normalizamos base: filtramos y garantizamos un order numérico
     const normalizedBase = base
       .filter((p) => p?.id && p?.name)
+      .filter((p) => !creativeIds.has(p.id))
       .map((p, idx) => ({
         ...p,
         order: Number.isFinite(Number(p?.order))
@@ -7144,11 +7208,11 @@ export default function DetailsClient({
             : idx, // si hay order, los sin order al final
       }));
 
-    // 5) Unimos (extras primero para que “ganen” en dedupe) y deduplicamos por id
+    // 5) Deduplicamos por id respetando el orden de reparto
     const seen = new Set();
     const mergedUnique = [];
 
-    for (const item of [...extras, ...normalizedBase]) {
+    for (const item of normalizedBase) {
       if (!item?.id) continue;
       if (seen.has(item.id)) continue;
       seen.add(item.id);
@@ -7161,17 +7225,25 @@ export default function DetailsClient({
     }
 
     return mergedUnique;
-  }, [tmdbCast, castData, type, movieDirectorsCrew, tvCreators]);
+  }, [tmdbCast, castData, creativeCreditsForUI]);
+
+  const creativeCreditsLoading =
+    (type === "movie" && movieDirectorLoading) ||
+    (type === "tv" && tvCreatorsLoading);
+
+  const peopleSectionCount =
+    (creativeCreditsForUI?.length || 0) + (castDataForUI?.length || 0);
 
   const sectionItems = useMemo(() => {
     const items = [];
 
-    // Reparto
+    // Equipo creativo + reparto
     items.push({
       id: "cast",
-      label: "Reparto",
+      label: "Equipo y reparto",
       icon: Users,
-      count: castDataForUI?.length ? castDataForUI.length : undefined,
+      count: peopleSectionCount || undefined,
+      loading: creativeCreditsLoading,
     });
 
     // Recomendaciones
@@ -7274,13 +7346,14 @@ export default function DetailsClient({
     reviews,
     visibleTraktSeasons.length,
     tLists?.items,
-    castData,
-    castDataForUI,
+    peopleSectionCount,
+    creativeCreditsLoading,
     recommendations,
     hasAwardItems,
     awardItems.length,
     collectionId,
     collectionData,
+    collectionLoading,
   ]);
 
   // Menu global (scroll + sticky + spy)
@@ -8586,16 +8659,31 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 <LiquidButton
                   onClick={toggleFavorite}
                   disabled={favLoading}
-                  active={favorite}
+                  active={favorite || (!!trakt?.connected && !!trakt?.favorite)}
                   activeColor="red"
                   groupId="details-actions"
-                  title="Favorito"
+                  title={getTwoApiSyncTitle({
+                    label: "Favorito",
+                    tmdbActive: favorite,
+                    traktActive: !!trakt?.connected && !!trakt?.favorite,
+                    addLabel: "Añadir a favoritos",
+                    removeLabel: "Quitar de favoritos",
+                  })}
+                  aria-label={getTwoApiSyncTitle({
+                    label: "Favorito",
+                    tmdbActive: favorite,
+                    traktActive: !!trakt?.connected && !!trakt?.favorite,
+                    addLabel: "Añadir a favoritos",
+                    removeLabel: "Quitar de favoritos",
+                  })}
                 >
                   {favLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <Heart
-                      className={`w-5 h-5 ${favorite ? "fill-current" : ""}`}
+                    <TwoApiSyncIcon
+                      icon={Heart}
+                      tmdbActive={favorite}
+                      traktActive={!!trakt?.connected && !!trakt?.favorite}
                     />
                   )}
                 </LiquidButton>
@@ -8604,16 +8692,33 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 <LiquidButton
                   onClick={toggleWatchlist}
                   disabled={wlLoading}
-                  active={watchlist}
+                  active={
+                    watchlist || (!!trakt?.connected && !!trakt?.inWatchlist)
+                  }
                   activeColor="blue"
                   groupId="details-actions"
-                  title="Watchlist"
+                  title={getTwoApiSyncTitle({
+                    label: "Pendientes",
+                    tmdbActive: watchlist,
+                    traktActive: !!trakt?.connected && !!trakt?.inWatchlist,
+                    addLabel: "Añadir a pendientes",
+                    removeLabel: "Quitar de pendientes",
+                  })}
+                  aria-label={getTwoApiSyncTitle({
+                    label: "Pendientes",
+                    tmdbActive: watchlist,
+                    traktActive: !!trakt?.connected && !!trakt?.inWatchlist,
+                    addLabel: "Añadir a pendientes",
+                    removeLabel: "Quitar de pendientes",
+                  })}
                 >
                   {wlLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <BookmarkPlus
-                      className={`w-5 h-5 ${watchlist ? "fill-current" : ""}`}
+                    <TwoApiSyncIcon
+                      icon={BookmarkPlus}
+                      tmdbActive={watchlist}
+                      traktActive={!!trakt?.connected && !!trakt?.inWatchlist}
                     />
                   )}
                 </LiquidButton>
@@ -9390,6 +9495,77 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           <div className="mt-6 space-y-14">
             <section id="section-cast" ref={registerSection("cast")}>
               <AnimatedSection delay={0.04}>
+                {/* === EQUIPO CREATIVO: Director / Creadores === */}
+                {(creativeCreditsLoading || creativeCreditsForUI.length > 0) && (
+                  <section className="mb-10">
+                    <SectionTitle
+                      title={type === "movie" ? "Dirección" : "Creación"}
+                      icon={Building2}
+                    />
+
+                    {creativeCreditsForUI.length > 0 ? (
+                      <DetailsArrowCarousel
+                        spaceBetween={12}
+                        slidesPerView={2}
+                        breakpoints={{
+                          500: { slidesPerView: 2, spaceBetween: 14 },
+                          768: { slidesPerView: 3, spaceBetween: 16 },
+                          1024: { slidesPerView: 4, spaceBetween: 18 },
+                          1280: { slidesPerView: 5, spaceBetween: 20 },
+                        }}
+                        className="pb-8"
+                      >
+                        {creativeCreditsForUI.map((person) => (
+                          <SwiperSlide key={`creative-${person.id}`}>
+                            <Link
+                              href={`/details/person/${person.id}`}
+                              className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-amber-400/20 hover:border-amber-400/70 hover:shadow-2xl hover:shadow-amber-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                            >
+                              <div className="aspect-[2/3] overflow-hidden relative">
+                                {person.profile_path ? (
+                                  <img
+                                    src={`https://image.tmdb.org/t/p/w342${person.profile_path}`}
+                                    alt={person.name}
+                                    className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[8%]"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
+                                    <Building2 className="w-10 h-10" />
+                                  </div>
+                                )}
+
+                                <div className="absolute left-2 top-2 rounded-md border border-amber-300/30 bg-amber-400/15 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-amber-100 backdrop-blur">
+                                  {person.character}
+                                </div>
+
+                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
+
+                                <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
+                                  <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
+                                    {person.name}
+                                  </p>
+                                  <p className="text-amber-300 text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">
+                                    {type === "movie" ? "Director" : "Creador"}
+                                  </p>
+                                </div>
+                              </div>
+                            </Link>
+                          </SwiperSlide>
+                        ))}
+                      </DetailsArrowCarousel>
+                    ) : (
+                      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                        {[0, 1].map((item) => (
+                          <div
+                            key={item}
+                            className="aspect-[2/3] animate-pulse rounded-xl border border-white/5 bg-neutral-800/70"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                )}
+
                 {/* === REPARTO PRINCIPAL (Cast) === */}
                 {castDataForUI && castDataForUI.length > 0 && (
                   <section className="mb-16">

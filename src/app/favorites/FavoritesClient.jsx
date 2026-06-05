@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useCallback,
-  useDeferredValue,
   startTransition,
 } from "react";
 import Link from "next/link";
@@ -19,7 +18,8 @@ import {
   getWatchProviders,
 } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
-import { traktGetItemStatus, traktGetScoreboard } from "@/lib/api/traktClient";
+import { traktGetScoreboard } from "@/lib/api/traktClient";
+import TwoApiSyncIcon from "@/components/TwoApiSyncIcon";
 import {
   Heart,
   Film,
@@ -211,6 +211,62 @@ function writeProvidersCache(providersMap) {
   } catch (e) {
     console.warn("Failed to write provider cache:", e);
   }
+}
+
+function getTmdbSyncKey(item) {
+  const type = item?.media_type || (item?.title ? "movie" : "tv");
+  return `${type}:${item?.id}`;
+}
+
+async function fetchTraktPresence(kind) {
+  try {
+    const res = await fetch(`/api/trakt/sync/presence?kind=${kind}`, {
+      cache: "no-store",
+      credentials: "include",
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.connected || json?.degraded) {
+      return { known: false, keys: new Set() };
+    }
+    return {
+      known: true,
+      keys: new Set((Array.isArray(json.keys) ? json.keys : []).map(String)),
+    };
+  } catch {
+    return { known: false, keys: new Set() };
+  }
+}
+
+function TmdbOnlyBadge({ compact = false }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-md border border-red-400/30 bg-red-500/15 text-red-100 shadow-lg shadow-black/30 backdrop-blur-md ${
+        compact
+          ? "px-1.5 py-1 text-[0.55rem] font-black uppercase tracking-wider"
+          : "px-2 py-1 text-[0.6rem] font-black uppercase tracking-wider"
+      }`}
+      title="Solo está en TMDb. Falta sincronizarlo con Trakt."
+    >
+      <TwoApiSyncIcon
+        icon={Heart}
+        tmdbActive
+        traktActive={false}
+        className={compact ? "w-3.5 h-3.5" : "w-4 h-4"}
+      />
+      Solo TMDb
+    </span>
+  );
+}
+
+function buildLayoutScoreSnapshot(items, source) {
+  const scores = new Map(readScoreCache(source));
+  for (const item of Array.isArray(items) ? items : []) {
+    const key = String(item?.id);
+    if (!scores.has(key) && typeof item?.vote_average === "number") {
+      scores.set(key, item.vote_average);
+    }
+  }
+  return scores;
 }
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -1515,6 +1571,7 @@ function FavoriteCard({
   const genreIds = item.genre_ids || [];
   const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
   const firstGenre = genreIds.length > 0 ? genreMap[genreIds[0]] : null;
+  const missingTraktFavorite = item._traktSyncKnown && !item._traktFavorite;
 
   const [imdbScore, setImdbScore] = useState(initialImdbScore);
   const [traktScore, setTraktScore] = useState(initialTraktScore);
@@ -1532,12 +1589,6 @@ function FavoriteCard({
       setTraktScore(initialTraktScore);
     }
   }, [initialTraktScore]);
-
-  const animDelay =
-    totalItems > 30
-      ? Math.min(index * 0.01, 0.15)
-      : Math.min(index * 0.02, 0.3);
-  const shouldAnimate = index < 30;
 
   const href =
     type === "movie" ? `/details/movie/${item.id}` : `/details/tv/${item.id}`;
@@ -1634,17 +1685,7 @@ function FavoriteCard({
 
   if (viewMode === "list") {
     return (
-      <motion.div
-        layout
-        initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{
-          duration: 0.35,
-          delay: shouldAnimate ? animDelay : 0,
-          ease: "easeOut",
-        }}
-      >
+      <div>
         <Link
           href={href}
           className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-red-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
@@ -1656,6 +1697,11 @@ function FavoriteCard({
                 title={title}
                 mode={effectiveImageMode}
               />
+              {missingTraktFavorite && (
+                <div className="absolute left-2 top-2 z-20">
+                  <TmdbOnlyBadge compact />
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               <div className="flex items-center gap-2">
@@ -1692,23 +1738,13 @@ function FavoriteCard({
             </div>
           </div>
         </Link>
-      </motion.div>
+      </div>
     );
   }
 
   if (viewMode === "compact") {
     return (
-      <motion.div
-        layout
-        initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{
-          duration: 0.35,
-          delay: shouldAnimate ? animDelay : 0,
-          ease: "easeOut",
-        }}
-      >
+      <div>
         <Link href={href} className="block">
           <motion.div
             className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md`}
@@ -1724,6 +1760,11 @@ function FavoriteCard({
             onMouseEnter={handleHover}
           >
             <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+            {missingTraktFavorite && (
+              <div className="absolute left-2 top-2 z-20">
+                <TmdbOnlyBadge compact />
+              </div>
+            )}
             {/* Overlay con gradientes */}
             <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               {/* Top gradient con tipo y ratings */}
@@ -1804,29 +1845,24 @@ function FavoriteCard({
             </div>
           </motion.div>
         </Link>
-      </motion.div>
+      </div>
     );
   }
 
   // Grid mode
   return (
-    <motion.div
-      layout
-      initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{
-        duration: 0.35,
-        delay: shouldAnimate ? animDelay : 0,
-        ease: "easeOut",
-      }}
-    >
+    <div>
       <Link href={href} className="block">
         <div
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-red-900/20 transition-all`}
           onMouseEnter={handleHover}
         >
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+          {missingTraktFavorite && (
+            <div className="absolute left-2 top-2 z-20">
+              <TmdbOnlyBadge />
+            </div>
+          )}
           {/* Mobile overlay - bottom only */}
           <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
             <div className="flex items-center gap-2 mb-1 -ml-0.5">
@@ -1935,7 +1971,7 @@ function FavoriteCard({
           </div>
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
 }
 
@@ -1951,9 +1987,16 @@ export default function FavoritesClient() {
   const [traktScores, setTraktScores] = useState(() =>
     readScoreCache("trakt"),
   );
+  const [layoutImdbScores, setLayoutImdbScores] = useState(() =>
+    buildLayoutScoreSnapshot(readFavoritesCache()?.items || [], "imdb"),
+  );
+  const [layoutTraktScores, setLayoutTraktScores] = useState(() =>
+    buildLayoutScoreSnapshot(readFavoritesCache()?.items || [], "trakt"),
+  );
   const [providersByItem, setProvidersByItem] = useState(() =>
     readProvidersCache(),
   );
+  const [layoutProvidersByItem] = useState(() => readProvidersCache());
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
@@ -2084,12 +2127,13 @@ export default function FavoritesClient() {
         // Fetch favorites and rated items in parallel so user_rating
         // is available from the very first render — avoids the flash
         // of "Sin puntuar" when grouped by user_rating.
-        const [favResponse, rated] = await Promise.all([
+        const [favResponse, rated, traktPresence] = await Promise.all([
           fetch("/api/tmdb/account/favorite"),
           fetchRatedForUser(account.id, session).catch((err) => {
             console.error("Error loading rated items:", err);
             return [];
           }),
+          fetchTraktPresence("favorites"),
         ]);
 
         if (!favResponse.ok) {
@@ -2122,6 +2166,8 @@ export default function FavoritesClient() {
         const favoritesWithMeta = favorites.map((item, index) => ({
           ...item,
           user_rating: ratingMap.get(getRatingKey({ ...item })) ?? null,
+          _traktSyncKnown: traktPresence.known,
+          _traktFavorite: traktPresence.keys.has(getTmdbSyncKey(item)),
           _addedIndex: index,
         }));
 
@@ -2134,6 +2180,10 @@ export default function FavoritesClient() {
           if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
           setRatedItems(rated);
+          setLayoutImdbScores(buildLayoutScoreSnapshot(favoritesWithMeta, "imdb"));
+          setLayoutTraktScores(
+            buildLayoutScoreSnapshot(favoritesWithMeta, "trakt"),
+          );
           setItems(favoritesWithMeta);
           writeFavoritesCache(favoritesWithMeta, rated);
         }
@@ -2451,14 +2501,14 @@ export default function FavoritesClient() {
     if (sortBy === "rating-desc" || sortBy === "rating-asc") {
       const getRating = (item) => {
         if (groupBy === "imdb_rating")
-          return imdbScores.get(String(item.id)) || 0;
+          return layoutImdbScores.get(String(item.id)) || 0;
         if (groupBy === "tmdb_rating") return item.vote_average || 0;
         if (groupBy === "trakt_rating")
-          return traktScores.get(String(item.id)) || 0;
+          return layoutTraktScores.get(String(item.id)) || 0;
         // Default (including user_rating): average of available ratings (IMDb, TMDb, Trakt)
         const tmdb = item.vote_average || 0;
-        const imdb = imdbScores.get(String(item.id)) || 0;
-        const trakt = traktScores.get(String(item.id)) || 0;
+        const imdb = layoutImdbScores.get(String(item.id)) || 0;
+        const trakt = layoutTraktScores.get(String(item.id)) || 0;
         let sum = 0,
           count = 0;
         if (tmdb > 0) {
@@ -2529,12 +2579,7 @@ export default function FavoritesClient() {
       });
     }
     return arr;
-  }, [filtered, sortBy, watchDates, groupBy, imdbScores, traktScores]);
-
-  const deferredSorted = useDeferredValue(sorted);
-  const deferredImdbScores = useDeferredValue(imdbScores);
-  const deferredTraktScores = useDeferredValue(traktScores);
-  const deferredProvidersByItem = useDeferredValue(providersByItem);
+  }, [filtered, sortBy, watchDates, groupBy, layoutImdbScores, layoutTraktScores]);
 
   useEffect(() => {
     if (
@@ -2623,12 +2668,14 @@ export default function FavoritesClient() {
   const stats = useMemo(() => {
     let movies = 0;
     let shows = 0;
+    let tmdbOnly = 0;
     for (const item of filtered) {
       const type = item.media_type || (item.title ? "movie" : "tv");
       if (type === "movie") movies++;
       else shows++;
+      if (item._traktSyncKnown && !item._traktFavorite) tmdbOnly++;
     }
-    return { total: filtered.length, movies, shows };
+    return { total: filtered.length, movies, shows, tmdbOnly };
   }, [filtered]);
 
   // Grouping logic
@@ -2637,12 +2684,12 @@ export default function FavoritesClient() {
 
     const groups = new Map();
     const groupContext = {
-      imdbScores: deferredImdbScores,
-      traktScores: deferredTraktScores,
-      providersByItem: deferredProvidersByItem,
+      imdbScores: layoutImdbScores,
+      traktScores: layoutTraktScores,
+      providersByItem: layoutProvidersByItem,
     };
 
-    for (const item of deferredSorted) {
+    for (const item of sorted) {
       const metas = buildFavoriteGroupMetas(item, groupBy, groupContext);
       for (const meta of metas) {
         if (!groups.has(meta.key)) {
@@ -2657,7 +2704,12 @@ export default function FavoritesClient() {
 
         const group = groups.get(meta.key);
         group.items.push(item);
-        addFavoriteGroupStats(group.stats, item, deferredImdbScores, deferredTraktScores);
+        addFavoriteGroupStats(
+          group.stats,
+          item,
+          layoutImdbScores,
+          layoutTraktScores,
+        );
       }
     }
 
@@ -2701,12 +2753,12 @@ export default function FavoritesClient() {
 
     return sortFavoriteGroups(Array.from(groups.values()), groupBy);
   }, [
-    deferredSorted,
+    sorted,
     groupBy,
     subGroupBy,
-    deferredImdbScores,
-    deferredTraktScores,
-    deferredProvidersByItem,
+    layoutImdbScores,
+    layoutTraktScores,
+    layoutProvidersByItem,
     loadingProviders,
   ]);
 
@@ -2896,6 +2948,28 @@ export default function FavoritesClient() {
                   <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
                     Total
                   </div>
+                </div>
+                <div
+                  className={`flex-1 lg:flex-none lg:min-w-[120px] rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1 ${
+                    stats.tmdbOnly > 0
+                      ? "bg-red-500/10 border border-red-400/20"
+                      : "bg-zinc-900/50 border border-white/5"
+                  }`}
+                >
+                    <div className="p-1.5 md:p-2 rounded-full bg-red-500/10 mb-1 text-red-200">
+                      <TwoApiSyncIcon
+                        icon={Heart}
+                        tmdbActive
+                        traktActive={false}
+                        className="w-4 h-4 md:w-5 md:h-5"
+                      />
+                    </div>
+                    <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                      {stats.tmdbOnly}
+                    </div>
+                    <div className="text-[9px] md:text-[10px] uppercase font-bold text-red-200/80 tracking-wider text-center leading-tight">
+                      Solo TMDb
+                    </div>
                 </div>
                 <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
@@ -3534,13 +3608,9 @@ export default function FavoritesClient() {
                           title={subgroup.label}
                           count={subgroup.items.length}
                         />
-                        <motion.div
+                        <div
                           key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
                           className={getItemsGridClass(true)}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.2 }}
                         >
                           {subgroup.items.map((item, idx) => (
                             <FavoriteCard
@@ -3554,18 +3624,14 @@ export default function FavoritesClient() {
                               traktScore={traktScores.get(String(item.id))}
                             />
                           ))}
-                        </motion.div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <motion.div
+                  <div
                     key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
                     className={getItemsGridClass(true)}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
                   >
                     {group.items.map((item, idx) => (
                       <FavoriteCard
@@ -3579,19 +3645,15 @@ export default function FavoritesClient() {
                         traktScore={traktScores.get(String(item.id))}
                       />
                     ))}
-                  </motion.div>
+                  </div>
                 )}
               </div>
             ))}
           </div>
         ) : (
-          <motion.div
+          <div
             key={`flat-grid-${viewMode}-${imageMode}`}
             className={getItemsGridClass(false)}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
           >
             {sorted.map((item, idx) => (
               <FavoriteCard
@@ -3605,7 +3667,7 @@ export default function FavoritesClient() {
                 traktScore={traktScores.get(String(item.id))}
               />
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
     </div>
