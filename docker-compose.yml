@@ -10,7 +10,7 @@ services:
 
   # ── Aplicación Next.js ────────────────────────────────────────────────────
   app:
-    image: tu-usuario/the-show-verse:latest   # <-- cambia "tu-usuario" por tu usuario de Docker Hub
+    image: the-show-verse:latest   # imagen construida localmente por el workflow de CI
     container_name: the-show-verse
     restart: unless-stopped
     ports:
