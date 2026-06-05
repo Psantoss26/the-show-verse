@@ -8,16 +8,16 @@ set -euo pipefail
 
 NAS_DEPLOY_DIR="/nas-deploy"
 APP_DIR="$NAS_DEPLOY_DIR/app"
-COMPOSE_FILE="$NAS_DEPLOY_DIR/docker-compose.yml"
+COMPOSE_FILE="$APP_DIR/docker-compose.yml"
 
 echo "══════════════════════════════════════════════════════════"
 echo "  The Show Verse · Despliegue con Ollama (IA local)"
 echo "══════════════════════════════════════════════════════════"
 
-# ── 1. Sincronizar docker-compose.yml ────────────────────────────────────────
+# ── 1. Entrar en la app para que docker compose lea .env y build context bien ─
 echo ""
-echo "▶ Copiando docker-compose.yml..."
-cp "$APP_DIR/docker-compose.yml" "$COMPOSE_FILE"
+echo "▶ Usando app en $APP_DIR..."
+cd "$APP_DIR"
 
 # ── 2. Arrancar / actualizar Ollama ──────────────────────────────────────────
 echo ""
@@ -44,8 +44,6 @@ echo ""
 echo "▶ Rebuilding imagen de la app..."
 docker compose -f "$COMPOSE_FILE" \
   --project-name the-show-verse build \
-  --build-arg NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-http://192.168.1.126:3000}" \
-  --build-arg NEXT_PUBLIC_TMDB_API_KEY="${NEXT_PUBLIC_TMDB_API_KEY:-}" \
   2>&1
 
 echo ""
