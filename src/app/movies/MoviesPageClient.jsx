@@ -102,6 +102,9 @@ const buildImg = (path, size = "original") =>
 
 const PREVIEW_BACKDROP_SIZE = "w780";
 
+const getPreviewBackdropFallback = (movie) =>
+  movie?.backdrop_path || movie?.poster_path || null;
+
 const MOVIE_GENRES = {
   28: "Acción",
   12: "Aventura",
@@ -540,12 +543,12 @@ function Top10MobileBackdropCard({ movie, rank }) {
         return;
       }
 
-      let chosen = null;
+      let chosen = getPreviewBackdropFallback(movie);
       try {
         const preferred = await fetchBestBackdrop(movie.id);
-        chosen = preferred || null;
+        chosen = preferred || chosen;
       } catch {
-        chosen = null;
+        chosen = getPreviewBackdropFallback(movie);
       }
 
       movieBackdropCache.set(movie.id, chosen);
@@ -690,13 +693,14 @@ function InlinePreviewCard({ movie, heightClass }) {
         } else {
           try {
             const preferred = await fetchBestBackdrop(movie.id);
-            const chosen = preferred || null;
+            const chosen = preferred || getPreviewBackdropFallback(movie);
             movieBackdropCache.set(movie.id, chosen);
 
             revealBackdrop(chosen);
           } catch {
-            movieBackdropCache.set(movie.id, null);
-            revealBackdrop(null);
+            const fallback = getPreviewBackdropFallback(movie);
+            movieBackdropCache.set(movie.id, fallback);
+            revealBackdrop(fallback);
           }
         }
       }
@@ -900,7 +904,16 @@ function InlinePreviewCard({ movie, heightClass }) {
             decoding="async"
             fetchPriority="high"
             onLoad={() => setBackdropReady(true)}
-            onError={() => setBackdropReady(false)}
+            onError={() => {
+              const fallback = getPreviewBackdropFallback(movie);
+              if (fallback && fallback !== backdropPath) {
+                movieBackdropCache.set(movie.id, fallback);
+                setBackdropPath(fallback);
+                setBackdropReady(false);
+                return;
+              }
+              setBackdropReady(false);
+            }}
           />
         )}
 
@@ -1139,9 +1152,11 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 
         if (backdropPath === undefined) {
           try {
-            backdropPath = (await fetchBestBackdrop(movie.id)) || null;
+            backdropPath =
+              (await fetchBestBackdrop(movie.id)) ||
+              getPreviewBackdropFallback(movie);
           } catch {
-            backdropPath = null;
+            backdropPath = getPreviewBackdropFallback(movie);
           }
           movieBackdropCache.set(movie.id, backdropPath);
         }
