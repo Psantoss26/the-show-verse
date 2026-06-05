@@ -49,10 +49,9 @@ jobs:
 
       - name: Reiniciar contenedor con la nueva imagen
         run: |
-          cp /nas-deploy/app/docker-compose.yml /nas-deploy/docker-compose.yml
           docker stop the-show-verse 2>/dev/null || true
           docker rm   the-show-verse 2>/dev/null || true
-          docker compose -f /nas-deploy/docker-compose.yml \
+          cd /nas-deploy/app && docker compose -f docker-compose.yml \
             --project-name the-show-verse up -d app
           echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"
 
