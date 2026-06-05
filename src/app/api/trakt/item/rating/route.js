@@ -22,9 +22,8 @@ function normalizeRating(val) {
   if (val === null || val === undefined) return null;
   const n = Number(val);
   if (!Number.isFinite(n)) return null;
-  const normalized =
-    Math.round((Math.min(10, Math.max(0.5, n)) + Number.EPSILON) * 2) / 2;
-  return normalized >= 0.5 && normalized <= 10 ? normalized : null;
+  const normalized = Math.round(Math.min(10, Math.max(1, n)));
+  return normalized >= 1 && normalized <= 10 ? normalized : null;
 }
 
 export async function POST(req) {

@@ -91,10 +91,6 @@ import {
 
 // Boton con efecto liquido para acciones principales
 import LiquidButton from "@/components/LiquidButton";
-import TwoApiSyncIcon, {
-  getTwoApiNextValue,
-  getTwoApiSyncTitle,
-} from "@/components/TwoApiSyncIcon";
 
 // -- Autenticacion y APIs de cuenta (TMDb) --
 import { useAuth } from "@/context/AuthContext";
@@ -2639,8 +2635,7 @@ export default function DetailsClient({
     if (requireLogin() || favLoading) return;
     try {
       setFavLoading(true);
-      const traktFavorite = !!trakt?.connected && !!trakt?.favorite;
-      const next = getTwoApiNextValue(favorite, traktFavorite);
+      const next = !favorite;
       setFavorite(next);
       const result = await markAsFavorite({
         accountId: account.id,
@@ -2668,8 +2663,7 @@ export default function DetailsClient({
     if (requireLogin() || wlLoading) return;
     try {
       setWlLoading(true);
-      const traktWatchlist = !!trakt?.connected && !!trakt?.inWatchlist;
-      const next = getTwoApiNextValue(watchlist, traktWatchlist);
+      const next = !watchlist;
       setWatchlist(next);
       const result = await markInWatchlist({
         accountId: account.id,
@@ -5668,6 +5662,7 @@ export default function DetailsClient({
     rtScore: null,
     mcScore: null,
   });
+  const [awardsLoading, setAwardsLoading] = useState(false);
   // ID de IMDb resuelto (puede venir directo de TMDb o cargarse via getExternalIds)
   const [resolvedImdbId, setResolvedImdbId] = useState(null);
 
@@ -5805,19 +5800,24 @@ export default function DetailsClient({
   useEffect(() => {
     let abort = false;
 
+    setAwardsLoading(true);
     setExtras((prev) => ({
       ...prev,
       awardsDetails: null,
     }));
 
     const run = async () => {
-      const awardsData = await fetchTmdbAwards(endpointType, id);
-      if (abort) return;
+      try {
+        const awardsData = await fetchTmdbAwards(endpointType, id);
+        if (abort) return;
 
-      setExtras((prev) => ({
-        ...prev,
-        awardsDetails: awardsData || null,
-      }));
+        setExtras((prev) => ({
+          ...prev,
+          awardsDetails: awardsData || null,
+        }));
+      } finally {
+        if (!abort) setAwardsLoading(false);
+      }
     };
 
     run();
@@ -7208,11 +7208,12 @@ export default function DetailsClient({
             : idx, // si hay order, los sin order al final
       }));
 
-    // 5) Deduplicamos por id respetando el orden de reparto
+    // 5) Unimos director/creador primero y reparto después, manteniendo el
+    // mismo diseño de tarjeta para toda la fila.
     const seen = new Set();
     const mergedUnique = [];
 
-    for (const item of normalizedBase) {
+    for (const item of [...creativeCreditsForUI, ...normalizedBase]) {
       if (!item?.id) continue;
       if (seen.has(item.id)) continue;
       seen.add(item.id);
@@ -7231,19 +7232,18 @@ export default function DetailsClient({
     (type === "movie" && movieDirectorLoading) ||
     (type === "tv" && tvCreatorsLoading);
 
-  const peopleSectionCount =
-    (creativeCreditsForUI?.length || 0) + (castDataForUI?.length || 0);
+  const castSectionLoading = creativeCreditsLoading || tmdbCastLoading;
 
   const sectionItems = useMemo(() => {
     const items = [];
 
-    // Equipo creativo + reparto
+    // Reparto
     items.push({
       id: "cast",
-      label: "Equipo y reparto",
+      label: "Reparto",
       icon: Users,
-      count: peopleSectionCount || undefined,
-      loading: creativeCreditsLoading,
+      count: castDataForUI?.length ? castDataForUI.length : undefined,
+      loading: castSectionLoading,
     });
 
     // Recomendaciones
@@ -7257,12 +7257,13 @@ export default function DetailsClient({
     });
 
     // Premios
-    if (hasAwardItems) {
+    if (awardsLoading || hasAwardItems) {
       items.push({
         id: "awards",
         label: "Premios",
         icon: Trophy,
-        count: awardItems.length,
+        count: awardItems.length || undefined,
+        loading: awardsLoading,
       });
     }
 
@@ -7346,9 +7347,10 @@ export default function DetailsClient({
     reviews,
     visibleTraktSeasons.length,
     tLists?.items,
-    peopleSectionCount,
-    creativeCreditsLoading,
+    castDataForUI,
+    castSectionLoading,
     recommendations,
+    awardsLoading,
     hasAwardItems,
     awardItems.length,
     collectionId,
@@ -7366,6 +7368,17 @@ export default function DetailsClient({
   const [menuCompact, setMenuCompact] = useState(false);
   const [menuH, setMenuH] = useState(0);
   const [activeSectionId, setActiveSectionId] = useState(null);
+
+  const priorityCastResolved = !castSectionLoading;
+  const priorityRecommendationsResolved = priorityCastResolved;
+  const priorityAwardsResolved =
+    priorityRecommendationsResolved && !awardsLoading;
+  const priorityCollectionResolved =
+    priorityAwardsResolved && (!collectionId || !collectionLoading);
+  const canRenderRecommendations = priorityCastResolved;
+  const canRenderAwards = priorityRecommendationsResolved && !awardsLoading;
+  const canRenderCollection = priorityAwardsResolved && !!collectionId;
+  const canRenderLowerPrioritySections = priorityCollectionResolved;
 
   const registerSection = useCallback(
     (sid) => (el) => {
@@ -8659,32 +8672,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 <LiquidButton
                   onClick={toggleFavorite}
                   disabled={favLoading}
-                  active={favorite || (!!trakt?.connected && !!trakt?.favorite)}
+                  active={favorite}
                   activeColor="red"
                   groupId="details-actions"
-                  title={getTwoApiSyncTitle({
-                    label: "Favorito",
-                    tmdbActive: favorite,
-                    traktActive: !!trakt?.connected && !!trakt?.favorite,
-                    addLabel: "Añadir a favoritos",
-                    removeLabel: "Quitar de favoritos",
-                  })}
-                  aria-label={getTwoApiSyncTitle({
-                    label: "Favorito",
-                    tmdbActive: favorite,
-                    traktActive: !!trakt?.connected && !!trakt?.favorite,
-                    addLabel: "Añadir a favoritos",
-                    removeLabel: "Quitar de favoritos",
-                  })}
+                  title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                  aria-label={
+                    favorite ? "Quitar de favoritos" : "Añadir a favoritos"
+                  }
                 >
                   {favLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <TwoApiSyncIcon
-                      icon={Heart}
-                      tmdbActive={favorite}
-                      traktActive={!!trakt?.connected && !!trakt?.favorite}
-                    />
+                    <Heart className={`w-5 h-5 ${favorite ? "fill-current" : ""}`} />
                   )}
                 </LiquidButton>
 
@@ -8692,33 +8691,21 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 <LiquidButton
                   onClick={toggleWatchlist}
                   disabled={wlLoading}
-                  active={
-                    watchlist || (!!trakt?.connected && !!trakt?.inWatchlist)
-                  }
+                  active={watchlist}
                   activeColor="blue"
                   groupId="details-actions"
-                  title={getTwoApiSyncTitle({
-                    label: "Pendientes",
-                    tmdbActive: watchlist,
-                    traktActive: !!trakt?.connected && !!trakt?.inWatchlist,
-                    addLabel: "Añadir a pendientes",
-                    removeLabel: "Quitar de pendientes",
-                  })}
-                  aria-label={getTwoApiSyncTitle({
-                    label: "Pendientes",
-                    tmdbActive: watchlist,
-                    traktActive: !!trakt?.connected && !!trakt?.inWatchlist,
-                    addLabel: "Añadir a pendientes",
-                    removeLabel: "Quitar de pendientes",
-                  })}
+                  title={
+                    watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
+                  }
+                  aria-label={
+                    watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
+                  }
                 >
                   {wlLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <TwoApiSyncIcon
-                      icon={BookmarkPlus}
-                      tmdbActive={watchlist}
-                      traktActive={!!trakt?.connected && !!trakt?.inWatchlist}
+                    <BookmarkPlus
+                      className={`w-5 h-5 ${watchlist ? "fill-current" : ""}`}
                     />
                   )}
                 </LiquidButton>
@@ -9495,79 +9482,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           <div className="mt-6 space-y-14">
             <section id="section-cast" ref={registerSection("cast")}>
               <AnimatedSection delay={0.04}>
-                {/* === EQUIPO CREATIVO: Director / Creadores === */}
-                {(creativeCreditsLoading || creativeCreditsForUI.length > 0) && (
-                  <section className="mb-10">
-                    <SectionTitle
-                      title={type === "movie" ? "Dirección" : "Creación"}
-                      icon={Building2}
-                    />
-
-                    {creativeCreditsForUI.length > 0 ? (
-                      <DetailsArrowCarousel
-                        spaceBetween={12}
-                        slidesPerView={2}
-                        breakpoints={{
-                          500: { slidesPerView: 2, spaceBetween: 14 },
-                          768: { slidesPerView: 3, spaceBetween: 16 },
-                          1024: { slidesPerView: 4, spaceBetween: 18 },
-                          1280: { slidesPerView: 5, spaceBetween: 20 },
-                        }}
-                        className="pb-8"
-                      >
-                        {creativeCreditsForUI.map((person) => (
-                          <SwiperSlide key={`creative-${person.id}`}>
-                            <Link
-                              href={`/details/person/${person.id}`}
-                              className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-amber-400/20 hover:border-amber-400/70 hover:shadow-2xl hover:shadow-amber-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                            >
-                              <div className="aspect-[2/3] overflow-hidden relative">
-                                {person.profile_path ? (
-                                  <img
-                                    src={`https://image.tmdb.org/t/p/w342${person.profile_path}`}
-                                    alt={person.name}
-                                    className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[8%]"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                                    <Building2 className="w-10 h-10" />
-                                  </div>
-                                )}
-
-                                <div className="absolute left-2 top-2 rounded-md border border-amber-300/30 bg-amber-400/15 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-amber-100 backdrop-blur">
-                                  {person.character}
-                                </div>
-
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
-
-                                <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
-                                  <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
-                                    {person.name}
-                                  </p>
-                                  <p className="text-amber-300 text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">
-                                    {type === "movie" ? "Director" : "Creador"}
-                                  </p>
-                                </div>
-                              </div>
-                            </Link>
-                          </SwiperSlide>
-                        ))}
-                      </DetailsArrowCarousel>
-                    ) : (
-                      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                        {[0, 1].map((item) => (
-                          <div
-                            key={item}
-                            className="aspect-[2/3] animate-pulse rounded-xl border border-white/5 bg-neutral-800/70"
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                )}
-
                 {/* === REPARTO PRINCIPAL (Cast) === */}
-                {castDataForUI && castDataForUI.length > 0 && (
+                {!castSectionLoading && castDataForUI && castDataForUI.length > 0 && (
                   <section className="mb-16">
                     <SectionTitle title="Reparto Principal" icon={Users} />
                     <DetailsArrowCarousel
@@ -9623,7 +9539,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             <section id="section-recs" ref={registerSection("recs")}>
               <AnimatedSection delay={0.04}>
                 {/* === RECOMENDACIONES === */}
-                {recommendations && recommendations.length > 0 && (
+                {canRenderRecommendations &&
+                  recommendations &&
+                  recommendations.length > 0 && (
                   <section className="mb-16">
                     <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
 
@@ -9776,7 +9694,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </AnimatedSection>
             </section>
 
-            {hasAwardItems && (
+            {canRenderAwards && hasAwardItems && (
               <section id="section-awards" ref={registerSection("awards")}>
                 <AnimatedSection delay={0.04}>
                   <section className="mb-16">
@@ -9819,7 +9737,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </section>
             )}
 
-            {collectionId && (
+            {canRenderCollection && (
               <section
                 id="section-collection"
                 ref={registerSection("collection")}
@@ -9896,10 +9814,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </section>
             )}
 
-            {/* =================================================================
-                SECCIÓN: MEDIA (Portadas y Fondos)
-               ================================================================= */}
-            <section id="section-media" ref={registerSection("media")}>
+            {canRenderLowerPrioritySections && (
+              <>
+                {/* =================================================================
+                    SECCIÓN: MEDIA (Portadas y Fondos)
+                   ================================================================= */}
+                <section id="section-media" ref={registerSection("media")}>
               <AnimatedSection
                 key={`${id}-artwork-${artworkInitialized ? "ready" : "loading"}`}
                 delay={0.04}
@@ -10705,7 +10625,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </section>
                 )}
               </AnimatedSection>
-            </section>
+                </section>
 
             <section id="section-sentiment" ref={registerSection("sentiment")}>
               <AnimatedSection delay={0.04}>
@@ -11452,6 +11372,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
               </AnimatedSection>
             </section>
+              </>
+            )}
           </div>
         </div>
       </div>
