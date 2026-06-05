@@ -51,7 +51,7 @@ const anton = Anton({ weight: "400", subsets: ["latin"] });
 
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
-  hidden: { opacity: 0, y: 40 },
+  hidden: { opacity: 1, y: 0 },
   visible: {
     opacity: 1,
     y: 0,
@@ -60,7 +60,7 @@ const fadeInUp = {
 };
 
 const staggerContainer = {
-  hidden: { opacity: 0 },
+  hidden: { opacity: 1 },
   visible: {
     opacity: 1,
     transition: {
@@ -71,7 +71,7 @@ const staggerContainer = {
 };
 
 const scaleIn = {
-  hidden: { opacity: 0, scale: 0.95 },
+  hidden: { opacity: 1, scale: 1 },
   visible: {
     opacity: 1,
     scale: 1,
@@ -1968,7 +1968,7 @@ function Row({
   return (
     <motion.div
       ref={rowRef}
-      initial="hidden"
+      initial={false}
       animate={isInView ? "visible" : "hidden"}
       variants={fadeInUp}
       className="relative group"
@@ -2296,7 +2296,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
   return (
     <motion.div
       ref={rowRef}
-      initial="hidden"
+      initial={false}
       animate={isInView ? "visible" : "hidden"}
       variants={fadeInUp}
       className="relative group"
@@ -2421,7 +2421,7 @@ const AnticipatedSection = memo(function AnticipatedSection({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={false}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
@@ -2646,17 +2646,15 @@ function TopRatedHero({
   return (
     <motion.div
       ref={heroRef}
-      initial={{ opacity: 0, y: 20 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+      initial={false}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
       className="relative group mb-10 sm:mb-14"
     >
       {/* Título de la sección con selector Películas / Series */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={
-          isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }
-        }
+        initial={false}
+        animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         className="mb-5 px-1 sm:px-0"
       >
@@ -3124,7 +3122,7 @@ export default function MainDashboardClient({ initialData }) {
       <motion.div
         className="space-y-14 sm:space-y-16 mt-10 sm:mt-14"
         variants={staggerContainer}
-        initial="hidden"
+        initial={false}
         animate="visible"
       >
         {/* Trakt: Más esperadas con selector Películas/Series */}

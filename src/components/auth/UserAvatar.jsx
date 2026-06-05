@@ -3,8 +3,17 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
+function getTmdbAvatarUrl(account) {
+  const tmdbPath = account?.avatar?.tmdb?.avatar_path
+  if (tmdbPath) return `https://image.tmdb.org/t/p/w185${tmdbPath}`
 
-export default function UserAvatar() {
+  const gravatarHash = account?.avatar?.gravatar?.hash
+  if (gravatarHash) return `https://www.gravatar.com/avatar/${gravatarHash}?s=96&d=identicon`
+
+  return null
+}
+
+export default function UserAvatar({ account }) {
   const [traktAvatarUrl, setTraktAvatarUrl] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -31,11 +40,31 @@ export default function UserAvatar() {
     return () => { cancelled = true }
   }, [])
 
+  const tmdbAvatarUrl = getTmdbAvatarUrl(account)
+
   if (loading) {
-    return <div className="w-10 h-10 rounded-full bg-neutral-800/80 animate-pulse flex-shrink-0" />
+    return (
+      <Link
+        href="/profile"
+        title="Mi perfil"
+        className="flex-shrink-0 rounded-full p-[2px] bg-neutral-700 hover:bg-white/30 transition-colors duration-200"
+      >
+        <div className="w-9 h-9 rounded-full overflow-hidden bg-neutral-800">
+          {tmdbAvatarUrl ? (
+            <img
+              src={tmdbAvatarUrl}
+              alt="Usuario"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full animate-pulse" />
+          )}
+        </div>
+      </Link>
+    )
   }
 
-  const avatarSrc = traktAvatarUrl || '/default-avatar.png'
+  const avatarSrc = traktAvatarUrl || tmdbAvatarUrl || '/default-avatar.png'
 
   return (
     <Link
