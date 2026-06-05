@@ -49,6 +49,7 @@ jobs:
 
       - name: Reiniciar contenedor con la nueva imagen
         run: |
+          cp /nas-deploy/app/docker-compose.yml /nas-deploy/docker-compose.yml
           docker stop the-show-verse 2>/dev/null || true
           docker rm   the-show-verse 2>/dev/null || true
           docker compose -f /nas-deploy/docker-compose.yml \
