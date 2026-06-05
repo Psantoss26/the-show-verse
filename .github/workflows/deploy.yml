@@ -58,8 +58,44 @@ jobs:
               cp "$ENV_PATH" /nas-deploy/app/.env
             fi
           else
-            echo "⚠️ No se encontró archivo .env en el servidor. Creando uno vacío para evitar fallo de docker compose."
+            echo "⚠️ No se encontró archivo .env en el servidor. Se intentará completar con GitHub Secrets."
             touch /nas-deploy/app/.env
+          fi
+
+          # Garantizar variables core en runtime. El build usa NEXT_PUBLIC_*, pero
+          # las rutas server de Next leen process.env dentro del contenedor.
+          set_key() {
+            key="$1"
+            value="$2"
+            if [ -n "$value" ]; then
+              grep -v "^${key}=" /nas-deploy/app/.env > /nas-deploy/app/.env.tmp || true
+              mv /nas-deploy/app/.env.tmp /nas-deploy/app/.env
+              printf '%s=%s\n' "$key" "$value" >> /nas-deploy/app/.env
+            fi
+          }
+
+          set_key NEXT_PUBLIC_APP_URL "https://theshowverse.com"
+          set_key NEXT_PUBLIC_TMDB_API_KEY "$GH_NEXT_PUBLIC_TMDB_API_KEY"
+          set_key TMDB_API_KEY "$GH_NEXT_PUBLIC_TMDB_API_KEY"
+          set_key NEXT_PUBLIC_TRAKT_CLIENT_ID "$GH_NEXT_PUBLIC_TRAKT_CLIENT_ID"
+          set_key TRAKT_CLIENT_ID "$GH_TRAKT_CLIENT_ID"
+          if ! grep -q "^TRAKT_CLIENT_ID=." /nas-deploy/app/.env; then
+            set_key TRAKT_CLIENT_ID "$GH_NEXT_PUBLIC_TRAKT_CLIENT_ID"
+          fi
+          set_key TRAKT_CLIENT_SECRET "$GH_TRAKT_CLIENT_SECRET"
+
+          echo "Variables runtime detectadas:"
+          for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET; do
+            if grep -q "^${key}=." /nas-deploy/app/.env; then
+              echo "✅ $key"
+            else
+              echo "❌ Falta $key"
+            fi
+          done
+
+          if ! grep -q "^NEXT_PUBLIC_TMDB_API_KEY=." /nas-deploy/app/.env && ! grep -q "^TMDB_API_KEY=." /nas-deploy/app/.env; then
+            echo "❌ Falta TMDB_API_KEY/NEXT_PUBLIC_TMDB_API_KEY en runtime. Sin esto la app queda sin contenido."
+            exit 1
           fi
           
           # Ollama no debe bloquear el arranque de la web. Si falla, la app sigue online
@@ -70,6 +106,11 @@ jobs:
           cd /nas-deploy/app && docker compose -f docker-compose.yml \
             --project-name the-show-verse up -d --no-deps --force-recreate app
           echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"
+        env:
+          GH_NEXT_PUBLIC_TMDB_API_KEY: ${{ secrets.NEXT_PUBLIC_TMDB_API_KEY }}
+          GH_NEXT_PUBLIC_TRAKT_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_TRAKT_CLIENT_ID }}
+          GH_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          GH_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
 
       - name: Verificar que el contenedor está corriendo
         run: |
@@ -77,6 +118,7 @@ jobs:
           for attempt in $(seq 1 120); do
             if docker exec the-show-verse wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
               echo "✅ App online dentro del contenedor"
+              docker exec the-show-verse wget -qO- http://127.0.0.1:3000/api/health || true
               docker ps --filter name=the-show-verse --format '{{.Names}}: {{.Status}}'
               docker port the-show-verse || true
               if curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1 || wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
