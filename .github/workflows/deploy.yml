@@ -50,6 +50,7 @@ jobs:
           read_env_value() {
             key="$1"
             file="$2"
+            [ -f "$file" ] || return 0
             awk -F= -v key="$key" '
               $0 !~ /^[[:space:]]*#/ && $1 == key {
                 sub(/^[^=]*=/, "")
@@ -57,7 +58,7 @@ jobs:
                 print
                 exit
               }
-            ' "$file" 2>/dev/null
+            ' "$file" 2>/dev/null || true
           }
 
           ENV_PATH=""
@@ -75,17 +76,25 @@ jobs:
           done
 
           if [ -z "$ENV_PATH" ]; then
-            ENV_PATH=$(find /nas-deploy /volume1/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse -maxdepth 3 -name ".env" -type f 2>/dev/null | while read -r file; do
-              if has_tmdb_key "$file"; then
-                echo "$file"
-                break
-              fi
-            done)
+            ENV_PATH=$(
+              {
+                for root in /nas-deploy /volume1/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse; do
+                  [ -d "$root" ] && find "$root" -maxdepth 3 -name ".env" -type f 2>/dev/null
+                done
+              } | while read -r file; do
+                if has_tmdb_key "$file"; then
+                  echo "$file"
+                  break
+                fi
+              done || true
+            )
           fi
 
           if [ -n "$ENV_PATH" ]; then
             echo "✅ Archivo .env encontrado en: $ENV_PATH"
-            cp "$ENV_PATH" /nas-deploy/app/.env
+            if [ "$ENV_PATH" != "/nas-deploy/app/.env" ]; then
+              cp "$ENV_PATH" /nas-deploy/app/.env
+            fi
           else
             echo "⚠️ No se encontró archivo .env en el servidor. Se intentará completar con GitHub Secrets."
             touch /nas-deploy/app/.env
