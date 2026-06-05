@@ -51,6 +51,18 @@ jobs:
         run: |
           docker stop the-show-verse 2>/dev/null || true
           docker rm   the-show-verse 2>/dev/null || true
+          
+          # Buscar el archivo .env original en el NAS (suele estar en /nas-deploy o /volume1/docker)
+          ENV_PATH=$(find /nas-deploy /volume1/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse -maxdepth 2 -name ".env" -type f 2>/dev/null | head -n 1)
+          
+          if [ -n "$ENV_PATH" ]; then
+            echo "✅ Archivo .env encontrado en: $ENV_PATH"
+            cp "$ENV_PATH" /nas-deploy/app/.env
+          else
+            echo "⚠️ No se encontró archivo .env en el servidor. Creando uno vacío para evitar fallo de docker compose."
+            touch /nas-deploy/app/.env
+          fi
+          
           cd /nas-deploy/app && docker compose -f docker-compose.yml \
             --project-name the-show-verse up -d app
           echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"
