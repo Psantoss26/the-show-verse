@@ -64,9 +64,15 @@ jobs:
           ENV_PATH=""
           for candidate in \
             /nas-deploy/.env \
+            /nas-deploy/env.txt \
             /nas-deploy/app/.env \
+            /nas-deploy/app/.env.production \
             /volume1/docker/the-show-verse/.env \
+            /volume1/docker/the-show-verse/env.txt \
+            /volume1/docker/the-show-verse/app/.env.production \
             /data/docker/the-show-verse/.env \
+            /data/docker/the-show-verse/env.txt \
+            /data/docker/the-show-verse/app/.env.production \
             /home/pablo/the-show-verse/.env
           do
             if [ -f "$candidate" ] && has_tmdb_key "$candidate"; then
@@ -79,7 +85,7 @@ jobs:
             ENV_PATH=$(
               {
                 for root in /nas-deploy /volume1/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse; do
-                  [ -d "$root" ] && find "$root" -maxdepth 3 -name ".env" -type f 2>/dev/null
+                  [ -d "$root" ] && find "$root" -maxdepth 3 \( -name ".env" -o -name ".env.production" -o -name "env.txt" \) -type f 2>/dev/null
                 done
               } | while read -r file; do
                 if has_tmdb_key "$file"; then
