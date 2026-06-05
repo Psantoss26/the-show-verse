@@ -8,6 +8,7 @@ import {
   traktGetProgressWatchedForShow,
   computeHistorySummary,
   mapHistoryEntries,
+  traktFetch,
 } from "@/lib/trakt/server";
 import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
 
@@ -25,6 +26,38 @@ function noCacheHeaders(response) {
   response.headers.set("Pragma", "no-cache");
   response.headers.set("Expires", "0");
   return response;
+}
+
+function hasTraktPresence(items, { objectKey, tmdbId, traktId }) {
+  const expectedTmdb = tmdbId != null ? String(tmdbId) : null;
+  const expectedTrakt = traktId != null ? String(traktId) : null;
+
+  return (Array.isArray(items) ? items : []).some((entry) => {
+    const item = entry?.[objectKey] || entry;
+    const ids = item?.ids || {};
+    return (
+      (expectedTmdb && String(ids.tmdb || "") === expectedTmdb) ||
+      (expectedTrakt && String(ids.trakt || "") === expectedTrakt)
+    );
+  });
+}
+
+async function getTraktListPresence({
+  token,
+  type,
+  tmdbId,
+  traktId,
+  listKind,
+}) {
+  const objectKey = type === "movie" ? "movie" : "show";
+  const pathType = type === "movie" ? "movies" : "shows";
+  const result = await traktFetch(`/sync/${listKind}/${pathType}`, {
+    token,
+    timeoutMs: 4000,
+  });
+
+  if (!result.ok) return false;
+  return hasTraktPresence(result.json, { objectKey, tmdbId, traktId });
 }
 
 export async function GET(request) {
@@ -133,30 +166,64 @@ export async function GET(request) {
     let progress = null;
     let completed = 0;
     let aired = 0;
+    let favorite = false;
+    let inWatchlist = false;
 
     if (traktId) {
+      const presencePromises = [
+        getTraktListPresence({
+          token,
+          type,
+          tmdbId,
+          traktId,
+          listKind: "favorites",
+        }),
+        getTraktListPresence({
+          token,
+          type,
+          tmdbId,
+          traktId,
+          listKind: "watchlist",
+        }),
+      ];
+
       if (type === "show") {
-        const [historyRes, progressRes] = await Promise.allSettled([
-          traktGetHistoryForItem(token, { type, traktId, limit: 10 }),
-          traktGetProgressWatchedForShow(token, { traktId }),
-        ]);
+        const [historyRes, progressRes, favoriteRes, watchlistRes] =
+          await Promise.allSettled([
+            traktGetHistoryForItem(token, { type, traktId, limit: 10 }),
+            traktGetProgressWatchedForShow(token, { traktId }),
+            ...presencePromises,
+          ]);
         history = historyRes.status === "fulfilled" ? historyRes.value : [];
         if (progressRes.status === "fulfilled" && progressRes.value) {
           completed = Math.max(0, Number(progressRes.value.completed || 0));
           aired = Math.max(0, Number(progressRes.value.aired || 0));
           progress = aired > 0 ? Math.round((completed / aired) * 100) : 0;
         }
+        favorite =
+          favoriteRes.status === "fulfilled" ? !!favoriteRes.value : false;
+        inWatchlist =
+          watchlistRes.status === "fulfilled" ? !!watchlistRes.value : false;
       } else {
         // Single fetch — client-side confirmMovieTraktStatus already handles
         // post-write retries with delays. Adding retries here caused timeouts
         // on Vercel (maxDuration=10) for unwatched movies because the loop
         // always ran all 3 attempts (including waits) when history was empty.
-        history = await traktGetHistoryForItem(token, {
-          type,
-          traktId,
-          limit: 10,
-          timeoutMs: 5000,
-        });
+        const [historyRes, favoriteRes, watchlistRes] =
+          await Promise.allSettled([
+            traktGetHistoryForItem(token, {
+              type,
+              traktId,
+              limit: 10,
+              timeoutMs: 5000,
+            }),
+            ...presencePromises,
+          ]);
+        history = historyRes.status === "fulfilled" ? historyRes.value : [];
+        favorite =
+          favoriteRes.status === "fulfilled" ? !!favoriteRes.value : false;
+        inWatchlist =
+          watchlistRes.status === "fulfilled" ? !!watchlistRes.value : false;
       }
     }
 
@@ -165,6 +232,8 @@ export async function GET(request) {
     const res = NextResponse.json({
       connected: true,
       ...summary,
+      favorite,
+      inWatchlist,
       progress,
       completed,
       aired,

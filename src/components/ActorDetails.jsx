@@ -39,6 +39,13 @@ import {
   ArrowUpDown,
   ChevronDown,
   Calendar,
+  Instagram,
+  Youtube,
+  Facebook,
+  Twitter,
+  Music2,
+  Database,
+  LinkIcon,
 } from "lucide-react";
 import {
   AnimatedSection,
@@ -1246,6 +1253,36 @@ function PhotoCard({ image }) {
   );
 }
 
+function PersonExternalIconButton({
+  href,
+  label,
+  icon: Icon,
+  className = "",
+  iconClassName = "",
+}) {
+  if (!href || !Icon) return null;
+
+  return (
+    <motion.a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={label}
+      aria-label={label}
+      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ y: -2, scale: 1.08 }}
+      className={[
+        "grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-200 shadow-lg shadow-black/30 transition-colors hover:border-emerald-400/35 hover:bg-emerald-400/10 hover:text-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300",
+        className,
+      ].join(" ")}
+    >
+      <Icon className={`h-5 w-5 ${iconClassName}`} aria-hidden="true" />
+    </motion.a>
+  );
+}
+
 function TaggedMediaCard({ image }) {
   const title = image?.media?.title || image?.media?.name || "";
 
@@ -1836,60 +1873,138 @@ export default function ActorDetails({
   const socials = useMemo(() => {
     const ex = externalIds || {};
     const imdb = actorDetails?.imdb_id || ex?.imdb_id;
+    const tiktokId = ex?.tiktok_id
+      ? String(ex.tiktok_id).replace(/^@/, "")
+      : "";
+    const youtubeId = ex?.youtube_id
+      ? String(ex.youtube_id).replace(/^\//, "")
+      : "";
     return {
+      homepage: actorDetails?.homepage,
       imdb: imdb ? `https://www.imdb.com/name/${imdb}` : null,
+      tmdb: tmdbUrl,
+      wikidata: ex?.wikidata_id
+        ? `https://www.wikidata.org/wiki/${ex.wikidata_id}`
+        : null,
       instagram: ex?.instagram_id
         ? `https://www.instagram.com/${ex.instagram_id}`
         : null,
-      twitter: ex?.twitter_id ? `https://twitter.com/${ex.twitter_id}` : null,
+      twitter: ex?.twitter_id ? `https://x.com/${ex.twitter_id}` : null,
       facebook: ex?.facebook_id
         ? `https://www.facebook.com/${ex.facebook_id}`
         : null,
-      youtube: ex?.youtube_id
-        ? `https://www.youtube.com/${ex.youtube_id}`
-        : null,
-      homepage: actorDetails?.homepage,
-      tmdb: tmdbUrl,
+      youtube: youtubeId ? (
+        `https://www.youtube.com/${
+          youtubeId.startsWith("@") ? youtubeId : `channel/${youtubeId}`
+        }`
+      ) : null,
+      tiktok: tiktokId ? `https://www.tiktok.com/@${tiktokId}` : null,
+      freebase: ex?.freebase_mid
+        ? `https://www.google.com/search?q=${encodeURIComponent(ex.freebase_mid)}`
+        : ex?.freebase_id
+          ? `https://www.google.com/search?q=${encodeURIComponent(ex.freebase_id)}`
+          : null,
     };
   }, [externalIds, actorDetails, tmdbUrl]);
 
-  const actorExternalLinks = useMemo(
-    () =>
-      [
-        socials.homepage
-          ? {
-              id: "web",
-              label: "Web oficial",
-              icon: "/logo-Web.png",
-              href: socials.homepage,
-            }
-          : null,
-        socials.imdb
-          ? {
-              id: "imdb",
-              label: "IMDb",
-              icon: "/logo-IMDb.svg",
-              href: socials.imdb,
-              iconSize: { width: 42, height: 22 },
-              iconClassName:
-                "!w-[42px] !h-[22px] lg:!w-[44px] lg:!h-[22px] rounded-md shadow-lg object-contain",
-            }
-          : null,
-        socials.tmdb
-          ? {
-              id: "tmdb",
-              label: "TMDb",
-              icon: "/logo-TMDb.png",
-              href: socials.tmdb,
-              size: 38,
-              iconSize: { width: 34, height: 34 },
-              iconClassName:
-                "!w-[34px] !h-[34px] lg:!w-[36px] lg:!h-[36px] rounded-lg shadow-none object-contain",
-            }
-          : null,
-      ].filter(Boolean),
-    [socials],
-  );
+  const actorExternalLinks = useMemo(() => {
+    const links = [
+      socials.homepage
+        ? {
+            id: "web",
+            label: "Web oficial",
+            icon: "/logo-Web.png",
+            href: socials.homepage,
+          }
+        : null,
+      socials.imdb
+        ? {
+            id: "imdb",
+            label: "IMDb",
+            icon: "/logo-IMDb.svg",
+            href: socials.imdb,
+            iconSize: { width: 42, height: 22 },
+            iconClassName:
+              "!w-[42px] !h-[22px] lg:!w-[44px] lg:!h-[22px] rounded-md shadow-lg object-contain",
+          }
+        : null,
+      socials.wikidata
+        ? {
+            id: "wikidata",
+            label: "Wikidata",
+            iconComponent: Database,
+            href: socials.wikidata,
+          }
+        : null,
+      socials.instagram
+        ? {
+            id: "instagram",
+            label: "Instagram",
+            iconComponent: Instagram,
+            href: socials.instagram,
+          }
+        : null,
+      socials.twitter
+        ? {
+            id: "twitter",
+            label: "X / Twitter",
+            iconComponent: Twitter,
+            href: socials.twitter,
+          }
+        : null,
+      socials.facebook
+        ? {
+            id: "facebook",
+            label: "Facebook",
+            iconComponent: Facebook,
+            href: socials.facebook,
+          }
+        : null,
+      socials.youtube
+        ? {
+            id: "youtube",
+            label: "YouTube",
+            iconComponent: Youtube,
+            href: socials.youtube,
+          }
+        : null,
+      socials.tiktok
+        ? {
+            id: "tiktok",
+            label: "TikTok",
+            iconComponent: Music2,
+            href: socials.tiktok,
+          }
+        : null,
+      socials.freebase
+        ? {
+            id: "freebase",
+            label: "Freebase",
+            iconComponent: LinkIcon,
+            href: socials.freebase,
+          }
+        : null,
+      socials.tmdb
+        ? {
+            id: "tmdb",
+            label: "TMDb",
+            icon: "/logo-TMDb.png",
+            href: socials.tmdb,
+            size: 38,
+            iconSize: { width: 34, height: 34 },
+            iconClassName:
+              "!w-[34px] !h-[34px] lg:!w-[36px] lg:!h-[36px] rounded-lg shadow-none object-contain",
+          }
+        : null,
+    ].filter(Boolean);
+
+    const seen = new Set();
+    return links.filter((link) => {
+      if (!link?.href || seen.has(link.href)) return false;
+      seen.add(link.href);
+      return true;
+    });
+  }, [socials]);
 
   const age = calcAge(actorDetails?.birthday, actorDetails?.deathday);
   const esBio = translations?.translations?.find((t) => t.iso_639_1 === "es")
@@ -2174,18 +2289,27 @@ export default function ActorDetails({
                 className="flex flex-row flex-wrap justify-center items-center gap-2.5 w-full px-1 py-2"
                 staggerDelay={0.05}
               >
-                {actorExternalLinks.map((link) => (
-                  <ExternalLinkButton
-                    key={link.id}
-                    icon={link.icon}
-                    href={link.href}
-                    title={link.label}
-                    size={link.size}
-                    iconSize={link.iconSize}
-                    iconClassName={link.iconClassName}
-                    className={link.id === "tmdb" ? "mx-1" : ""}
-                  />
-                ))}
+                {actorExternalLinks.map((link) =>
+                  link.iconComponent ? (
+                    <PersonExternalIconButton
+                      key={link.id}
+                      href={link.href}
+                      label={link.label}
+                      icon={link.iconComponent}
+                    />
+                  ) : (
+                    <ExternalLinkButton
+                      key={link.id}
+                      icon={link.icon}
+                      href={link.href}
+                      title={link.label}
+                      size={link.size}
+                      iconSize={link.iconSize}
+                      iconClassName={link.iconClassName}
+                      className={link.id === "tmdb" ? "mx-1" : ""}
+                    />
+                  ),
+                )}
               </StaggerContainer>
             )}
           </div>
@@ -2731,19 +2855,39 @@ export default function ActorDetails({
                       </h3>
 
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(socials).map(([key, url]) =>
-                          url ? (
+                        {actorExternalLinks.map((link) => {
+                          const Icon = link.iconComponent;
+                          return (
                             <a
-                              key={key}
-                              href={url}
+                              key={link.id}
+                              href={link.href}
                               target="_blank"
-                              rel="noreferrer"
-                              className="px-3 py-1.5 rounded-lg bg-zinc-800/70 hover:bg-emerald-500/15 hover:text-emerald-300 border border-white/5 text-sm capitalize transition-colors"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-white/5 bg-zinc-800/70 px-3 py-1.5 text-sm text-zinc-200 transition-colors hover:border-emerald-400/25 hover:bg-emerald-500/15 hover:text-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+                              aria-label={`Abrir ${link.label}`}
                             >
-                              {key}
+                              {Icon ? (
+                                <Icon
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
+                              ) : link.icon ? (
+                                <img
+                                  src={link.icon}
+                                  alt=""
+                                  className="h-3.5 w-3.5 rounded-sm object-contain"
+                                  draggable="false"
+                                />
+                              ) : (
+                                <ExternalLink
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
+                              )}
+                              <span>{link.label}</span>
                             </a>
-                          ) : null,
-                        )}
+                          );
+                        })}
                       </div>
 
                       <div className="mt-1">

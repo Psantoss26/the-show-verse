@@ -7,11 +7,14 @@ import {
   markAsFavorite,
   markInWatchlist,
 } from '@/lib/api/tmdb'
+import { traktGetItemStatus } from '@/lib/api/traktClient'
+import TwoApiSyncIcon, {
+  getTwoApiNextValue,
+  getTwoApiSyncTitle,
+} from '@/components/TwoApiSyncIcon'
 import {
   Heart,
-  HeartOff,
   BookmarkPlus,
-  BookmarkMinus,
   Loader2,
   LogIn,
 } from 'lucide-react'
@@ -21,6 +24,11 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
   const [loadingStates, setLoadingStates] = useState(true)
   const [favorite, setFavorite] = useState(false)
   const [watchlist, setWatchlist] = useState(false)
+  const [traktState, setTraktState] = useState({
+    connected: false,
+    favorite: false,
+    inWatchlist: false,
+  })
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
 
@@ -32,9 +40,21 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
       }
 
       try {
-        const states = await getMediaAccountStates(type, mediaId, session)
+        const traktType = type === 'tv' ? 'show' : type
+        const [states, traktStatus] = await Promise.all([
+          getMediaAccountStates(type, mediaId, session),
+          traktGetItemStatus({
+            type: traktType,
+            tmdbId: mediaId,
+          }).catch(() => ({ connected: false })),
+        ])
         setFavorite(states.favorite)
         setWatchlist(states.watchlist)
+        setTraktState({
+          connected: !!traktStatus?.connected,
+          favorite: !!traktStatus?.favorite,
+          inWatchlist: !!traktStatus?.inWatchlist,
+        })
       } catch (e) {
         console.error(e)
       } finally {
@@ -60,19 +80,24 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
     if (updating) return
     setUpdating(true)
     setError('')
-    const next = !favorite
+    const traktFavorite = !!traktState.connected && !!traktState.favorite
+    const next = getTwoApiNextValue(favorite, traktFavorite)
 
     // Optimista
     setFavorite(next)
 
     try {
-      await markAsFavorite({
+      const result = await markAsFavorite({
         accountId: account.id,
         sessionId: session,
         type,
         mediaId,
         favorite: next,
       })
+      setTraktState((prev) => ({
+        ...prev,
+        favorite: result?.trakt?.synced ? next : !!prev.favorite,
+      }))
     } catch (e) {
       console.error(e)
       setFavorite(!next) // revertir
@@ -86,19 +111,25 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
     if (updating) return
     setUpdating(true)
     setError('')
-    const next = !watchlist
+    const traktWatchlist =
+      !!traktState.connected && !!traktState.inWatchlist
+    const next = getTwoApiNextValue(watchlist, traktWatchlist)
 
     // Optimista
     setWatchlist(next)
 
     try {
-      await markInWatchlist({
+      const result = await markInWatchlist({
         accountId: account.id,
         sessionId: session,
         type,
         mediaId,
         watchlist: next,
       })
+      setTraktState((prev) => ({
+        ...prev,
+        inWatchlist: result?.trakt?.synced ? next : !!prev.inWatchlist,
+      }))
     } catch (e) {
       console.error(e)
       setWatchlist(!next) // revertir
@@ -120,6 +151,10 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
   const watchClass = watchlist
     ? 'bg-blue-600 hover:bg-blue-500 text-white'
     : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-100 border border-neutral-700'
+  const traktFavorite = !!traktState.connected && !!traktState.favorite
+  const traktWatchlist = !!traktState.connected && !!traktState.inWatchlist
+  const favoriteActive = favorite || traktFavorite
+  const watchlistActive = watchlist || traktWatchlist
 
   return (
     <div className="flex flex-col gap-2">
@@ -128,17 +163,34 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
         <button
           onClick={handleToggleFavorite}
           disabled={isBusy}
-          className={`${baseBtn} ${favClass}`}
+          className={`${baseBtn} ${favoriteActive ? 'bg-red-600 hover:bg-red-500 text-white' : favClass}`}
+          title={getTwoApiSyncTitle({
+            label: 'Favorito',
+            tmdbActive: favorite,
+            traktActive: traktFavorite,
+            addLabel: 'Añadir a favoritos',
+            removeLabel: 'Quitar de favoritos',
+          })}
+          aria-label={getTwoApiSyncTitle({
+            label: 'Favorito',
+            tmdbActive: favorite,
+            traktActive: traktFavorite,
+            addLabel: 'Añadir a favoritos',
+            removeLabel: 'Quitar de favoritos',
+          })}
         >
           {isBusy ? (
             <Loader2 className="w-4 h-4 animate-spin" />
-          ) : favorite ? (
-            <HeartOff className="w-4 h-4" /> // ← aquí el cambio
           ) : (
-            <Heart className="w-4 h-4" />
+            <TwoApiSyncIcon
+              icon={Heart}
+              tmdbActive={favorite}
+              traktActive={traktFavorite}
+              className="w-4 h-4"
+            />
           )}
           <span>
-            {favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+            {favoriteActive ? 'Favorito' : 'Añadir a favoritos'}
           </span>
         </button>
 
@@ -146,17 +198,34 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
         <button
           onClick={handleToggleWatchlist}
           disabled={isBusy}
-          className={`${baseBtn} ${watchClass}`}
+          className={`${baseBtn} ${watchlistActive ? 'bg-blue-600 hover:bg-blue-500 text-white' : watchClass}`}
+          title={getTwoApiSyncTitle({
+            label: 'Pendientes',
+            tmdbActive: watchlist,
+            traktActive: traktWatchlist,
+            addLabel: 'Añadir a pendientes',
+            removeLabel: 'Quitar de pendientes',
+          })}
+          aria-label={getTwoApiSyncTitle({
+            label: 'Pendientes',
+            tmdbActive: watchlist,
+            traktActive: traktWatchlist,
+            addLabel: 'Añadir a pendientes',
+            removeLabel: 'Quitar de pendientes',
+          })}
         >
           {isBusy ? (
             <Loader2 className="w-4 h-4 animate-spin" />
-          ) : watchlist ? (
-            <BookmarkMinus className="w-4 h-4" />
           ) : (
-            <BookmarkPlus className="w-4 h-4" />
+            <TwoApiSyncIcon
+              icon={BookmarkPlus}
+              tmdbActive={watchlist}
+              traktActive={traktWatchlist}
+              className="w-4 h-4"
+            />
           )}
           <span>
-            {watchlist ? 'Quitar de pendientes' : 'Añadir a pendientes'}
+            {watchlistActive ? 'Pendiente' : 'Añadir a pendientes'}
           </span>
         </button>
       </div>
