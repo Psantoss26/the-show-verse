@@ -31,9 +31,16 @@ import {
   ChevronDown,
   Calendar as CalendarIcon,
   CheckCircle2,
+  Bookmark,
+  Heart,
+  Tv2,
 } from "lucide-react";
 
-import { getMoviesByDate, getMoviesByDateRange } from "@/lib/api/calendar";
+import {
+  getMoviesByDate,
+  getMoviesByDateRange,
+  getTrackedEpisodesByDateRange,
+} from "@/lib/api/calendar";
 import { formatPageTitle } from "@/lib/pageTitle";
 
 // --- COMPONENTES UI AUXILIARES ---
@@ -59,6 +66,115 @@ function TmdbPoster({ path, alt, className = "" }) {
       loading="lazy"
       onError={() => setFailed(true)}
     />
+  );
+}
+
+function TmdbBackdrop({ path, fallbackPath, alt, className = "" }) {
+  const [failed, setFailed] = useState(false);
+  const imagePath = failed ? fallbackPath : path || fallbackPath;
+
+  if (!imagePath) {
+    return (
+      <div
+        className={`bg-zinc-900 flex items-center justify-center text-zinc-700 ${className}`}
+      >
+        <ImageOff className="w-8 h-8 opacity-50" />
+      </div>
+    );
+  }
+
+  const size = imagePath === fallbackPath && !path ? "w342" : "w780";
+
+  return (
+    <img
+      src={`https://image.tmdb.org/t/p/${size}${imagePath}`}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function EpisodeCard({ item, viewMode }) {
+  const show = item?.show || {};
+  const episode = item?.episode || {};
+  const title = show?.title || "Serie";
+  const season = Number(episode?.season || 0);
+  const number = Number(episode?.number || 0);
+  const href =
+    show?.tmdbId && season > 0 && number > 0
+      ? `/details/tv/${show.tmdbId}/season/${season}/episode/${number}`
+      : `/details/tv/${show.tmdbId}`;
+  const airedDate = item?.first_aired ? new Date(item.first_aired) : null;
+  const validAiredDate =
+    airedDate && Number.isFinite(airedDate.getTime()) ? airedDate : null;
+  const source = Array.isArray(item?.source) ? item.source : [];
+  const isFavorite = source.includes("favorite");
+  const isWatchlist = source.includes("watchlist");
+
+  return (
+    <Link
+      href={href}
+      className="group block overflow-hidden rounded-xl border border-purple-500/15 bg-zinc-950 shadow-lg ring-1 ring-white/5 transition duration-300 hover:-translate-y-0.5 hover:border-purple-400/40 hover:shadow-[0_0_24px_rgba(168,85,247,0.18)]"
+    >
+      <div className="relative aspect-[16/9] overflow-hidden bg-zinc-900">
+        <TmdbBackdrop
+          path={show?.backdrop_path}
+          fallbackPath={show?.poster_path}
+          alt={title}
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/10" />
+
+        {viewMode !== "day" && validAiredDate && (
+          <div
+            className={`absolute left-2 top-2 rounded-lg border px-2 py-1 text-white shadow-lg backdrop-blur-md ${
+              isToday(validAiredDate)
+                ? "border-yellow-400/50 bg-yellow-500/90 text-black"
+                : "border-white/15 bg-black/70"
+            }`}
+          >
+            <div className="text-[9px] font-bold uppercase leading-none">
+              {format(validAiredDate, "EEE", { locale: es })}
+            </div>
+            <div className="mt-0.5 text-base font-black leading-none">
+              {format(validAiredDate, "d")}
+            </div>
+          </div>
+        )}
+
+        <div className="absolute right-2 top-2 flex gap-1.5">
+          {isWatchlist && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-sky-400/25 bg-sky-500/20 px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-sky-200 backdrop-blur-md">
+              <Bookmark className="h-3 w-3" />
+              Pendiente
+            </span>
+          )}
+          {isFavorite && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-rose-400/25 bg-rose-500/20 px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-rose-200 backdrop-blur-md">
+              <Heart className="h-3 w-3 fill-current" />
+              Favorita
+            </span>
+          )}
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 p-3">
+          <div className="mb-1 inline-flex items-center gap-1.5 rounded-md border border-purple-400/25 bg-purple-500/20 px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-purple-200 backdrop-blur-md">
+            <Tv2 className="h-3 w-3" />
+            Episodio
+          </div>
+          <h3 className="line-clamp-1 text-sm font-black leading-tight text-white drop-shadow-md">
+            {title}
+          </h3>
+          <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-zinc-300">
+            T{season || "?"} · E{number || "?"}
+            {episode?.title ? ` · ${episode.title}` : ""}
+          </p>
+        </div>
+      </div>
+    </Link>
   );
 }
 
@@ -288,7 +404,11 @@ export default function CalendarPage() {
   const [viewMode, setViewMode] = useState("day");
 
   const [selectedMovies, setSelectedMovies] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [trackedEpisodes, setTrackedEpisodes] = useState([]);
+  const [moviesLoading, setMoviesLoading] = useState(true);
+  const [episodesLoading, setEpisodesLoading] = useState(true);
+  const [traktConnected, setTraktConnected] = useState(null);
+  const [episodeError, setEpisodeError] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -334,7 +454,7 @@ export default function CalendarPage() {
   useEffect(() => {
     const fetchMovies = async () => {
       try {
-        setLoading(true);
+        setMoviesLoading(true);
         setError(null);
 
         let movies;
@@ -350,12 +470,38 @@ export default function CalendarPage() {
         setSelectedMovies([]);
         setError("No se han podido cargar los estrenos.");
       } finally {
-        setLoading(false);
+        setMoviesLoading(false);
       }
     };
 
     fetchMovies();
   }, [selectedDate, viewMode, dateRange.start, dateRange.end]);
+
+  useEffect(() => {
+    const fetchTrackedEpisodes = async () => {
+      try {
+        setEpisodesLoading(true);
+        setEpisodeError(null);
+
+        const data = await getTrackedEpisodesByDateRange(
+          dateRange.start,
+          dateRange.end,
+        );
+
+        setTraktConnected(data?.connected === true);
+        setTrackedEpisodes(Array.isArray(data?.items) ? data.items : []);
+        if (data?.error) setEpisodeError(data.error);
+      } catch (err) {
+        console.error("Error al cargar episodios Trakt:", err);
+        setTrackedEpisodes([]);
+        setEpisodeError("No se han podido cargar tus episodios de Trakt.");
+      } finally {
+        setEpisodesLoading(false);
+      }
+    };
+
+    fetchTrackedEpisodes();
+  }, [dateRange.start, dateRange.end]);
 
   const isTodaySelected = isToday(selectedDate);
 
@@ -384,6 +530,20 @@ export default function CalendarPage() {
         return format(selectedDate, "d 'de' MMMM 'de' yyyy", { locale: es });
     }
   }, [selectedDate, viewMode, dateRange]);
+
+  const sortedTrackedEpisodes = useMemo(
+    () =>
+      [...trackedEpisodes].sort((a, b) =>
+        (a?.first_aired || "").localeCompare(b?.first_aired || ""),
+      ),
+    [trackedEpisodes],
+  );
+
+  const hasMovies = selectedMovies.length > 0;
+  const hasEpisodes = sortedTrackedEpisodes.length > 0;
+  const hasAnyItems = hasMovies || hasEpisodes;
+  const loading =
+    (moviesLoading && !hasEpisodes) || (episodesLoading && !hasMovies);
 
   // Handlers
   const goPrev = () => {
@@ -531,7 +691,7 @@ export default function CalendarPage() {
               Consultando fecha...
             </span>
           </div>
-        ) : error ? (
+        ) : error && !hasAnyItems ? (
           <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-red-900/30 rounded-3xl bg-red-900/5 mx-2">
             <ImageOff className="w-16 h-16 text-red-500/50 mb-4" />
             <h3 className="text-xl font-bold text-red-200">{error}</h3>
@@ -539,7 +699,7 @@ export default function CalendarPage() {
               Inténtalo de nuevo más tarde.
             </p>
           </div>
-        ) : selectedMovies.length === 0 ? (
+        ) : !hasAnyItems ? (
           <div className="flex flex-col items-center justify-center py-40 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20 mx-2">
             <div className="w-24 h-24 bg-zinc-900/50 rounded-full flex items-center justify-center mb-6 border border-zinc-800/50">
               <CalendarIcon className="w-10 h-10 text-zinc-600" />
@@ -552,12 +712,20 @@ export default function CalendarPage() {
                   : "Mes tranquilo"}
             </h3>
             <p className="text-zinc-500 mt-2 max-w-md px-4">
-              No hay estrenos registrados para{" "}
+              No hay estrenos registrados ni episodios de tus series para{" "}
               <span className="text-yellow-400 font-bold capitalize">
                 {dateRangeLabel}
               </span>
               .
             </p>
+            {traktConnected === false && (
+              <Link
+                href={`/api/trakt/auth/start?next=${encodeURIComponent("/calendar")}`}
+                className="mt-6 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-2 text-sm font-bold text-purple-200 transition hover:bg-purple-500 hover:text-white"
+              >
+                Conectar Trakt
+              </Link>
+            )}
           </div>
         ) : (
           <>
@@ -567,7 +735,8 @@ export default function CalendarPage() {
                 <div className="h-px flex-1 bg-gradient-to-r from-yellow-500/50 to-transparent" />
                 <div className="text-center">
                   <span className="text-yellow-400 font-bold text-xs sm:text-sm tracking-widest uppercase block">
-                    {selectedMovies.length} Lanzamientos
+                    {selectedMovies.length} películas ·{" "}
+                    {sortedTrackedEpisodes.length} episodios
                   </span>
                   {viewMode !== "day" && (
                     <span className="text-zinc-500 text-[10px] sm:text-xs mt-1 capitalize block">
@@ -579,116 +748,208 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            {/* Grid continuo con badges de fecha en semana/mes */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-4 lg:gap-6">
-              {(() => {
-                // Ordenar películas por fecha si estamos en vista semana/mes
-                const sortedMovies =
-                  viewMode !== "day"
-                    ? [...selectedMovies].sort((a, b) => {
-                        const dateA =
-                          a.media_type === "movie" || a.title
-                            ? a.release_date
-                            : a.first_air_date;
-                        const dateB =
-                          b.media_type === "movie" || b.title
-                            ? b.release_date
-                            : b.first_air_date;
-                        return (dateA || "").localeCompare(dateB || "");
-                      })
-                    : selectedMovies;
+            {(episodesLoading ||
+              hasEpisodes ||
+              traktConnected === false ||
+              episodeError) && (
+              <section className="mb-10 px-2 sm:px-0">
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <div className="mb-1 flex items-center gap-2 text-purple-300">
+                      <Tv2 className="h-4 w-4" />
+                      <h2 className="text-lg font-black tracking-tight text-white sm:text-2xl">
+                        Episodios de tus series
+                      </h2>
+                    </div>
+                    <p className="text-sm text-zinc-500">
+                      Próximas emisiones de series en Trakt marcadas como
+                      pendientes o favoritas.
+                    </p>
+                  </div>
+                  {hasEpisodes && (
+                    <span className="w-fit rounded-full border border-purple-500/25 bg-purple-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-purple-200">
+                      {sortedTrackedEpisodes.length} episodios
+                    </span>
+                  )}
+                </div>
 
-                return sortedMovies.map((item) => {
-                  const isMovie = item.media_type === "movie" || !!item.title;
-                  const mediaType =
-                    item.media_type || (isMovie ? "movie" : "tv");
-                  const href = `/details/${mediaType}/${item.id}`;
-                  const title = isMovie ? item.title : item.name;
-                  const releaseDate = isMovie
-                    ? item.release_date
-                    : item.first_air_date;
-                  const year = releaseDate?.slice(0, 4);
-                  const posterPath = item.poster_path || item.backdrop_path;
-
-                  // Calcular info de fecha para badge en vistas semana/mes
-                  let dateBadgeInfo = null;
-                  if (viewMode !== "day" && releaseDate) {
-                    const date = new Date(releaseDate + "T00:00:00");
-                    const isDateToday = isToday(date);
-                    const dayNum = format(date, "d");
-                    const dayName = format(date, "EEE", { locale: es });
-
-                    dateBadgeInfo = {
-                      isToday: isDateToday,
-                      dayNum,
-                      dayName,
-                    };
-                  }
-
-                  return (
+                {episodesLoading ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="aspect-[16/9] animate-pulse rounded-xl border border-white/5 bg-zinc-900"
+                      />
+                    ))}
+                  </div>
+                ) : traktConnected === false ? (
+                  <div className="flex flex-col items-start gap-3 rounded-2xl border border-purple-500/20 bg-purple-500/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="font-bold text-purple-100">
+                        Conecta Trakt para ver tus episodios
+                      </h3>
+                      <p className="mt-1 text-sm text-zinc-500">
+                        El calendario podrá cruzar tus pendientes y favoritas
+                        con los próximos estrenos.
+                      </p>
+                    </div>
                     <Link
-                      key={`${mediaType}-${item.id}`}
-                      href={href}
-                      className="group relative block animate-in fade-in zoom-in-95 duration-500"
+                      href={`/api/trakt/auth/start?next=${encodeURIComponent("/calendar")}`}
+                      className="rounded-xl bg-purple-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-purple-400"
                     >
-                      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg sm:rounded-xl bg-zinc-900 shadow-md ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_20px_rgba(234,179,8,0.25)] group-hover:scale-[1.03] z-0 group-hover:z-10">
-                        <TmdbPoster
-                          path={posterPath}
-                          alt={title}
-                          className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-                        />
+                      Conectar
+                    </Link>
+                  </div>
+                ) : hasEpisodes ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {sortedTrackedEpisodes.map((item) => (
+                      <EpisodeCard
+                        key={item.id}
+                        item={item}
+                        viewMode={viewMode}
+                      />
+                    ))}
+                  </div>
+                ) : episodeError ? (
+                  <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-4 text-sm text-purple-200">
+                    {episodeError}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-purple-500/15 bg-zinc-900/20 p-5 text-sm text-zinc-500">
+                    No hay episodios de tus series para este periodo.
+                  </div>
+                )}
+              </section>
+            )}
 
-                        {/* Overlay en hover */}
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
-                          {/* Badge Tipo en hover - Esquina superior derecha */}
-                          <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-end items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                            <span
-                              className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                                isMovie
-                                  ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                  : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                              }`}
-                            >
-                              {isMovie ? "PELÍCULA" : "SERIE"}
-                            </span>
-                          </div>
+            {hasMovies && (
+              <section className="px-2 sm:px-0">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-yellow-400" />
+                    <h2 className="text-lg font-black tracking-tight text-white sm:text-2xl">
+                      Películas
+                    </h2>
+                  </div>
+                  <span className="rounded-full border border-yellow-500/25 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-yellow-300">
+                    {selectedMovies.length} lanzamientos
+                  </span>
+                </div>
 
-                          {/* Info Bottom en hover */}
-                          <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                            <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">
-                              {title}
-                            </h3>
-                            {year && (
-                              <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
-                                {year}
-                              </p>
+                {/* Grid continuo con badges de fecha en semana/mes */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-4 lg:gap-6">
+                  {(() => {
+                    // Ordenar películas por fecha si estamos en vista semana/mes
+                    const sortedMovies =
+                      viewMode !== "day"
+                        ? [...selectedMovies].sort((a, b) => {
+                            const dateA =
+                              a.media_type === "movie" || a.title
+                                ? a.release_date
+                                : a.first_air_date;
+                            const dateB =
+                              b.media_type === "movie" || b.title
+                                ? b.release_date
+                                : b.first_air_date;
+                            return (dateA || "").localeCompare(dateB || "");
+                          })
+                        : selectedMovies;
+
+                    return sortedMovies.map((item) => {
+                      const isMovie =
+                        item.media_type === "movie" || !!item.title;
+                      const mediaType =
+                        item.media_type || (isMovie ? "movie" : "tv");
+                      const href = `/details/${mediaType}/${item.id}`;
+                      const title = isMovie ? item.title : item.name;
+                      const releaseDate = isMovie
+                        ? item.release_date
+                        : item.first_air_date;
+                      const year = releaseDate?.slice(0, 4);
+                      const posterPath =
+                        item.poster_path || item.backdrop_path;
+
+                      // Calcular info de fecha para badge en vistas semana/mes
+                      let dateBadgeInfo = null;
+                      if (viewMode !== "day" && releaseDate) {
+                        const date = new Date(releaseDate + "T00:00:00");
+                        const isDateToday = isToday(date);
+                        const dayNum = format(date, "d");
+                        const dayName = format(date, "EEE", { locale: es });
+
+                        dateBadgeInfo = {
+                          isToday: isDateToday,
+                          dayNum,
+                          dayName,
+                        };
+                      }
+
+                      return (
+                        <Link
+                          key={`${mediaType}-${item.id}`}
+                          href={href}
+                          className="group relative block animate-in fade-in zoom-in-95 duration-500"
+                        >
+                          <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg sm:rounded-xl bg-zinc-900 shadow-md ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_20px_rgba(234,179,8,0.25)] group-hover:scale-[1.03] z-0 group-hover:z-10">
+                            <TmdbPoster
+                              path={posterPath}
+                              alt={title}
+                              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+                            />
+
+                            {/* Overlay en hover */}
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
+                              {/* Badge Tipo en hover - Esquina superior derecha */}
+                              <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-end items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                                <span
+                                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                                    isMovie
+                                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                  }`}
+                                >
+                                  {isMovie ? "PELÍCULA" : "SERIE"}
+                                </span>
+                              </div>
+
+                              {/* Info Bottom en hover */}
+                              <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                                <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs sm:text-sm">
+                                  {title}
+                                </h3>
+                                {year && (
+                                  <p className="text-yellow-500 text-[10px] sm:text-xs font-bold mt-0.5 drop-shadow-md">
+                                    {year}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Badge Fecha (siempre visible en vistas semana/mes) */}
+                            {dateBadgeInfo && (
+                              <div
+                                className={`absolute top-1 left-1 sm:top-2 sm:left-2 px-1.5 py-1 rounded-lg backdrop-blur-md border shadow-lg ${
+                                  dateBadgeInfo.isToday
+                                    ? "bg-yellow-500/90 border-yellow-400/50 text-black"
+                                    : "bg-black/80 border-white/20 text-white"
+                                }`}
+                              >
+                                <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider leading-none">
+                                  {dateBadgeInfo.dayName}
+                                </div>
+                                <div className="text-sm sm:text-base font-black leading-none mt-0.5">
+                                  {dateBadgeInfo.dayNum}
+                                </div>
+                              </div>
                             )}
                           </div>
-                        </div>
-
-                        {/* Badge Fecha (siempre visible en vistas semana/mes) */}
-                        {dateBadgeInfo && (
-                          <div
-                            className={`absolute top-1 left-1 sm:top-2 sm:left-2 px-1.5 py-1 rounded-lg backdrop-blur-md border shadow-lg ${
-                              dateBadgeInfo.isToday
-                                ? "bg-yellow-500/90 border-yellow-400/50 text-black"
-                                : "bg-black/80 border-white/20 text-white"
-                            }`}
-                          >
-                            <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider leading-none">
-                              {dateBadgeInfo.dayName}
-                            </div>
-                            <div className="text-sm sm:text-base font-black leading-none mt-0.5">
-                              {dateBadgeInfo.dayNum}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </Link>
-                  );
-                });
-              })()}
-            </div>
+                        </Link>
+                      );
+                    });
+                  })()}
+                </div>
+              </section>
+            )}
           </>
         )}
       </div>
