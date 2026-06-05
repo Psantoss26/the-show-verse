@@ -36,12 +36,15 @@ jobs:
           echo "✓ Archivos sincronizados: $(git rev-parse --short HEAD)"
 
       - name: Build imagen Docker desde el código actualizado
+        env:
+          GH_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY || secrets.NEXT_PUBLIC_TMDB_API_KEY }}
+          GH_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID || secrets.NEXT_PUBLIC_TRAKT_CLIENT_ID }}
         run: |
           docker build \
             --no-cache \
             --build-arg NEXT_PUBLIC_APP_URL="https://theshowverse.com" \
-            --build-arg NEXT_PUBLIC_TMDB_API_KEY="${{ secrets.NEXT_PUBLIC_TMDB_API_KEY }}" \
-            --build-arg NEXT_PUBLIC_TRAKT_CLIENT_ID="${{ secrets.NEXT_PUBLIC_TRAKT_CLIENT_ID }}" \
+            --build-arg NEXT_PUBLIC_TMDB_API_KEY="$GH_TMDB_API_KEY" \
+            --build-arg NEXT_PUBLIC_TRAKT_CLIENT_ID="$GH_TRAKT_CLIENT_ID" \
             -t the-show-verse:latest \
             -t the-show-verse:$(git rev-parse --short HEAD) \
             /nas-deploy/app/
@@ -49,8 +52,34 @@ jobs:
 
       - name: Reiniciar contenedor con la nueva imagen
         run: |
-          # Buscar el archivo .env original en el NAS (suele estar en /nas-deploy o /volume1/docker)
-          ENV_PATH=$(find /nas-deploy /volume1/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse -maxdepth 2 -name ".env" -type f 2>/dev/null | head -n 1)
+          has_tmdb_key() {
+            grep -Eq '^(TMDB_API_KEY|NEXT_PUBLIC_TMDB_API_KEY)=.+' "$1" 2>/dev/null
+          }
+
+          # Buscar el archivo .env original en el NAS. No basta con que exista:
+          # /nas-deploy/app/.env pudo quedar vacío por un deploy anterior.
+          ENV_PATH=""
+          for candidate in \
+            /nas-deploy/.env \
+            /nas-deploy/app/.env \
+            /volume1/docker/the-show-verse/.env \
+            /data/docker/the-show-verse/.env \
+            /home/pablo/the-show-verse/.env
+          do
+            if [ -f "$candidate" ] && has_tmdb_key "$candidate"; then
+              ENV_PATH="$candidate"
+              break
+            fi
+          done
+
+          if [ -z "$ENV_PATH" ]; then
+            ENV_PATH=$(find /nas-deploy /volume1/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse -maxdepth 3 -name ".env" -type f 2>/dev/null | while read -r file; do
+              if has_tmdb_key "$file"; then
+                echo "$file"
+                break
+              fi
+            done)
+          fi
           
           if [ -n "$ENV_PATH" ]; then
             echo "✅ Archivo .env encontrado en: $ENV_PATH"
@@ -75,12 +104,12 @@ jobs:
           }
 
           set_key NEXT_PUBLIC_APP_URL "https://theshowverse.com"
-          set_key NEXT_PUBLIC_TMDB_API_KEY "$GH_NEXT_PUBLIC_TMDB_API_KEY"
-          set_key TMDB_API_KEY "$GH_NEXT_PUBLIC_TMDB_API_KEY"
-          set_key NEXT_PUBLIC_TRAKT_CLIENT_ID "$GH_NEXT_PUBLIC_TRAKT_CLIENT_ID"
+          set_key NEXT_PUBLIC_TMDB_API_KEY "$GH_TMDB_API_KEY"
+          set_key TMDB_API_KEY "$GH_TMDB_API_KEY"
+          set_key NEXT_PUBLIC_TRAKT_CLIENT_ID "$GH_TRAKT_CLIENT_ID"
           set_key TRAKT_CLIENT_ID "$GH_TRAKT_CLIENT_ID"
           if ! grep -q "^TRAKT_CLIENT_ID=." /nas-deploy/app/.env; then
-            set_key TRAKT_CLIENT_ID "$GH_NEXT_PUBLIC_TRAKT_CLIENT_ID"
+            set_key TRAKT_CLIENT_ID "$GH_TRAKT_CLIENT_ID"
           fi
           set_key TRAKT_CLIENT_SECRET "$GH_TRAKT_CLIENT_SECRET"
 
@@ -95,6 +124,11 @@ jobs:
 
           if ! grep -q "^NEXT_PUBLIC_TMDB_API_KEY=." /nas-deploy/app/.env && ! grep -q "^TMDB_API_KEY=." /nas-deploy/app/.env; then
             echo "❌ Falta TMDB_API_KEY/NEXT_PUBLIC_TMDB_API_KEY en runtime. Sin esto la app queda sin contenido."
+            echo "Archivos .env encontrados para diagnóstico:"
+            find /nas-deploy /volume1/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse -maxdepth 3 -name ".env" -type f 2>/dev/null | while read -r file; do
+              keys=$(grep -E '^(TMDB_API_KEY|NEXT_PUBLIC_TMDB_API_KEY|TRAKT_CLIENT_ID|NEXT_PUBLIC_TRAKT_CLIENT_ID|TRAKT_CLIENT_SECRET)=' "$file" 2>/dev/null | cut -d= -f1 | tr '\n' ' ')
+              echo "- $file :: ${keys:-sin claves core}"
+            done
             exit 1
           fi
           
@@ -107,9 +141,8 @@ jobs:
             --project-name the-show-verse up -d --no-deps --force-recreate app
           echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"
         env:
-          GH_NEXT_PUBLIC_TMDB_API_KEY: ${{ secrets.NEXT_PUBLIC_TMDB_API_KEY }}
-          GH_NEXT_PUBLIC_TRAKT_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_TRAKT_CLIENT_ID }}
-          GH_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          GH_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY || secrets.NEXT_PUBLIC_TMDB_API_KEY }}
+          GH_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID || secrets.NEXT_PUBLIC_TRAKT_CLIENT_ID }}
           GH_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
 
       - name: Verificar que el contenedor está corriendo
