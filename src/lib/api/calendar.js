@@ -44,3 +44,22 @@ export async function getMoviesByDateRange(startDate, endDate) {
 
   return movies;
 }
+
+export async function getTrackedEpisodesByDateRange(startDate, endDate) {
+  const formattedStart = startDate.toISOString().split("T")[0];
+  const formattedEnd = endDate.toISOString().split("T")[0];
+  const params = new URLSearchParams({
+    start: formattedStart,
+    end: formattedEnd,
+  });
+
+  const res = await fetch(`/api/trakt/calendar/episodes?${params.toString()}`, {
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Trakt calendar failed (${res.status})`);
+  }
+
+  return res.json();
+}
