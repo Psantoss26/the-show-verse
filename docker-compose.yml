@@ -11,6 +11,15 @@ services:
   # ── Aplicación Next.js ────────────────────────────────────────────────────
   app:
     image: the-show-verse:latest   # imagen construida localmente por el workflow de CI
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://192.168.1.126:3000}
+        NEXT_PUBLIC_TMDB_API_KEY: ${NEXT_PUBLIC_TMDB_API_KEY:-${TMDB_API_KEY:-}}
+        NEXT_PUBLIC_TRAKT_CLIENT_ID: ${NEXT_PUBLIC_TRAKT_CLIENT_ID:-${TRAKT_CLIENT_ID:-}}
+        TMDB_API_KEY: ${TMDB_API_KEY:-${NEXT_PUBLIC_TMDB_API_KEY:-}}
+        TRAKT_CLIENT_ID: ${TRAKT_CLIENT_ID:-${NEXT_PUBLIC_TRAKT_CLIENT_ID:-}}
     container_name: the-show-verse
     restart: unless-stopped
     ports:

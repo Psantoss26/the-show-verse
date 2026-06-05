@@ -35,29 +35,31 @@ jobs:
             "$GITHUB_WORKSPACE/" /nas-deploy/app/
           echo "✓ Archivos sincronizados: $(git rev-parse --short HEAD)"
 
-      - name: Build imagen Docker desde el código actualizado
+      - name: Preparar variables para build y runtime
         env:
           GH_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY || secrets.NEXT_PUBLIC_TMDB_API_KEY }}
           GH_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID || secrets.NEXT_PUBLIC_TRAKT_CLIENT_ID }}
+          GH_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
         run: |
-          docker build \
-            --no-cache \
-            --build-arg NEXT_PUBLIC_APP_URL="https://theshowverse.com" \
-            --build-arg NEXT_PUBLIC_TMDB_API_KEY="$GH_TMDB_API_KEY" \
-            --build-arg NEXT_PUBLIC_TRAKT_CLIENT_ID="$GH_TRAKT_CLIENT_ID" \
-            -t the-show-verse:latest \
-            -t the-show-verse:$(git rev-parse --short HEAD) \
-            /nas-deploy/app/
-          echo "✓ Build completado: the-show-verse:$(git rev-parse --short HEAD)"
+          set -euo pipefail
 
-      - name: Reiniciar contenedor con la nueva imagen
-        run: |
           has_tmdb_key() {
             grep -Eq '^(TMDB_API_KEY|NEXT_PUBLIC_TMDB_API_KEY)=.+' "$1" 2>/dev/null
           }
 
-          # Buscar el archivo .env original en el NAS. No basta con que exista:
-          # /nas-deploy/app/.env pudo quedar vacío por un deploy anterior.
+          read_env_value() {
+            key="$1"
+            file="$2"
+            awk -F= -v key="$key" '
+              $0 !~ /^[[:space:]]*#/ && $1 == key {
+                sub(/^[^=]*=/, "")
+                gsub(/\r$/, "")
+                print
+                exit
+              }
+            ' "$file" 2>/dev/null
+          }
+
           ENV_PATH=""
           for candidate in \
             /nas-deploy/.env \
@@ -80,19 +82,15 @@ jobs:
               fi
             done)
           fi
-          
+
           if [ -n "$ENV_PATH" ]; then
             echo "✅ Archivo .env encontrado en: $ENV_PATH"
-            if [ "$ENV_PATH" != "/nas-deploy/app/.env" ]; then
-              cp "$ENV_PATH" /nas-deploy/app/.env
-            fi
+            cp "$ENV_PATH" /nas-deploy/app/.env
           else
             echo "⚠️ No se encontró archivo .env en el servidor. Se intentará completar con GitHub Secrets."
             touch /nas-deploy/app/.env
           fi
 
-          # Garantizar variables core en runtime. El build usa NEXT_PUBLIC_*, pero
-          # las rutas server de Next leen process.env dentro del contenedor.
           set_key() {
             key="$1"
             value="$2"
@@ -103,16 +101,78 @@ jobs:
             fi
           }
 
-          set_key NEXT_PUBLIC_APP_URL "https://theshowverse.com"
-          set_key NEXT_PUBLIC_TMDB_API_KEY "$GH_TMDB_API_KEY"
-          set_key TMDB_API_KEY "$GH_TMDB_API_KEY"
-          set_key NEXT_PUBLIC_TRAKT_CLIENT_ID "$GH_TRAKT_CLIENT_ID"
-          set_key TRAKT_CLIENT_ID "$GH_TRAKT_CLIENT_ID"
-          if ! grep -q "^TRAKT_CLIENT_ID=." /nas-deploy/app/.env; then
-            set_key TRAKT_CLIENT_ID "$GH_TRAKT_CLIENT_ID"
+          TMDB_VALUE="${GH_TMDB_API_KEY:-}"
+          if [ -z "$TMDB_VALUE" ]; then
+            TMDB_VALUE="$(read_env_value NEXT_PUBLIC_TMDB_API_KEY /nas-deploy/app/.env)"
           fi
-          set_key TRAKT_CLIENT_SECRET "$GH_TRAKT_CLIENT_SECRET"
+          if [ -z "$TMDB_VALUE" ]; then
+            TMDB_VALUE="$(read_env_value TMDB_API_KEY /nas-deploy/app/.env)"
+          fi
 
+          TRAKT_CLIENT_VALUE="${GH_TRAKT_CLIENT_ID:-}"
+          if [ -z "$TRAKT_CLIENT_VALUE" ]; then
+            TRAKT_CLIENT_VALUE="$(read_env_value NEXT_PUBLIC_TRAKT_CLIENT_ID /nas-deploy/app/.env)"
+          fi
+          if [ -z "$TRAKT_CLIENT_VALUE" ]; then
+            TRAKT_CLIENT_VALUE="$(read_env_value TRAKT_CLIENT_ID /nas-deploy/app/.env)"
+          fi
+
+          TRAKT_SECRET_VALUE="${GH_TRAKT_CLIENT_SECRET:-}"
+          if [ -z "$TRAKT_SECRET_VALUE" ]; then
+            TRAKT_SECRET_VALUE="$(read_env_value TRAKT_CLIENT_SECRET /nas-deploy/app/.env)"
+          fi
+
+          set_key NEXT_PUBLIC_APP_URL "https://theshowverse.com"
+          set_key NEXT_PUBLIC_TMDB_API_KEY "$TMDB_VALUE"
+          set_key TMDB_API_KEY "$TMDB_VALUE"
+          set_key NEXT_PUBLIC_TRAKT_CLIENT_ID "$TRAKT_CLIENT_VALUE"
+          set_key TRAKT_CLIENT_ID "$TRAKT_CLIENT_VALUE"
+          set_key TRAKT_CLIENT_SECRET "$TRAKT_SECRET_VALUE"
+
+          for value in "$TMDB_VALUE" "$TRAKT_CLIENT_VALUE" "$TRAKT_SECRET_VALUE"; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
+
+          {
+            echo "BUILD_NEXT_PUBLIC_APP_URL=https://theshowverse.com"
+            echo "BUILD_NEXT_PUBLIC_TMDB_API_KEY=$TMDB_VALUE"
+            echo "BUILD_TMDB_API_KEY=$TMDB_VALUE"
+            echo "BUILD_NEXT_PUBLIC_TRAKT_CLIENT_ID=$TRAKT_CLIENT_VALUE"
+            echo "BUILD_TRAKT_CLIENT_ID=$TRAKT_CLIENT_VALUE"
+          } >> "$GITHUB_ENV"
+
+          echo "Variables detectadas:"
+          for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET; do
+            if grep -q "^${key}=." /nas-deploy/app/.env; then
+              echo "✅ $key"
+            else
+              echo "❌ Falta $key"
+            fi
+          done
+
+          if [ -z "$TMDB_VALUE" ]; then
+            echo "❌ Falta TMDB_API_KEY/NEXT_PUBLIC_TMDB_API_KEY. Sin esto el bundle de producción queda sin contenido."
+            exit 1
+          fi
+
+      - name: Build imagen Docker desde el código actualizado
+        run: |
+          docker build \
+            --no-cache \
+            --build-arg NEXT_PUBLIC_APP_URL="$BUILD_NEXT_PUBLIC_APP_URL" \
+            --build-arg NEXT_PUBLIC_TMDB_API_KEY="$BUILD_NEXT_PUBLIC_TMDB_API_KEY" \
+            --build-arg NEXT_PUBLIC_TRAKT_CLIENT_ID="$BUILD_NEXT_PUBLIC_TRAKT_CLIENT_ID" \
+            --build-arg TMDB_API_KEY="$BUILD_TMDB_API_KEY" \
+            --build-arg TRAKT_CLIENT_ID="$BUILD_TRAKT_CLIENT_ID" \
+            -t the-show-verse:latest \
+            -t the-show-verse:$(git rev-parse --short HEAD) \
+            /nas-deploy/app/
+          echo "✓ Build completado: the-show-verse:$(git rev-parse --short HEAD)"
+
+      - name: Reiniciar contenedor con la nueva imagen
+        run: |
           echo "Variables runtime detectadas:"
           for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET; do
             if grep -q "^${key}=." /nas-deploy/app/.env; then
@@ -140,10 +200,6 @@ jobs:
           cd /nas-deploy/app && docker compose -f docker-compose.yml \
             --project-name the-show-verse up -d --no-deps --force-recreate app
           echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"
-        env:
-          GH_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY || secrets.NEXT_PUBLIC_TMDB_API_KEY }}
-          GH_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID || secrets.NEXT_PUBLIC_TRAKT_CLIENT_ID }}
-          GH_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
 
       - name: Verificar que el contenedor está corriendo
         run: |
