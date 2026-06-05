@@ -19,6 +19,7 @@ import {
   X,
   FilmIcon,
   TvIcon,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -144,6 +145,45 @@ const getBackdropCacheKey = (item, mediaType = getMediaTypeForItem(item)) =>
 
 const getPreviewBackdropFallback = (item) =>
   item?.backdrop_path || item?.poster_path || null;
+
+const EXPANDABLE_SECTION_HREFS = {
+  Tendencias: "/dashboard/tendencias",
+  Populares: "/dashboard/populares",
+  Recomendados: "/dashboard/recomendados",
+  "Más esperadas": "/dashboard/mas-esperadas",
+};
+
+function ExpandableSectionTitle({ title, href, className = "" }) {
+  const content = (
+    <>
+      <span>{title}</span>
+      <span className="text-amber-500">.</span>
+      {href && (
+        <ChevronRight className="ml-1 h-5 w-5 translate-x-[-4px] text-amber-400 opacity-0 transition duration-200 group-hover/title:translate-x-0 group-hover/title:opacity-100 sm:h-6 sm:w-6" />
+      )}
+    </>
+  );
+
+  if (!href) {
+    return (
+      <h3
+        className={`text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent ${className}`}
+      >
+        {content}
+      </h3>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className={`group/title inline-flex w-fit items-center text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent transition hover:from-amber-100 hover:via-white hover:to-amber-200 ${className}`}
+      aria-label={`Ver todos los títulos de ${title}`}
+    >
+      {content}
+    </Link>
+  );
+}
 
 const GENRES = {
   28: "Acción",
@@ -1718,10 +1758,10 @@ const RowWithSourceFilter = memo(function RowWithSourceFilter({
           </span>
         </div>
         <div className="flex items-center justify-between gap-4">
-          <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-            {title}
-            <span className="text-amber-500">.</span>
-          </h3>
+          <ExpandableSectionTitle
+            title={title}
+            href={EXPANDABLE_SECTION_HREFS[title]}
+          />
 
           {/* Selector de fuente */}
           <div className="flex gap-1 bg-white/5 rounded-full p-1">
@@ -1774,6 +1814,7 @@ function Row({
   eager = false,
   hideTitle = false, // Ocultar título cuando se usa con RowWithTimeFilter
   labelText, // Label superior para la sección
+  sectionHref,
 }) {
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = normalizedItems.length > 0;
@@ -1782,6 +1823,7 @@ function Row({
   const isGenreRow =
     ![
       "Recomendado",
+      "Recomendados",
       "Tendencias",
       "Más esperadas",
       "Populares",
@@ -1792,7 +1834,6 @@ function Row({
       "Películas de culto",
       "Infravaloradas",
       "En ascenso",
-      "Recomendadas para ti",
     ].includes(title) &&
     !title.includes("década") &&
     !title.includes("Clásicos") &&
@@ -1942,10 +1983,10 @@ function Row({
               </span>
             </div>
           )}
-          <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-            {title}
-            <span className="text-amber-500">.</span>
-          </h3>
+          <ExpandableSectionTitle
+            title={title}
+            href={sectionHref || EXPANDABLE_SECTION_HREFS[title]}
+          />
         </motion.div>
       )}
 
@@ -2198,6 +2239,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
   const isGenreRow =
     ![
       "Recomendado",
+      "Recomendados",
       "Tendencias",
       "Más esperadas",
       "Populares",
@@ -2208,7 +2250,6 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
       "Películas de culto",
       "Infravaloradas",
       "En ascenso",
-      "Recomendadas para ti",
     ].includes(title) &&
     !title.includes("década") &&
     !title.includes("Clásicos") &&
@@ -2394,9 +2435,10 @@ const AnticipatedSection = memo(function AnticipatedSection({
               PRÓXIMAMENTE
             </span>
           </div>
-          <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-            Más esperadas<span className="text-amber-500">.</span>
-          </h3>
+          <ExpandableSectionTitle
+            title="Más esperadas"
+            href={EXPANDABLE_SECTION_HREFS["Más esperadas"]}
+          />
         </div>
 
         {!loading && (
@@ -2828,6 +2870,9 @@ export default function MainDashboardClient({ initialData }) {
   const hasRenderableInitialAnticipatedData =
     (seededMoviesAnticipated?.length || 0) > 0 ||
     (seededShowsAnticipated?.length || 0) > 0;
+  const seededRecommended = Array.isArray(initialData?.traktRecommended)
+    ? initialData.traktRecommended
+    : null;
 
   // ⚡ Estado para secciones lazy (se cargan progresivamente en el cliente)
   const [lazySections, setLazySections] = useState({
@@ -2841,7 +2886,7 @@ export default function MainDashboardClient({ initialData }) {
     traktShowsAnticipated: hasRenderableInitialAnticipatedData
       ? (seededShowsAnticipated ?? [])
       : null,
-    traktRecommended: [],
+    traktRecommended: seededRecommended,
     traktPlayedWeekly: [],
     traktPlayedMonthly: [],
     traktWatchedWeekly: [],
@@ -2867,7 +2912,6 @@ export default function MainDashboardClient({ initialData }) {
       "trending",
       "awarded",
       "dramaTV",
-      "recommended",
       // Nuevas secciones Trakt
       "traktTrending",
       "traktPopular",
@@ -3103,9 +3147,10 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        {/* Trakt: Recomendado (preview normal) */}
+        {/* Trakt: Recomendados (preview normal) */}
         <Row
-          title="Recomendado"
+          title="Recomendados"
+          labelText="TRAKT"
           items={dashboardData.traktRecommended || EMPTY_ARRAY}
           isMobile={isMobile}
           hydrated={hydrated}
@@ -3207,18 +3252,6 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        {dashboardData.recommended?.length > 0 && (
-          <Row
-            title="Recomendadas para ti"
-            items={dashboardData.recommended}
-            isMobile={isMobile}
-            hydrated={hydrated}
-            posterCacheRef={posterCacheRef}
-            posterOverrides={posterOverrides}
-            backdropOverrides={backdropOverrides}
-            overridesReady={overridesReady}
-          />
-        )}
       </motion.div>
     </div>
   );

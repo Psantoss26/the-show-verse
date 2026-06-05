@@ -5,6 +5,7 @@
  */
 
 import { fetchTrakt as fetchTraktWithCache } from "@/lib/trakt/fetchWithCache";
+import { traktFetch } from "@/lib/trakt/server";
 
 // Cache de deduplicación: evita pedir el mismo TMDb ID varias veces en un mismo render
 const tmdbDetailsCache = new Map();
@@ -109,8 +110,22 @@ async function hydrateTraktResults(seeds, limit = 24) {
       return {
         id: details.id,
         media_type: it.media_type,
-        title: details.title || null,
-        name: details.name || null,
+        title:
+          it.media_type === "movie"
+            ? it.trakt_title || details.title || null
+            : details.title || null,
+        name:
+          it.media_type === "tv"
+            ? it.trakt_title || details.name || null
+            : details.name || null,
+        tmdb_title: details.title || details.name || null,
+        trakt_title: it.trakt_title || null,
+        trakt_year: it.trakt_year ?? null,
+        trakt_id: it.trakt_id ?? null,
+        trakt_slug: it.trakt_slug || null,
+        imdb_id: it.imdb_id || null,
+        trakt_recommended_rank: it.trakt_recommended_rank ?? null,
+        trakt_recommendation_source: it.trakt_recommendation_source || null,
         poster_path: details.poster_path || null,
         backdrop_path: details.backdrop_path || null,
         release_date: details.release_date || null,
@@ -180,24 +195,102 @@ export async function getTraktPopular(limit = 24) {
   return await hydrateTraktResults(mixed, limit);
 }
 
+function traktRecommendationSeed(type, item, index = 0) {
+  const media_type = type === "shows" ? "tv" : "movie";
+  const entity = item?.[media_type === "tv" ? "show" : "movie"] || item;
+  const tmdb = entity?.ids?.tmdb;
+  if (!tmdb) return null;
+
+  return {
+    media_type,
+    tmdb,
+    trakt_id: entity?.ids?.trakt ?? null,
+    trakt_slug: entity?.ids?.slug || null,
+    imdb_id: entity?.ids?.imdb || null,
+    trakt_title: entity?.title || null,
+    trakt_year: entity?.year ?? null,
+    trakt_recommended_rank: index + 1,
+  };
+}
+
+async function fetchPersonalRecommendedTraktItems(type, token) {
+  if (!token) return [];
+
+  const res = await traktFetch(`/recommendations/${type}?limit=50`, {
+    token,
+    timeoutMs: 10000,
+    retries: 1,
+  });
+
+  if (!res.ok) {
+    const err = new Error(
+      res.json?.error ||
+        res.json?.message ||
+        `Trakt recommendations failed (${res.status})`,
+    );
+    err.status = res.status;
+    throw err;
+  }
+
+  return Array.isArray(res.json) ? res.json : [];
+}
+
+async function fetchPublicRecommendedTraktItems(type, period = "weekly") {
+  return fetchTrakt(`/${type}/recommended/${period}?limit=50`);
+}
+
+async function fetchRecommendedTraktItems(
+  type,
+  { period = "weekly", token } = {},
+) {
+  if (token) {
+    try {
+      const personalItems = await fetchPersonalRecommendedTraktItems(
+        type,
+        token,
+      );
+      return { items: personalItems, source: "personal" };
+    } catch (err) {
+      console.warn(
+        `[traktHelpers] Personal recommendations unavailable for ${type}:`,
+        err.message,
+      );
+    }
+  }
+
+  const publicItems = await fetchPublicRecommendedTraktItems(type, period);
+  return { items: publicItems, source: "public" };
+}
+
 /**
- * RECOMMENDED: Recomendaciones personalizadas (requiere clave de Trakt)
+ * RECOMMENDED: recomendaciones exactas de Trakt.
+ * Si hay token, usa las recomendaciones personales ordenadas por Trakt.
+ * Sin token, conserva el fallback público semanal.
  */
-export async function getTraktRecommended(limit = 24, period = "weekly") {
-  const [movies, shows] = await Promise.all([
-    fetchTrakt(`/movies/recommended/${period}?limit=50`),
-    fetchTrakt(`/shows/recommended/${period}?limit=50`),
+export async function getTraktRecommended(
+  limit = 24,
+  period = "weekly",
+  { token } = {},
+) {
+  const [moviesResult, showsResult] = await Promise.all([
+    fetchRecommendedTraktItems("movies", { period, token }),
+    fetchRecommendedTraktItems("shows", { period, token }),
   ]);
 
-  const movieSeeds = movies
-    .map((m) => ({ media_type: "movie", tmdb: m?.ids?.tmdb }))
-    .filter((x) => x.tmdb);
+  const movieSeeds = moviesResult.items
+    .map((m, index) => traktRecommendationSeed("movies", m, index))
+    .filter(Boolean);
 
-  const showSeeds = shows
-    .map((s) => ({ media_type: "tv", tmdb: s?.ids?.tmdb }))
-    .filter((x) => x.tmdb);
+  const showSeeds = showsResult.items
+    .map((s, index) => traktRecommendationSeed("shows", s, index))
+    .filter(Boolean);
 
-  const mixed = interleave(movieSeeds, showSeeds, limit);
+  const isPersonal =
+    moviesResult.source === "personal" || showsResult.source === "personal";
+  const mixed = interleave(movieSeeds, showSeeds, limit).map((item) => ({
+    ...item,
+    trakt_recommendation_source: isPersonal ? "personal" : "public",
+  }));
   return await hydrateTraktResults(mixed, limit);
 }
 
@@ -330,12 +423,14 @@ export async function getTraktMoviesPopular(limit = 40) {
 /**
  * SOLO PELÍCULAS - Recommended
  */
-export async function getTraktMoviesRecommended(limit = 40) {
-  const movies = await fetchTrakt("/movies/recommended/weekly?limit=50");
+export async function getTraktMoviesRecommended(limit = 40, { token } = {}) {
+  const { items: movies } = await fetchRecommendedTraktItems("movies", {
+    token,
+  });
 
   const seeds = movies
-    .map((m) => ({ media_type: "movie", tmdb: m?.ids?.tmdb }))
-    .filter((x) => x.tmdb);
+    .map((m, index) => traktRecommendationSeed("movies", m, index))
+    .filter(Boolean);
 
   return await hydrateTraktResults(seeds, limit);
 }
@@ -399,12 +494,14 @@ export async function getTraktShowsPopular(limit = 40) {
 /**
  * SOLO SERIES - Recommended
  */
-export async function getTraktShowsRecommended(limit = 40) {
-  const shows = await fetchTrakt("/shows/recommended/weekly?limit=50");
+export async function getTraktShowsRecommended(limit = 40, { token } = {}) {
+  const { items: shows } = await fetchRecommendedTraktItems("shows", {
+    token,
+  });
 
   const seeds = shows
-    .map((s) => ({ media_type: "tv", tmdb: s?.ids?.tmdb }))
-    .filter((x) => x.tmdb);
+    .map((s, index) => traktRecommendationSeed("shows", s, index))
+    .filter(Boolean);
 
   return await hydrateTraktResults(seeds, limit);
 }
