@@ -7,9 +7,7 @@ on:
 
 jobs:
   deploy:
-    # Usamos el runner gratuito de GitHub — se conecta al NAS por SSH
-    # Esto elimina la dependencia del runner self-hosted que puede caerse
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, nas-showverse]
     timeout-minutes: 30
 
     steps:
@@ -19,83 +17,53 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Mostrar commit que se va a desplegar
+      - name: Mostrar commit desplegado
         run: |
           echo "📦 Commit: $(git rev-parse --short HEAD)"
           echo "📝 Mensaje: $(git log -1 --pretty=%s)"
           echo "🕐 Fecha: $(git log -1 --pretty=%ci)"
 
-      - name: Instalar cliente SSH
+      - name: Sincronizar archivos al directorio de la app
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq sshpass rsync openssh-client
-
-      - name: Aceptar clave SSH del NAS (evitar prompt de host)
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.NAS_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          echo "✓ Clave del host aceptada"
-
-      - name: Sincronizar código al NAS via rsync+SSH
-        env:
-          SSHPASS: ${{ secrets.NAS_SSH_PASS }}
-        run: |
-          rsync -az --delete \
+          which rsync || apt-get install -y rsync -qq
+          rsync -a --delete \
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='.next' \
             --exclude='.env*' \
             --exclude='*.log' \
-            -e "sshpass -e ssh -o StrictHostKeyChecking=no -p 22" \
-            ./ ${{ secrets.NAS_SSH_USER }}@${{ secrets.NAS_SSH_HOST }}:/nas-deploy/app/
-          echo "✓ Código sincronizado: $(git rev-parse --short HEAD)"
+            "$GITHUB_WORKSPACE/" /nas-deploy/app/
+          echo "✓ Archivos sincronizados: $(git rev-parse --short HEAD)"
 
-      - name: Build y deploy en el NAS via SSH
-        env:
-          SSHPASS: ${{ secrets.NAS_SSH_PASS }}
+      - name: Build imagen Docker desde el código actualizado
         run: |
-          sshpass -e ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.NAS_SSH_USER }}@${{ secrets.NAS_SSH_HOST }} << 'REMOTE_EOF'
-            set -e
-            echo "═══ Build imagen Docker ═══"
-            docker build \
-              --no-cache \
-              --build-arg NEXT_PUBLIC_APP_URL="https://theshowverse.com" \
-              --build-arg NEXT_PUBLIC_TMDB_API_KEY="${NEXT_PUBLIC_TMDB_API_KEY:-}" \
-              --build-arg NEXT_PUBLIC_TRAKT_CLIENT_ID="${NEXT_PUBLIC_TRAKT_CLIENT_ID:-}" \
-              -t the-show-verse:latest \
-              /nas-deploy/app/ \
-              2>&1 | tail -30
-            echo "✓ Build completado"
+          docker build \
+            --no-cache \
+            --build-arg NEXT_PUBLIC_APP_URL="https://theshowverse.com" \
+            --build-arg NEXT_PUBLIC_TMDB_API_KEY="${{ secrets.NEXT_PUBLIC_TMDB_API_KEY }}" \
+            --build-arg NEXT_PUBLIC_TRAKT_CLIENT_ID="${{ secrets.NEXT_PUBLIC_TRAKT_CLIENT_ID }}" \
+            -t the-show-verse:latest \
+            -t the-show-verse:$(git rev-parse --short HEAD) \
+            /nas-deploy/app/
+          echo "✓ Build completado: the-show-verse:$(git rev-parse --short HEAD)"
 
-            echo "═══ Reiniciando contenedor ═══"
-            docker stop the-show-verse 2>/dev/null || true
-            docker rm   the-show-verse 2>/dev/null || true
-            docker compose -f /nas-deploy/docker-compose.yml \
-              --project-name the-show-verse up -d app
-            echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"
-
-            echo "═══ Estado final ═══"
-            sleep 8
-            docker ps --filter name=the-show-verse --format '{{.Names}}: {{.Status}}'
-            docker inspect -f '{{.State.Running}}' the-show-verse | grep -q true && \
-              echo "✅ Contenedor online" || \
-              (echo "❌ El contenedor no arrancó" && docker logs the-show-verse --tail 30 && exit 1)
-
-            echo "═══ Limpiando imágenes antiguas ═══"
-            docker image prune -f 2>/dev/null || true
-          REMOTE_EOF
-
-      - name: Verificar deploy desde GitHub
-        env:
-          SSHPASS: ${{ secrets.NAS_SSH_PASS }}
+      - name: Reiniciar contenedor con la nueva imagen
         run: |
-          STATUS=$(sshpass -e ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.NAS_SSH_USER }}@${{ secrets.NAS_SSH_HOST }} \
-            "docker inspect -f '{{.State.Running}}' the-show-verse 2>/dev/null")
-          if [ "$STATUS" = "true" ]; then
-            echo "✅ Deploy exitoso — contenedor corriendo en el NAS"
-          else
-            echo "❌ El contenedor no está corriendo"
-            exit 1
-          fi
+          docker stop the-show-verse 2>/dev/null || true
+          docker rm   the-show-verse 2>/dev/null || true
+          docker compose -f /nas-deploy/docker-compose.yml \
+            --project-name the-show-verse up -d app
+          echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"
+
+      - name: Verificar que el contenedor está corriendo
+        run: |
+          sleep 10
+          docker ps --filter name=the-show-verse --format '{{.Names}}: {{.Status}}'
+          docker inspect -f '{{.State.Running}}' the-show-verse | grep -q true && \
+            echo "✅ Contenedor online" || \
+            (echo "❌ El contenedor no arrancó" && docker logs the-show-verse --tail 50 && exit 1)
+
+      - name: Limpiar imágenes antiguas
+        run: |
+          docker image prune -f || true
+          echo "✓ Limpieza completada"
