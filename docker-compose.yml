@@ -27,7 +27,7 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
       WATCH_NEXT_AI_PROVIDER: ${WATCH_NEXT_AI_PROVIDER:-ollama}
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 3
