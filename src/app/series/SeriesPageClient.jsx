@@ -102,6 +102,9 @@ const buildImg = (path, size = "original") =>
 
 const PREVIEW_BACKDROP_SIZE = "w780";
 
+const getPreviewBackdropFallback = (show) =>
+  show?.backdrop_path || show?.poster_path || null;
+
 const TV_GENRES = {
   10759: "Acción y aventura",
   16: "Animación",
@@ -673,14 +676,15 @@ function InlinePreviewCard({ show, heightClass }) {
         } else {
           try {
             const preferred = await fetchBestTVBackdrop(show.id);
-            const chosen = preferred || null;
+            const chosen = preferred || getPreviewBackdropFallback(show);
 
             tvBackdropCache.set(show.id, chosen);
 
             revealBackdrop(chosen);
           } catch {
-            tvBackdropCache.set(show.id, null);
-            revealBackdrop(null);
+            const fallback = getPreviewBackdropFallback(show);
+            tvBackdropCache.set(show.id, fallback);
+            revealBackdrop(fallback);
           }
         }
       }
@@ -886,7 +890,16 @@ function InlinePreviewCard({ show, heightClass }) {
             decoding="async"
             fetchPriority="high"
             onLoad={() => setBackdropReady(true)}
-            onError={() => setBackdropReady(false)}
+            onError={() => {
+              const fallback = getPreviewBackdropFallback(show);
+              if (fallback && fallback !== backdropPath) {
+                tvBackdropCache.set(show.id, fallback);
+                setBackdropPath(fallback);
+                setBackdropReady(false);
+                return;
+              }
+              setBackdropReady(false);
+            }}
           />
         )}
 
@@ -1103,9 +1116,11 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 
         if (backdropPath === undefined) {
           try {
-            backdropPath = (await fetchBestTVBackdrop(show.id)) || null;
+            backdropPath =
+              (await fetchBestTVBackdrop(show.id)) ||
+              getPreviewBackdropFallback(show);
           } catch {
-            backdropPath = null;
+            backdropPath = getPreviewBackdropFallback(show);
           }
           tvBackdropCache.set(show.id, backdropPath);
         }

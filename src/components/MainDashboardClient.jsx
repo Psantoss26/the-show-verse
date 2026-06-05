@@ -134,6 +134,17 @@ const buildImg = (path, size = "original") =>
 
 const PREVIEW_BACKDROP_SIZE = "w780";
 
+const getMediaTypeForItem = (item) =>
+  item?.media_type === "tv" || (item?.name && !item?.title) || item?.first_air_date
+    ? "tv"
+    : "movie";
+
+const getBackdropCacheKey = (item, mediaType = getMediaTypeForItem(item)) =>
+  `${mediaType}:${item?.id}`;
+
+const getPreviewBackdropFallback = (item) =>
+  item?.backdrop_path || item?.poster_path || null;
+
 const GENRES = {
   28: "Acción",
   12: "Aventura",
@@ -658,44 +669,33 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       };
 
       const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
+      const mediaType = getMediaTypeForItem(movie);
+      const backdropCacheKey = getBackdropCacheKey(movie, mediaType);
       if (userBackdrop) {
-        movieBackdropCache.set(movie.id, userBackdrop);
+        movieBackdropCache.set(backdropCacheKey, userBackdrop);
         revealBackdrop(userBackdrop);
       } else if (backdropOverride) {
-        movieBackdropCache.set(movie.id, backdropOverride);
+        movieBackdropCache.set(backdropCacheKey, backdropOverride);
         revealBackdrop(backdropOverride);
       } else {
-        const cachedBackdrop = movieBackdropCache.get(movie.id);
+        const cachedBackdrop = movieBackdropCache.get(backdropCacheKey);
         if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
           try {
-            const mediaType =
-              movie.media_type === "tv" ||
-              (movie.name && !movie.title) ||
-              movie.first_air_date
-                ? "tv"
-                : "movie";
             const preferred = await fetchBestBackdrop(movie.id, mediaType);
-            const chosen = preferred || null;
+            const chosen = preferred || getPreviewBackdropFallback(movie);
 
-            movieBackdropCache.set(movie.id, chosen);
+            movieBackdropCache.set(backdropCacheKey, chosen);
 
             revealBackdrop(chosen);
           } catch {
-            movieBackdropCache.set(movie.id, null);
-            revealBackdrop(null);
+            const fallback = getPreviewBackdropFallback(movie);
+            movieBackdropCache.set(backdropCacheKey, fallback);
+            revealBackdrop(fallback);
           }
         }
       }
-
-      // Detectar tipo de media
-      const mediaType =
-        movie.media_type === "tv" ||
-        (movie.name && !movie.title) ||
-        movie.first_air_date
-          ? "tv"
-          : "movie";
 
       const cachedExtras = movieExtrasCache.get(movie.id);
       if (cachedExtras) {
@@ -929,7 +929,16 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
             decoding="async"
             fetchPriority="high"
             onLoad={() => setBackdropReady(true)}
-            onError={() => setBackdropReady(false)}
+            onError={() => {
+              const fallback = getPreviewBackdropFallback(movie);
+              if (fallback && fallback !== backdropPath) {
+                movieBackdropCache.set(getBackdropCacheKey(movie), fallback);
+                setBackdropPath(fallback);
+                setBackdropReady(false);
+                return;
+              }
+              setBackdropReady(false);
+            }}
           />
         )}
 
@@ -1188,36 +1197,33 @@ function InlinePreviewCardAnticipated({
 
       // Backdrop (igual que tu preview normal)
       const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
+      const mediaTypeForBackdrop = getMediaTypeForItem(movie);
+      const backdropCacheKey = getBackdropCacheKey(movie, mediaTypeForBackdrop);
       if (userBackdrop) {
-        movieBackdropCache.set(movie.id, userBackdrop);
+        movieBackdropCache.set(backdropCacheKey, userBackdrop);
         revealBackdrop(userBackdrop);
       } else if (backdropOverride) {
-        movieBackdropCache.set(movie.id, backdropOverride);
+        movieBackdropCache.set(backdropCacheKey, backdropOverride);
         revealBackdrop(backdropOverride);
       } else {
-        const cachedBackdrop = movieBackdropCache.get(movie.id);
+        const cachedBackdrop = movieBackdropCache.get(backdropCacheKey);
         if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
           try {
-            const mediaTypeForBackdrop =
-              movie.media_type === "tv" ||
-              (movie.name && !movie.title) ||
-              movie.first_air_date
-                ? "tv"
-                : "movie";
             const preferred = await fetchBestBackdrop(
               movie.id,
               mediaTypeForBackdrop,
             );
-            const chosen = preferred || null;
+            const chosen = preferred || getPreviewBackdropFallback(movie);
 
-            movieBackdropCache.set(movie.id, chosen);
+            movieBackdropCache.set(backdropCacheKey, chosen);
 
             revealBackdrop(chosen);
           } catch {
-            movieBackdropCache.set(movie.id, null);
-            revealBackdrop(null);
+            const fallback = getPreviewBackdropFallback(movie);
+            movieBackdropCache.set(backdropCacheKey, fallback);
+            revealBackdrop(fallback);
           }
         }
       }
@@ -1419,7 +1425,16 @@ function InlinePreviewCardAnticipated({
             decoding="async"
             fetchPriority="high"
             onLoad={() => setBackdropReady(true)}
-            onError={() => setBackdropReady(false)}
+            onError={() => {
+              const fallback = getPreviewBackdropFallback(movie);
+              if (fallback && fallback !== backdropPath) {
+                movieBackdropCache.set(getBackdropCacheKey(movie), fallback);
+                setBackdropPath(fallback);
+                setBackdropReady(false);
+                return;
+              }
+              setBackdropReady(false);
+            }}
           />
         )}
 
@@ -1820,22 +1835,20 @@ function Row({
 
       for (const movie of toPreload) {
         const backdropOverride = backdropOverrides?.[movie.id];
-        let backdropPath = backdropOverride || movieBackdropCache.get(movie.id);
+        const mediaType = getMediaTypeForItem(movie);
+        const backdropCacheKey = getBackdropCacheKey(movie, mediaType);
+        let backdropPath =
+          backdropOverride || movieBackdropCache.get(backdropCacheKey);
 
         if (backdropPath === undefined) {
           try {
-            const mediaType =
-              movie.media_type === "tv" ||
-              (movie.name && !movie.title) ||
-              movie.first_air_date
-                ? "tv"
-                : "movie";
             backdropPath =
-              (await fetchBestBackdrop(movie.id, mediaType)) || null;
+              (await fetchBestBackdrop(movie.id, mediaType)) ||
+              getPreviewBackdropFallback(movie);
           } catch {
-            backdropPath = null;
+            backdropPath = getPreviewBackdropFallback(movie);
           }
-          movieBackdropCache.set(movie.id, backdropPath);
+          movieBackdropCache.set(backdropCacheKey, backdropPath);
         }
 
         if (backdropPath) {
