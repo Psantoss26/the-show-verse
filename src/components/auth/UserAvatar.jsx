@@ -2,35 +2,40 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useAuth } from '@/context/AuthContext'
 
-export default function UserAvatar({ account }) {
-  const { session } = useAuth()
+
+export default function UserAvatar() {
   const [traktAvatarUrl, setTraktAvatarUrl] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
     async function loadTraktAvatar() {
       try {
         const res = await fetch('/api/trakt/profile?userOnly=1', { cache: 'no-store' })
-        if (!res.ok) return
+        if (!res.ok) {
+          if (!cancelled) setLoading(false)
+          return
+        }
         const data = await res.json()
         const url = data?.user?.avatarUrl
-        if (url && !cancelled) setTraktAvatarUrl(url)
+        if (!cancelled) {
+          if (url) setTraktAvatarUrl(url)
+          setLoading(false)
+        }
       } catch {
-        // Trakt no conectado — no pasa nada, usamos fallback
+        if (!cancelled) setLoading(false)
       }
     }
     loadTraktAvatar()
     return () => { cancelled = true }
-  }, [session])
+  }, [])
 
-  // Fallback: avatar TMDb si Trakt no tiene imagen
-  const tmdbAvatarUrl = account?.avatar?.tmdb?.avatar_path
-    ? `https://image.tmdb.org/t/p/w64_and_h64_face${account.avatar.tmdb.avatar_path}`
-    : '/default-avatar.png'
+  if (loading) {
+    return <div className="w-10 h-10 rounded-full bg-neutral-800/80 animate-pulse flex-shrink-0" />
+  }
 
-  const avatarSrc = traktAvatarUrl || tmdbAvatarUrl
+  const avatarSrc = traktAvatarUrl || '/default-avatar.png'
 
   return (
     <Link
@@ -41,7 +46,7 @@ export default function UserAvatar({ account }) {
       <div className="w-9 h-9 rounded-full overflow-hidden">
         <img
           src={avatarSrc}
-          alt={account?.username || 'Usuario'}
+          alt="Usuario"
           className="w-full h-full object-cover"
         />
       </div>
