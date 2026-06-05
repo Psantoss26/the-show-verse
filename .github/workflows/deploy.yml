@@ -9,11 +9,20 @@ jobs:
   deploy:
     # Corre en el runner self-hosted que vive en el NAS
     runs-on: [self-hosted, nas-showverse]
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout código
+      - name: Checkout código (rama main, último commit)
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1   # solo el último commit, más rápido
+
+      - name: Mostrar commit desplegado
+        run: |
+          echo "📦 Commit: $(git rev-parse --short HEAD)"
+          echo "📝 Mensaje: $(git log -1 --pretty=%s)"
+          echo "🕐 Fecha: $(git log -1 --pretty=%ci)"
 
       - name: Sincronizar archivos al directorio de la app
         run: |
@@ -25,20 +34,42 @@ jobs:
             --exclude='.env*' \
             --exclude='*.log' \
             "$GITHUB_WORKSPACE/" /nas-deploy/app/
-          echo "✓ Archivos sincronizados"
+          echo "✓ Archivos sincronizados desde: $(git rev-parse --short HEAD)"
 
-      - name: Build imagen Docker
+      - name: Build imagen Docker desde el código actualizado
         run: |
-          docker compose -f /nas-deploy/docker-compose.yml \
-            --project-name the-show-verse build \
-            --build-arg NEXT_PUBLIC_APP_URL=https://theshowverse.com \
-            --build-arg NEXT_PUBLIC_TMDB_API_KEY=934b1e031967a214521ca1a5426baa2b \
-            --build-arg NEXT_PUBLIC_TRAKT_CLIENT_ID=ea0db95eaadde224ab6e87c24ace932cdb0e8ffd9d7882ccc995a47584caaafe \
-            2>&1
-          echo "✓ Build completado"
+          docker build \
+            --no-cache \
+            --build-arg NEXT_PUBLIC_APP_URL="${{ secrets.NEXT_PUBLIC_APP_URL || 'https://theshowverse.com' }}" \
+            --build-arg NEXT_PUBLIC_TMDB_API_KEY=${{ secrets.NEXT_PUBLIC_TMDB_API_KEY }} \
+            --build-arg NEXT_PUBLIC_TRAKT_CLIENT_ID=${{ secrets.NEXT_PUBLIC_TRAKT_CLIENT_ID }} \
+            -t the-show-verse:latest \
+            -t the-show-verse:$(git rev-parse --short HEAD) \
+            /nas-deploy/app/
+          echo "✓ Build completado: the-show-verse:$(git rev-parse --short HEAD)"
 
-      - name: Reiniciar contenedor
+      - name: Reiniciar contenedor con la nueva imagen
         run: |
+          # Detener y eliminar el contenedor anterior
+          docker stop the-show-verse 2>/dev/null || true
+          docker rm   the-show-verse 2>/dev/null || true
+
+          # Levantar con docker compose usando la imagen recién construida
+          # El compose file referencia la imagen local 'the-show-verse:latest'
           docker compose -f /nas-deploy/docker-compose.yml \
             --project-name the-show-verse up -d app
           echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"
+
+      - name: Verificar que el contenedor está corriendo
+        run: |
+          sleep 10
+          docker ps --filter name=the-show-verse --format '{{.Names}}: {{.Status}}'
+          # Falla el step si el contenedor no está UP
+          docker inspect -f '{{.State.Running}}' the-show-verse | grep -q true && \
+            echo "✅ Contenedor online" || \
+            (echo "❌ El contenedor no arrancó" && docker logs the-show-verse --tail 50 && exit 1)
+
+      - name: Limpiar imágenes antiguas (liberar espacio NAS)
+        run: |
+          docker image prune -f --filter "label!=keep" || true
+          echo "✓ Limpieza completada"
