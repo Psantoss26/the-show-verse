@@ -32,6 +32,8 @@ import {
   LayoutGrid,
   Layers3,
   MoreHorizontal,
+  RotateCcw,
+  LogOut,
 } from "lucide-react";
 
 // ================== UTILS & CACHE ==================
@@ -2426,19 +2428,60 @@ export default function WatchlistClient() {
 
   if (!session || !account) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <div className="text-center">
-          <Bookmark className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Inicia sesión</h2>
-          <p className="text-zinc-500 mb-6">
-            Necesitas iniciar sesión para ver tu lista
-          </p>
-          <Link
-            href="/login"
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition"
+      <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-blue-500/30 pb-20">
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-[150px]" />
+        </div>
+
+        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+          <motion.header
+            className="mb-8"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            Iniciar sesión
-          </Link>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-px w-12 bg-blue-500" />
+              <span className="text-blue-400 font-bold uppercase tracking-widest text-xs">
+                POR VER
+              </span>
+            </div>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+              Pendientes<span className="text-blue-500">.</span>
+            </h1>
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
+              Títulos guardados para ver más tarde.
+            </p>
+          </motion.header>
+
+          <div className="flex items-center justify-center py-12 lg:py-24">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
+            >
+              <div className="mb-6">
+                <img
+                  src="/logo-TMDb.png"
+                  alt="TMDb Logo"
+                  className="w-24 h-24 object-contain shadow-lg shadow-blue-500/20 rounded-2xl"
+                />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">
+                Conecta tu cuenta de TMDb
+              </h2>
+              <p className="text-zinc-400 max-w-sm mb-8 text-sm">
+                Conecta tu cuenta de TMDb para ver y gestionar tu lista de títulos pendientes sincronizada.
+              </p>
+              <Link
+                href="/login?next=/watchlist"
+                className="px-8 py-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold rounded-xl hover:from-blue-400 hover:to-blue-500 transition shadow-lg shadow-blue-500/20"
+              >
+                Conectar ahora
+              </Link>
+            </motion.div>
+          </div>
         </div>
       </div>
     );
@@ -2467,9 +2510,51 @@ export default function WatchlistClient() {
                   POR VER
                 </span>
               </div>
-              <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                Pendientes<span className="text-blue-500">.</span>
-              </h1>
+              <div className="flex items-center gap-6">
+                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+                  Pendientes<span className="text-blue-500">.</span>
+                </h1>
+
+                {/* Action buttons next to title */}
+                <div className="flex items-center gap-2">
+                  <motion.button
+                    onClick={() => window.location.reload()}
+                    disabled={loading}
+                    className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4, delay: 0.3 }}
+                    whileHover={{ scale: loading ? 1 : 1.05 }}
+                    whileTap={{ scale: loading ? 1 : 0.95 }}
+                    title="Sincronizar lista"
+                  >
+                    <RotateCcw
+                      className={`w-5 h-5 text-white ${loading ? "animate-spin" : ""}`}
+                    />
+                  </motion.button>
+
+                  <motion.button
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.localStorage.removeItem("tmdb_session");
+                        window.localStorage.removeItem("tmdb_account");
+                        document.cookie = "tmdb_session_id=; path=/; max-age=0";
+                        window.location.href = "/";
+                      }
+                    }}
+                    disabled={loading}
+                    className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4, delay: 0.4 }}
+                    whileHover={{ scale: loading ? 1 : 1.05 }}
+                    whileTap={{ scale: loading ? 1 : 0.95 }}
+                    title="Desconectar cuenta TMDb"
+                  >
+                    <LogOut className="w-5 h-5 text-red-400" />
+                  </motion.button>
+                </div>
+              </div>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
                 Títulos guardados para ver más tarde.
               </p>

@@ -104,26 +104,47 @@ function Skeleton() {
 }
 
 export default function ProfileClient() {
+  // Phase 1: user info only (fast — 1 API call)
+  const [user, setUser] = useState(null);
+  // Phase 2: full data
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [notConnected, setNotConnected] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let ignore = false;
-    (async () => {
+
+    async function loadProfile() {
+      // ── Phase 1: fetch user only (~1 Trakt call, very fast) ──────────
+      try {
+        const res = await fetch("/api/trakt/profile?userOnly=1", { cache: "no-store" });
+        if (res.status === 401) { if (!ignore) setNotConnected(true); return; }
+        if (res.ok) {
+          const j = await res.json();
+          if (!ignore) setUser(j?.user ?? null);
+        }
+      } catch { /* skip — phase 2 will set error if needed */ }
+
+      // ── Phase 2: fetch full profile in background ─────────────────────
       try {
         const res = await fetch("/api/trakt/profile", { cache: "no-store" });
         if (res.status === 401) { if (!ignore) setNotConnected(true); return; }
-        if (res.ok) { const j = await res.json(); if (!ignore) setData(j); }
-        else { const j = await res.json().catch(() => ({})); if (!ignore) setError(j?.error || "Error"); }
+        if (res.ok) {
+          const j = await res.json();
+          if (!ignore) { setData(j); setUser(j?.user ?? null); }
+        } else {
+          const j = await res.json().catch(() => ({}));
+          if (!ignore) setError(j?.error || "Error");
+        }
       } catch { if (!ignore) setError("Error de red"); }
-      finally { if (!ignore) setLoading(false); }
-    })();
+    }
+
+    loadProfile();
     return () => { ignore = true; };
   }, []);
 
-  if (loading) return <Skeleton />;
+  // Show skeleton only before ANY data (user or full) is available
+  const loading = !user && !notConnected && !error;
   if (notConnected) return <NotConnected />;
 
   const { user = {}, stats, recentHistory = [], recentRatings = [], watchlist = [], topMovies = [], topShows = [], topActors = [], topDirectors = [], collectionCount = 0 } = data || {};
