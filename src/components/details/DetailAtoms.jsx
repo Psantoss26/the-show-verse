@@ -117,7 +117,7 @@ export function ScoreBadge({
           <img
             src={logo}
             alt={alt || label}
-            className="h-4 w-auto opacity-90"
+            className="h-3 w-auto opacity-90"
           />
         ) : null}
 
