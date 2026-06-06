@@ -1,14 +1,28 @@
 export async function fetchImdbRatingByImdb(imdbId, init = {}) {
   if (!imdbId) return null;
 
+  const { timeoutMs = 1200, signal, ...fetchInit } = init;
+  const controller = new AbortController();
+  const timeoutId =
+    typeof window !== "undefined" && timeoutMs > 0
+      ? window.setTimeout(() => controller.abort(), timeoutMs)
+      : setTimeout(() => controller.abort(), timeoutMs);
+
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+
   try {
     const res = await fetch(
       `/api/imdb/ratings?i=${encodeURIComponent(imdbId)}`,
       {
         cache: "force-cache",
-        ...init,
+        ...fetchInit,
+        signal: controller.signal,
       },
     );
+    clearTimeout(timeoutId);
     if (!res.ok) return null;
 
     const json = await res.json();
@@ -25,6 +39,8 @@ export async function fetchImdbRatingByImdb(imdbId, init = {}) {
     };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
