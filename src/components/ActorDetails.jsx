@@ -40,6 +40,7 @@ import {
   ChevronDown,
   Calendar,
   Youtube,
+  Music2,
 } from "lucide-react";
 import {
   AnimatedSection,
@@ -1867,6 +1868,9 @@ export default function ActorDetails({
   const socials = useMemo(() => {
     const ex = externalIds || {};
     const imdb = actorDetails?.imdb_id || ex?.imdb_id;
+    const tiktokId = ex?.tiktok_id
+      ? String(ex.tiktok_id).replace(/^@/, "")
+      : "";
     const youtubeId = ex?.youtube_id
       ? String(ex.youtube_id).replace(/^\//, "")
       : "";
@@ -1889,6 +1893,7 @@ export default function ActorDetails({
           youtubeId.startsWith("@") ? youtubeId : `channel/${youtubeId}`
         }`
       ) : null,
+      tiktok: tiktokId ? `https://www.tiktok.com/@${tiktokId}` : null,
     };
   }, [externalIds, actorDetails, tmdbUrl]);
 
@@ -1908,9 +1913,9 @@ export default function ActorDetails({
             label: "IMDb",
             icon: "/logo-IMDb.svg",
             href: socials.imdb,
-            iconSize: { width: 48, height: 25 },
+            iconSize: { width: 42, height: 22 },
             iconClassName:
-              "!w-[48px] !h-[25px] lg:!w-[50px] lg:!h-[26px] rounded-md shadow-lg object-contain",
+              "!w-[42px] !h-[22px] lg:!w-[44px] lg:!h-[22px] rounded-md shadow-lg object-contain",
           }
         : null,
       socials.wikipedia
@@ -1919,8 +1924,8 @@ export default function ActorDetails({
             label: "Wikipedia",
             icon: "/wikipedia.png",
             href: socials.wikipedia,
-            iconSize: { width: 28, height: 28 },
-            iconClassName: "!h-7 !w-7 rounded-md object-contain",
+            iconSize: { width: 24, height: 24 },
+            iconClassName: "!h-6 !w-6 rounded-md object-contain",
             menuIconClassName: "h-4 w-4 rounded-sm object-contain",
           }
         : null,
@@ -1930,8 +1935,8 @@ export default function ActorDetails({
             label: "Instagram",
             icon: "/instagram.png",
             href: socials.instagram,
-            iconSize: { width: 28, height: 28 },
-            iconClassName: "!h-7 !w-7 rounded-md object-contain",
+            iconSize: { width: 24, height: 24 },
+            iconClassName: "!h-6 !w-6 rounded-md object-contain",
             menuIconClassName: "h-4 w-4 rounded-sm object-contain",
           }
         : null,
@@ -1941,8 +1946,8 @@ export default function ActorDetails({
             label: "X",
             icon: "/x.png",
             href: socials.twitter,
-            iconSize: { width: 28, height: 28 },
-            iconClassName: "!h-7 !w-7 rounded-md object-contain",
+            iconSize: { width: 24, height: 24 },
+            iconClassName: "!h-6 !w-6 rounded-md object-contain",
             menuIconClassName: "h-4 w-4 rounded-sm object-contain",
           }
         : null,
@@ -1952,8 +1957,8 @@ export default function ActorDetails({
             label: "Facebook",
             icon: "/facebook.png",
             href: socials.facebook,
-            iconSize: { width: 28, height: 28 },
-            iconClassName: "!h-7 !w-7 rounded-md object-contain",
+            iconSize: { width: 24, height: 24 },
+            iconClassName: "!h-6 !w-6 rounded-md object-contain",
             menuIconClassName: "h-4 w-4 rounded-sm object-contain",
           }
         : null,
@@ -1965,16 +1970,24 @@ export default function ActorDetails({
             href: socials.youtube,
           }
         : null,
+      socials.tiktok
+        ? {
+            id: "tiktok",
+            label: "TikTok",
+            iconComponent: Music2,
+            href: socials.tiktok,
+          }
+        : null,
       socials.tmdb
         ? {
             id: "tmdb",
             label: "TMDb",
             icon: "/logo-TMDb.png",
             href: socials.tmdb,
-            iconSize: { width: 50, height: 24 },
+            size: 38,
+            iconSize: { width: 34, height: 34 },
             iconClassName:
-              "!w-[50px] !h-6 lg:!w-[52px] lg:!h-[25px] rounded-none shadow-none object-contain",
-            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
+              "!w-[34px] !h-[34px] lg:!w-[36px] lg:!h-[36px] rounded-lg shadow-none object-contain",
           }
         : null,
     ].filter(Boolean);
