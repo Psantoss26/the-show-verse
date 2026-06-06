@@ -11,6 +11,7 @@ import {
   Star as StarIcon,
 } from "lucide-react";
 import { formatVoteCount } from "@/lib/details/formatters";
+import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
 function CompactBadge({
   logo,
@@ -252,7 +253,7 @@ export default function ScoreboardBar({
       setUserRating(val);
 
       try {
-        const r = await fetch("/api/trakt/ratings", {
+        const r = await offlineMutationFetch("/api/trakt/ratings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           cache: "no-store",
@@ -261,6 +262,9 @@ export default function ScoreboardBar({
             ids: { trakt: traktIdForUserRating },
             rating: val,
           }),
+        }, {
+          label: val == null ? "Quitar valoracion" : "Guardar valoracion",
+          dedupeKey: `trakt:scoreboard-rating:${traktParams.type}:${traktIdForUserRating}`,
         });
 
         if (r.status === 401) {

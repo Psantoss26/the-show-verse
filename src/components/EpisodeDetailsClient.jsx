@@ -20,6 +20,7 @@ import {
   Play as PlayIcon,
   List as ListIcon,
 } from "lucide-react";
+import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
 import { SectionTitle, VisualMetaCard } from "@/components/details/DetailAtoms";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
@@ -597,7 +598,7 @@ export default function EpisodeDetailsClient({
         const next = val == null || Number(val) <= 0 ? null : Number(val);
 
         setRatingLoading(true);
-        const res = await fetch("/api/trakt/ratings", {
+        const res = await offlineMutationFetch("/api/trakt/ratings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -607,6 +608,9 @@ export default function EpisodeDetailsClient({
             episode: Number(episodeNumber),
             rating: next, // null => remove
           }),
+        }, {
+          label: next == null ? "Quitar valoracion de episodio" : "Guardar valoracion de episodio",
+          dedupeKey: `trakt:episode-rating:${showId}:${seasonNumber}:${episodeNumber}`,
         });
 
         if (res.status === 401) {

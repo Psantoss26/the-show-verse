@@ -1119,25 +1119,26 @@ function AwardCard({ item }) {
           <div className="absolute inset-x-5 top-12 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
           <div className="absolute inset-x-8 bottom-5 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
-          {item?.groupImageUrl && (
-            <div className="absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/45 p-1 backdrop-blur-md sm:right-3 sm:bottom-3 sm:h-10 sm:w-10 sm:rounded-lg sm:p-1.5">
-              <img
-                src={item.groupImageUrl}
-                alt=""
-                className="h-full w-full object-contain"
-                loading="lazy"
-                decoding="async"
-              />
-            </div>
-          )}
-
-          <div className="absolute inset-x-2 bottom-8 text-center sm:inset-x-4 sm:bottom-14">
+          <div className="absolute inset-x-0 inset-y-0 flex flex-col items-center justify-center px-3 pt-8 text-center sm:px-4 sm:pt-10">
             <div
-              className={`text-base font-black tracking-[0.14em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] sm:text-2xl sm:tracking-[0.18em] ${visual.accent}`}
+              className={`max-w-[82%] rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-black uppercase leading-none tracking-[0.16em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] line-clamp-1 backdrop-blur-sm sm:text-[11px] ${visual.accent}`}
             >
               {visual.label}
             </div>
-            <div className="mt-1 hidden text-[9px] font-bold uppercase tracking-[0.18em] text-white/55 line-clamp-1 sm:block">
+
+            {item?.groupImageUrl && (
+              <div className="mt-3 flex h-16 w-16 items-center justify-center rounded-xl border border-white/10 bg-black/55 p-2 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md sm:mt-4 sm:h-[4.5rem] sm:w-[4.5rem] sm:p-2.5">
+                <img
+                  src={item.groupImageUrl}
+                  alt=""
+                  className="h-full w-full object-contain"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+            )}
+
+            <div className="mt-3 hidden max-w-[86%] text-[8px] font-bold uppercase leading-snug tracking-[0.14em] text-white/55 line-clamp-2 sm:block">
               {groupLabel}
             </div>
           </div>

@@ -1,4 +1,6 @@
 // /src/lib/api/traktClient.js
+import { offlineMutationFetch } from "@/lib/offline/syncQueue";
+
 async function safeJson(res) {
   try {
     return await res.json();
@@ -230,10 +232,13 @@ export async function traktSetWatched({ type, tmdbId, watched, watchedAt }) {
   const payload = { type, tmdbId, watched };
   if (watchedAtYmd) payload.watchedAt = watchedAtYmd;
 
-  const res = await fetch("/api/trakt/item/watched", {
+  const res = await offlineMutationFetch("/api/trakt/item/watched", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  }, {
+    label: watched ? "Marcar visto" : "Quitar visto",
+    dedupeKey: `trakt:watched:${type}:${tmdbId}`,
   });
 
   const json = await safeJson(res);
@@ -257,10 +262,16 @@ export async function traktHistoryOp({
   const watchedAtYmd = normalizeWatchedAtForApi(watchedAt);
   if (watchedAtYmd) payload.watchedAt = watchedAtYmd;
 
-  const res = await fetch("/api/trakt/item/history", {
+  const res = await offlineMutationFetch("/api/trakt/item/history", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  }, {
+    label: "Actualizar historial",
+    dedupeKey:
+      op === "remove" && historyId != null
+        ? `trakt:history:remove:${historyId}`
+        : `trakt:history:${op}:${type || "item"}:${tmdbId || "unknown"}:${watchedAtYmd || historyId || Date.now()}`,
   });
 
   const json = await safeJson(res);
@@ -395,10 +406,13 @@ export async function traktSetEpisodeWatched({
   const payload = { tmdbId, season, episode, watched };
   if (watchedAtYmd) payload.watchedAt = watchedAtYmd;
 
-  const res = await fetch("/api/trakt/episode/watched", {
+  const res = await offlineMutationFetch("/api/trakt/episode/watched", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  }, {
+    label: watched ? "Marcar episodio visto" : "Quitar episodio visto",
+    dedupeKey: `trakt:episode:${tmdbId}:${season}:${episode}`,
   });
 
   const json = await safeJson(res);
@@ -418,10 +432,13 @@ export async function traktSetSeasonWatched({
   const payload = { tmdbId, season, watched };
   if (watchedAtYmd) payload.watchedAt = watchedAtYmd;
 
-  const res = await fetch("/api/trakt/season/watched", {
+  const res = await offlineMutationFetch("/api/trakt/season/watched", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  }, {
+    label: watched ? "Marcar temporada vista" : "Quitar temporada vista",
+    dedupeKey: `trakt:season:${tmdbId}:${season}`,
   });
 
   const json = await safeJson(res);
@@ -557,10 +574,13 @@ export async function traktSetRating({
   // ✅ opcional: si tu backend aceptara traktId directo
   if (ids?.trakt != null) body.traktId = Number(ids.trakt);
 
-  const res = await fetch("/api/trakt/ratings", {
+  const res = await offlineMutationFetch("/api/trakt/ratings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  }, {
+    label: rating == null ? "Quitar valoracion" : "Guardar valoracion",
+    dedupeKey: `trakt:rating:${type}:${body.tmdbId || body.traktId || ids?.trakt || "unknown"}:${season || ""}:${episode || ""}`,
   });
 
   const json = await res.json().catch(() => ({}));
@@ -574,10 +594,13 @@ export async function traktSetRating({
 }
 
 export async function traktRemoveRating({ type, ids }) {
-  const res = await fetch("/api/trakt/ratings", {
+  const res = await offlineMutationFetch("/api/trakt/ratings", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type, ids }),
+  }, {
+    label: "Quitar valoracion",
+    dedupeKey: `trakt:rating:remove:${type}:${ids?.tmdb || ids?.trakt || "unknown"}`,
   });
 
   const data = await res.json().catch(() => ({}));

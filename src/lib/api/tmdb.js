@@ -1,4 +1,6 @@
 // /lib/api/tmdb.js
+import { offlineMutationFetch } from "@/lib/offline/syncQueue";
+
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
 const IS_SERVER = typeof window === "undefined";
@@ -504,7 +506,7 @@ export async function markAsFavorite({
   favorite,
 }) {
   // Route through our Next.js API so Trakt sync happens server-side
-  const res = await fetch('/api/tmdb/account/favorite', {
+  const res = await offlineMutationFetch('/api/tmdb/account/favorite', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -512,6 +514,9 @@ export async function markAsFavorite({
       mediaId,
       favorite,
     }),
+  }, {
+    label: favorite ? 'Añadir favorito' : 'Quitar favorito',
+    dedupeKey: `tmdb:favorite:${type}:${mediaId}`,
   });
   const data = await res.json();
   if (!res.ok) {
@@ -531,7 +536,7 @@ export async function markInWatchlist({
   watchlist,
 }) {
   // Route through our Next.js API so Trakt sync happens server-side
-  const res = await fetch('/api/tmdb/account/watchlist', {
+  const res = await offlineMutationFetch('/api/tmdb/account/watchlist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -539,6 +544,9 @@ export async function markInWatchlist({
       mediaId,
       watchlist,
     }),
+  }, {
+    label: watchlist ? 'Añadir pendiente' : 'Quitar pendiente',
+    dedupeKey: `tmdb:watchlist:${type}:${mediaId}`,
   });
   const data = await res.json();
   if (!res.ok) {
