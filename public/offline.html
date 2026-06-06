@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>The Show Verse offline</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+        margin: 0;
+        background: #000;
+        color: #fff;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        padding: 28px;
+      }
+
+      main {
+        width: min(460px, 100%);
+        text-align: center;
+      }
+
+      img {
+        width: min(300px, 78vw);
+        height: auto;
+        filter: drop-shadow(0 0 36px rgba(212, 175, 55, 0.22));
+      }
+
+      h1 {
+        margin: 28px 0 10px;
+        font-size: clamp(1.35rem, 6vw, 2rem);
+        line-height: 1.05;
+      }
+
+      p {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.68);
+        font-size: 0.98rem;
+        line-height: 1.55;
+      }
+
+      nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 26px;
+      }
+
+      a,
+      button {
+        min-height: 46px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.07);
+        color: #fff;
+        font: inherit;
+        font-weight: 800;
+        text-decoration: none;
+        display: grid;
+        place-items: center;
+      }
+
+      button {
+        grid-column: 1 / -1;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/logo-final-titulo-sinFondo.png" alt="The Show Verse" />
+      <h1>Modo offline</h1>
+      <p>
+        El servidor principal no responde. Puedes abrir secciones que ya se
+        hayan guardado en este dispositivo; los cambios pendientes se
+        sincronizaran cuando vuelva la conexion.
+      </p>
+      <nav aria-label="Secciones offline">
+        <a href="/">Inicio</a>
+        <a href="/calendar">Calendario</a>
+        <a href="/favorites">Favoritas</a>
+        <a href="/watchlist">Pendientes</a>
+        <button type="button" onclick="location.reload()">Reintentar conexion</button>
+      </nav>
+    </main>
+  </body>
+</html>

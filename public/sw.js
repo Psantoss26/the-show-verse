@@ -1,11 +1,13 @@
-const VERSION = "showverse-v2";
+const VERSION = "showverse-v3";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const API_CACHE = `${VERSION}-api`;
 const IMAGE_CACHE = `${VERSION}-images`;
+const OFFLINE_FALLBACK_URL = "/offline.html";
 
 const APP_SHELL = [
   "/",
+  OFFLINE_FALLBACK_URL,
   "/site.webmanifest",
   "/icon.png",
   "/apple-icon.png",
@@ -44,17 +46,55 @@ async function trimCache(cacheName, maxEntries) {
   await Promise.all(keys.slice(0, keys.length - maxEntries).map((key) => cache.delete(key)));
 }
 
+async function isMaintenanceResponse(response) {
+  if (!response) return true;
+  if (response.status >= 500) return true;
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("text/html")) return false;
+
+  try {
+    const text = await response.clone().text();
+    return (
+      text.includes("Servidor en mantenimiento") ||
+      text.includes("theshowverse-maintenance")
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function getUsableCachedNavigation(request) {
+  const cache = await caches.open(PAGE_CACHE);
+  const staticCache = await caches.open(STATIC_CACHE);
+  const candidates = [
+    await cache.match(request),
+    await cache.match("/"),
+    await staticCache.match(OFFLINE_FALLBACK_URL),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && !(await isMaintenanceResponse(candidate))) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 async function networkFirst(request) {
   const cache = await caches.open(PAGE_CACHE);
   try {
     const response = await fetch(request);
+    if (await isMaintenanceResponse(response)) {
+      throw new Error("maintenance-response");
+    }
     if (response.ok) cache.put(request, response.clone());
     await trimCache(PAGE_CACHE, 30);
     return response;
   } catch {
     return (
-      (await cache.match(request)) ||
-      (await caches.match("/")) ||
+      (await getUsableCachedNavigation(request)) ||
       new Response("The Show Verse esta disponible offline cuando ya has visitado esta pantalla.", {
         status: 503,
         headers: { "Content-Type": "text/plain; charset=utf-8" },
