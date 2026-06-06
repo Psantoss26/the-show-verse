@@ -324,10 +324,43 @@ export default function Navbar() {
     return `${base} ${ringBase} ${toneClass} ${t.focus}`;
   };
 
-  const navLinkClassMobileBottom = (href) =>
-    `flex-1 flex items-center justify-center px-2 transition-colors ${
-      isActive(href) ? "text-blue-400" : "text-neutral-400 hover:text-white"
-    }`;
+  const navLinkClassMobileBottom = (href, tone = "blue") => {
+    const active = isActive(href);
+
+    const tones = {
+      red: {
+        hover:
+          "hover:text-red-300 hover:bg-red-500/10 hover:ring-red-500/30 hover:shadow-[0_0_18px_rgba(239,68,68,0.16)]",
+        active:
+          "text-red-200 bg-red-500/15 ring-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.20)]",
+        focus: "focus-visible:ring-2 focus-visible:ring-red-500/30",
+      },
+      blue: {
+        hover:
+          "hover:text-sky-300 hover:bg-sky-500/10 hover:ring-sky-500/30 hover:shadow-[0_0_18px_rgba(14,165,233,0.16)]",
+        active:
+          "text-sky-200 bg-sky-500/15 ring-sky-500/35 shadow-[0_0_18px_rgba(14,165,233,0.20)]",
+        focus: "focus-visible:ring-2 focus-visible:ring-sky-500/30",
+      },
+      purple: {
+        hover:
+          "hover:text-fuchsia-300 hover:bg-fuchsia-500/10 hover:ring-fuchsia-500/30 hover:shadow-[0_0_18px_rgba(217,70,239,0.16)]",
+        active:
+          "text-fuchsia-200 bg-fuchsia-500/15 ring-fuchsia-500/35 shadow-[0_0_18px_rgba(217,70,239,0.20)]",
+        focus: "focus-visible:ring-2 focus-visible:ring-fuchsia-500/30",
+      },
+    };
+
+    const t = tones[tone] || tones.blue;
+    const toneClass = active ? t.active : t.hover;
+
+    return (
+      "group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-2xl " +
+      "text-neutral-400 ring-1 ring-transparent transition-all duration-200 " +
+      "hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 focus:outline-none " +
+      `${toneClass} ${t.focus}`
+    );
+  };
 
   // Menú inferior fijo: 6 iconos. Si no hay sesión, fav/watchlist llevan a login.
   const favHref = hydrated && account ? "/favorites" : "/login";
@@ -510,27 +543,36 @@ export default function Navbar() {
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
       <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black/95 backdrop-blur-md border-t border-neutral-800 flex items-center">
-        <Link href="/movies" className={navLinkClassMobileBottom("/movies")}>
+        <Link
+          href="/movies"
+          className={navLinkClassMobileBottom("/movies", "blue")}
+        >
           <FilmIcon className="w-6 h-6" />
         </Link>
 
-        <Link href="/series" className={navLinkClassMobileBottom("/series")}>
+        <Link
+          href="/series"
+          className={navLinkClassMobileBottom("/series", "purple")}
+        >
           <TvIcon className="w-6 h-6" />
         </Link>
 
         <TraktHistoryNavButton
-          className="flex-1 flex items-center justify-center"
+          className="mx-1 my-2 flex h-12 flex-1 items-center justify-center"
           variant="icon"
           iconSize={24}
         />
 
-        <Link href={favHref} className={navLinkClassMobileBottom("/favorites")}>
+        <Link
+          href={favHref}
+          className={navLinkClassMobileBottom("/favorites", "red")}
+        >
           <Heart className="w-6 h-6" />
         </Link>
 
         <Link
           href={watchHref}
-          className={navLinkClassMobileBottom("/watchlist")}
+          className={navLinkClassMobileBottom("/watchlist", "blue")}
         >
           <Bookmark className="w-6 h-6" />
         </Link>

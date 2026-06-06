@@ -1,4 +1,4 @@
-const VERSION = "showverse-v1";
+const VERSION = "showverse-v2";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const API_CACHE = `${VERSION}-api`;

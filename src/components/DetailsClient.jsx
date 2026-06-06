@@ -1138,7 +1138,7 @@ function AwardCard({ item }) {
               </div>
             )}
 
-            <div className="mt-3 hidden max-w-[86%] text-[8px] font-bold uppercase leading-snug tracking-[0.14em] text-white/55 line-clamp-2 sm:block">
+            <div className="mt-3 hidden max-w-[88%] text-[9px] font-extrabold uppercase leading-snug tracking-[0.11em] text-white/75 drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] line-clamp-2 sm:block">
               {groupLabel}
             </div>
           </div>
