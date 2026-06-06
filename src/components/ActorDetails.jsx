@@ -39,13 +39,8 @@ import {
   ArrowUpDown,
   ChevronDown,
   Calendar,
-  Instagram,
   Youtube,
-  Facebook,
-  Twitter,
   Music2,
-  Database,
-  LinkIcon,
 } from "lucide-react";
 import {
   AnimatedSection,
@@ -1883,8 +1878,8 @@ export default function ActorDetails({
       homepage: actorDetails?.homepage,
       imdb: imdb ? `https://www.imdb.com/name/${imdb}` : null,
       tmdb: tmdbUrl,
-      wikidata: ex?.wikidata_id
-        ? `https://www.wikidata.org/wiki/${ex.wikidata_id}`
+      wikipedia: ex?.wikidata_id
+        ? `https://es.wikipedia.org/wiki/Special:EntityPage/${ex.wikidata_id}`
         : null,
       instagram: ex?.instagram_id
         ? `https://www.instagram.com/${ex.instagram_id}`
@@ -1899,11 +1894,6 @@ export default function ActorDetails({
         }`
       ) : null,
       tiktok: tiktokId ? `https://www.tiktok.com/@${tiktokId}` : null,
-      freebase: ex?.freebase_mid
-        ? `https://www.google.com/search?q=${encodeURIComponent(ex.freebase_mid)}`
-        : ex?.freebase_id
-          ? `https://www.google.com/search?q=${encodeURIComponent(ex.freebase_id)}`
-          : null,
     };
   }, [externalIds, actorDetails, tmdbUrl]);
 
@@ -1928,36 +1918,48 @@ export default function ActorDetails({
               "!w-[42px] !h-[22px] lg:!w-[44px] lg:!h-[22px] rounded-md shadow-lg object-contain",
           }
         : null,
-      socials.wikidata
+      socials.wikipedia
         ? {
-            id: "wikidata",
-            label: "Wikidata",
-            iconComponent: Database,
-            href: socials.wikidata,
+            id: "wikipedia",
+            label: "Wikipedia",
+            icon: "/wikipedia.png",
+            href: socials.wikipedia,
+            iconSize: { width: 24, height: 24 },
+            iconClassName: "!h-6 !w-6 rounded-md object-contain",
+            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
           }
         : null,
       socials.instagram
         ? {
             id: "instagram",
             label: "Instagram",
-            iconComponent: Instagram,
+            icon: "/instagram.png",
             href: socials.instagram,
+            iconSize: { width: 24, height: 24 },
+            iconClassName: "!h-6 !w-6 rounded-md object-contain",
+            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
           }
         : null,
       socials.twitter
         ? {
             id: "twitter",
-            label: "X / Twitter",
-            iconComponent: Twitter,
+            label: "X",
+            icon: "/x.png",
             href: socials.twitter,
+            iconSize: { width: 24, height: 24 },
+            iconClassName: "!h-6 !w-6 rounded-md object-contain",
+            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
           }
         : null,
       socials.facebook
         ? {
             id: "facebook",
             label: "Facebook",
-            iconComponent: Facebook,
+            icon: "/facebook.png",
             href: socials.facebook,
+            iconSize: { width: 24, height: 24 },
+            iconClassName: "!h-6 !w-6 rounded-md object-contain",
+            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
           }
         : null,
       socials.youtube
@@ -1974,14 +1976,6 @@ export default function ActorDetails({
             label: "TikTok",
             iconComponent: Music2,
             href: socials.tiktok,
-          }
-        : null,
-      socials.freebase
-        ? {
-            id: "freebase",
-            label: "Freebase",
-            iconComponent: LinkIcon,
-            href: socials.freebase,
           }
         : null,
       socials.tmdb
@@ -2875,7 +2869,10 @@ export default function ActorDetails({
                                 <img
                                   src={link.icon}
                                   alt=""
-                                  className="h-3.5 w-3.5 rounded-sm object-contain"
+                                  className={
+                                    link.menuIconClassName ||
+                                    "h-3.5 w-3.5 rounded-sm object-contain"
+                                  }
                                   draggable="false"
                                 />
                               ) : (
