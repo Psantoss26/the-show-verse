@@ -2,28 +2,60 @@
     "name": "The Show Verse",
     "short_name": "ShowVerse",
     "start_url": "/",
+    "scope": "/",
     "display": "standalone",
+    "display_override": [
+        "window-controls-overlay",
+        "standalone",
+        "minimal-ui"
+    ],
+    "orientation": "portrait",
     "background_color": "#000000",
     "theme_color": "#000000",
     "description": "Tu plataforma de películas y series",
+    "categories": [
+        "entertainment",
+        "lifestyle"
+    ],
+    "lang": "es",
     "icons": [
         {
-            "src": "/logo-final.png",
+            "src": "/icon.png",
+            "sizes": "256x256",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icon.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/logo-final.png",
+            "src": "/icon.png",
             "sizes": "1024x1024",
             "type": "image/png",
-            "purpose": "any"
+            "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Calendario",
+            "short_name": "Calendario",
+            "url": "/calendar",
+            "icons": [{ "src": "/icon.png", "sizes": "512x512", "type": "image/png" }]
         },
         {
-            "src": "/logo-final.png",
-            "sizes": "2048x2048",
-            "type": "image/png",
-            "purpose": "any maskable"
+            "name": "Pendientes",
+            "short_name": "Pendientes",
+            "url": "/watchlist",
+            "icons": [{ "src": "/icon.png", "sizes": "512x512", "type": "image/png" }]
+        },
+        {
+            "name": "Favoritas",
+            "short_name": "Favoritas",
+            "url": "/favorites",
+            "icons": [{ "src": "/icon.png", "sizes": "512x512", "type": "image/png" }]
         }
     ]
 }

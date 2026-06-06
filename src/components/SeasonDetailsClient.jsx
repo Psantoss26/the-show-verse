@@ -19,6 +19,7 @@ import {
   LayoutGrid,
   AlignJustify,
 } from "lucide-react";
+import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
 import { SectionTitle, VisualMetaCard } from "@/components/details/DetailAtoms";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
@@ -753,7 +754,7 @@ export default function SeasonDetailsClient({
       try {
         setRatingLoading(true);
 
-        const res = await fetch("/api/trakt/ratings", {
+        const res = await offlineMutationFetch("/api/trakt/ratings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -762,6 +763,9 @@ export default function SeasonDetailsClient({
             season: Number(seasonNumber),
             rating: val ?? null,
           }),
+        }, {
+          label: val == null ? "Quitar valoracion de temporada" : "Guardar valoracion de temporada",
+          dedupeKey: `trakt:season-rating:${showId}:${seasonNumber}`,
         });
 
         if (res.status === 401) {
