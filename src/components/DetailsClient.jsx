@@ -2900,12 +2900,6 @@ export default function DetailsClient({
   const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false); // Modal de episodios vistos abierto
   const traktEpisodesWasOpenRef = useRef(false);
 
-  // Cierra el modal de episodios limpiando estados transitorios
-  const closeTraktEpisodesModal = useCallback(() => {
-    setTraktEpisodesOpen(false);
-    setEpisodeBusyKey(""); // Evita que quede bloqueado al reabrir
-  }, []);
-
   // -- Episodios vistos por temporada (solo TV) --
   const [watchedBySeason, setWatchedBySeason] = useState(
     initialWatchedBySeason,
@@ -3335,6 +3329,16 @@ export default function DetailsClient({
       };
     }
   }, [type, id, trakt?.connected, applyWatchedBySeasonState]);
+
+  // Cierra el modal de episodios al instante y reconcilia el % visto en segundo plano.
+  const closeTraktEpisodesModal = useCallback(() => {
+    setTraktEpisodesOpen(false);
+    setEpisodeBusyKey(""); // Evita que quede bloqueado al reabrir
+
+    if (type !== "tv" || !trakt?.connected) return;
+
+    void loadTraktShowWatched();
+  }, [type, trakt?.connected, loadTraktShowWatched]);
 
   // -- Scoreboard de la comunidad (puntuaciones agregadas de multiples fuentes) --
   // Si hay datos prefetched desde page.jsx, usarlos como estado inicial
@@ -5145,12 +5149,18 @@ export default function DetailsClient({
     const next = !currentlyWatched;
 
     // Actualizacion optimista: cambiar UI antes de confirmar con el servidor
-    setWatchedBySeason((prev) => {
-      const cur = new Set(prev?.[seasonNumber] || []);
-      if (next) cur.add(episodeNumber);
-      else cur.delete(episodeNumber);
-      return { ...prev, [seasonNumber]: Array.from(cur).sort((a, b) => a - b) };
-    });
+    const optimisticWatchedBySeason = {
+      ...normalizeWatchedBySeasonMap(watchedBySeasonRef.current),
+    };
+    const optimisticEpisodes = new Set(
+      optimisticWatchedBySeason?.[seasonNumber] || [],
+    );
+    if (next) optimisticEpisodes.add(episodeNumber);
+    else optimisticEpisodes.delete(episodeNumber);
+    optimisticWatchedBySeason[seasonNumber] = Array.from(
+      optimisticEpisodes,
+    ).sort((a, b) => a - b);
+    applyWatchedBySeasonState(optimisticWatchedBySeason, { loaded: true });
 
     try {
       const r = await traktSetEpisodeWatched({
@@ -5177,15 +5187,18 @@ export default function DetailsClient({
       }
     } catch {
       // Rollback: revertir cambio optimista si falla la peticion
-      setWatchedBySeason((prev) => {
-        const cur = new Set(prev?.[seasonNumber] || []);
-        if (!next) cur.add(episodeNumber);
-        else cur.delete(episodeNumber);
-        return {
-          ...prev,
-          [seasonNumber]: Array.from(cur).sort((a, b) => a - b),
-        };
-      });
+      const rollbackWatchedBySeason = {
+        ...normalizeWatchedBySeasonMap(watchedBySeasonRef.current),
+      };
+      const rollbackEpisodes = new Set(
+        rollbackWatchedBySeason?.[seasonNumber] || [],
+      );
+      if (!next) rollbackEpisodes.add(episodeNumber);
+      else rollbackEpisodes.delete(episodeNumber);
+      rollbackWatchedBySeason[seasonNumber] = Array.from(
+        rollbackEpisodes,
+      ).sort((a, b) => a - b);
+      applyWatchedBySeasonState(rollbackWatchedBySeason, { loaded: true });
     } finally {
       setEpisodeBusyKey("");
     }
@@ -5739,39 +5752,55 @@ export default function DetailsClient({
         )
           return;
 
-        // IMDb rating: dataset oficial de IMDb. OMDb queda para awards/RT/MC.
-        const [imdbDataset, omdb] = await Promise.all([
-          fetchImdbRatingByImdb(imdbId),
-          fetchOmdbByImdb(imdbId),
-        ]);
-        if (abort) return;
+        // IMDb carga independiente y con timeout corto: no debe esperar a OMDb/premios.
+        const imdbPromise = (async () => {
+          const imdbDataset = await fetchImdbRatingByImdb(imdbId, {
+            timeoutMs: cached?.imdbRating != null ? 900 : 1400,
+          });
+          if (abort || !imdbDataset) return;
 
-        const imdbRating =
-          typeof imdbDataset?.rating === "number" ? imdbDataset.rating : null;
-        const votes =
-          typeof imdbDataset?.votes === "number" ? imdbDataset.votes : null;
+          const imdbRating =
+            typeof imdbDataset?.rating === "number" ? imdbDataset.rating : null;
+          const votes =
+            typeof imdbDataset?.votes === "number" ? imdbDataset.votes : null;
 
-        const { rtScore, mcScore } = extractOmdbExtraScores(omdb);
-        const awards = normalizeOmdbAwards(omdb?.Awards);
+          if (!Number.isFinite(imdbRating)) return;
 
-        // Actualizar IMDb, votos, RT y Metacritic juntos para evitar apariciones escalonadas.
-        setExtras((prev) => ({
-          ...prev,
-          imdbRating: Number.isFinite(imdbRating) ? imdbRating : null,
-          imdbVotes: Number.isFinite(votes) ? votes : null,
-          awards,
-          rtScore,
-          mcScore,
-        }));
+          setExtras((prev) => ({
+            ...prev,
+            imdbRating,
+            imdbVotes: Number.isFinite(votes) ? votes : null,
+          }));
 
-        writeOmdbCache(imdbId, {
-          imdbRating: Number.isFinite(imdbRating) ? imdbRating : null,
-          imdbVotes: Number.isFinite(votes) ? votes : null,
-          awards,
-          awardsFetched: true,
-          rtScore,
-          mcScore,
-        });
+          writeOmdbCache(imdbId, {
+            imdbRating,
+            imdbVotes: Number.isFinite(votes) ? votes : null,
+          });
+        })();
+
+        const omdbPromise = (async () => {
+          const omdb = await fetchOmdbByImdb(imdbId);
+          if (abort || !omdb) return;
+
+          const { rtScore, mcScore } = extractOmdbExtraScores(omdb);
+          const awards = normalizeOmdbAwards(omdb?.Awards);
+
+          setExtras((prev) => ({
+            ...prev,
+            awards,
+            rtScore,
+            mcScore,
+          }));
+
+          writeOmdbCache(imdbId, {
+            awards,
+            awardsFetched: true,
+            rtScore,
+            mcScore,
+          });
+        })();
+
+        await Promise.allSettled([imdbPromise, omdbPromise]);
       } catch {
         if (!abort) {
           setExtras((prev) => ({

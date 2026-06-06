@@ -23,7 +23,6 @@ async function clearShowVerseCaches() {
 export default function PwaManager() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [isIos, setIsIos] = useState(false);
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -37,12 +36,6 @@ export default function PwaManager() {
       window.matchMedia?.("(display-mode: standalone)")?.matches ||
         window.navigator.standalone === true,
     );
-    setIsIos(
-      /iphone|ipad|ipod/i.test(window.navigator.userAgent) ||
-        (window.navigator.platform === "MacIntel" &&
-          window.navigator.maxTouchPoints > 1),
-    );
-
     if (!ENABLE_SERVICE_WORKER && "serviceWorker" in navigator) {
       navigator.serviceWorker
         .getRegistrations()
@@ -108,58 +101,54 @@ export default function PwaManager() {
     if (choice?.outcome === "accepted") setInstallPrompt(null);
   }
 
-  const showInstall = (installPrompt || isIos) && !isInstalled;
+  const showInstall = installPrompt && !isInstalled;
   const showStatus = !online || pending > 0;
   if (!showInstall && !showStatus) return null;
 
   return (
-    <div className="fixed bottom-20 left-3 right-3 z-50 mx-auto flex max-w-md flex-wrap items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/90 px-3 py-2 text-xs text-white shadow-2xl backdrop-blur-md lg:bottom-4 lg:right-4 lg:left-auto">
+    <>
       {showStatus && (
-        <div className="flex items-center gap-2 text-neutral-200">
-          {!online ? (
-            <WifiOff className="h-4 w-4 text-amber-300" />
-          ) : (
-            <RotateCw
-              className={`h-4 w-4 text-emerald-300 ${syncing ? "animate-spin" : ""}`}
-            />
-          )}
-          <span>
-            {!online
-              ? "Modo offline"
-              : pending > 0
-                ? `${pending} cambio${pending === 1 ? "" : "s"} pendiente${pending === 1 ? "" : "s"}`
-                : "Sincronizado"}
-          </span>
-          {online && pending > 0 && (
-            <button
-              type="button"
-              onClick={syncNow}
-              disabled={syncing}
-              className="rounded-lg bg-white/10 px-2 py-1 font-bold text-white transition hover:bg-white/20 disabled:opacity-60"
-            >
-              Sincronizar
-            </button>
-          )}
+        <div className="fixed bottom-20 left-3 right-3 z-50 mx-auto flex max-w-md flex-wrap items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/90 px-3 py-2 text-xs text-white shadow-2xl backdrop-blur-md lg:bottom-4 lg:right-4 lg:left-auto">
+          <div className="flex items-center gap-2 text-neutral-200">
+            {!online ? (
+              <WifiOff className="h-4 w-4 text-amber-300" />
+            ) : (
+              <RotateCw
+                className={`h-4 w-4 text-emerald-300 ${syncing ? "animate-spin" : ""}`}
+              />
+            )}
+            <span>
+              {!online
+                ? "Modo offline"
+                : pending > 0
+                  ? `${pending} cambio${pending === 1 ? "" : "s"} pendiente${pending === 1 ? "" : "s"}`
+                  : "Sincronizado"}
+            </span>
+            {online && pending > 0 && (
+              <button
+                type="button"
+                onClick={syncNow}
+                disabled={syncing}
+                className="rounded-lg bg-white/10 px-2 py-1 font-bold text-white transition hover:bg-white/20 disabled:opacity-60"
+              >
+                Sincronizar
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      {showInstall && installPrompt && (
+      {showInstall && (
         <button
           type="button"
           onClick={installApp}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 font-bold text-white transition hover:bg-blue-500"
+          className="fixed bottom-20 right-4 z-50 grid h-12 w-12 place-items-center rounded-full border border-sky-300/25 bg-sky-500/15 text-sky-100 shadow-[0_0_22px_rgba(14,165,233,0.24)] ring-1 ring-sky-500/35 backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.04] hover:bg-sky-500/20 hover:text-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60 active:scale-95 lg:bottom-4"
+          title="Instalar app"
+          aria-label="Instalar app"
         >
-          <Download className="h-4 w-4" />
-          Instalar app
+          <Download className="h-5 w-5" />
         </button>
       )}
-
-      {showInstall && !installPrompt && isIos && (
-        <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 font-semibold text-white">
-          <Download className="h-4 w-4" />
-          Compartir &gt; Añadir a inicio
-        </div>
-      )}
-    </div>
+    </>
   );
 }

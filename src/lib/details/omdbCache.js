@@ -1,11 +1,15 @@
 // src/lib/details/omdbCache.js
 
 export const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const cacheKey = (imdbId) => `showverse:omdb:${imdbId}`
 
 export const readOmdbCache = (imdbId) => {
     if (!imdbId || typeof window === 'undefined') return null
     try {
-        const raw = window.sessionStorage.getItem(`showverse:omdb:${imdbId}`)
+        const key = cacheKey(imdbId)
+        const raw =
+            window.localStorage.getItem(key) ||
+            window.sessionStorage.getItem(key)
         if (!raw) return null
         const parsed = JSON.parse(raw)
         const t = Number(parsed?.t || 0)
@@ -31,7 +35,10 @@ export const writeOmdbCache = (imdbId, patch) => {
             rtScore: patch?.rtScore ?? prev?.rtScore ?? null,
             mcScore: patch?.mcScore ?? prev?.mcScore ?? null
         }
-        window.sessionStorage.setItem(`showverse:omdb:${imdbId}`, JSON.stringify(next))
+        const key = cacheKey(imdbId)
+        const value = JSON.stringify(next)
+        window.localStorage.setItem(key, value)
+        window.sessionStorage.setItem(key, value)
     } catch {
         // ignore
     }
