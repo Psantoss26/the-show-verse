@@ -8,6 +8,18 @@ import {
   subscribeOfflineQueue,
 } from "@/lib/offline/syncQueue";
 
+const ENABLE_SERVICE_WORKER = process.env.NODE_ENV === "production";
+
+async function clearShowVerseCaches() {
+  if (typeof window === "undefined" || !("caches" in window)) return;
+  const keys = await window.caches.keys();
+  await Promise.all(
+    keys
+      .filter((key) => key.startsWith("showverse-"))
+      .map((key) => window.caches.delete(key)),
+  );
+}
+
 export default function PwaManager() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -31,7 +43,17 @@ export default function PwaManager() {
           window.navigator.maxTouchPoints > 1),
     );
 
-    if ("serviceWorker" in navigator) {
+    if (!ENABLE_SERVICE_WORKER && "serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) =>
+          Promise.all(registrations.map((registration) => registration.unregister())),
+        )
+        .then(clearShowVerseCaches)
+        .catch((error) => {
+          console.warn("[PWA] No se pudo limpiar el service worker local", error);
+        });
+    } else if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch((error) => {
         console.warn("[PWA] No se pudo registrar el service worker", error);
       });
