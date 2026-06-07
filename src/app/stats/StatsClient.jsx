@@ -29,6 +29,8 @@ import {
   MapPin,
   BookMarked,
   ChevronRight,
+  LogOut,
+  RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -38,7 +40,7 @@ import "swiper/swiper-bundle.css";
 // Score fetching APIs
 import { getExternalIds } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
-import { traktGetScoreboard } from "@/lib/api/traktClient";
+import { traktDisconnect, traktGetScoreboard } from "@/lib/api/traktClient";
 
 // Score caching system identical to favorites
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -645,7 +647,7 @@ function CustomTooltip({ active, payload, label, formatter }) {
   return null;
 }
 
-function ProfileHero({ user }) {
+function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   if (!user) {
     return (
       <div className="flex items-center gap-5">
@@ -706,6 +708,41 @@ function ProfileHero({ user }) {
               VIP
             </span>
           )}
+          <div className="ml-2 flex items-center gap-2">
+            <motion.button
+              type="button"
+              onClick={onSync}
+              disabled={syncing}
+              className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+              whileHover={{ scale: syncing ? 1 : 1.05 }}
+              whileTap={{ scale: syncing ? 1 : 0.95 }}
+              title="Sincronizar"
+              aria-label="Sincronizar perfil de Trakt"
+            >
+              <RotateCcw
+                className={`w-5 h-5 text-white ${syncing ? "animate-spin" : ""}`}
+              />
+            </motion.button>
+
+            <motion.button
+              type="button"
+              onClick={onDisconnect}
+              disabled={syncing}
+              className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, delay: 0.4 }}
+              whileHover={{ scale: syncing ? 1 : 1.05 }}
+              whileTap={{ scale: syncing ? 1 : 0.95 }}
+              title="Desconectar"
+              aria-label="Desconectar Trakt"
+            >
+              <LogOut className="w-5 h-5 text-red-400" />
+            </motion.button>
+          </div>
         </div>
         <p className="mt-1 text-sm font-medium text-zinc-500">@{user.username}</p>
         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
@@ -1078,6 +1115,34 @@ export default function StatsClient({ connectNext = "/profile" }) {
   const [profileData, setProfileData] = useState(null);
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState("overview"); // overview | patterns | yearly
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+
+  const handleSyncProfile = useCallback(() => {
+    clearProfileSessionCache();
+    setError("");
+    setNotConnected(false);
+    setLoading(true);
+    setPeopleLoading(false);
+    setPeopleLoaded(false);
+    setRefreshTick((tick) => tick + 1);
+  }, []);
+
+  const handleDisconnect = useCallback(async () => {
+    try {
+      await traktDisconnect();
+      clearProfileSessionCache();
+      setShowDisconnectModal(false);
+      setNotConnected(true);
+      setData(null);
+      setProfileData(null);
+      window.location.href = "/";
+    } catch (e) {
+      console.error("Error desconectando Trakt:", e);
+      setShowDisconnectModal(false);
+      alert("Error al desconectar de Trakt. Por favor, inténtalo de nuevo.");
+    }
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -1261,7 +1326,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [refreshTick]);
 
   useEffect(() => {
     if (!data || notConnected || peopleLoaded) return;
@@ -1475,7 +1540,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,auto)] lg:items-center"
         >
-          <ProfileHero user={profileUser} />
+          <ProfileHero
+            user={profileUser}
+            onSync={handleSyncProfile}
+            onDisconnect={() => setShowDisconnectModal(true)}
+            syncing={loading}
+          />
 
           <div className="flex justify-start lg:justify-end">
             {headerReady ? (
@@ -2217,6 +2287,50 @@ export default function StatsClient({ connectNext = "/profile" }) {
           </AnimatePresence>
         )}
       </div>
+
+      <AnimatePresence>
+        {showDisconnectModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+            onClick={() => setShowDisconnectModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-6 text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <LogOut className="mx-auto mb-4 h-10 w-10 text-red-500" />
+              <h2 className="mb-2 text-lg font-bold text-white">
+                ¿Desconectar Trakt?
+              </h2>
+              <p className="mb-6 text-sm text-zinc-400">
+                Se eliminará la conexión con tu cuenta de Trakt.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDisconnectModal(false)}
+                  className="flex-1 rounded-xl bg-zinc-800 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500"
+                >
+                  Desconectar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
