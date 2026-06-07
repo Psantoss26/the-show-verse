@@ -19,7 +19,6 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Award,
   CheckCircle2,
-  ImageOff,
   ExternalLink,
   Film,
   Tv as TvIcon,
@@ -1026,9 +1025,7 @@ function ActorRowCarousel({ children, variant = "poster" }) {
 
 /**
  * PosterCard (CRÉDITOS EN PANTALLA)
- * Solo muestra la portada por defecto
- * Título/“como …”/año/puntuación SOLO en hover/focus
- * La puntuación en hover es la de estos créditos (vote_average)
+ * Mismo diseño y hover que las tarjetas de Perfil.
  */
 function PosterCard({ item }) {
   const title = item?.title || item?.name || "Sin título";
@@ -1040,85 +1037,49 @@ function PosterCard({ item }) {
     mediaType === "movie"
       ? `/details/movie/${item?.id}`
       : `/details/tv/${item?.id}`;
+  const typeLabel = mediaType === "tv" ? "Serie" : "Película";
+  const meta = subtitle || [year, typeLabel].filter(Boolean).join(" · ");
 
-  const rating = Number(item?.vote_average ?? item?.rating ?? 0);
-  const hasRating = Number.isFinite(rating) && rating > 0;
+  const [err, setErr] = useState(false);
 
   return (
     <Link
       href={href}
       prefetch={false}
-      className="group relative z-0 block w-full hover:z-[60] focus:z-[60] focus:outline-none"
-      aria-label={title}
+      className="group relative block w-full"
+      title={title}
     >
-      <motion.div
-        whileHover={{
-          y: -7,
-          boxShadow:
-            "0 20px 45px -24px rgba(16,185,129,0.75), 0 18px 32px -28px rgba(0,0,0,0.9)",
-        }}
-        transition={{ type: "spring", stiffness: 360, damping: 26 }}
-        className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/5 transition-all duration-300 group-hover:ring-emerald-500/35"
-      >
-        {poster ? (
+      <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-800 border border-white/5 group-hover:border-emerald-500/50 transition-all duration-300">
+        {poster && !err ? (
           <img
             src={poster}
             alt={title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            className="w-full h-full object-cover grayscale-[18%] group-hover:scale-110 group-hover:grayscale-0 transition-transform duration-500"
             loading="lazy"
             decoding="async"
+            onError={() => setErr(true)}
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-zinc-700 bg-zinc-900">
-            <ImageOff className="w-10 h-10 mb-2 opacity-50" />
-            <span className="text-[10px] uppercase font-bold tracking-widest">
-              No Image
-            </span>
+          <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-zinc-600">
+            {mediaType === "movie" ? (
+              <Film className="h-9 w-9 opacity-60" />
+            ) : (
+              <TvIcon className="h-9 w-9 opacity-60" />
+            )}
           </div>
         )}
 
-        {/* Hover / focus overlay (sin repetir texto fuera) */}
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300">
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-70 group-hover:opacity-85 transition" />
 
-          {/* Rating SOLO en hover (créditos en pantalla) */}
-          {hasRating && (
-            <div className="absolute top-2 right-2 translate-y-1 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:translate-y-0 transition-all duration-300">
-              <div className="px-2 py-1 rounded-full bg-black/65 backdrop-blur border border-white/10 text-[11px] font-extrabold text-white inline-flex items-center gap-1.5">
-                <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-                {rating.toFixed(1)}
-              </div>
-            </div>
-          )}
-
-          <div className="absolute left-0 right-0 bottom-0 p-4">
-            <div className="translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 transition-all duration-300">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-emerald-400 text-[11px] font-extrabold uppercase tracking-wider">
-                  {mediaType === "tv" ? "Serie" : "Película"}
-                </span>
-                {year ? (
-                  <span className="text-[11px] text-zinc-300/80 font-semibold">
-                    · {year}
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="text-white text-sm font-extrabold leading-snug line-clamp-2">
-                {title}
-              </div>
-              {subtitle ? (
-                <div className="mt-1 text-xs text-zinc-300/85 line-clamp-1">
-                  {subtitle}
-                </div>
-              ) : null}
-            </div>
-          </div>
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2.5 pb-2.5 pt-8 backdrop-blur-[1.5px]">
+          <p className="line-clamp-2 text-[13px] font-extrabold leading-[1.12] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
+            {title}
+          </p>
+          <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-emerald-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
+            {meta}
+          </p>
         </div>
-      </motion.div>
-
-      {/* Accesibilidad (sin UI visible) */}
-      <span className="sr-only">{title}</span>
+      </div>
     </Link>
   );
 }
