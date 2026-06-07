@@ -1,6 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { Children, useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { Film, Tv, Clock, Star, Users, BookMarked, Trophy, Calendar, MapPin, ExternalLink, Activity, Library, ChevronRight, Timer, MessageSquare, Heart } from "lucide-react";
 import { PosterCard, RankedPosterCard, WatchlistCard, PersonCard } from "./ProfileCards";
@@ -64,6 +64,130 @@ function SectionTitle({ icon: Icon, title, subtitle, color = "indigo", href }) {
 }
 
 const starColor = (r) => r >= 9 ? "#f59e0b" : r >= 7 ? "#10b981" : r >= 5 ? "#6366f1" : "#ef4444";
+
+function ProfileCarousel({ children }) {
+  const scrollerRef = useRef(null);
+  const [isHoveredRow, setIsHoveredRow] = useState(false);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+  const slides = Children.toArray(children);
+
+  const updateNav = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const maxScrollLeft = Math.max(el.scrollWidth - el.clientWidth, 0);
+    setCanPrev(el.scrollLeft > 1);
+    setCanNext(el.scrollLeft < maxScrollLeft - 1);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return undefined;
+
+    const refresh = () => updateNav();
+    const raf = requestAnimationFrame(refresh);
+    const timeout = window.setTimeout(refresh, 250);
+    const resizeObserver = new ResizeObserver(refresh);
+    resizeObserver.observe(el);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(timeout);
+      resizeObserver.disconnect();
+    };
+  }, [slides.length, updateNav]);
+
+  const handlePrevClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const el = scrollerRef.current;
+      if (!el) return;
+      el.scrollBy({ left: -Math.round(el.clientWidth * 0.85), behavior: "smooth" });
+    },
+    [],
+  );
+
+  const handleNextClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const el = scrollerRef.current;
+      if (!el) return;
+      el.scrollBy({ left: Math.round(el.clientWidth * 0.85), behavior: "smooth" });
+    },
+    [],
+  );
+
+  const showPrev = isHoveredRow && canPrev;
+  const showNext = isHoveredRow && canNext;
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsHoveredRow(true)}
+      onMouseLeave={() => setIsHoveredRow(false)}
+    >
+      <div
+        ref={scrollerRef}
+        onScroll={updateNav}
+        className="no-scrollbar flex gap-3 overflow-x-auto overflow-y-hidden pb-2 scroll-smooth overscroll-x-contain sm:gap-3.5 md:gap-4 lg:gap-[18px] xl:gap-5"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {slides.map((child, idx) => (
+          <div
+            key={child?.key || idx}
+            className="relative min-w-0 flex-none basis-[calc((100%_-_24px)/3)] sm:basis-[calc((100%_-_42px)/4)] md:basis-[calc((100%_-_64px)/5)] lg:basis-[calc((100%_-_72px)/5)] xl:basis-[calc((100%_-_80px)/5)]"
+          >
+            {child}
+          </div>
+        ))}
+      </div>
+
+      <AnimatePresence>
+        {showPrev && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            type="button"
+            onClick={handlePrevClick}
+            className="absolute inset-y-0 left-0 z-30 hidden w-24 items-center justify-start bg-gradient-to-r from-black/90 via-black/70 to-transparent text-white transition-all duration-300 hover:from-black/95 hover:via-black/80 pointer-events-auto sm:flex group/nav"
+            aria-label="Anterior"
+          >
+            <motion.span
+              className="ml-5 text-4xl font-bold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
+              whileHover={{ x: -4 }}
+            >
+              ‹
+            </motion.span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showNext && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            type="button"
+            onClick={handleNextClick}
+            className="absolute inset-y-0 right-0 z-30 hidden w-24 items-center justify-end bg-gradient-to-l from-black/90 via-black/70 to-transparent text-white transition-all duration-300 hover:from-black/95 hover:via-black/80 pointer-events-auto sm:flex group/nav"
+            aria-label="Siguiente"
+          >
+            <motion.span
+              className="mr-5 text-4xl font-bold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
+              whileHover={{ x: 4 }}
+            >
+              ›
+            </motion.span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 function NotConnected() {
   return (
@@ -267,9 +391,9 @@ export default function ProfileClient() {
             className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative mb-6">
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
             <SectionTitle icon={Activity} title="Vistos recientemente" subtitle="Tus últimas visualizaciones" color="emerald" href="/history" />
-            <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth:"none" }}>
+            <ProfileCarousel>
               {recentHistory.map((item, i) => <PosterCard key={i} item={item} dateField="watched_at" accentColor="emerald" />)}
-            </div>
+            </ProfileCarousel>
           </motion.div>
         )}
 
@@ -279,9 +403,9 @@ export default function ProfileClient() {
             className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative mb-6">
             <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 rounded-full blur-3xl pointer-events-none" />
             <SectionTitle icon={Star} title="Últimas valoraciones" subtitle="Lo que has puntuado recientemente" color="yellow" href="/stats" />
-            <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth:"none" }}>
+            <ProfileCarousel>
               {recentRatings.map((item, i) => <PosterCard key={i} item={item} showRating dateField="rated_at" />)}
-            </div>
+            </ProfileCarousel>
           </motion.div>
         )}
 
@@ -289,9 +413,9 @@ export default function ProfileClient() {
         {topMovies.length > 0 && (
           <motion.div initial={{ opacity:0, x:-20 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.35 }} className="mb-6">
             <SectionTitle icon={Film} title="Películas Top" subtitle="Las que más has visto" color="blue" />
-            <div className="grid grid-cols-6 gap-3">
+            <ProfileCarousel>
               {topMovies.slice(0, 6).map((item, i) => <RankedPosterCard key={item.movie?.ids?.tmdb||i} item={item} rank={i+1} type="movie" accentColor="blue" />)}
-            </div>
+            </ProfileCarousel>
           </motion.div>
         )}
 
@@ -299,9 +423,9 @@ export default function ProfileClient() {
         {topShows.length > 0 && (
           <motion.div initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.4 }} className="mb-6">
             <SectionTitle icon={Tv} title="Series Top" subtitle="Tus maratones favoritos" color="purple" />
-            <div className="grid grid-cols-6 gap-3">
+            <ProfileCarousel>
               {topShows.slice(0, 6).map((item, i) => <RankedPosterCard key={item.show?.ids?.tmdb||i} item={item} rank={i+1} type="show" accentColor="purple" />)}
-            </div>
+            </ProfileCarousel>
           </motion.div>
         )}
 
@@ -310,9 +434,9 @@ export default function ProfileClient() {
           <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.65 }}
             className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl mb-6">
             <SectionTitle icon={Users} title="Actores Favoritos" subtitle="Las caras que más ves" color="yellow" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+            <ProfileCarousel>
               {topActors.map((p) => <PersonCard key={p.id} person={p} accentColor="yellow" />)}
-            </div>
+            </ProfileCarousel>
           </motion.div>
         )}
 
@@ -321,9 +445,9 @@ export default function ProfileClient() {
           <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.7 }}
             className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl mb-6">
             <SectionTitle icon={Film} title="Directores Favoritos" subtitle="Los cineastas que más sigues" color="rose" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+            <ProfileCarousel>
               {topDirectors.map((p) => <PersonCard key={p.id} person={p} accentColor="rose" />)}
-            </div>
+            </ProfileCarousel>
           </motion.div>
         )}
 
@@ -333,9 +457,9 @@ export default function ProfileClient() {
             className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative mb-6">
             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
             <SectionTitle icon={BookMarked} title="Watchlist" subtitle="Títulos que quieres ver" color="indigo" href="/watchlist" />
-            <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-8 gap-3">
+            <ProfileCarousel>
               {watchlist.map((item, i) => <WatchlistCard key={i} item={item} />)}
-            </div>
+            </ProfileCarousel>
           </motion.div>
         )}
 
