@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import "@/app/globals.css";
 import { useAuth } from "@/context/AuthContext";
 import UserAvatar from "@/components/auth/UserAvatar";
+import { traktAuthStatus } from "@/lib/api/traktClient";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FilmIcon,
@@ -251,6 +252,8 @@ export default function Navbar() {
 
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [traktReady, setTraktReady] = useState(false);
+  const [traktConnected, setTraktConnected] = useState(false);
 
   const isActive = (href) =>
     pathname === href || (href !== "/" && pathname?.startsWith(href));
@@ -365,6 +368,8 @@ export default function Navbar() {
   // Menú inferior fijo: 6 iconos. Si no hay sesión, fav/watchlist llevan a login.
   const favHref = hydrated && account ? "/favorites" : "/login";
   const watchHref = hydrated && account ? "/watchlist" : "/login";
+  const profileAuthLoading = !hydrated || (hydrated && !!account && !traktReady);
+  const traktProfileConnectHref = "/api/trakt/auth/start?next=/profile";
 
   // Bloquear scroll cuando overlays están abiertos
   useEffect(() => {
@@ -374,6 +379,38 @@ export default function Navbar() {
       document.body.style.overflow = "";
     };
   }, [showMobileSearch, mobileMenuOpen]);
+
+  useEffect(() => {
+    let alive = true;
+
+    if (!hydrated) return undefined;
+
+    if (!account) {
+      setTraktConnected(false);
+      setTraktReady(true);
+      return undefined;
+    }
+
+    setTraktReady(false);
+    setTraktConnected(false);
+
+    (async () => {
+      try {
+        const status = await traktAuthStatus();
+        if (!alive) return;
+        setTraktConnected(!!status?.connected);
+      } catch {
+        if (!alive) return;
+        setTraktConnected(false);
+      } finally {
+        if (alive) setTraktReady(true);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [account, hydrated]);
 
   return (
     <>
@@ -465,7 +502,7 @@ export default function Navbar() {
               )}
             </div>
 
-            {!hydrated ? (
+            {profileAuthLoading ? (
               <div className="ml-2 w-28 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
             ) : !account ? (
               <Link
@@ -474,6 +511,13 @@ export default function Navbar() {
               >
                 Iniciar sesión
               </Link>
+            ) : !traktConnected ? (
+              <a
+                href={traktProfileConnectHref}
+                className="ml-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
+              >
+                Iniciar sesión
+              </a>
             ) : (
               <UserAvatar account={account} />
             )}
@@ -525,7 +569,7 @@ export default function Navbar() {
               <SearchIcon className="w-6 h-6 text-white" />
             </button>
 
-            {!hydrated ? (
+            {profileAuthLoading ? (
               <div className="w-9 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
             ) : !account ? (
               <Link
@@ -534,6 +578,13 @@ export default function Navbar() {
               >
                 Acceder
               </Link>
+            ) : !traktConnected ? (
+              <a
+                href={traktProfileConnectHref}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
+              >
+                Acceder
+              </a>
             ) : (
               <UserAvatar account={account} />
             )}

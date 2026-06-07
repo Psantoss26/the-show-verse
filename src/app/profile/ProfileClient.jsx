@@ -2,8 +2,9 @@
 import { Children, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { Film, Tv, Clock, Star, Users, BookMarked, Trophy, Calendar, MapPin, ExternalLink, Activity, Library, ChevronRight, Timer, MessageSquare, Heart } from "lucide-react";
+import { Film, Tv, Clock, Star, Users, BookMarked, Trophy, Calendar, MapPin, ExternalLink, Activity, Library, ChevronRight, Timer, MessageSquare, Heart, LogOut, RotateCcw } from "lucide-react";
 import { PosterCard, RankedPosterCard, WatchlistCard, PersonCard } from "./ProfileCards";
+import { traktDisconnect } from "@/lib/api/traktClient";
 
 const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "—";
 const fmtMinutes = (m) => { if (!m) return "0h"; const d = Math.floor(m/1440), h = Math.floor((m%1440)/60); return d > 0 ? `${d}d ${h}h` : `${h}h ${m%60}m`; };
@@ -191,23 +192,37 @@ function ProfileCarousel({ children }) {
 
 function NotConnected() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 pb-20">
+    <div className="min-h-screen bg-[#050505] text-zinc-100 pb-20 selection:bg-emerald-500/30">
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] mix-blend-screen" />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] mix-blend-screen" />
+        <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-sky-500/5 rounded-full blur-[150px]" />
       </div>
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <motion.div initial={{ opacity:0, y:-20 }} animate={{ opacity:1, y:0 }} className="mb-8">
-          <div className="flex items-center gap-3 mb-2"><div className="h-px w-12 bg-indigo-500" /><span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">Tu cuenta</span></div>
-          <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">Perfil<span className="text-indigo-500">.</span></h1>
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        <motion.div initial={{ opacity:0, y:-20 }} animate={{ opacity:1, y:0 }} className="mb-6 lg:mb-10">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-px w-12 bg-emerald-500" />
+            <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">Tu cuenta</span>
+          </div>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">Perfil<span className="text-emerald-500">.</span></h1>
+          <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">Tu actividad y estadísticas sincronizadas con Trakt.</p>
         </motion.div>
-        <div className="flex items-center justify-center py-24">
-          <div className="max-w-md w-full flex flex-col items-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed">
+        <div className="flex items-center justify-center py-12 lg:py-24">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
+          >
             <img src="/logo-Trakt.png" alt="Trakt" className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl mb-6" />
             <h2 className="text-2xl font-bold text-white mb-2">Conecta tu cuenta de Trakt</h2>
             <p className="text-zinc-400 max-w-sm mb-8 text-sm">Para ver tu perfil y estadísticas necesitas iniciar sesión con Trakt.</p>
-            <button onClick={() => window.location.assign("/api/trakt/auth/start?next=/profile")} className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg">Conectar ahora</button>
-          </div>
+            <button
+              type="button"
+              onClick={() => window.location.assign("/api/trakt/auth/start?next=/profile")}
+              className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
+            >
+              Conectar ahora
+            </button>
+          </motion.div>
         </div>
       </div>
     </div>
@@ -234,38 +249,82 @@ export default function ProfileClient() {
   const [data, setData] = useState(null);
   const [notConnected, setNotConnected] = useState(false);
   const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
-  useEffect(() => {
-    let ignore = false;
+  const loadProfile = useCallback(async ({ ignoreState = () => false } = {}) => {
+    setRefreshing(true);
+    setError("");
+    try {
+      try {
+        const statusRes = await fetch("/api/trakt/auth/status", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        const status = await statusRes.json().catch(() => null);
+        if (!status?.connected) {
+          if (!ignoreState()) setNotConnected(true);
+          return;
+        }
+      } catch {
+        /* skip — profile calls below will surface the real error if needed */
+      }
 
-    async function loadProfile() {
       // ── Phase 1: fetch user only (~1 Trakt call, very fast) ──────────
       try {
         const res = await fetch("/api/trakt/profile?userOnly=1", { cache: "no-store" });
-        if (res.status === 401) { if (!ignore) setNotConnected(true); return; }
+        if (res.status === 401) { if (!ignoreState()) setNotConnected(true); return; }
         if (res.ok) {
           const j = await res.json();
-          if (!ignore) setUser(j?.user ?? null);
+          if (!ignoreState()) {
+            setNotConnected(false);
+            setUser(j?.user ?? null);
+          }
         }
       } catch { /* skip — phase 2 will set error if needed */ }
 
       // ── Phase 2: fetch full profile in background ─────────────────────
       try {
         const res = await fetch("/api/trakt/profile", { cache: "no-store" });
-        if (res.status === 401) { if (!ignore) setNotConnected(true); return; }
+        if (res.status === 401) { if (!ignoreState()) setNotConnected(true); return; }
         if (res.ok) {
           const j = await res.json();
-          if (!ignore) { setData(j); setUser(j?.user ?? null); }
+          if (!ignoreState()) {
+            setNotConnected(false);
+            setData(j);
+            setUser(j?.user ?? null);
+          }
         } else {
           const j = await res.json().catch(() => ({}));
-          if (!ignore) setError(j?.error || "Error");
+          if (!ignoreState()) setError(j?.error || "Error");
         }
-      } catch { if (!ignore) setError("Error de red"); }
+      } catch { if (!ignoreState()) setError("Error de red"); }
+    } finally {
+      if (!ignoreState()) setRefreshing(false);
     }
-
-    loadProfile();
-    return () => { ignore = true; };
   }, []);
+
+  const handleDisconnect = useCallback(async () => {
+    try {
+      await traktDisconnect();
+      setShowDisconnectModal(false);
+      setNotConnected(true);
+      setUser(null);
+      setData(null);
+      window.location.href = "/";
+    } catch (e) {
+      console.error("Error desconectando Trakt:", e);
+      setShowDisconnectModal(false);
+      alert("Error al desconectar de Trakt. Por favor, inténtalo de nuevo.");
+    }
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    loadProfile({ ignoreState: () => ignore });
+    return () => { ignore = true; };
+  }, [loadProfile]);
 
   // Show skeleton only before ANY data (user or full) is available
   const loading = !user && !notConnected && !error;
@@ -302,7 +361,44 @@ export default function ProfileClient() {
           className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
           <div>
             <div className="flex items-center gap-3 mb-2"><div className="h-px w-12 bg-indigo-500" /><span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">Tu cuenta</span></div>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">Perfil<span className="text-indigo-500">.</span></h1>
+            <div className="flex items-center gap-6">
+              <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">Perfil<span className="text-indigo-500">.</span></h1>
+              {user && (
+                <div className="flex items-center gap-2">
+                  <motion.button
+                    type="button"
+                    onClick={() => loadProfile()}
+                    disabled={refreshing}
+                    className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4, delay: 0.3 }}
+                    whileHover={{ scale: refreshing ? 1 : 1.05 }}
+                    whileTap={{ scale: refreshing ? 1 : 0.95 }}
+                    title="Sincronizar"
+                    aria-label="Sincronizar perfil de Trakt"
+                  >
+                    <RotateCcw className={`w-5 h-5 text-white ${refreshing ? "animate-spin" : ""}`} />
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={() => setShowDisconnectModal(true)}
+                    disabled={refreshing}
+                    className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4, delay: 0.4 }}
+                    whileHover={{ scale: refreshing ? 1 : 1.05 }}
+                    whileTap={{ scale: refreshing ? 1 : 0.95 }}
+                    title="Desconectar"
+                    aria-label="Desconectar Trakt"
+                  >
+                    <LogOut className="w-5 h-5 text-red-400" />
+                  </motion.button>
+                </div>
+              )}
+            </div>
             <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">Tu actividad y estadísticas en Trakt.</p>
           </div>
           {/* User card */}
@@ -465,6 +561,50 @@ export default function ProfileClient() {
 
         {error && <div className="mt-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">{error}</div>}
       </div>
+
+      <AnimatePresence>
+        {showDisconnectModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-4"
+            onClick={() => setShowDisconnectModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <LogOut className="w-10 h-10 text-red-500 mx-auto mb-4" />
+              <h2 className="text-lg font-bold text-white mb-2">
+                ¿Desconectar Trakt?
+              </h2>
+              <p className="text-sm text-zinc-400 mb-6">
+                Se eliminará la conexión con tu cuenta de Trakt.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDisconnectModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-zinc-800 text-white font-semibold text-sm hover:bg-zinc-700 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-semibold text-sm hover:bg-red-500 transition"
+                >
+                  Desconectar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
