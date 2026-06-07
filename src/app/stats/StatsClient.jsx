@@ -1463,37 +1463,41 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
   if (notConnected) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 pb-20">
+      <div className="min-h-screen bg-[#050505] text-zinc-100 pb-20 selection:bg-emerald-500/30">
         {/* Background Ambience */}
-        <div className="fixed inset-0 pointer-events-none">
-          <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] mix-blend-screen" />
-          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] mix-blend-screen" />
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-sky-500/5 rounded-full blur-[150px]" />
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
+            className="mb-8 lg:mb-10"
           >
             <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-indigo-500" />
-              <span className="text-indigo-400 font-bold uppercase tracking-widest text-xs">
+              <div className="h-px w-12 bg-emerald-500" />
+              <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">
                 Tu Perfil
               </span>
             </div>
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
               Perfil
-              <span className="text-indigo-500">.</span>
+              <span className="text-emerald-500">.</span>
             </h1>
             <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-              Tu actividad y estadísticas en Trakt.
+              Tu actividad y estadísticas sincronizadas con Trakt.
             </p>
           </motion.div>
 
           <div className="flex items-center justify-center py-12 lg:py-24">
-            <div className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
+            >
               <div className="mb-6">
                 <img
                   src="/logo-Trakt.png"
@@ -1514,11 +1518,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     `/api/trakt/auth/start?next=${encodeURIComponent(connectNext)}`,
                   )
                 }
+                type="button"
                 className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
               >
                 Conectar ahora
               </button>
-            </div>
+            </motion.div>
           </div>
         </div>
       </div>
