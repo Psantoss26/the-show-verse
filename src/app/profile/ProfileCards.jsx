@@ -21,7 +21,7 @@ export function PosterCard({ item, showRating = false, dateField = "watched_at",
   const src = tmdbImg(item.poster_path, "w185");
   const { border, text } = ACCENT[accentColor] || ACCENT.yellow;
   return (
-    <Link href={item.detailsHref || "#"} className="group relative block w-28 flex-shrink-0" title={item.title}>
+    <Link href={item.detailsHref || "#"} className="group relative block w-full" title={item.title}>
       <div className={`aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 border border-white/5 ${border} transition-all duration-300`}>
         {src && !err ? (
           <img src={src} alt={item.title} className="w-full h-full object-cover grayscale-[18%] group-hover:scale-110 group-hover:grayscale-0 transition-transform duration-500" onError={() => setErr(true)} />
@@ -57,7 +57,7 @@ export function RankedPosterCard({ item, rank, type, accentColor = "yellow" }) {
   const { border, text } = ACCENT[accentColor] || ACCENT.yellow;
 
   return (
-    <Link href={href} className="group relative block" title={title}>
+    <Link href={href} className="group relative block w-full" title={title}>
       <div className={`aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 border border-white/5 ${border} transition-all duration-300`}>
         {src ? (
           <img src={src} alt={title} loading="lazy" decoding="async" className="w-full h-full object-cover grayscale-[18%] group-hover:scale-110 group-hover:grayscale-0 transition-transform duration-500" />
@@ -83,7 +83,7 @@ export function WatchlistCard({ item }) {
   const src = tmdbImg(item.poster_path, "w342");
   const typeLabel = item.type === "movie" ? "Película" : "Serie";
   return (
-    <Link href={item.detailsHref || "#"} className="group relative block" title={item.title}>
+    <Link href={item.detailsHref || "#"} className="group relative block w-full" title={item.title}>
       <div className="aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 border border-white/5 group-hover:border-indigo-500/50 transition-all duration-300">
         {src ? (
           <img src={src} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
@@ -106,7 +106,7 @@ export function PersonCard({ person, accentColor = "yellow" }) {
   const src = person.profile_path ? `https://image.tmdb.org/t/p/w342${person.profile_path}` : null;
   const { border, text } = ACCENT[accentColor] || ACCENT.yellow;
   return (
-    <Link href={`/details/person/${person.id}`} className="group relative">
+    <Link href={`/details/person/${person.id}`} className="group relative block w-full">
       <div className={`aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 border border-white/5 ${border} transition-all duration-300`}>
         {src ? (
           <img src={src} alt={person.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
