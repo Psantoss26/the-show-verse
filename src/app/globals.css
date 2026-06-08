@@ -36,6 +36,30 @@ body {
     scrollbar-width: none;
     /* Firefox */
   }
+
+  .soundtrack-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+
+  .soundtrack-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .soundtrack-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .soundtrack-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .soundtrack-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.26);
+  }
 }
 
 .react-day-picker {

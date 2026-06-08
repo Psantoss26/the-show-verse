@@ -76,6 +76,7 @@ import {
   Search,
   RotateCcw,
   Play,
+  Music2,
   ExternalLink,
   ThumbsUp,
   ThumbsDown,
@@ -206,6 +207,7 @@ import {
 // -- Modales del componente --
 import AddToListModal from "@/components/details/AddToListModal";
 import VideoModal from "@/components/details/VideoModal";
+import SoundtrackModal from "@/components/details/SoundtrackModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 
@@ -1735,9 +1737,29 @@ export default function DetailsClient({
   const [videosError, setVideosError] = useState("");
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); // Video seleccionado para el modal
+  const [soundtrackModalOpen, setSoundtrackModalOpen] = useState(false);
+  const [activeSoundtrackId, setActiveSoundtrackId] = useState(null);
+  const [soundtrackTracks, setSoundtrackTracks] = useState([]);
+  const [soundtrackLoading, setSoundtrackLoading] = useState(false);
+  const [soundtrackResolved, setSoundtrackResolved] = useState(false);
+  const [soundtrackError, setSoundtrackError] = useState("");
 
   // Selecciona automaticamente el mejor video (trailer oficial preferido)
   const preferredVideo = useMemo(() => pickPreferredVideo(videos), [videos]);
+  const soundtrackSearchQuery = useMemo(() => {
+    if (!title) return "";
+    return [title, yearIso, endpointType === "tv" ? "series soundtrack" : "movie soundtrack"]
+      .filter(Boolean)
+      .join(" ");
+  }, [endpointType, title, yearIso]);
+  const soundtrackYoutubeSearchUrl = useMemo(() => {
+    if (!soundtrackSearchQuery) return "";
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(soundtrackSearchQuery)}`;
+  }, [soundtrackSearchQuery]);
+  const openSoundtrack = (trackId = null) => {
+    setActiveSoundtrackId(trackId);
+    setSoundtrackModalOpen(true);
+  };
 
   // Abre el modal de video con el video seleccionado
   const openVideo = (v) => {
@@ -1756,7 +1778,82 @@ export default function DetailsClient({
   useEffect(() => {
     setVideoModalOpen(false);
     setActiveVideo(null);
+    setSoundtrackModalOpen(false);
+    setActiveSoundtrackId(null);
   }, [id, endpointType]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSoundtrack = async () => {
+      if (!soundtrackSearchQuery) {
+        setSoundtrackTracks([]);
+        setSoundtrackError("");
+        setSoundtrackLoading(false);
+        setSoundtrackResolved(true);
+        return;
+      }
+
+      setSoundtrackLoading(true);
+      setSoundtrackResolved(false);
+      setSoundtrackError("");
+
+      try {
+        const params = new URLSearchParams({
+          term: soundtrackSearchQuery,
+          media: "music",
+          entity: "song",
+          limit: "18",
+        });
+        const response = await fetch(
+          `https://itunes.apple.com/search?${params.toString()}`,
+        );
+        if (!response.ok) throw new Error("No se pudo cargar el soundtrack");
+        const payload = await response.json();
+        const results = Array.isArray(payload?.results) ? payload.results : [];
+        const normalized = results
+          .filter((item) => item?.previewUrl && item?.trackName)
+          .map((item) => ({
+            id: String(item.trackId || item.previewUrl),
+            trackName: item.trackName,
+            artistName: item.artistName || "Artista desconocido",
+            collectionName: item.collectionName || "",
+            previewUrl: item.previewUrl,
+            artworkUrl:
+              item.artworkUrl100?.replace("100x100bb", "300x300bb") ||
+              item.artworkUrl100 ||
+              "",
+          }));
+
+        if (!cancelled) {
+          setSoundtrackTracks(normalized);
+          setSoundtrackError(
+            normalized.length
+              ? ""
+              : "No se encontraron previews reproducibles para este título.",
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSoundtrackTracks([]);
+          setSoundtrackError(
+            error?.message || "No se pudo cargar la música del título.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setSoundtrackLoading(false);
+          setSoundtrackResolved(true);
+        }
+      }
+    };
+
+    loadSoundtrack();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [soundtrackSearchQuery]);
 
   useLayoutEffect(() => {
     if (!TMDB_API_KEY || !id) {
@@ -8729,6 +8826,21 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   />
                 </LiquidButton>
 
+                {/* Botón de música/soundtrack - Abre previews reproducibles del título */}
+                <LiquidButton
+                  onClick={() => openSoundtrack()}
+                  disabled={!soundtrackSearchQuery}
+                  activeColor="yellow"
+                  groupId="details-actions"
+                  title={
+                    soundtrackSearchQuery
+                      ? "Reproducir soundtrack"
+                      : "Sin soundtrack"
+                  }
+                >
+                  <Music2 className="w-5 h-5" />
+                </LiquidButton>
+
                 {/* Separador vertical entre el botón de tráiler y los controles de Trakt */}
                 <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
 
@@ -10763,6 +10875,128 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       </section>
                     )}
                   </AnimatedSection>
+
+                  <AnimatedSection
+                    key={`${id}-soundtrack-${soundtrackResolved ? "ready" : "loading"}-${soundtrackTracks.length}`}
+                    delay={0.06}
+                  >
+                    {soundtrackSearchQuery && (
+                      <section className="mt-2 mb-10">
+                        <SectionTitle
+                          title="Soundtrack y música"
+                          icon={Music2}
+                        />
+
+                        {soundtrackLoading && (
+                          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                            {Array.from({ length: 4 }).map((_, index) => (
+                              <div
+                                key={index}
+                                className="rounded-2xl overflow-hidden border border-white/10 bg-black/25 animate-pulse"
+                                aria-hidden="true"
+                              >
+                                <div className="relative aspect-video bg-white/5">
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-14 h-14 rounded-full bg-yellow-400/10 border border-yellow-300/10" />
+                                  </div>
+                                </div>
+                                <div className="p-4">
+                                  <div className="h-4 w-3/4 rounded bg-white/10" />
+                                  <div className="mt-3 h-3 w-1/2 rounded bg-white/10" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {!soundtrackLoading &&
+                          soundtrackResolved &&
+                          soundtrackTracks.length === 0 && (
+                            <div className="rounded-2xl border border-white/10 bg-black/25 p-5 text-sm text-zinc-400">
+                              {soundtrackError ||
+                                "No se encontraron previews reproducibles para este título."}
+                              {soundtrackYoutubeSearchUrl && (
+                                <a
+                                  href={soundtrackYoutubeSearchUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="ml-2 font-bold text-yellow-300 hover:text-yellow-200"
+                                >
+                                  Buscar en YouTube
+                                </a>
+                              )}
+                            </div>
+                          )}
+
+                        {soundtrackTracks.length > 0 && (
+                          <DetailsArrowCarousel
+                            spaceBetween={12}
+                            slidesPerView={2}
+                            breakpoints={{
+                              640: { slidesPerView: 2, spaceBetween: 16 },
+                              768: { slidesPerView: 3, spaceBetween: 16 },
+                              1024: { slidesPerView: 4, spaceBetween: 16 },
+                              1280: { slidesPerView: 4, spaceBetween: 16 },
+                            }}
+                            className="pb-2"
+                          >
+                            {soundtrackTracks.slice(0, 12).map((track) => (
+                              <SwiperSlide key={track.id} className="h-full">
+                                <button
+                                  type="button"
+                                  onClick={() => openSoundtrack(track.id)}
+                                  title={track.trackName || "Reproducir música"}
+                                  className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
+                                    border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
+                                >
+                                  <div className="relative aspect-video overflow-hidden">
+                                    <img
+                                      src={track.artworkUrl || "/placeholder.png"}
+                                      alt=""
+                                      className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <div className="w-14 h-14 rounded-full bg-yellow-400/15 border border-yellow-300/25 flex items-center justify-center transition-transform hover:scale-105 backdrop-blur-md">
+                                        <Music2 className="w-7 h-7 text-yellow-200" />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-col flex-1 p-4 items-start">
+                                    <div className="w-full min-h-[22px]">
+                                      <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
+                                        {track.trackName}
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-2 line-clamp-1 text-xs font-medium text-zinc-400">
+                                      {track.artistName}
+                                    </div>
+
+                                    <div className="mt-3 flex items-center gap-1.5 w-full overflow-hidden">
+                                      <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-yellow-200">
+                                        Preview
+                                      </span>
+                                      <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-zinc-300">
+                                        iTunes
+                                      </span>
+                                    </div>
+
+                                    <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
+                                      <span className="font-semibold text-zinc-200">
+                                        {track.collectionName || "Soundtrack"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </button>
+                              </SwiperSlide>
+                            ))}
+                          </DetailsArrowCarousel>
+                        )}
+                      </section>
+                    )}
+                  </AnimatedSection>
                 </section>
 
                 <section
@@ -11549,6 +11783,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         open={videoModalOpen}
         onClose={closeVideo}
         video={activeVideo}
+      />
+
+      <SoundtrackModal
+        open={soundtrackModalOpen}
+        onClose={() => setSoundtrackModalOpen(false)}
+        title={title}
+        tracks={soundtrackTracks}
+        loading={soundtrackLoading}
+        error={soundtrackError}
+        initialTrackId={activeSoundtrackId}
+        searchUrl={soundtrackYoutubeSearchUrl}
       />
 
       {/* Modal de enlaces externos - Muestra todos los enlaces a páginas externas */}
