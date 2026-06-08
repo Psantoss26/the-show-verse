@@ -744,7 +744,7 @@ export default function TraktEpisodesWatchedModal({
   if (!open) return null;
 
   const PanelClass =
-    "fixed inset-0 sm:static w-full h-[100dvh] sm:h-[85vh] sm:max-w-5xl bg-[#0b0b0b] sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-2xl overflow-hidden flex flex-col z-[10060] sm:z-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:py-0";
+    "fixed inset-0 sm:static w-full h-[100dvh] sm:h-[85vh] sm:max-w-5xl overflow-hidden flex flex-col z-[10060] sm:z-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:py-0 bg-black/25 bg-gradient-to-br from-white/10 via-white/5 to-black/45 backdrop-blur-[50px] sm:rounded-[2rem] sm:border sm:border-white/20 sm:shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)]";
 
   const ButtonBase =
     "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed";
@@ -754,8 +754,9 @@ export default function TraktEpisodesWatchedModal({
     return (
       <div className="fixed inset-0 z-[99999] flex items-center justify-center sm:p-4">
         <div
-          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          className="absolute inset-0 bg-black/60 backdrop-blur-lg"
           onClick={onClose}
+          aria-hidden="true"
         />
 
         <motion.div
@@ -763,18 +764,22 @@ export default function TraktEpisodesWatchedModal({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           className={`${PanelClass} sm:max-w-lg sm:h-auto`}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Marcar película"
         >
-          <div className="p-5 border-b border-white/10 flex justify-between items-start gap-4 bg-[#0b0b0b]">
+          <div className="flex items-start justify-between gap-4 border-b border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
             <div>
               <h3 className="text-xl font-black text-white">Marcar película</h3>
-              <p className="text-sm text-zinc-400 mt-0.5 line-clamp-1">
+              <p className="mt-0.5 line-clamp-1 text-sm text-white/55">
                 {title}
               </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+              title="Cerrar"
             >
               <X className="w-5 h-5" />
             </button>
@@ -803,7 +808,7 @@ export default function TraktEpisodesWatchedModal({
                     type="datetime-local"
                     value={movieEditValue}
                     onChange={(e) => setMovieEditValue(e.target.value)}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition"
+                    className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white backdrop-blur-md transition focus:border-emerald-300/50 focus:outline-none"
                   />
                   {movieWatchedAt && (
                     <p className="mt-2 text-xs text-emerald-400">
@@ -816,7 +821,7 @@ export default function TraktEpisodesWatchedModal({
                   <button
                     type="button"
                     onClick={onClose}
-                    className={`${ButtonBase} flex-1 py-3 bg-zinc-800 text-zinc-300 hover:bg-zinc-700`}
+                    className={`${ButtonBase} flex-1 border border-white/10 bg-white/5 py-3 text-white/75 hover:bg-white/10 hover:text-white`}
                   >
                     Cancelar
                   </button>
@@ -869,8 +874,9 @@ export default function TraktEpisodesWatchedModal({
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center sm:p-4">
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       <motion.div
@@ -880,32 +886,35 @@ export default function TraktEpisodesWatchedModal({
         exit={{ opacity: 0, scale: 0.98 }}
         transition={{ duration: 0.2 }}
         className={PanelClass}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Episodios vistos"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#0b0b0b] shrink-0 z-30">
+        <div className="z-30 flex shrink-0 items-center justify-between border-b border-white/10 bg-white/[0.04] px-5 py-4 backdrop-blur-xl">
           <div className="min-w-0 pr-4">
-            <h2 className="text-lg sm:text-xl font-black text-white truncate leading-tight">
+            <h2 className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl">
               Episodios vistos
             </h2>
-            <p className="text-xs sm:text-sm text-zinc-400 truncate">{title}</p>
+            <p className="truncate text-xs text-white/55 sm:text-sm">{title}</p>
 
             {totals.totalEpisodes > 0 && (
               <div className="flex items-center gap-3 mt-2">
-                <div className="h-1.5 w-28 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-1.5 w-28 overflow-hidden rounded-full border border-white/10 bg-black/35 backdrop-blur-md">
                   <div
-                    className={`h-full rounded-full ${isRewatchView ? "bg-purple-500" : "bg-emerald-500"}`}
+                    className={`h-full rounded-full shadow-[0_0_12px_currentColor] ${isRewatchView ? "bg-purple-300 text-purple-300" : "bg-emerald-300 text-emerald-300"}`}
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
-                <span className="text-[10px] font-bold text-zinc-300">
+                <span className="text-[10px] font-bold text-white/70">
                   {progressPct}%
                 </span>
 
                 <span
                   className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
                     isRewatchView
-                      ? "bg-purple-500/10 text-purple-200 border-purple-500/20"
-                      : "bg-white/5 text-zinc-200 border-white/10"
+                      ? "bg-purple-500/15 text-purple-100 border-purple-300/25"
+                      : "bg-white/10 text-white/85 border-white/15"
                   }`}
                   title={
                     isRewatchView
@@ -924,14 +933,15 @@ export default function TraktEpisodesWatchedModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+            title="Cerrar (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Toolbar */}
-        <div className="px-4 py-3 border-b border-white/5 bg-[#0b0b0b] shrink-0 z-20 space-y-2">
+        <div className="z-20 shrink-0 space-y-2 border-b border-white/10 bg-white/[0.035] px-4 py-3 backdrop-blur-xl">
           {/* Móvil: búsqueda + toggle filtros */}
           <div className="flex gap-2 lg:hidden">
             <div className="relative flex-1">
@@ -944,7 +954,7 @@ export default function TraktEpisodesWatchedModal({
                     ? "Buscar episodio..."
                     : "Buscar temporada..."
                 }
-                className="w-full h-10 xl:h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition placeholder:text-zinc-600"
+                className="h-10 w-full rounded-xl border border-white/10 bg-black/30 py-2.5 pl-10 pr-4 text-sm text-white/85 backdrop-blur-md transition placeholder:text-white/30 focus:border-emerald-300/50 focus:outline-none"
               />
             </div>
             <button
@@ -953,7 +963,7 @@ export default function TraktEpisodesWatchedModal({
               className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
                 mobileFiltersOpen
                   ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                  : "bg-black/30 border-white/10 text-white/50 hover:border-white/20 hover:bg-white/10 hover:text-white"
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
@@ -979,8 +989,8 @@ export default function TraktEpisodesWatchedModal({
                       disabled={!isConnected}
                       className={`h-11 w-full inline-flex items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition ${
                         !isConnected
-                          ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
-                          : "bg-gradient-to-r from-zinc-900 to-zinc-950 border-zinc-800 text-zinc-200 hover:border-emerald-500/40"
+                          ? "opacity-50 cursor-not-allowed bg-black/25 border-white/10 text-white/30"
+                          : "bg-black/30 border-white/10 text-white/80 hover:border-emerald-300/40 hover:bg-white/10"
                       }`}
                     >
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-red-500/10 border border-red-500/30 text-red-400 shrink-0">
@@ -1001,7 +1011,7 @@ export default function TraktEpisodesWatchedModal({
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -6 }}
                           transition={{ duration: 0.16, ease: "easeOut" }}
-                          className="mt-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950"
+                          className="mt-1 overflow-hidden rounded-xl border border-white/10 bg-black/65 shadow-2xl backdrop-blur-2xl"
                         >
                           <div className="max-h-56 overflow-y-auto sv-scroll py-1">
                             {viewMenuItems.map((item) => {
@@ -1042,14 +1052,14 @@ export default function TraktEpisodesWatchedModal({
 
                   {/* Fila 2: Lista/Tabla + Todos */}
                   <div className="flex gap-2">
-                    <div className="flex flex-1 gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800">
+                    <div className="flex flex-1 gap-1 rounded-xl border border-white/10 bg-black/30 p-1 backdrop-blur-md">
                       <button
                         type="button"
                         onClick={() => setViewMode("list")}
                         className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
                           viewMode === "list"
-                            ? "bg-zinc-700 text-white shadow"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                            ? "bg-white/15 text-white shadow"
+                            : "text-white/45 hover:bg-white/10 hover:text-white"
                         }`}
                       >
                         <List className="w-3.5 h-3.5" /> Lista
@@ -1059,8 +1069,8 @@ export default function TraktEpisodesWatchedModal({
                         onClick={() => setViewMode("table")}
                         className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
                           viewMode === "table"
-                            ? "bg-zinc-700 text-white shadow"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                            ? "bg-white/15 text-white shadow"
+                            : "text-white/45 hover:bg-white/10 hover:text-white"
                         }`}
                       >
                         <Table2 className="w-3.5 h-3.5" /> Tabla
@@ -1072,7 +1082,7 @@ export default function TraktEpisodesWatchedModal({
                       className={`flex-1 h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap ${
                         onlyUnwatched
                           ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                          : "bg-black/30 border-white/10 text-white/50 hover:border-white/20 hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       <Filter className="w-4 h-4" />
@@ -1088,8 +1098,8 @@ export default function TraktEpisodesWatchedModal({
                       onClick={() => openAddPlayDialog("play")}
                       className={`flex-1 h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap ${
                         !isConnected
-                          ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
-                          : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
+                          ? "opacity-50 cursor-not-allowed bg-black/25 border-white/10 text-white/30"
+                          : "bg-black/30 border-white/10 text-white/75 hover:border-white/20 hover:bg-white/10"
                       }`}
                     >
                       <Plus className="w-4 h-4" /> Añadir / Rewatch
@@ -1104,8 +1114,8 @@ export default function TraktEpisodesWatchedModal({
                       }}
                       className={`flex-1 h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border text-sm font-semibold transition whitespace-nowrap ${
                         !isConnected || rewatchItems.length === 0
-                          ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
-                          : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
+                          ? "opacity-50 cursor-not-allowed bg-black/25 border-white/10 text-white/30"
+                          : "bg-black/30 border-white/10 text-white/75 hover:border-white/20 hover:bg-white/10"
                       }`}
                     >
                       <History className="w-4 h-4 text-emerald-400" />
@@ -1157,7 +1167,7 @@ export default function TraktEpisodesWatchedModal({
                     ? "Buscar episodio..."
                     : "Buscar temporada..."
                 }
-                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition placeholder:text-zinc-600"
+                className="h-11 w-full rounded-xl border border-white/10 bg-black/30 py-2.5 pl-10 pr-4 text-sm text-white/85 backdrop-blur-md transition placeholder:text-white/30 focus:border-emerald-300/50 focus:outline-none"
               />
             </div>
 
@@ -1173,8 +1183,8 @@ export default function TraktEpisodesWatchedModal({
                 title="Cambiar vista (Global o Rewatch por visionado)"
                 className={`h-10 xl:h-11 w-full inline-flex items-center gap-2 rounded-xl border px-2.5 xl:px-3 text-[11px] xl:text-sm font-semibold transition ${
                   !isConnected
-                    ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
-                    : "bg-gradient-to-r from-zinc-900 to-zinc-950 border-zinc-800 text-zinc-200 hover:border-emerald-500/40"
+                    ? "opacity-50 cursor-not-allowed bg-black/25 border-white/10 text-white/30"
+                    : "bg-black/30 border-white/10 text-white/80 hover:border-emerald-300/40 hover:bg-white/10"
                 }`}
               >
                 <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-red-500/10 border border-red-500/30 text-red-400 shrink-0">
@@ -1195,7 +1205,7 @@ export default function TraktEpisodesWatchedModal({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="absolute z-40 top-full mt-1 left-0 w-[230px] overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl"
+                    className="absolute left-0 top-full z-40 mt-1 w-[230px] overflow-hidden rounded-xl border border-white/10 bg-black/65 shadow-2xl backdrop-blur-2xl"
                   >
                     <div className="max-h-56 overflow-y-auto sv-scroll py-1">
                       {viewMenuItems.map((item) => {
@@ -1233,15 +1243,15 @@ export default function TraktEpisodesWatchedModal({
             </div>
 
             {/* Lista / Tabla */}
-            <div className="flex gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 shrink-0">
+            <div className="flex shrink-0 gap-1 rounded-xl border border-white/10 bg-black/30 p-1 backdrop-blur-md">
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
                 title="Vista lista"
                 className={`w-9 h-8 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
                   viewMode === "list"
-                    ? "bg-zinc-700 text-white shadow"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    ? "bg-white/15 text-white shadow"
+                    : "text-white/45 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <List className="w-3.5 h-3.5" />
@@ -1252,8 +1262,8 @@ export default function TraktEpisodesWatchedModal({
                 title="Vista tabla"
                 className={`w-9 h-8 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
                   viewMode === "table"
-                    ? "bg-zinc-700 text-white shadow"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    ? "bg-white/15 text-white shadow"
+                    : "text-white/45 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <Table2 className="w-3.5 h-3.5" />
@@ -1267,7 +1277,7 @@ export default function TraktEpisodesWatchedModal({
               className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl border text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 onlyUnwatched
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                  : "bg-black/30 border-white/10 text-white/50 hover:border-white/20 hover:bg-white/10 hover:text-white"
               }`}
               title={onlyUnwatched ? "Mostrar no vistos" : "Mostrar todos"}
             >
@@ -1284,8 +1294,8 @@ export default function TraktEpisodesWatchedModal({
               onClick={() => openAddPlayDialog("play")}
               className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl border text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 !isConnected
-                  ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
+                  ? "opacity-50 cursor-not-allowed bg-black/25 border-white/10 text-white/30"
+                  : "bg-black/30 border-white/10 text-white/75 hover:border-white/20 hover:bg-white/10"
               }`}
               title={
                 !isConnected
@@ -1309,8 +1319,8 @@ export default function TraktEpisodesWatchedModal({
               }}
               className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl border text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 !isConnected || rewatchItems.length === 0
-                  ? "opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800 text-zinc-500"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-600"
+                  ? "opacity-50 cursor-not-allowed bg-black/25 border-white/10 text-white/30"
+                  : "bg-black/30 border-white/10 text-white/75 hover:border-white/20 hover:bg-white/10"
               }`}
               title={
                 !isConnected
@@ -1384,7 +1394,7 @@ export default function TraktEpisodesWatchedModal({
                     className={`px-3 py-2 rounded-xl border text-xs font-black transition ${
                       rewatchMarkPreset === "today"
                         ? "bg-purple-500/15 border-purple-500/30 text-purple-100"
-                        : "bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                        : "bg-black/30 border-white/10 text-white/70 hover:bg-white/10"
                     }`}
                   >
                     Hoy
@@ -1395,7 +1405,7 @@ export default function TraktEpisodesWatchedModal({
                     className={`px-3 py-2 rounded-xl border text-xs font-black whitespace-nowrap transition ${
                       rewatchMarkPreset === "other_date"
                         ? "bg-purple-500/15 border-purple-500/30 text-purple-100"
-                        : "bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                        : "bg-black/30 border-white/10 text-white/70 hover:bg-white/10"
                     }`}
                   >
                     Otra fecha
@@ -1407,7 +1417,7 @@ export default function TraktEpisodesWatchedModal({
                     type="datetime-local"
                     value={rewatchMarkOtherValue}
                     onChange={(e) => setRewatchMarkOtherValue(e.target.value)}
-                    className="w-full sm:w-[230px] bg-zinc-900/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-purple-500/50 outline-none transition"
+                    className="w-full rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-sm text-white backdrop-blur-md transition focus:border-purple-300/50 focus:outline-none sm:w-[230px]"
                   />
                 )}
               </div>
@@ -1432,7 +1442,7 @@ export default function TraktEpisodesWatchedModal({
           ) : viewMode === "list" ? (
             <>
               {/* Sidebar Temporadas (Desktop) */}
-              <div className="hidden md:flex w-64 flex-col border-r border-white/5 bg-zinc-900/20 overflow-y-auto sv-scroll">
+              <div className="hidden w-64 flex-col overflow-y-auto border-r border-white/10 bg-white/[0.035] backdrop-blur-xl sv-scroll md:flex">
                 <div className="p-3 space-y-1">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
@@ -1454,7 +1464,7 @@ export default function TraktEpisodesWatchedModal({
                             ? isRewatchView
                               ? "bg-purple-500/10 border border-purple-500/20"
                               : "bg-emerald-500/10 border border-emerald-500/20"
-                            : "hover:bg-white/5 border border-transparent"
+                            : "border border-transparent hover:bg-white/10"
                         }`}
                       >
                         <div>
@@ -1489,7 +1499,7 @@ export default function TraktEpisodesWatchedModal({
               </div>
 
               {/* Mobile Season Selector */}
-              <div className="md:hidden w-full overflow-x-auto no-scrollbar border-b border-white/5 bg-zinc-900/20 shrink-0">
+              <div className="w-full shrink-0 overflow-x-auto border-b border-white/10 bg-white/[0.035] backdrop-blur-xl no-scrollbar md:hidden">
                 <div className="flex gap-2 p-3 min-w-max">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
@@ -1508,7 +1518,7 @@ export default function TraktEpisodesWatchedModal({
                             ? isRewatchView
                               ? "bg-purple-400 text-black border-purple-400 shadow-lg shadow-purple-500/20"
                               : "bg-emerald-500 text-black border-emerald-500 shadow-lg shadow-emerald-500/20"
-                            : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700 hover:text-white"
+                            : "bg-black/30 border-white/10 text-white/55 hover:bg-white/10 hover:text-white"
                         }`}
                       >
                         {`T${sn}`}
@@ -1555,9 +1565,9 @@ export default function TraktEpisodesWatchedModal({
                               openEpisodeDetails(sn, en);
                             }
                           }}
-                          className="group flex gap-3 sm:gap-4 p-2 sm:p-3 rounded-xl bg-zinc-900/30 border border-white/5 hover:bg-zinc-800/50 hover:border-white/10 transition cursor-pointer"
+                          className="group flex cursor-pointer gap-3 rounded-2xl border border-white/10 bg-white/[0.045] p-2 backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.08] sm:gap-4 sm:p-3"
                         >
-                          <div className="w-24 sm:w-32 aspect-video bg-zinc-800 rounded-lg overflow-hidden shrink-0 relative">
+                          <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30 sm:w-32">
                             {img ? (
                               <img
                                 src={img}
@@ -1670,13 +1680,13 @@ export default function TraktEpisodesWatchedModal({
                 return (
                   <div
                     key={sn}
-                    className="bg-zinc-900/30 border border-white/5 rounded-2xl p-4"
+                    className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 backdrop-blur-xl"
                   >
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="text-sm font-bold text-white">
                         {seasonLabelText(sn, s.name)}
                       </h4>
-                      <span className="text-xs font-medium text-zinc-500 bg-zinc-900 px-2 py-1 rounded-md border border-white/5">
+                      <span className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs font-medium text-white/45">
                         {watchedCount}/{total}
                       </span>
                     </div>
@@ -1698,7 +1708,7 @@ export default function TraktEpisodesWatchedModal({
                                 ? isRewatchView
                                   ? "bg-purple-600 border-purple-500 text-white"
                                   : "bg-emerald-600 border-emerald-500 text-white"
-                                : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700 hover:text-white"
+                                : "bg-black/30 border-white/10 text-white/55 hover:bg-white/10 hover:text-white"
                             } ${busy ? "opacity-50" : ""}`}
                             title={
                               isRewatchView
@@ -1725,7 +1735,7 @@ export default function TraktEpisodesWatchedModal({
                           onClick={() =>
                             setExpandedSeason((p) => ({ ...p, [sn]: true }))
                           }
-                          className="px-3 h-9 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-bold text-zinc-400 hover:text-white"
+                          className="h-9 rounded-lg border border-white/10 bg-black/30 px-3 text-xs font-bold text-white/55 transition hover:bg-white/10 hover:text-white"
                         >
                           +{remaining}
                         </button>
@@ -1748,16 +1758,19 @@ export default function TraktEpisodesWatchedModal({
               exit={{ opacity: 0 }}
               onClick={() => !addPlayBusy && setAddPlayOpen(false)}
             >
-              <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-lg" />
               <motion.div
                 initial={{ opacity: 0, y: 10, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.98 }}
                 transition={{ duration: 0.18 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-lg rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl overflow-hidden"
+                className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] backdrop-blur-[50px]"
+                role="dialog"
+                aria-modal="true"
+                aria-label={addPlayMode === "rewatch" ? "Crear rewatch" : "Añadir visionado"}
               >
-                <div className="p-5 border-b border-white/10 flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
                   <div>
                     <h3 className="text-lg font-black text-white">
                       {addPlayMode === "rewatch"
@@ -1774,7 +1787,8 @@ export default function TraktEpisodesWatchedModal({
                     type="button"
                     disabled={addPlayBusy}
                     onClick={() => setAddPlayOpen(false)}
-                    className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition disabled:opacity-50"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                    title="Cerrar"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1796,7 +1810,7 @@ export default function TraktEpisodesWatchedModal({
                         className={`px-3 py-3 rounded-2xl border text-sm font-black transition text-left ${
                           addPlayMode === "play"
                             ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                            : "bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                            : "bg-black/30 border-white/10 text-white/70 hover:bg-white/10"
                         }`}
                       >
                         <div>Play completo</div>
@@ -1815,7 +1829,7 @@ export default function TraktEpisodesWatchedModal({
                         className={`px-3 py-3 rounded-2xl border text-sm font-black transition text-left ${
                           addPlayMode === "rewatch"
                             ? "bg-purple-500/10 border-purple-500/30 text-purple-200"
-                            : "bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                            : "bg-black/30 border-white/10 text-white/70 hover:bg-white/10"
                         } ${!hasCreateRewatchHandler ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
                         <div>Rewatch vacío</div>
@@ -1860,7 +1874,7 @@ export default function TraktEpisodesWatchedModal({
                           ${
                             addPlayPreset === opt.id
                               ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                              : "bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                              : "bg-black/30 border-white/10 text-white/70 hover:bg-white/10"
                           }
                           ${opt.disabled ? "opacity-40 cursor-not-allowed" : ""}`}
                         title={
@@ -1884,7 +1898,7 @@ export default function TraktEpisodesWatchedModal({
                         value={addPlayOtherValue}
                         onChange={(e) => setAddPlayOtherValue(e.target.value)}
                         disabled={addPlayBusy}
-                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition"
+                        className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white backdrop-blur-md transition focus:border-emerald-300/50 focus:outline-none"
                       />
                     </div>
                   )}
@@ -1900,7 +1914,7 @@ export default function TraktEpisodesWatchedModal({
                       type="button"
                       disabled={addPlayBusy}
                       onClick={() => setAddPlayOpen(false)}
-                      className="py-3 rounded-2xl font-black text-sm transition bg-zinc-900 border border-white/10 text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+                      className="rounded-full border border-white/10 bg-white/5 py-3 text-sm font-black text-white/75 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
                     >
                       Cancelar
                     </button>
@@ -1947,14 +1961,17 @@ export default function TraktEpisodesWatchedModal({
               exit={{ opacity: 0 }}
               onClick={() => setHistoryOpen(false)}
             >
-              <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-lg" />
               <motion.div
                 initial={{ opacity: 0, y: 10, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.98 }}
                 transition={{ duration: 0.18 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-2xl rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl overflow-hidden"
+                className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] backdrop-blur-[50px]"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Historial de visionados"
               >
                 <div className="p-5 border-b border-white/10 flex items-start justify-between gap-4">
                   <div>
@@ -1968,7 +1985,8 @@ export default function TraktEpisodesWatchedModal({
                   <button
                     type="button"
                     onClick={() => setHistoryOpen(false)}
-                    className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+                    title="Cerrar"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1984,7 +2002,7 @@ export default function TraktEpisodesWatchedModal({
                         setHistoryLimit(60);
                       }}
                       placeholder="Buscar por fecha/hora..."
-                      className="w-full bg-zinc-900/50 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 py-2 pl-9 pr-4 text-sm text-white/85 backdrop-blur-md transition focus:border-emerald-300/50 focus:outline-none"
                     />
                   </div>
 
@@ -1997,7 +2015,7 @@ export default function TraktEpisodesWatchedModal({
                       visibleHistory.map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 backdrop-blur-xl"
                         >
                           <div className="min-w-0">
                             <div className="text-sm font-extrabold text-white truncate">

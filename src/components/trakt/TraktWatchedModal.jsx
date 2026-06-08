@@ -119,18 +119,32 @@ function CalendarPickerModal({ open, valueYmd, onSelect, onClose, title = 'Selec
 
     return (
         <div className="fixed inset-0 z-[10060] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
+            <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in"
+                onClick={onClose}
+                aria-hidden="true"
+            />
 
-            <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div
+                className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] backdrop-blur-[50px] animate-in zoom-in-95 duration-300 ease-out"
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
+            >
                 {/* Header Calendario */}
-                <div className="px-5 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+                <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
                     <div>
-                        <div className="text-sm font-bold text-white uppercase tracking-wide">{title}</div>
-                        <div className="text-xs text-emerald-400 mt-0.5 font-mono">
+                        <div className="text-sm font-black uppercase tracking-wide text-white drop-shadow-sm">{title}</div>
+                        <div className="mt-0.5 font-mono text-xs font-semibold text-emerald-300">
                             {selected ? formatYmdHuman(selected) : 'Sin fecha'}
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+                        title="Cerrar"
+                    >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -138,15 +152,19 @@ function CalendarPickerModal({ open, valueYmd, onSelect, onClose, title = 'Selec
                 {/* Navegación Mes */}
                 <div className="p-4 pb-0 flex items-center justify-between mb-4">
                     <button
+                        type="button"
                         onClick={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-                        className="p-2 rounded-xl hover:bg-white/10 text-zinc-300 transition"
+                        className="rounded-full border border-white/10 bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+                        title="Mes anterior"
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
                     <span className="text-sm font-bold text-white capitalize">{monthLabel}</span>
                     <button
+                        type="button"
                         onClick={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-                        className="p-2 rounded-xl hover:bg-white/10 text-zinc-300 transition"
+                        className="rounded-full border border-white/10 bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+                        title="Mes siguiente"
                     >
                         <ChevronRight className="w-5 h-5" />
                     </button>
@@ -173,7 +191,7 @@ function CalendarPickerModal({ open, valueYmd, onSelect, onClose, title = 'Selec
                                     onClick={() => key && onSelect?.(key)}
                                     className={`
                                         relative aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all duration-200
-                                        ${!inMonth ? 'text-zinc-700 opacity-50' : 'text-zinc-300 hover:bg-white/10'}
+                                        ${!inMonth ? 'text-white/20 opacity-50' : 'text-white/70 hover:bg-white/10 hover:text-white'}
                                         ${isSel ? '!bg-emerald-500 !text-black font-extrabold shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 z-10' : ''}
                                         ${isToday && !isSel ? 'bg-white/5 border border-white/10 text-white' : ''}
                                     `}
@@ -185,10 +203,11 @@ function CalendarPickerModal({ open, valueYmd, onSelect, onClose, title = 'Selec
                         })}
                     </div>
 
-                    <div className="mt-5 pt-4 border-t border-white/5 flex gap-2">
+                    <div className="mt-5 flex gap-2 border-t border-white/10 pt-4">
                         <button
+                            type="button"
                             onClick={() => onSelect?.(todayYmd())}
-                            className="flex-1 py-2.5 rounded-xl bg-white/5 text-xs font-bold text-white hover:bg-white/10 transition"
+                            className="flex-1 rounded-full border border-white/20 bg-white/10 py-2.5 text-xs font-bold uppercase tracking-wide text-white/90 backdrop-blur-xl transition hover:bg-white/20 active:scale-95"
                         >
                             Seleccionar Hoy
                         </button>
@@ -211,8 +230,11 @@ export default function TraktWatchedModal({
     onAddPlay,
     onUpdatePlay,
     onRemovePlay,
-    busy
+    busy,
+    busyKey
 }) {
+    const isBusy = !!(busy || busyKey)
+
     // Hooks y lógica (igual que antes)
     const items = useMemo(() => {
         const arr = Array.isArray(history) ? history : []
@@ -280,52 +302,63 @@ export default function TraktWatchedModal({
         setCalOpen(false)
     }
     const doAdd = async () => {
-        if (!newDate || busy) return
+        if (!newDate || isBusy) return
         await onAddPlay?.(newDate)
         setNewDate(todayYmd())
     }
     const doSaveEdit = async () => {
-        if (!editingId || !editDate || busy) return
+        if (!editingId || !editDate || isBusy) return
         await onUpdatePlay?.(editingId, editDate)
         stopEdit()
     }
     const doRemove = async (id) => {
-        if (!id || busy) return
+        if (!id || isBusy) return
         await onRemovePlay?.(id)
         if (editingId === id) stopEdit()
     }
 
     return (
-        <div className="fixed inset-0 z-[10050] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[10050] flex items-center justify-center p-4 sm:p-6">
             {/* Backdrop con Blur y Fade */}
-            <div className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose} />
+            <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
+                onClick={onClose}
+                aria-hidden="true"
+            />
 
             {/* Modal Container */}
-            <div className="relative w-full max-w-md flex flex-col max-h-[90vh] 
-                            rounded-3xl border border-white/10 bg-[#050505] 
-                            shadow-[0_0_50px_-12px_rgba(255,255,255,0.05)] 
-                            overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div
+                className="relative flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] backdrop-blur-[50px] animate-in zoom-in-95 duration-300 ease-out"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Historial de visionados"
+            >
 
                 {/* Header Premium */}
-                <div className="px-6 py-5 border-b border-white/5 flex items-start justify-between bg-white/[0.02]">
+                <div className="flex items-start justify-between border-b border-white/10 px-6 py-5 sm:px-7">
                     <div>
-                        <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
+                        <h3 className="text-xl font-black text-white drop-shadow-md">
                             Historial de Visionado
                         </h3>
                         <div className="flex items-center gap-2 mt-1">
-                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400 uppercase tracking-wide">
+                            <span className="flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200 backdrop-blur-md">
                                 <Check className="w-3 h-3" />
                                 {plays ? `${plays} Vistas` : 'Sin ver'}
                             </span>
                             {traktUrl && (
-                                <a href={traktUrl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-zinc-500 hover:text-white transition flex items-center gap-1">
+                                <a href={traktUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] font-bold text-white/50 transition hover:text-white">
                                     Trakt <ExternalLink className="w-2.5 h-2.5" />
                                 </a>
                             )}
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 -mr-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white hover:rotate-90 transition-all duration-300">
-                        <X className="w-6 h-6" />
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+                        title="Cerrar (Esc)"
+                    >
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
 
@@ -333,30 +366,33 @@ export default function TraktWatchedModal({
 
                     {/* SECCIÓN 1: AÑADIR NUEVO (Hero Section) */}
                     <div className="relative group">
-                        <div className="absolute -inset-2 bg-gradient-to-b from-emerald-500/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition duration-500 blur-lg" />
-                        <div className="relative flex flex-col gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                        <div className="absolute -inset-2 rounded-3xl bg-gradient-to-b from-emerald-400/15 to-transparent opacity-0 blur-lg transition duration-500 group-hover:opacity-100" />
+                        <div className="relative flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Registrar nueva vista</span>
-                                {busy && <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />}
+                                <span className="text-xs font-bold uppercase tracking-wider text-white/60">Registrar nueva vista</span>
+                                {isBusy && <Loader2 className="w-4 h-4 text-emerald-300 animate-spin" />}
                             </div>
 
                             <div className="flex gap-2">
                                 <button
+                                    type="button"
                                     onClick={openCalendarForNew}
-                                    disabled={busy}
-                                    className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl bg-black/40 border border-white/10 hover:border-white/20 text-left transition disabled:opacity-50"
+                                    disabled={isBusy}
+                                    className="flex flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-left backdrop-blur-md transition hover:border-white/20 hover:bg-white/10 disabled:opacity-50"
                                 >
-                                    <CalendarDays className="w-5 h-5 text-zinc-400" />
+                                    <CalendarDays className="w-5 h-5 text-emerald-200/80" />
                                     <div>
-                                        <div className="text-xs text-zinc-500 font-medium">Fecha</div>
+                                        <div className="text-xs font-medium text-white/45">Fecha</div>
                                         <div className="text-sm font-bold text-white">{formatYmdHuman(newDate)}</div>
                                     </div>
                                 </button>
 
                                 <button
+                                    type="button"
                                     onClick={doAdd}
-                                    disabled={busy}
-                                    className="px-5 py-3 rounded-xl bg-emerald-500 text-black font-extrabold hover:bg-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                    disabled={isBusy}
+                                    className="flex items-center justify-center rounded-full border border-emerald-200/30 bg-emerald-400/90 px-5 py-3 font-extrabold text-black shadow-[0_10px_30px_-10px_rgba(52,211,153,0.65)] transition-all hover:bg-emerald-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                                    title="Añadir visionado"
                                 >
                                     <Plus className="w-6 h-6" />
                                 </button>
@@ -367,14 +403,14 @@ export default function TraktWatchedModal({
                     {/* SECCIÓN 2: HISTORIAL (Timeline) */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2">
-                            <History className="w-4 h-4 text-zinc-500" />
-                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Actividad Reciente</h4>
+                            <History className="w-4 h-4 text-white/40" />
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-white/45">Actividad Reciente</h4>
                         </div>
 
                         {!items.length ? (
-                            <div className="py-8 flex flex-col items-center justify-center text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
-                                <Clock className="w-8 h-8 text-zinc-700 mb-2" />
-                                <p className="text-sm text-zinc-500">No hay registros en el historial.</p>
+                            <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/15 bg-white/[0.04] py-8 text-center backdrop-blur-xl">
+                                <Clock className="mb-2 w-8 h-8 text-white/25" />
+                                <p className="text-sm text-white/45">No hay registros en el historial.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -386,23 +422,23 @@ export default function TraktWatchedModal({
                                         <div
                                             key={it.id}
                                             className={`
-                                                relative p-4 rounded-2xl border transition-all duration-300
+                                                relative rounded-3xl border p-4 backdrop-blur-xl transition-all duration-300
                                                 ${isEditing
-                                                    ? 'bg-zinc-900 border-yellow-500/30 shadow-[0_0_30px_-10px_rgba(234,179,8,0.2)]'
-                                                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04] hover:border-white/10'
+                                                    ? 'border-yellow-300/30 bg-yellow-400/10 shadow-[0_0_30px_-10px_rgba(234,179,8,0.35)]'
+                                                    : 'border-white/10 bg-white/[0.045] hover:border-white/20 hover:bg-white/[0.08]'
                                                 }
                                             `}
                                         >
                                             <div className="flex items-start justify-between gap-4">
                                                 <div className="flex items-center gap-4">
                                                     <div className={`
-                                                        w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border
-                                                        ${isEditing ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500' : 'bg-white/5 border-white/5 text-zinc-500'}
+                                                        w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border backdrop-blur-md
+                                                        ${isEditing ? 'bg-yellow-400/15 border-yellow-300/25 text-yellow-200' : 'bg-white/5 border-white/10 text-white/45'}
                                                     `}>
                                                         {isEditing ? <Pencil className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                                     </div>
                                                     <div>
-                                                        <div className={`text-base sm:text-lg font-extrabold tracking-tight leading-tight ${isEditing ? 'text-yellow-100' : 'text-zinc-100'}`}>
+                                                        <div className={`text-base sm:text-lg font-extrabold tracking-tight leading-tight ${isEditing ? 'text-yellow-100' : 'text-white'}`}>
                                                             {isEditing ? 'Editando fecha...' : date}
                                                         </div>
                                                     </div>
@@ -412,17 +448,19 @@ export default function TraktWatchedModal({
                                                 {!isEditing && (
                                                     <div className="flex items-center gap-1">
                                                         <button
+                                                            type="button"
                                                             onClick={() => startEdit(it.id, it.watchedAt)}
-                                                            disabled={busy}
-                                                            className="p-2 rounded-lg hover:bg-white/10 text-zinc-500 hover:text-white transition"
+                                                            disabled={isBusy}
+                                                            className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
                                                             title="Editar"
                                                         >
                                                             <Pencil className="w-4 h-4" />
                                                         </button>
                                                         <button
+                                                            type="button"
                                                             onClick={() => doRemove(it.id)}
-                                                            disabled={busy}
-                                                            className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition"
+                                                            disabled={isBusy}
+                                                            className="rounded-full p-2 text-white/45 transition hover:bg-red-500/15 hover:text-red-300"
                                                             title="Eliminar"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
@@ -436,24 +474,28 @@ export default function TraktWatchedModal({
                                                 <div className="mt-4 pt-4 border-t border-white/10 animate-in slide-in-from-top-2 fade-in">
                                                     <div className="flex gap-2">
                                                         <button
+                                                            type="button"
                                                             onClick={openCalendarForEdit}
-                                                            disabled={busy}
-                                                            className="flex-1 flex items-center justify-between px-3 py-2.5 rounded-xl bg-black/50 border border-white/10 hover:border-white/20 text-sm text-zinc-200 transition"
+                                                            disabled={isBusy}
+                                                            className="flex flex-1 items-center justify-between rounded-2xl border border-white/10 bg-black/35 px-3 py-2.5 text-sm text-white/85 transition hover:border-white/20 hover:bg-white/10"
                                                         >
                                                             <span className="font-mono">{formatYmdHuman(editDate)}</span>
-                                                            <CalendarDays className="w-4 h-4 text-yellow-500" />
+                                                            <CalendarDays className="w-4 h-4 text-yellow-200" />
                                                         </button>
                                                         <button
+                                                            type="button"
                                                             onClick={doSaveEdit}
-                                                            disabled={busy}
-                                                            className="px-4 py-2 rounded-xl bg-yellow-500 text-black text-sm font-bold hover:bg-yellow-400 transition"
+                                                            disabled={isBusy}
+                                                            className="rounded-full border border-yellow-200/30 bg-yellow-300/90 px-4 py-2 text-sm font-bold text-black transition hover:bg-yellow-200 active:scale-95"
                                                         >
                                                             Guardar
                                                         </button>
                                                         <button
+                                                            type="button"
                                                             onClick={stopEdit}
-                                                            disabled={busy}
-                                                            className="px-3 py-2 rounded-xl bg-white/5 text-zinc-400 text-sm font-bold hover:bg-white/10 transition"
+                                                            disabled={isBusy}
+                                                            className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-white/60 transition hover:bg-white/10 hover:text-white"
+                                                            title="Cancelar"
                                                         >
                                                             <X className="w-4 h-4" />
                                                         </button>
