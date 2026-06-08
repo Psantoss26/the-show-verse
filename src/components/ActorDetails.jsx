@@ -13,7 +13,7 @@ import {
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { FreeMode } from "swiper";
+import { FreeMode } from "swiper/modules";
 import "swiper/swiper-bundle.css";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {

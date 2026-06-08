@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, FreeMode } from "swiper";
+import { Navigation, FreeMode } from "swiper/modules";
 import "swiper/swiper-bundle.css";
 
 // Score fetching APIs

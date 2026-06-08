@@ -3,7 +3,7 @@
 
 import { useRef, useEffect, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, FreeMode } from "swiper";
+import { Navigation, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion, useInView } from "framer-motion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
