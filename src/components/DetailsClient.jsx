@@ -7390,6 +7390,9 @@ export default function DetailsClient({
   const sentinelRef = useRef(null);
   const menuStickyRef = useRef(null);
   const sectionElsRef = useRef({});
+  const pendingSectionRef = useRef(null);
+  const pendingSectionTimerRef = useRef(null);
+  const pendingScrollEndCleanupRef = useRef(null);
 
   const [menuCompact, setMenuCompact] = useState(false);
   const [menuH, setMenuH] = useState(0);
@@ -7452,6 +7455,40 @@ export default function DetailsClient({
 
       const offset = STICKY_TOP + (menuH || 0) + 10;
       const y = window.scrollY + el.getBoundingClientRect().top - offset;
+
+      if (pendingScrollEndCleanupRef.current) {
+        pendingScrollEndCleanupRef.current();
+        pendingScrollEndCleanupRef.current = null;
+      }
+      if (pendingSectionTimerRef.current) {
+        window.clearTimeout(pendingSectionTimerRef.current);
+        pendingSectionTimerRef.current = null;
+      }
+
+      pendingSectionRef.current = sid;
+      setActiveSectionId(sid);
+
+      const releasePending = () => {
+        if (pendingSectionRef.current === sid) {
+          pendingSectionRef.current = null;
+          setActiveSectionId((prev) => (prev === sid ? prev : sid));
+        }
+        if (pendingSectionTimerRef.current) {
+          window.clearTimeout(pendingSectionTimerRef.current);
+          pendingSectionTimerRef.current = null;
+        }
+        if (pendingScrollEndCleanupRef.current) {
+          pendingScrollEndCleanupRef.current();
+          pendingScrollEndCleanupRef.current = null;
+        }
+      };
+
+      window.addEventListener("scrollend", releasePending, { once: true });
+      pendingScrollEndCleanupRef.current = () => {
+        window.removeEventListener("scrollend", releasePending);
+      };
+      pendingSectionTimerRef.current = window.setTimeout(releasePending, 1800);
+
       window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
     },
     [menuH],
@@ -7460,39 +7497,67 @@ export default function DetailsClient({
   // Scroll-spy (qué sección está “activa”)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const ids = (sectionItems || []).map((x) => x?.id).filter(Boolean);
-    if (!ids.length) return;
+    let raf = 0;
 
-    const elements = ids
-      .map(
-        (sid) =>
-          sectionElsRef.current[sid] ||
-          document.getElementById(`section-${sid}`),
-      )
-      .filter(Boolean);
+    const getSectionElements = () =>
+      (sectionItems || [])
+        .map((x) => x?.id)
+        .filter(Boolean)
+        .map((sid) => ({
+          id: sid,
+          el:
+            sectionElsRef.current[sid] ||
+            document.getElementById(`section-${sid}`),
+        }))
+        .filter((item) => item.el);
 
-    if (!elements.length) return;
+    const updateActiveSection = () => {
+      raf = 0;
+      const sections = getSectionElements();
+      if (!sections.length) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+      const offset = STICKY_TOP + (menuH || 0) + 10;
+      const pendingId = pendingSectionRef.current;
 
-        if (!visible.length) return;
+      if (pendingId) {
+        setActiveSectionId((prev) => (prev === pendingId ? prev : pendingId));
+        return;
+      }
 
-        const next = visible[0].target.id?.replace(/^section-/, "") || ids[0];
-        setActiveSectionId((prev) => (prev === next ? prev : next));
-      },
-      {
-        root: null,
-        rootMargin: `-${STICKY_TOP + 16}px 0px -55% 0px`,
-        threshold: [0, 0.25, 0.5, 0.75],
-      },
-    );
+      const probeY = window.scrollY + offset + 16;
+      let next = sections[0].id;
 
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+      for (const { id, el } of sections) {
+        const top = window.scrollY + el.getBoundingClientRect().top;
+        if (top <= probeY) next = id;
+        else break;
+      }
+
+      setActiveSectionId((prev) => (prev === next ? prev : next));
+    };
+
+    const requestUpdate = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(updateActiveSection);
+    };
+
+    requestUpdate();
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+    window.addEventListener("resize", requestUpdate);
+
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", requestUpdate);
+      window.removeEventListener("resize", requestUpdate);
+      if (pendingSectionTimerRef.current) {
+        window.clearTimeout(pendingSectionTimerRef.current);
+        pendingSectionTimerRef.current = null;
+      }
+      if (pendingScrollEndCleanupRef.current) {
+        pendingScrollEndCleanupRef.current();
+        pendingScrollEndCleanupRef.current = null;
+      }
+    };
   }, [sectionItems, menuH]);
 
   useEffect(() => {
