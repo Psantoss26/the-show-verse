@@ -313,7 +313,8 @@ export default function EpisodeDetailsClient({
   }, []);
 
   const hasNumericScoreboardStats = useCallback(
-    (stats) => Object.values(stats || {}).some((value) => typeof value === "number"),
+    (stats) =>
+      Object.values(stats || {}).some((value) => typeof value === "number"),
     [],
   );
 
@@ -491,7 +492,15 @@ export default function EpisodeDetailsClient({
       controller.abort();
       cancelSchedule();
     };
-  }, [showId, seasonNumber, episodeNumber, imdbId, imdb, showName, show?.seasons]);
+  }, [
+    showId,
+    seasonNumber,
+    episodeNumber,
+    imdbId,
+    imdb,
+    showName,
+    show?.seasons,
+  ]);
 
   useEffect(() => {
     if (episodeCredits) return;
@@ -598,20 +607,27 @@ export default function EpisodeDetailsClient({
         const next = val == null || Number(val) <= 0 ? null : Number(val);
 
         setRatingLoading(true);
-        const res = await offlineMutationFetch("/api/trakt/ratings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "episode",
-            tmdbId: Number(showId), // TMDb ID de la SERIE (show)
-            season: Number(seasonNumber),
-            episode: Number(episodeNumber),
-            rating: next, // null => remove
-          }),
-        }, {
-          label: next == null ? "Quitar valoracion de episodio" : "Guardar valoracion de episodio",
-          dedupeKey: `trakt:episode-rating:${showId}:${seasonNumber}:${episodeNumber}`,
-        });
+        const res = await offlineMutationFetch(
+          "/api/trakt/ratings",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "episode",
+              tmdbId: Number(showId), // TMDb ID de la SERIE (show)
+              season: Number(seasonNumber),
+              episode: Number(episodeNumber),
+              rating: next, // null => remove
+            }),
+          },
+          {
+            label:
+              next == null
+                ? "Quitar valoracion de episodio"
+                : "Guardar valoracion de episodio",
+            dedupeKey: `trakt:episode-rating:${showId}:${seasonNumber}:${episodeNumber}`,
+          },
+        );
 
         if (res.status === 401) {
           window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
@@ -642,7 +658,9 @@ export default function EpisodeDetailsClient({
       connected: hasInitialShowWatched
         ? initialShowWatched?.connected !== false
         : false,
-      found: hasInitialShowWatched ? initialShowWatched?.found !== false : false,
+      found: hasInitialShowWatched
+        ? initialShowWatched?.found !== false
+        : false,
       watched: false,
       error: "",
       traktId: initialShowWatched?.traktId ?? null,
@@ -650,7 +668,9 @@ export default function EpisodeDetailsClient({
 
     if (typeof window !== "undefined" && !hasInitialShowWatched) {
       try {
-        const cachedRaw = window.localStorage.getItem(traktShowWatchedStorageKey);
+        const cachedRaw = window.localStorage.getItem(
+          traktShowWatchedStorageKey,
+        );
         const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
         const cachedWatched = normalizeWatchedBySeason(cached?.watchedBySeason);
         if (cachedWatched) {
@@ -761,7 +781,9 @@ export default function EpisodeDetailsClient({
 
         setTraktConnected(true);
 
-        const watchedRes = await traktGetShowWatched({ tmdbId: Number(showId) });
+        const watchedRes = await traktGetShowWatched({
+          tmdbId: Number(showId),
+        });
         if (requestId !== traktRequestIdRef.current) return null;
 
         applyShowWatchedPayload({
@@ -796,12 +818,7 @@ export default function EpisodeDetailsClient({
         return nextState;
       }
     },
-    [
-      showId,
-      watchedBySeasonLoaded,
-      trakt.watched,
-      applyShowWatchedPayload,
-    ],
+    [showId, watchedBySeasonLoaded, trakt.watched, applyShowWatchedPayload],
   );
 
   useEffect(() => {
@@ -890,7 +907,13 @@ export default function EpisodeDetailsClient({
       window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [reloadEpisodeTraktState, trakt.loading, trakt.connected, trakt.error, watchedBusy]);
+  }, [
+    reloadEpisodeTraktState,
+    trakt.loading,
+    trakt.connected,
+    trakt.error,
+    watchedBusy,
+  ]);
 
   // Toggle watched para el episodio
   const toggleEpisodeWatched = useCallback(async () => {
@@ -1169,42 +1192,42 @@ export default function EpisodeDetailsClient({
 
               {!tScoreboard.loading &&
                 hasNumericScoreboardStats(tScoreboard?.stats) && (
-                <div className="border-t border-white/5 bg-black/10">
-                  <div
-                    className="
+                  <div className="border-t border-white/5 bg-black/10">
+                    <div
+                      className="
           overflow-x-auto
           [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
           py-2
           pl-[calc(1rem+env(safe-area-inset-left))]
           pr-[calc(1rem+env(safe-area-inset-right))]
         "
-                  >
-                    <div className="flex items-center gap-3 min-w-max">
-                      <div className="shrink-0">
-                        <MiniStat
-                          icon={Eye}
-                          value={fmtStat(tScoreboard?.stats?.watchers)}
-                          tooltip="Watchers"
-                        />
-                      </div>
-                      <div className="shrink-0">
-                        <MiniStat
-                          icon={PlayIcon}
-                          value={fmtStat(tScoreboard?.stats?.plays)}
-                          tooltip="Plays"
-                        />
-                      </div>
-                      <div className="shrink-0">
-                        <MiniStat
-                          icon={ListIcon}
-                          value={fmtStat(tScoreboard?.stats?.lists)}
-                          tooltip="Lists"
-                        />
+                    >
+                      <div className="flex items-center gap-3 min-w-max">
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Eye}
+                            value={fmtStat(tScoreboard?.stats?.watchers)}
+                            tooltip="Watchers"
+                          />
+                        </div>
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={PlayIcon}
+                            value={fmtStat(tScoreboard?.stats?.plays)}
+                            tooltip="Plays"
+                          />
+                        </div>
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={ListIcon}
+                            value={fmtStat(tScoreboard?.stats?.lists)}
+                            tooltip="Lists"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
 
             {/* Tabs (DETALLES / SINOPSIS) */}

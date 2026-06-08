@@ -1748,7 +1748,11 @@ export default function DetailsClient({
   const preferredVideo = useMemo(() => pickPreferredVideo(videos), [videos]);
   const soundtrackSearchQuery = useMemo(() => {
     if (!title) return "";
-    return [title, yearIso, endpointType === "tv" ? "series soundtrack" : "movie soundtrack"]
+    return [
+      title,
+      yearIso,
+      endpointType === "tv" ? "series soundtrack" : "movie soundtrack",
+    ]
       .filter(Boolean)
       .join(" ");
   }, [endpointType, title, yearIso]);
@@ -8810,8 +8814,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                ================================================================= */}
             {/* Sección de botones de acción rápida: reproducir tráiler, marcar como visto,
                 puntuar, agregar a favoritos, watchlist y listas, cambiar portada */}
-            <FadeIn delay={0.12} className="mb-6 px-1">
-              <div className="flex flex-wrap items-center gap-2">
+            <FadeIn delay={0.12} className="mb-6 px-1 w-full">
+              <div
+                className="flex flex-nowrap items-center justify-between sm:justify-start gap-1.5 sm:gap-2 w-full
+                [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-0 [&>*:not(.separator)]:max-w-[48px]
+                [&_[data-liquid-button]]:!w-full [&_[data-liquid-button]]:!h-auto [&_[data-liquid-button]]:aspect-square
+                [&_[data-liquid-button]_svg]:!w-4 [&_[data-liquid-button]_svg]:!h-4 sm:[&_[data-liquid-button]_svg]:!w-5 sm:[&_[data-liquid-button]_svg]:!h-5
+                [&_[data-liquid-button]_.text-xl]:!text-base sm:[&_[data-liquid-button]_.text-xl]:!text-xl"
+              >
                 {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
                 <LiquidButton
                   onClick={() => openVideo(preferredVideo)}
@@ -8822,7 +8832,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   title={preferredVideo ? "Ver Tráiler" : "Sin Tráiler"}
                 >
                   <Play
-                    className={`w-5 h-5 fill-current ${preferredVideo ? "ml-0.5" : ""}`}
+                    className={`fill-current ${preferredVideo ? "ml-0.5 sm:ml-1" : ""}`}
                   />
                 </LiquidButton>
 
@@ -8832,17 +8842,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   disabled={!soundtrackSearchQuery}
                   activeColor="yellow"
                   groupId="details-actions"
+                  className={
+                    soundtrackSearchQuery ? "!bg-white !text-black" : ""
+                  }
                   title={
                     soundtrackSearchQuery
                       ? "Reproducir soundtrack"
                       : "Sin soundtrack"
                   }
                 >
-                  <Music2 className="w-5 h-5" />
+                  <Music2 />
                 </LiquidButton>
 
                 {/* Separador vertical entre el botón de tráiler y los controles de Trakt */}
-                <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
+                <div className="w-px h-8 bg-white/10 mx-0.5 sm:mx-1 hidden sm:block shrink-0 separator" />
 
                 {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
                 <TraktWatchedControl
@@ -8890,11 +8903,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   }
                 >
                   {favLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="animate-spin" />
                   ) : (
-                    <Heart
-                      className={`w-5 h-5 ${favorite ? "fill-current" : ""}`}
-                    />
+                    <Heart className={`${favorite ? "fill-current" : ""}`} />
                   )}
                 </LiquidButton>
 
@@ -8913,10 +8924,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   }
                 >
                   {wlLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="animate-spin" />
                   ) : (
                     <BookmarkPlus
-                      className={`w-5 h-5 ${watchlist ? "fill-current" : ""}`}
+                      className={`${watchlist ? "fill-current" : ""}`}
                     />
                   )}
                 </LiquidButton>
@@ -8932,9 +8943,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     title="Añadir a lista"
                   >
                     {listsPresenceLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <Loader2 className="animate-spin" />
                     ) : (
-                      <ListVideo className="w-5 h-5" />
+                      <ListVideo />
                     )}
                   </LiquidButton>
                 )}
@@ -8957,7 +8968,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   }
                 >
                   <ImageIcon
-                    className={`w-5 h-5 transition-all duration-200 ${
+                    className={`transition-all duration-200 ${
                       posterToggleBusy ? "scale-95 opacity-75" : "scale-100"
                     }`}
                   />
@@ -8996,7 +9007,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* Badge de TMDb - Muestra la puntuación promedio y número de votos */}
                     <CompactBadge
                       logo="/logo-TMDb.png"
-                      logoClassName="h-2 sm:h-4"
+                      logoClassName="h-5 sm:h-5"
                       value={data.vote_average?.toFixed(1)}
                       sub={formatCountShort(data.vote_count)}
                       href={tmdbDetailUrl}
@@ -10951,7 +10962,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 >
                                   <div className="relative aspect-video overflow-hidden">
                                     <img
-                                      src={track.artworkUrl || "/placeholder.png"}
+                                      src={
+                                        track.artworkUrl || "/placeholder.png"
+                                      }
                                       alt=""
                                       className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
                                     />

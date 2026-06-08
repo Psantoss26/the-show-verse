@@ -296,7 +296,8 @@ export default function SeasonDetailsClient({
   }, []);
 
   const hasNumericScoreboardStats = useCallback(
-    (stats) => Object.values(stats || {}).some((value) => typeof value === "number"),
+    (stats) =>
+      Object.values(stats || {}).some((value) => typeof value === "number"),
     [],
   );
 
@@ -352,7 +353,9 @@ export default function SeasonDetailsClient({
       connected: hasInitialShowWatched
         ? initialShowWatched?.connected !== false
         : false,
-      found: hasInitialShowWatched ? initialShowWatched?.found !== false : false,
+      found: hasInitialShowWatched
+        ? initialShowWatched?.found !== false
+        : false,
       traktId: initialShowWatched?.traktId ?? null,
       watched: watchedEpisodes > 0,
       error: "",
@@ -388,7 +391,9 @@ export default function SeasonDetailsClient({
       connected: hasInitialShowWatched
         ? initialShowWatched?.connected !== false
         : false,
-      found: hasInitialShowWatched ? initialShowWatched?.found !== false : false,
+      found: hasInitialShowWatched
+        ? initialShowWatched?.found !== false
+        : false,
       traktId: initialShowWatched?.traktId ?? null,
       watched: false,
       error: "",
@@ -396,7 +401,9 @@ export default function SeasonDetailsClient({
 
     if (typeof window !== "undefined" && !hasInitialShowWatched) {
       try {
-        const cachedRaw = window.localStorage.getItem(traktShowWatchedStorageKey);
+        const cachedRaw = window.localStorage.getItem(
+          traktShowWatchedStorageKey,
+        );
         const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
         const cachedWatched = normalizeWatchedBySeason(cached?.watchedBySeason);
         if (cachedWatched) {
@@ -511,7 +518,9 @@ export default function SeasonDetailsClient({
       }));
 
       try {
-        const watchedRes = await traktGetShowWatched({ tmdbId: Number(showId) });
+        const watchedRes = await traktGetShowWatched({
+          tmdbId: Number(showId),
+        });
         if (requestId !== traktRequestIdRef.current) return null;
 
         setTraktConnected(watchedRes?.connected !== false);
@@ -754,19 +763,26 @@ export default function SeasonDetailsClient({
       try {
         setRatingLoading(true);
 
-        const res = await offlineMutationFetch("/api/trakt/ratings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "season",
-            tmdbId: Number(showId),
-            season: Number(seasonNumber),
-            rating: val ?? null,
-          }),
-        }, {
-          label: val == null ? "Quitar valoracion de temporada" : "Guardar valoracion de temporada",
-          dedupeKey: `trakt:season-rating:${showId}:${seasonNumber}`,
-        });
+        const res = await offlineMutationFetch(
+          "/api/trakt/ratings",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "season",
+              tmdbId: Number(showId),
+              season: Number(seasonNumber),
+              rating: val ?? null,
+            }),
+          },
+          {
+            label:
+              val == null
+                ? "Quitar valoracion de temporada"
+                : "Guardar valoracion de temporada",
+            dedupeKey: `trakt:season-rating:${showId}:${seasonNumber}`,
+          },
+        );
 
         if (res.status === 401) {
           window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}`;
@@ -846,7 +862,13 @@ export default function SeasonDetailsClient({
       window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [reloadSeasonTraktState, trakt.loading, trakt.connected, trakt.error, watchedBusy]);
+  }, [
+    reloadSeasonTraktState,
+    trakt.loading,
+    trakt.connected,
+    trakt.error,
+    watchedBusy,
+  ]);
 
   const toggleSeasonWatched = useCallback(async () => {
     if (trakt.loading || watchedBusy || Number(seasonNumber) <= 0) return;
@@ -981,7 +1003,9 @@ export default function SeasonDetailsClient({
           >
             <AnimatedPosterFrame
               src={
-                posterPath ? `https://image.tmdb.org/t/p/w780${posterPath}` : null
+                posterPath
+                  ? `https://image.tmdb.org/t/p/w780${posterPath}`
+                  : null
               }
               alt={seasonName}
               aspect="poster"
@@ -1128,42 +1152,42 @@ export default function SeasonDetailsClient({
               {/* Footer stats */}
               {!tScoreboard.loading &&
                 hasNumericScoreboardStats(tScoreboard?.stats) && (
-                <div className="border-t border-white/5 bg-black/10">
-                  <div
-                    className="
+                  <div className="border-t border-white/5 bg-black/10">
+                    <div
+                      className="
                       overflow-x-auto
                       [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
                       py-2
                       pl-[calc(1rem+env(safe-area-inset-left))]
                       pr-[calc(1rem+env(safe-area-inset-right))]
                     "
-                  >
-                    <div className="flex items-center gap-3 min-w-max">
-                      <div className="shrink-0">
-                        <MiniStat
-                          icon={Eye}
-                          value={fmtStat(tScoreboard?.stats?.watchers)}
-                          tooltip="Watchers"
-                        />
-                      </div>
-                      <div className="shrink-0">
-                        <MiniStat
-                          icon={PlayIcon}
-                          value={fmtStat(tScoreboard?.stats?.plays)}
-                          tooltip="Plays"
-                        />
-                      </div>
-                      <div className="shrink-0">
-                        <MiniStat
-                          icon={ListIcon}
-                          value={fmtStat(tScoreboard?.stats?.lists)}
-                          tooltip="Lists"
-                        />
+                    >
+                      <div className="flex items-center gap-3 min-w-max">
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Eye}
+                            value={fmtStat(tScoreboard?.stats?.watchers)}
+                            tooltip="Watchers"
+                          />
+                        </div>
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={PlayIcon}
+                            value={fmtStat(tScoreboard?.stats?.plays)}
+                            tooltip="Plays"
+                          />
+                        </div>
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={ListIcon}
+                            value={fmtStat(tScoreboard?.stats?.lists)}
+                            tooltip="Lists"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
 
             {/* Tabs */}

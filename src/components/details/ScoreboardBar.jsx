@@ -253,19 +253,23 @@ export default function ScoreboardBar({
       setUserRating(val);
 
       try {
-        const r = await offlineMutationFetch("/api/trakt/ratings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          cache: "no-store",
-          body: JSON.stringify({
-            type: traktParams.type,
-            ids: { trakt: traktIdForUserRating },
-            rating: val,
-          }),
-        }, {
-          label: val == null ? "Quitar valoracion" : "Guardar valoracion",
-          dedupeKey: `trakt:scoreboard-rating:${traktParams.type}:${traktIdForUserRating}`,
-        });
+        const r = await offlineMutationFetch(
+          "/api/trakt/ratings",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify({
+              type: traktParams.type,
+              ids: { trakt: traktIdForUserRating },
+              rating: val,
+            }),
+          },
+          {
+            label: val == null ? "Quitar valoracion" : "Guardar valoracion",
+            dedupeKey: `trakt:scoreboard-rating:${traktParams.type}:${traktIdForUserRating}`,
+          },
+        );
 
         if (r.status === 401) {
           setTraktConnected(false);
