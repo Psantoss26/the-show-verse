@@ -74,6 +74,7 @@ async function fetchGetJsonDeduped(
     if (!res.ok) {
       const err = new Error(json?.error || `HTTP ${res.status}`);
       err.status = res.status;
+      err.payload = json;
       throw err;
     }
     return json;
@@ -275,8 +276,12 @@ export async function traktHistoryOp({
   });
 
   const json = await safeJson(res);
-  if (!res.ok)
-    throw new Error(json?.error || `Trakt history HTTP ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(json?.error || `Trakt history HTTP ${res.status}`);
+    err.status = res.status;
+    err.payload = json;
+    throw err;
+  }
   return json;
 }
 
@@ -322,8 +327,12 @@ export async function traktGetHistory({
     cache: "no-store",
   });
   const json = await safeJson(res);
-  if (!res.ok)
-    throw new Error(json?.error || `Trakt history HTTP ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(json?.error || `Trakt history HTTP ${res.status}`);
+    err.status = res.status;
+    err.payload = json;
+    throw err;
+  }
   return json;
 }
 

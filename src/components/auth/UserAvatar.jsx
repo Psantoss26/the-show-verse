@@ -6,6 +6,7 @@ import Link from 'next/link'
 export default function UserAvatar() {
   const [traktAvatarUrl, setTraktAvatarUrl] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [available, setAvailable] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -19,6 +20,7 @@ export default function UserAvatar() {
         const data = await res.json()
         const url = data?.user?.avatarUrl
         if (!cancelled) {
+          setAvailable(!!url)
           if (url) setTraktAvatarUrl(url)
           setLoading(false)
         }
@@ -44,7 +46,17 @@ export default function UserAvatar() {
     )
   }
 
-  const avatarSrc = traktAvatarUrl || '/default-avatar.png'
+  if (!available) {
+    return (
+      <a
+        href="/api/trakt/auth/start?next=/profile"
+        className="flex-shrink-0 rounded-full bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 lg:px-4 lg:py-2"
+      >
+        <span className="hidden lg:inline">Iniciar sesión</span>
+        <span className="lg:hidden">Acceder</span>
+      </a>
+    )
+  }
 
   return (
     <Link
@@ -54,7 +66,7 @@ export default function UserAvatar() {
     >
       <div className="w-9 h-9 rounded-full overflow-hidden">
         <img
-          src={avatarSrc}
+          src={traktAvatarUrl}
           alt="Usuario"
           className="w-full h-full object-cover"
         />
