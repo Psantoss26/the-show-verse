@@ -8,7 +8,6 @@ import { AnimatePresence, motion, useInView } from "framer-motion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Anton } from "next/font/google";
 import {
   Heart,
   HeartOff,
@@ -46,8 +45,6 @@ function toItemsArray(value) {
   if (Array.isArray(value?.items)) return value.items;
   return EMPTY_ARRAY;
 }
-
-const anton = Anton({ weight: "400", subsets: ["latin"] });
 
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
