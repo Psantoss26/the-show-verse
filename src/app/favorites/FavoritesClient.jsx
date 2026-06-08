@@ -2993,7 +2993,7 @@ export default function FavoritesClient() {
           {/* Mobile: search + toggle */}
           <div className="relative z-10 flex gap-2 lg:hidden">
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500 z-10 pointer-events-none" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
@@ -3272,7 +3272,7 @@ export default function FavoritesClient() {
           {/* Desktop: Single row */}
           <div className="relative z-10 hidden lg:flex gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500 z-10 pointer-events-none" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
