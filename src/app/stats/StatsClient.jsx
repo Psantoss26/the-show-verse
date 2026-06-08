@@ -297,6 +297,15 @@ const COLOR_STYLES = {
   },
 };
 
+const PROFILE_GLASS_SURFACE =
+  "relative isolate overflow-hidden border border-white/15 bg-white/[0.028] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.055),0_24px_70px_-48px_rgba(0,0,0,0.88)] backdrop-blur-2xl";
+const PROFILE_GLASS_HOVER =
+  "transition-all duration-300 hover:border-indigo-300/35 hover:bg-white/[0.05] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.24),inset_0_-1px_0_rgba(255,255,255,0.08),0_30px_82px_-52px_rgba(99,102,241,0.58)]";
+const PROFILE_GLASS_PANEL = `${PROFILE_GLASS_SURFACE} ${PROFILE_GLASS_HOVER}`;
+const PROFILE_BACKGROUND_STYLE = {
+  backgroundImage: 'url("/fluid-liquid-8k-43.jpg")',
+};
+
 // -----------------------------------------------------------------------------
 // DATA HELPERS
 // -----------------------------------------------------------------------------
@@ -393,8 +402,9 @@ function KPICard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.5 }}
-      className="relative overflow-hidden rounded-3xl border border-white/5 bg-zinc-900/50 p-4 backdrop-blur-xl transition-all duration-300 group hover:bg-zinc-900/80 sm:p-6"
+      className={`${PROFILE_GLASS_PANEL} group rounded-3xl p-4 sm:p-6`}
     >
+      <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(circle_at_18%_12%,rgba(255,255,255,0.10),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.055),transparent_42%)] opacity-80" />
       <div
         className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity ${styles.iconText}`}
       >
@@ -437,6 +447,36 @@ function KPICard({
   );
 }
 
+function ProfilePageBackground({ variant = "indigo" }) {
+  const isConnect = variant === "connect";
+
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden">
+      <div
+        className="absolute -inset-8 bg-cover bg-center opacity-95 blur-2xl saturate-150 contrast-125 brightness-110"
+        style={PROFILE_BACKGROUND_STYLE}
+      />
+      <div
+        className="absolute inset-0 bg-cover bg-center opacity-18 saturate-125 contrast-110"
+        style={PROFILE_BACKGROUND_STYLE}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.18),transparent_40%),linear-gradient(180deg,rgba(5,5,8,0.14)_0%,rgba(5,5,8,0.30)_46%,rgba(5,5,8,0.54)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.22),rgba(0,0,0,0.02)_48%,rgba(0,0,0,0.30))]" />
+      {isConnect ? (
+        <>
+          <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-emerald-500/8 rounded-full blur-[120px] mix-blend-screen" />
+          <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-sky-500/8 rounded-full blur-[150px] mix-blend-screen" />
+        </>
+      ) : (
+        <>
+          <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/8 rounded-full blur-[120px] mix-blend-screen" />
+          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/8 rounded-full blur-[120px] mix-blend-screen" />
+        </>
+      )}
+    </div>
+  );
+}
+
 function SectionTitle({ icon: Icon, title, subtitle, color = "indigo", href }) {
   const styles = COLOR_STYLES[color] || COLOR_STYLES.indigo;
 
@@ -444,7 +484,7 @@ function SectionTitle({ icon: Icon, title, subtitle, color = "indigo", href }) {
     <div className="flex items-center justify-between gap-4 mb-6">
       <div className="flex items-center gap-3">
         <div
-          className={`p-2 rounded-lg border ${styles.iconBg} border-white/10 ${styles.iconText}`}
+          className={`rounded-xl border border-white/10 p-2 ${styles.iconBg} ${styles.iconText} shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-xl`}
         >
           <Icon className="w-5 h-5" />
         </div>
@@ -650,7 +690,7 @@ function CustomTooltip({ active, payload, label, formatter }) {
 function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   if (!user) {
     return (
-      <div className="relative min-h-[172px] overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900/30 p-5 sm:p-6">
+      <div className={`${PROFILE_GLASS_SURFACE} min-h-[172px] rounded-[2rem] p-5 sm:p-6`}>
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/15 via-zinc-900/30 to-transparent" />
         <div className="relative z-10 space-y-3 pt-8">
           <div className="h-4 w-36 rounded-lg bg-zinc-800/70 animate-pulse" />
@@ -708,7 +748,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.1 }}
-        className="relative isolate flex min-h-[184px] min-w-0 flex-col justify-end overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-950/40 px-5 py-5 shadow-2xl shadow-indigo-950/10 backdrop-blur-xl sm:min-h-[200px] sm:px-6 sm:py-6 lg:hidden"
+        className={`${PROFILE_GLASS_SURFACE} flex min-h-[184px] min-w-0 flex-col justify-end rounded-[2rem] px-5 py-5 sm:min-h-[200px] sm:px-6 sm:py-6 lg:hidden`}
       >
         <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           {avatarUrl ? (
@@ -866,44 +906,73 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
 }
 
 function ProfileSectionTabs({ viewMode, setViewMode, className = "" }) {
+  const tabs = [
+    { id: "overview", label: "General", icon: PieChartIcon },
+    { id: "patterns", label: "Patrones", icon: TrendingUp },
+    { id: "yearly", label: "Histórico", icon: CalendarIcon },
+  ];
+
   return (
     <div className={className}>
       <div
-        className="flex w-full items-center gap-2 overflow-x-auto lg:w-fit"
+        className={`${PROFILE_GLASS_SURFACE} w-full rounded-3xl p-1.5 lg:w-fit`}
         role="tablist"
         aria-label="Secciones del perfil"
       >
-        {[
-          { id: "overview", label: "General", icon: PieChartIcon },
-          { id: "patterns", label: "Patrones", icon: TrendingUp },
-          { id: "yearly", label: "Histórico", icon: CalendarIcon },
-        ].map((tab) => {
-          const active = viewMode === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setViewMode(tab.id)}
-              role="tab"
-              aria-selected={active}
-              className={`group relative inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border bg-zinc-900 px-4 text-sm transition sm:flex-none lg:min-w-[155px] ${
-                active
-                  ? "border-indigo-500/45 text-white shadow-[0_0_18px_rgba(99,102,241,0.12)]"
-                  : "border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
-              }`}
-            >
-              {active && (
-                <span className="absolute inset-x-4 bottom-0 h-px rounded-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.9)]" />
-              )}
-              <span className="flex min-w-0 items-center gap-2">
-                <tab.icon className="h-4 w-4 shrink-0 text-indigo-500 transition-colors group-hover:text-indigo-400" />
-                <span className="min-w-0 truncate font-semibold text-white">
-                  {tab.label}
+        <div className="grid w-full grid-cols-3 items-center gap-1.5 lg:flex lg:w-fit">
+          {tabs.map((tab) => {
+            const active = viewMode === tab.id;
+            return (
+              <motion.button
+                key={tab.id}
+                type="button"
+                onClick={() => setViewMode(tab.id)}
+                role="tab"
+                aria-selected={active}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`group relative inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-[1.45rem] px-2 text-sm font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 sm:px-4 lg:min-w-[155px] ${
+                  active
+                    ? "text-white"
+                    : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                }`}
+              >
+                <AnimatePresence>
+                  {active && (
+                    <motion.span
+                      layoutId="profileSectionActiveBg"
+                      className="absolute inset-0 rounded-[1.45rem] border border-indigo-500/25 bg-gradient-to-br from-indigo-500/18 via-indigo-400/10 to-violet-500/14 shadow-[0_8px_24px_-18px_rgba(99,102,241,0.95),inset_0_1px_0_rgba(255,255,255,0.12)]"
+                      initial={{ opacity: 0, scale: 0.96 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.96 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 700,
+                        damping: 28,
+                      }}
+                    />
+                  )}
+                </AnimatePresence>
+                {active && (
+                  <motion.span
+                    layoutId="profileSectionActiveLine"
+                    className="absolute inset-x-7 bottom-1.5 h-0.5 rounded-full bg-gradient-to-r from-transparent via-violet-400 to-transparent shadow-[0_0_10px_rgba(99,102,241,0.85)]"
+                  />
+                )}
+                <span className="relative z-10 flex min-w-0 items-center gap-2">
+                  <tab.icon
+                    className={`h-4 w-4 shrink-0 transition-all duration-300 ${
+                      active
+                        ? "text-indigo-300 drop-shadow-[0_0_6px_rgba(129,140,248,0.75)]"
+                        : "text-indigo-500 group-hover:text-indigo-400"
+                    }`}
+                  />
+                  <span className="min-w-0 truncate">{tab.label}</span>
                 </span>
-              </span>
-            </button>
-          );
-        })}
+              </motion.button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1150,7 +1219,7 @@ function ProfileUnifiedCard({
       onDragStart={(e) => e.preventDefault()}
     >
       <motion.div
-        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/5 bg-neutral-800/80 shadow-lg transition-colors duration-300 transform-gpu will-change-transform"
+        className={`${PROFILE_GLASS_PANEL} group z-0 aspect-[2/3] w-full rounded-2xl shadow-lg transform-gpu will-change-transform`}
         whileHover={{
           y: -6,
           zIndex: 300,
@@ -1604,11 +1673,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
   if (notConnected) {
     return (
       <div className="min-h-screen bg-[#050505] text-zinc-100 pb-20 selection:bg-emerald-500/30">
-        {/* Background Ambience */}
-        <div className="fixed inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px]" />
-          <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-sky-500/5 rounded-full blur-[150px]" />
-        </div>
+        <ProfilePageBackground variant="connect" />
 
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
           {/* Header */}
@@ -1636,7 +1701,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
+              className={`${PROFILE_GLASS_SURFACE} max-w-md w-full flex flex-col items-center justify-center py-12 rounded-3xl text-center px-4 border-dashed`}
             >
               <div className="mb-6">
                 <img
@@ -1672,11 +1737,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-20 text-zinc-100 selection:bg-emerald-500/30">
-      {/* Background Ambience */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] mix-blend-screen" />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] mix-blend-screen" />
-      </div>
+      <ProfilePageBackground />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Header - Always Visible */}
@@ -1702,7 +1763,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
         {headerReady ? (
           <motion.div
-            className="sticky top-16 z-[60] mb-3 p-2 rounded-2xl transition-all duration-300 lg:hidden"
+            className="sticky top-20 z-[60] mb-3 transition-all duration-300 lg:hidden"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.25 }}
@@ -1774,7 +1835,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 {/* Secondary KPIs */}
                 {stats && (
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
+                    <div className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}>
                       <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500">
                         <Star className="w-5 h-5" />
                       </div>
@@ -1787,7 +1848,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         </div>
                       </div>
                     </div>
-                    <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
+                    <div className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}>
                       <div className="p-2 bg-rose-500/10 rounded-lg text-rose-500">
                         <MessageSquare className="w-5 h-5" />
                       </div>
@@ -1800,7 +1861,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         </div>
                       </div>
                     </div>
-                    <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
+                    <div className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}>
                       <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
                         <Users className="w-5 h-5" />
                       </div>
@@ -1813,7 +1874,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         </div>
                       </div>
                     </div>
-                    <div className="bg-zinc-900/30 rounded-2xl p-4 flex items-center gap-3 border border-white/5 hover:bg-zinc-900/60 transition-colors">
+                    <div className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}>
                       <div className="p-2 bg-teal-500/10 rounded-lg text-teal-500">
                         <Heart className="w-5 h-5" />
                       </div>
@@ -1924,7 +1985,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2 }}
-                      className="lg:col-span-2 bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden"
+                      className={`${PROFILE_GLASS_PANEL} lg:col-span-2 rounded-3xl p-6`}
                     >
                       <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
                       <SectionTitle
@@ -2006,7 +2067,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.3 }}
-                      className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center justify-center relative"
+                      className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6 flex flex-col items-center justify-center`}
                     >
                       <SectionTitle
                         icon={Clock}
@@ -2203,7 +2264,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Hour of Day */}
-                  <div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+                  <div className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}>
                     <SectionTitle
                       icon={Clock}
                       title="Hora del Día"
@@ -2240,7 +2301,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   </div>
 
                   {/* Day of Week */}
-                  <div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+                  <div className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}>
                     <SectionTitle
                       icon={CalendarIcon}
                       title="Día de la Semana"
@@ -2280,7 +2341,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 {/* Genres & Ratings row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Genres - Radar */}
-                  <motion.div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+                  <motion.div className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}>
                     <SectionTitle
                       icon={Target}
                       title="Gustos por Género"
@@ -2324,7 +2385,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   </motion.div>
 
                   {/* Ratings - Bar */}
-                  <motion.div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+                  <motion.div className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}>
                     <SectionTitle
                       icon={Award}
                       title="Tus Puntuaciones"
@@ -2385,7 +2446,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 transition={{ duration: 0.4 }}
                 className="flex flex-col items-center justify-center py-20 text-center"
               >
-                <div className="w-24 h-24 bg-zinc-900 rounded-full border border-white/10 flex items-center justify-center mb-6 relative">
+                <div
+                  className={`${PROFILE_GLASS_SURFACE} w-24 h-24 rounded-full flex items-center justify-center mb-6`}
+                >
                   <div className="absolute inset-0 bg-indigo-500/20 rounded-full blur-xl animate-pulse" />
                   <CalendarIcon className="w-10 h-10 text-zinc-400" />
                 </div>
@@ -2401,7 +2464,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   {stats.years.slice(0, 5).map((year) => (
                     <span
                       key={year}
-                      className="px-4 py-2 rounded-lg bg-zinc-900 border border-white/10 text-zinc-400 font-mono text-sm"
+                      className={`${PROFILE_GLASS_SURFACE} px-4 py-2 rounded-xl text-zinc-400 font-mono text-sm`}
                     >
                       {year}
                     </span>
@@ -2429,7 +2492,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-6 text-center"
+              className={`${PROFILE_GLASS_SURFACE} w-full max-w-sm rounded-2xl p-6 text-center`}
               onClick={(e) => e.stopPropagation()}
             >
               <LogOut className="mx-auto mb-4 h-10 w-10 text-red-500" />
