@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useLayoutEffect, useState } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 export default function DetailsSectionMenu({
   items = [],
@@ -58,29 +58,17 @@ export default function DetailsSectionMenu({
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const available = el.clientWidth || 0;
-
-        inner.style.transform = "scale(1)";
-        inner.style.transformOrigin = "center";
-
         const needed = inner.scrollWidth || 0;
 
         if (!available || !needed) {
           setFits(true);
           setScale(1);
-          inner.style.transform = "scale(1)";
-          return;
-        }
-
-        if (needed <= available) {
+        } else if (needed <= available) {
           setFits(true);
           setScale(1);
-          inner.style.transform = "scale(1)";
         } else {
-          const nextScale = Math.min(1, available / needed);
           setFits(false);
-          setScale(nextScale);
-          inner.style.transform = `scale(${nextScale})`;
-          inner.style.transformOrigin = "center";
+          setScale(Math.min(1, available / needed));
         }
       });
     };
@@ -121,8 +109,9 @@ export default function DetailsSectionMenu({
           <div
             className={[
               "absolute inset-0 rounded-[inherit] backdrop-blur-2xl",
-              "bg-gradient-to-br from-black/40 via-black/30 to-black/35",
-              "border border-white/10",
+              "bg-gradient-to-br from-white/[0.075] via-black/24 to-white/[0.045]",
+              "border border-white/[0.14]",
+              "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
             ].join(" ")}
           />
 
@@ -173,7 +162,7 @@ export default function DetailsSectionMenu({
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
                             className={[
-                              "group relative flex items-center justify-center rounded-xl",
+                              "group relative flex items-center justify-center overflow-hidden rounded-xl",
                               "px-3 py-2 sm:px-3.5 sm:py-2.5",
                               "transition-all duration-300 ease-out",
                               "outline-none focus-visible:ring-2",
@@ -184,23 +173,30 @@ export default function DetailsSectionMenu({
                             title={item.label}
                             aria-label={item.label}
                           >
-                            <AnimatePresence mode="wait">
-                              {active && (
+                            {active && (
+                              <>
                                 <motion.div
-                                  layoutId="activeSectionBg"
-                                  initial={{ opacity: 0, scale: 0.95 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.95 }}
-                                  transition={{
-                                    type: "spring",
-                                    stiffness: 800,
-                                    damping: 20,
-                                  }}
+                                  aria-hidden="true"
                                   className={`absolute inset-0 rounded-xl bg-gradient-to-br shadow-lg border ${colors.activeBg}`}
+                                  initial={false}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{
+                                    duration: shouldReduceMotion ? 0 : 0.16,
+                                    ease: "easeOut",
+                                  }}
                                 />
-                              )}
-                            </AnimatePresence>
-
+                                <motion.span
+                                  aria-hidden="true"
+                                  className={`absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r ${colors.indicator}`}
+                                  initial={false}
+                                  animate={{ opacity: 1, scaleX: 1 }}
+                                  transition={{
+                                    duration: shouldReduceMotion ? 0 : 0.16,
+                                    ease: "easeOut",
+                                  }}
+                                />
+                              </>
+                            )}
                             <div className="relative z-10 flex items-center gap-2">
                               {Icon && (
                                 <motion.div
@@ -254,23 +250,6 @@ export default function DetailsSectionMenu({
                                 </motion.span>
                               )}
                             </div>
-
-                            <AnimatePresence>
-                              {active && (
-                                <motion.span
-                                  layoutId="activeSectionIndicator"
-                                  initial={{ scaleX: 0, opacity: 0 }}
-                                  animate={{ scaleX: 1, opacity: 1 }}
-                                  exit={{ scaleX: 0, opacity: 0 }}
-                                  transition={{
-                                    type: "spring",
-                                    stiffness: 800,
-                                    damping: 20,
-                                  }}
-                                  className={`absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r ${colors.indicator}`}
-                                />
-                              )}
-                            </AnimatePresence>
                           </motion.button>
                         );
                       })}
