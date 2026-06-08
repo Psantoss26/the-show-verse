@@ -14,7 +14,7 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { FreeMode } from "swiper";
+import { FreeMode } from "swiper/modules";
 import "swiper/swiper-bundle.css";
 
 import useTmdbLists from "@/lib/hooks/useTmdbLists";

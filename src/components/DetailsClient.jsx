@@ -228,7 +228,10 @@ const getMovieDirectorsFromCrew = (crew) =>
 
 const formatCreditNames = (list) =>
   Array.isArray(list) && list.length
-    ? list.map((person) => person?.name).filter(Boolean).join(", ")
+    ? list
+        .map((person) => person?.name)
+        .filter(Boolean)
+        .join(", ")
     : null;
 
 /**
@@ -3476,11 +3479,11 @@ export default function DetailsClient({
   // -- Analisis de sentimiento: pros y contras extraidos de comentarios --
   const [tSentiment, setTSentiment] = useState({
     loading: false,
-  error: "",
-  pros: [],
-  cons: [],
-  sourceCount: 0,
-});
+    error: "",
+    pros: [],
+    cons: [],
+    sourceCount: 0,
+  });
 
   // -- Comentarios de Trakt con paginacion y pestanas --
   const [tCommentsTab, setTCommentsTab] = useState("recent"); // "likes30" (top 30 dias) | "likesAll" (top historico) | "recent"
@@ -5195,9 +5198,9 @@ export default function DetailsClient({
       );
       if (!next) rollbackEpisodes.add(episodeNumber);
       else rollbackEpisodes.delete(episodeNumber);
-      rollbackWatchedBySeason[seasonNumber] = Array.from(
-        rollbackEpisodes,
-      ).sort((a, b) => a - b);
+      rollbackWatchedBySeason[seasonNumber] = Array.from(rollbackEpisodes).sort(
+        (a, b) => a - b,
+      );
       applyWatchedBySeasonState(rollbackWatchedBySeason, { loaded: true });
     } finally {
       setEpisodeBusyKey("");
@@ -5823,8 +5826,6 @@ export default function DetailsClient({
       abort = true;
     };
   }, [type, id, data?.imdb_id, data?.external_ids?.imdb_id, endpointType]);
-
-
 
   // Carga premios detallados desde TMDb para la seccion independiente.
   useEffect(() => {
@@ -6887,8 +6888,7 @@ export default function DetailsClient({
   const runtimeValue =
     type === "movie" ? formatRuntimeMinutes(data.runtime) : null;
 
-  const episodeRuntimeValue =
-    type === "tv" ? formatEpisodeRuntime(data) : null;
+  const episodeRuntimeValue = type === "tv" ? formatEpisodeRuntime(data) : null;
 
   const displayRuntimeValue = runtimeValue || episodeRuntimeValue;
 
@@ -7192,11 +7192,7 @@ export default function DetailsClient({
 
   const creativeCreditsForUI = useMemo(() => {
     const source =
-      type === "movie"
-        ? movieDirectorsCrew
-        : type === "tv"
-          ? tvCreators
-          : [];
+      type === "movie" ? movieDirectorsCrew : type === "tv" ? tvCreators : [];
 
     const role = type === "movie" ? "Director" : "Creador";
 
@@ -7467,39 +7463,36 @@ export default function DetailsClient({
     const ids = (sectionItems || []).map((x) => x?.id).filter(Boolean);
     if (!ids.length) return;
 
-    let raf = 0;
-    const compute = () => {
-      const offset = STICKY_TOP + (menuH || 0) + 16;
-      let current = ids[0];
+    const elements = ids
+      .map(
+        (sid) =>
+          sectionElsRef.current[sid] ||
+          document.getElementById(`section-${sid}`),
+      )
+      .filter(Boolean);
 
-      for (const sid of ids) {
-        const el = sectionElsRef.current[sid];
-        if (!el) continue;
-        const top = el.getBoundingClientRect().top;
-        if (top - offset <= 0) current = sid;
-        else break;
-      }
+    if (!elements.length) return;
 
-      setActiveSectionId((prev) => (prev === current ? prev : current));
-    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
 
-    const onScroll = () => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(() => {
-        raf = 0;
-        compute();
-      });
-    };
+        if (!visible.length) return;
 
-    compute();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+        const next = visible[0].target.id?.replace(/^section-/, "") || ids[0];
+        setActiveSectionId((prev) => (prev === next ? prev : next));
+      },
+      {
+        root: null,
+        rootMargin: `-${STICKY_TOP + 16}px 0px -55% 0px`,
+        threshold: [0, 0.25, 0.5, 0.75],
+      },
+    );
 
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (raf) window.cancelAnimationFrame(raf);
-    };
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
   }, [sectionItems, menuH]);
 
   useEffect(() => {
@@ -8138,7 +8131,9 @@ export default function DetailsClient({
     const loop = (t) => {
       if (!mounted) return;
 
-      const now = t ?? (typeof performance !== "undefined" ? performance.now() : Date.now());
+      const now =
+        t ??
+        (typeof performance !== "undefined" ? performance.now() : Date.now());
       const idle = now - posterLastInputRef.current > IDLE_DELAY;
 
       let target = posterTargetRef.current;
@@ -8147,8 +8142,8 @@ export default function DetailsClient({
         const dt = now / 1000;
         target = {
           rx: Math.sin(dt * 1.05) * 5.5,
-          ry: Math.cos(dt * 0.90) * 8.5,
-          s: 1.03 + Math.sin(dt * 1.60) * 0.01,
+          ry: Math.cos(dt * 0.9) * 8.5,
+          s: 1.03 + Math.sin(dt * 1.6) * 0.01,
         };
       }
 
@@ -8169,7 +8164,8 @@ export default function DetailsClient({
 
     return () => {
       mounted = false;
-      if (posterAnimRafRef.current) cancelAnimationFrame(posterAnimRafRef.current);
+      if (posterAnimRafRef.current)
+        cancelAnimationFrame(posterAnimRafRef.current);
       posterAnimRafRef.current = 0;
     };
   }, [poster3dEnabled, displayPosterPath]);
@@ -8177,7 +8173,7 @@ export default function DetailsClient({
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
       {/* --- BACKGROUND & OVERLAY --- */}
-      <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a]">
+      <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
         {useBackdrop && artworkInitialized && heroBackgroundPath ? (
           <>
             {/* Imagen anterior (fade out) */}
@@ -8188,8 +8184,9 @@ export default function DetailsClient({
                   style={{
                     backgroundImage: `url(https://image.tmdb.org/t/p/original${prevBackgroundPath})`,
                     transform: "scale(1)",
-                    filter: "blur(14px) brightness(0.65) saturate(1.05)",
+                    filter: "brightness(0.75) saturate(1.03)",
                     opacity: 0,
+                    willChange: "opacity",
                   }}
                 />
                 <div
@@ -8200,6 +8197,7 @@ export default function DetailsClient({
                     transform: "scale(1)",
                     transformOrigin: "center top",
                     opacity: 0,
+                    willChange: "opacity",
                   }}
                 />
               </>
@@ -8211,8 +8209,9 @@ export default function DetailsClient({
               style={{
                 backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 transform: "scale(1)",
-                filter: "blur(14px) brightness(0.65) saturate(1.05)",
+                filter: "brightness(0.75) saturate(1.03)",
                 opacity: isTransitioning ? 1 : 1,
+                willChange: "opacity",
               }}
             />
 
@@ -8225,6 +8224,7 @@ export default function DetailsClient({
                 transform: "scale(1)",
                 transformOrigin: "center top",
                 opacity: isTransitioning ? 1 : 1,
+                willChange: "opacity",
               }}
             />
           </>
@@ -8238,7 +8238,7 @@ export default function DetailsClient({
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
 
         {/* Tus overlays originales */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20 backdrop-blur-[2px]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
       </div>
 
@@ -8705,7 +8705,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   active={favorite}
                   activeColor="red"
                   groupId="details-actions"
-                  title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                  title={
+                    favorite ? "Quitar de favoritos" : "Añadir a favoritos"
+                  }
                   aria-label={
                     favorite ? "Quitar de favoritos" : "Añadir a favoritos"
                   }
@@ -8713,7 +8715,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {favLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <Heart className={`w-5 h-5 ${favorite ? "fill-current" : ""}`} />
+                    <Heart
+                      className={`w-5 h-5 ${favorite ? "fill-current" : ""}`}
+                    />
                   )}
                 </LiquidButton>
 
@@ -9513,56 +9517,58 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             <section id="section-cast" ref={registerSection("cast")}>
               <AnimatedSection delay={0.04}>
                 {/* === REPARTO PRINCIPAL (Cast) === */}
-                {!castSectionLoading && castDataForUI && castDataForUI.length > 0 && (
-                  <section className="mb-16">
-                    <SectionTitle title="Reparto Principal" icon={Users} />
-                    <DetailsArrowCarousel
-                      spaceBetween={12}
-                      slidesPerView={3}
-                      breakpoints={{
-                        500: { slidesPerView: 3, spaceBetween: 14 },
-                        768: { slidesPerView: 4, spaceBetween: 16 },
-                        1024: { slidesPerView: 5, spaceBetween: 18 },
-                        1280: { slidesPerView: 6, spaceBetween: 20 },
-                      }}
-                      className="pb-8"
-                    >
-                      {castDataForUI.slice(0, 20).map((actor) => (
-                        <SwiperSlide key={actor.id}>
-                          <Link
-                            href={`/details/person/${actor.id}`}
-                            className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                          >
-                            <div className="aspect-[2/3] overflow-hidden relative">
-                              {actor.profile_path ? (
-                                <img
-                                  src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
-                                  alt={actor.name}
-                                  className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                                  <UsersIconComponent size={40} />
+                {!castSectionLoading &&
+                  castDataForUI &&
+                  castDataForUI.length > 0 && (
+                    <section className="mb-16">
+                      <SectionTitle title="Reparto Principal" icon={Users} />
+                      <DetailsArrowCarousel
+                        spaceBetween={12}
+                        slidesPerView={3}
+                        breakpoints={{
+                          500: { slidesPerView: 3, spaceBetween: 14 },
+                          768: { slidesPerView: 4, spaceBetween: 16 },
+                          1024: { slidesPerView: 5, spaceBetween: 18 },
+                          1280: { slidesPerView: 6, spaceBetween: 20 },
+                        }}
+                        className="pb-8"
+                      >
+                        {castDataForUI.slice(0, 20).map((actor) => (
+                          <SwiperSlide key={actor.id}>
+                            <Link
+                              href={`/details/person/${actor.id}`}
+                              className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                            >
+                              <div className="aspect-[2/3] overflow-hidden relative">
+                                {actor.profile_path ? (
+                                  <img
+                                    src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
+                                    alt={actor.name}
+                                    className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
+                                    <UsersIconComponent size={40} />
+                                  </div>
+                                )}
+
+                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
+
+                                <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
+                                  <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
+                                    {actor.name}
+                                  </p>
+                                  <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
+                                    {actor.character}
+                                  </p>
                                 </div>
-                              )}
-
-                              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
-
-                              <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
-                                <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
-                                  {actor.name}
-                                </p>
-                                <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                                  {actor.character}
-                                </p>
                               </div>
-                            </div>
-                          </Link>
-                        </SwiperSlide>
-                      ))}
-                    </DetailsArrowCarousel>
-                  </section>
-                )}
+                            </Link>
+                          </SwiperSlide>
+                        ))}
+                      </DetailsArrowCarousel>
+                    </section>
+                  )}
               </AnimatedSection>
             </section>
 
@@ -9572,155 +9578,159 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {canRenderRecommendations &&
                   recommendations &&
                   recommendations.length > 0 && (
-                  <section className="mb-16">
-                    <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
+                    <section className="mb-16">
+                      <SectionTitle
+                        title="Recomendaciones"
+                        icon={MonitorPlay}
+                      />
 
-                    <DetailsArrowCarousel
-                      spaceBetween={12}
-                      slidesPerView={3}
-                      breakpoints={{
-                        500: { slidesPerView: 3, spaceBetween: 14 },
-                        768: { slidesPerView: 4, spaceBetween: 16 },
-                        1024: { slidesPerView: 5, spaceBetween: 18 },
-                        1280: { slidesPerView: 6, spaceBetween: 20 },
-                      }}
-                    >
-                      {recommendations.slice(0, 15).map((rec) => {
-                        const recTitle = rec.title || rec.name;
-                        const recDate =
-                          rec.release_date || rec.first_air_date || "";
-                        const recYear = recDate ? recDate.slice(0, 4) : "";
-                        const isMovie = rec.media_type
-                          ? rec.media_type === "movie"
-                          : type === "movie";
+                      <DetailsArrowCarousel
+                        spaceBetween={12}
+                        slidesPerView={3}
+                        breakpoints={{
+                          500: { slidesPerView: 3, spaceBetween: 14 },
+                          768: { slidesPerView: 4, spaceBetween: 16 },
+                          1024: { slidesPerView: 5, spaceBetween: 18 },
+                          1280: { slidesPerView: 6, spaceBetween: 20 },
+                        }}
+                      >
+                        {recommendations.slice(0, 15).map((rec) => {
+                          const recTitle = rec.title || rec.name;
+                          const recDate =
+                            rec.release_date || rec.first_air_date || "";
+                          const recYear = recDate ? recDate.slice(0, 4) : "";
+                          const isMovie = rec.media_type
+                            ? rec.media_type === "movie"
+                            : type === "movie";
 
-                        const tmdbScore =
-                          typeof rec.vote_average === "number" &&
-                          rec.vote_average > 0
-                            ? rec.vote_average
-                            : null;
+                          const tmdbScore =
+                            typeof rec.vote_average === "number" &&
+                            rec.vote_average > 0
+                              ? rec.vote_average
+                              : null;
 
-                        const imdbScore =
-                          recImdbRatings[rec.id] != null
-                            ? recImdbRatings[rec.id]
-                            : undefined;
+                          const imdbScore =
+                            recImdbRatings[rec.id] != null
+                              ? recImdbRatings[rec.id]
+                              : undefined;
 
-                        // En móvil, deshabilitar hover para mostrar solo las imágenes
-                        const enableHover = supportsHover && !isMobileViewport;
+                          // En móvil, deshabilitar hover para mostrar solo las imágenes
+                          const enableHover =
+                            supportsHover && !isMobileViewport;
 
-                        const recCardClass = enableHover
-                          ? "mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                          : "mt-3 block relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-white/5";
-                        const recImageClass = enableHover
-                          ? "w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
-                          : "w-full h-full object-cover";
-                        const recOverlayClass = enableHover
-                          ? "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300"
-                          : "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0";
-                        const recHeaderInfoClass = enableHover
-                          ? "absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                          : "hidden";
-                        const recFooterInfoClass = enableHover
-                          ? "absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                          : "hidden";
+                          const recCardClass = enableHover
+                            ? "mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                            : "mt-3 block relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-white/5";
+                          const recImageClass = enableHover
+                            ? "w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
+                            : "w-full h-full object-cover";
+                          const recOverlayClass = enableHover
+                            ? "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300"
+                            : "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0";
+                          const recHeaderInfoClass = enableHover
+                            ? "absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                            : "hidden";
+                          const recFooterInfoClass = enableHover
+                            ? "absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                            : "hidden";
 
-                        return (
-                          <SwiperSlide key={rec.id}>
-                            <Link
-                              href={`/details/${rec.media_type || type}/${rec.id}`}
-                              className={recCardClass}
-                              onMouseEnter={
-                                enableHover
-                                  ? () => prefetchRecImdb(rec)
-                                  : undefined
-                              }
-                              onFocus={
-                                enableHover
-                                  ? () => prefetchRecImdb(rec)
-                                  : undefined
-                              }
-                            >
-                              <div className="aspect-[2/3] overflow-hidden relative">
-                                <img
-                                  src={
-                                    rec.poster_path
-                                      ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
-                                      : "/placeholder.png"
-                                  }
-                                  alt={recTitle}
-                                  loading="lazy"
-                                  decoding="async"
-                                  sizes="(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 180px"
-                                  className={recImageClass}
-                                />
+                          return (
+                            <SwiperSlide key={rec.id}>
+                              <Link
+                                href={`/details/${rec.media_type || type}/${rec.id}`}
+                                className={recCardClass}
+                                onMouseEnter={
+                                  enableHover
+                                    ? () => prefetchRecImdb(rec)
+                                    : undefined
+                                }
+                                onFocus={
+                                  enableHover
+                                    ? () => prefetchRecImdb(rec)
+                                    : undefined
+                                }
+                              >
+                                <div className="aspect-[2/3] overflow-hidden relative">
+                                  <img
+                                    src={
+                                      rec.poster_path
+                                        ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
+                                        : "/placeholder.png"
+                                    }
+                                    alt={recTitle}
+                                    loading="lazy"
+                                    decoding="async"
+                                    sizes="(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 180px"
+                                    className={recImageClass}
+                                  />
 
-                                <div className={recHeaderInfoClass}>
-                                  <div>
-                                    <span
-                                      className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                                        isMovie
-                                          ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                          : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                      }`}
-                                    >
-                                      {isMovie ? "PELÍCULA" : "SERIE"}
-                                    </span>
+                                  <div className={recHeaderInfoClass}>
+                                    <div>
+                                      <span
+                                        className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                                          isMovie
+                                            ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                                            : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                        }`}
+                                      >
+                                        {isMovie ? "PELÍCULA" : "SERIE"}
+                                      </span>
+                                    </div>
+
+                                    {(tmdbScore || imdbScore != null) && (
+                                      <div className="flex flex-col items-end gap-1">
+                                        {tmdbScore && (
+                                          <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                            <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
+                                              {tmdbScore.toFixed(1)}
+                                            </span>
+                                            <img
+                                              src="/logo-TMDb.png"
+                                              alt=""
+                                              className="w-auto h-2.5 opacity-100"
+                                              loading="lazy"
+                                              decoding="async"
+                                            />
+                                          </div>
+                                        )}
+                                        {imdbScore != null && (
+                                          <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                            <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
+                                              {Number(imdbScore).toFixed(1)}
+                                            </span>
+                                            <img
+                                              src="/logo-IMDb.svg"
+                                              alt=""
+                                              className="w-auto h-3 opacity-100"
+                                              loading="lazy"
+                                              decoding="async"
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
 
-                                  {(tmdbScore || imdbScore != null) && (
-                                    <div className="flex flex-col items-end gap-1">
-                                      {tmdbScore && (
-                                        <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                          <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                                            {tmdbScore.toFixed(1)}
-                                          </span>
-                                          <img
-                                            src="/logo-TMDb.png"
-                                            alt=""
-                                            className="w-auto h-2.5 opacity-100"
-                                            loading="lazy"
-                                            decoding="async"
-                                          />
-                                        </div>
-                                      )}
-                                      {imdbScore != null && (
-                                        <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                          <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                                            {Number(imdbScore).toFixed(1)}
-                                          </span>
-                                          <img
-                                            src="/logo-IMDb.svg"
-                                            alt=""
-                                            className="w-auto h-3 opacity-100"
-                                            loading="lazy"
-                                            decoding="async"
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
+                                  <div className={recOverlayClass} />
 
-                                <div className={recOverlayClass} />
-
-                                <div className={recFooterInfoClass}>
-                                  <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-2">
-                                    {recTitle}
-                                  </p>
-                                  {recYear && (
-                                    <p className="text-yellow-500 text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">
-                                      {recYear}
+                                  <div className={recFooterInfoClass}>
+                                    <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-2">
+                                      {recTitle}
                                     </p>
-                                  )}
+                                    {recYear && (
+                                      <p className="text-yellow-500 text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">
+                                        {recYear}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </Link>
-                          </SwiperSlide>
-                        );
-                      })}
-                    </DetailsArrowCarousel>
-                  </section>
-                )}
+                              </Link>
+                            </SwiperSlide>
+                          );
+                        })}
+                      </DetailsArrowCarousel>
+                    </section>
+                  )}
               </AnimatedSection>
             </section>
 
@@ -9850,291 +9860,76 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     SECCIÓN: MEDIA (Portadas y Fondos)
                    ================================================================= */}
                 <section id="section-media" ref={registerSection("media")}>
-              <AnimatedSection
-                key={`${id}-artwork-${artworkInitialized ? "ready" : "loading"}`}
-                delay={0.04}
-              >
-                {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
-                {(type === "movie" || type === "tv") && (
-                  <section className="mb-16" ref={artworkControlsWrapRef}>
-                    {/* ========== Header de la Sección de Media ========== */}
-                    {/* Incluye título y controles (tabs y filtros) */}
-                    <div className="mb-3 sm:mb-5 md:mb-6 flex items-start justify-between gap-3">
-                      {/* Título de la sección - Alineado a la izquierda */}
-                      <SectionTitle
-                        title="Portadas y fondos"
-                        icon={ImageIcon}
-                        className="mb-0"
-                      />
+                  <AnimatedSection
+                    key={`${id}-artwork-${artworkInitialized ? "ready" : "loading"}`}
+                    delay={0.04}
+                  >
+                    {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
+                    {(type === "movie" || type === "tv") && (
+                      <section className="mb-16" ref={artworkControlsWrapRef}>
+                        {/* ========== Header de la Sección de Media ========== */}
+                        {/* Incluye título y controles (tabs y filtros) */}
+                        <div className="mb-3 sm:mb-5 md:mb-6 flex items-start justify-between gap-3">
+                          {/* Título de la sección - Alineado a la izquierda */}
+                          <SectionTitle
+                            title="Portadas y fondos"
+                            icon={ImageIcon}
+                            className="mb-0"
+                          />
 
-                      {/* ========== Controles de Filtrado ========== */}
-                      {/* Desktop: Tabs + Filtros en línea | Móvil: Botón que abre modal */}
-                      <div className="self-start flex items-center gap-2 sm:gap-3 h-10 md:h-11">
-                        {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
-                        <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
-                          {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
-                          <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 w-fit h-10 md:h-11">
-                            {["posters", "backdrops", "background"].map(
-                              (tab) => (
-                                <button
-                                  key={tab}
-                                  type="button"
-                                  onClick={() => setActiveImagesTab(tab)}
-                                  className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
+                          {/* ========== Controles de Filtrado ========== */}
+                          {/* Desktop: Tabs + Filtros en línea | Móvil: Botón que abre modal */}
+                          <div className="self-start flex items-center gap-2 sm:gap-3 h-10 md:h-11">
+                            {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
+                            <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
+                              {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
+                              <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 w-fit h-10 md:h-11">
+                                {["posters", "backdrops", "background"].map(
+                                  (tab) => (
+                                    <button
+                                      key={tab}
+                                      type="button"
+                                      onClick={() => setActiveImagesTab(tab)}
+                                      className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
               ${
                 activeImagesTab === tab
                   ? "bg-white/10 text-white shadow"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
-                                  style={{
-                                    WebkitTapHighlightColor: "transparent",
-                                  }}
-                                >
-                                  {tab === "posters"
-                                    ? "Portada"
-                                    : tab === "backdrops"
-                                      ? "Vista previa"
-                                      : "Fondo"}
-                                </button>
-                              ),
-                            )}
-                          </div>
-
-                          {/* Resolución (sin label superior) */}
-                          <div ref={resMenuRef} className="relative">
-                            <button
-                              type="button"
-                              onClick={() => setResMenuOpen((v) => !v)}
-                              className="h-10 md:h-11 inline-flex items-center justify-between gap-2 min-w-[150px]
-            px-3 rounded-xl bg-neutral-800/80 border border-white/10
-            hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/15 transition-all duration-300
-            text-sm text-zinc-200"
-                              title="Resolución"
-                              aria-label="Resolución"
-                              style={{ WebkitTapHighlightColor: "transparent" }}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
-                                  RES
-                                </span>
-                                <span className="font-semibold">
-                                  {imagesResFilter === "all"
-                                    ? "Todas"
-                                    : imagesResFilter === "720p"
-                                      ? "720p"
-                                      : imagesResFilter === "1080p"
-                                        ? "1080p"
-                                        : imagesResFilter === "2k"
-                                          ? "2K"
-                                          : "4K"}
-                                </span>
-                              </span>
-                              <ChevronDown
-                                className={`w-4 h-4 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
-                              />
-                            </button>
-
-                            <AnimatePresence>
-                              {resMenuOpen && (
-                                <motion.div
-                                  initial={{ opacity: 0, y: 6, scale: 0.98 }}
-                                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                                  exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                                  transition={{
-                                    duration: 0.14,
-                                    ease: "easeOut",
-                                  }}
-                                  className="absolute left-0 top-full z-[9999] mt-2 w-44 rounded-2xl
-                border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
-                                >
-                                  <div className="py-1">
-                                    {[
-                                      { id: "all", label: "Todas" },
-                                      { id: "720p", label: "720p" },
-                                      { id: "1080p", label: "1080p" },
-                                      { id: "2k", label: "2K" },
-                                      { id: "4k", label: "4K" },
-                                    ].map((opt) => {
-                                      const active = imagesResFilter === opt.id;
-                                      return (
-                                        <button
-                                          key={opt.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setImagesResFilter(opt.id);
-                                            setResMenuOpen(false);
-                                          }}
-                                          className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
-                        transition ${active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5"}`}
-                                        >
-                                          <span className="font-semibold">
-                                            {opt.label}
-                                          </span>
-                                          {active && (
-                                            <Check className="w-4 h-4 text-emerald-300" />
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-
-                          {/* Idioma (sin label) */}
-                          {activeImagesTab !== "background" && (
-                            <div
-                              className="h-10 md:h-11 flex items-center rounded-xl bg-neutral-800/80 border border-white/10 p-1"
-                              title="Idioma"
-                              aria-label="Idioma"
-                            >
-                              <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
-                                <button
-                                  type="button"
-                                  onClick={() => setLangES((v) => !v)}
-                                  className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
-                ${langES ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
-                                  style={{
-                                    WebkitTapHighlightColor: "transparent",
-                                  }}
-                                >
-                                  ES
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setLangEN((v) => !v)}
-                                  className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
-                ${langEN ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
-                                  style={{
-                                    WebkitTapHighlightColor: "transparent",
-                                  }}
-                                >
-                                  EN
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* ===================== MÓVIL: botón filtros + reset ===================== */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setArtworkControlsOpen((v) => !v);
-                            setResMenuOpen(false);
-                          }}
-                          className="sm:hidden inline-flex items-center justify-center w-10 h-10 rounded-xl
-        border border-white/10 bg-neutral-800/80 text-zinc-200
-        hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/20 transition-all duration-300
-        transform-gpu hover:-translate-y-0.5"
-                          title="Filtros"
-                          aria-label="Filtros"
-                          style={{ WebkitTapHighlightColor: "transparent" }}
-                        >
-                          <SlidersHorizontal className="w-5 h-5" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={handleResetArtwork}
-                          className="inline-flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
-        border border-red-500/30 bg-red-500/10 text-red-400
-        hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45 transition"
-                          title="Restaurar valores por defecto"
-                          aria-label="Restaurar valores por defecto"
-                          style={{ WebkitTapHighlightColor: "transparent" }}
-                        >
-                          <RotateCcw className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Panel movil desplegable en 2 filas maximo */}
-                    <AnimatePresence>
-                      {artworkControlsOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -8 }}
-                          transition={{ duration: 0.16, ease: "easeOut" }}
-                          className="sm:hidden mb-4"
-                        >
-                          <div>
-                            {/* Todo en una sola fila con iconos */}
-                            <div className="flex items-center gap-2">
-                              {/* Tabs con iconos - compacto */}
-                              <div className="flex bg-white/5 rounded-xl p-1 border border-white/10">
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveImagesTab("posters")}
-                                  className={`p-2 rounded-lg transition-all ${
-                                    activeImagesTab === "posters"
-                                      ? "bg-white/10 text-white shadow"
-                                      : "text-zinc-400 hover:text-zinc-200"
-                                  }`}
-                                  style={{
-                                    WebkitTapHighlightColor: "transparent",
-                                  }}
-                                  title="Portada"
-                                >
-                                  <ImageIcon className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setActiveImagesTab("backdrops")
-                                  }
-                                  className={`p-2 rounded-lg transition-all ${
-                                    activeImagesTab === "backdrops"
-                                      ? "bg-white/10 text-white shadow"
-                                      : "text-zinc-400 hover:text-zinc-200"
-                                  }`}
-                                  style={{
-                                    WebkitTapHighlightColor: "transparent",
-                                  }}
-                                  title="Vista previa"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setActiveImagesTab("background")
-                                  }
-                                  className={`p-2 rounded-lg transition-all ${
-                                    activeImagesTab === "background"
-                                      ? "bg-white/10 text-white shadow"
-                                      : "text-zinc-400 hover:text-zinc-200"
-                                  }`}
-                                  style={{
-                                    WebkitTapHighlightColor: "transparent",
-                                  }}
-                                  title="Fondo"
-                                >
-                                  <Layers className="w-4 h-4" />
-                                </button>
+                                      style={{
+                                        WebkitTapHighlightColor: "transparent",
+                                      }}
+                                    >
+                                      {tab === "posters"
+                                        ? "Portada"
+                                        : tab === "backdrops"
+                                          ? "Vista previa"
+                                          : "Fondo"}
+                                    </button>
+                                  ),
+                                )}
                               </div>
 
-                              {/* Resolución móvil - más compacto */}
-                              <div ref={resMenuRef} className="relative flex-1">
+                              {/* Resolución (sin label superior) */}
+                              <div ref={resMenuRef} className="relative">
                                 <button
                                   type="button"
                                   onClick={() => setResMenuOpen((v) => !v)}
-                                  className="h-10 w-full inline-flex items-center justify-between gap-2
-                  px-3 rounded-xl bg-black/35 border border-white/10
-                  hover:bg-black/45 hover:border-white/15 transition text-sm text-zinc-200"
+                                  className="h-10 md:h-11 inline-flex items-center justify-between gap-2 min-w-[150px]
+            px-3 rounded-xl bg-neutral-800/80 border border-white/10
+            hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/15 transition-all duration-300
+            text-sm text-zinc-200"
                                   title="Resolución"
                                   aria-label="Resolución"
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
                                   }}
                                 >
-                                  <span className="inline-flex items-center gap-2 truncate">
+                                  <span className="inline-flex items-center gap-2">
                                     <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
                                       RES
                                     </span>
-                                    <span className="font-semibold truncate">
+                                    <span className="font-semibold">
                                       {imagesResFilter === "all"
                                         ? "Todas"
                                         : imagesResFilter === "720p"
@@ -10147,7 +9942,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </span>
                                   </span>
                                   <ChevronDown
-                                    className={`w-4 h-4 shrink-0 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
+                                    className={`w-4 h-4 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
                                   />
                                 </button>
 
@@ -10165,8 +9960,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         duration: 0.14,
                                         ease: "easeOut",
                                       }}
-                                      className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
-                      border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
+                                      className="absolute left-0 top-full z-[9999] mt-2 w-44 rounded-2xl
+                border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
                                     >
                                       <div className="py-1">
                                         {[
@@ -10187,7 +9982,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 setResMenuOpen(false);
                                               }}
                                               className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
-                              transition ${active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5"}`}
+                        transition ${active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5"}`}
                                             >
                                               <span className="font-semibold">
                                                 {opt.label}
@@ -10204,1204 +9999,1476 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 </AnimatePresence>
                               </div>
 
-                              {/* Idioma móvil - compacto */}
+                              {/* Idioma (sin label) */}
                               {activeImagesTab !== "background" && (
-                                <div className="flex gap-1.5 bg-black/35 border border-white/10 rounded-xl p-1.5 h-10">
-                                  <button
-                                    type="button"
-                                    onClick={() => setLangES((v) => !v)}
-                                    className={`px-3 rounded-lg text-xs font-medium transition-all ${
-                                      langES
-                                        ? "bg-zinc-800 text-white"
-                                        : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                                    }`}
-                                    style={{
-                                      WebkitTapHighlightColor: "transparent",
-                                    }}
-                                  >
-                                    ES
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setLangEN((v) => !v)}
-                                    className={`px-3 rounded-lg text-xs font-medium transition-all ${
-                                      langEN
-                                        ? "bg-zinc-800 text-white"
-                                        : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                                    }`}
-                                    style={{
-                                      WebkitTapHighlightColor: "transparent",
-                                    }}
-                                  >
-                                    EN
-                                  </button>
+                                <div
+                                  className="h-10 md:h-11 flex items-center rounded-xl bg-neutral-800/80 border border-white/10 p-1"
+                                  title="Idioma"
+                                  aria-label="Idioma"
+                                >
+                                  <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                                    <button
+                                      type="button"
+                                      onClick={() => setLangES((v) => !v)}
+                                      className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
+                ${langES ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
+                                      style={{
+                                        WebkitTapHighlightColor: "transparent",
+                                      }}
+                                    >
+                                      ES
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setLangEN((v) => !v)}
+                                      className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
+                ${langEN ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
+                                      style={{
+                                        WebkitTapHighlightColor: "transparent",
+                                      }}
+                                    >
+                                      EN
+                                    </button>
+                                  </div>
                                 </div>
                               )}
                             </div>
+
+                            {/* ===================== MÓVIL: botón filtros + reset ===================== */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setArtworkControlsOpen((v) => !v);
+                                setResMenuOpen(false);
+                              }}
+                              className="sm:hidden inline-flex items-center justify-center w-10 h-10 rounded-xl
+        border border-white/10 bg-neutral-800/80 text-zinc-200
+        hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/20 transition-all duration-300
+        transform-gpu hover:-translate-y-0.5"
+                              title="Filtros"
+                              aria-label="Filtros"
+                              style={{ WebkitTapHighlightColor: "transparent" }}
+                            >
+                              <SlidersHorizontal className="w-5 h-5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleResetArtwork}
+                              className="inline-flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
+        border border-red-500/30 bg-red-500/10 text-red-400
+        hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45 transition"
+                              title="Restaurar valores por defecto"
+                              aria-label="Restaurar valores por defecto"
+                              style={{ WebkitTapHighlightColor: "transparent" }}
+                            >
+                              <RotateCcw className="w-5 h-5" />
+                            </button>
                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                        </div>
 
-                    {!!imagesError && (
-                      <div className="text-sm text-red-400 mb-3">
-                        {imagesError}
-                      </div>
-                    )}
+                        {/* Panel movil desplegable en 2 filas maximo */}
+                        <AnimatePresence>
+                          {artworkControlsOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -8 }}
+                              transition={{ duration: 0.16, ease: "easeOut" }}
+                              className="sm:hidden mb-4"
+                            >
+                              <div>
+                                {/* Todo en una sola fila con iconos */}
+                                <div className="flex items-center gap-2">
+                                  {/* Tabs con iconos - compacto */}
+                                  <div className="flex bg-white/5 rounded-xl p-1 border border-white/10">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setActiveImagesTab("posters")
+                                      }
+                                      className={`p-2 rounded-lg transition-all ${
+                                        activeImagesTab === "posters"
+                                          ? "bg-white/10 text-white shadow"
+                                          : "text-zinc-400 hover:text-zinc-200"
+                                      }`}
+                                      style={{
+                                        WebkitTapHighlightColor: "transparent",
+                                      }}
+                                      title="Portada"
+                                    >
+                                      <ImageIcon className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setActiveImagesTab("backdrops")
+                                      }
+                                      className={`p-2 rounded-lg transition-all ${
+                                        activeImagesTab === "backdrops"
+                                          ? "bg-white/10 text-white shadow"
+                                          : "text-zinc-400 hover:text-zinc-200"
+                                      }`}
+                                      style={{
+                                        WebkitTapHighlightColor: "transparent",
+                                      }}
+                                      title="Vista previa"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setActiveImagesTab("background")
+                                      }
+                                      className={`p-2 rounded-lg transition-all ${
+                                        activeImagesTab === "background"
+                                          ? "bg-white/10 text-white shadow"
+                                          : "text-zinc-400 hover:text-zinc-200"
+                                      }`}
+                                      style={{
+                                        WebkitTapHighlightColor: "transparent",
+                                      }}
+                                      title="Fondo"
+                                    >
+                                      <Layers className="w-4 h-4" />
+                                    </button>
+                                  </div>
 
-                    {(() => {
-                      const {
-                        ordered,
-                        isPoster,
-                        isBackdropTab,
-                        aspect,
-                        size,
-                        activePath,
-                      } = artworkSelection;
+                                  {/* Resolución móvil - más compacto */}
+                                  <div
+                                    ref={resMenuRef}
+                                    className="relative flex-1"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => setResMenuOpen((v) => !v)}
+                                      className="h-10 w-full inline-flex items-center justify-between gap-2
+                  px-3 rounded-xl bg-black/35 border border-white/10
+                  hover:bg-black/45 hover:border-white/15 transition text-sm text-zinc-200"
+                                      title="Resolución"
+                                      aria-label="Resolución"
+                                      style={{
+                                        WebkitTapHighlightColor: "transparent",
+                                      }}
+                                    >
+                                      <span className="inline-flex items-center gap-2 truncate">
+                                        <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
+                                          RES
+                                        </span>
+                                        <span className="font-semibold truncate">
+                                          {imagesResFilter === "all"
+                                            ? "Todas"
+                                            : imagesResFilter === "720p"
+                                              ? "720p"
+                                              : imagesResFilter === "1080p"
+                                                ? "1080p"
+                                                : imagesResFilter === "2k"
+                                                  ? "2K"
+                                                  : "4K"}
+                                        </span>
+                                      </span>
+                                      <ChevronDown
+                                        className={`w-4 h-4 shrink-0 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
+                                      />
+                                    </button>
 
-                      // 2 en movil y 4 en desktop para backdrops (vista previa / fondo)
-                      const isBackdropLike = activeImagesTab !== "posters";
+                                    <AnimatePresence>
+                                      {resMenuOpen && (
+                                        <motion.div
+                                          initial={{
+                                            opacity: 0,
+                                            y: 6,
+                                            scale: 0.98,
+                                          }}
+                                          animate={{
+                                            opacity: 1,
+                                            y: 0,
+                                            scale: 1,
+                                          }}
+                                          exit={{
+                                            opacity: 0,
+                                            y: 6,
+                                            scale: 0.98,
+                                          }}
+                                          transition={{
+                                            duration: 0.14,
+                                            ease: "easeOut",
+                                          }}
+                                          className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
+                      border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
+                                        >
+                                          <div className="py-1">
+                                            {[
+                                              { id: "all", label: "Todas" },
+                                              { id: "720p", label: "720p" },
+                                              { id: "1080p", label: "1080p" },
+                                              { id: "2k", label: "2K" },
+                                              { id: "4k", label: "4K" },
+                                            ].map((opt) => {
+                                              const active =
+                                                imagesResFilter === opt.id;
+                                              return (
+                                                <button
+                                                  key={opt.id}
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setImagesResFilter(opt.id);
+                                                    setResMenuOpen(false);
+                                                  }}
+                                                  className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
+                              transition ${active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5"}`}
+                                                >
+                                                  <span className="font-semibold">
+                                                    {opt.label}
+                                                  </span>
+                                                  {active && (
+                                                    <Check className="w-4 h-4 text-emerald-300" />
+                                                  )}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </div>
 
-                      const breakpoints = isPoster
-                        ? {
-                            500: { slidesPerView: 3, spaceBetween: 14 },
-                            640: { slidesPerView: 4, spaceBetween: 14 },
-                            768: { slidesPerView: 5, spaceBetween: 16 },
-                            1024: { slidesPerView: 6, spaceBetween: 18 },
-                            1280: { slidesPerView: 7, spaceBetween: 18 },
-                          }
-                        : {
-                            0: { slidesPerView: 2, spaceBetween: 12 },
-                            640: { slidesPerView: 3, spaceBetween: 14 },
-                            768: { slidesPerView: 4, spaceBetween: 16 },
-                            1024: { slidesPerView: 4, spaceBetween: 18 },
-                            1280: { slidesPerView: 4, spaceBetween: 20 },
-                          };
-
-                      const loadingCardsCount = Math.max(
-                        1,
-                        Math.min(
-                          ordered?.length || (isPoster ? 7 : 4),
-                          isPoster ? 7 : 4,
-                        ),
-                      );
-
-                      const loadingCarousel = (
-                        <Swiper
-                          key={`${activeImagesTab}-loading`}
-                          spaceBetween={12}
-                          slidesPerView={isBackdropLike ? 2 : 3}
-                          breakpoints={breakpoints}
-                          allowTouchMove={false}
-                          className="pt-3 pb-8"
-                        >
-                          {Array.from({ length: loadingCardsCount }).map(
-                            (_, index) => (
-                              <SwiperSlide
-                                key={`${activeImagesTab}-loading-${index}`}
-                                className="h-full pt-1 pb-3"
-                              >
-                                <div
-                                  className={`w-full rounded-2xl border-2 border-white/10 bg-white/5 animate-pulse ${aspect}`}
-                                  aria-hidden="true"
-                                />
-                              </SwiperSlide>
-                            ),
+                                  {/* Idioma móvil - compacto */}
+                                  {activeImagesTab !== "background" && (
+                                    <div className="flex gap-1.5 bg-black/35 border border-white/10 rounded-xl p-1.5 h-10">
+                                      <button
+                                        type="button"
+                                        onClick={() => setLangES((v) => !v)}
+                                        className={`px-3 rounded-lg text-xs font-medium transition-all ${
+                                          langES
+                                            ? "bg-zinc-800 text-white"
+                                            : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                        }`}
+                                        style={{
+                                          WebkitTapHighlightColor:
+                                            "transparent",
+                                        }}
+                                      >
+                                        ES
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setLangEN((v) => !v)}
+                                        className={`px-3 rounded-lg text-xs font-medium transition-all ${
+                                          langEN
+                                            ? "bg-zinc-800 text-white"
+                                            : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                        }`}
+                                        style={{
+                                          WebkitTapHighlightColor:
+                                            "transparent",
+                                        }}
+                                      >
+                                        EN
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </motion.div>
                           )}
-                        </Swiper>
-                      );
+                        </AnimatePresence>
 
-                      if (
-                        (!ordered || ordered.length === 0) &&
-                        (imagesLoading || !artworkInitialized)
-                      ) {
-                        return (
-                          <div className="relative overflow-x-hidden overflow-y-visible">
-                            {loadingCarousel}
+                        {!!imagesError && (
+                          <div className="text-sm text-red-400 mb-3">
+                            {imagesError}
                           </div>
-                        );
-                      }
+                        )}
 
-                      if (!ordered || ordered.length === 0) {
-                        return (
-                          <div className="text-sm text-zinc-400">
-                            No hay imágenes disponibles con los filtros
-                            actuales.
-                          </div>
-                        );
-                      }
+                        {(() => {
+                          const {
+                            ordered,
+                            isPoster,
+                            isBackdropTab,
+                            aspect,
+                            size,
+                            activePath,
+                          } = artworkSelection;
 
-                      return (
-                        <div className="relative overflow-visible">
-                          {!artworkRowReady && loadingCarousel}
+                          // 2 en movil y 4 en desktop para backdrops (vista previa / fondo)
+                          const isBackdropLike = activeImagesTab !== "posters";
 
-                          {artworkRowReady && (
-                            <DetailsArrowCarousel
-                              key={activeImagesTab}
+                          const breakpoints = isPoster
+                            ? {
+                                500: { slidesPerView: 3, spaceBetween: 14 },
+                                640: { slidesPerView: 4, spaceBetween: 14 },
+                                768: { slidesPerView: 5, spaceBetween: 16 },
+                                1024: { slidesPerView: 6, spaceBetween: 18 },
+                                1280: { slidesPerView: 7, spaceBetween: 18 },
+                              }
+                            : {
+                                0: { slidesPerView: 2, spaceBetween: 12 },
+                                640: { slidesPerView: 3, spaceBetween: 14 },
+                                768: { slidesPerView: 4, spaceBetween: 16 },
+                                1024: { slidesPerView: 4, spaceBetween: 18 },
+                                1280: { slidesPerView: 4, spaceBetween: 20 },
+                              };
+
+                          const loadingCardsCount = Math.max(
+                            1,
+                            Math.min(
+                              ordered?.length || (isPoster ? 7 : 4),
+                              isPoster ? 7 : 4,
+                            ),
+                          );
+
+                          const loadingCarousel = (
+                            <Swiper
+                              key={`${activeImagesTab}-loading`}
                               spaceBetween={12}
                               slidesPerView={isBackdropLike ? 2 : 3}
                               breakpoints={breakpoints}
+                              allowTouchMove={false}
                               className="pt-3 pb-8"
-                              arrowClassName="top-3 bottom-8"
                             >
-                              {ordered.map((img, index) => {
-                                const filePath = img?.file_path;
-                                if (!filePath) return null;
-
-                                const isActive = activePath === filePath;
-                                const resText = imgResLabel(img);
-                                const isPriority = index < artworkPreloadCount;
-                                const imgAlt = isPoster
-                                  ? `Portada de ${title}`
-                                  : isBackdropTab
-                                    ? `Vista previa de ${title}`
-                                    : `Fondo de ${title}`;
-
-                                const imgSrc = `https://image.tmdb.org/t/p/${size}${filePath}`;
-                                const imgSrcSet = isPoster
-                                  ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w342${filePath} 342w, https://image.tmdb.org/t/p/w500${filePath} 500w`
-                                  : `https://image.tmdb.org/t/p/w300${filePath} 300w, https://image.tmdb.org/t/p/w780${filePath} 780w, https://image.tmdb.org/t/p/w1280${filePath} 1280w`;
-                                const imgSizes = isPoster
-                                  ? "(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 140px"
-                                  : "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px";
-
-                                return (
+                              {Array.from({ length: loadingCardsCount }).map(
+                                (_, index) => (
                                   <SwiperSlide
-                                    key={filePath}
+                                    key={`${activeImagesTab}-loading-${index}`}
                                     className="h-full pt-1 pb-3"
                                   >
                                     <div
-                                      role="button"
-                                      tabIndex={0}
-                                      onClick={() => {
-                                        if (activeImagesTab === "posters")
-                                          handleSelectPoster(filePath);
-                                        else if (
-                                          activeImagesTab === "backdrops"
-                                        )
-                                          handleSelectPreviewBackdrop(filePath);
-                                        else handleSelectBackground(filePath);
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (
-                                          e.key === "Enter" ||
-                                          e.key === " "
-                                        ) {
-                                          e.preventDefault();
-                                          if (activeImagesTab === "posters")
-                                            handleSelectPoster(filePath);
-                                          else if (
-                                            activeImagesTab === "backdrops"
-                                          )
-                                            handleSelectPreviewBackdrop(
-                                              filePath,
-                                            );
-                                          else handleSelectBackground(filePath);
-                                        }
-                                      }}
-                                      className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
+                                      className={`w-full rounded-2xl border-2 border-white/10 bg-white/5 animate-pulse ${aspect}`}
+                                      aria-hidden="true"
+                                    />
+                                  </SwiperSlide>
+                                ),
+                              )}
+                            </Swiper>
+                          );
+
+                          if (
+                            (!ordered || ordered.length === 0) &&
+                            (imagesLoading || !artworkInitialized)
+                          ) {
+                            return (
+                              <div className="relative overflow-x-hidden overflow-y-visible">
+                                {loadingCarousel}
+                              </div>
+                            );
+                          }
+
+                          if (!ordered || ordered.length === 0) {
+                            return (
+                              <div className="text-sm text-zinc-400">
+                                No hay imágenes disponibles con los filtros
+                                actuales.
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="relative overflow-visible">
+                              {!artworkRowReady && loadingCarousel}
+
+                              {artworkRowReady && (
+                                <DetailsArrowCarousel
+                                  key={activeImagesTab}
+                                  spaceBetween={12}
+                                  slidesPerView={isBackdropLike ? 2 : 3}
+                                  breakpoints={breakpoints}
+                                  className="pt-3 pb-8"
+                                  arrowClassName="top-3 bottom-8"
+                                >
+                                  {ordered.map((img, index) => {
+                                    const filePath = img?.file_path;
+                                    if (!filePath) return null;
+
+                                    const isActive = activePath === filePath;
+                                    const resText = imgResLabel(img);
+                                    const isPriority =
+                                      index < artworkPreloadCount;
+                                    const imgAlt = isPoster
+                                      ? `Portada de ${title}`
+                                      : isBackdropTab
+                                        ? `Vista previa de ${title}`
+                                        : `Fondo de ${title}`;
+
+                                    const imgSrc = `https://image.tmdb.org/t/p/${size}${filePath}`;
+                                    const imgSrcSet = isPoster
+                                      ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w342${filePath} 342w, https://image.tmdb.org/t/p/w500${filePath} 500w`
+                                      : `https://image.tmdb.org/t/p/w300${filePath} 300w, https://image.tmdb.org/t/p/w780${filePath} 780w, https://image.tmdb.org/t/p/w1280${filePath} 1280w`;
+                                    const imgSizes = isPoster
+                                      ? "(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 140px"
+                                      : "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px";
+
+                                    return (
+                                      <SwiperSlide
+                                        key={filePath}
+                                        className="h-full pt-1 pb-3"
+                                      >
+                                        <div
+                                          role="button"
+                                          tabIndex={0}
+                                          onClick={() => {
+                                            if (activeImagesTab === "posters")
+                                              handleSelectPoster(filePath);
+                                            else if (
+                                              activeImagesTab === "backdrops"
+                                            )
+                                              handleSelectPreviewBackdrop(
+                                                filePath,
+                                              );
+                                            else
+                                              handleSelectBackground(filePath);
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (
+                                              e.key === "Enter" ||
+                                              e.key === " "
+                                            ) {
+                                              e.preventDefault();
+                                              if (activeImagesTab === "posters")
+                                                handleSelectPoster(filePath);
+                                              else if (
+                                                activeImagesTab === "backdrops"
+                                              )
+                                                handleSelectPreviewBackdrop(
+                                                  filePath,
+                                                );
+                                              else
+                                                handleSelectBackground(
+                                                  filePath,
+                                                );
+                                            }
+                                          }}
+                                          className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
                         ${
                           isActive
                             ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
                             : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
                         }`}
-                                      title="Seleccionar"
-                                      style={{
-                                        WebkitTapHighlightColor: "transparent",
-                                      }}
-                                    >
-                                      <div
-                                        className={`w-full ${aspect} bg-black/40`}
-                                      >
-                                        <img
-                                          src={imgSrc}
-                                          srcSet={imgSrcSet}
-                                          sizes={imgSizes}
-                                          alt={imgAlt}
-                                          loading={
-                                            isPriority ? "eager" : "lazy"
-                                          }
-                                          fetchPriority={
-                                            isPriority ? "high" : "auto"
-                                          }
-                                          decoding="async"
-                                          className="w-full h-full object-cover transition-transform duration-700 transform-gpu
-                            group-hover:scale-[1.08]"
-                                        />
-                                      </div>
-
-                                      {isActive && (
-                                        <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-400 rounded-full shadow-lg shadow-emerald-500/50 ring-2 ring-white/20" />
-                                      )}
-
-                                      {resText && (
-                                        <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                          <span
-                                            className="text-[10px] font-bold tracking-wide px-2 py-1 rounded-full
-                            bg-black/70 border border-white/15 text-zinc-100"
+                                          title="Seleccionar"
+                                          style={{
+                                            WebkitTapHighlightColor:
+                                              "transparent",
+                                          }}
+                                        >
+                                          <div
+                                            className={`w-full ${aspect} bg-black/40`}
                                           >
-                                            {resText}
-                                          </span>
-                                        </div>
-                                      )}
+                                            <img
+                                              src={imgSrc}
+                                              srcSet={imgSrcSet}
+                                              sizes={imgSizes}
+                                              alt={imgAlt}
+                                              loading={
+                                                isPriority ? "eager" : "lazy"
+                                              }
+                                              fetchPriority={
+                                                isPriority ? "high" : "auto"
+                                              }
+                                              decoding="async"
+                                              className="w-full h-full object-cover transition-transform duration-700 transform-gpu
+                            group-hover:scale-[1.08]"
+                                            />
+                                          </div>
 
-                                      <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleCopyImageUrl(filePath);
-                                        }}
-                                        onKeyDown={(e) => {
-                                          if (
-                                            e.key === "Enter" ||
-                                            e.key === " "
-                                          ) {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleCopyImageUrl(filePath);
-                                          }
-                                        }}
-                                        className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
+                                          {isActive && (
+                                            <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-400 rounded-full shadow-lg shadow-emerald-500/50 ring-2 ring-white/20" />
+                                          )}
+
+                                          {resText && (
+                                            <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <span
+                                                className="text-[10px] font-bold tracking-wide px-2 py-1 rounded-full
+                            bg-black/70 border border-white/15 text-zinc-100"
+                                              >
+                                                {resText}
+                                              </span>
+                                            </div>
+                                          )}
+
+                                          <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleCopyImageUrl(filePath);
+                                            }}
+                                            onKeyDown={(e) => {
+                                              if (
+                                                e.key === "Enter" ||
+                                                e.key === " "
+                                              ) {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                handleCopyImageUrl(filePath);
+                                              }
+                                            }}
+                                            className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
                           opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
-                                        title="Copiar URL"
-                                      >
-                                        <LinkIcon size={14} />
-                                      </div>
+                                            title="Copiar URL"
+                                          >
+                                            <LinkIcon size={14} />
+                                          </div>
+                                        </div>
+                                      </SwiperSlide>
+                                    );
+                                  })}
+                                </DetailsArrowCarousel>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </section>
+                    )}
+                  </AnimatedSection>
+
+                  <AnimatedSection
+                    key={`${id}-videos-${videosResolved ? "ready" : "loading"}-${videos.length}`}
+                    delay={0.04}
+                  >
+                    {/* =================================================================
+                    SECCIÓN: TRÁILER Y VÍDEOS
+                   ================================================================= */}
+                    {/* Carrusel de vídeos (tráilers, teasers, clips, etc.) del contenido */}
+                    {/* Solo se muestra si hay una API key de TMDb configurada */}
+                    {TMDB_API_KEY && (
+                      <section className="mt-6">
+                        <SectionTitle
+                          title="Tráiler y vídeos"
+                          icon={MonitorPlay}
+                        />
+
+                        <div className="rounded-2xl p-0 mb-10">
+                          {videosLoading && (
+                            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                              {Array.from({ length: 4 }).map((_, index) => (
+                                <div
+                                  key={index}
+                                  className="rounded-2xl overflow-hidden border border-white/10 bg-black/25 animate-pulse"
+                                  aria-hidden="true"
+                                >
+                                  <div className="relative aspect-video bg-white/5">
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <div className="w-14 h-14 rounded-full bg-white/10 border border-white/10" />
                                     </div>
+                                  </div>
+
+                                  <div className="p-4">
+                                    <div className="h-4 w-3/4 rounded bg-white/10" />
+                                    <div className="mt-3 flex gap-2">
+                                      <div className="h-5 w-16 rounded-full bg-white/10" />
+                                      <div className="h-5 w-14 rounded-full bg-white/10" />
+                                      <div className="h-5 w-10 rounded-full bg-white/10" />
+                                    </div>
+                                    <div className="mt-4 flex items-center gap-2">
+                                      <div className="h-3 w-14 rounded bg-white/10" />
+                                      <div className="h-3 w-1 rounded-full bg-white/10" />
+                                      <div className="h-3 w-20 rounded bg-white/10" />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {!!videosError && (
+                            <div className="text-sm text-red-400">
+                              {videosError}
+                            </div>
+                          )}
+
+                          {videosResolved &&
+                            !videosLoading &&
+                            !videosError &&
+                            videos.length === 0 && (
+                              <div className="text-sm text-zinc-400">
+                                No hay tráileres o vídeos disponibles en TMDb
+                                para este título.
+                              </div>
+                            )}
+
+                          {videos.length > 0 && (
+                            <DetailsArrowCarousel
+                              spaceBetween={12}
+                              slidesPerView={2}
+                              breakpoints={{
+                                640: { slidesPerView: 2, spaceBetween: 16 },
+                                768: { slidesPerView: 3, spaceBetween: 16 },
+                                1024: { slidesPerView: 4, spaceBetween: 16 },
+                                1280: { slidesPerView: 4, spaceBetween: 16 },
+                              }}
+                              className="pb-2"
+                            >
+                              {videos.slice(0, 20).map((v) => {
+                                const thumb = videoThumbUrl(v);
+                                const fallbackPath =
+                                  displayBackdropPath || displayPosterPath;
+                                const fallback = fallbackPath
+                                  ? `https://image.tmdb.org/t/p/w780${fallbackPath}`
+                                  : "/placeholder.png";
+
+                                return (
+                                  <SwiperSlide
+                                    key={`${v.site}:${v.key}`}
+                                    className="h-full"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => openVideo(v)}
+                                      title={v.name || "Ver vídeo"}
+                                      className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
+                            border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
+                                    >
+                                      <div className="relative aspect-video overflow-hidden">
+                                        <img
+                                          src={thumb || fallback}
+                                          alt={v.name || "Video"}
+                                          className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                          <div className="w-14 h-14 rounded-full bg-black/55 border border-white/15 flex items-center justify-center transition-transform hover:scale-105">
+                                            <Play className="w-7 h-7 text-yellow-300 translate-x-[1px]" />
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex flex-col flex-1 p-4 items-start">
+                                        {/* Titulo arriba (1 linea siempre) */}
+                                        <div className="w-full min-h-[22px]">
+                                          <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
+                                            {v.name || "Vídeo"}
+                                          </div>
+                                        </div>
+
+                                        {/* Propiedades debajo, alineadas a la izquierda */}
+                                        <div className="mt-3 flex items-center gap-1.5 w-full overflow-hidden">
+                                          <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar">
+                                            {/* Label de Oficial - Agregado shrink-0 */}
+                                            {v.official && (
+                                              <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200 flex items-center gap-0.5">
+                                                <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+                                                OFFICIAL
+                                              </span>
+                                            )}
+
+                                            {/* Label de Tipo (Trailer, Teaser, etc) - Agregado shrink-0 */}
+                                            {v.type && (
+                                              <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-zinc-300">
+                                                {v.type}
+                                              </span>
+                                            )}
+
+                                            {/* Label de Idioma - Agregado shrink-0 */}
+                                            {v.iso_639_1 && (
+                                              <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300">
+                                                {v.iso_639_1}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {/* Fuente y fecha abajo, mismo margen izquierdo */}
+                                        <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
+                                          <span className="font-semibold text-zinc-200">
+                                            {v.site || "—"}
+                                          </span>
+                                          {v.published_at && (
+                                            <>
+                                              <span className="text-zinc-600">
+                                                ·
+                                              </span>
+                                              <span className="shrink-0">
+                                                {new Date(
+                                                  v.published_at,
+                                                ).toLocaleDateString("es-ES")}
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </button>
                                   </SwiperSlide>
                                 );
                               })}
                             </DetailsArrowCarousel>
                           )}
                         </div>
-                      );
-                    })()}
-                  </section>
-                )}
-              </AnimatedSection>
-
-              <AnimatedSection
-                key={`${id}-videos-${videosResolved ? "ready" : "loading"}-${videos.length}`}
-                delay={0.04}
-              >
-                {/* =================================================================
-                    SECCIÓN: TRÁILER Y VÍDEOS
-                   ================================================================= */}
-                {/* Carrusel de vídeos (tráilers, teasers, clips, etc.) del contenido */}
-                {/* Solo se muestra si hay una API key de TMDb configurada */}
-                {TMDB_API_KEY && (
-                  <section className="mt-6">
-                    <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} />
-
-                    <div className="rounded-2xl p-0 mb-10">
-                      {videosLoading && (
-                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                          {Array.from({ length: 4 }).map((_, index) => (
-                            <div
-                              key={index}
-                              className="rounded-2xl overflow-hidden border border-white/10 bg-black/25 animate-pulse"
-                              aria-hidden="true"
-                            >
-                              <div className="relative aspect-video bg-white/5">
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <div className="w-14 h-14 rounded-full bg-white/10 border border-white/10" />
-                                </div>
-                              </div>
-
-                              <div className="p-4">
-                                <div className="h-4 w-3/4 rounded bg-white/10" />
-                                <div className="mt-3 flex gap-2">
-                                  <div className="h-5 w-16 rounded-full bg-white/10" />
-                                  <div className="h-5 w-14 rounded-full bg-white/10" />
-                                  <div className="h-5 w-10 rounded-full bg-white/10" />
-                                </div>
-                                <div className="mt-4 flex items-center gap-2">
-                                  <div className="h-3 w-14 rounded bg-white/10" />
-                                  <div className="h-3 w-1 rounded-full bg-white/10" />
-                                  <div className="h-3 w-20 rounded bg-white/10" />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {!!videosError && (
-                        <div className="text-sm text-red-400">
-                          {videosError}
-                        </div>
-                      )}
-
-                      {videosResolved &&
-                        !videosLoading &&
-                        !videosError &&
-                        videos.length === 0 && (
-                          <div className="text-sm text-zinc-400">
-                            No hay tráileres o vídeos disponibles en TMDb para
-                            este título.
-                          </div>
-                        )}
-
-                      {videos.length > 0 && (
-                        <DetailsArrowCarousel
-                          spaceBetween={12}
-                          slidesPerView={2}
-                          breakpoints={{
-                            640: { slidesPerView: 2, spaceBetween: 16 },
-                            768: { slidesPerView: 3, spaceBetween: 16 },
-                            1024: { slidesPerView: 4, spaceBetween: 16 },
-                            1280: { slidesPerView: 4, spaceBetween: 16 },
-                          }}
-                          className="pb-2"
-                        >
-                          {videos.slice(0, 20).map((v) => {
-                            const thumb = videoThumbUrl(v);
-                            const fallbackPath =
-                              displayBackdropPath || displayPosterPath;
-                            const fallback = fallbackPath
-                              ? `https://image.tmdb.org/t/p/w780${fallbackPath}`
-                              : "/placeholder.png";
-
-                            return (
-                              <SwiperSlide
-                                key={`${v.site}:${v.key}`}
-                                className="h-full"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => openVideo(v)}
-                                  title={v.name || "Ver vídeo"}
-                                  className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
-                            border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
-                                >
-                                  <div className="relative aspect-video overflow-hidden">
-                                    <img
-                                      src={thumb || fallback}
-                                      alt={v.name || "Video"}
-                                      className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <div className="w-14 h-14 rounded-full bg-black/55 border border-white/15 flex items-center justify-center transition-transform hover:scale-105">
-                                        <Play className="w-7 h-7 text-yellow-300 translate-x-[1px]" />
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex flex-col flex-1 p-4 items-start">
-                                    {/* Titulo arriba (1 linea siempre) */}
-                                    <div className="w-full min-h-[22px]">
-                                      <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
-                                        {v.name || "Vídeo"}
-                                      </div>
-                                    </div>
-
-                                    {/* Propiedades debajo, alineadas a la izquierda */}
-                                    <div className="mt-3 flex items-center gap-1.5 w-full overflow-hidden">
-                                      <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar">
-                                        {/* Label de Oficial - Agregado shrink-0 */}
-                                        {v.official && (
-                                          <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200 flex items-center gap-0.5">
-                                            <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
-                                            OFFICIAL
-                                          </span>
-                                        )}
-
-                                        {/* Label de Tipo (Trailer, Teaser, etc) - Agregado shrink-0 */}
-                                        {v.type && (
-                                          <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-zinc-300">
-                                            {v.type}
-                                          </span>
-                                        )}
-
-                                        {/* Label de Idioma - Agregado shrink-0 */}
-                                        {v.iso_639_1 && (
-                                          <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300">
-                                            {v.iso_639_1}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    {/* Fuente y fecha abajo, mismo margen izquierdo */}
-                                    <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
-                                      <span className="font-semibold text-zinc-200">
-                                        {v.site || "—"}
-                                      </span>
-                                      {v.published_at && (
-                                        <>
-                                          <span className="text-zinc-600">
-                                            ·
-                                          </span>
-                                          <span className="shrink-0">
-                                            {new Date(
-                                              v.published_at,
-                                            ).toLocaleDateString("es-ES")}
-                                          </span>
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                </button>
-                              </SwiperSlide>
-                            );
-                          })}
-                        </DetailsArrowCarousel>
-                      )}
-                    </div>
-                  </section>
-                )}
-              </AnimatedSection>
+                      </section>
+                    )}
+                  </AnimatedSection>
                 </section>
 
-            <section id="section-sentiment" ref={registerSection("sentiment")}>
-              <AnimatedSection delay={0.04}>
-                {/* ===================================================== */}
-                {/* Trakt: sentimientos - Solo mostrar si no hay error */}
-                {!tSentiment.error && (
-                  <section className="mb-12">
-                    <SectionTitle
-                      title="Análisis de sentimientos"
-                      icon={Sparkles}
-                    />
+                <section
+                  id="section-sentiment"
+                  ref={registerSection("sentiment")}
+                >
+                  <AnimatedSection delay={0.04}>
+                    {/* ===================================================== */}
+                    {/* Trakt: sentimientos - Solo mostrar si no hay error */}
+                    {!tSentiment.error && (
+                      <section className="mb-12">
+                        <SectionTitle
+                          title="Análisis de sentimientos"
+                          icon={Sparkles}
+                        />
 
-                    <div className="mt-3 sm:mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
-                      {/* Header del bloque */}
-                      <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
-                        <div className="flex items-center gap-4">
-                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
-                            <img
-                              src="/logo-Trakt.png"
-                              alt="Trakt"
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                          <div>
-                            <h3 className="text-base font-bold leading-tight text-white">
-                              Opiniones de la comunidad de Trakt
-                            </h3>
-                            <p className="text-xs font-medium text-zinc-400">
-                              Resumen oficial de sentimientos de Trakt sobre{" "}
-                              <span className="text-zinc-200">{title}</span>
-                            </p>
-                          </div>
-                        </div>
-                        {tSentiment.loading && (
-                          <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
-                        )}
-                      </div>
-
-                      <div className="p-6">
-                        {/* Sin mostrar error, directamente el contenido */}
-                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                          {/* Columna Positiva */}
-                          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
-                            <div className="mb-4 flex items-center gap-3">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
-                                <ThumbsUp className="h-4 w-4" />
-                              </div>
-                              <span className="font-bold tracking-wide text-emerald-100">
-                                Positivo
-                              </span>
-                            </div>
-
-                            {tSentiment.pros?.length ? (
-                              <ul className="space-y-3">
-                                {tSentiment.pros.map((s, i) => (
-                                  <li
-                                    key={i}
-                                    className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300"
-                                  >
-                                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
-                                    <span>{s}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <div className="text-sm italic text-zinc-500">
-                                No hay suficientes datos positivos.
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Columna Negativa */}
-                          <div className="relative overflow-hidden rounded-2xl border border-rose-500/20 bg-gradient-to-b from-rose-500/10 to-transparent p-5">
-                            <div className="mb-4 flex items-center gap-3">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
-                                <ThumbsDown className="h-4 w-4" />
-                              </div>
-                              <span className="font-bold tracking-wide text-rose-100">
-                                Negativo
-                              </span>
-                            </div>
-
-                            {tSentiment.cons?.length ? (
-                              <ul className="space-y-3">
-                                {tSentiment.cons.map((s, i) => (
-                                  <li
-                                    key={i}
-                                    className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300"
-                                  >
-                                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]" />
-                                    <span>{s}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <div className="text-sm italic text-zinc-500">
-                                No hay suficientes datos negativos.
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-                )}
-              </AnimatedSection>
-            </section>
-
-            {/* =================================================================
-                SECCIÓN: TEMPORADAS (solo para series)
-               ================================================================= */}
-            {/* Muestra las temporadas disponibles de la serie con información resumida */}
-            {type === "tv" && (
-              <section id="section-seasons" ref={registerSection("seasons")}>
-                <AnimatedSection delay={0.04}>
-                  <section className="mb-12">
-                    <SectionTitle title="Temporadas" icon={Layers} />
-
-                    <div className="mt-3 sm:mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {tSeasons.loading && (
-                        <div className="col-span-full py-10 flex justify-center">
-                          <Loader2 className="animate-spin text-white/50" />
-                        </div>
-                      )}
-
-                      {!tSeasons.loading &&
-                        visibleTraktSeasons.map((s) => {
-                          const sn = getSeasonNumber(s);
-                          const titleSeason = `Temporada ${sn}`;
-                          const imdbRating = toRatingNumber(
-                            seasonImdbRatings?.[sn],
-                          );
-                          const seriesGraphRating =
-                            seriesGraphSeasonRatings.get(sn) ?? null;
-                          const rating = imdbRating ?? seriesGraphRating;
-                          const imdbSeasonUrl = resolvedImdbId
-                            ? `https://www.imdb.com/title/${resolvedImdbId}/episodes/?season=${sn}`
-                            : null;
-
-                          // Lógica de progreso (usa TMDb para saber total)
-                          const tmdbSeason = (data?.seasons || []).find(
-                            (x) => Number(x?.season_number) === sn,
-                          );
-                          const totalEp =
-                            Number(tmdbSeason?.episode_count || 0) || null;
-                          const watchedEp = Array.isArray(watchedBySeason?.[sn])
-                            ? watchedBySeason[sn].length
-                            : 0;
-                          const percentage = totalEp
-                            ? Math.round((watchedEp / totalEp) * 100)
-                            : 0;
-
-                          const isComplete = percentage === 100;
-                          const barColor = isComplete
-                            ? "bg-emerald-500"
-                            : "bg-yellow-500";
-
-                          return (
-                            <button
-                              key={sn}
-                              type="button"
-                              onClick={() =>
-                                router.push(`/details/tv/${id}/season/${sn}`)
-                              }
-                              onMouseEnter={() => prefetchSeasonDetails(sn)}
-                              onFocus={() => prefetchSeasonDetails(sn)}
-                              onTouchStart={() => prefetchSeasonDetails(sn)}
-                              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5
-                             transition-all hover:-translate-y-1 hover:border-white/20 hover:bg-white/10 hover:shadow-xl
-                             text-left w-full"
-                              title={`Ver ${titleSeason}`}
-                            >
-                              {/* Fondo decorativo del número de temporada */}
-                              <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10">
-                                {sn}
-                              </div>
-
-                              <div className="relative p-5">
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <h4 className="text-lg font-extrabold text-white">
-                                      {titleSeason}
-                                    </h4>
-
-                                    <div className="mt-1 flex items-center gap-2 text-xs font-medium text-zinc-400">
-                                      {rating != null && (
-                                        <span className="flex items-center gap-1 text-yellow-400">
-                                          <Star className="h-3 w-3 fill-yellow-400" />{" "}
-                                          {rating.toFixed(1)}
-                                        </span>
-                                      )}
-                                      {totalEp != null && (
-                                        <span>• {totalEp} episodios</span>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Botón externo a IMDb (NO navega a la season page interna) */}
-                                  {imdbSeasonUrl && (
-                                    <a
-                                      href={imdbSeasonUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        window.open(
-                                          imdbSeasonUrl,
-                                          "_blank",
-                                          "noopener,noreferrer",
-                                        );
-                                      }}
-                                      className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
-                                      title="Ver temporada en IMDb"
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                    </a>
-                                  )}
-                                </div>
-
-                                {/* Barra de Progreso */}
-                                {totalEp != null && (
-                                  <div className="mt-6">
-                                    <div className="mb-1.5 flex items-end justify-between text-xs font-bold">
-                                      <span
-                                        className={
-                                          percentage > 0
-                                            ? "text-white"
-                                            : "text-zinc-500"
-                                        }
-                                      >
-                                        {watchedEp}{" "}
-                                        <span className="text-zinc-500 font-normal">
-                                          vistos
-                                        </span>
-                                      </span>
-                                      <span className="text-zinc-500">
-                                        {percentage}%
-                                      </span>
-                                    </div>
-
-                                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                                      <div
-                                        className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                                        style={{ width: `${percentage}%` }}
-                                      />
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })}
-                    </div>
-                  </section>
-                </AnimatedSection>
-              </section>
-            )}
-
-            {/* =================================================================
-                SECCIÓN: VALORACIÓN DE EPISODIOS (solo para series)
-               ================================================================= */}
-            {/* Gráfico de valoraciones por episodio mostrando la evolución de ratings */}
-            {type === "tv" && (
-              <section id="section-episodes" ref={registerSection("episodes")}>
-                <AnimatedSection delay={0.04}>
-                  {/* Subsección: Episodios y sus valoraciones */}
-                  {type === "tv" ? (
-                    <section className="mb-10">
-                      <SectionTitle
-                        title="Valoración de Episodios"
-                        icon={TrendingUp}
-                      />
-                      <div className="p-0">
-                        {ratingsError && (
-                          <p className="text-sm text-red-400 mb-2">
-                            {ratingsError}
-                          </p>
-                        )}
-                        {!ratingsLoading && !ratingsError && !ratings && (
-                          <p className="text-sm text-zinc-400 mb-2">
-                            No hay datos de episodios disponibles.
-                          </p>
-                        )}
-                        {!!ratings && !ratingsError && (
-                          <EpisodeRatingsGrid
-                            ratings={ratings}
-                            showId={Number(id)}
-                            tmdbSeasons={data?.seasons || []}
-                            density="compact"
-                          />
-                        )}
-                      </div>
-                    </section>
-                  ) : (
-                    <div className="text-sm text-zinc-400">
-                      Esta sección solo aplica a series.
-                    </div>
-                  )}
-                </AnimatedSection>
-              </section>
-            )}
-
-            <section id="section-comments" ref={registerSection("comments")}>
-              <AnimatedSection delay={0.04}>
-                {/* CRÍTICAS */}
-                {reviews && reviews.length > 0 && (
-                  <section className="mb-10">
-                    <div className="flex items-center justify-between mb-2">
-                      <SectionTitle
-                        title="Críticas de Usuarios"
-                        icon={MessageSquareIcon}
-                      />
-                      {reviewLimit < reviews.length && (
-                        <button
-                          onClick={() => setReviewLimit((prev) => prev + 2)}
-                          className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
-                        >
-                          Ver más
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {reviews.slice(0, reviewLimit).map((r) => {
-                        const avatar = r.author_details?.avatar_path
-                          ? r.author_details.avatar_path.startsWith("/https")
-                            ? r.author_details.avatar_path.slice(1)
-                            : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
-                          : `https://ui-avatars.com/api/?name=${r.author}&background=random`;
-
-                        return (
-                          <div
-                            key={r.id}
-                            className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
-                          >
+                        <div className="mt-3 sm:mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
+                          {/* Header del bloque */}
+                          <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
                             <div className="flex items-center gap-4">
-                              <img
-                                src={avatar}
-                                alt={r.author}
-                                className="w-12 h-12 rounded-full object-cover shadow-lg"
-                              />
-                              <div>
-                                <h4 className="font-bold text-white">
-                                  {r.author}
-                                </h4>
-                                <div className="flex items-center gap-2 text-xs text-gray-400">
-                                  <span>
-                                    {new Date(
-                                      r.created_at,
-                                    ).toLocaleDateString()}
-                                  </span>
-                                  {r.author_details?.rating && (
-                                    <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
-                                      ★ {r.author_details.rating}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
-                              "{r.content.replace(/<[^>]*>?/gm, "")}"
-                            </div>
-
-                            <a
-                              href={r.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
-                            >
-                              Leer review completa en TMDb &rarr;
-                            </a>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
-                )}
-              </AnimatedSection>
-
-              <AnimatedSection delay={0.04}>
-                {/* ===================================================== */}
-                {/* Trakt: comentarios */}
-                <section className="mb-10">
-                  <div className="mb-2 flex items-center justify-between gap-4">
-                    {/* Mantiene SectionTitle (mismo tamano), pero sin mb interno aqui */}
-                    <SectionTitle
-                      title="Comentarios"
-                      icon={MessageSquareIcon}
-                      className="mb-0"
-                    />
-
-                    {/* Bloque derecho centrado al titulo */}
-                    <div className="flex items-center gap-2 h-10 md:h-11 transform-gpu -translate-y-[3px] md:-translate-y-[10px]">
-                      <a
-                        href={
-                          trakt?.traktUrl
-                            ? `${trakt.traktUrl}/comments`
-                            : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
-                        }
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5
-        px-4 h-10 md:h-11 text-xs font-bold uppercase tracking-wider text-zinc-300 transition
-        hover:border-yellow-500/50 hover:bg-yellow-500/10 hover:text-yellow-400"
-                        style={{ WebkitTapHighlightColor: "transparent" }}
-                      >
-                        <span className="hidden sm:inline">Ver en Trakt</span>
-                        {tComments.total > 0 && (
-                          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white">
-                            {tComments.total}
-                          </span>
-                        )}
-                        <ExternalLink className="h-3 w-3 opacity-50 transition group-hover:opacity-100" />
-                      </a>
-
-                      <a
-                        href={
-                          trakt?.traktUrl
-                            ? `${trakt.traktUrl}/comments`
-                            : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
-                        }
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-2 rounded-full bg-white text-black
-        px-4 h-10 md:h-11 text-xs font-bold uppercase tracking-wider transition hover:bg-zinc-200"
-                        style={{ WebkitTapHighlightColor: "transparent" }}
-                      >
-                        <Plus className="h-3 w-3" />
-                        <span className="hidden sm:inline">Escribir</span>
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/20 backdrop-blur-sm">
-                    {/* Filtros estilo Tabs Modernos */}
-                    <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-4 py-3">
-                      <div className="flex gap-1 rounded-xl bg-black/40 p-1">
-                        {[
-                          { id: "likes30", label: "Top 30 Días" },
-                          { id: "likesAll", label: "Top Histórico" },
-                          { id: "recent", label: "Recientes" },
-                        ].map((t) => (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => setTCommentsTab(t.id)}
-                            className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
-                              tCommentsTab === t.id
-                                ? "bg-zinc-700 text-white shadow-md"
-                                : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-                            }`}
-                          >
-                            {t.label}
-                          </button>
-                        ))}
-                      </div>
-                      {tComments.loading && (
-                        <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-                      )}
-                    </div>
-
-                    <div className="space-y-4 p-4 sm:p-6">
-                      {!tComments.loading &&
-                        (tComments.items || []).length === 0 && (
-                          <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
-                            <MessageSquareIcon className="mb-2 h-8 w-8 opacity-20" />
-                            <p className="text-sm">
-                              Sé el primero en comentar.
-                            </p>
-                          </div>
-                        )}
-
-                      {(tComments.items || [])
-                        .slice(0, COMMENTS_SECTION_LIMIT)
-                        .map((c) => {
-                          const user = c?.user || {};
-                          const avatar =
-                            user?.images?.avatar?.full ||
-                            user?.images?.avatar?.medium ||
-                            `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.username || "User")}`;
-                          const text = stripHtml(
-                            c?.comment?.comment ?? c?.comment ?? "",
-                          );
-                          const created = c?.created_at
-                            ? formatDateTimeEs(c.created_at)
-                            : "";
-                          const likes = Number(c?.likes || 0);
-
-                          return (
-                            <div
-                              key={String(
-                                c?.id || `${user?.username}-${created}`,
-                              )}
-                              className="group relative flex gap-4 rounded-2xl bg-white/5 p-5 transition hover:bg-white/10"
-                            >
-                              {/* Avatar */}
-                              <div className="shrink-0">
+                              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
                                 <img
-                                  src={avatar}
-                                  alt={user?.username}
-                                  className="h-12 w-12 rounded-full object-cover shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20"
+                                  src="/logo-Trakt.png"
+                                  alt="Trakt"
+                                  className="h-full w-full object-cover"
                                 />
                               </div>
-
-                              {/* Content */}
-                              <div className="min-w-0 flex-1">
-                                <div className="mb-1 flex items-baseline justify-between gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-white group-hover:text-yellow-400 transition-colors cursor-pointer">
-                                      {user?.name ||
-                                        user?.username ||
-                                        "Usuario"}
-                                    </span>
-                                    {user?.vip && (
-                                      <span className="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-500">
-                                        VIP
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-xs text-zinc-500">
-                                    {created}
-                                  </span>
-                                </div>
-
-                                <div className="relative text-sm leading-relaxed text-zinc-300">
-                                  {/* Icono de comillas decorativo */}
-                                  <span className="absolute -left-3 -top-1 font-serif text-4xl text-white/5">
-                                    “
-                                  </span>
-                                  <p className="whitespace-pre-line">{text}</p>
-                                </div>
-
-                                {/* Actions Footer */}
-                                <div className="mt-3 flex items-center gap-4 border-t border-white/5 pt-3">
-                                  <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2 py-1 text-xs font-medium text-emerald-400">
-                                    <ThumbsUp className="h-3 w-3" /> {likes}
-                                  </div>
-                                  <a
-                                    href={
-                                      trakt?.traktUrl
-                                        ? `${trakt.traktUrl}/comments`
-                                        : undefined
-                                    }
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="ml-auto text-xs font-semibold text-zinc-500 hover:text-white transition-colors"
-                                  >
-                                    Responder en Trakt →
-                                  </a>
-                                </div>
+                              <div>
+                                <h3 className="text-base font-bold leading-tight text-white">
+                                  Opiniones de la comunidad de Trakt
+                                </h3>
+                                <p className="text-xs font-medium text-zinc-400">
+                                  Resumen oficial de sentimientos de Trakt sobre{" "}
+                                  <span className="text-zinc-200">{title}</span>
+                                </p>
                               </div>
                             </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-                </section>
-              </AnimatedSection>
-            </section>
+                            {tSentiment.loading && (
+                              <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+                            )}
+                          </div>
 
-            <section id="section-lists" ref={registerSection("lists")}>
-              <AnimatedSection delay={0.04}>
-                {/* ===================================================== */}
-                {/* Trakt: listas - Solo mostrar si no hay error */}
-                {!tLists.error && (
-                  <section className="mb-12">
-                    <div className="mb-6 flex items-center justify-between">
-                      <SectionTitle title="Listas" icon={ListVideo} />
-
-                      {/* Selector de Listas */}
-                      <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
-                        {["popular", "trending"].map((tab) => (
-                          <button
-                            key={tab}
-                            onClick={() => setTListsTab(tab)}
-                            className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${
-                              tListsTab === tab
-                                ? "bg-white text-black shadow-lg scale-105"
-                                : "text-zinc-400 hover:text-white hover:bg-white/5"
-                            }`}
-                          >
-                            {tab}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                      {tLists.loading ? (
-                        <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
-                          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-                          <span className="text-sm font-medium animate-pulse">
-                            Buscando listas y portadas...
-                          </span>
-                        </div>
-                      ) : (
-                        (tLists.items || []).map((row) => {
-                          const list = row?.list || row || {};
-                          const user = row?.user || list?.user || {};
-                          const previews = row?.previewPosters || [];
-
-                          const name = list?.name || "Lista";
-                          const itemCount = Number(
-                            list?.item_count || list?.items || 0,
-                          );
-                          const likes = Number(list?.likes || 0);
-                          const username = user?.username || user?.name || null;
-                          const slug = list?.ids?.slug || null;
-                          const traktId = list?.ids?.trakt || null;
-
-                          // Ruta interna (slug si existe; si no, traktId)
-                          const internalUrl =
-                            username && (slug || traktId)
-                              ? `/lists/trakt/${encodeURIComponent(username)}/${encodeURIComponent(String(slug || traktId))}`
-                              : null;
-
-                          // (opcional) enlace externo a Trakt, pero ya NO es el click principal
-                          const traktUrl =
-                            username && (slug || traktId)
-                              ? `https://trakt.tv/users/${username}/lists/${slug || traktId}`
-                              : null;
-
-                          const avatar =
-                            user?.images?.avatar?.full ||
-                            `https://ui-avatars.com/api/?name=${encodeURIComponent(username || "user")}&background=random`;
-
-                          const disabled = !internalUrl;
-
-                          return (
-                            <Link
-                              key={String(
-                                traktId || `${username}-${slug}` || name,
-                              )}
-                              href={internalUrl || "#"}
-                              aria-disabled={disabled}
-                              className={[
-                                "group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500",
-                                "hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)]",
-                                disabled
-                                  ? "pointer-events-none opacity-60"
-                                  : "",
-                              ].join(" ")}
-                            >
-                              {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS) */}
-                              <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
-                                {previews.length > 0 ? (
-                                  <div className="h-full w-full flex items-center justify-center overflow-visible">
-                                    <PosterStack posters={previews} />
+                          <div className="p-6">
+                            {/* Sin mostrar error, directamente el contenido */}
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                              {/* Columna Positiva */}
+                              <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
+                                <div className="mb-4 flex items-center gap-3">
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+                                    <ThumbsUp className="h-4 w-4" />
                                   </div>
+                                  <span className="font-bold tracking-wide text-emerald-100">
+                                    Positivo
+                                  </span>
+                                </div>
+
+                                {tSentiment.pros?.length ? (
+                                  <ul className="space-y-3">
+                                    {tSentiment.pros.map((s, i) => (
+                                      <li
+                                        key={i}
+                                        className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300"
+                                      >
+                                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                                        <span>{s}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
                                 ) : (
-                                  <div className="flex h-full items-center justify-center opacity-10">
-                                    <ListVideo className="h-20 w-20" />
+                                  <div className="text-sm italic text-zinc-500">
+                                    No hay suficientes datos positivos.
                                   </div>
-                                )}
-
-                                {/* Botón externo (opcional) sin romper el Link */}
-                                {traktUrl && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      window.open(
-                                        traktUrl,
-                                        "_blank",
-                                        "noopener,noreferrer",
-                                      );
-                                    }}
-                                    className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-zinc-200 border border-white/10 hover:border-indigo-400/30 hover:text-white"
-                                    title="Ver en Trakt"
-                                  >
-                                    Trakt
-                                  </button>
                                 )}
                               </div>
 
-                              {/* 2. CONTENIDO DE TEXTO */}
-                              <div className="relative flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
-                                <div>
-                                  <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
-                                    {name}
-                                  </h4>
-
-                                  {list?.description && (
-                                    <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
-                                      {stripHtml(list.description)}
-                                    </p>
-                                  )}
+                              {/* Columna Negativa */}
+                              <div className="relative overflow-hidden rounded-2xl border border-rose-500/20 bg-gradient-to-b from-rose-500/10 to-transparent p-5">
+                                <div className="mb-4 flex items-center gap-3">
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
+                                    <ThumbsDown className="h-4 w-4" />
+                                  </div>
+                                  <span className="font-bold tracking-wide text-rose-100">
+                                    Negativo
+                                  </span>
                                 </div>
 
-                                {/* Footer */}
-                                <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <img
-                                      src={avatar}
-                                      alt={username || "user"}
-                                      className="h-6 w-6 rounded-full ring-1 ring-white/20"
-                                    />
-                                    <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px]">
-                                      {username || "—"}
-                                    </span>
+                                {tSentiment.cons?.length ? (
+                                  <ul className="space-y-3">
+                                    {tSentiment.cons.map((s, i) => (
+                                      <li
+                                        key={i}
+                                        className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300"
+                                      >
+                                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]" />
+                                        <span>{s}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <div className="text-sm italic text-zinc-500">
+                                    No hay suficientes datos negativos.
                                   </div>
-
-                                  <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
-                                    <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
-                                      {itemCount} items
-                                    </span>
-                                    <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
-                                      <ThumbsUp className="h-3 w-3" /> {likes}
-                                    </span>
-                                  </div>
-                                </div>
+                                )}
                               </div>
-                            </Link>
-                          );
-                        })
-                      )}
-                    </div>
-
-                    {tLists.hasMore && (
-                      <div className="mt-8 flex justify-center">
-                        <button
-                          onClick={() =>
-                            setTLists((p) => ({
-                              ...p,
-                              page: (p.page || 1) + 1,
-                            }))
-                          }
-                          className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold focus:outline-none"
-                        >
-                          <span className="absolute h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
-                          <span className="relative flex items-center gap-2 rounded-full bg-black px-6 py-2.5 transition-all duration-300 group-hover:bg-opacity-0">
-                            <span className="bg-gradient-to-r from-indigo-200 to-white bg-clip-text text-transparent group-hover:text-white">
-                              Cargar más listas
-                            </span>
-                            <ChevronDown className="h-4 w-4 text-indigo-300 group-hover:text-white" />
-                          </span>
-                        </button>
-                      </div>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
                     )}
+                  </AnimatedSection>
+                </section>
+
+                {/* =================================================================
+                SECCIÓN: TEMPORADAS (solo para series)
+               ================================================================= */}
+                {/* Muestra las temporadas disponibles de la serie con información resumida */}
+                {type === "tv" && (
+                  <section
+                    id="section-seasons"
+                    ref={registerSection("seasons")}
+                  >
+                    <AnimatedSection delay={0.04}>
+                      <section className="mb-12">
+                        <SectionTitle title="Temporadas" icon={Layers} />
+
+                        <div className="mt-3 sm:mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {tSeasons.loading && (
+                            <div className="col-span-full py-10 flex justify-center">
+                              <Loader2 className="animate-spin text-white/50" />
+                            </div>
+                          )}
+
+                          {!tSeasons.loading &&
+                            visibleTraktSeasons.map((s) => {
+                              const sn = getSeasonNumber(s);
+                              const titleSeason = `Temporada ${sn}`;
+                              const imdbRating = toRatingNumber(
+                                seasonImdbRatings?.[sn],
+                              );
+                              const seriesGraphRating =
+                                seriesGraphSeasonRatings.get(sn) ?? null;
+                              const rating = imdbRating ?? seriesGraphRating;
+                              const imdbSeasonUrl = resolvedImdbId
+                                ? `https://www.imdb.com/title/${resolvedImdbId}/episodes/?season=${sn}`
+                                : null;
+
+                              // Lógica de progreso (usa TMDb para saber total)
+                              const tmdbSeason = (data?.seasons || []).find(
+                                (x) => Number(x?.season_number) === sn,
+                              );
+                              const totalEp =
+                                Number(tmdbSeason?.episode_count || 0) || null;
+                              const watchedEp = Array.isArray(
+                                watchedBySeason?.[sn],
+                              )
+                                ? watchedBySeason[sn].length
+                                : 0;
+                              const percentage = totalEp
+                                ? Math.round((watchedEp / totalEp) * 100)
+                                : 0;
+
+                              const isComplete = percentage === 100;
+                              const barColor = isComplete
+                                ? "bg-emerald-500"
+                                : "bg-yellow-500";
+
+                              return (
+                                <button
+                                  key={sn}
+                                  type="button"
+                                  onClick={() =>
+                                    router.push(
+                                      `/details/tv/${id}/season/${sn}`,
+                                    )
+                                  }
+                                  onMouseEnter={() => prefetchSeasonDetails(sn)}
+                                  onFocus={() => prefetchSeasonDetails(sn)}
+                                  onTouchStart={() => prefetchSeasonDetails(sn)}
+                                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5
+                             transition-all hover:-translate-y-1 hover:border-white/20 hover:bg-white/10 hover:shadow-xl
+                             text-left w-full"
+                                  title={`Ver ${titleSeason}`}
+                                >
+                                  {/* Fondo decorativo del número de temporada */}
+                                  <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10">
+                                    {sn}
+                                  </div>
+
+                                  <div className="relative p-5">
+                                    <div className="flex items-start justify-between">
+                                      <div>
+                                        <h4 className="text-lg font-extrabold text-white">
+                                          {titleSeason}
+                                        </h4>
+
+                                        <div className="mt-1 flex items-center gap-2 text-xs font-medium text-zinc-400">
+                                          {rating != null && (
+                                            <span className="flex items-center gap-1 text-yellow-400">
+                                              <Star className="h-3 w-3 fill-yellow-400" />{" "}
+                                              {rating.toFixed(1)}
+                                            </span>
+                                          )}
+                                          {totalEp != null && (
+                                            <span>• {totalEp} episodios</span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Botón externo a IMDb (NO navega a la season page interna) */}
+                                      {imdbSeasonUrl && (
+                                        <a
+                                          href={imdbSeasonUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            window.open(
+                                              imdbSeasonUrl,
+                                              "_blank",
+                                              "noopener,noreferrer",
+                                            );
+                                          }}
+                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
+                                          title="Ver temporada en IMDb"
+                                        >
+                                          <ExternalLink className="h-4 w-4" />
+                                        </a>
+                                      )}
+                                    </div>
+
+                                    {/* Barra de Progreso */}
+                                    {totalEp != null && (
+                                      <div className="mt-6">
+                                        <div className="mb-1.5 flex items-end justify-between text-xs font-bold">
+                                          <span
+                                            className={
+                                              percentage > 0
+                                                ? "text-white"
+                                                : "text-zinc-500"
+                                            }
+                                          >
+                                            {watchedEp}{" "}
+                                            <span className="text-zinc-500 font-normal">
+                                              vistos
+                                            </span>
+                                          </span>
+                                          <span className="text-zinc-500">
+                                            {percentage}%
+                                          </span>
+                                        </div>
+
+                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                                          <div
+                                            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                                            style={{ width: `${percentage}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                        </div>
+                      </section>
+                    </AnimatedSection>
                   </section>
                 )}
-              </AnimatedSection>
-            </section>
+
+                {/* =================================================================
+                SECCIÓN: VALORACIÓN DE EPISODIOS (solo para series)
+               ================================================================= */}
+                {/* Gráfico de valoraciones por episodio mostrando la evolución de ratings */}
+                {type === "tv" && (
+                  <section
+                    id="section-episodes"
+                    ref={registerSection("episodes")}
+                  >
+                    <AnimatedSection delay={0.04}>
+                      {/* Subsección: Episodios y sus valoraciones */}
+                      {type === "tv" ? (
+                        <section className="mb-10">
+                          <SectionTitle
+                            title="Valoración de Episodios"
+                            icon={TrendingUp}
+                          />
+                          <div className="p-0">
+                            {ratingsError && (
+                              <p className="text-sm text-red-400 mb-2">
+                                {ratingsError}
+                              </p>
+                            )}
+                            {!ratingsLoading && !ratingsError && !ratings && (
+                              <p className="text-sm text-zinc-400 mb-2">
+                                No hay datos de episodios disponibles.
+                              </p>
+                            )}
+                            {!!ratings && !ratingsError && (
+                              <EpisodeRatingsGrid
+                                ratings={ratings}
+                                showId={Number(id)}
+                                tmdbSeasons={data?.seasons || []}
+                                density="compact"
+                              />
+                            )}
+                          </div>
+                        </section>
+                      ) : (
+                        <div className="text-sm text-zinc-400">
+                          Esta sección solo aplica a series.
+                        </div>
+                      )}
+                    </AnimatedSection>
+                  </section>
+                )}
+
+                <section
+                  id="section-comments"
+                  ref={registerSection("comments")}
+                >
+                  <AnimatedSection delay={0.04}>
+                    {/* CRÍTICAS */}
+                    {reviews && reviews.length > 0 && (
+                      <section className="mb-10">
+                        <div className="flex items-center justify-between mb-2">
+                          <SectionTitle
+                            title="Críticas de Usuarios"
+                            icon={MessageSquareIcon}
+                          />
+                          {reviewLimit < reviews.length && (
+                            <button
+                              onClick={() => setReviewLimit((prev) => prev + 2)}
+                              className="text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
+                            >
+                              Ver más
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {reviews.slice(0, reviewLimit).map((r) => {
+                            const avatar = r.author_details?.avatar_path
+                              ? r.author_details.avatar_path.startsWith(
+                                  "/https",
+                                )
+                                ? r.author_details.avatar_path.slice(1)
+                                : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
+                              : `https://ui-avatars.com/api/?name=${r.author}&background=random`;
+
+                            return (
+                              <div
+                                key={r.id}
+                                className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <img
+                                    src={avatar}
+                                    alt={r.author}
+                                    className="w-12 h-12 rounded-full object-cover shadow-lg"
+                                  />
+                                  <div>
+                                    <h4 className="font-bold text-white">
+                                      {r.author}
+                                    </h4>
+                                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                                      <span>
+                                        {new Date(
+                                          r.created_at,
+                                        ).toLocaleDateString()}
+                                      </span>
+                                      {r.author_details?.rating && (
+                                        <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
+                                          ★ {r.author_details.rating}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
+                                  "{r.content.replace(/<[^>]*>?/gm, "")}"
+                                </div>
+
+                                <a
+                                  href={r.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
+                                >
+                                  Leer review completa en TMDb &rarr;
+                                </a>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    )}
+                  </AnimatedSection>
+
+                  <AnimatedSection delay={0.04}>
+                    {/* ===================================================== */}
+                    {/* Trakt: comentarios */}
+                    <section className="mb-10">
+                      <div className="mb-2 flex items-center justify-between gap-4">
+                        {/* Mantiene SectionTitle (mismo tamano), pero sin mb interno aqui */}
+                        <SectionTitle
+                          title="Comentarios"
+                          icon={MessageSquareIcon}
+                          className="mb-0"
+                        />
+
+                        {/* Bloque derecho centrado al titulo */}
+                        <div className="flex items-center gap-2 h-10 md:h-11 transform-gpu -translate-y-[3px] md:-translate-y-[10px]">
+                          <a
+                            href={
+                              trakt?.traktUrl
+                                ? `${trakt.traktUrl}/comments`
+                                : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5
+        px-4 h-10 md:h-11 text-xs font-bold uppercase tracking-wider text-zinc-300 transition
+        hover:border-yellow-500/50 hover:bg-yellow-500/10 hover:text-yellow-400"
+                            style={{ WebkitTapHighlightColor: "transparent" }}
+                          >
+                            <span className="hidden sm:inline">
+                              Ver en Trakt
+                            </span>
+                            {tComments.total > 0 && (
+                              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white">
+                                {tComments.total}
+                              </span>
+                            )}
+                            <ExternalLink className="h-3 w-3 opacity-50 transition group-hover:opacity-100" />
+                          </a>
+
+                          <a
+                            href={
+                              trakt?.traktUrl
+                                ? `${trakt.traktUrl}/comments`
+                                : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-2 rounded-full bg-white text-black
+        px-4 h-10 md:h-11 text-xs font-bold uppercase tracking-wider transition hover:bg-zinc-200"
+                            style={{ WebkitTapHighlightColor: "transparent" }}
+                          >
+                            <Plus className="h-3 w-3" />
+                            <span className="hidden sm:inline">Escribir</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/20 backdrop-blur-sm">
+                        {/* Filtros estilo Tabs Modernos */}
+                        <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-4 py-3">
+                          <div className="flex gap-1 rounded-xl bg-black/40 p-1">
+                            {[
+                              { id: "likes30", label: "Top 30 Días" },
+                              { id: "likesAll", label: "Top Histórico" },
+                              { id: "recent", label: "Recientes" },
+                            ].map((t) => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => setTCommentsTab(t.id)}
+                                className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
+                                  tCommentsTab === t.id
+                                    ? "bg-zinc-700 text-white shadow-md"
+                                    : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                                }`}
+                              >
+                                {t.label}
+                              </button>
+                            ))}
+                          </div>
+                          {tComments.loading && (
+                            <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+                          )}
+                        </div>
+
+                        <div className="space-y-4 p-4 sm:p-6">
+                          {!tComments.loading &&
+                            (tComments.items || []).length === 0 && (
+                              <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
+                                <MessageSquareIcon className="mb-2 h-8 w-8 opacity-20" />
+                                <p className="text-sm">
+                                  Sé el primero en comentar.
+                                </p>
+                              </div>
+                            )}
+
+                          {(tComments.items || [])
+                            .slice(0, COMMENTS_SECTION_LIMIT)
+                            .map((c) => {
+                              const user = c?.user || {};
+                              const avatar =
+                                user?.images?.avatar?.full ||
+                                user?.images?.avatar?.medium ||
+                                `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.username || "User")}`;
+                              const text = stripHtml(
+                                c?.comment?.comment ?? c?.comment ?? "",
+                              );
+                              const created = c?.created_at
+                                ? formatDateTimeEs(c.created_at)
+                                : "";
+                              const likes = Number(c?.likes || 0);
+
+                              return (
+                                <div
+                                  key={String(
+                                    c?.id || `${user?.username}-${created}`,
+                                  )}
+                                  className="group relative flex gap-4 rounded-2xl bg-white/5 p-5 transition hover:bg-white/10"
+                                >
+                                  {/* Avatar */}
+                                  <div className="shrink-0">
+                                    <img
+                                      src={avatar}
+                                      alt={user?.username}
+                                      className="h-12 w-12 rounded-full object-cover shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20"
+                                    />
+                                  </div>
+
+                                  {/* Content */}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="mb-1 flex items-baseline justify-between gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-bold text-white group-hover:text-yellow-400 transition-colors cursor-pointer">
+                                          {user?.name ||
+                                            user?.username ||
+                                            "Usuario"}
+                                        </span>
+                                        {user?.vip && (
+                                          <span className="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-500">
+                                            VIP
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-xs text-zinc-500">
+                                        {created}
+                                      </span>
+                                    </div>
+
+                                    <div className="relative text-sm leading-relaxed text-zinc-300">
+                                      {/* Icono de comillas decorativo */}
+                                      <span className="absolute -left-3 -top-1 font-serif text-4xl text-white/5">
+                                        “
+                                      </span>
+                                      <p className="whitespace-pre-line">
+                                        {text}
+                                      </p>
+                                    </div>
+
+                                    {/* Actions Footer */}
+                                    <div className="mt-3 flex items-center gap-4 border-t border-white/5 pt-3">
+                                      <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2 py-1 text-xs font-medium text-emerald-400">
+                                        <ThumbsUp className="h-3 w-3" /> {likes}
+                                      </div>
+                                      <a
+                                        href={
+                                          trakt?.traktUrl
+                                            ? `${trakt.traktUrl}/comments`
+                                            : undefined
+                                        }
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="ml-auto text-xs font-semibold text-zinc-500 hover:text-white transition-colors"
+                                      >
+                                        Responder en Trakt →
+                                      </a>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    </section>
+                  </AnimatedSection>
+                </section>
+
+                <section id="section-lists" ref={registerSection("lists")}>
+                  <AnimatedSection delay={0.04}>
+                    {/* ===================================================== */}
+                    {/* Trakt: listas - Solo mostrar si no hay error */}
+                    {!tLists.error && (
+                      <section className="mb-12">
+                        <div className="mb-6 flex items-center justify-between">
+                          <SectionTitle title="Listas" icon={ListVideo} />
+
+                          {/* Selector de Listas */}
+                          <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
+                            {["popular", "trending"].map((tab) => (
+                              <button
+                                key={tab}
+                                onClick={() => setTListsTab(tab)}
+                                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${
+                                  tListsTab === tab
+                                    ? "bg-white text-black shadow-lg scale-105"
+                                    : "text-zinc-400 hover:text-white hover:bg-white/5"
+                                }`}
+                              >
+                                {tab}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                          {tLists.loading ? (
+                            <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
+                              <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                              <span className="text-sm font-medium animate-pulse">
+                                Buscando listas y portadas...
+                              </span>
+                            </div>
+                          ) : (
+                            (tLists.items || []).map((row) => {
+                              const list = row?.list || row || {};
+                              const user = row?.user || list?.user || {};
+                              const previews = row?.previewPosters || [];
+
+                              const name = list?.name || "Lista";
+                              const itemCount = Number(
+                                list?.item_count || list?.items || 0,
+                              );
+                              const likes = Number(list?.likes || 0);
+                              const username =
+                                user?.username || user?.name || null;
+                              const slug = list?.ids?.slug || null;
+                              const traktId = list?.ids?.trakt || null;
+
+                              // Ruta interna (slug si existe; si no, traktId)
+                              const internalUrl =
+                                username && (slug || traktId)
+                                  ? `/lists/trakt/${encodeURIComponent(username)}/${encodeURIComponent(String(slug || traktId))}`
+                                  : null;
+
+                              // (opcional) enlace externo a Trakt, pero ya NO es el click principal
+                              const traktUrl =
+                                username && (slug || traktId)
+                                  ? `https://trakt.tv/users/${username}/lists/${slug || traktId}`
+                                  : null;
+
+                              const avatar =
+                                user?.images?.avatar?.full ||
+                                `https://ui-avatars.com/api/?name=${encodeURIComponent(username || "user")}&background=random`;
+
+                              const disabled = !internalUrl;
+
+                              return (
+                                <Link
+                                  key={String(
+                                    traktId || `${username}-${slug}` || name,
+                                  )}
+                                  href={internalUrl || "#"}
+                                  aria-disabled={disabled}
+                                  className={[
+                                    "group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500",
+                                    "hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)]",
+                                    disabled
+                                      ? "pointer-events-none opacity-60"
+                                      : "",
+                                  ].join(" ")}
+                                >
+                                  {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS) */}
+                                  <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
+                                    {previews.length > 0 ? (
+                                      <div className="h-full w-full flex items-center justify-center overflow-visible">
+                                        <PosterStack posters={previews} />
+                                      </div>
+                                    ) : (
+                                      <div className="flex h-full items-center justify-center opacity-10">
+                                        <ListVideo className="h-20 w-20" />
+                                      </div>
+                                    )}
+
+                                    {/* Botón externo (opcional) sin romper el Link */}
+                                    {traktUrl && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          window.open(
+                                            traktUrl,
+                                            "_blank",
+                                            "noopener,noreferrer",
+                                          );
+                                        }}
+                                        className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-zinc-200 border border-white/10 hover:border-indigo-400/30 hover:text-white"
+                                        title="Ver en Trakt"
+                                      >
+                                        Trakt
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* 2. CONTENIDO DE TEXTO */}
+                                  <div className="relative flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
+                                    <div>
+                                      <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
+                                        {name}
+                                      </h4>
+
+                                      {list?.description && (
+                                        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                                          {stripHtml(list.description)}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {/* Footer */}
+                                    <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <img
+                                          src={avatar}
+                                          alt={username || "user"}
+                                          className="h-6 w-6 rounded-full ring-1 ring-white/20"
+                                        />
+                                        <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px]">
+                                          {username || "—"}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
+                                        <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
+                                          {itemCount} items
+                                        </span>
+                                        <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
+                                          <ThumbsUp className="h-3 w-3" />{" "}
+                                          {likes}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </Link>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {tLists.hasMore && (
+                          <div className="mt-8 flex justify-center">
+                            <button
+                              onClick={() =>
+                                setTLists((p) => ({
+                                  ...p,
+                                  page: (p.page || 1) + 1,
+                                }))
+                              }
+                              className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold focus:outline-none"
+                            >
+                              <span className="absolute h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+                              <span className="relative flex items-center gap-2 rounded-full bg-black px-6 py-2.5 transition-all duration-300 group-hover:bg-opacity-0">
+                                <span className="bg-gradient-to-r from-indigo-200 to-white bg-clip-text text-transparent group-hover:text-white">
+                                  Cargar más listas
+                                </span>
+                                <ChevronDown className="h-4 w-4 text-indigo-300 group-hover:text-white" />
+                              </span>
+                            </button>
+                          </div>
+                        )}
+                      </section>
+                    )}
+                  </AnimatedSection>
+                </section>
               </>
             )}
           </div>

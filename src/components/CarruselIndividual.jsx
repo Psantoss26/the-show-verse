@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Navigation } from 'swiper'
+import { Navigation } from 'swiper/modules'
 import 'swiper/swiper-bundle.css'
 import Link from 'next/link'
 
