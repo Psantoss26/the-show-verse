@@ -46,6 +46,11 @@ const HISTORY_PAGE_SIZE = 80;
 const HISTORY_CACHE_KEY = "showverse:history:items:v1";
 const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 
+function isTraktUnavailableError(error) {
+  const status = Number(error?.status || error?.payload?.upstreamStatus || 0);
+  return status === 429 || status === 401 || status === 403 || status >= 500;
+}
+
 // ----------------------------
 // UTILS
 // ----------------------------
@@ -1598,7 +1603,10 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         borderColor: "rgba(16, 185, 129, 0.4)",
       }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      style={{ transformOrigin: "center center" }}
+      style={{
+        transformOrigin: "center center",
+        borderColor: "rgba(255, 255, 255, 0.05)",
+      }}
     >
       {/* Poster Image */}
       <Poster entry={entry} className="w-full h-full" />
@@ -2058,7 +2066,7 @@ export default function HistoryClient() {
   const loadAuth = useCallback(async () => {
     try {
       const st = await traktAuthStatus();
-      setAuth({ loading: false, connected: !!st?.connected });
+      setAuth({ loading: false, connected: !!st?.connected && !st?.degraded });
     } catch {
       setAuth({ loading: false, connected: false });
     }
@@ -2117,7 +2125,14 @@ export default function HistoryClient() {
         return nextItems;
       });
     } catch (error) {
-      setHistoryError(error?.message || "No se pudo cargar el historial.");
+      if (isTraktUnavailableError(error)) {
+        setAuth({ loading: false, connected: false });
+        setRaw([]);
+        setHistoryError("");
+        clearHistoryCache();
+      } else {
+        setHistoryError("No se pudo cargar el historial.");
+      }
       if (reset) {
         hasMoreHistoryRef.current = false;
       }

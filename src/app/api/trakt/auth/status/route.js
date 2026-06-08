@@ -32,10 +32,10 @@ export async function GET(request) {
 
             const res = NextResponse.json(
                 {
-                    connected: true,
+                    connected: false,
                     degraded: true,
                     upstreamStatus: auth.status,
-                    error: 'Trakt upstream check failed',
+                    error: 'Trakt no está disponible ahora mismo.',
                 },
                 { status: 200 }
             )

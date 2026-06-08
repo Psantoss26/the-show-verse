@@ -138,8 +138,13 @@ export async function GET(request) {
     while (currentPage < page + maxPages) {
       const path = buildPath(currentPage, perPage);
       const r = await traktFetch(path, { token });
-      if (!r.ok)
-        throw new Error(r?.json?.error || `Trakt history failed (${r.status})`);
+      if (!r.ok) {
+        const error = new Error(
+          r?.json?.error || `Trakt history failed (${r.status})`,
+        );
+        error.status = r.status;
+        throw error;
+      }
 
       const pageItems = Array.isArray(r.json) ? r.json : [];
       lastPageSize = pageItems.length;
@@ -268,14 +273,16 @@ export async function GET(request) {
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
     return res;
   } catch (e) {
+    const status = Number(e?.status || 500);
     const res = NextResponse.json(
       {
-        connected: true,
-        error: e?.message || "Trakt history failed",
+        connected: false,
+        upstreamStatus: status,
+        error: "Trakt no está disponible ahora mismo.",
         items: [],
         stats: null,
       },
-      { status: 500 },
+      { status },
     );
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
     return res;

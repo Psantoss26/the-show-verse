@@ -1528,7 +1528,10 @@ function WatchlistCard({
               borderColor: "rgba(59, 130, 246, 0.4)",
             }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            style={{ transformOrigin: "center center" }}
+            style={{
+              transformOrigin: "center center",
+              borderColor: "rgba(39, 39, 42, 0.8)",
+            }}
             onMouseEnter={handleHover}
           >
             <SmartPoster item={item} title={title} mode={effectiveImageMode} />

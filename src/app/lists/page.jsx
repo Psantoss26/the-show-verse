@@ -672,6 +672,7 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile, accent = "trak
         }}
         whileTap={{ y: -2 }}
         transition={{ type: "spring", stiffness: 360, damping: 26 }}
+        style={{ borderColor: "rgba(255, 255, 255, 0.05)" }}
       >
         {posterUrl && !imgFailed ? (
           <img

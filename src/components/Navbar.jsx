@@ -398,7 +398,7 @@ export default function Navbar() {
       try {
         const status = await traktAuthStatus();
         if (!alive) return;
-        setTraktConnected(!!status?.connected);
+        setTraktConnected(!!status?.connected && !status?.degraded);
       } catch {
         if (!alive) return;
         setTraktConnected(false);

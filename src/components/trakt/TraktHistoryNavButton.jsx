@@ -52,7 +52,7 @@ export default function TraktHistoryNavButton({
       try {
         const st = await traktAuthStatus();
         if (!alive) return;
-        setConnected(!!st?.connected);
+        setConnected(!!st?.connected && !st?.degraded);
       } finally {
         if (alive) setLoading(false);
       }
