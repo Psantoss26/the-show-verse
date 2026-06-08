@@ -40,7 +40,7 @@ function absolutizeTmdbWebUrl(value) {
   return null;
 }
 
-function useOriginalTmdbImageSize(value) {
+function getOriginalTmdbImageSize(value) {
   const url = absolutizeTmdbWebUrl(value);
   if (!url) return null;
   return url.replace(/\/t\/p\/[^/]+\//, "/t/p/original/");
@@ -64,7 +64,7 @@ function extractImageUrl(html) {
     );
   });
 
-  return useOriginalTmdbImageSize(preferred?.[1] || matches[0]?.[1]);
+  return getOriginalTmdbImageSize(preferred?.[1] || matches[0]?.[1]);
 }
 
 function normalizeResult(result) {

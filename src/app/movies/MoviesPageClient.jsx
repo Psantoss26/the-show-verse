@@ -8,7 +8,6 @@ import { AnimatePresence, motion, useInView } from "framer-motion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Anton } from "next/font/google";
 import {
   Heart,
   HeartOff,
@@ -31,8 +30,6 @@ import {
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
-
-const anton = Anton({ weight: "400", subsets: ["latin"] });
 
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
