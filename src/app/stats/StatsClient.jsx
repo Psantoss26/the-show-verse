@@ -478,7 +478,7 @@ function ProfileCardScroller({ children }) {
     640: { slidesPerView: 4, spaceBetween: 14 },
     768: { slidesPerView: 4, spaceBetween: 16 },
     1024: { slidesPerView: 5, spaceBetween: 18 },
-    1280: { slidesPerView: 6, spaceBetween: 20 },
+    1280: { slidesPerView: 7, spaceBetween: 18 },
   };
 
   const updateNav = (swiper) => {
@@ -498,7 +498,7 @@ function ProfileCardScroller({ children }) {
     e.stopPropagation();
     const swiper = swiperRef.current;
     if (!swiper) return;
-    const target = Math.max((swiper.activeIndex || 0) - 6, 0);
+    const target = Math.max((swiper.activeIndex || 0) - 7, 0);
     swiper.slideTo(target);
   };
 
@@ -508,7 +508,7 @@ function ProfileCardScroller({ children }) {
     const swiper = swiperRef.current;
     if (!swiper) return;
     const maxIndex = swiper.slides.length - 1;
-    const target = Math.min((swiper.activeIndex || 0) + 6, maxIndex);
+    const target = Math.min((swiper.activeIndex || 0) + 7, maxIndex);
     swiper.slideTo(target);
   };
 
@@ -650,11 +650,12 @@ function CustomTooltip({ active, payload, label, formatter }) {
 function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   if (!user) {
     return (
-      <div className="flex items-center gap-5">
-        <div className="h-24 w-24 rounded-3xl bg-zinc-900/50 animate-pulse" />
-        <div className="space-y-3">
-          <div className="h-10 w-64 rounded-xl bg-zinc-900/50 animate-pulse" />
-          <div className="h-4 w-44 rounded-lg bg-zinc-900/40 animate-pulse" />
+      <div className="relative min-h-[172px] overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900/30 p-5 sm:p-6">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/15 via-zinc-900/30 to-transparent" />
+        <div className="relative z-10 space-y-3 pt-8">
+          <div className="h-4 w-36 rounded-lg bg-zinc-800/70 animate-pulse" />
+          <div className="h-10 w-64 max-w-full rounded-xl bg-zinc-900/60 animate-pulse" />
+          <div className="h-4 w-44 rounded-lg bg-zinc-900/50 animate-pulse" />
         </div>
       </div>
     );
@@ -663,109 +664,248 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   const avatarUrl = user?.avatarUrl || null;
   const displayName = user.name || user.username || "Usuario";
 
+  const actionButtons = (className = "") => (
+    <div className={`flex items-center gap-2 ${className}`}>
+      <motion.button
+        type="button"
+        onClick={onSync}
+        disabled={syncing}
+        className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50 backdrop-blur-md"
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, delay: 0.3 }}
+        whileHover={{ scale: syncing ? 1 : 1.05 }}
+        whileTap={{ scale: syncing ? 1 : 0.95 }}
+        title="Sincronizar"
+        aria-label="Sincronizar perfil de Trakt"
+      >
+        <RotateCcw
+          className={`w-5 h-5 text-white ${syncing ? "animate-spin" : ""}`}
+        />
+      </motion.button>
+
+      <motion.button
+        type="button"
+        onClick={onDisconnect}
+        disabled={syncing}
+        className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50 backdrop-blur-md"
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, delay: 0.4 }}
+        whileHover={{ scale: syncing ? 1 : 1.05 }}
+        whileTap={{ scale: syncing ? 1 : 0.95 }}
+        title="Desconectar"
+        aria-label="Desconectar Trakt"
+      >
+        <LogOut className="w-5 h-5 text-red-400" />
+      </motion.button>
+    </div>
+  );
+
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: 0.1 }}
-      className="flex min-w-0 items-center gap-5"
-    >
-      <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-3xl ring-2 ring-indigo-500/35 shadow-2xl shadow-indigo-500/10 sm:h-28 sm:w-28">
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={displayName}
-            width={112}
-            height={112}
-            loading="eager"
-            fetchPriority="high"
-            decoding="sync"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
-            <span className="text-4xl font-black text-white">
-              {displayName[0]?.toUpperCase() || "?"}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="mb-2 flex items-center gap-3">
-          <div className="h-px w-12 bg-indigo-500" />
-          <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">
-            Tu cuenta
-          </span>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h1 className="min-w-0 truncate text-4xl font-black tracking-tighter text-white md:text-6xl">
-            {displayName}
-            <span className="text-indigo-500">.</span>
-          </h1>
-          {user.vip && (
-            <span className="rounded-full border border-yellow-500/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-black uppercase text-yellow-400">
-              VIP
-            </span>
-          )}
-          <div className="ml-2 flex items-center gap-2">
-            <motion.button
-              type="button"
-              onClick={onSync}
-              disabled={syncing}
-              className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, delay: 0.3 }}
-              whileHover={{ scale: syncing ? 1 : 1.05 }}
-              whileTap={{ scale: syncing ? 1 : 0.95 }}
-              title="Sincronizar"
-              aria-label="Sincronizar perfil de Trakt"
-            >
-              <RotateCcw
-                className={`w-5 h-5 text-white ${syncing ? "animate-spin" : ""}`}
+    <>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.1 }}
+        className="relative isolate flex min-h-[184px] min-w-0 flex-col justify-end overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-950/40 px-5 py-5 shadow-2xl shadow-indigo-950/10 backdrop-blur-xl sm:min-h-[200px] sm:px-6 sm:py-6 lg:hidden"
+      >
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          {avatarUrl ? (
+            <>
+              <img
+                src={avatarUrl}
+                alt=""
+                aria-hidden="true"
+                loading="eager"
+                fetchPriority="high"
+                decoding="sync"
+                className="absolute inset-0 h-full w-full scale-105 object-cover object-top opacity-24 blur-xl"
               />
-            </motion.button>
+              <div className="absolute right-0 top-0 h-full w-[72%] [mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.05)_18%,rgba(0,0,0,0.28)_34%,rgba(0,0,0,0.7)_54%,black_76%)] [-webkit-mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.05)_18%,rgba(0,0,0,0.28)_34%,rgba(0,0,0,0.7)_54%,black_76%)] sm:w-[68%]">
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  aria-hidden="true"
+                  loading="eager"
+                  decoding="async"
+                  className="h-full w-full object-cover object-top opacity-95 [mask-image:linear-gradient(to_bottom,black_0%,black_42%,rgba(0,0,0,0.64)_66%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_42%,rgba(0,0,0,0.64)_66%,transparent_100%)]"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="absolute right-0 top-0 h-full w-[68%] [mask-image:linear-gradient(to_right,transparent,black_45%)] [-webkit-mask-image:linear-gradient(to_right,transparent,black_45%)]">
+              <div className="h-full w-full bg-gradient-to-r from-transparent via-indigo-600/20 to-purple-700/25 [mask-image:linear-gradient(to_bottom,black_0%,black_48%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_48%,transparent_100%)]" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(99,102,241,0.12),transparent_42%),linear-gradient(90deg,rgba(10,10,10,0.98)_0%,rgba(10,10,10,0.9)_34%,rgba(10,10,10,0.54)_58%,rgba(10,10,10,0.16)_100%)]" />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/58 to-transparent [mask-image:linear-gradient(to_right,black_0%,black_50%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0%,black_50%,transparent_100%)]" />
+        </div>
 
-            <motion.button
-              type="button"
-              onClick={onDisconnect}
-              disabled={syncing}
-              className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, delay: 0.4 }}
-              whileHover={{ scale: syncing ? 1 : 1.05 }}
-              whileTap={{ scale: syncing ? 1 : 0.95 }}
-              title="Desconectar"
-              aria-label="Desconectar Trakt"
-            >
-              <LogOut className="w-5 h-5 text-red-400" />
-            </motion.button>
+        <div className="relative z-10 min-w-0 pr-24 sm:pr-28">
+          <div className="mb-2 flex items-center gap-3">
+            <div className="h-px w-12 bg-indigo-500" />
+            <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">
+              Tu cuenta
+            </span>
           </div>
-        </div>
-        <p className="mt-1 text-sm font-medium text-zinc-500">@{user.username}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-          {user.location && (
-            <span className="flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              {user.location}
-            </span>
+          <div className="flex min-w-0 items-center">
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="min-w-0 truncate text-4xl font-black tracking-tighter leading-none text-white md:text-6xl">
+                  {displayName}
+                  <span className="text-indigo-500">.</span>
+                </h1>
+                {user.vip && (
+                  <span className="shrink-0 rounded-full border border-yellow-500/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-black uppercase text-yellow-400">
+                    VIP
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <p className="mt-1 text-sm font-medium text-zinc-500">@{user.username}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+            {user.location && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {user.location}
+              </span>
+            )}
+            {user.joined_at && (
+              <span className="flex items-center gap-1">
+                <CalendarIcon className="h-3 w-3" />
+                Desde {fmtDate(user.joined_at)}
+              </span>
+            )}
+          </div>
+          {user.about && (
+            <p className="mt-2 line-clamp-1 max-w-lg text-sm text-zinc-400">
+              {user.about}
+            </p>
           )}
-          {user.joined_at && (
-            <span className="flex items-center gap-1">
-              <CalendarIcon className="h-3 w-3" />
-              Desde {fmtDate(user.joined_at)}
-            </span>
+        </div>
+
+        {actionButtons("absolute bottom-5 right-5 z-20 sm:bottom-6 sm:right-6")}
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.1 }}
+        className="hidden min-w-0 items-center gap-5 lg:flex"
+      >
+        <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-3xl ring-2 ring-indigo-500/35 shadow-2xl shadow-indigo-500/10">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={displayName}
+              width={112}
+              height={112}
+              loading="eager"
+              fetchPriority="high"
+              decoding="sync"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
+              <span className="text-4xl font-black text-white">
+                {displayName[0]?.toUpperCase() || "?"}
+              </span>
+            </div>
           )}
         </div>
-        {user.about && (
-          <p className="mt-2 line-clamp-1 max-w-lg text-sm text-zinc-400">
-            {user.about}
-          </p>
-        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex items-center gap-3">
+            <div className="h-px w-12 bg-indigo-500" />
+            <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">
+              Tu cuenta
+            </span>
+          </div>
+          <div className="flex min-w-0 items-center gap-5">
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="min-w-0 truncate text-6xl font-black tracking-tighter leading-none text-white">
+                  {displayName}
+                  <span className="text-indigo-500">.</span>
+                </h1>
+                {user.vip && (
+                  <span className="shrink-0 rounded-full border border-yellow-500/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-black uppercase text-yellow-400">
+                    VIP
+                  </span>
+                )}
+              </div>
+            </div>
+            {actionButtons("shrink-0")}
+          </div>
+          <p className="mt-2 text-sm font-medium text-zinc-500">@{user.username}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+            {user.location && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {user.location}
+              </span>
+            )}
+            {user.joined_at && (
+              <span className="flex items-center gap-1">
+                <CalendarIcon className="h-3 w-3" />
+                Desde {fmtDate(user.joined_at)}
+              </span>
+            )}
+          </div>
+          {user.about && (
+            <p className="mt-2 line-clamp-1 max-w-lg text-sm text-zinc-400">
+              {user.about}
+            </p>
+          )}
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
+function ProfileSectionTabs({ viewMode, setViewMode, className = "" }) {
+  return (
+    <div className={className}>
+      <div
+        className="flex w-full items-center gap-2 overflow-x-auto lg:w-fit"
+        role="tablist"
+        aria-label="Secciones del perfil"
+      >
+        {[
+          { id: "overview", label: "General", icon: PieChartIcon },
+          { id: "patterns", label: "Patrones", icon: TrendingUp },
+          { id: "yearly", label: "Histórico", icon: CalendarIcon },
+        ].map((tab) => {
+          const active = viewMode === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setViewMode(tab.id)}
+              role="tab"
+              aria-selected={active}
+              className={`group relative inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border bg-zinc-900 px-4 text-sm transition sm:flex-none lg:min-w-[155px] ${
+                active
+                  ? "border-indigo-500/45 text-white shadow-[0_0_18px_rgba(99,102,241,0.12)]"
+                  : "border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+              }`}
+            >
+              {active && (
+                <span className="absolute inset-x-4 bottom-0 h-px rounded-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.9)]" />
+              )}
+              <span className="flex min-w-0 items-center gap-2">
+                <tab.icon className="h-4 w-4 shrink-0 text-indigo-500 transition-colors group-hover:text-indigo-400" />
+                <span className="min-w-0 truncate font-semibold text-white">
+                  {tab.label}
+                </span>
+              </span>
+            </button>
+          );
+        })}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -1538,12 +1678,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] mix-blend-screen" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Header - Always Visible */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,auto)] lg:items-center"
+          className="mb-6 lg:mb-8 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8"
         >
           <ProfileHero
             user={profileUser}
@@ -1551,45 +1691,28 @@ export default function StatsClient({ connectNext = "/profile" }) {
             onDisconnect={() => setShowDisconnectModal(true)}
             syncing={loading}
           />
-
-          <div className="flex justify-start lg:justify-end">
-            {headerReady ? (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-                className="flex p-1.5 bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-x-auto"
-              >
-                {[
-                  { id: "overview", label: "General", icon: PieChartIcon },
-                  { id: "patterns", label: "Patrones", icon: TrendingUp },
-                  { id: "yearly", label: "Histórico", icon: CalendarIcon },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setViewMode(tab.id)}
-                    className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === tab.id
-                        ? "text-black"
-                        : "text-zinc-400 hover:text-white hover:bg-white/5"
-                      }`}
-                  >
-                    {viewMode === tab.id && (
-                      <motion.div
-                        layoutId="activeTab"
-                        className="absolute inset-0 bg-white rounded-xl"
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
-                    <span className="relative z-10 flex items-center gap-2">
-                      <tab.icon className="w-4 h-4" />
-                      {tab.label}
-                    </span>
-                  </button>
-                ))}
-              </motion.div>
-            ) : null}
-          </div>
+          {headerReady ? (
+            <ProfileSectionTabs
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+              className="hidden justify-self-end lg:block"
+            />
+          ) : null}
         </motion.div>
+
+        {headerReady ? (
+          <motion.div
+            className="sticky top-16 z-[60] mb-3 p-2 rounded-2xl transition-all duration-300 lg:hidden"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.25 }}
+          >
+            <ProfileSectionTabs
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+            />
+          </motion.div>
+        ) : null}
 
         {/* Content Area */}
         {!stats && error ? (
