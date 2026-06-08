@@ -96,19 +96,14 @@ export default function AddToListModal(props) {
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-300"
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg transition-opacity duration-300 animate-in fade-in"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div
-        className="relative w-full max-w-xl flex flex-col max-h-[85vh]
-                   rounded-3xl border border-white/10 bg-[#050505]
-                   shadow-[0_0_50px_-12px_rgba(255,255,255,0.05)]
-                   overflow-hidden animate-in zoom-in-95 duration-200"
-      >
+      <div className="relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[3rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] animate-in zoom-in-95 duration-300 ease-out">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-white/5 bg-white/[0.02] flex items-center justify-between shrink-0">
+        <div className="flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 border-b border-white/10 shrink-0">
           <div>
             <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
               Añadir a una lista
@@ -121,9 +116,7 @@ export default function AddToListModal(props) {
           <button
             type="button"
             onClick={onClose}
-            className="group relative flex h-9 w-9 items-center justify-center rounded-full
-                       bg-white/5 border border-white/5 text-zinc-400
-                       transition-all hover:bg-white/10 hover:text-white hover:rotate-90"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
             aria-label="Cerrar"
             title="Cerrar"
           >
@@ -132,7 +125,7 @@ export default function AddToListModal(props) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex-1 overflow-y-auto p-6 sm:px-8 pb-8 space-y-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {/* Resumen: ya está en... */}
           {addedLists.length > 0 && (
             <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4">

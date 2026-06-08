@@ -167,20 +167,28 @@ export default function StarRating({
       {mounted &&
         open &&
         createPortal(
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6">
             <div
-              className="absolute inset-0 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300"
+              className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
               onClick={() => setOpen(false)}
+              aria-hidden="true"
             />
 
-            <div className="relative w-full max-w-sm bg-[#080808] border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-              <div className="flex items-center justify-between px-6 py-5">
-                <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+            <div
+              className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] backdrop-blur-[50px] animate-in zoom-in-95 duration-300 ease-out"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Puntuación del usuario"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+                <span className="text-xs font-bold uppercase tracking-widest text-white/55">
                   Tu reseña
                 </span>
                 <button
+                  type="button"
                   onClick={() => setOpen(false)}
-                  className="p-2 -mr-2 rounded-full text-zinc-500 hover:bg-white/5 hover:text-white transition"
+                  className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+                  title="Cerrar (Esc)"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -190,10 +198,10 @@ export default function StarRating({
                 <div className="flex flex-col items-center justify-center gap-4">
                   <div className="relative flex items-center justify-center">
                     <Star
-                      className="w-24 h-24 text-yellow-500/20 fill-yellow-500/20 absolute drop-shadow-[0_0_15px_rgba(234,179,8,0.2)]"
+                      className="absolute h-28 w-28 fill-yellow-300/15 text-yellow-300/15 drop-shadow-[0_0_30px_rgba(234,179,8,0.25)]"
                       strokeWidth={1}
                     />
-                    <span className="relative text-6xl font-black text-white tracking-tighter z-10 font-sans">
+                    <span className="relative z-10 font-sans text-6xl font-black tracking-tighter text-white drop-shadow-md">
                       {fmt(value)}
                     </span>
                   </div>
@@ -201,9 +209,9 @@ export default function StarRating({
 
                 <div className="space-y-6">
                   <div className="relative h-12 flex items-center justify-center group touch-none">
-                    <div className="absolute w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="absolute h-2 w-full overflow-hidden rounded-full border border-white/10 bg-black/40 backdrop-blur-md">
                       <div
-                        className="h-full bg-zinc-200 rounded-full transition-all duration-75 ease-out"
+                        className="h-full rounded-full bg-gradient-to-r from-yellow-200/80 via-yellow-100 to-white shadow-[0_0_14px_rgba(250,204,21,0.45)] transition-all duration-75 ease-out"
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
@@ -216,34 +224,39 @@ export default function StarRating({
                       step={step}
                       value={value}
                       onChange={(e) => updateValue(e.target.value)}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                      className="absolute inset-0 z-20 h-full w-full cursor-pointer opacity-0"
+                      aria-label="Seleccionar puntuación"
                     />
 
                     <div
-                      className="absolute h-7 w-7 bg-white rounded-full shadow-[0_0_20px_rgba(255,255,255,0.3)] pointer-events-none transition-all duration-75 ease-out z-10 flex items-center justify-center border-4 border-[#080808]"
+                      className="pointer-events-none absolute z-10 flex h-7 w-7 items-center justify-center rounded-full border-4 border-black/60 bg-white shadow-[0_0_24px_rgba(255,255,255,0.45)] transition-all duration-75 ease-out"
                       style={{ left: `calc(${percentage}% - 14px)` }}
                     >
                       <div className="w-1.5 h-1.5 bg-black rounded-full" />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-zinc-500">
+                  <div className="flex items-center justify-between text-white/50">
                     <button
+                      type="button"
                       onClick={() => adjust(-step)}
-                      className="w-12 h-12 rounded-2xl border border-white/5 bg-white/[0.02] flex items-center justify-center hover:bg-white/10 hover:text-white transition active:scale-95"
+                      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 backdrop-blur-xl transition hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
                       disabled={effectiveDisabled}
+                      title="Bajar puntuación"
                     >
                       <Minus className="w-5 h-5" />
                     </button>
 
-                    <span className="text-[10px] font-medium tracking-widest opacity-40 select-none">
+                    <span className="select-none text-[10px] font-bold tracking-widest text-white/35">
                       DESLIZA PARA PUNTUAR
                     </span>
 
                     <button
+                      type="button"
                       onClick={() => adjust(step)}
-                      className="w-12 h-12 rounded-2xl border border-white/5 bg-white/[0.02] flex items-center justify-center hover:bg-white/10 hover:text-white transition active:scale-95"
+                      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 backdrop-blur-xl transition hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
                       disabled={effectiveDisabled}
+                      title="Subir puntuación"
                     >
                       <Plus className="w-5 h-5" />
                     </button>
@@ -253,8 +266,9 @@ export default function StarRating({
                 <div className="flex items-center gap-3 pt-2">
                   {hasRating && (
                     <button
+                      type="button"
                       onClick={handleClear}
-                      className="h-12 w-12 flex items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-red-400 hover:border-red-900/50 hover:bg-red-900/10 transition"
+                      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/45 backdrop-blur-xl transition hover:border-red-300/30 hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
                       title="Eliminar nota"
                       disabled={effectiveDisabled}
                     >
@@ -263,9 +277,10 @@ export default function StarRating({
                   )}
 
                   <button
+                    type="button"
                     onClick={handleSave}
                     disabled={effectiveDisabled}
-                    className="flex-1 h-12 rounded-xl bg-white text-black font-extrabold text-sm uppercase tracking-wide hover:bg-zinc-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full border border-white/20 bg-white/90 text-sm font-extrabold uppercase tracking-wide text-black shadow-[0_10px_30px_-10px_rgba(255,255,255,0.45)] transition-all hover:bg-white active:scale-[0.98] disabled:opacity-50"
                   >
                     {loading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

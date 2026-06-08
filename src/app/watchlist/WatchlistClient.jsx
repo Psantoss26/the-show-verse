@@ -187,7 +187,10 @@ function writeProvidersCache(providersMap) {
     const now = Date.now();
     const data = {};
     providersMap.forEach((providers, key) => {
-      data[key] = { providers: Array.isArray(providers) ? providers : [], t: now };
+      data[key] = {
+        providers: Array.isArray(providers) ? providers : [],
+        t: now,
+      };
     });
     window.localStorage.setItem(PROVIDER_CACHE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -407,7 +410,13 @@ function ratingRangeMeta(rating, emptyKey, emptyLabel, step = 0.5, offset = 0) {
 function buildWatchlistGroupMetas(
   item,
   groupBy,
-  { imdbScores, traktScores, providersByItem, ratingStep = 0.5, ratingOffset = 0 },
+  {
+    imdbScores,
+    traktScores,
+    providersByItem,
+    ratingStep = 0.5,
+    ratingOffset = 0,
+  },
 ) {
   if (groupBy === "none") return [];
 
@@ -415,7 +424,8 @@ function buildWatchlistGroupMetas(
     const type = item.media_type || (item.title ? "movie" : "tv");
     const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
     const genreIds = item.genre_ids || [];
-    if (genreIds.length === 0) return [{ key: "no_genre", label: "Sin género" }];
+    if (genreIds.length === 0)
+      return [{ key: "no_genre", label: "Sin género" }];
     return genreIds.map((genreId) => ({
       key: String(genreId),
       label: genreMap[genreId] || `Género ${genreId}`,
@@ -594,7 +604,8 @@ function buildSmartWatchlistRatingSubgroups(items, subGroupBy, groupContext) {
   });
 
   const best = candidates.sort((a, b) => {
-    if (b.largestGroup !== a.largestGroup) return b.largestGroup - a.largestGroup;
+    if (b.largestGroup !== a.largestGroup)
+      return b.largestGroup - a.largestGroup;
     if (a.singletons !== b.singletons) return a.singletons - b.singletons;
     if (a.groupCount !== b.groupCount) return a.groupCount - b.groupCount;
     return b.ratingOffset - a.ratingOffset;
@@ -616,7 +627,11 @@ function canonicalPlatformFromProvider(provider) {
     };
   }
 
-  if (id === 119 || name.includes("amazon prime video") || name === "prime video") {
+  if (
+    id === 119 ||
+    name.includes("amazon prime video") ||
+    name === "prime video"
+  ) {
     return {
       platform_key: "prime",
       provider_id: 119,
@@ -738,7 +753,8 @@ async function fetchPlexLibraryIndex() {
     const index = new Set();
     for (const item of data.items) {
       const tmdbId = Number(item?.tmdbId || 0);
-      const tmdbType = item?.tmdbType || (item?.type === "movie" ? "movie" : "tv");
+      const tmdbType =
+        item?.tmdbType || (item?.type === "movie" ? "movie" : "tv");
       if (Number.isFinite(tmdbId) && tmdbId > 0 && tmdbType) {
         index.add(`${tmdbType}:${tmdbId}`);
       }
@@ -1023,15 +1039,13 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
-      <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-[#0a0a0a] border border-white/[0.08]">
-        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/[0.03] via-transparent to-transparent opacity-50" />
-
-        <div className="relative px-3 sm:px-6 py-2.5 sm:py-5 flex items-center justify-between gap-3 sm:gap-6">
+      <div className="relative overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
+        <div className="relative z-10 px-3 sm:px-6 py-2.5 sm:py-5 flex items-center justify-between gap-3 sm:gap-6">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             <div className="w-1 sm:w-1.5 h-8 sm:h-12 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.4)] shrink-0" />
 
             <div className="min-w-0 flex-1">
-              <h2 className="text-base sm:text-2xl font-black tracking-tight text-white leading-tight line-clamp-1">
+              <h2 className="text-base sm:text-2xl font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md">
                 {title}
               </h2>
 
@@ -1122,7 +1136,7 @@ function InlineDropdown({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[140px] lg:w-auto lg:max-w-none"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:border-white/30 hover:bg-black/30"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-blue-500" />}
@@ -1151,7 +1165,7 @@ function InlineDropdown({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-xl border border-zinc-800 bg-[#121212] p-1 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] p-2 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] [scrollbar-color:#3f3f46_transparent]"
             style={{
               maxHeight: `${menuMaxHeight}px`,
               scrollbarWidth: "thin",
@@ -1172,11 +1186,11 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-3 py-2 rounded-lg text-left text-sm transition flex items-center justify-between
-        ${active ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"}`}
+      className={`w-full px-3 py-2 rounded-xl text-left text-sm transition flex items-center justify-between
+        ${active ? "bg-white/10 text-white font-bold" : "text-zinc-300 hover:bg-white/5 hover:text-white"}`}
     >
       <span className="font-medium">{children}</span>
-      {active && <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />}
+      {active && <CheckCircle2 className="w-4 h-4 text-blue-500" />}
     </button>
   );
 }
@@ -1247,11 +1261,11 @@ function SubGroupDivider({ title, count }) {
   return (
     <div className="flex items-center gap-3 py-1.5 sm:py-2">
       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-500/40 to-blue-500/15" />
-      <div className="inline-flex max-w-[70%] items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs sm:text-sm">
-        <span className="truncate font-black uppercase tracking-wide text-blue-100">
+      <div className="relative overflow-hidden inline-flex max-w-[70%] items-center gap-2 rounded-xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_5px_15px_-5px_rgba(0,0,0,0.5)] px-3 py-1 text-xs sm:text-sm">
+        <span className="relative z-10 truncate font-black uppercase tracking-wide text-blue-100 drop-shadow-sm">
           {title}
         </span>
-        <span className="shrink-0 text-[10px] font-bold text-blue-300/80">
+        <span className="relative z-10 shrink-0 text-[10px] font-bold text-blue-300/80">
           {count}
         </span>
       </div>
@@ -1746,9 +1760,7 @@ export default function WatchlistClient() {
   const [loading, setLoading] = useState(() => !readWatchlistCache()?.items);
   const [items, setItems] = useState(() => readWatchlistCache()?.items || []);
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
-  const [traktScores, setTraktScores] = useState(() =>
-    readScoreCache("trakt"),
-  );
+  const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
   const [layoutImdbScores, setLayoutImdbScores] = useState(() =>
     buildLayoutScoreSnapshot(readWatchlistCache()?.items || [], "imdb"),
   );
@@ -1798,9 +1810,7 @@ export default function WatchlistClient() {
 
   const [subGroupBy, setSubGroupBy] = useState(() => {
     if (typeof window === "undefined") return "none";
-    const saved = window.localStorage.getItem(
-      "showverse:watchlist:subGroupBy",
-    );
+    const saved = window.localStorage.getItem("showverse:watchlist:subGroupBy");
     return saved || "none";
   });
 
@@ -1906,7 +1916,9 @@ export default function WatchlistClient() {
         const cachedTrakt = readScoreCache("trakt");
         if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
-        setLayoutImdbScores(buildLayoutScoreSnapshot(watchlistWithIndex, "imdb"));
+        setLayoutImdbScores(
+          buildLayoutScoreSnapshot(watchlistWithIndex, "imdb"),
+        );
         setLayoutTraktScores(
           buildLayoutScoreSnapshot(watchlistWithIndex, "trakt"),
         );
@@ -2415,15 +2427,17 @@ export default function WatchlistClient() {
   };
 
   if (!hydrated) {
-    return <div className="min-h-screen bg-[#050505]" />;
+    return <div className="min-h-screen bg-black" />;
   }
 
   if (!session || !account) {
     return (
-      <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-blue-500/30 pb-20">
-        <div className="fixed inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px]" />
-          <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-[150px]" />
+      <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30 pb-20">
+        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+          {/* Manchas abstractas azules y negras */}
+          <div className="absolute -top-[20%] -left-[10%] w-[70vw] max-w-[800px] aspect-square rounded-full bg-blue-600/15 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute top-[30%] -right-[10%] w-[50vw] max-w-[600px] aspect-square rounded-full bg-blue-900/30 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute -bottom-[20%] left-[20%] w-[60vw] max-w-[700px] aspect-square rounded-full bg-cyan-800/20 blur-[120px] sm:blur-[150px]" />
         </div>
 
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -2464,7 +2478,8 @@ export default function WatchlistClient() {
                 Conecta tu cuenta de TMDb
               </h2>
               <p className="text-zinc-400 max-w-sm mb-8 text-sm">
-                Conecta tu cuenta de TMDb para ver y gestionar tu lista de títulos pendientes sincronizada.
+                Conecta tu cuenta de TMDb para ver y gestionar tu lista de
+                títulos pendientes sincronizada.
               </p>
               <Link
                 href="/login?next=/watchlist"
@@ -2480,10 +2495,12 @@ export default function WatchlistClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-blue-500/30">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-[150px]" />
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        {/* Manchas abstractas azules y negras */}
+        <div className="absolute -top-[20%] -left-[10%] w-[70vw] max-w-[800px] aspect-square rounded-full bg-blue-600/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[30%] -right-[10%] w-[50vw] max-w-[600px] aspect-square rounded-full bg-blue-900/30 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[20%] left-[20%] w-[60vw] max-w-[700px] aspect-square rounded-full bg-cyan-800/20 blur-[120px] sm:blur-[150px]" />
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -2559,36 +2576,36 @@ export default function WatchlistClient() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                  <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-blue-400">
+                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                  <div className="relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-blue-400 shadow-sm border border-white/10">
                     <Bookmark className="w-4 h-4 md:w-5 md:h-5 fill-blue-400" />
                   </div>
-                  <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                  <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
                     {stats.total}
                   </div>
-                  <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                  <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
                     Total
                   </div>
                 </div>
-                <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                  <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400">
+                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                  <div className="relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400 shadow-sm border border-white/10">
                     <Film className="w-4 h-4 md:w-5 md:h-5" />
                   </div>
-                  <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                  <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
                     {stats.movies}
                   </div>
-                  <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                  <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
                     Películas
                   </div>
                 </div>
-                <div className="flex-1 lg:flex-none lg:min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                  <div className="p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400">
+                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                  <div className="relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400 shadow-sm border border-white/10">
                     <TvGlyph className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
                   </div>
-                  <div className="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                  <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
                     {stats.shows}
                   </div>
-                  <div className="text-[9px] md:text-[10px] uppercase font-bold text-zinc-500 tracking-wider text-center leading-tight">
+                  <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
                     Series
                   </div>
                 </div>
@@ -2599,66 +2616,37 @@ export default function WatchlistClient() {
 
         {/* Filters */}
         <motion.div
-          ref={(el) => {
-            if (el && !el.dataset.stickySetup) {
-              el.dataset.stickySetup = "true";
-              const observer = new IntersectionObserver(
-                ([e]) => {
-                  const isStuck = e.intersectionRatio < 1;
-                  if (isStuck) {
-                    el.classList.add(
-                      "backdrop-blur-xl",
-                      "bg-gradient-to-br",
-                      "from-black/60",
-                      "via-black/50",
-                      "to-black/55",
-                    );
-                  } else {
-                    el.classList.remove(
-                      "backdrop-blur-xl",
-                      "bg-gradient-to-br",
-                      "from-black/60",
-                      "via-black/50",
-                      "to-black/55",
-                    );
-                  }
-                },
-                { threshold: [1], rootMargin: "-65px 0px 0px 0px" },
-              );
-              observer.observe(el);
-            }
-          }}
-          className="sticky top-16 z-[60] space-y-1 mb-3 p-2 rounded-2xl transition-all duration-300"
+          className="sticky top-20 z-[60] space-y-3 mb-6 transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
           {/* Mobile: search + toggle */}
-          <div className="flex gap-2 lg:hidden">
+          <div className="relative z-10 flex gap-2 lg:hidden">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar..."
-                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-zinc-600"
+                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:border-blue-500/50 placeholder:text-zinc-400 border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-white"
               />
               {q && (
                 <button
                   onClick={() => setQ("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
                 >
-                  <X className="w-3.5 h-3.5 text-zinc-500" />
+                  <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
                 </button>
               )}
             </div>
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] ${
                 mobileFiltersOpen
-                  ? "bg-blue-500/20 border-blue-500/40 text-blue-400"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                  ? "border-blue-500/50 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                  : "text-zinc-200 hover:border-white/30 hover:bg-black/30"
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
@@ -2673,7 +2661,7 @@ export default function WatchlistClient() {
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="lg:hidden overflow-visible"
+                className="relative z-10 lg:hidden overflow-visible"
               >
                 <div className="space-y-3 pt-1">
                   <div className="flex gap-2">
@@ -2828,13 +2816,13 @@ export default function WatchlistClient() {
                       </InlineDropdown>
                     </div>
                     <div className="flex-1 flex gap-2">
-                      <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center flex-1">
+                      <div className="flex rounded-xl p-1 border h-11 items-center flex-1 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                         <button
                           onClick={() => setViewMode("list")}
                           className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                             viewMode === "list"
                               ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                              : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                              : "text-zinc-400 hover:text-white hover:bg-white/10"
                           }`}
                         >
                           <LayoutList className="w-4 h-4" />
@@ -2844,7 +2832,7 @@ export default function WatchlistClient() {
                           className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                             viewMode === "compact"
                               ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                              : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                              : "text-zinc-400 hover:text-white hover:bg-white/10"
                           }`}
                         >
                           <Grid3x3 className="w-4 h-4" />
@@ -2854,7 +2842,7 @@ export default function WatchlistClient() {
                           className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                             viewMode === "grid"
                               ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                              : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                              : "text-zinc-400 hover:text-white hover:bg-white/10"
                           }`}
                         >
                           <LayoutGrid className="w-4 h-4" />
@@ -2866,10 +2854,10 @@ export default function WatchlistClient() {
                             imageMode === "poster" ? "backdrop" : "poster",
                           )
                         }
-                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
+                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] ${
                           imageMode === "backdrop"
-                            ? "bg-blue-500/20 border-blue-500/40 text-blue-400"
-                            : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                            ? "border-blue-500/50 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                            : "text-zinc-200 hover:border-white/30 hover:bg-black/30"
                         }`}
                         title={
                           imageMode === "poster"
@@ -2891,21 +2879,21 @@ export default function WatchlistClient() {
           </AnimatePresence>
 
           {/* Desktop: Single row */}
-          <div className="hidden lg:flex gap-3">
+          <div className="relative z-10 hidden lg:flex gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar por título..."
-                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-zinc-600"
+                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:border-blue-500/50 placeholder:text-zinc-400 border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-white"
               />
               {q && (
                 <button
                   onClick={() => setQ("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
                 >
-                  <X className="w-3.5 h-3.5 text-zinc-500" />
+                  <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
                 </button>
               )}
             </div>
@@ -3054,13 +3042,13 @@ export default function WatchlistClient() {
               )}
             </InlineDropdown>
 
-            <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
+            <div className="flex rounded-xl p-1 border h-11 items-center shrink-0 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
               <button
                 onClick={() => setViewMode("list")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "list"
                     ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
                 <LayoutList className="w-4 h-4" />
@@ -3070,7 +3058,7 @@ export default function WatchlistClient() {
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "compact"
                     ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
                 <Grid3x3 className="w-4 h-4" />
@@ -3080,20 +3068,20 @@ export default function WatchlistClient() {
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "grid"
                     ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
                 <PosterGlyph className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
+            <div className="flex rounded-xl p-1 border h-11 items-center shrink-0 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
               <button
                 onClick={() => setImageMode("poster")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   imageMode === "poster"
                     ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
                 title="Vista Poster"
               >
@@ -3104,7 +3092,7 @@ export default function WatchlistClient() {
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   imageMode === "backdrop"
                     ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
                 title="Vista Backdrop"
               >
@@ -3141,10 +3129,7 @@ export default function WatchlistClient() {
           // Grouped view
           <div className="space-y-8">
             {grouped.map((group) => (
-              <div
-                key={group.key}
-                className="overflow-visible"
-              >
+              <div key={group.key} className="overflow-visible">
                 <GroupDivider
                   title={group.label}
                   count={group.items.length}

@@ -501,13 +501,13 @@ export default function LiquidButton({
         relative overflow-hidden
         w-12 h-12 rounded-full
         flex items-center justify-center
-        border backdrop-blur-sm
+        border backdrop-blur-[50px]
         ${
           disabled
-            ? "border-white/10 bg-white/5 text-white/30 cursor-not-allowed"
+            ? "border-white/10 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 text-white/30 cursor-not-allowed"
             : active
-              ? "border-opacity-50 bg-opacity-10 shadow-lg"
-              : "border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
+              ? "border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+              : "border-white/20 bg-white/5 bg-gradient-to-br from-white/10 via-white/5 to-black/20 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:border-white/30 hover:bg-white/10 hover:text-white"
         }
         ${isExploding ? "" : "transition-all duration-300"}
         ${className}

@@ -10071,7 +10071,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                             <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
                               {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
-                              <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 w-fit h-10 md:h-11">
+                              <div className="flex items-center rounded-xl p-1 border w-fit h-10 md:h-11 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                 {["posters", "backdrops", "background"].map(
                                   (tab) => (
                                     <button
@@ -10081,8 +10081,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
               ${
                 activeImagesTab === tab
-                  ? "bg-white/10 text-white shadow"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-white/10 text-white shadow-md"
+                  : "text-zinc-400 hover:text-white hover:bg-white/10"
               }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
@@ -10104,9 +10104,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   type="button"
                                   onClick={() => setResMenuOpen((v) => !v)}
                                   className="h-10 md:h-11 inline-flex items-center justify-between gap-2 min-w-[150px]
-            px-3 rounded-xl bg-neutral-800/80 border border-white/10
-            hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/15 transition-all duration-300
-            text-sm text-zinc-200"
+            px-3 rounded-xl border transition-all duration-300
+            border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
+            text-sm text-zinc-200 hover:border-white/30 hover:bg-black/30"
                                   title="Resolución"
                                   aria-label="Resolución"
                                   style={{
@@ -10149,7 +10149,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         ease: "easeOut",
                                       }}
                                       className="absolute left-0 top-full z-[9999] mt-2 w-44 rounded-2xl
-                border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
+                border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden"
                                     >
                                       <div className="py-1">
                                         {[
@@ -10190,34 +10190,32 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {/* Idioma (sin label) */}
                               {activeImagesTab !== "background" && (
                                 <div
-                                  className="h-10 md:h-11 flex items-center rounded-xl bg-neutral-800/80 border border-white/10 p-1"
+                                  className="flex rounded-xl p-1 border h-10 md:h-11 items-center border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
                                   title="Idioma"
                                   aria-label="Idioma"
                                 >
-                                  <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
-                                    <button
-                                      type="button"
-                                      onClick={() => setLangES((v) => !v)}
-                                      className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
-                ${langES ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
-                                      style={{
-                                        WebkitTapHighlightColor: "transparent",
-                                      }}
-                                    >
-                                      ES
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setLangEN((v) => !v)}
-                                      className={`h-8 md:h-9 px-3 rounded-md text-xs font-semibold transition-all
-                ${langEN ? "bg-white/10 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
-                                      style={{
-                                        WebkitTapHighlightColor: "transparent",
-                                      }}
-                                    >
-                                      EN
-                                    </button>
-                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setLangES((v) => !v)}
+                                    className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
+                ${langES ? "bg-white/10 text-white shadow-md" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
+                                    style={{
+                                      WebkitTapHighlightColor: "transparent",
+                                    }}
+                                  >
+                                    ES
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setLangEN((v) => !v)}
+                                    className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
+                ${langEN ? "bg-white/10 text-white shadow-md" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
+                                    style={{
+                                      WebkitTapHighlightColor: "transparent",
+                                    }}
+                                  >
+                                    EN
+                                  </button>
                                 </div>
                               )}
                             </div>
@@ -10230,9 +10228,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 setResMenuOpen(false);
                               }}
                               className="sm:hidden inline-flex items-center justify-center w-10 h-10 rounded-xl
-        border border-white/10 bg-neutral-800/80 text-zinc-200
-        hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/20 transition-all duration-300
-        transform-gpu hover:-translate-y-0.5"
+        border transition-all duration-300 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200
+        hover:border-white/30 hover:bg-black/30 transform-gpu hover:-translate-y-0.5"
                               title="Filtros"
                               aria-label="Filtros"
                               style={{ WebkitTapHighlightColor: "transparent" }}
@@ -10244,8 +10241,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               type="button"
                               onClick={handleResetArtwork}
                               className="inline-flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
-        border border-red-500/30 bg-red-500/10 text-red-400
-        hover:text-red-300 hover:bg-red-500/15 hover:border-red-500/45 transition"
+        border transition-all border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
+        text-red-400 hover:border-red-500/50 hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                               title="Restaurar valores por defecto"
                               aria-label="Restaurar valores por defecto"
                               style={{ WebkitTapHighlightColor: "transparent" }}
@@ -10269,16 +10266,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 {/* Todo en una sola fila con iconos */}
                                 <div className="flex items-center gap-2">
                                   {/* Tabs con iconos - compacto */}
-                                  <div className="flex bg-white/5 rounded-xl p-1 border border-white/10">
+                                  <div className="flex rounded-xl p-1 border h-10 items-center border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                     <button
                                       type="button"
                                       onClick={() =>
                                         setActiveImagesTab("posters")
                                       }
-                                      className={`p-2 rounded-lg transition-all ${
+                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
                                         activeImagesTab === "posters"
-                                          ? "bg-white/10 text-white shadow"
-                                          : "text-zinc-400 hover:text-zinc-200"
+                                          ? "bg-white/10 text-white shadow-md"
+                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
                                       }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
@@ -10292,10 +10289,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       onClick={() =>
                                         setActiveImagesTab("backdrops")
                                       }
-                                      className={`p-2 rounded-lg transition-all ${
+                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
                                         activeImagesTab === "backdrops"
-                                          ? "bg-white/10 text-white shadow"
-                                          : "text-zinc-400 hover:text-zinc-200"
+                                          ? "bg-white/10 text-white shadow-md"
+                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
                                       }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
@@ -10309,10 +10306,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       onClick={() =>
                                         setActiveImagesTab("background")
                                       }
-                                      className={`p-2 rounded-lg transition-all ${
+                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
                                         activeImagesTab === "background"
-                                          ? "bg-white/10 text-white shadow"
-                                          : "text-zinc-400 hover:text-zinc-200"
+                                          ? "bg-white/10 text-white shadow-md"
+                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
                                       }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
@@ -10332,8 +10329,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       type="button"
                                       onClick={() => setResMenuOpen((v) => !v)}
                                       className="h-10 w-full inline-flex items-center justify-between gap-2
-                  px-3 rounded-xl bg-black/35 border border-white/10
-                  hover:bg-black/45 hover:border-white/15 transition text-sm text-zinc-200"
+                  px-3 rounded-xl border transition text-sm
+                  border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:border-white/30 hover:bg-black/30"
                                       title="Resolución"
                                       aria-label="Resolución"
                                       style={{
@@ -10384,7 +10381,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             ease: "easeOut",
                                           }}
                                           className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
-                      border border-white/10 bg-[#101010]/95 shadow-2xl overflow-hidden backdrop-blur"
+                      border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden"
                                         >
                                           <div className="py-1">
                                             {[
@@ -10424,14 +10421,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                   {/* Idioma móvil - compacto */}
                                   {activeImagesTab !== "background" && (
-                                    <div className="flex gap-1.5 bg-black/35 border border-white/10 rounded-xl p-1.5 h-10">
+                                    <div className="flex rounded-xl p-1 border h-10 items-center border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                       <button
                                         type="button"
                                         onClick={() => setLangES((v) => !v)}
-                                        className={`px-3 rounded-lg text-xs font-medium transition-all ${
+                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
                                           langES
-                                            ? "bg-zinc-800 text-white"
-                                            : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                            ? "bg-white/10 text-white shadow-md"
+                                            : "text-zinc-400 hover:text-white hover:bg-white/10"
                                         }`}
                                         style={{
                                           WebkitTapHighlightColor:
@@ -10443,10 +10440,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       <button
                                         type="button"
                                         onClick={() => setLangEN((v) => !v)}
-                                        className={`px-3 rounded-lg text-xs font-medium transition-all ${
+                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
                                           langEN
-                                            ? "bg-zinc-800 text-white"
-                                            : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                                            ? "bg-white/10 text-white shadow-md"
+                                            : "text-zinc-400 hover:text-white hover:bg-white/10"
                                         }`}
                                         style={{
                                           WebkitTapHighlightColor:
@@ -10732,24 +10729,24 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {Array.from({ length: 4 }).map((_, index) => (
                                 <div
                                   key={index}
-                                  className="rounded-2xl overflow-hidden border border-white/10 bg-black/25 animate-pulse"
+                                  className="relative rounded-2xl overflow-hidden border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] animate-pulse"
                                   aria-hidden="true"
                                 >
-                                  <div className="relative aspect-video bg-white/5">
+                                  <div className="relative z-10 aspect-video bg-white/5">
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                                     <div className="absolute inset-0 flex items-center justify-center">
                                       <div className="w-14 h-14 rounded-full bg-white/10 border border-white/10" />
                                     </div>
                                   </div>
 
-                                  <div className="p-4">
+                                  <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 w-full">
                                     <div className="h-4 w-3/4 rounded bg-white/10" />
                                     <div className="mt-3 flex gap-2">
                                       <div className="h-5 w-16 rounded-full bg-white/10" />
                                       <div className="h-5 w-14 rounded-full bg-white/10" />
                                       <div className="h-5 w-10 rounded-full bg-white/10" />
                                     </div>
-                                    <div className="mt-4 flex items-center gap-2">
+                                    <div className="mt-auto flex items-center gap-2">
                                       <div className="h-3 w-14 rounded bg-white/10" />
                                       <div className="h-3 w-1 rounded-full bg-white/10" />
                                       <div className="h-3 w-20 rounded bg-white/10" />
@@ -10805,10 +10802,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       type="button"
                                       onClick={() => openVideo(v)}
                                       title={v.name || "Ver vídeo"}
-                                      className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
-                            border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
+                                      className="relative w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:border-yellow-500/50 hover:bg-black/30 group"
                                     >
-                                      <div className="relative aspect-video overflow-hidden">
+                                      <div className="relative z-10 aspect-video overflow-hidden">
                                         <img
                                           src={thumb || fallback}
                                           alt={v.name || "Video"}
@@ -10822,7 +10818,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         </div>
                                       </div>
 
-                                      <div className="flex flex-col flex-1 p-4 items-start">
+                                      <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 items-start w-full">
                                         {/* Titulo arriba (1 linea siempre) */}
                                         <div className="w-full min-h-[22px]">
                                           <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
@@ -10903,15 +10899,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             {Array.from({ length: 4 }).map((_, index) => (
                               <div
                                 key={index}
-                                className="rounded-2xl overflow-hidden border border-white/10 bg-black/25 animate-pulse"
+                                className="relative rounded-2xl overflow-hidden border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] animate-pulse"
                                 aria-hidden="true"
                               >
-                                <div className="relative aspect-video bg-white/5">
+                                <div className="relative z-10 aspect-video bg-white/5">
                                   <div className="absolute inset-0 flex items-center justify-center">
                                     <div className="w-14 h-14 rounded-full bg-yellow-400/10 border border-yellow-300/10" />
                                   </div>
                                 </div>
-                                <div className="p-4">
+                                <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 w-full">
                                   <div className="h-4 w-3/4 rounded bg-white/10" />
                                   <div className="mt-3 h-3 w-1/2 rounded bg-white/10" />
                                 </div>
@@ -10923,19 +10919,21 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         {!soundtrackLoading &&
                           soundtrackResolved &&
                           soundtrackTracks.length === 0 && (
-                            <div className="rounded-2xl border border-white/10 bg-black/25 p-5 text-sm text-zinc-400">
-                              {soundtrackError ||
-                                "No se encontraron previews reproducibles para este título."}
-                              {soundtrackYoutubeSearchUrl && (
-                                <a
-                                  href={soundtrackYoutubeSearchUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="ml-2 font-bold text-yellow-300 hover:text-yellow-200"
-                                >
-                                  Buscar en YouTube
-                                </a>
-                              )}
+                            <div className="relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] p-5 text-sm text-zinc-400">
+                              <div className="relative z-10">
+                                {soundtrackError ||
+                                  "No se encontraron previews reproducibles para este título."}
+                                {soundtrackYoutubeSearchUrl && (
+                                  <a
+                                    href={soundtrackYoutubeSearchUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="ml-2 font-bold text-yellow-300 hover:text-yellow-200"
+                                  >
+                                    Buscar en YouTube
+                                  </a>
+                                )}
+                              </div>
                             </div>
                           )}
 
@@ -10957,10 +10955,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   type="button"
                                   onClick={() => openSoundtrack(track.id)}
                                   title={track.trackName || "Reproducir música"}
-                                  className="w-full h-full text-left flex flex-col rounded-2xl overflow-hidden
-                                    border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition"
+                                  className="relative w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:border-yellow-500/50 hover:bg-black/30 group"
                                 >
-                                  <div className="relative aspect-video overflow-hidden">
+                                  <div className="relative z-10 aspect-video overflow-hidden">
                                     <img
                                       src={
                                         track.artworkUrl || "/placeholder.png"
@@ -10976,7 +10973,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </div>
                                   </div>
 
-                                  <div className="flex flex-col flex-1 p-4 items-start">
+                                  <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 items-start w-full">
                                     <div className="w-full min-h-[22px]">
                                       <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
                                         {track.trackName}
@@ -11026,9 +11023,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           icon={Sparkles}
                         />
 
-                        <div className="mt-3 sm:mt-4 overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm shadow-2xl">
+                        <div className="mt-3 sm:mt-4 relative overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.8)]">
                           {/* Header del bloque */}
-                          <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
+                          <div className="relative z-10 flex items-center justify-between border-b border-white/10 bg-white/5 px-6 py-4">
                             <div className="flex items-center gap-4">
                               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
                                 <img
@@ -11052,7 +11049,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             )}
                           </div>
 
-                          <div className="p-6">
+                          <div className="relative z-10 p-6">
                             {/* Sin mostrar error, directamente el contenido */}
                             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                               {/* Columna Positiva */}
@@ -11188,17 +11185,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   onMouseEnter={() => prefetchSeasonDetails(sn)}
                                   onFocus={() => prefetchSeasonDetails(sn)}
                                   onTouchStart={() => prefetchSeasonDetails(sn)}
-                                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5
-                             transition-all hover:-translate-y-1 hover:border-white/20 hover:bg-white/10 hover:shadow-xl
-                             text-left w-full"
+                                  className="group relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:-translate-y-1 hover:border-yellow-500/50 hover:bg-black/30 hover:shadow-2xl text-left w-full"
                                   title={`Ver ${titleSeason}`}
                                 >
                                   {/* Fondo decorativo del número de temporada */}
-                                  <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10">
+                                  <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10 z-0">
                                     {sn}
                                   </div>
 
-                                  <div className="relative p-5">
+                                  <div className="relative z-10 p-5">
                                     <div className="flex items-start justify-between">
                                       <div>
                                         <h4 className="text-lg font-extrabold text-white">
@@ -11363,9 +11358,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             return (
                               <div
                                 key={r.id}
-                                className="bg-neutral-800/40 p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4"
+                                className="relative flex flex-col p-6 overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-3xl shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:border-white/30 gap-4"
                               >
-                                <div className="flex items-center gap-4">
+                                <div className="relative z-10 flex items-center gap-4">
                                   <img
                                     src={avatar}
                                     alt={r.author}
@@ -11390,7 +11385,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   </div>
                                 </div>
 
-                                <div className="text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
+                                <div className="relative z-10 text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
                                   "{r.content.replace(/<[^>]*>?/gm, "")}"
                                 </div>
 
@@ -11398,7 +11393,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   href={r.url}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
+                                  className="relative z-10 text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
                                 >
                                   Leer review completa en TMDb &rarr;
                                 </a>
@@ -11466,10 +11461,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         </div>
                       </div>
 
-                      <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/20 backdrop-blur-sm">
+                      <div className="relative overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)]">
                         {/* Filtros estilo Tabs Modernos */}
-                        <div className="flex items-center justify-between border-b border-white/5 bg-white/5 px-4 py-3">
-                          <div className="flex gap-1 rounded-xl bg-black/40 p-1">
+                        <div className="relative z-10 flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-3">
+                          <div className="flex items-center rounded-xl p-1 border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                             {[
                               { id: "likes30", label: "Top 30 Días" },
                               { id: "likesAll", label: "Top Histórico" },
@@ -11479,10 +11474,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 key={t.id}
                                 type="button"
                                 onClick={() => setTCommentsTab(t.id)}
-                                className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
+                                className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all flex items-center justify-center ${
                                   tCommentsTab === t.id
-                                    ? "bg-zinc-700 text-white shadow-md"
-                                    : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                                    ? "bg-white/10 text-white shadow-md"
+                                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                                 }`}
                               >
                                 {t.label}
@@ -11494,7 +11489,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           )}
                         </div>
 
-                        <div className="space-y-4 p-4 sm:p-6">
+                        <div className="relative z-10 space-y-4 p-4 sm:p-6">
                           {!tComments.loading &&
                             (tComments.items || []).length === 0 && (
                               <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
@@ -11526,7 +11521,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   key={String(
                                     c?.id || `${user?.username}-${created}`,
                                   )}
-                                  className="group relative flex gap-4 rounded-2xl bg-white/5 p-5 transition hover:bg-white/10"
+                                  className="group relative flex gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 transition-all hover:bg-white/10 hover:border-white/20 shadow-sm"
                                 >
                                   {/* Avatar */}
                                   <div className="shrink-0">
@@ -11605,15 +11600,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <SectionTitle title="Listas" icon={ListVideo} />
 
                           {/* Selector de Listas */}
-                          <div className="flex rounded-lg bg-white/5 p-1 border border-white/10 backdrop-blur-md">
+                          <div className="flex items-center rounded-xl p-1 border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                             {["popular", "trending"].map((tab) => (
                               <button
                                 key={tab}
                                 onClick={() => setTListsTab(tab)}
-                                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-md ${
+                                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-lg flex items-center justify-center ${
                                   tListsTab === tab
-                                    ? "bg-white text-black shadow-lg scale-105"
-                                    : "text-zinc-400 hover:text-white hover:bg-white/5"
+                                    ? "bg-white/10 text-white shadow-md"
+                                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                                 }`}
                               >
                                 {tab}
@@ -11672,15 +11667,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   href={internalUrl || "#"}
                                   aria-disabled={disabled}
                                   className={[
-                                    "group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500",
-                                    "hover:border-indigo-500/30 hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)]",
+                                    "group relative flex flex-col overflow-hidden rounded-3xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all duration-500",
+                                    "hover:border-indigo-500/50 hover:shadow-[0_0_40px_-5px_rgba(99,102,241,0.4)] hover:bg-black/30",
                                     disabled
                                       ? "pointer-events-none opacity-60"
                                       : "",
                                   ].join(" ")}
                                 >
                                   {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS) */}
-                                  <div className="relative h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
+                                  <div className="relative z-10 h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
                                     {previews.length > 0 ? (
                                       <div className="h-full w-full flex items-center justify-center overflow-visible">
                                         <PosterStack posters={previews} />
@@ -11713,7 +11708,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   </div>
 
                                   {/* 2. CONTENIDO DE TEXTO */}
-                                  <div className="relative flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
+                                  <div className="relative z-10 flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
                                     <div>
                                       <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
                                         {name}
