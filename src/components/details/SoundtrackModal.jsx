@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
-  ExternalLink,
   Loader2,
   Music2,
   X,
@@ -12,7 +11,33 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
+  ExternalLink,
 } from "lucide-react";
+
+function SpotifyIcon({ className = "" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="12" cy="12" r="10" fill="currentColor" />
+      <path
+        d="M7.4 9.3c3.3-1 6.9-.7 9.7.9M8.1 12.2c2.5-.7 5.2-.5 7.4.8M8.8 14.9c1.9-.5 3.8-.3 5.5.5"
+        fill="none"
+        stroke="#000"
+        strokeLinecap="round"
+        strokeWidth="1.45"
+      />
+    </svg>
+  );
+}
+
+function SourceLinkIcon({ source, className = "" }) {
+  if (source === "Spotify") return <SpotifyIcon className={className} />;
+  return <ExternalLink className={className} />;
+}
 
 export default function SoundtrackModal({
   open,
@@ -194,15 +219,20 @@ export default function SoundtrackModal({
           <div className="flex flex-col p-8 items-center w-full">
             {/* --- CABECERA --- */}
             <div className="flex w-full justify-between items-center mb-8">
-              {searchUrl ? (
+              {selectedExternalUrl ? (
                 <a
-                  href={searchUrl}
+                  href={selectedExternalUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
-                  title="Buscar en YouTube"
+                  className={`flex h-11 w-11 items-center justify-center rounded-full border shadow-sm transition ${
+                    selectedTrack?.source === "Spotify"
+                      ? "border-[#1DB954]/30 bg-[#1DB954]/15 text-[#1DB954] hover:bg-[#1DB954]/25 hover:text-[#1ED760]"
+                      : "border-white/20 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+                  }`}
+                  title={`Escuchar en ${selectedTrack?.source || "la web"}`}
+                  aria-label={`Escuchar ${selectedTrack?.trackName || title || "soundtrack"} en ${selectedTrack?.source || "la web"}`}
                 >
-                  <ExternalLink className="h-5 w-5" />
+                  <SourceLinkIcon source={selectedTrack?.source} className="h-5 w-5" />
                 </a>
               ) : (
                 <div className="w-11 h-11" />
@@ -308,10 +338,14 @@ export default function SoundtrackModal({
                     href={selectedExternalUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/15"
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition ${
+                      selectedTrack?.source === "Spotify"
+                        ? "border-[#1DB954]/30 bg-[#1DB954]/15 text-[#1ED760] hover:bg-[#1DB954]/25"
+                        : "border-white/20 bg-white/10 text-zinc-200 hover:bg-white/20"
+                    }`}
                   >
-                    <ExternalLink className="h-4 w-4" />
-                    Abrir canción
+                    <SourceLinkIcon source={selectedTrack?.source} className="h-4 w-4" />
+                    Escuchar en {selectedTrack?.source || "la web"}
                   </a>
                 )}
               </div>
@@ -354,36 +388,36 @@ export default function SoundtrackModal({
 
             {/* --- VOLUMEN --- */}
             {selectedHasPreview && (
-            <div className="w-full flex items-center justify-center gap-4 px-8">
-              <button
-                type="button"
-                onClick={toggleMute}
-                className="text-white/60 hover:text-white transition"
-              >
-                {isMuted || volume === 0 ? (
-                  <VolumeX className="w-5 h-5" />
-                ) : (
-                  <Volume2 className="w-5 h-5" />
-                )}
-              </button>
-              <div className="relative flex items-center w-28 h-5 group">
-                <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden border border-white/10 pointer-events-none">
-                  <div
-                    className="h-full bg-white/70 group-hover:bg-white rounded-full transition-all duration-75"
-                    style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}
+              <div className="w-full flex items-center justify-center gap-4 px-8">
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  className="text-white/60 hover:text-white transition"
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX className="w-5 h-5" />
+                  ) : (
+                    <Volume2 className="w-5 h-5" />
+                  )}
+                </button>
+                <div className="relative flex items-center w-28 h-5 group">
+                  <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden border border-white/10 pointer-events-none">
+                    <div
+                      className="h-full bg-white/70 group-hover:bg-white rounded-full transition-all duration-75"
+                      style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}
+                    />
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={isMuted ? 0 : volume}
+                    onChange={handleVolumeChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={isMuted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
               </div>
-            </div>
             )}
           </div>
         ) : (

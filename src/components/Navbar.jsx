@@ -122,9 +122,9 @@ function SearchBar({ onResultClick, isMobile = false }) {
         <div
           className={`
             relative flex items-center w-full transition-all duration-300 ease-out
-            rounded-full border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] group
-            hover:border-white/30 hover:bg-black/30
-            focus-within:border-white/40 focus-within:bg-black/40 focus-within:ring-4 focus-within:ring-white/10
+            rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] group
+            hover:bg-black/30
+            focus-within:bg-black/40 focus-within:ring-4 focus-within:ring-white/10
             ${isMobile ? "h-12 pl-4 pr-3" : "h-11 pl-4 pr-3"}
           `}
         >
@@ -178,7 +178,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             className={`absolute top-full left-0 w-full text-white ${isMobile ? "mt-3" : "mt-2"} z-50 max-h-[70vh] overflow-y-auto no-scrollbar
-              rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)]`}
+              rounded-[2rem] bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)]`}
           >
             <div className="p-2">
               {results.slice(0, 8).map((item, index) => (
@@ -415,7 +415,7 @@ export default function Navbar() {
   return (
     <>
       {/* ===================== TOP BAR ===================== */}
-      <nav className="sticky top-0 z-40 w-full border-b border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]">
+      <nav className="sticky top-0 z-40 w-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]">
         {/* ---------------- Desktop ---------------- */}
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
           {/* Izquierda */}
@@ -593,7 +593,7 @@ export default function Navbar() {
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
-      <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 border-t border-white/20 bg-black/20 bg-gradient-to-tr from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_-10px_30px_-10px_rgba(0,0,0,0.8)] flex items-center">
+      <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black/20 bg-gradient-to-tr from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_-10px_30px_-10px_rgba(0,0,0,0.8)] flex items-center">
         <Link
           href="/movies"
           className={navLinkClassMobileBottom("/movies", "blue")}
@@ -644,7 +644,7 @@ export default function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: -320 }}
               transition={{ type: "tween", duration: 0.22 }}
-              className="h-full w-[280px] border-r border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[30px_0_80px_-15px_rgba(0,0,0,0.9)] px-4 pt-2 pb-2"
+              className="h-full w-[280px] bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[30px_0_80px_-15px_rgba(0,0,0,0.9)] px-4 pt-2 pb-2"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between gap-2">
@@ -843,7 +843,7 @@ export default function Navbar() {
                 </div>
                 <button
                   onClick={() => setShowMobileSearch(false)}
-                  className="flex-shrink-0 p-3 rounded-full border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] hover:border-white/30 hover:bg-black/30 text-white transition-all active:scale-95 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+                  className="flex-shrink-0 p-3 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] hover:bg-black/30 text-white transition-all active:scale-95"
                   aria-label="Cerrar búsqueda"
                 >
                   <XIcon className="w-6 h-6" />
