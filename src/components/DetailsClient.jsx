@@ -9778,7 +9778,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
 
-                                <div className="absolute bottom-0 left-0 right-0 p-3 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
+                                <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
                                   <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
                                     {actor.name}
                                   </p>
