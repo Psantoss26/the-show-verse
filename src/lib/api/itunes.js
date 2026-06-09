@@ -145,8 +145,9 @@ async function lookupAlbumTracks(collectionId, country) {
 
 export async function searchITunes(ctx, country = "US") {
   const queries = buildQueries(ctx);
-  let allTracks = [];
+  let allScoredAlbums = [];
   let usedQuery = "";
+
   for (let qi = 0; qi < queries.length; qi++) {
     const q = queries[qi];
     let albums;
@@ -159,28 +160,32 @@ export async function searchITunes(ctx, country = "US") {
 
     if (!usedQuery) usedQuery = q;
 
-    const scoredAlbums = albums
+    const scored = albums
       .map((a) => ({ ...a, _score: scoreAlbum(a, ctx) }))
       .filter((a) => a._score >= ALBUM_MIN_SCORE)
       .sort((a, b) => b._score - a._score)
       .slice(0, MAX_ALBUMS);
 
-    if (scoredAlbums.length > 0) {
-      for (const album of scoredAlbums) {
-        try {
-          const tracks = await lookupAlbumTracks(album.collectionId, country);
-          for (const t of tracks) {
-            allTracks.push(normalizeTrack(t, album));
-          }
-        } catch {
-          continue;
-        }
-      }
-
-      if (allTracks.length >= 5) break;
-    }
+    allScoredAlbums.push(...scored);
 
     if (qi < queries.length - 1) await sleep(200);
+  }
+
+  const topAlbums = allScoredAlbums
+    .sort((a, b) => b._score - a._score)
+    .filter((a, i, arr) => arr.findIndex((x) => x.collectionId === a.collectionId) === i)
+    .slice(0, MAX_ALBUMS);
+
+  let allTracks = [];
+  for (const album of topAlbums) {
+    try {
+      const tracks = await lookupAlbumTracks(album.collectionId, country);
+      for (const t of tracks) {
+        allTracks.push(normalizeTrack(t, album));
+      }
+    } catch {
+      continue;
+    }
   }
 
   const deduped = dedupeTracks(allTracks);

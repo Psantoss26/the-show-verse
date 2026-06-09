@@ -8872,10 +8872,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 puntuar, agregar a favoritos, watchlist y listas, cambiar portada */}
             <FadeIn delay={0.12} className="mb-6 px-1 w-full">
               <div
-                className="flex flex-nowrap items-center justify-between sm:justify-start gap-1.5 sm:gap-2 w-full
-                [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-0 [&>*:not(.separator)]:max-w-[48px]
+                className="flex flex-nowrap items-center justify-center sm:justify-start gap-2.5 sm:gap-3 w-full
+                [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[36px] [&>*:not(.separator)]:max-w-[60px] sm:[&>*:not(.separator)]:max-w-[52px]
                 [&_[data-liquid-button]]:!w-full [&_[data-liquid-button]]:!h-auto [&_[data-liquid-button]]:aspect-square
-                [&_[data-liquid-button]_svg]:!w-4 [&_[data-liquid-button]_svg]:!h-4 sm:[&_[data-liquid-button]_svg]:!w-5 sm:[&_[data-liquid-button]_svg]:!h-5
+                [&_[data-liquid-button]_svg]:!w-5 [&_[data-liquid-button]_svg]:!h-5
                 [&_[data-liquid-button]_.text-xl]:!text-base sm:[&_[data-liquid-button]_.text-xl]:!text-xl"
               >
                 {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}

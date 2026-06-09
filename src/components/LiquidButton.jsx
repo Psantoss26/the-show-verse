@@ -259,10 +259,6 @@ export default function LiquidButton({
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * 2;
-    canvas.height = rect.height * 2;
-    ctx.scale(2, 2);
 
     if (particlesRef.current.length === 0) {
       generateParticles();
@@ -271,7 +267,17 @@ export default function LiquidButton({
     let time = 0;
 
     const animate = () => {
-      ctx.clearRect(0, 0, rect.width, rect.height);
+      const currentRect = canvas.getBoundingClientRect();
+      if (
+        canvas.width !== currentRect.width * 2 ||
+        canvas.height !== currentRect.height * 2
+      ) {
+        canvas.width = currentRect.width * 2;
+        canvas.height = currentRect.height * 2;
+        ctx.scale(2, 2);
+      }
+
+      ctx.clearRect(0, 0, currentRect.width, currentRect.height);
       time += 0.016;
 
       // Dibujar partículas de explosión optimizadas
@@ -363,11 +369,13 @@ export default function LiquidButton({
           particle.x += particle.vx + Math.sin(time * 2 + particle.phase) * 0.4;
           particle.y += particle.vy + Math.cos(time * 2 + particle.phase) * 0.4;
 
-          if (particle.x < 0 || particle.x > rect.width) particle.vx *= -1;
-          if (particle.y < 0 || particle.y > rect.height) particle.vy *= -1;
+          if (particle.x < 0 || particle.x > currentRect.width)
+            particle.vx *= -1;
+          if (particle.y < 0 || particle.y > currentRect.height)
+            particle.vy *= -1;
 
-          particle.x = Math.max(0, Math.min(rect.width, particle.x));
-          particle.y = Math.max(0, Math.min(rect.height, particle.y));
+          particle.x = Math.max(0, Math.min(currentRect.width, particle.x));
+          particle.y = Math.max(0, Math.min(currentRect.height, particle.y));
 
           const particleOpacity =
             particle.opacity * (isHovered || active ? 1 : proximityGlow * 1.5);
