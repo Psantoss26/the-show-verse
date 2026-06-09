@@ -37,11 +37,15 @@ import {
 } from "@/lib/details/seriesGraphRatings";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
+import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
 import {
   invalidateTraktGetCache,
   traktGetItemStatus,
   traktGetShowWatched,
   traktSetEpisodeWatched,
+  traktGetEpisodePlays,
+  traktAddEpisodePlay,
+  traktRemoveWatchPlay,
 } from "@/lib/api/traktClient";
 
 const episodeScoreboardCache = new Map();
@@ -558,6 +562,14 @@ export default function EpisodeDetailsClient({
     traktId: initialShowWatched?.traktId ?? null,
   });
   const [watchedBusy, setWatchedBusy] = useState(false);
+  const [episodePlaysOpen, setEpisodePlaysOpen] = useState(false);
+  const [episodePlaysLoading, setEpisodePlaysLoading] = useState(false);
+  const [episodePlaysLoaded, setEpisodePlaysLoaded] = useState(false);
+  const [episodePlays, setEpisodePlays] = useState({
+    plays: 0,
+    history: [],
+    lastWatchedAt: null,
+  });
 
   // Cargar rating del usuario (Trakt) en segundo plano.
   useEffect(() => {
@@ -915,6 +927,111 @@ export default function EpisodeDetailsClient({
     watchedBusy,
   ]);
 
+  // Cargar historial de plays del episodio
+  const loadEpisodePlays = useCallback(async () => {
+    if (episodePlaysLoaded) return;
+    setEpisodePlaysLoading(true);
+    try {
+      const json = await traktGetEpisodePlays({
+        tmdbId: Number(showId),
+        season: Number(seasonNumber),
+        episode: Number(episodeNumber),
+      });
+      setEpisodePlays({
+        plays: json?.plays ?? 0,
+        history: Array.isArray(json?.history) ? json.history : [],
+        lastWatchedAt: json?.lastWatchedAt ?? null,
+      });
+      setEpisodePlaysLoaded(true);
+    } catch (e) {
+      console.error("Error loading episode plays:", e);
+    } finally {
+      setEpisodePlaysLoading(false);
+    }
+  }, [showId, seasonNumber, episodeNumber, episodePlaysLoaded]);
+
+  const handleEpisodeAddPlay = useCallback(async (watchedAt) => {
+    setWatchedBusy(true);
+    try {
+      await traktAddEpisodePlay({
+        tmdbId: Number(showId),
+        season: Number(seasonNumber),
+        episode: Number(episodeNumber),
+        watchedAt,
+      });
+      // Recargar historial después de añadir
+      setEpisodePlaysLoaded(false);
+      const json = await traktGetEpisodePlays({
+        tmdbId: Number(showId),
+        season: Number(seasonNumber),
+        episode: Number(episodeNumber),
+      });
+      setEpisodePlays({
+        plays: json?.plays ?? 0,
+        history: Array.isArray(json?.history) ? json.history : [],
+        lastWatchedAt: json?.lastWatchedAt ?? null,
+      });
+      setEpisodePlaysLoaded(true);
+    } catch (e) {
+      console.error("Error adding episode play:", e);
+    } finally {
+      setWatchedBusy(false);
+    }
+  }, [showId, seasonNumber, episodeNumber]);
+
+  const handleEpisodeUpdatePlay = useCallback(async (historyId, watchedAt) => {
+    setWatchedBusy(true);
+    try {
+      // Remove old + add new
+      await traktRemoveWatchPlay({ historyId });
+      await traktAddEpisodePlay({
+        tmdbId: Number(showId),
+        season: Number(seasonNumber),
+        episode: Number(episodeNumber),
+        watchedAt,
+      });
+      setEpisodePlaysLoaded(false);
+      const json = await traktGetEpisodePlays({
+        tmdbId: Number(showId),
+        season: Number(seasonNumber),
+        episode: Number(episodeNumber),
+      });
+      setEpisodePlays({
+        plays: json?.plays ?? 0,
+        history: Array.isArray(json?.history) ? json.history : [],
+        lastWatchedAt: json?.lastWatchedAt ?? null,
+      });
+      setEpisodePlaysLoaded(true);
+    } catch (e) {
+      console.error("Error updating episode play:", e);
+    } finally {
+      setWatchedBusy(false);
+    }
+  }, [showId, seasonNumber, episodeNumber]);
+
+  const handleEpisodeRemovePlay = useCallback(async (historyId) => {
+    setWatchedBusy(true);
+    try {
+      await traktRemoveWatchPlay({ historyId });
+      setEpisodePlaysLoaded(false);
+      const json = await traktGetEpisodePlays({
+        tmdbId: Number(showId),
+        season: Number(seasonNumber),
+        episode: Number(episodeNumber),
+      });
+      setEpisodePlays({
+        plays: json?.plays ?? 0,
+        history: Array.isArray(json?.history) ? json.history : [],
+        lastWatchedAt: json?.lastWatchedAt ?? null,
+      });
+      setEpisodePlaysLoaded(true);
+    } catch (e) {
+      console.error("Error removing episode play:", e);
+    } finally {
+      setWatchedBusy(false);
+    }
+  }, [showId, seasonNumber, episodeNumber]);
+
   // Toggle watched para el episodio
   const toggleEpisodeWatched = useCallback(async () => {
     if (trakt.loading || watchedBusy) return;
@@ -1168,15 +1285,18 @@ export default function EpisodeDetailsClient({
                 <div className="w-px h-6 bg-white/10 shrink-0" />
 
                 <div className="flex items-center gap-3 shrink-0">
-                  {/* Botón de visionado */}
+                  {/* Botón de visionado — abre modal con historial de plays */}
                   <TraktWatchedControl
                     connected={trakt.connected}
                     watched={trakt.watched}
-                    plays={null}
+                    plays={episodePlays.plays}
                     badge={null}
                     busy={watchedBusy}
                     loading={trakt.loading && !watchedBySeasonLoaded}
-                    onOpen={toggleEpisodeWatched}
+                    onOpen={() => {
+                      setEpisodePlaysOpen(true);
+                      void loadEpisodePlays();
+                    }}
                   />
 
                   {/* Botón de rating */}
@@ -1431,7 +1551,26 @@ export default function EpisodeDetailsClient({
             </Swiper>
           </AnimatedSection>
         )}
-      </div>
+
+      {/* Modal de historial de visionados del episodio */}
+      <TraktWatchedModal
+        open={episodePlaysOpen}
+        onClose={() => {
+          setEpisodePlaysOpen(false);
+          invalidateTraktGetCache({
+            tmdbId: Number(showId),
+            traktId: trakt.traktId ?? undefined,
+          });
+          void reloadEpisodeTraktState({ background: true });
+        }}
+        plays={episodePlays.plays}
+        history={episodePlays.history}
+        onAddPlay={handleEpisodeAddPlay}
+        onUpdatePlay={handleEpisodeUpdatePlay}
+        onRemovePlay={handleEpisodeRemovePlay}
+        busy={watchedBusy}
+      />
+    </div>
     </div>
   );
 }
