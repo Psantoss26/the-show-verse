@@ -151,6 +151,7 @@ function buildQueries(ctx) {
 
   if (primary) {
     qs.push(`album:"${primary}" soundtrack`);
+    qs.push(`album:"${primary}"`);
     if (ctx.year) {
       qs.push(`album:"${primary}" year:${ctx.year} soundtrack`);
     }
@@ -408,6 +409,16 @@ function scoreAlbum(album, ctx) {
   const total = Number(album?.total_tracks ?? 0);
   if (total >= 4 && total <= 80) s += 8;
   if (total < 3) s -= 18;
+
+  const nameTokens = new Set(tokens(album?.name ?? ""));
+  const anyTitleToken = ctx.titles
+    .map(sigTokens)
+    .filter((ts) => ts.length)
+    .some((ts) => ts.some((t) => nameTokens.has(t)));
+  if (!anyTitleToken) s -= 50;
+
+  const hasSigTokens = ctx.titles.some((t) => sigTokens(t).length > 0);
+  if (bestTitleScore(album?.name ?? "", ctx.titles) === 0 && hasSigTokens) s -= 200;
 
   return Math.round(s);
 }

@@ -9383,7 +9383,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   : data.original_name
                               }
                               expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
 
                             {/* Tarjeta: Formato - Solo para series (número de temporadas y episodios) */}
@@ -9396,7 +9396,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
                                     : "—"
                                 }
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                               />
                             ) : null}
 
@@ -9405,7 +9405,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               icon={CalendarIcon}
                               label={type === "movie" ? "Estreno" : "Inicio"}
                               value={releaseDateValue || "—"}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
 
                             {/* Tarjeta: Finalización/Última Emisión - Solo para series */}
@@ -9418,7 +9418,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     : "Última emisión"
                                 }
                                 value={lastAirDateValue || "En emisión"}
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                               />
                             )}
 
@@ -9429,13 +9429,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   icon={BadgeDollarSignIcon}
                                   label="Presupuesto"
                                   value={budgetValue || "—"}
-                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                                 />
                                 <VisualMetaCard
                                   icon={TrendingUp}
                                   label="Recaudación"
                                   value={revenueValue || "—"}
-                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                                 />
                               </>
                             )}
@@ -9466,7 +9466,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   : createdByNames || "Desconocido"
                               }
                               expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
 
                             {/* Canal (solo TV) */}
@@ -9475,7 +9475,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 icon={MonitorPlay}
                                 label="Canal"
                                 value={network || "—"}
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                               />
                             ) : null}
 
@@ -9485,7 +9485,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               label="Producción"
                               value={production || "—"}
                               expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
                           </div>
                         </motion.div>
@@ -9584,7 +9584,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             : data.original_name
                         }
                         expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                       />
 
                       {type !== "movie" ? (
@@ -9596,7 +9596,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
                               : "—"
                           }
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
                       ) : null}
 
@@ -9604,7 +9604,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         icon={CalendarIcon}
                         label={type === "movie" ? "Estreno" : "Inicio"}
                         value={releaseDateValue || "—"}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                       />
 
                       {type !== "movie" && lastAirDateValue && (
@@ -9616,7 +9616,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               : "Última emisión"
                           }
                           value={lastAirDateValue}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
                       )}
 
@@ -9627,7 +9627,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               icon={BadgeDollarSignIcon}
                               label="Presupuesto"
                               value={budgetValue}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
                           )}
                           {revenueValue && (
@@ -9635,7 +9635,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               icon={TrendingUp}
                               label="Recaudación"
                               value={revenueValue}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
                           )}
                         </>
@@ -9663,7 +9663,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             : createdByNames || "Desconocido"
                         }
                         expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                       />
 
                       {type !== "movie" && network && (
@@ -9671,7 +9671,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           icon={MonitorPlay}
                           label="Canal"
                           value={network}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
                       )}
 
@@ -9680,7 +9680,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         label="Producción"
                         value={production || "—"}
                         expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                       />
                     </div>
                   </motion.div>
