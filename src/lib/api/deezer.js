@@ -6,8 +6,8 @@ import {
 const DEEZER_API = "https://api.deezer.com";
 const MAX_TRACKS = 40;
 const MAX_ALBUMS = 4;
-const ALBUM_MIN_SCORE = 20;
-const TRACK_MIN_SCORE = 14;
+const ALBUM_MIN_SCORE = 26;
+const TRACK_MIN_SCORE = 18;
 const QUERY_TIMEOUT_MS = 7000;
 
 let _rateLimitUntil = 0;
@@ -86,8 +86,10 @@ function scoreAlbum(album, ctx) {
   s += soundtrackBonus(text);
 
   if (/motion picture|television|series|movie|film/.test(text)) s += 10;
-  if (ctx.mediaType === "tv" && /series|show|season|episode|tv/.test(text)) s += 8;
+  if (ctx.mediaType === "tv" && /series|show|season|episode|tv|television/.test(text)) s += 8;
   if (ctx.mediaType === "movie" && /movie|film|motion picture/.test(text)) s += 8;
+  if (ctx.mediaType === "tv" && /movie|film/.test(text) && !/series|show|season|episode|tv|television/.test(text)) s -= 12;
+  if (ctx.mediaType === "movie" && /series|season|episode|tv|television/.test(text) && !/movie|film|motion picture/.test(text)) s -= 12;
   if (/original|official/.test(text)) s += 6;
 
   s += yearScore(album.release_date, ctx.year, ctx.mediaType);

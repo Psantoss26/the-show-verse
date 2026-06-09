@@ -80,10 +80,17 @@ export function titleScore(text, title) {
 
   const hits = sig.filter((t) => tgSet.has(t)).length;
   const ratio = hits / sig.length;
-  if (ratio >= 1) return 50;
-  if (ratio >= 0.75) return 34;
-  if (ratio >= 0.5 && sig.length >= 3) return 22;
-  if (sig.length === 1 && tgSet.has(sig[0])) return 30;
+
+  const textSig = sigTokens(text);
+  let inversePenalty = 0;
+  if (textSig.length > sig.length * 1.5 && hits < textSig.length * 0.5) {
+    inversePenalty = Math.round((textSig.length - hits) * 6);
+  }
+
+  if (ratio >= 1) return Math.max(50 - inversePenalty, 10);
+  if (ratio >= 0.75) return Math.max(34 - inversePenalty, 8);
+  if (ratio >= 0.5 && sig.length >= 3) return Math.max(22 - inversePenalty, 6);
+  if (sig.length === 1 && tgSet.has(sig[0])) return Math.max(22 - inversePenalty, 8);
   return 0;
 }
 
@@ -100,14 +107,13 @@ export function yearScore(releaseDate, titleYear, mediaType) {
   if (diff === 1) return 9;
   if (diff === -1) return 6;
   if (mediaType === "tv" && diff >= 0 && diff <= 5) return 7;
-  if (Math.abs(diff) <= 3) return 3;
   return -10;
 }
 
 export function soundtrackBonus(text) {
   let s = 0;
   if (containsAny(text, SOUNDTRACK_WORDS)) s += 34;
-  if (/playlist|songs|music|soundtrack|ost|score/.test(text)) s += 10;
+  if (/playlist|songs|music/.test(text)) s += 8;
   if (containsAny(text, BAD_MATCH_WORDS)) s -= 55;
   return s;
 }

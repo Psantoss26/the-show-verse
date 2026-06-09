@@ -477,7 +477,7 @@ function StatCard({
   loading = false,
 }) {
   return (
-    <div className="relative overflow-hidden flex-1 lg:flex-none lg:minw-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+    <div className="relative overflow-hidden w-full h-full rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
       <div
         className={`relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 shadow-sm border border-white/10 ${colorClass}`}
       >
@@ -2320,9 +2320,9 @@ export default function HistoryClient() {
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         {/* Manchas abstractas esmeralda y negras */}
-        <div className="absolute -top-[20%] -left-[10%] w-[70vw] max-w-[800px] aspect-square rounded-full bg-emerald-500/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[20%] -right-[10%] w-[60vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/30 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[20%] left-[10%] w-[70vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/25 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -top-[20%] -left-[10%] w-[70vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[30%] -right-[10%] w-[50vw] max-w-[600px] aspect-square rounded-full bg-emerald-900/30 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[20%] left-[20%] w-[60vw] max-w-[700px] aspect-square rounded-full bg-emerald-800/20 blur-[120px] sm:blur-[150px]" />
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -2390,7 +2390,7 @@ export default function HistoryClient() {
             {/* Solo estadísticas a la derecha */}
             {auth.connected && historyLoaded && (
               <motion.div
-                className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+                className="grid grid-cols-2 lg:flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
@@ -2399,6 +2399,7 @@ export default function HistoryClient() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.5 }}
+                  className="flex w-full lg:w-[140px] lg:flex-none"
                 >
                   <StatCard
                     label="Cargados"
@@ -2412,6 +2413,7 @@ export default function HistoryClient() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.6 }}
+                  className="flex w-full lg:w-[140px] lg:flex-none"
                 >
                   <StatCard
                     label="Títulos Únicos"
@@ -2425,6 +2427,7 @@ export default function HistoryClient() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.7 }}
+                  className="flex w-full lg:w-[140px] lg:flex-none"
                 >
                   <StatCard
                     label="Películas"
@@ -2438,6 +2441,7 @@ export default function HistoryClient() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.8 }}
+                  className="flex w-full lg:w-[140px] lg:flex-none"
                 >
                   <StatCard
                     label="Episodios"
@@ -2465,42 +2469,13 @@ export default function HistoryClient() {
           >
             {auth.connected && (
               <motion.div
-                ref={(el) => {
-                  if (el && !el.dataset.stickySetup) {
-                    el.dataset.stickySetup = "true";
-                    const observer = new IntersectionObserver(
-                      ([e]) => {
-                        const isStuck = e.intersectionRatio < 1;
-                        if (isStuck) {
-                          el.classList.add(
-                            "backdrop-blur-xl",
-                            "bg-gradient-to-br",
-                            "from-black/60",
-                            "via-black/50",
-                            "to-black/55",
-                          );
-                        } else {
-                          el.classList.remove(
-                            "backdrop-blur-xl",
-                            "bg-gradient-to-br",
-                            "from-black/60",
-                            "via-black/50",
-                            "to-black/55",
-                          );
-                        }
-                      },
-                      { threshold: [1], rootMargin: "-65px 0px 0px 0px" },
-                    );
-                    observer.observe(el);
-                  }
-                }}
-                className="sticky top-16 z-[60] space-y-1 mb-3 p-2 rounded-2xl transition-all duration-300"
+                className="sticky top-20 z-[60] space-y-3 mb-6 transition-all duration-300"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.5 }}
               >
                 {/* Mobile: search + toggle */}
-                <div className="flex gap-2 lg:hidden relative z-10">
+                <div className="relative z-10 flex gap-2 lg:hidden">
                   <div className="relative flex-1">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
                     <input
