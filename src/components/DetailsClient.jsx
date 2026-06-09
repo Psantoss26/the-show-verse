@@ -1027,7 +1027,7 @@ function AwardsPanel({ awards }) {
   const formattedAwards = formatDashboardAwards(awards);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-yellow-500/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] p-5 sm:p-6 [&_div]:!bg-transparent">
+    <div className="relative overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-yellow-500/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] p-5 sm:p-6">
       <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
 
       <div className="relative z-10">
@@ -8875,8 +8875,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 className="flex flex-nowrap items-center justify-center sm:justify-start gap-2.5 sm:gap-3 w-full
                 [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[36px] [&>*:not(.separator)]:max-w-[60px] sm:[&>*:not(.separator)]:max-w-[52px]
                 [&_[data-liquid-button]]:!w-full [&_[data-liquid-button]]:!h-auto [&_[data-liquid-button]]:aspect-square
-                [&_[data-liquid-button]_svg]:!w-5 [&_[data-liquid-button]_svg]:!h-5
-                [&_[data-liquid-button]_.text-xl]:!text-base sm:[&_[data-liquid-button]_.text-xl]:!text-xl"
+                [&_[data-liquid-button]_svg]:!w-[22px] [&_[data-liquid-button]_svg]:!h-[22px]
+                [&_[data-liquid-button]_.text-xl]:!text-[22px]"
               >
                 {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
                 <LiquidButton
@@ -9348,7 +9348,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           exit={{ opacity: 0, y: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <div className="relative p-5 sm:p-6 rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent">
+                          <div className="relative p-5 sm:p-6 rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
                             {data.tagline && (
                               <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
                                 “{data.tagline}”
@@ -9552,7 +9552,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="relative p-5 sm:p-6 rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent">
+                    <div className="relative p-5 sm:p-6 rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
                       {data.tagline && (
                         <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
                           "{data.tagline}"

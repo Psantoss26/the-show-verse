@@ -157,7 +157,17 @@ export default function StarRating({
         {loading ? (
           <Loader2 className="w-5 h-5 animate-spin" />
         ) : hasRating ? (
-          <span className="text-xl font-black">{fmt(rating)}</span>
+          <span
+            className={`font-black leading-none translate-y-[1px] ${
+              fmt(rating).length === 1
+                ? "text-xl"
+                : fmt(rating) === "10"
+                  ? "text-xl tracking-tighter -translate-x-[1px]"
+                  : "text-lg tracking-tighter"
+            }`}
+          >
+            {fmt(rating)}
+          </span>
         ) : (
           <Star className="w-5 h-5" />
         )}
