@@ -1293,9 +1293,14 @@ export default function EpisodeDetailsClient({
                     badge={null}
                     busy={watchedBusy}
                     loading={trakt.loading && !watchedBySeasonLoaded}
-                    onOpen={() => {
+                    onOpen={async () => {
+                      setWatchedBusy(true);
+                      try {
+                        await loadEpisodePlays();
+                      } finally {
+                        setWatchedBusy(false);
+                      }
                       setEpisodePlaysOpen(true);
-                      void loadEpisodePlays();
                     }}
                   />
 
