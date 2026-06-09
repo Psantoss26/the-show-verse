@@ -1025,7 +1025,7 @@ function AwardsPanel({ awards }) {
   const formattedAwards = formatDashboardAwards(awards);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-black/20 bg-gradient-to-br from-yellow-500/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] p-5 sm:p-6">
+    <div className="relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-yellow-500/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] p-5 sm:p-6 [&_div]:!bg-transparent">
       <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
 
       <div className="relative z-10">
@@ -8977,7 +8977,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
             <ScaleIn delay={0.18} className="mb-6">
-              <div className="relative w-full overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] mb-6">
+              <div className="relative w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] mb-6">
                 <div
                   className="
       py-3
@@ -9308,7 +9308,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           exit={{ opacity: 0, y: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <div className="relative p-5 sm:p-6 rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
+                          <div className="relative p-5 sm:p-6 rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent">
                             {data.tagline && (
                               <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
                                 “{data.tagline}”
@@ -9343,7 +9343,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   : data.original_name
                               }
                               expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                             />
 
                             {/* Tarjeta: Formato - Solo para series (número de temporadas y episodios) */}
@@ -9356,7 +9356,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
                                     : "—"
                                 }
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                               />
                             ) : null}
 
@@ -9365,7 +9365,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               icon={CalendarIcon}
                               label={type === "movie" ? "Estreno" : "Inicio"}
                               value={releaseDateValue || "—"}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                             />
 
                             {/* Tarjeta: Finalización/Última Emisión - Solo para series */}
@@ -9378,7 +9378,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     : "Última emisión"
                                 }
                                 value={lastAirDateValue || "En emisión"}
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                               />
                             )}
 
@@ -9389,13 +9389,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   icon={BadgeDollarSignIcon}
                                   label="Presupuesto"
                                   value={budgetValue || "—"}
-                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                                 />
                                 <VisualMetaCard
                                   icon={TrendingUp}
                                   label="Recaudación"
                                   value={revenueValue || "—"}
-                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                                 />
                               </>
                             )}
@@ -9426,7 +9426,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   : createdByNames || "Desconocido"
                               }
                               expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                             />
 
                             {/* Canal (solo TV) */}
@@ -9435,7 +9435,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 icon={MonitorPlay}
                                 label="Canal"
                                 value={network || "—"}
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                               />
                             ) : null}
 
@@ -9445,7 +9445,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               label="Producción"
                               value={production || "—"}
                               expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                             />
                           </div>
                         </motion.div>
@@ -9512,7 +9512,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="relative p-5 sm:p-6 rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
+                    <div className="relative p-5 sm:p-6 rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent">
                       {data.tagline && (
                         <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
                           "{data.tagline}"
@@ -9544,7 +9544,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             : data.original_name
                         }
                         expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                       />
 
                       {type !== "movie" ? (
@@ -9556,7 +9556,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
                               : "—"
                           }
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                         />
                       ) : null}
 
@@ -9564,7 +9564,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         icon={CalendarIcon}
                         label={type === "movie" ? "Estreno" : "Inicio"}
                         value={releaseDateValue || "—"}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                       />
 
                       {type !== "movie" && lastAirDateValue && (
@@ -9576,7 +9576,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               : "Última emisión"
                           }
                           value={lastAirDateValue}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                         />
                       )}
 
@@ -9587,7 +9587,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               icon={BadgeDollarSignIcon}
                               label="Presupuesto"
                               value={budgetValue}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                             />
                           )}
                           {revenueValue && (
@@ -9595,7 +9595,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               icon={TrendingUp}
                               label="Recaudación"
                               value={revenueValue}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                             />
                           )}
                         </>
@@ -9623,7 +9623,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             : createdByNames || "Desconocido"
                         }
                         expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                       />
 
                       {type !== "movie" && network && (
@@ -9631,7 +9631,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           icon={MonitorPlay}
                           label="Canal"
                           value={network}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                         />
                       )}
 
@@ -9640,7 +9640,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         label="Producción"
                         value={production || "—"}
                         expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl !bg-transparent bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] [&_div]:!bg-transparent"
                       />
                     </div>
                   </motion.div>

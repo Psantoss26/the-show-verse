@@ -26,9 +26,13 @@ export default function SoundtrackModal({
 }) {
   const audioRef = useRef(null);
 
-  const playableTracks = useMemo(
-    () => tracks.filter((track) => track?.previewUrl),
+  const trackQueue = useMemo(
+    () => tracks.filter((track) => track?.trackName),
     [tracks],
+  );
+  const playableTracks = useMemo(
+    () => trackQueue.filter((track) => track?.previewUrl),
+    [trackQueue],
   );
 
   const [selectedId, setSelectedId] = useState(null);
@@ -40,10 +44,12 @@ export default function SoundtrackModal({
 
   useEffect(() => {
     if (!open) return;
-    setSelectedId(initialTrackId || playableTracks[0]?.id || null);
-    setIsPlaying(true);
+    const initialTrack =
+      trackQueue.find((track) => track.id === initialTrackId) || trackQueue[0];
+    setSelectedId(initialTrack?.id || null);
+    setIsPlaying(Boolean(initialTrack?.previewUrl));
     setProgress(0);
-  }, [initialTrackId, open, playableTracks]);
+  }, [initialTrackId, open, trackQueue]);
 
   useEffect(() => {
     if (!open) return;
@@ -73,6 +79,7 @@ export default function SoundtrackModal({
 
   // Controles del reproductor de audio
   const togglePlay = () => {
+    if (!selectedTrack?.previewUrl) return;
     if (audioRef.current) {
       if (isPlaying) audioRef.current.pause();
       else audioRef.current.play();
@@ -136,26 +143,32 @@ export default function SoundtrackModal({
   if (!open) return null;
 
   const selectedTrack =
-    playableTracks.find((track) => track.id === selectedId) ||
-    playableTracks[0] ||
+    trackQueue.find((track) => track.id === selectedId) ||
+    trackQueue[0] ||
     null;
 
   const currentIndex = selectedTrack
-    ? playableTracks.findIndex((track) => track.id === selectedTrack.id)
+    ? trackQueue.findIndex((track) => track.id === selectedTrack.id)
     : -1;
   const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex >= 0 && currentIndex < playableTracks.length - 1;
+  const hasNext = currentIndex >= 0 && currentIndex < trackQueue.length - 1;
+  const selectedExternalUrl = selectedTrack?.externalUrl || searchUrl;
+  const selectedHasPreview = Boolean(selectedTrack?.previewUrl);
 
   const goPrev = () => {
     if (!hasPrev) return;
-    setSelectedId(playableTracks[currentIndex - 1]?.id);
-    setIsPlaying(true);
+    const prevTrack = trackQueue[currentIndex - 1];
+    setSelectedId(prevTrack?.id);
+    setIsPlaying(Boolean(prevTrack?.previewUrl));
+    setProgress(0);
   };
 
   const goNext = () => {
     if (!hasNext) return;
-    setSelectedId(playableTracks[currentIndex + 1]?.id);
-    setIsPlaying(true);
+    const nextTrack = trackQueue[currentIndex + 1];
+    setSelectedId(nextTrack?.id);
+    setIsPlaying(Boolean(nextTrack?.previewUrl));
+    setProgress(0);
   };
 
   return (
@@ -200,8 +213,13 @@ export default function SoundtrackModal({
                   {title || "Soundtrack"}
                 </div>
                 <div className="text-[10px] font-semibold text-white/40 mt-1">
-                  {currentIndex + 1} DE {playableTracks.length}
+                  {currentIndex + 1} DE {trackQueue.length}
                 </div>
+                {playableTracks.length > 0 && playableTracks.length < trackQueue.length && (
+                  <div className="text-[10px] font-semibold text-white/30 mt-0.5">
+                    {playableTracks.length} con preview
+                  </div>
+                )}
               </div>
 
               <button
@@ -239,43 +257,65 @@ export default function SoundtrackModal({
               </p>
             </div>
 
-            {/* Reproductor de Audio Oculto */}
-            <audio
-              ref={audioRef}
-              src={selectedTrack.previewUrl}
-              autoPlay
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onEnded={handleEnded}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-            />
-
-            {/* --- BARRA DE PROGRESO --- */}
-            <div className="w-full flex items-center gap-4 mb-8">
-              <span className="text-xs font-semibold text-white/50 w-10 text-right tabular-nums">
-                {formatTime(progress)}
-              </span>
-              <div className="relative flex-1 flex items-center group h-5">
-                <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden border border-white/10 pointer-events-none">
-                  <div
-                    className="h-full bg-gradient-to-r from-white/60 to-white rounded-full transition-all duration-75 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
-                    style={{ width: `${(progress / (duration || 1)) * 100}%` }}
-                  />
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 100}
-                  value={progress}
-                  onChange={handleSeek}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            {selectedHasPreview ? (
+              <>
+                {/* Reproductor de Audio Oculto */}
+                <audio
+                  ref={audioRef}
+                  src={selectedTrack.previewUrl}
+                  autoPlay
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onEnded={handleEnded}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
                 />
+
+                {/* --- BARRA DE PROGRESO --- */}
+                <div className="w-full flex items-center gap-4 mb-8">
+                  <span className="text-xs font-semibold text-white/50 w-10 text-right tabular-nums">
+                    {formatTime(progress)}
+                  </span>
+                  <div className="relative flex-1 flex items-center group h-5">
+                    <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden border border-white/10 pointer-events-none">
+                      <div
+                        className="h-full bg-gradient-to-r from-white/60 to-white rounded-full transition-all duration-75 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+                        style={{ width: `${(progress / (duration || 1)) * 100}%` }}
+                      />
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={duration || 100}
+                      value={progress}
+                      onChange={handleSeek}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      aria-label="Progreso de la preview"
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-white/50 w-10 text-left tabular-nums">
+                    {formatTime(duration)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="mb-8 flex w-full flex-col items-center gap-3 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-center">
+                <p className="text-sm font-medium text-white/60">
+                  Esta pista no tiene preview disponible.
+                </p>
+                {selectedExternalUrl && (
+                  <a
+                    href={selectedExternalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/15"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Abrir canción
+                  </a>
+                )}
               </div>
-              <span className="text-xs font-semibold text-white/50 w-10 text-left tabular-nums">
-                {formatTime(duration)}
-              </span>
-            </div>
+            )}
 
             {/* --- CONTROLES DE REPRODUCCIÓN --- */}
             <div className="w-full flex items-center justify-center gap-8 mb-8">
@@ -291,9 +331,11 @@ export default function SoundtrackModal({
               <button
                 type="button"
                 onClick={togglePlay}
+                disabled={!selectedHasPreview}
                 className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center hover:bg-white/20 hover:scale-105 active:scale-95 transition shadow-[0_10px_40px_-10px_rgba(255,255,255,0.2)]"
+                aria-label={selectedHasPreview ? "Reproducir o pausar preview" : "Preview no disponible"}
               >
-                {isPlaying ? (
+                {isPlaying && selectedHasPreview ? (
                   <Pause className="w-10 h-10 sm:w-12 sm:h-12 fill-current" />
                 ) : (
                   <Play className="w-10 h-10 sm:w-12 sm:h-12 fill-current ml-1 sm:ml-1.5" />
@@ -311,6 +353,7 @@ export default function SoundtrackModal({
             </div>
 
             {/* --- VOLUMEN --- */}
+            {selectedHasPreview && (
             <div className="w-full flex items-center justify-center gap-4 px-8">
               <button
                 type="button"
@@ -341,13 +384,14 @@ export default function SoundtrackModal({
                 />
               </div>
             </div>
+            )}
           </div>
         ) : (
           <div className="flex h-[340px] flex-col items-center justify-center gap-3 text-center text-zinc-400 p-6">
             <Music2 className="h-12 w-12 opacity-25" />
             <p className="text-sm">
               {error ||
-                "No se encontraron previews reproducibles para este título."}
+                "No se encontraron canciones para este título."}
             </p>
           </div>
         )}

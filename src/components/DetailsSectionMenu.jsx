@@ -101,20 +101,13 @@ export default function DetailsSectionMenu({
         <div
           className={[
             "relative isolate overflow-hidden rounded-2xl sm:rounded-3xl",
-            "shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
+            "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40",
+            "backdrop-blur-[50px]",
+            "shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]",
             "transform-gpu",
           ].join(" ")}
           style={{ contain: "layout style" }}
         >
-          <div
-            className={[
-              "absolute inset-0 rounded-[inherit] backdrop-blur-2xl",
-              "bg-gradient-to-br from-white/[0.075] via-black/24 to-white/[0.045]",
-              "border border-white/[0.14]",
-              "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
-            ].join(" ")}
-          />
-
           <div className="relative">
             <div>
               <div className="py-2.5">

@@ -12,7 +12,9 @@ const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 const REQUEST_TIMEOUT_MS = 6500;
 const MAX_ALBUMS_TO_LOOKUP = 5;
 const MAX_TRACKS = 30;
-const MAX_SPOTIFY_PLAYLISTS = 3;
+const MAX_SPOTIFY_PLAYLISTS = 5;
+const SPOTIFY_PLAYLIST_SEARCH_LIMIT = 20;
+const SPOTIFY_PLAYLIST_MIN_SCORE = 46;
 const OFFICIAL_ALBUM_THRESHOLD = 58;
 const LOOSE_ALBUM_THRESHOLD = 42;
 const DIRECT_TRACK_THRESHOLD = 24;
@@ -419,14 +421,22 @@ function buildSongFallbackQueries({ title, year, mediaType }) {
 function buildSpotifyPlaylistQueries({ title, year, mediaType }) {
   const titles = Array.isArray(title) ? title : [title];
   const label = mediaType === "tv" ? "series soundtrack" : "movie soundtrack";
+  const typed =
+    mediaType === "tv"
+      ? "original television soundtrack"
+      : "original motion picture soundtrack";
+
   return unique(
     titles.flatMap((baseTitle) => [
-      `${baseTitle} ${year || ""} soundtrack`,
-      `${baseTitle} ${year || ""} ${label}`,
       `${baseTitle} soundtrack`,
+      `${baseTitle} ${typed}`,
       `${baseTitle} official soundtrack`,
+      `${baseTitle} OST`,
       `${baseTitle} songs`,
       `${baseTitle} music from`,
+      `${baseTitle} ${label}`,
+      `${baseTitle} ${year || ""} soundtrack`,
+      `${baseTitle} ${year || ""} ${label}`,
     ]),
   ).map((query) => query.trim().replace(/\s+/g, " "));
 }
@@ -611,8 +621,13 @@ function playlistScore(playlist, context) {
   const ownerName = playlist?.owner?.display_name || "";
   const text = normalizeText(`${name} ${description} ${ownerName}`);
   const nameCoverage = bestTitleCoverageScore(name, context.titles);
+  const originalCoverage = context.originalTitle
+    ? titleCoverageScore(name, context.originalTitle)
+    : 0;
   let score = nameCoverage;
 
+  if (originalCoverage >= 60) score += 22;
+  else if (originalCoverage >= 42) score += 12;
   if (containsAny(text, SOUNDTRACK_WORDS)) score += 32;
   if (/playlist|songs|music|soundtrack|ost|score/.test(text)) score += 10;
   if (context.mediaType === "tv" && /series|show|season|episode|tv/.test(text)) {
@@ -637,6 +652,7 @@ function playlistScore(playlist, context) {
   const anchor = albumAnchorScore(pseudoAlbum, context.titles);
   if (anchor >= 3) score += 28;
   else if (anchor >= 2) score += 14;
+  if (nameCoverage >= 60 && containsAny(text, SOUNDTRACK_WORDS)) score += 12;
 
   const tokenSets = context.titles.map(titleTokens).filter((tokens) => tokens.length);
   const nameTokenSet = new Set(textTokens(name));
@@ -664,12 +680,12 @@ async function searchSpotifyPlaylists(context, market) {
         q: query,
         type: "playlist",
         market,
-        limit: 10,
+        limit: SPOTIFY_PLAYLIST_SEARCH_LIMIT,
       }),
     ),
   );
 
-  return payloads
+  const rankedPlaylists = payloads
     .flatMap((result) =>
       result.status === "fulfilled"
         ? Array.isArray(result.value?.playlists?.items)
@@ -682,17 +698,25 @@ async function searchSpotifyPlaylists(context, market) {
       ...playlist,
       score: playlistScore(playlist, context),
     }))
-    .filter((playlist) => playlist.score >= 60)
+    .filter((playlist) => playlist.score >= SPOTIFY_PLAYLIST_MIN_SCORE)
     .sort((a, b) => b.score - a.score)
     .filter(
       (playlist, index, all) =>
         all.findIndex((candidate) => candidate?.id === playlist?.id) === index,
+    );
+
+  const bestScore = rankedPlaylists[0]?.score || 0;
+  return rankedPlaylists
+    .filter(
+      (playlist) =>
+        playlist.score >= SPOTIFY_PLAYLIST_MIN_SCORE &&
+        playlist.score >= Math.max(SPOTIFY_PLAYLIST_MIN_SCORE, bestScore - 24),
     )
     .slice(0, MAX_SPOTIFY_PLAYLISTS);
 }
 
 async function getSpotifyPlaylistTracks(playlist, market) {
-  const token = await getSpotifyUserToken();
+  const token = (await getSpotifyUserToken()) || (await getSpotifyClientToken());
   if (!token || !playlist?.id) return [];
 
   try {
@@ -710,10 +734,13 @@ async function getSpotifyPlaylistTracks(playlist, market) {
     return (Array.isArray(payload?.items) ? payload.items : [])
       .map((item) => item?.track)
       .filter((track) => track?.type === "track" && track?.name)
-      .map((track) =>
+      .map((track, index) =>
         normalizeSpotifyTrack(track, {
           playlistName: playlist.name,
-          score: playlist.score + Math.min(Number(track?.popularity || 0) / 10, 8),
+          score:
+            playlist.score +
+            Math.max(0, 22 - index * 0.45) +
+            Math.min(Number(track?.popularity || 0) / 25, 4),
         }),
       );
   } catch {
@@ -945,8 +972,8 @@ export async function GET(req) {
     return NextResponse.json({ error: "Missing title" }, { status: 400 });
   }
 
-  const titles = unique([title, originalTitle]);
-  const context = { title: titles, titles, year, mediaType };
+  const titles = unique([originalTitle, title]);
+  const context = { title: titles, titles, originalTitle, year, mediaType };
   const albumQueries = buildAlbumQueries(context);
   const countries = unique([country, "US"]);
 

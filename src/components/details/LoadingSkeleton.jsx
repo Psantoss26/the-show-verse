@@ -27,7 +27,7 @@ export function CardSkeleton({ className = "" }) {
 
 export function ScoreboardSkeleton() {
   return (
-    <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden">
+    <div className="relative w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
       <div className="py-3 px-4 flex items-center gap-4">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex flex-col items-center gap-2">
