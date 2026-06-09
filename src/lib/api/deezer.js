@@ -1,5 +1,5 @@
 import {
-  norm, tokens, sigTokens, containsAny, bestTitleScore,
+  norm, tokens, sigTokens, bestTitleScore,
   yearScore, soundtrackBonus, sleep,
 } from "@/lib/api/soundtrack-utils";
 
@@ -7,7 +7,6 @@ const DEEZER_API = "https://api.deezer.com";
 const MAX_TRACKS = 40;
 const MAX_ALBUMS = 4;
 const ALBUM_MIN_SCORE = 26;
-const TRACK_MIN_SCORE = 18;
 const QUERY_TIMEOUT_MS = 7000;
 
 let _rateLimitUntil = 0;
@@ -48,7 +47,6 @@ function buildQueries(ctx) {
 
   if (primary) {
     qs.push(`${primary} soundtrack`);
-    qs.push(primary);
     qs.push(`${primary} OST`);
     if (ctx.year) qs.push(`${primary} ${ctx.year} soundtrack`);
     qs.push(`${primary} music from`);
@@ -120,27 +118,6 @@ function scoreAlbum(album, ctx) {
   return Math.round(s);
 }
 
-function scoreTrackItem(track, ctx) {
-  const name = track.title ?? "";
-  const artist = track.artist?.name ?? "";
-  const albumName = track.album?.title ?? "";
-  const text = norm(`${name} ${artist} ${albumName}`);
-
-  let s = bestTitleScore(name, ctx.titles);
-
-  if (containsAny(text, ["soundtrack", "ost", "score", "theme", "song", "music"])) s += 20;
-  if (containsAny(text, ["karaoke", "tribute", "cover", "remix", "lullaby", "lofi"])) s -= 50;
-
-  if (albumName) {
-    const albumScore = bestTitleScore(albumName, ctx.titles);
-    s += Math.round(albumScore * 0.4);
-    const albumText = norm(albumName);
-    if (containsAny(albumText, ["soundtrack", "ost", "score", "music from"])) s += 12;
-  }
-
-  return Math.round(s);
-}
-
 function normalizeTrack(track, album) {
   const cover = album.cover_medium ?? track.album?.cover_medium ?? "";
   const albumTitle = album.title ?? track.album?.title ?? "";
@@ -173,20 +150,12 @@ async function getAlbumTracks(albumId) {
   return Array.isArray(data.data) ? data.data : [];
 }
 
-async function searchTracks(query) {
-  const url = `${DEEZER_API}/search/track?q=${encodeURIComponent(query)}&limit=25`;
-  const data = await fetchJson(url);
-  if (!data) return [];
-  return Array.isArray(data.data) ? data.data : [];
-}
-
 export async function searchDeezer(ctx) {
   if (isRateLimited()) return { tracks: [], query: "" };
 
   const queries = buildQueries(ctx);
   let allTracks = [];
   let usedQuery = "";
-  let scoreFallbackTracks = [];
 
   for (let qi = 0; qi < queries.length; qi++) {
     if (isRateLimited()) break;
@@ -229,30 +198,10 @@ export async function searchDeezer(ctx) {
       if (allTracks.length >= 5) break;
     }
 
-    if (qi >= 1 && allTracks.length < 3 && scoredAlbums.length < 2) {
-      if (!isRateLimited()) {
-        try {
-          const tracks = await searchTracks(q);
-          for (const t of tracks) {
-            if (scoreTrackItem(t, ctx) >= TRACK_MIN_SCORE) {
-              const albumInfo = {
-                title: t.album?.title ?? "",
-                cover_medium: t.album?.cover_medium ?? "",
-                id: t.album?.id,
-                link: t.album?.link ?? `https://www.deezer.com/album/${t.album?.id}`,
-              };
-              scoreFallbackTracks.push(normalizeTrack(t, albumInfo));
-            }
-          }
-        } catch {}
-      }
-    }
-
     if (qi < queries.length - 1) await sleep(250);
   }
 
-  const all = [...allTracks, ...scoreFallbackTracks];
-  const deduped = dedupeTracks(all);
+  const deduped = dedupeTracks(allTracks);
   return {
     tracks: deduped.slice(0, MAX_TRACKS),
     query: usedQuery,

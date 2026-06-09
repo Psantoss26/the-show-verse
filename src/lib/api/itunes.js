@@ -1,5 +1,5 @@
 import {
-  norm, tokens, sigTokens, containsAny, bestTitleScore,
+  norm, tokens, sigTokens, bestTitleScore,
   yearScore, soundtrackBonus, sleep,
 } from "@/lib/api/soundtrack-utils";
 
@@ -8,7 +8,6 @@ const ITUNES_LOOKUP_URL = "https://itunes.apple.com/lookup";
 const MAX_TRACKS = 40;
 const MAX_ALBUMS = 4;
 const ALBUM_MIN_SCORE = 26;
-const TRACK_MIN_SCORE = 18;
 const QUERY_TIMEOUT_MS = 7000;
 
 function fetchJson(url) {
@@ -29,7 +28,6 @@ function buildQueries(ctx) {
 
   if (primary) {
     qs.push(`${primary} soundtrack`);
-    qs.push(primary);
     qs.push(`${primary} OST`);
     if (ctx.year) qs.push(`${primary} ${ctx.year} soundtrack`);
     qs.push(`${primary} music from`);
@@ -104,29 +102,6 @@ function scoreAlbum(album, ctx) {
   return Math.round(s);
 }
 
-function scoreTrackItem(track, ctx) {
-  const name = track.trackName ?? track.trackCensoredName ?? "";
-  const artist = track.artistName ?? "";
-  const albumName = track.collectionName ?? "";
-  const text = norm(`${name} ${artist} ${albumName}`);
-
-  let s = bestTitleScore(name, ctx.titles);
-
-  if (containsAny(text, ["soundtrack", "ost", "score", "theme", "song", "music"])) s += 20;
-  if (containsAny(text, ["karaoke", "tribute", "cover", "remix", "lullaby", "lofi"])) s -= 50;
-
-  if (track.primaryGenreName?.toLowerCase().includes("soundtrack")) s += 15;
-
-  if (albumName) {
-    const albumScore = bestTitleScore(albumName, ctx.titles);
-    s += Math.round(albumScore * 0.4);
-    const albumText = norm(albumName);
-    if (containsAny(albumText, ["soundtrack", "ost", "score", "music from"])) s += 12;
-  }
-
-  return Math.round(s);
-}
-
 function normalizeTrack(track, album) {
   const artwork = (track.artworkUrl100 ?? album.artworkUrl100 ?? "")
     .replace("100x100bb", "500x500bb");
@@ -168,25 +143,10 @@ async function lookupAlbumTracks(collectionId, country) {
     .filter((r) => r.wrapperType === "track" && r.kind === "song");
 }
 
-async function searchTracks(query, country) {
-  const url = `${ITUNES_SEARCH_URL}?${new URLSearchParams({
-    term: query,
-    media: "music",
-    entity: "musicTrack",
-    limit: "25",
-    country,
-  })}`;
-  const data = await fetchJson(url);
-  return (Array.isArray(data?.results) ? data.results : [])
-    .filter((r) => r.wrapperType === "track" && r.kind === "song");
-}
-
 export async function searchITunes(ctx, country = "US") {
   const queries = buildQueries(ctx);
   let allTracks = [];
   let usedQuery = "";
-  let scoreFallbackTracks = [];
-
   for (let qi = 0; qi < queries.length; qi++) {
     const q = queries[qi];
     let albums;
@@ -220,27 +180,10 @@ export async function searchITunes(ctx, country = "US") {
       if (allTracks.length >= 5) break;
     }
 
-    if (qi >= 1 && allTracks.length < 3 && scoredAlbums.length < 2) {
-      try {
-        const tracks = await searchTracks(q, country);
-        for (const t of tracks) {
-          if (scoreTrackItem(t, ctx) >= TRACK_MIN_SCORE) {
-            const albumInfo = {
-              collectionName: t.collectionName ?? "",
-              collectionViewUrl: t.collectionViewUrl ?? "",
-              artworkUrl100: t.artworkUrl100 ?? "",
-            };
-            scoreFallbackTracks.push(normalizeTrack(t, albumInfo));
-          }
-        }
-      } catch {}
-    }
-
     if (qi < queries.length - 1) await sleep(200);
   }
 
-  const all = [...allTracks, ...scoreFallbackTracks];
-  const deduped = dedupeTracks(all);
+  const deduped = dedupeTracks(allTracks);
   return {
     tracks: deduped.slice(0, MAX_TRACKS),
     query: usedQuery,
