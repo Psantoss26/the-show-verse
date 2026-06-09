@@ -40,6 +40,10 @@ jobs:
           GH_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY || secrets.NEXT_PUBLIC_TMDB_API_KEY }}
           GH_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID || secrets.NEXT_PUBLIC_TRAKT_CLIENT_ID }}
           GH_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          GH_SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          GH_SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          GH_SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
+          GH_SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -137,14 +141,41 @@ jobs:
             TRAKT_SECRET_VALUE="$(read_env_value TRAKT_CLIENT_SECRET /nas-deploy/app/.env)"
           fi
 
+          SPOTIFY_CLIENT_ID_VALUE="${GH_SPOTIFY_CLIENT_ID:-}"
+          if [ -z "$SPOTIFY_CLIENT_ID_VALUE" ]; then
+            SPOTIFY_CLIENT_ID_VALUE="$(read_env_value SPOTIFY_CLIENT_ID /nas-deploy/app/.env)"
+          fi
+
+          SPOTIFY_CLIENT_SECRET_VALUE="${GH_SPOTIFY_CLIENT_SECRET:-}"
+          if [ -z "$SPOTIFY_CLIENT_SECRET_VALUE" ]; then
+            SPOTIFY_CLIENT_SECRET_VALUE="$(read_env_value SPOTIFY_CLIENT_SECRET /nas-deploy/app/.env)"
+          fi
+
+          SPOTIFY_REDIRECT_URI_VALUE="${GH_SPOTIFY_REDIRECT_URI:-}"
+          if [ -z "$SPOTIFY_REDIRECT_URI_VALUE" ]; then
+            SPOTIFY_REDIRECT_URI_VALUE="$(read_env_value SPOTIFY_REDIRECT_URI /nas-deploy/app/.env)"
+          fi
+          if [ -z "$SPOTIFY_REDIRECT_URI_VALUE" ]; then
+            SPOTIFY_REDIRECT_URI_VALUE="https://theshowverse.com/api/spotify/callback"
+          fi
+
+          SPOTIFY_REFRESH_TOKEN_VALUE="${GH_SPOTIFY_REFRESH_TOKEN:-}"
+          if [ -z "$SPOTIFY_REFRESH_TOKEN_VALUE" ]; then
+            SPOTIFY_REFRESH_TOKEN_VALUE="$(read_env_value SPOTIFY_REFRESH_TOKEN /nas-deploy/app/.env)"
+          fi
+
           set_key NEXT_PUBLIC_APP_URL "https://theshowverse.com"
           set_key NEXT_PUBLIC_TMDB_API_KEY "$TMDB_VALUE"
           set_key TMDB_API_KEY "$TMDB_VALUE"
           set_key NEXT_PUBLIC_TRAKT_CLIENT_ID "$TRAKT_CLIENT_VALUE"
           set_key TRAKT_CLIENT_ID "$TRAKT_CLIENT_VALUE"
           set_key TRAKT_CLIENT_SECRET "$TRAKT_SECRET_VALUE"
+          set_key SPOTIFY_CLIENT_ID "$SPOTIFY_CLIENT_ID_VALUE"
+          set_key SPOTIFY_CLIENT_SECRET "$SPOTIFY_CLIENT_SECRET_VALUE"
+          set_key SPOTIFY_REDIRECT_URI "$SPOTIFY_REDIRECT_URI_VALUE"
+          set_key SPOTIFY_REFRESH_TOKEN "$SPOTIFY_REFRESH_TOKEN_VALUE"
 
-          for value in "$TMDB_VALUE" "$TRAKT_CLIENT_VALUE" "$TRAKT_SECRET_VALUE"; do
+          for value in "$TMDB_VALUE" "$TRAKT_CLIENT_VALUE" "$TRAKT_SECRET_VALUE" "$SPOTIFY_CLIENT_ID_VALUE" "$SPOTIFY_CLIENT_SECRET_VALUE" "$SPOTIFY_REFRESH_TOKEN_VALUE"; do
             if [ -n "$value" ]; then
               echo "::add-mask::$value"
             fi
@@ -159,7 +190,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
           echo "Variables detectadas:"
-          for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET; do
+          for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET SPOTIFY_REDIRECT_URI SPOTIFY_REFRESH_TOKEN; do
             if grep -q "^${key}=." /nas-deploy/app/.env; then
               echo "✅ $key"
             else
@@ -189,7 +220,7 @@ jobs:
       - name: Reiniciar contenedor con la nueva imagen
         run: |
           echo "Variables runtime detectadas:"
-          for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET; do
+          for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET SPOTIFY_REDIRECT_URI SPOTIFY_REFRESH_TOKEN; do
             if grep -q "^${key}=." /nas-deploy/app/.env; then
               echo "✅ $key"
             else

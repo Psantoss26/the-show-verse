@@ -1025,7 +1025,7 @@ function AwardsPanel({ awards }) {
   const formattedAwards = formatDashboardAwards(awards);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-5 sm:p-6">
+    <div className="relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-black/20 bg-gradient-to-br from-yellow-500/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] p-5 sm:p-6">
       <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
 
       <div className="relative z-10">
@@ -1219,6 +1219,7 @@ export default function DetailsClient({
 
   // -- Datos basicos derivados de las props --
   const title = data.title || data.name; // Peliculas usan "title", series usan "name"
+  const originalTitle = data.original_title || data.original_name || ""; // Titulo original para mejorar busquedas musicales
   const endpointType = type === "tv" ? "tv" : "movie"; // Tipo normalizado para endpoints de API
   const yearIso = (data.release_date || data.first_air_date || "")?.slice(0, 4); // Año de estreno
   const filmAffinitySearchUrl = `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent((title || "").trim())}&stype=title`;
@@ -1787,7 +1788,7 @@ export default function DetailsClient({
   }, [id, endpointType]);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
     const loadSoundtrack = async () => {
       if (!soundtrackSearchQuery) {
@@ -1804,32 +1805,25 @@ export default function DetailsClient({
 
       try {
         const params = new URLSearchParams({
-          term: soundtrackSearchQuery,
-          media: "music",
-          entity: "song",
-          limit: "18",
+          title,
+          type: endpointType,
+          country: "ES",
         });
-        const response = await fetch(
-          `https://itunes.apple.com/search?${params.toString()}`,
-        );
+        if (originalTitle && originalTitle !== title) {
+          params.set("originalTitle", originalTitle);
+        }
+        if (yearIso) params.set("year", yearIso);
+        if (id) params.set("tmdbId", String(id));
+
+        const response = await fetch(`/api/soundtrack?${params.toString()}`, {
+          signal: controller.signal,
+          priority: "low",
+        });
         if (!response.ok) throw new Error("No se pudo cargar el soundtrack");
         const payload = await response.json();
-        const results = Array.isArray(payload?.results) ? payload.results : [];
-        const normalized = results
-          .filter((item) => item?.previewUrl && item?.trackName)
-          .map((item) => ({
-            id: String(item.trackId || item.previewUrl),
-            trackName: item.trackName,
-            artistName: item.artistName || "Artista desconocido",
-            collectionName: item.collectionName || "",
-            previewUrl: item.previewUrl,
-            artworkUrl:
-              item.artworkUrl100?.replace("100x100bb", "300x300bb") ||
-              item.artworkUrl100 ||
-              "",
-          }));
+        const normalized = Array.isArray(payload?.tracks) ? payload.tracks : [];
 
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setSoundtrackTracks(normalized);
           setSoundtrackError(
             normalized.length
@@ -1838,14 +1832,14 @@ export default function DetailsClient({
           );
         }
       } catch (error) {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setSoundtrackTracks([]);
           setSoundtrackError(
             error?.message || "No se pudo cargar la música del título.",
           );
         }
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setSoundtrackLoading(false);
           setSoundtrackResolved(true);
         }
@@ -1855,9 +1849,9 @@ export default function DetailsClient({
     loadSoundtrack();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [soundtrackSearchQuery]);
+  }, [endpointType, id, originalTitle, soundtrackSearchQuery, title, yearIso]);
 
   useLayoutEffect(() => {
     if (!TMDB_API_KEY || !id) {
@@ -8983,7 +8977,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
             <ScaleIn delay={0.18} className="mb-6">
-              <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] mb-6">
                 <div
                   className="
       py-3
@@ -9314,7 +9308,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           exit={{ opacity: 0, y: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <div className="p-5 rounded-2xl bg-white/5 border border-white/5">
+                          <div className="relative p-5 sm:p-6 rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
                             {data.tagline && (
                               <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
                                 “{data.tagline}”
@@ -9349,7 +9343,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   : data.original_name
                               }
                               expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                             />
 
                             {/* Tarjeta: Formato - Solo para series (número de temporadas y episodios) */}
@@ -9362,7 +9356,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
                                     : "—"
                                 }
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                               />
                             ) : null}
 
@@ -9371,7 +9365,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               icon={CalendarIcon}
                               label={type === "movie" ? "Estreno" : "Inicio"}
                               value={releaseDateValue || "—"}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                             />
 
                             {/* Tarjeta: Finalización/Última Emisión - Solo para series */}
@@ -9384,7 +9378,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     : "Última emisión"
                                 }
                                 value={lastAirDateValue || "En emisión"}
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                               />
                             )}
 
@@ -9395,13 +9389,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   icon={BadgeDollarSignIcon}
                                   label="Presupuesto"
                                   value={budgetValue || "—"}
-                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                                 />
                                 <VisualMetaCard
                                   icon={TrendingUp}
                                   label="Recaudación"
                                   value={revenueValue || "—"}
-                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                                 />
                               </>
                             )}
@@ -9432,7 +9426,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   : createdByNames || "Desconocido"
                               }
                               expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                             />
 
                             {/* Canal (solo TV) */}
@@ -9441,7 +9435,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 icon={MonitorPlay}
                                 label="Canal"
                                 value={network || "—"}
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                               />
                             ) : null}
 
@@ -9451,7 +9445,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               label="Producción"
                               value={production || "—"}
                               expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                             />
                           </div>
                         </motion.div>
@@ -9518,7 +9512,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="p-5 rounded-2xl bg-white/5 border border-white/5">
+                    <div className="relative p-5 sm:p-6 rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
                       {data.tagline && (
                         <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
                           "{data.tagline}"
@@ -9550,7 +9544,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             : data.original_name
                         }
                         expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                       />
 
                       {type !== "movie" ? (
@@ -9562,7 +9556,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
                               : "—"
                           }
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                         />
                       ) : null}
 
@@ -9570,7 +9564,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         icon={CalendarIcon}
                         label={type === "movie" ? "Estreno" : "Inicio"}
                         value={releaseDateValue || "—"}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                       />
 
                       {type !== "movie" && lastAirDateValue && (
@@ -9582,7 +9576,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               : "Última emisión"
                           }
                           value={lastAirDateValue}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                         />
                       )}
 
@@ -9593,7 +9587,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               icon={BadgeDollarSignIcon}
                               label="Presupuesto"
                               value={budgetValue}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                             />
                           )}
                           {revenueValue && (
@@ -9601,7 +9595,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               icon={TrendingUp}
                               label="Recaudación"
                               value={revenueValue}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                             />
                           )}
                         </>
@@ -9629,7 +9623,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             : createdByNames || "Desconocido"
                         }
                         expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                       />
 
                       {type !== "movie" && network && (
@@ -9637,7 +9631,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           icon={MonitorPlay}
                           label="Canal"
                           value={network}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                         />
                       )}
 
@@ -9646,7 +9640,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         label="Producción"
                         value={production || "—"}
                         expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0 relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]"
                       />
                     </div>
                   </motion.div>
@@ -10989,7 +10983,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         Preview
                                       </span>
                                       <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-zinc-300">
-                                        iTunes
+                                        {track.source || "iTunes"}
                                       </span>
                                     </div>
 
