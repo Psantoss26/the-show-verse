@@ -48,13 +48,10 @@ function buildQueries(ctx) {
 
   if (primary) {
     qs.push(`${primary} soundtrack`);
+    qs.push(primary);
     qs.push(`${primary} OST`);
     if (ctx.year) qs.push(`${primary} ${ctx.year} soundtrack`);
     qs.push(`${primary} music from`);
-    const oscKeyword = ctx.mediaType === "tv"
-      ? "original television soundtrack"
-      : "original motion picture soundtrack";
-    qs.push(`${primary} ${oscKeyword}`);
   }
 
   if (alt && alt !== primary) {
@@ -64,7 +61,6 @@ function buildQueries(ctx) {
 
   if (primary) {
     if (ctx.mediaType === "tv") qs.push(`${primary} series soundtrack`);
-    qs.push(primary);
   }
 
   return [...new Set(qs.filter(Boolean))].slice(0, 5);
@@ -104,6 +100,9 @@ function scoreAlbum(album, ctx) {
     .filter((ts) => ts.length)
     .some((ts) => ts.some((t) => nameTokens.has(t)));
   if (!anyTitleToken) s -= 40;
+
+  const hasSigTokens = ctx.titles.some((t) => sigTokens(t).length > 0);
+  if (bestTitleScore(name, ctx.titles) === 0 && hasSigTokens) s -= 200;
 
   const knownComposers = [
     "hans zimmer", "john williams", "danny elfman", "howard shore",
