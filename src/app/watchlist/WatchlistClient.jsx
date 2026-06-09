@@ -34,6 +34,7 @@ import {
   RotateCcw,
   LogOut,
 } from "lucide-react";
+import LiquidButton from "@/components/LiquidButton";
 
 // ================== UTILS & CACHE ==================
 
@@ -2435,9 +2436,9 @@ export default function WatchlistClient() {
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
           {/* Manchas abstractas azules y negras */}
-          <div className="absolute -top-[20%] -left-[10%] w-[70vw] max-w-[800px] aspect-square rounded-full bg-blue-600/15 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute top-[30%] -right-[10%] w-[50vw] max-w-[600px] aspect-square rounded-full bg-blue-900/30 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute -bottom-[20%] left-[20%] w-[60vw] max-w-[700px] aspect-square rounded-full bg-cyan-800/20 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-blue-600/15 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-blue-700/20 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-blue-800/25 blur-[120px] sm:blur-[150px]" />
         </div>
 
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -2498,9 +2499,9 @@ export default function WatchlistClient() {
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         {/* Manchas abstractas azules y negras */}
-        <div className="absolute -top-[20%] -left-[10%] w-[70vw] max-w-[800px] aspect-square rounded-full bg-blue-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[30%] -right-[10%] w-[50vw] max-w-[600px] aspect-square rounded-full bg-blue-900/30 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[20%] left-[20%] w-[60vw] max-w-[700px] aspect-square rounded-full bg-cyan-800/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-blue-600/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-blue-700/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-blue-800/25 blur-[120px] sm:blur-[150px]" />
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -2526,42 +2527,50 @@ export default function WatchlistClient() {
 
                 {/* Action buttons next to title */}
                 <div className="flex items-center gap-2">
-                  <motion.button
-                    onClick={() => window.location.reload()}
-                    disabled={loading}
-                    className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50"
+                  <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.3 }}
-                    whileHover={{ scale: loading ? 1 : 1.05 }}
-                    whileTap={{ scale: loading ? 1 : 0.95 }}
-                    title="Sincronizar lista"
                   >
-                    <RotateCcw
-                      className={`w-5 h-5 text-white ${loading ? "animate-spin" : ""}`}
-                    />
-                  </motion.button>
+                    <LiquidButton
+                      onClick={() => window.location.reload()}
+                      disabled={loading}
+                      loading={loading}
+                      activeColor="blue"
+                      groupId="watchlist-header-actions"
+                      title="Sincronizar lista"
+                    >
+                      <RotateCcw
+                        className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
+                      />
+                    </LiquidButton>
+                  </motion.div>
 
-                  <motion.button
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                        window.localStorage.removeItem("tmdb_session");
-                        window.localStorage.removeItem("tmdb_account");
-                        document.cookie = "tmdb_session_id=; path=/; max-age=0";
-                        window.location.href = "/";
-                      }
-                    }}
-                    disabled={loading}
-                    className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50"
+                  <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.4 }}
-                    whileHover={{ scale: loading ? 1 : 1.05 }}
-                    whileTap={{ scale: loading ? 1 : 0.95 }}
-                    title="Desconectar cuenta TMDb"
                   >
-                    <LogOut className="w-5 h-5 text-red-400" />
-                  </motion.button>
+                    <LiquidButton
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          window.localStorage.removeItem("tmdb_session");
+                          window.localStorage.removeItem("tmdb_account");
+                          document.cookie =
+                            "tmdb_session_id=; path=/; max-age=0";
+                          window.location.href = "/";
+                        }
+                      }}
+                      disabled={loading}
+                      loading={loading}
+                      activeColor="red"
+                      groupId="watchlist-header-actions"
+                      title="Desconectar cuenta TMDb"
+                      className="!text-red-400 hover:!text-red-300"
+                    >
+                      <LogOut className="w-5 h-5" />
+                    </LiquidButton>
+                  </motion.div>
                 </div>
               </div>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">

@@ -2805,9 +2805,9 @@ export default function FavoritesClient() {
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
           {/* Manchas abstractas rojas y negras */}
-          <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-red-600/20 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-red-700/25 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-red-800/30 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-red-600/15 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-red-700/20 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-red-800/25 blur-[120px] sm:blur-[150px]" />
         </div>
 
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -2868,9 +2868,9 @@ export default function FavoritesClient() {
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-500/30">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         {/* Manchas abstractas rojas y negras */}
-        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-red-600/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-red-700/25 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-red-800/30 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-red-600/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-red-700/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-red-800/25 blur-[120px] sm:blur-[150px]" />
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
