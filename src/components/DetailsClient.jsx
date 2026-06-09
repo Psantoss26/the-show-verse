@@ -388,35 +388,37 @@ function DetailsArrowCarousel({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Swiper
-        {...swiperProps}
-        observer={swiperProps.observer ?? true}
-        observeParents={swiperProps.observeParents ?? true}
-        resizeObserver={swiperProps.resizeObserver ?? true}
-        onSwiper={(swiper) => {
-          handleSwiper(swiper);
-          swiperProps.onSwiper?.(swiper);
-        }}
-        onSlideChange={(swiper) => {
-          updateNav(swiper);
-          swiperProps.onSlideChange?.(swiper);
-        }}
-        onResize={(swiper) => {
-          updateNav(swiper);
-          swiperProps.onResize?.(swiper);
-        }}
-        onReachBeginning={(swiper) => {
-          updateNav(swiper);
-          swiperProps.onReachBeginning?.(swiper);
-        }}
-        onReachEnd={(swiper) => {
-          updateNav(swiper);
-          swiperProps.onReachEnd?.(swiper);
-        }}
-        className={className}
-      >
-        {children}
-      </Swiper>
+      <div style={{ overflowX: "clip", overflowY: "visible" }}>
+        <Swiper
+          {...swiperProps}
+          observer={swiperProps.observer ?? true}
+          observeParents={swiperProps.observeParents ?? true}
+          resizeObserver={swiperProps.resizeObserver ?? true}
+          onSwiper={(swiper) => {
+            handleSwiper(swiper);
+            swiperProps.onSwiper?.(swiper);
+          }}
+          onSlideChange={(swiper) => {
+            updateNav(swiper);
+            swiperProps.onSlideChange?.(swiper);
+          }}
+          onResize={(swiper) => {
+            updateNav(swiper);
+            swiperProps.onResize?.(swiper);
+          }}
+          onReachBeginning={(swiper) => {
+            updateNav(swiper);
+            swiperProps.onReachBeginning?.(swiper);
+          }}
+          onReachEnd={(swiper) => {
+            updateNav(swiper);
+            swiperProps.onReachEnd?.(swiper);
+          }}
+          className={className}
+        >
+          {children}
+        </Swiper>
+      </div>
 
       <AnimatePresence>
         {isHovered && canPrev && (
@@ -9753,34 +9755,34 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           1024: { slidesPerView: 5, spaceBetween: 18 },
                           1280: { slidesPerView: 6, spaceBetween: 20 },
                         }}
-                        className="pb-8"
+                        className="pb-8 pt-4 !overflow-visible"
                       >
                         {castDataForUI.slice(0, 20).map((actor) => (
                           <SwiperSlide key={actor.id}>
                             <Link
                               href={`/details/person/${actor.id}`}
-                              className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                              className="mt-3 block group relative bg-neutral-900 rounded-xl overflow-hidden border border-white/10 hover:border-yellow-400 hover:shadow-[0_0_25px_-5px_rgba(250,204,21,0.5)] hover:z-10 transition-all duration-300 hover:-translate-y-1"
                             >
                               <div className="aspect-[2/3] overflow-hidden relative">
                                 {actor.profile_path ? (
                                   <img
                                     src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                                     alt={actor.name}
-                                    className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
+                                    className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
                                   />
                                 ) : (
-                                  <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
+                                  <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
                                     <UsersIconComponent size={40} />
                                   </div>
                                 )}
 
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
 
-                                <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
-                                  <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
+                                <div className="absolute bottom-0 left-0 right-0 p-3 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
+                                  <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
                                     {actor.name}
                                   </p>
-                                  <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
+                                  <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
                                     {actor.character}
                                   </p>
                                 </div>
