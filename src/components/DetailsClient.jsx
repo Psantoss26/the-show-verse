@@ -61,6 +61,8 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   MonitorPlay,
   TrendingUp,
   Layers,
@@ -231,9 +233,9 @@ const getMovieDirectorsFromCrew = (crew) =>
 const formatCreditNames = (list) =>
   Array.isArray(list) && list.length
     ? list
-      .map((person) => person?.name)
-      .filter(Boolean)
-      .join(", ")
+        .map((person) => person?.name)
+        .filter(Boolean)
+        .join(", ")
     : null;
 
 /**
@@ -276,8 +278,8 @@ function formatRuntimeMinutes(minutes) {
 function formatEpisodeRuntime(data) {
   const runtimes = Array.isArray(data?.episode_run_time)
     ? data.episode_run_time
-      .map((value) => Number(value))
-      .filter((value) => Number.isFinite(value) && value > 0)
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value > 0)
     : [];
 
   const uniqueRuntimes = [...new Set(runtimes)].sort((a, b) => a - b);
@@ -1299,6 +1301,7 @@ export default function DetailsClient({
   const [posterLayoutMode, setPosterLayoutMode] = useState("poster");
   const [posterModeHydrated, setPosterModeHydrated] = useState(false);
 
+  const [isPosterHovered, setIsPosterHovered] = useState(false);
   // -- Imagen de fondo (background) con transicion suave --
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null);
   const [prevBackgroundPath, setPrevBackgroundPath] = useState(null); // Fondo anterior (para crossfade)
@@ -1661,9 +1664,9 @@ export default function DetailsClient({
           const id = getListId(l);
           return id === lid
             ? {
-              ...l,
-              item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
-            }
+                ...l,
+                item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
+              }
             : l;
         }),
       );
@@ -2292,7 +2295,7 @@ export default function DetailsClient({
       img.decoding = "async";
       try {
         img.fetchPriority = "high";
-      } catch { }
+      } catch {}
       img.onload = finishOne;
       img.onerror = finishOne; // Si una falla, no bloqueamos toda la fila
       img.src = url;
@@ -2479,8 +2482,8 @@ export default function DetailsClient({
               const savedGlobalMode =
                 typeof window !== "undefined"
                   ? window.localStorage.getItem(
-                    "showverse:global:posterViewMode",
-                  )
+                      "showverse:global:posterViewMode",
+                    )
                   : null;
 
               if (savedGlobalMode === "preview" && bestPreviewPath) {
@@ -2923,7 +2926,7 @@ export default function DetailsClient({
         : false;
     const fromShowWatched =
       endpointType === "tv" &&
-        typeof initialShowWatched?.connected === "boolean"
+      typeof initialShowWatched?.connected === "boolean"
         ? initialShowWatched.connected
         : false;
     return fromStatus || fromShowWatched;
@@ -3048,12 +3051,12 @@ export default function DetailsClient({
 
       const normalizedEpisodes = Array.isArray(episodes)
         ? Array.from(
-          new Set(
-            episodes
-              .map((episode) => Number(episode))
-              .filter((episode) => Number.isFinite(episode) && episode > 0),
-          ),
-        ).sort((a, b) => a - b)
+            new Set(
+              episodes
+                .map((episode) => Number(episode))
+                .filter((episode) => Number.isFinite(episode) && episode > 0),
+            ),
+          ).sort((a, b) => a - b)
         : [];
 
       acc[seasonNumber] = normalizedEpisodes;
@@ -3144,8 +3147,8 @@ export default function DetailsClient({
     const fallbackTs = new Date(fallbackStartAt).getTime();
     const newerRun = Number.isFinite(fallbackTs)
       ? sortedRuns
-        .filter((run) => run.ts > fallbackTs)
-        .sort((a, b) => a.ts - b.ts)[0] || null
+          .filter((run) => run.ts > fallbackTs)
+          .sort((a, b) => a.ts - b.ts)[0] || null
       : null;
 
     return {
@@ -3992,7 +3995,7 @@ export default function DetailsClient({
     try {
       const v = window.localStorage.getItem("showverse:trakt:sync") === "1";
       setSyncTrakt(v);
-    } catch { }
+    } catch {}
   }, []);
 
   // Guardar preferencia de sincronizacion en localStorage
@@ -4003,7 +4006,7 @@ export default function DetailsClient({
         "showverse:trakt:sync",
         syncTrakt ? "1" : "0",
       );
-    } catch { }
+    } catch {}
   }, [syncTrakt]);
 
   // Recarga el estado de Trakt (visto, rating, historial, watchlist) para el contenido actual
@@ -4353,7 +4356,7 @@ export default function DetailsClient({
             error: "",
           }),
         );
-      } catch { }
+      } catch {}
     };
 
     const load = async () => {
@@ -4430,7 +4433,7 @@ export default function DetailsClient({
           );
           setTScoreboard((prev) => mergeScoreboardState(prev, hydratedQuick));
           persistScoreboardCache(workingScoreboard);
-        } catch { }
+        } catch {}
       }
 
       // 2) Si ya tenemos stats numéricas, no hace falta pedirlas otra vez.
@@ -4480,7 +4483,7 @@ export default function DetailsClient({
               return;
             }
           }
-        } catch { }
+        } catch {}
       }
 
       // Si las stats no llegan, al menos dejamos rating/votos sin bloquear el resto.
@@ -4552,7 +4555,7 @@ export default function DetailsClient({
             nextTrakt.error = "";
             hydratedStatus = true;
           }
-        } catch { }
+        } catch {}
       }
 
       if (endpointType === "tv" && !hasInitialShowWatched) {
@@ -4595,7 +4598,7 @@ export default function DetailsClient({
 
             nextTrakt.watched = hasAnyWatchedEpisode;
           }
-        } catch { }
+        } catch {}
       }
     }
 
@@ -4646,7 +4649,7 @@ export default function DetailsClient({
       } else if (trakt?.loading === false) {
         window.localStorage.removeItem(traktStatusStorageKey);
       }
-    } catch { }
+    } catch {}
   }, [trakt, traktStatusStorageKey]);
 
   useEffect(() => {
@@ -4670,7 +4673,7 @@ export default function DetailsClient({
       } else if (watchedBySeasonLoaded && !trakt?.connected) {
         window.localStorage.removeItem(traktShowWatchedStorageKey);
       }
-    } catch { }
+    } catch {}
   }, [
     endpointType,
     watchedBySeason,
@@ -4760,8 +4763,8 @@ export default function DetailsClient({
     const syncNotBefore =
       Date.now() +
       (hasInitialTraktStatus ||
-        hasCachedTraktStatus ||
-        (endpointType === "tv" && (hasInitialShowWatched || hasCachedShowWatched))
+      hasCachedTraktStatus ||
+      (endpointType === "tv" && (hasInitialShowWatched || hasCachedShowWatched))
         ? 2500
         : 0);
 
@@ -4957,7 +4960,7 @@ export default function DetailsClient({
                 rewatchRunsStorageKey,
                 JSON.stringify(mergedRuns),
               );
-            } catch { }
+            } catch {}
             return mergedRuns;
           });
         }
@@ -4973,12 +4976,12 @@ export default function DetailsClient({
         if (startAtIso) {
           const nextWatchedBySeason =
             r?.watchedBySeasonSince &&
-              typeof r.watchedBySeasonSince === "object"
+            typeof r.watchedBySeasonSince === "object"
               ? r.watchedBySeasonSince
               : {};
           const nextHistoryIds =
             r?.historyIdsByEpisodeSince &&
-              typeof r.historyIdsByEpisodeSince === "object"
+            typeof r.historyIdsByEpisodeSince === "object"
               ? r.historyIdsByEpisodeSince
               : {};
 
@@ -5080,12 +5083,12 @@ export default function DetailsClient({
       setTrakt((prev) => {
         const optimisticHistory = next
           ? normalizeTraktHistoryEntries([
-            {
-              id: `temp-${Date.now()}`,
-              watched_at: new Date().toISOString(),
-            },
-            ...(Array.isArray(prev.history) ? prev.history : []),
-          ])
+              {
+                id: `temp-${Date.now()}`,
+                watched_at: new Date().toISOString(),
+              },
+              ...(Array.isArray(prev.history) ? prev.history : []),
+            ])
           : [];
 
         return buildTraktStateFromHistory({
@@ -5173,10 +5176,10 @@ export default function DetailsClient({
           history: normalizeTraktHistoryEntries(prev.history).map((entry) =>
             String(entry.id) === String(historyId)
               ? {
-                ...entry,
-                watched_at: optimisticIso,
-                watchedAt: optimisticIso,
-              }
+                  ...entry,
+                  watched_at: optimisticIso,
+                  watchedAt: optimisticIso,
+                }
               : entry,
           ),
         }),
@@ -5606,7 +5609,7 @@ export default function DetailsClient({
     // Persistir fecha de inicio del rewatch en localStorage
     try {
       window.localStorage.setItem(rewatchStorageKey, startIso);
-    } catch { }
+    } catch {}
 
     const windowState = resolveRewatchWindow(startIso, rewatchRunsRef.current);
     await loadTraktShowPlays(
@@ -5738,7 +5741,7 @@ export default function DetailsClient({
               rewatchRunsStorageKey,
               JSON.stringify(runs),
             );
-          } catch { }
+          } catch {}
         }
       }
 
@@ -6011,7 +6014,7 @@ export default function DetailsClient({
           rewatchRunsStorageKey,
           JSON.stringify(nextRuns || []),
         );
-      } catch { }
+      } catch {}
     },
     [rewatchRunsStorageKey],
   );
@@ -6023,7 +6026,7 @@ export default function DetailsClient({
       setActiveEpisodesView(v);
       try {
         window.localStorage.setItem(episodesViewStorageKey, v);
-      } catch { }
+      } catch {}
 
       if (v === "global") {
         setRewatchStartAt(null);
@@ -6070,7 +6073,7 @@ export default function DetailsClient({
       setActiveEpisodesView(run.id);
       try {
         window.localStorage.setItem(episodesViewStorageKey, run.id);
-      } catch { }
+      } catch {}
       setRewatchStartAt(run.startedAt);
 
       const windowState = resolveRewatchWindow(run.id, nextRuns);
@@ -6141,7 +6144,7 @@ export default function DetailsClient({
         const nextView = prev === runId ? "global" : prev;
         try {
           window.localStorage.setItem(episodesViewStorageKey, nextView);
-        } catch { }
+        } catch {}
         return nextView;
       });
 
@@ -6157,7 +6160,7 @@ export default function DetailsClient({
           applyWatchedBySeasonState(fresh?.watchedBySeason || {}, {
             loaded: true,
           });
-        } catch { }
+        } catch {}
 
         try {
           if (wasActive) {
@@ -6172,7 +6175,7 @@ export default function DetailsClient({
               windowState.endBefore || null,
             );
           }
-        } catch { }
+        } catch {}
       }
     },
     [
@@ -6225,7 +6228,7 @@ export default function DetailsClient({
           cacheKey,
           JSON.stringify({ ts: Date.now(), data }),
         );
-      } catch { }
+      } catch {}
     };
 
     let ignore = false;
@@ -6312,10 +6315,10 @@ export default function DetailsClient({
         .map((episode) =>
           toRatingNumber(
             episode?.seriesGraphRating ??
-            episode?.seriesgraphRating ??
-            episode?.series_graph_rating ??
-            episode?.rating ??
-            episode?.vote_average,
+              episode?.seriesgraphRating ??
+              episode?.series_graph_rating ??
+              episode?.rating ??
+              episode?.vote_average,
           ),
         )
         .filter((rating) => rating != null);
@@ -6357,7 +6360,7 @@ export default function DetailsClient({
       if (typeof window === "undefined") return;
       try {
         window.sessionStorage.setItem(cacheKey, JSON.stringify(value || {}));
-      } catch { }
+      } catch {}
     };
 
     const run = async () => {
@@ -6591,7 +6594,7 @@ export default function DetailsClient({
       if (!posterToggleBusy) {
         setPosterLayoutMode(posterViewMode);
       }
-    } catch { }
+    } catch {}
   }, [
     posterViewMode,
     globalViewModeStorageKey,
@@ -6655,8 +6658,8 @@ export default function DetailsClient({
   const seriesGraphUrl =
     type === "tv" && data?.id && (data.name || data.original_name)
       ? `https://seriesgraph.com/show/${data.id}-${slugifyForSeriesGraph(
-        data.original_name || data.name,
-      )}`
+          data.original_name || data.name,
+        )}`
       : null;
 
   const [traktHomepage, setTraktHomepage] = useState(null);
@@ -6743,7 +6746,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch { }
+    } catch {}
   }, [jwCacheKey]);
 
   useEffect(() => {
@@ -6758,7 +6761,7 @@ export default function DetailsClient({
       try {
         if (typeof window !== "undefined")
           window.localStorage.removeItem(jwCacheKey);
-      } catch { }
+      } catch {}
       return;
     }
 
@@ -6773,8 +6776,8 @@ export default function DetailsClient({
 
         const watchnow =
           watchLink &&
-            typeof watchLink === "string" &&
-            !watchLink.includes("themoviedb.org")
+          typeof watchLink === "string" &&
+          !watchLink.includes("themoviedb.org")
             ? watchLink
             : null;
 
@@ -6807,7 +6810,7 @@ export default function DetailsClient({
             if (resolved) window.localStorage.setItem(jwCacheKey, resolved);
             else window.localStorage.removeItem(jwCacheKey);
           }
-        } catch { }
+        } catch {}
       } catch (e) {
         if (ac.signal.aborted) return;
         setExtLinks((p) => ({
@@ -8434,26 +8437,36 @@ export default function DetailsClient({
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
-            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-[max-width] duration-500 ease-out ${isBackdropPoster
+            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-[max-width] duration-500 ease-out ${
+              isBackdropPoster
                 ? "max-w-full lg:max-w-[600px]"
                 : "max-w-[280px] lg:max-w-[320px]"
-              }`}
+            }`}
           >
             {/* Poster Card */}
             <div className="relative">
               {/* Wrapper: solo perspectiva + captura puntero */}
               <div
                 ref={posterWrapRef}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCyclePoster();
+                }}
                 onPointerMove={(e) =>
                   setPosterTargetFromPointer(e.clientX, e.clientY)
                 }
-                onPointerLeave={resetPosterTarget}
+                onPointerLeave={() => {
+                  resetPosterTarget();
+                  setIsPosterHovered(false);
+                }}
+                onPointerEnter={() => setIsPosterHovered(true)}
                 onPointerDown={(e) => {
                   // mejora tactil (evita pérdidas de tracking)
                   e.currentTarget.setPointerCapture?.(e.pointerId);
                   setPosterTargetFromPointer(e.clientX, e.clientY);
                 }}
-                className="relative"
+                className="relative cursor-pointer"
                 style={{
                   perspective: poster3dEnabled ? 1100 : undefined,
                   transformStyle: "preserve-3d",
@@ -8477,8 +8490,9 @@ export default function DetailsClient({
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10" />
 
                   <div
-                    className={`relative bg-neutral-950 will-change-auto overflow-hidden ${isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
-                      }`}
+                    className={`relative bg-neutral-950 will-change-auto overflow-hidden ${
+                      isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
+                    }`}
                     style={{
                       transition:
                         "aspect-ratio 500ms cubic-bezier(0.25, 1, 0.5, 1)",
@@ -8573,7 +8587,7 @@ ${currentHighLoaded ? "opacity-0" : shouldRevealCurrentPosterImmediately || curr
                                 setPosterHighLoaded(true);
                               }
                             }}
-                            onError={() => { }}
+                            onError={() => {}}
                             className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500 ease-out will-change-[opacity,transform]
 ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
@@ -8589,6 +8603,40 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         <ImageOff className="w-10 h-10 text-neutral-700" />
                       </div>
                     )}
+
+                    {/* Right arrow for poster -> backdrop */}
+                    <AnimatePresence>
+                      {supportsHover &&
+                        isPosterHovered &&
+                        posterViewMode === "poster" && (
+                          <motion.div
+                            initial={{ opacity: 0, x: 10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 10 }}
+                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                            className="absolute inset-y-0 right-0 z-20 flex w-1/3 items-center justify-end bg-gradient-to-l from-black/70 to-transparent pr-4 pointer-events-none"
+                          >
+                            <ChevronRight className="h-8 w-8 text-white drop-shadow-lg" />
+                          </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Left arrow for backdrop -> poster */}
+                    <AnimatePresence>
+                      {supportsHover &&
+                        isPosterHovered &&
+                        posterViewMode === "preview" && (
+                          <motion.div
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                            className="absolute inset-y-0 left-0 z-20 flex w-1/3 items-center justify-start bg-gradient-to-r from-black/70 to-transparent pl-4 pointer-events-none"
+                          >
+                            <ChevronLeft className="h-8 w-8 text-white drop-shadow-lg" />
+                          </motion.div>
+                        )}
+                    </AnimatePresence>
                   </div>
                 </div>
               </div>
@@ -8596,7 +8644,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
             {/* Providers Grid + Enlaces Externos (cuando es backdrop) */}
             {(limitedProviders && limitedProviders.length > 0) ||
-              (isBackdropPoster && externalLinks.length > 0) ? (
+            (isBackdropPoster && externalLinks.length > 0) ? (
               <StaggerContainer
                 className="flex flex-row flex-nowrap justify-center items-center gap-3 w-full px-1 py-2 overflow-x-auto [scrollbar-width:none]"
                 staggerDelay={0.05}
@@ -8764,8 +8812,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
           {/* --- COLUMNA DERECHA: INFO (sin tabs cuando es backdrop) --- */}
           <div
-            className={`flex-1 flex flex-col min-w-0 w-full ${isBackdropPoster ? "" : ""
-              }`}
+            className={`flex-1 flex flex-col min-w-0 w-full ${
+              isBackdropPoster ? "" : ""
+            }`}
           >
             {/* 1. TÍTULO Y CABECERA */}
             <FadeIn delay={0.06} className="mb-5 px-1">
@@ -8791,10 +8840,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <>
                     <span className="text-white text-[10px]">●</span>
                     <span
-                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${data.status === "Ended" || data.status === "Canceled"
+                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
+                        data.status === "Ended" || data.status === "Canceled"
                           ? "bg-red-500/10 text-red-400 border border-red-500/20"
                           : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        }`}
+                      }`}
                     >
                       {data.status}
                     </span>
@@ -8957,29 +9007,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     )}
                   </LiquidButton>
                 )}
-
-                {/* Botón para cambiar entre vista de portada y vista previa (backdrop) */}
-                {/* Permite alternar la imagen principal entre el póster y el backdrop */}
-                <LiquidButton
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleCyclePoster();
-                  }}
-                  active={posterViewMode === "preview"}
-                  activeColor="orange"
-                  groupId="details-actions"
-                  title={
-                    posterViewMode === "preview"
-                      ? "Mostrar portada"
-                      : "Mostrar vista previa"
-                  }
-                >
-                  <ImageIcon
-                    className={`transition-all duration-200 ${posterToggleBusy ? "scale-95 opacity-75" : "scale-100"
-                      }`}
-                  />
-                </LiquidButton>
               </div>
             </FadeIn>
 
@@ -9036,9 +9063,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         onClick={
                           !trakt?.connected
                             ? () =>
-                              window.location.assign(
-                                `/api/trakt/auth/start?next=/details/${type}/${id}`,
-                              )
+                                window.location.assign(
+                                  `/api/trakt/auth/start?next=/details/${type}/${id}`,
+                                )
                             : undefined
                         }
                       />
@@ -9085,20 +9112,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* Muestra el porcentaje de audiencia de RT, prioriza datos de Trakt sobre OMDb */}
                     {(tScoreboard?.external?.rtAudience != null ||
                       extras.rtScore != null) && (
-                        <div className="hidden sm:block">
-                          <CompactBadge
-                            logo="/logo-RottenTomatoes.png"
-                            value={
-                              tScoreboard?.external?.rtAudience != null
-                                ? Math.round(tScoreboard.external.rtAudience)
-                                : extras.rtScore != null
-                                  ? Math.round(extras.rtScore)
-                                  : null
-                            }
-                            suffix="%"
-                          />
-                        </div>
-                      )}
+                      <div className="hidden sm:block">
+                        <CompactBadge
+                          logo="/logo-RottenTomatoes.png"
+                          value={
+                            tScoreboard?.external?.rtAudience != null
+                              ? Math.round(tScoreboard.external.rtAudience)
+                              : extras.rtScore != null
+                                ? Math.round(extras.rtScore)
+                                : null
+                          }
+                          suffix="%"
+                        />
+                      </div>
+                    )}
 
                     {/* Badge de Metacritic - Solo visible en desktop (>= sm) */}
                     {/* Muestra la puntuación de Metacritic sobre 100 */}
@@ -9205,66 +9232,66 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {Object.values(tScoreboard?.stats || {}).some(
                   (v) => typeof v === "number",
                 ) && (
-                    <div className="border-t border-white/5 bg-black/10">
-                      {/* Scroller con padding + safe-area para que no se recorte en bordes */}
-                      <div
-                        className="
+                  <div className="border-t border-white/5 bg-black/10">
+                    {/* Scroller con padding + safe-area para que no se recorte en bordes */}
+                    <div
+                      className="
         overflow-x-auto
         [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
         py-2
         pl-[calc(1rem+env(safe-area-inset-left))]
         pr-[calc(1rem+env(safe-area-inset-right))]
       "
-                      >
-                        {/* Contenedor interno con min-w-max para evitar que se corten los últimos elementos */}
-                        <div className="flex items-center gap-3 min-w-max">
-                          {/* Watchers - Usuarios que siguen este contenido */}
-                          <div className="shrink-0">
-                            <MiniStat
-                              icon={Eye}
-                              value={formatVoteCount(
-                                tScoreboard?.stats?.watchers ?? 0,
-                              )}
-                              tooltip="Watchers"
-                            />
-                          </div>
+                    >
+                      {/* Contenedor interno con min-w-max para evitar que se corten los últimos elementos */}
+                      <div className="flex items-center gap-3 min-w-max">
+                        {/* Watchers - Usuarios que siguen este contenido */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Eye}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.watchers ?? 0,
+                            )}
+                            tooltip="Watchers"
+                          />
+                        </div>
 
-                          {/* Plays - Número de reproducciones totales */}
-                          <div className="shrink-0">
-                            <MiniStat
-                              icon={Play}
-                              value={formatVoteCount(
-                                tScoreboard?.stats?.plays ?? 0,
-                              )}
-                              tooltip="Plays"
-                            />
-                          </div>
+                        {/* Plays - Número de reproducciones totales */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Play}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.plays ?? 0,
+                            )}
+                            tooltip="Plays"
+                          />
+                        </div>
 
-                          {/* Lists - Cantidad de listas que incluyen este contenido */}
-                          <div className="shrink-0">
-                            <MiniStat
-                              icon={List}
-                              value={formatVoteCount(
-                                tScoreboard?.stats?.lists ?? 0,
-                              )}
-                              tooltip="Lists"
-                            />
-                          </div>
+                        {/* Lists - Cantidad de listas que incluyen este contenido */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={List}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.lists ?? 0,
+                            )}
+                            tooltip="Lists"
+                          />
+                        </div>
 
-                          {/* Favorited - Usuarios que lo han marcado como favorito */}
-                          <div className="shrink-0">
-                            <MiniStat
-                              icon={Heart}
-                              value={formatVoteCount(
-                                tScoreboard?.stats?.favorited ?? 0,
-                              )}
-                              tooltip="Favorited"
-                            />
-                          </div>
+                        {/* Favorited - Usuarios que lo han marcado como favorito */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Heart}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.favorited ?? 0,
+                            )}
+                            tooltip="Favorited"
+                          />
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
               </div>
             </ScaleIn>
 
@@ -9295,10 +9322,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         whileHover={{ y: -1 }}
                         whileTap={{ scale: 0.98 }}
                         className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-          ${activeTab === tab.id
-                            ? "text-white border-yellow-500"
-                            : "text-zinc-500 border-transparent hover:text-zinc-300"
-                          }`}
+          ${
+            activeTab === tab.id
+              ? "text-white border-yellow-500"
+              : "text-zinc-500 border-transparent hover:text-zinc-300"
+          }`}
                       >
                         {tab.label}
                       </motion.button>
@@ -9501,10 +9529,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.98 }}
                   className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-        ${activeTab === tab.id
-                      ? "text-white border-yellow-500"
-                      : "text-zinc-500 border-transparent hover:text-zinc-300"
-                    }`}
+        ${
+          activeTab === tab.id
+            ? "text-white border-yellow-500"
+            : "text-zinc-500 border-transparent hover:text-zinc-300"
+        }`}
                 >
                   {tab.label}
                 </motion.button>
@@ -9798,7 +9827,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                           const tmdbScore =
                             typeof rec.vote_average === "number" &&
-                              rec.vote_average > 0
+                            rec.vote_average > 0
                               ? rec.vote_average
                               : null;
 
@@ -9860,10 +9889,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <div className={recHeaderInfoClass}>
                                     <div>
                                       <span
-                                        className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${isMovie
+                                        className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
+                                          isMovie
                                             ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
                                             : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                          }`}
+                                        }`}
                                       >
                                         {isMovie ? "PELÍCULA" : "SERIE"}
                                       </span>
@@ -10083,10 +10113,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       type="button"
                                       onClick={() => setActiveImagesTab(tab)}
                                       className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
-              ${activeImagesTab === tab
-                                          ? "bg-white/10 text-white shadow-md"
-                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                        }`}
+              ${
+                activeImagesTab === tab
+                  ? "bg-white/10 text-white shadow-md"
+                  : "text-zinc-400 hover:text-white hover:bg-white/10"
+              }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
@@ -10275,10 +10306,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       onClick={() =>
                                         setActiveImagesTab("posters")
                                       }
-                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${activeImagesTab === "posters"
+                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
+                                        activeImagesTab === "posters"
                                           ? "bg-white/10 text-white shadow-md"
                                           : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                        }`}
+                                      }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
@@ -10291,10 +10323,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       onClick={() =>
                                         setActiveImagesTab("backdrops")
                                       }
-                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${activeImagesTab === "backdrops"
+                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
+                                        activeImagesTab === "backdrops"
                                           ? "bg-white/10 text-white shadow-md"
                                           : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                        }`}
+                                      }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
@@ -10307,10 +10340,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       onClick={() =>
                                         setActiveImagesTab("background")
                                       }
-                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${activeImagesTab === "background"
+                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
+                                        activeImagesTab === "background"
                                           ? "bg-white/10 text-white shadow-md"
                                           : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                        }`}
+                                      }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
@@ -10425,10 +10459,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       <button
                                         type="button"
                                         onClick={() => setLangES((v) => !v)}
-                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${langES
+                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
+                                          langES
                                             ? "bg-white/10 text-white shadow-md"
                                             : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                          }`}
+                                        }`}
                                         style={{
                                           WebkitTapHighlightColor:
                                             "transparent",
@@ -10439,10 +10474,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       <button
                                         type="button"
                                         onClick={() => setLangEN((v) => !v)}
-                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${langEN
+                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
+                                          langEN
                                             ? "bg-white/10 text-white shadow-md"
                                             : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                          }`}
+                                        }`}
                                         style={{
                                           WebkitTapHighlightColor:
                                             "transparent",
@@ -10479,19 +10515,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                           const breakpoints = isPoster
                             ? {
-                              500: { slidesPerView: 3, spaceBetween: 14 },
-                              640: { slidesPerView: 4, spaceBetween: 14 },
-                              768: { slidesPerView: 5, spaceBetween: 16 },
-                              1024: { slidesPerView: 6, spaceBetween: 18 },
-                              1280: { slidesPerView: 7, spaceBetween: 18 },
-                            }
+                                500: { slidesPerView: 3, spaceBetween: 14 },
+                                640: { slidesPerView: 4, spaceBetween: 14 },
+                                768: { slidesPerView: 5, spaceBetween: 16 },
+                                1024: { slidesPerView: 6, spaceBetween: 18 },
+                                1280: { slidesPerView: 7, spaceBetween: 18 },
+                              }
                             : {
-                              0: { slidesPerView: 2, spaceBetween: 12 },
-                              640: { slidesPerView: 3, spaceBetween: 14 },
-                              768: { slidesPerView: 4, spaceBetween: 16 },
-                              1024: { slidesPerView: 4, spaceBetween: 18 },
-                              1280: { slidesPerView: 4, spaceBetween: 20 },
-                            };
+                                0: { slidesPerView: 2, spaceBetween: 12 },
+                                640: { slidesPerView: 3, spaceBetween: 14 },
+                                768: { slidesPerView: 4, spaceBetween: 16 },
+                                1024: { slidesPerView: 4, spaceBetween: 18 },
+                                1280: { slidesPerView: 4, spaceBetween: 20 },
+                              };
 
                           const loadingCardsCount = Math.max(
                             1,
@@ -10623,10 +10659,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           }}
                                           className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
-                        ${isActive
-                                              ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
-                                              : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
-                                            }`}
+                        ${
+                          isActive
+                            ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
+                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
+                        }`}
                                           title="Seleccionar"
                                           style={{
                                             WebkitTapHighlightColor:
@@ -11348,8 +11385,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           {reviews.slice(0, reviewLimit).map((r) => {
                             const avatar = r.author_details?.avatar_path
                               ? r.author_details.avatar_path.startsWith(
-                                "/https",
-                              )
+                                  "/https",
+                                )
                                 ? r.author_details.avatar_path.slice(1)
                                 : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
                               : `https://ui-avatars.com/api/?name=${r.author}&background=random`;
@@ -11473,10 +11510,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 key={t.id}
                                 type="button"
                                 onClick={() => setTCommentsTab(t.id)}
-                                className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all flex items-center justify-center ${tCommentsTab === t.id
+                                className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all flex items-center justify-center ${
+                                  tCommentsTab === t.id
                                     ? "bg-white/10 text-white shadow-md"
                                     : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                  }`}
+                                }`}
                               >
                                 {t.label}
                               </button>
@@ -11603,10 +11641,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 key={tab}
                                 onClick={() => setTListsTab(tab)}
-                                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-lg flex items-center justify-center ${tListsTab === tab
+                                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all rounded-lg flex items-center justify-center ${
+                                  tListsTab === tab
                                     ? "bg-white/10 text-white shadow-md"
                                     : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                  }`}
+                                }`}
                               >
                                 {tab}
                               </button>
