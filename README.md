@@ -419,6 +419,12 @@ TRAKT_REDIRECT_URI=urn:ietf:wg:oauth:2.0:oob
 
 # OMDb API (opcional)
 OMDB_API_KEY=tu_clave_omdb_aqui
+
+# Spotify Web API (opcional, mejora Soundtrack y música)
+SPOTIFY_CLIENT_ID=tu_client_id_spotify_aqui
+SPOTIFY_CLIENT_SECRET=tu_client_secret_spotify_aqui
+SPOTIFY_REDIRECT_URI=https://theshowverse.com/api/spotify/callback
+SPOTIFY_REFRESH_TOKEN=generar_desde_api_spotify_login
 ```
 
 ### 4. Ejecutar en Desarrollo
@@ -457,6 +463,39 @@ Para habilitar la sincronización con Trakt:
 
 3. **Reiniciar servidor de desarrollo**
 
+### Configuración de Spotify
+
+Para mejorar el modal de "Soundtrack y música", crea una app en [Spotify for Developers](https://developer.spotify.com/dashboard):
+
+1. **Crear aplicación:**
+   - **App name:** The Show Verse
+   - **App description:** Local app for personal use related to films and TV shows info
+   - **Website:** `http://localhost:3000` en local, o tu dominio en producción
+   - **Redirect URIs:** `https://theshowverse.com/api/spotify/callback`
+   - **API/SDK:** marca **Web API**
+
+2. **Actualizar `.env`:**
+
+   ```env
+   SPOTIFY_CLIENT_ID=tu_client_id
+   SPOTIFY_CLIENT_SECRET=tu_client_secret
+   SPOTIFY_REDIRECT_URI=https://theshowverse.com/api/spotify/callback
+   ```
+
+3. **Generar refresh token:**
+   - Reinicia el servidor.
+   - Abre `/api/spotify/login` en el dominio configurado en `SPOTIFY_REDIRECT_URI`.
+   - Autoriza Spotify y copia el `SPOTIFY_REFRESH_TOKEN` que se muestra.
+   - Añádelo al `.env`:
+
+   ```env
+   SPOTIFY_REFRESH_TOKEN=tu_refresh_token
+   ```
+
+4. **Reiniciar servidor de desarrollo.**
+
+La app usa Client Credentials para buscar playlists y un refresh token de usuario para leer sus canciones. El refresh token se guarda solo en servidor.
+
 ### Configuración de Producción
 
 Para desplegar en producción (ej. Vercel):
@@ -467,6 +506,7 @@ Para desplegar en producción (ej. Vercel):
 2. **Variables de entorno en Vercel:**
    - Ve a Project Settings → Environment Variables
    - Añade todas las variables del `.env`
+   - En Spotify, añade tambien `https://tu-dominio.com/api/spotify/callback` como Redirect URI si vas a usar el dominio de producción.
 
 ---
 
