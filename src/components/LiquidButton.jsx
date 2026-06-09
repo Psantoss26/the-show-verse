@@ -505,10 +505,10 @@ export default function LiquidButton({
         backdrop-blur-[50px]
         ${
           disabled
-            ? "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-white/30 cursor-not-allowed"
+            ? "bg-white/5 border border-white/10 text-white/30 cursor-not-allowed"
             : active
-              ? "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
-              : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-white/10 hover:text-white"
+              ? "bg-gradient-to-br from-white/15 to-white/5 border border-white/20 shadow-lg"
+              : "bg-gradient-to-br from-white/10 to-white/5 border border-white/15 shadow-lg text-zinc-100 hover:from-white/15 hover:to-white/10 hover:border-white/25 hover:shadow-xl hover:text-white"
         }
         ${isExploding ? "" : "transition-all duration-300"}
         ${className}
