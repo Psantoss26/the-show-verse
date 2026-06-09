@@ -74,6 +74,9 @@ jobs:
             /volume1/docker/the-show-verse/.env \
             /volume1/docker/the-show-verse/env.txt \
             /volume1/docker/the-show-verse/app/.env.production \
+            /volume4/docker/the-show-verse/.env \
+            /volume4/docker/the-show-verse/env.txt \
+            /volume4/docker/the-show-verse/app/.env.production \
             /data/docker/the-show-verse/.env \
             /data/docker/the-show-verse/env.txt \
             /data/docker/the-show-verse/app/.env.production \
@@ -88,7 +91,7 @@ jobs:
           if [ -z "$ENV_PATH" ]; then
             ENV_PATH=$(
               {
-                for root in /nas-deploy /volume1/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse; do
+                for root in /nas-deploy /volume1/docker/the-show-verse /volume4/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse; do
                   [ -d "$root" ] && find "$root" -maxdepth 3 \( -name ".env" -o -name ".env.production" -o -name "env.txt" \) -type f 2>/dev/null
                 done
               } | while read -r file; do
@@ -231,8 +234,8 @@ jobs:
           if ! grep -q "^NEXT_PUBLIC_TMDB_API_KEY=." /nas-deploy/app/.env && ! grep -q "^TMDB_API_KEY=." /nas-deploy/app/.env; then
             echo "❌ Falta TMDB_API_KEY/NEXT_PUBLIC_TMDB_API_KEY en runtime. Sin esto la app queda sin contenido."
             echo "Archivos .env encontrados para diagnóstico:"
-            find /nas-deploy /volume1/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse -maxdepth 3 -name ".env" -type f 2>/dev/null | while read -r file; do
-              keys=$(grep -E '^(TMDB_API_KEY|NEXT_PUBLIC_TMDB_API_KEY|TRAKT_CLIENT_ID|NEXT_PUBLIC_TRAKT_CLIENT_ID|TRAKT_CLIENT_SECRET)=' "$file" 2>/dev/null | cut -d= -f1 | tr '\n' ' ')
+            find /nas-deploy /volume1/docker/the-show-verse /volume4/docker/the-show-verse /data/docker/the-show-verse /home/pablo/the-show-verse -maxdepth 3 -name ".env" -type f 2>/dev/null | while read -r file; do
+              keys=$(grep -E '^(TMDB_API_KEY|NEXT_PUBLIC_TMDB_API_KEY|TRAKT_CLIENT_ID|NEXT_PUBLIC_TRAKT_CLIENT_ID|TRAKT_CLIENT_SECRET|SPOTIFY_CLIENT_ID|SPOTIFY_CLIENT_SECRET|SPOTIFY_REDIRECT_URI|SPOTIFY_REFRESH_TOKEN)=' "$file" 2>/dev/null | cut -d= -f1 | tr '\n' ' ')
               echo "- $file :: ${keys:-sin claves core}"
             done
             exit 1
@@ -243,8 +246,20 @@ jobs:
           cd /nas-deploy/app && docker compose -f docker-compose.yml \
             --project-name the-show-verse up -d ollama || true
 
+          # Puede existir un contenedor creado manualmente con el mismo nombre
+          # (por ejemplo, tras una reparación SSH). Si no se elimina antes,
+          # docker compose falla con "container name is already in use".
           cd /nas-deploy/app && docker compose -f docker-compose.yml \
-            --project-name the-show-verse up -d --no-deps --force-recreate app
+            --project-name the-show-verse stop app || true
+          cd /nas-deploy/app && docker compose -f docker-compose.yml \
+            --project-name the-show-verse rm -f app || true
+          if docker ps -aq --filter "name=^/the-show-verse$" | grep -q .; then
+            echo "Eliminando contenedor the-show-verse existente para evitar conflicto de nombre..."
+            docker rm -f the-show-verse
+          fi
+
+          cd /nas-deploy/app && docker compose -f docker-compose.yml \
+            --project-name the-show-verse up -d --no-deps app
           echo "✓ Desplegado: $(date '+%Y-%m-%d %H:%M:%S')"
 
       - name: Verificar que el contenedor está corriendo
