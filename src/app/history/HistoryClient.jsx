@@ -33,6 +33,7 @@ import {
   traktGetHistory,
   traktDisconnect,
 } from "@/lib/api/traktClient";
+import LiquidButton from "@/components/LiquidButton";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 80;
@@ -2320,9 +2321,9 @@ export default function HistoryClient() {
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         {/* Manchas abstractas esmeralda y negras */}
-        <div className="absolute -top-[20%] -left-[10%] w-[70vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[30%] -right-[10%] w-[50vw] max-w-[600px] aspect-square rounded-full bg-emerald-900/30 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[20%] left-[20%] w-[60vw] max-w-[700px] aspect-square rounded-full bg-emerald-800/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-emerald-800/25 blur-[120px] sm:blur-[150px]" />
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -2350,35 +2351,41 @@ export default function HistoryClient() {
                 {/* Botones redondos junto al título */}
                 {auth.connected && historyLoaded && (
                   <div className="flex items-center gap-2">
-                    <motion.button
-                      onClick={() => loadHistory()}
-                      disabled={loading}
-                      className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50"
+                    <motion.div
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.4, delay: 0.3 }}
-                      whileHover={{ scale: loading ? 1 : 1.05 }}
-                      whileTap={{ scale: loading ? 1 : 0.95 }}
-                      title="Sincronizar"
                     >
-                      <RotateCcw
-                        className={`w-5 h-5 text-white ${loading ? "animate-spin" : ""}`}
-                      />
-                    </motion.button>
+                      <LiquidButton
+                        onClick={() => loadHistory()}
+                        disabled={loading}
+                        loading={loading}
+                        activeColor="green"
+                        groupId="history-header-actions"
+                        title="Sincronizar"
+                        className="!border-white/20 hover:!border-white/40"
+                      >
+                        <RotateCcw className="w-5 h-5" />
+                      </LiquidButton>
+                    </motion.div>
 
-                    <motion.button
-                      onClick={() => setShowDisconnectModal(true)}
-                      disabled={loading}
-                      className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50"
+                    <motion.div
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.4, delay: 0.4 }}
-                      whileHover={{ scale: loading ? 1 : 1.05 }}
-                      whileTap={{ scale: loading ? 1 : 0.95 }}
-                      title="Desconectar"
                     >
-                      <LogOut className="w-5 h-5 text-red-400" />
-                    </motion.button>
+                      <LiquidButton
+                        onClick={() => setShowDisconnectModal(true)}
+                        disabled={loading}
+                        loading={loading}
+                        activeColor="red"
+                        groupId="history-header-actions"
+                        title="Desconectar"
+                        className="!text-red-400 hover:!text-red-300 !border-red-500/30 hover:!border-red-500/50"
+                      >
+                        <LogOut className="w-5 h-5" />
+                      </LiquidButton>
+                    </motion.div>
                   </div>
                 )}
               </div>
