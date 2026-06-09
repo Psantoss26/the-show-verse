@@ -29,8 +29,8 @@ const MAX_TRACKS = 40;
 const MAX_PLAYLISTS = 4;
 const MAX_ALBUMS = 4;
 const SEARCH_LIMIT = 10;
-const PLAYLIST_MIN_SCORE = 22;
-const ALBUM_MIN_SCORE = 22;
+const PLAYLIST_MIN_SCORE = 32;
+const ALBUM_MIN_SCORE = 32;
 
 const CACHE_DIR = path.join(process.cwd(), ".next", "cache", "spotify");
 const CACHE_FILE = path.join(CACHE_DIR, "soundtrack.json");
@@ -367,8 +367,10 @@ function scorePlaylist(pl, ctx) {
   }
 
   s += soundtrackBonus(text);
-  if (ctx.mediaType === "tv" && /series|show|season|episode|tv/.test(text)) s += 8;
+  if (ctx.mediaType === "tv" && /series|show|season|episode|tv|television/.test(text)) s += 8;
   if (ctx.mediaType === "movie" && /movie|film|motion picture/.test(text)) s += 8;
+  if (ctx.mediaType === "tv" && /movie|film/.test(text) && !/series|show|season|episode|tv|television/.test(text)) s -= 14;
+  if (ctx.mediaType === "movie" && /series|season|episode|tv|television/.test(text) && !/movie|film|motion picture/.test(text)) s -= 14;
 
   const total = Number(pl?.tracks?.total ?? 0);
   if (total >= 5 && total <= 120) s += 12;
@@ -399,6 +401,8 @@ function scoreAlbum(album, ctx) {
 
   s += soundtrackBonus(text);
   if (/motion picture|television|series|movie|film/.test(text)) s += 10;
+  if (ctx.mediaType === "tv" && /movie|film|motion picture/.test(text) && !/series|television|tv/.test(text)) s -= 12;
+  if (ctx.mediaType === "movie" && /series|television|tv/.test(text) && !/movie|film|motion picture/.test(text)) s -= 12;
   s += yearScore(album?.release_date, ctx.year, ctx.mediaType);
 
   const total = Number(album?.total_tracks ?? 0);

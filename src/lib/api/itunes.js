@@ -7,8 +7,8 @@ const ITUNES_SEARCH_URL = "https://itunes.apple.com/search";
 const ITUNES_LOOKUP_URL = "https://itunes.apple.com/lookup";
 const MAX_TRACKS = 40;
 const MAX_ALBUMS = 4;
-const ALBUM_MIN_SCORE = 20;
-const TRACK_MIN_SCORE = 14;
+const ALBUM_MIN_SCORE = 26;
+const TRACK_MIN_SCORE = 18;
 const QUERY_TIMEOUT_MS = 7000;
 
 function fetchJson(url) {
@@ -69,8 +69,10 @@ function scoreAlbum(album, ctx) {
   if (album.primaryGenreName?.toLowerCase().includes("soundtrack")) s += 20;
   if (/motion picture|television|series|movie|film/.test(text)) s += 10;
 
-  if (ctx.mediaType === "tv" && /series|show|season|episode|tv/.test(text)) s += 8;
+  if (ctx.mediaType === "tv" && /series|show|season|episode|tv|television/.test(text)) s += 8;
   if (ctx.mediaType === "movie" && /movie|film|motion picture/.test(text)) s += 8;
+  if (ctx.mediaType === "tv" && /movie|film/.test(text) && !/series|show|season|episode|tv|television/.test(text)) s -= 12;
+  if (ctx.mediaType === "movie" && /series|season|episode|tv|television/.test(text) && !/movie|film|motion picture/.test(text)) s -= 12;
   if (/original|official/.test(text)) s += 6;
 
   s += yearScore(album.releaseDate, ctx.year, ctx.mediaType);
