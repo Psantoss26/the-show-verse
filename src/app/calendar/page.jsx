@@ -18,8 +18,6 @@ import {
   isSameMonth,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { DayPicker } from "react-day-picker";
-import "react-day-picker/dist/style.css";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -117,7 +115,7 @@ function EpisodeCard({ item, viewMode }) {
   return (
     <Link
       href={href}
-      className="group block overflow-hidden rounded-xl border border-purple-500/15 bg-zinc-950 shadow-lg ring-1 ring-white/5 transition duration-300 hover:-translate-y-0.5 hover:border-purple-400/40 hover:shadow-[0_0_24px_rgba(168,85,247,0.18)]"
+      className="group block overflow-hidden rounded-xl transition duration-300 hover:-translate-y-0.5 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:shadow-[0_20px_25px_-5px_rgba(168,85,247,0.15)]"
     >
       <div className="relative aspect-[16/9] overflow-hidden bg-zinc-900">
         <TmdbBackdrop
@@ -130,10 +128,10 @@ function EpisodeCard({ item, viewMode }) {
 
         {viewMode !== "day" && validAiredDate && (
           <div
-            className={`absolute left-2 top-2 rounded-lg border px-2 py-1 text-white shadow-lg backdrop-blur-md ${
+            className={`absolute left-2 top-2 rounded-lg px-2 py-1 shadow-lg backdrop-blur-md border border-white/10 ${
               isToday(validAiredDate)
-                ? "border-yellow-400/50 bg-yellow-500/90 text-black"
-                : "border-white/15 bg-black/70"
+                ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black font-bold"
+                : "bg-black/40 bg-gradient-to-br from-white/10 to-white/5 text-white"
             }`}
           >
             <div className="text-[9px] font-bold uppercase leading-none">
@@ -147,13 +145,13 @@ function EpisodeCard({ item, viewMode }) {
 
         <div className="absolute right-2 top-2 flex gap-1.5">
           {isWatchlist && (
-            <span className="inline-flex items-center gap-1 rounded-md border border-sky-400/25 bg-sky-500/20 px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-sky-200 backdrop-blur-md">
+            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-sky-200 backdrop-blur-md bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg border border-white/10">
               <Bookmark className="h-3 w-3" />
               Pendiente
             </span>
           )}
           {isFavorite && (
-            <span className="inline-flex items-center gap-1 rounded-md border border-rose-400/25 bg-rose-500/20 px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-rose-200 backdrop-blur-md">
+            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-rose-200 backdrop-blur-md bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg border border-white/10">
               <Heart className="h-3 w-3 fill-current" />
               Favorita
             </span>
@@ -161,7 +159,7 @@ function EpisodeCard({ item, viewMode }) {
         </div>
 
         <div className="absolute inset-x-0 bottom-0 p-3">
-          <div className="mb-1 inline-flex items-center gap-1.5 rounded-md border border-purple-400/25 bg-purple-500/20 px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-purple-200 backdrop-blur-md">
+          <div className="mb-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-purple-200 backdrop-blur-md bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg border border-white/10">
             <Tv2 className="h-3 w-3" />
             Episodio
           </div>
@@ -175,6 +173,136 @@ function EpisodeCard({ item, viewMode }) {
         </div>
       </div>
     </Link>
+  );
+}
+
+function CustomCalendar({
+  selected,
+  onSelect,
+  currentMonth,
+  onMonthChange,
+  viewMode,
+}) {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+
+  const buildMonthGrid = (y, m) => {
+    const first = new Date(y, m, 1);
+    const firstDow = first.getDay();
+    const offset = (firstDow - 1 + 7) % 7;
+    const start = new Date(y, m, 1 - offset);
+    const weeks = [];
+    for (let w = 0; w < 6; w++) {
+      const week = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + w * 7 + i);
+        week.push(d);
+      }
+      weeks.push(week);
+    }
+    return weeks;
+  };
+
+  const weeks = useMemo(() => buildMonthGrid(year, month), [year, month]);
+  const dow = ["L", "M", "X", "J", "V", "S", "D"];
+
+  const goPrev = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onMonthChange(subMonths(currentMonth, 1));
+  };
+  const goNext = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onMonthChange(addMonths(currentMonth, 1));
+  };
+
+  return (
+    <div className="w-[280px] sm:w-[320px] p-2 flex flex-col gap-4">
+      <div className="flex items-center justify-between px-2">
+        <button
+          type="button"
+          onClick={goPrev}
+          className="p-1.5 hover:bg-white/10 rounded-lg transition text-yellow-500"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="text-sm font-bold text-yellow-400 capitalize">
+          {format(currentMonth, "MMMM yyyy", { locale: es })}
+        </div>
+        <button
+          type="button"
+          onClick={goNext}
+          className="p-1.5 hover:bg-white/10 rounded-lg transition text-yellow-500"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <div className="grid grid-cols-7 mb-2">
+          {dow.map((d) => (
+            <div
+              key={d}
+              className="text-center text-xs font-bold text-zinc-500"
+            >
+              {d}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-y-1">
+          {weeks.flat().map((d, i) => {
+            const key = format(d, "yyyy-MM-dd");
+            const selKey = format(selected, "yyyy-MM-dd");
+            const isSel = key === selKey;
+
+            let isSelWeek = false;
+            if (viewMode === "week") {
+              isSelWeek = isSameWeek(d, selected, {
+                locale: es,
+                weekStartsOn: 1,
+              });
+            }
+
+            const inMonth = d.getMonth() === month;
+            const isTodayDate = isToday(d);
+
+            return (
+              <div
+                key={i}
+                className="flex justify-center items-center h-8 sm:h-9 relative"
+              >
+                {isSelWeek && !isSel && (
+                  <div className="absolute inset-0 bg-yellow-500/10 rounded-md" />
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelect(d);
+                    onMonthChange(d);
+                  }}
+                  className={`relative w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm transition-all z-10 ${
+                    isSel
+                      ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black font-bold shadow-md shadow-yellow-500/20 scale-105"
+                      : isSelWeek
+                        ? "text-yellow-400 font-bold hover:bg-yellow-500/20"
+                        : isTodayDate
+                          ? "bg-white/5 text-yellow-400 font-bold border border-yellow-500/30 hover:bg-white/10"
+                          : inMonth
+                            ? "text-zinc-300 hover:bg-white/10 hover:text-white"
+                            : "text-zinc-600 hover:bg-white/5 hover:text-zinc-400"
+                  }`}
+                >
+                  {d.getDate()}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -203,14 +331,14 @@ function Dropdown({ label, valueLabel, icon: Icon, children, className = "" }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full h-10 inline-flex items-center justify-between gap-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300"
+        className="w-full h-11 inline-flex items-center justify-between gap-2 px-3 rounded-xl transition text-sm bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
       >
         <div className="flex items-center gap-2 truncate">
           {Icon && <Icon className="w-4 h-4 text-zinc-500" />}
           <span className="font-medium text-white truncate">{valueLabel}</span>
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -221,9 +349,9 @@ function Dropdown({ label, valueLabel, icon: Icon, children, className = "" }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
-            className="absolute left-0 top-full z-[99999] mt-2 w-full rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden"
+            className="absolute left-0 top-full z-[99999] mt-2 w-full rounded-2xl bg-zinc-950/95 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl shadow-2xl p-2 border border-white/10"
           >
-            <div className="p-1 space-y-0.5">
+            <div className="space-y-1">
               {children({ close: () => setOpen(false) })}
             </div>
           </motion.div>
@@ -238,10 +366,10 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between ${
+      className={`w-full px-3 py-2 rounded-xl text-left text-xs sm:text-sm transition flex items-center justify-between ${
         active
-          ? "bg-zinc-800 text-white"
-          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+          ? "bg-white/10 text-white font-bold"
+          : "text-zinc-300 hover:bg-white/5 hover:text-white"
       }`}
     >
       <span className="font-medium">{children}</span>
@@ -293,9 +421,9 @@ function DateSelector({
   if (viewMode === "month") {
     return (
       <div className={className}>
-        <div className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-5 py-2.5 sm:py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl sm:rounded-2xl text-yellow-400 shadow-lg cursor-not-allowed">
+        <div className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-lg cursor-not-allowed bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg opacity-70">
           <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-          <span className="text-xs sm:text-sm font-bold capitalize truncate">
+          <span className="text-xs sm:text-sm font-bold capitalize truncate text-zinc-300">
             {buttonText}
           </span>
         </div>
@@ -310,84 +438,32 @@ function DateSelector({
     >
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-5 py-2.5 sm:py-3 bg-yellow-500 hover:bg-yellow-400 rounded-xl sm:rounded-2xl text-black shadow-lg shadow-yellow-900/20 transition-all group"
+        className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl transition-all group bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg shadow-lg hover:from-white/15 hover:to-white/10"
       >
-        <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-black/70" />
-        <span className="text-xs sm:text-sm font-bold capitalize truncate text-black">
+        <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
+        <span className="text-xs sm:text-sm font-bold capitalize truncate text-white">
           {buttonText}
         </span>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-black/60 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
 
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
+            exit={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
             transition={{ duration: 0.15 }}
-            className="absolute left-1/2 -translate-x-1/2 mt-2 sm:mt-4 p-4 bg-[#161616] border border-white/10 rounded-3xl shadow-2xl z-[99999] w-[280px] sm:w-auto"
+            className="absolute left-1/2 mt-2 sm:mt-4 p-4 bg-zinc-950/95 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl z-[99999] w-auto"
           >
-            <DayPicker
-              mode="single"
+            <CustomCalendar
               selected={selected}
               onSelect={handleSelect}
-              month={currentMonth}
+              currentMonth={currentMonth}
               onMonthChange={onMonthChange}
-              locale={es}
-              showOutsideDays
-              className="!m-0"
-              modifiers={
-                viewMode === "week"
-                  ? {
-                      selectedWeek: (date) =>
-                        isSameWeek(date, selected, {
-                          locale: es,
-                          weekStartsOn: 1,
-                        }),
-                    }
-                  : {}
-              }
-              modifiersClassNames={
-                viewMode === "week"
-                  ? {
-                      selectedWeek: "!bg-yellow-500/20 !text-yellow-300",
-                    }
-                  : {}
-              }
-              classNames={{
-                caption: "flex justify-center py-2 relative items-center mb-2",
-                caption_label: "text-sm font-bold text-yellow-400 capitalize",
-                nav: "flex items-center",
-                nav_button:
-                  "h-7 w-7 bg-transparent p-0 hover:bg-yellow-500/20 rounded-full flex items-center justify-center text-yellow-500/70 hover:text-yellow-400 transition-colors",
-                nav_button_previous: "absolute left-1",
-                nav_button_next: "absolute right-1",
-                table: "w-full border-collapse space-y-1",
-                head_row: "flex mb-2",
-                head_cell:
-                  "text-zinc-500 rounded-md w-8 sm:w-9 font-normal text-[0.75rem] uppercase",
-                row: "flex w-full mt-1",
-                cell: "text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
-                day: "h-8 w-8 sm:h-9 sm:w-9 p-0 font-normal hover:bg-yellow-500/10 rounded-full transition-colors text-zinc-300 hover:text-white",
-                day_selected:
-                  "!bg-yellow-500 !text-black hover:!bg-yellow-400 font-bold shadow-md shadow-yellow-500/20",
-                day_today:
-                  "text-yellow-400 font-bold border border-yellow-500/30",
-                day_outside: "text-zinc-700 opacity-50",
-                day_disabled: "text-zinc-700 opacity-50",
-                day_hidden: "invisible",
-              }}
-              components={{
-                IconLeft: () => (
-                  <ChevronLeft className="w-4 h-4 text-yellow-500" />
-                ),
-                IconRight: () => (
-                  <ChevronRight className="w-4 h-4 text-yellow-500" />
-                ),
-              }}
+              viewMode={viewMode}
             />
           </motion.div>
         )}
@@ -575,10 +651,11 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-sans selection:bg-yellow-500/30 pb-20">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] left-[10%] w-[700px] h-[700px] bg-yellow-600/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-amber-600/5 rounded-full blur-[100px]" />
+    <div className="min-h-screen bg-black text-gray-100 font-sans selection:bg-yellow-500/30 pb-20">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute -top-[20%] -left-[10%] w-[70vw] max-w-[800px] aspect-square rounded-full bg-yellow-600/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[30%] -right-[10%] w-[50vw] max-w-[600px] aspect-square rounded-full bg-yellow-900/30 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[20%] left-[20%] w-[60vw] max-w-[700px] aspect-square rounded-full bg-amber-800/20 blur-[120px] sm:blur-[150px]" />
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-2 sm:px-6 lg:px-8 py-6 lg:py-12">
@@ -608,33 +685,33 @@ export default function CalendarPage() {
               <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1.5 ml-1 hidden sm:block">
                 Vista
               </div>
-              <div className="flex items-center gap-1.5 p-1 bg-zinc-900/50 rounded-xl border border-white/5">
+              <div className="flex items-center gap-1.5 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg shadow-lg">
                 <button
                   onClick={() => setViewMode("day")}
-                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
                     viewMode === "day"
-                      ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
-                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                      ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                      : "text-zinc-400 hover:text-white hover:bg-white/10"
                   }`}
                 >
                   Día
                 </button>
                 <button
                   onClick={() => setViewMode("week")}
-                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
                     viewMode === "week"
-                      ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
-                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                      ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                      : "text-zinc-400 hover:text-white hover:bg-white/10"
                   }`}
                 >
                   Semana
                 </button>
                 <button
                   onClick={() => setViewMode("month")}
-                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                  className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
                     viewMode === "month"
-                      ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
-                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                      ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                      : "text-zinc-400 hover:text-white hover:bg-white/10"
                   }`}
                 >
                   Mes
@@ -646,7 +723,7 @@ export default function CalendarPage() {
             <div className="flex items-center gap-2 w-full xl:w-auto">
               <button
                 onClick={goPrev}
-                className="p-3 rounded-xl sm:rounded-2xl bg-zinc-900/50 border border-white/5 text-zinc-300 hover:text-white hover:border-white/20 transition shadow-lg flex-shrink-0"
+                className="p-3 rounded-xl sm:rounded-2xl transition shadow-lg flex-shrink-0 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white"
                 title={`${viewMode === "month" ? "Mes" : viewMode === "week" ? "Semana" : "Día"} anterior`}
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -664,7 +741,7 @@ export default function CalendarPage() {
 
               <button
                 onClick={goNext}
-                className="p-3 rounded-xl sm:rounded-2xl bg-zinc-900/50 border border-white/5 text-zinc-300 hover:text-white hover:border-white/20 transition shadow-lg flex-shrink-0"
+                className="p-3 rounded-xl sm:rounded-2xl transition shadow-lg flex-shrink-0 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white"
                 title={`${viewMode === "month" ? "Mes" : viewMode === "week" ? "Semana" : "Día"} siguiente`}
               >
                 <ChevronRight className="w-5 h-5" />
@@ -675,7 +752,7 @@ export default function CalendarPage() {
             {!isTodaySelected && (
               <button
                 onClick={() => setSelectedDate(new Date())}
-                className="px-4 py-2.5 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500 hover:text-black font-bold text-xs sm:text-sm transition"
+                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm transition font-bold bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg shadow-lg text-yellow-400 hover:from-white/15 hover:to-white/10 hover:text-yellow-300"
               >
                 Volver a Hoy
               </button>
@@ -692,7 +769,7 @@ export default function CalendarPage() {
             </span>
           </div>
         ) : error && !hasAnyItems ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-red-900/30 rounded-3xl bg-red-900/5 mx-2">
+          <div className="rounded-[2rem] flex flex-col items-center justify-center py-32 text-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg mx-2">
             <ImageOff className="w-16 h-16 text-red-500/50 mb-4" />
             <h3 className="text-xl font-bold text-red-200">{error}</h3>
             <p className="text-red-400/60 mt-2 text-sm">
@@ -700,8 +777,8 @@ export default function CalendarPage() {
             </p>
           </div>
         ) : !hasAnyItems ? (
-          <div className="flex flex-col items-center justify-center py-40 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20 mx-2">
-            <div className="w-24 h-24 bg-zinc-900/50 rounded-full flex items-center justify-center mb-6 border border-zinc-800/50">
+          <div className="flex flex-col items-center justify-center py-40 text-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg mx-2 border border-white/10">
+            <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 bg-white/5 shadow-sm border border-white/10">
               <CalendarIcon className="w-10 h-10 text-zinc-600" />
             </div>
             <h3 className="text-2xl font-bold text-zinc-300">
@@ -721,7 +798,7 @@ export default function CalendarPage() {
             {traktConnected === false && (
               <Link
                 href={`/api/trakt/auth/start?next=${encodeURIComponent("/calendar")}`}
-                className="mt-6 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-2 text-sm font-bold text-purple-200 transition hover:bg-purple-500 hover:text-white"
+                className="mt-6 rounded-xl px-4 py-2 text-sm font-bold transition bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-purple-300 hover:text-white hover:from-white/15 hover:to-white/10"
               >
                 Conectar Trakt
               </Link>
@@ -732,19 +809,19 @@ export default function CalendarPage() {
             {/* Header con info del período */}
             <div className="mb-6 sm:mb-8 px-2 sm:px-0">
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-gradient-to-r from-yellow-500/50 to-transparent" />
-                <div className="text-center">
-                  <span className="text-yellow-400 font-bold text-xs sm:text-sm tracking-widest uppercase block">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-500/40 to-yellow-500/15" />
+                <div className="relative overflow-hidden inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-1.5 text-center">
+                  <span className="text-yellow-100 font-bold text-xs sm:text-sm tracking-widest uppercase block drop-shadow-sm">
                     {selectedMovies.length} películas ·{" "}
                     {sortedTrackedEpisodes.length} episodios
                   </span>
                   {viewMode !== "day" && (
-                    <span className="text-zinc-500 text-[10px] sm:text-xs mt-1 capitalize block">
-                      {dateRangeLabel}
+                    <span className="text-yellow-300/80 text-[10px] sm:text-xs capitalize block ml-2">
+                      ({dateRangeLabel})
                     </span>
                   )}
                 </div>
-                <div className="h-px flex-1 bg-gradient-to-l from-yellow-500/50 to-transparent" />
+                <div className="h-px flex-1 bg-gradient-to-l from-transparent via-yellow-500/40 to-yellow-500/15" />
               </div>
             </div>
 
@@ -767,7 +844,7 @@ export default function CalendarPage() {
                     </p>
                   </div>
                   {hasEpisodes && (
-                    <span className="w-fit rounded-full border border-purple-500/25 bg-purple-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-purple-200">
+                    <span className="w-fit rounded-full px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-purple-300 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       {sortedTrackedEpisodes.length} episodios
                     </span>
                   )}
@@ -783,7 +860,7 @@ export default function CalendarPage() {
                     ))}
                   </div>
                 ) : traktConnected === false ? (
-                  <div className="flex flex-col items-start gap-3 rounded-2xl border border-purple-500/20 bg-purple-500/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col items-start gap-3 rounded-[2rem] p-5 sm:flex-row sm:items-center sm:justify-between bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                     <div>
                       <h3 className="font-bold text-purple-100">
                         Conecta Trakt para ver tus episodios
@@ -795,7 +872,7 @@ export default function CalendarPage() {
                     </div>
                     <Link
                       href={`/api/trakt/auth/start?next=${encodeURIComponent("/calendar")}`}
-                      className="rounded-xl bg-purple-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-purple-400"
+                      className="rounded-xl px-4 py-2 text-sm font-bold transition bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-purple-300 hover:text-white hover:from-white/15 hover:to-white/10"
                     >
                       Conectar
                     </Link>
@@ -811,11 +888,11 @@ export default function CalendarPage() {
                     ))}
                   </div>
                 ) : episodeError ? (
-                  <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-4 text-sm text-purple-200">
+                  <div className="rounded-[2rem] p-4 text-sm text-red-200 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-center">
                     {episodeError}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-purple-500/15 bg-zinc-900/20 p-5 text-sm text-zinc-500">
+                  <div className="rounded-[2rem] p-5 text-sm text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-center">
                     No hay episodios de tus series para este periodo.
                   </div>
                 )}
@@ -831,7 +908,7 @@ export default function CalendarPage() {
                       Películas
                     </h2>
                   </div>
-                  <span className="rounded-full border border-yellow-500/25 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-yellow-300">
+                  <span className="w-fit rounded-full px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-yellow-300 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                     {selectedMovies.length} lanzamientos
                   </span>
                 </div>
@@ -889,7 +966,7 @@ export default function CalendarPage() {
                           href={href}
                           className="group relative block animate-in fade-in zoom-in-95 duration-500"
                         >
-                          <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg sm:rounded-xl bg-zinc-900 shadow-md ring-1 ring-white/5 transition-all duration-500 group-hover:shadow-[0_0_20px_rgba(234,179,8,0.25)] group-hover:scale-[1.03] z-0 group-hover:z-10">
+                          <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg sm:rounded-xl shadow-md transition-all duration-500 group-hover:shadow-[0_20px_25px_-5px_rgba(234,179,8,0.15)] group-hover:scale-[1.03] z-0 group-hover:z-10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg">
                             <TmdbPoster
                               path={posterPath}
                               alt={title}
@@ -901,10 +978,8 @@ export default function CalendarPage() {
                               {/* Badge Tipo en hover - Esquina superior derecha */}
                               <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-end items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                                 <span
-                                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                                    isMovie
-                                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md shadow-sm backdrop-blur-md bg-black/40 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 ${
+                                    isMovie ? "text-sky-300" : "text-purple-300"
                                   }`}
                                 >
                                   {isMovie ? "PELÍCULA" : "SERIE"}
@@ -927,10 +1002,10 @@ export default function CalendarPage() {
                             {/* Badge Fecha (siempre visible en vistas semana/mes) */}
                             {dateBadgeInfo && (
                               <div
-                                className={`absolute top-1 left-1 sm:top-2 sm:left-2 px-1.5 py-1 rounded-lg backdrop-blur-md border shadow-lg ${
+                                className={`absolute top-1 left-1 sm:top-2 sm:left-2 px-1.5 py-1 rounded-lg backdrop-blur-md shadow-lg border border-white/10 ${
                                   dateBadgeInfo.isToday
-                                    ? "bg-yellow-500/90 border-yellow-400/50 text-black"
-                                    : "bg-black/80 border-white/20 text-white"
+                                    ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black font-bold"
+                                    : "bg-black/40 bg-gradient-to-br from-white/10 to-white/5 text-white"
                                 }`}
                               >
                                 <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider leading-none">

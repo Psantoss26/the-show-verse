@@ -12,10 +12,42 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 45;
 
 const TMDB_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_BASE = "https://api.themoviedb.org/3";
+
+// ---------------------------------------------------------------------------
+// Caché en memoria del lado servidor (misma instancia Node).
+// ---------------------------------------------------------------------------
+const _completedCache = new Map();
+const CACHE_TTL_MS = 3 * 60 * 1000;
+
+function _getCacheKey(token) {
+  return typeof token === "string" && token.length > 0
+    ? token.slice(0, 24)
+    : null;
+}
+
+function _readCache(key) {
+  if (!key) return null;
+  const entry = _completedCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) {
+    _completedCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function _writeCache(key, data) {
+  if (!key) return;
+  if (_completedCache.size >= 200) {
+    _completedCache.delete(_completedCache.keys().next().value);
+  }
+  _completedCache.set(key, { ts: Date.now(), data });
+}
 
 async function safeJson(res) {
   try {
@@ -81,6 +113,15 @@ export async function GET(request) {
         return NextResponse.json({ connected: false, items: [] });
       refreshedTokens = await refreshAccessToken(refreshToken);
       token = refreshedTokens.access_token;
+    }
+
+    // Comprobar caché servidor
+    const cacheKey = _getCacheKey(token);
+    const cachedData = _readCache(cacheKey);
+    if (cachedData) {
+      const res = NextResponse.json(cachedData);
+      if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+      return res;
     }
 
     // 1. Obtener todas las series vistas por el usuario
@@ -204,7 +245,7 @@ export async function GET(request) {
       };
     });
 
-    const res = NextResponse.json({
+    const responseData = {
       connected: true,
       items: enriched,
       stats: {
@@ -213,8 +254,11 @@ export async function GET(request) {
         totalEpisodesWatched: enriched.reduce((s, x) => s + x.completed, 0),
         totalEpisodesRemaining: 0,
       },
-    });
+    };
 
+    _writeCache(cacheKey, responseData);
+
+    const res = NextResponse.json(responseData);
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
     return res;
   } catch (e) {

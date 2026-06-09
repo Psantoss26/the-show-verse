@@ -143,6 +143,8 @@ function getProgressColor(pct) {
 // ----------------------------
 const IN_PROGRESS_CACHE_KEY = "showverse:trakt:in-progress:v1";
 const IN_PROGRESS_CACHE_TTL = 1000 * 60 * 5;
+const COMPLETED_CACHE_KEY = "showverse:trakt:completed:v1";
+const COMPLETED_CACHE_TTL = 1000 * 60 * 10;
 
 const buildImg = (path, size = "w500") => {
   if (!path) return null;
@@ -936,13 +938,7 @@ const InProgressCard = memo(function InProgressCard({
 
             {/* Progress circular gauge badge / User rating badge - top-right with consistent border margins */}
             <div className="absolute top-3 right-3">
-              <div
-                className="rounded-full"
-                style={{
-                  background: "rgba(0,0,0,0.75)",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-                }}
-              >
+              <div className="rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
                 {activeTab === "completed" ? (
                   item.user_rating ? (
                     <div className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full bg-yellow-500/15 border-2 border-yellow-400 flex items-center justify-center">
@@ -959,14 +955,7 @@ const InProgressCard = memo(function InProgressCard({
 
             {/* Next episode badge - solid dark bg */}
             {nextEpCode && (
-              <div
-                className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5"
-                style={{
-                  background: "rgba(0,0,0,0.75)",
-                  boxShadow:
-                    "0 4px 12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08)",
-                }}
-              >
+              <div className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
                 <Play
                   className="w-3 h-3 text-emerald-400"
                   fill="currentColor"
@@ -1231,16 +1220,22 @@ export default function InProgressClient() {
     }
   }, []);
 
-  const loadCompleted = useCallback(async () => {
-    setCompletedLoading(true);
+  const loadCompleted = useCallback(async ({ background = false } = {}) => {
+    if (!background) setCompletedLoading(true);
     try {
       const json = await traktGetCompleted();
-      setCompletedItems(json?.items || []);
-      setCompletedStats(json?.stats || null);
+      const nextItems = json?.items || [];
+      const nextStats = json?.stats || null;
+      setCompletedItems(nextItems);
+      setCompletedStats(nextStats);
+      writeSessionCache(COMPLETED_CACHE_KEY, {
+        items: nextItems,
+        stats: nextStats,
+      });
     } catch (e) {
       console.error("Error loading completed:", e);
     } finally {
-      setCompletedLoading(false);
+      if (!background) setCompletedLoading(false);
       setCompletedLoaded(true);
     }
   }, []);
@@ -1263,10 +1258,28 @@ export default function InProgressClient() {
     void loadData();
   }, [loadData]);
 
-  // Lazy load completed data when tab is switched
+  // Cargar completadas desde sessionStorage si hay caché disponible
+  useEffect(() => {
+    if (!auth.connected) return;
+    const cached = readSessionCache(COMPLETED_CACHE_KEY, COMPLETED_CACHE_TTL);
+    if (cached?.items || cached?.stats) {
+      setCompletedItems(Array.isArray(cached?.items) ? cached.items : []);
+      setCompletedStats(cached?.stats || null);
+      setCompletedLoaded(true);
+    }
+  }, [auth.connected]);
+
+  // Precargar completadas en segundo plano cuando los datos de "En progreso" ya están listos
+  useEffect(() => {
+    if (auth.connected && dataLoaded && !completedLoaded) {
+      void loadCompleted({ background: true });
+    }
+  }, [auth.connected, dataLoaded, completedLoaded, loadCompleted]);
+
+  // Lazy load completed data when tab is switched (fallback si la precarga no terminó)
   useEffect(() => {
     if (auth.connected && activeTab === "completed" && !completedLoaded) {
-      loadCompleted();
+      loadCompleted({ background: false });
     }
   }, [auth.connected, activeTab, completedLoaded, loadCompleted]);
 
