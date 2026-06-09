@@ -1114,7 +1114,7 @@ export default function EpisodeDetailsClient({
             </div>
 
             {/* SCOREBOARD */}
-            <div className="w-full border border-white/10 bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
+            <div className="relative w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] mb-6">
               <div
                 className="
       py-3
