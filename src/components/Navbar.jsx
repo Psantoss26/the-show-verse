@@ -253,16 +253,28 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [traktReady, setTraktReady] = useState(false);
   const [traktConnected, setTraktConnected] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 40);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const isActive = (href) =>
     pathname === href || (href !== "/" && pathname?.startsWith(href));
 
   const navLinkClass = (href) =>
-    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+    `px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 ${
       isActive(href)
         ? "bg-white/10 text-white"
-        : "text-neutral-400 hover:text-white hover:bg-white/5"
-    }`;
+        : isScrolled
+          ? "text-zinc-100 hover:text-white hover:bg-white/10"
+          : "text-neutral-300 hover:text-white hover:bg-white/5"
+    } ${isScrolled ? "[text-shadow:0_2px_10px_rgba(0,0,0,1),0_1px_4px_rgba(0,0,0,0.8)]" : ""}`;
 
   const iconLinkClass = (href, tone = "neutral") => {
     const active = isActive(href);
