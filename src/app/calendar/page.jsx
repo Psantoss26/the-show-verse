@@ -653,9 +653,9 @@ export default function CalendarPage() {
   return (
     <div className="min-h-screen bg-black text-gray-100 font-sans selection:bg-yellow-500/30 pb-20">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-[20%] -left-[10%] w-[70vw] max-w-[800px] aspect-square rounded-full bg-yellow-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[30%] -right-[10%] w-[50vw] max-w-[600px] aspect-square rounded-full bg-yellow-900/30 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[20%] left-[20%] w-[60vw] max-w-[700px] aspect-square rounded-full bg-amber-800/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-yellow-600/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-yellow-700/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-amber-800/25 blur-[120px] sm:blur-[150px]" />
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-2 sm:px-6 lg:px-8 py-6 lg:py-12">

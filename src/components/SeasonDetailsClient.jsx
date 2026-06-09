@@ -36,10 +36,12 @@ import {
 } from "@/lib/details/seriesGraphRatings";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
+import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
 import {
   invalidateTraktGetCache,
   traktGetShowWatched,
   traktSetSeasonWatched,
+  traktSetEpisodeWatched,
 } from "@/lib/api/traktClient";
 
 const seasonScoreboardCache = new Map();
@@ -338,6 +340,13 @@ export default function SeasonDetailsClient({
     hasInitialShowWatched,
   );
   const [watchedBusy, setWatchedBusy] = useState(false);
+  const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false);
+  const [episodeBusyKey, setEpisodeBusyKey] = useState("");
+
+  // Ref para optimistic updates del modal
+  const watchedBySeasonRef = useRef(watchedBySeason);
+  watchedBySeasonRef.current = watchedBySeason;
+
   const [trakt, setTrakt] = useState(() => {
     const seasonEpisodes = getSeasonWatchedEpisodes(
       initialWatchedBySeason,
@@ -870,7 +879,7 @@ export default function SeasonDetailsClient({
     watchedBusy,
   ]);
 
-  const toggleSeasonWatched = useCallback(async () => {
+  const toggleSeasonWatched = useCallback(async (watchedAt) => {
     if (trakt.loading || watchedBusy || Number(seasonNumber) <= 0) return;
 
     let connected = !!trakt.connected;
@@ -884,7 +893,9 @@ export default function SeasonDetailsClient({
       return;
     }
 
-    const nextWatched = !seasonFullyWatched;
+    const nextWatched = watchedAt !== undefined
+      ? watchedAt !== null
+      : !seasonFullyWatched;
     setWatchedBusy(true);
 
     try {
@@ -892,6 +903,7 @@ export default function SeasonDetailsClient({
         tmdbId: Number(showId),
         season: Number(seasonNumber),
         watched: nextWatched,
+        watchedAt: watchedAt || undefined,
       });
 
       traktRequestIdRef.current += 1;
@@ -925,6 +937,59 @@ export default function SeasonDetailsClient({
     reloadSeasonTraktState,
     showId,
     applyShowWatchedPayload,
+  ]);
+
+  // Toggle individual episode watched (para el modal)
+  const toggleEpisodeWatched = useCallback(async (sn, en) => {
+    if (!trakt?.connected) return;
+    if (episodeBusyKey) return;
+
+    const key = `S${sn}E${en}`;
+    setEpisodeBusyKey(key);
+
+    const currentlyWatched = !!watchedBySeasonRef.current?.[sn]?.includes(en);
+    const next = !currentlyWatched;
+
+    // Optimistic update
+    const optimistic = { ...watchedBySeasonRef.current };
+    const episodes = new Set(optimistic?.[sn] || []);
+    if (next) episodes.add(en);
+    else episodes.delete(en);
+    optimistic[sn] = Array.from(episodes).sort((a, b) => a - b);
+    setWatchedBySeason(optimistic);
+
+    try {
+      const r = await traktSetEpisodeWatched({
+        tmdbId: Number(showId),
+        season: sn,
+        episode: en,
+        watched: next,
+        watchedAt: null,
+      });
+      invalidateTraktGetCache({
+        tmdbId: Number(showId),
+        traktId: trakt.traktId ?? undefined,
+      });
+
+      if (r?.watchedBySeason) {
+        setWatchedBySeason(normalizeWatchedBySeason(r.watchedBySeason) || {});
+      } else {
+        const fresh = await traktGetShowWatched({ tmdbId: Number(showId) });
+        setWatchedBySeason(
+          normalizeWatchedBySeason(fresh?.watchedBySeason) || {},
+        );
+      }
+    } catch {
+      // Rollback
+      setWatchedBySeason(watchedBySeasonRef.current);
+    } finally {
+      setEpisodeBusyKey("");
+    }
+  }, [
+    trakt?.connected,
+    trakt.traktId,
+    episodeBusyKey,
+    showId,
   ]);
 
   return (
@@ -1129,7 +1194,7 @@ export default function SeasonDetailsClient({
                       badge={seasonProgressBadge}
                       busy={watchedBusy}
                       loading={trakt.loading && !watchedBySeasonLoaded}
-                      onOpen={toggleSeasonWatched}
+                      onOpen={() => setTraktEpisodesOpen(true)}
                     />
                   )}
 
@@ -1502,6 +1567,25 @@ export default function SeasonDetailsClient({
           )}
         </AnimatedSection>
       </div>
+
+      {/* Modal de episodios — solo la temporada actual */}
+      <TraktEpisodesWatchedModal
+        open={traktEpisodesOpen}
+        onClose={() => {
+          setTraktEpisodesOpen(false);
+          setEpisodeBusyKey("");
+          void reloadSeasonTraktState({ background: true });
+        }}
+        mediaType="tv"
+        tmdbId={Number(showId)}
+        title={showName}
+        connected={!!trakt?.connected}
+        seasons={[{ season_number: Number(seasonNumber) }]}
+        watchedBySeason={watchedBySeason}
+        busyKey={episodeBusyKey}
+        onToggleEpisodeWatched={toggleEpisodeWatched}
+        onToggleShowWatched={toggleSeasonWatched}
+      />
     </div>
   );
 }

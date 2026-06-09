@@ -711,6 +711,22 @@ export async function getTraktRelated({ type, tmdbId }) {
   }
   return json || { results: [] };
 }
+// ✅ Obtener historial de visionados de un episodio específico
+export async function traktGetEpisodePlays({ tmdbId, season, episode } = {}) {
+  const qs = new URLSearchParams({
+    tmdbId: String(tmdbId),
+    season: String(season),
+    episode: String(episode),
+  });
+  const res = await fetch(`/api/trakt/episode/plays?${qs.toString()}`, {
+    cache: "no-store",
+  });
+  const json = await safeJson(res);
+  if (!res.ok)
+    throw new Error(json?.error || `Trakt episode plays HTTP ${res.status}`);
+  return json; // { connected, found, plays, lastWatchedAt, history: [{id, watchedAt}] }
+}
+
 // ✅ Añadir play de episodio (rewatch-friendly) (ISO, no YYYY-MM-DD)
 export async function traktAddEpisodePlay({
   tmdbId,

@@ -128,7 +128,10 @@ function getListCacheKey(listOrSource, maybeId) {
   return `${String(listOrSource || "unknown")}:${String(maybeId || "")}`;
 }
 
-function ListsLoaderState({ message = "Cargando listas...", fullscreen = false }) {
+function ListsLoaderState({
+  message = "Cargando listas...",
+  fullscreen = false,
+}) {
   return (
     <div
       className={
@@ -197,10 +200,7 @@ function readSessionJsonCache(key, ttlMs) {
 function writeSessionJsonCache(key, data) {
   if (!key || typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(
-      key,
-      JSON.stringify({ t: Date.now(), data }),
-    );
+    window.sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data }));
   } catch {
     // ignore
   }
@@ -408,19 +408,21 @@ function Dropdown({ valueLabel, icon: Icon, children, className = "" }) {
   return (
     <div
       ref={ref}
-      className={`relative ${open ? "z-50" : "z-10"} ${className}`}
+      className={`relative ${open ? "z-[99999]" : "z-10"} ${className}`}
     >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full h-10 inline-flex items-center justify-between gap-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
       >
         <div className="flex items-center gap-2 truncate">
-          {Icon && <Icon className="w-4 h-4 text-zinc-500" />}
-          <span className="font-medium text-white truncate">{valueLabel}</span>
+          {Icon && <Icon className="w-4 h-4 text-purple-500" />}
+          <span className="font-semibold text-white truncate">
+            {valueLabel}
+          </span>
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -431,9 +433,9 @@ function Dropdown({ valueLabel, icon: Icon, children, className = "" }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
-            className="absolute right-0 top-full z-50 mt-2 w-full rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden"
+            className="absolute right-0 top-full z-[99999] mt-2 w-full rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
           >
-            <div className="p-1 space-y-0.5">
+            <div className="space-y-1">
               {children({ close: () => setOpen(false) })}
             </div>
           </motion.div>
@@ -448,17 +450,21 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-3 py-2 rounded-lg text-left text-xs sm:text-sm transition flex items-center justify-between
-        ${active ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"}`}
+      className={`w-full px-3 py-2 rounded-xl text-left text-xs sm:text-sm transition flex items-center justify-between ${
+        active
+          ? "bg-white/10 text-white font-bold"
+          : "text-zinc-300 hover:bg-white/5 hover:text-white"
+      }`}
     >
       <span className="font-medium">{children}</span>
-      {active && <CheckCircle2 className="w-3.5 h-3.5 text-purple-500" />}
+      {active && <CheckCircle2 className="w-4 h-4 text-purple-500" />}
     </button>
   );
 }
 
 function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
+  const [menuMaxHeight, setMenuMaxHeight] = useState(448);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -466,28 +472,47 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
     const onDown = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
+    const updateMenuSize = () => {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const availableBelow = window.innerHeight - rect.bottom - 12;
+      setMenuMaxHeight(Math.max(64, Math.min(448, availableBelow)));
+    };
+
+    updateMenuSize();
+    const frame = window.requestAnimationFrame(updateMenuSize);
     document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
+    window.addEventListener("resize", updateMenuSize);
+    window.addEventListener("scroll", updateMenuSize, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("resize", updateMenuSize);
+      window.removeEventListener("scroll", updateMenuSize, true);
+    };
   }, [open]);
 
   return (
-    <div ref={ref} className="relative w-full lg:w-auto lg:shrink-0">
+    <div
+      ref={ref}
+      className={`relative min-w-0 w-full lg:w-auto lg:shrink ${open ? "z-[99999]" : "z-10"}`}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[140px]"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-purple-500" />}
           <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider">
             {label}:
           </span>
-          <span className="font-semibold text-white truncate">
+          <span className="min-w-0 truncate font-semibold text-white">
             {valueLabel}
           </span>
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -497,9 +522,17 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 w-full rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-hidden p-1"
+            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+            style={{
+              maxHeight: `${menuMaxHeight}px`,
+              scrollbarWidth: "thin",
+              scrollbarGutter: "stable",
+              overscrollBehavior: "contain",
+            }}
           >
-            {children({ close: () => setOpen(false) })}
+            <div className="space-y-1">
+              {children({ close: () => setOpen(false) })}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -515,7 +548,7 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
         onClick={onClose}
@@ -524,9 +557,9 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="relative bg-[#0b0b0b] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+        className="relative bg-black/80 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl border border-white/10 rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden"
       >
-        <div className="p-5 border-b border-white/5 flex justify-between items-center bg-zinc-900/50">
+        <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5">
           <h3 className="text-lg font-bold text-white">Nueva Lista</h3>
           <button
             onClick={onClose}
@@ -543,7 +576,7 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none transition"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none transition focus:ring-1 focus:ring-purple-500/50"
               placeholder="Mi lista de favoritos..."
               autoFocus
             />
@@ -555,7 +588,7 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none transition resize-none h-24"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none transition resize-none h-24 focus:ring-1 focus:ring-purple-500/50"
               placeholder="De qué trata esta lista..."
             />
           </div>
@@ -564,7 +597,7 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
           <div className="flex gap-3 pt-2">
             <button
               onClick={onClose}
-              className="flex-1 py-3 rounded-xl font-bold text-sm bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition"
+              className="flex-1 py-3 rounded-xl font-bold text-sm bg-white/5 text-zinc-300 hover:bg-white/10 transition focus:outline-none border border-white/10"
             >
               Cancelar
             </button>
@@ -575,7 +608,7 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
                 setDesc("");
               }}
               disabled={creating || !name.trim()}
-              className="flex-1 py-3 rounded-xl font-bold text-sm bg-purple-600 text-white hover:bg-purple-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 py-3 rounded-xl font-bold text-sm bg-gradient-to-br from-purple-500 to-purple-600 text-white hover:from-purple-400 hover:to-purple-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none shadow-lg shadow-purple-500/20"
             >
               {creating && <Loader2 className="w-4 h-4 animate-spin" />} Crear
             </button>
@@ -586,7 +619,11 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
   );
 }
 
-const ListItemCard = memo(function ListItemCard({ item, isMobile, accent = "trakt" }) {
+const ListItemCard = memo(function ListItemCard({
+  item,
+  isMobile,
+  accent = "trakt",
+}) {
   const [imdbScore, setImdbScore] = useState(null);
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -596,7 +633,9 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile, accent = "trak
   const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
   const href = `/details/${mediaType}/${item.id}`;
   const posterPath = item?.poster_path || item?.backdrop_path || null;
-  const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w342${posterPath}` : null;
+  const posterUrl = posterPath
+    ? `https://image.tmdb.org/t/p/w342${posterPath}`
+    : null;
   const accentStyle = LIST_ROW_ACCENTS[accent] || LIST_ROW_ACCENTS.default;
   const hoverShadow = [
     `0 18px 48px -24px rgba(${accentStyle.shadowColor}, 0.72)`,
@@ -656,7 +695,7 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile, accent = "trak
   return (
     <Link
       href={href}
-      className="relative z-0 block w-full select-none hover:z-[300] focus:z-[300] focus:outline-none"
+      className="relative z-0 block w-full select-none hover:z-[50] focus:z-[50] focus:outline-none"
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
       onMouseEnter={prefetchEnabled ? prefetchImdb : undefined}
@@ -666,7 +705,7 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile, accent = "trak
         className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/5 bg-neutral-800/80 shadow-lg transition-colors duration-300 transform-gpu will-change-transform"
         whileHover={{
           y: -6,
-          zIndex: 300,
+          zIndex: 50,
           boxShadow: hoverShadow,
           borderColor: accentStyle.borderColor,
         }}
@@ -711,15 +750,25 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile, accent = "trak
                 <span className="font-mono text-[10px] font-black tracking-tight text-emerald-400 sm:text-xs">
                   {tmdbScore}
                 </span>
-                <img src="/logo-TMDb.png" alt="" className="h-2 w-auto sm:h-2.5" />
+                <img
+                  src="/logo-TMDb.png"
+                  alt=""
+                  className="h-2 w-auto sm:h-2.5"
+                />
               </div>
             ) : null}
             {!isMobile && imdbScore ? (
               <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
                 <span className="font-mono text-[10px] font-black tracking-tight text-yellow-400 sm:text-xs">
-                  {typeof imdbScore === "number" ? imdbScore.toFixed(1) : imdbScore}
+                  {typeof imdbScore === "number"
+                    ? imdbScore.toFixed(1)
+                    : imdbScore}
                 </span>
-                <img src="/logo-IMDb.svg" alt="" className="h-2.5 w-auto sm:h-3" />
+                <img
+                  src="/logo-IMDb.svg"
+                  alt=""
+                  className="h-2.5 w-auto sm:h-3"
+                />
               </div>
             ) : null}
           </div>
@@ -732,7 +781,9 @@ const ListItemCard = memo(function ListItemCard({ item, isMobile, accent = "trak
             {title}
           </h3>
           {year ? (
-            <p className={`mt-0.5 text-[10px] font-bold drop-shadow-md ${accentStyle.textClass}`}>
+            <p
+              className={`mt-0.5 text-[10px] font-bold drop-shadow-md ${accentStyle.textClass}`}
+            >
               {year}
             </p>
           ) : null}
@@ -804,7 +855,9 @@ function dedupePreviewItems(items) {
 
   for (const item of Array.isArray(items) ? items : []) {
     const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
-    const title = String(item?.title || item?.name || "").trim().toLowerCase();
+    const title = String(item?.title || item?.name || "")
+      .trim()
+      .toLowerCase();
     const poster = item?.poster_path || item?.backdrop_path || "";
     const identityKey =
       item?.id !== undefined && item?.id !== null
@@ -909,7 +962,7 @@ function ListItemsRow({ items, isMobile, accent = "trakt" }) {
   return (
     <div className="-mx-4 sm:mx-0">
       <div
-        className="relative z-0 px-3 hover:z-[200] sm:px-0"
+        className="relative z-0 px-3 hover:z-[40] sm:px-0"
         onMouseEnter={() => setIsHoveredRow(true)}
         onMouseLeave={() => setIsHoveredRow(false)}
       >
@@ -949,9 +1002,13 @@ function ListItemsRow({ items, isMobile, accent = "trakt" }) {
               return (
                 <SwiperSlide
                   key={`${mt}-${item?.id}-${idx}`}
-                  className="relative !h-auto select-none !overflow-visible !z-0 hover:!z-[300] focus-within:!z-[300]"
+                  className="relative !h-auto select-none !overflow-visible !z-0 hover:!z-[50] focus-within:!z-[50]"
                 >
-                  <ListItemCard item={item} isMobile={isMobile} accent={accent} />
+                  <ListItemCard
+                    item={item}
+                    isMobile={isMobile}
+                    accent={accent}
+                  />
                 </SwiperSlide>
               );
             })}
@@ -1541,8 +1598,7 @@ export default function ListsPage() {
   const visibleCount = filtered.length;
 
   const activeListsMap = useMemo(
-    () =>
-      new Map(activeLists.map((list) => [getListCacheKey(list), list])),
+    () => new Map(activeLists.map((list) => [getListCacheKey(list), list])),
     [activeLists],
   );
 
@@ -1610,7 +1666,9 @@ export default function ListsPage() {
             language: "es-ES",
             signal: ctrl.signal,
           });
-          const items = dedupePreviewItems(Array.isArray(json?.items) ? json.items : []);
+          const items = dedupePreviewItems(
+            Array.isArray(json?.items) ? json.items : [],
+          );
           writeSessionJsonCache(previewCacheKey, items);
           setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
           return;
@@ -1641,7 +1699,9 @@ export default function ListsPage() {
           },
         );
         const j = await res.json().catch(() => ({}));
-        const items = dedupePreviewItems(Array.isArray(j?.items) ? j.items : []);
+        const items = dedupePreviewItems(
+          Array.isArray(j?.items) ? j.items : [],
+        );
         writeSessionJsonCache(previewCacheKey, items);
         setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
       } catch (e) {
@@ -1738,12 +1798,12 @@ export default function ListsPage() {
     cachedActiveLists.length > 0
       ? true
       : !prefsHydrated
-      ? false
-      : source === "tmdb"
-        ? !!tmdbInitialized
-        : source === "trakt"
-          ? !!trakt?.initialized
-          : collectionsResolvedKey === collectionsQueryKey;
+        ? false
+        : source === "tmdb"
+          ? !!tmdbInitialized
+          : source === "trakt"
+            ? !!trakt?.initialized
+            : collectionsResolvedKey === collectionsQueryKey;
 
   useEffect(() => {
     if (hasCompletedInitialLoad) return;
@@ -1762,11 +1822,9 @@ export default function ListsPage() {
         ? "Cargando colecciones..."
         : "Cargando listas...";
 
-  const showInitialLoader =
-    false;
+  const showInitialLoader = false;
 
-  const showContentLoader =
-    false;
+  const showContentLoader = false;
 
   // ✅ readonly: Trakt y Colecciones no crean/borran ni loadMore
   const canEdit = !!canUse && source === "tmdb";
@@ -1796,9 +1854,10 @@ export default function ListsPage() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-purple-500/30">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[150px]" />
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-purple-600/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-purple-700/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-blue-800/25 blur-[120px] sm:blur-[150px]" />
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -1842,44 +1901,15 @@ export default function ListsPage() {
 
         {/* Filtros Sticky */}
         <motion.div
-          ref={(el) => {
-            if (el && !el.dataset.stickySetup) {
-              el.dataset.stickySetup = "true";
-              const observer = new IntersectionObserver(
-                ([e]) => {
-                  const isStuck = e.intersectionRatio < 1;
-                  if (isStuck) {
-                    el.classList.add(
-                      "backdrop-blur-xl",
-                      "bg-gradient-to-br",
-                      "from-black/60",
-                      "via-black/50",
-                      "to-black/55",
-                    );
-                  } else {
-                    el.classList.remove(
-                      "backdrop-blur-xl",
-                      "bg-gradient-to-br",
-                      "from-black/60",
-                      "via-black/50",
-                      "to-black/55",
-                    );
-                  }
-                },
-                { threshold: [1], rootMargin: "-65px 0px 0px 0px" },
-              );
-              observer.observe(el);
-            }
-          }}
-          className="sticky top-16 z-[60] space-y-1 mb-3 p-2 rounded-2xl transition-all duration-300"
+          className="sticky top-20 z-[60] space-y-3 mb-6 transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
           {/* Mobile: search + toggle */}
-          <div className="flex gap-2 lg:hidden">
+          <div className="relative z-10 flex gap-2 lg:hidden">
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500 z-10 pointer-events-none" />
               <input
                 value={query}
                 onChange={(e) =>
@@ -1890,24 +1920,24 @@ export default function ListsPage() {
                     ? "Buscar colecciones..."
                     : "Buscar listas..."
                 }
-                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-zinc-600"
+                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
               />
               {query && (
                 <button
                   onClick={() => startTransition(() => setQuery(""))}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
                 >
-                  <X className="w-3.5 h-3.5 text-zinc-500" />
+                  <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
                 </button>
               )}
             </div>
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                 mobileFiltersOpen
-                  ? "bg-purple-500/20 border-purple-500/40 text-purple-400"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                  ? "text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
+                  : "text-zinc-200 hover:bg-black/30"
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
@@ -1922,7 +1952,7 @@ export default function ListsPage() {
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="lg:hidden overflow-visible"
+                className="relative z-10 lg:hidden overflow-visible"
               >
                 <div className="space-y-3 pt-1">
                   <div className="flex gap-2">
@@ -1977,9 +2007,7 @@ export default function ListsPage() {
                         <InlineDropdown
                           label="Modo"
                           valueLabel={
-                            traktMode === "trending"
-                              ? "Trending"
-                              : "Popular"
+                            traktMode === "trending" ? "Trending" : "Popular"
                           }
                           icon={Filter}
                         >
@@ -2096,15 +2124,15 @@ export default function ListsPage() {
                   </div>
 
                   <div className="flex gap-2">
-                    <div className="flex flex-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center">
+                    <div className="flex flex-1 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
                         onClick={() =>
                           startTransition(() => setViewMode("grid"))
                         }
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center focus:outline-none ${
                           viewMode === "grid"
                             ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
                         title="Cuadrícula"
                       >
@@ -2114,10 +2142,10 @@ export default function ListsPage() {
                         onClick={() =>
                           startTransition(() => setViewMode("rows"))
                         }
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center focus:outline-none ${
                           viewMode === "rows"
                             ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
                         title="Filas"
                       >
@@ -2127,10 +2155,10 @@ export default function ListsPage() {
                         onClick={() =>
                           startTransition(() => setViewMode("list"))
                         }
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center focus:outline-none ${
                           viewMode === "list"
                             ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
                         title="Lista"
                       >
@@ -2140,7 +2168,7 @@ export default function ListsPage() {
 
                     <button
                       onClick={handleRefresh}
-                      className="h-11 w-11 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex items-center justify-center shrink-0"
+                      className="h-11 w-11 rounded-xl transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none"
                       title="Refrescar"
                     >
                       <RefreshCcw className="w-4 h-4" />
@@ -2149,7 +2177,7 @@ export default function ListsPage() {
                     {canEdit && (
                       <button
                         onClick={() => setCreateOpen(true)}
-                        className="h-11 px-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0"
+                        className="h-11 px-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0 hover:from-purple-400 hover:to-purple-500 focus:outline-none"
                       >
                         <Plus className="w-4 h-4" />
                         <span>Crear</span>
@@ -2162,9 +2190,9 @@ export default function ListsPage() {
           </AnimatePresence>
 
           {/* Desktop */}
-          <div className="hidden lg:flex gap-3">
+          <div className="hidden lg:flex gap-3 relative z-10">
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500 z-10 pointer-events-none" />
               <input
                 value={query}
                 onChange={(e) =>
@@ -2175,14 +2203,14 @@ export default function ListsPage() {
                     ? "Buscar colecciones..."
                     : "Buscar listas..."
                 }
-                className="w-full h-11 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-500/50 transition-all placeholder:text-zinc-600"
+                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
               />
               {query && (
                 <button
                   onClick={() => startTransition(() => setQuery(""))}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
                 >
-                  <X className="w-3.5 h-3.5 text-zinc-500" />
+                  <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
                 </button>
               )}
             </div>
@@ -2234,11 +2262,7 @@ export default function ListsPage() {
             {source === "trakt" && (
               <InlineDropdown
                 label="Modo"
-                valueLabel={
-                  traktMode === "trending"
-                    ? "Trending"
-                    : "Popular"
-                }
+                valueLabel={traktMode === "trending" ? "Trending" : "Popular"}
                 icon={Filter}
               >
                 {({ close }) => (
@@ -2343,13 +2367,13 @@ export default function ListsPage() {
               )}
             </InlineDropdown>
 
-            <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800 h-11 items-center shrink-0">
+            <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
                 onClick={() => startTransition(() => setViewMode("grid"))}
-                className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                className={`h-full px-3 rounded-lg text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
                   viewMode === "grid"
                     ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
                 title="Cuadrícula"
               >
@@ -2357,10 +2381,10 @@ export default function ListsPage() {
               </button>
               <button
                 onClick={() => startTransition(() => setViewMode("rows"))}
-                className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                className={`h-full px-3 rounded-lg text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
                   viewMode === "rows"
                     ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
                 title="Filas"
               >
@@ -2368,10 +2392,10 @@ export default function ListsPage() {
               </button>
               <button
                 onClick={() => startTransition(() => setViewMode("list"))}
-                className={`h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                className={`h-full px-3 rounded-lg text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
                   viewMode === "list"
                     ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
                 title="Lista"
               >
@@ -2381,7 +2405,7 @@ export default function ListsPage() {
 
             <button
               onClick={handleRefresh}
-              className="h-11 w-11 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex items-center justify-center shrink-0"
+              className="h-11 w-11 rounded-xl transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none"
               title="Refrescar"
             >
               <RefreshCcw className="w-4 h-4" />
@@ -2390,7 +2414,7 @@ export default function ListsPage() {
             {canEdit && (
               <button
                 onClick={() => setCreateOpen(true)}
-                className="h-11 px-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0"
+                className="h-11 px-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0 hover:from-purple-400 hover:to-purple-500 focus:outline-none"
               >
                 <Plus className="w-4 h-4" />
                 <span>Crear</span>
@@ -2418,7 +2442,8 @@ export default function ListsPage() {
         ) : null}
 
         {/* CONTENT */}
-        {!sourceInitialized && filtered.length === 0 ? null : filtered.length === 0 ? (
+        {!sourceInitialized &&
+        filtered.length === 0 ? null : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
             <ListVideo className="w-16 h-16 text-neutral-700 mb-4" />
             <h3 className="text-xl font-bold text-neutral-300">
@@ -2487,7 +2512,7 @@ export default function ListsPage() {
           <div className="flex justify-center pt-8">
             <button
               onClick={loadMore}
-              className="px-6 py-2 bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-full text-sm font-bold text-zinc-300 hover:text-white transition"
+              className="px-6 py-3 rounded-xl transition shadow-lg bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none font-bold"
             >
               Cargar más listas
             </button>
