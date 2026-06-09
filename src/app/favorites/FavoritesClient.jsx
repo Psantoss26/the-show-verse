@@ -1212,7 +1212,7 @@ function InlineDropdown({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:border-white/30 hover:bg-black/30"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-black/30"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-red-500" />}
@@ -1241,7 +1241,7 @@ function InlineDropdown({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] p-2 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] [scrollbar-color:#3f3f46_transparent]"
+            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] p-2 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] [scrollbar-color:#3f3f46_transparent]"
             style={{
               maxHeight: `${menuMaxHeight}px`,
               scrollbarWidth: "thin",
@@ -1337,7 +1337,7 @@ function SubGroupDivider({ title, count }) {
   return (
     <div className="flex items-center gap-3 py-1.5 sm:py-2">
       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-red-500/40 to-red-500/15" />
-      <div className="relative overflow-hidden inline-flex max-w-[70%] items-center gap-2 rounded-xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_5px_15px_-5px_rgba(0,0,0,0.5)] px-3 py-1 text-xs sm:text-sm">
+      <div className="relative overflow-hidden inline-flex max-w-[70%] items-center gap-2 rounded-xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_5px_15px_-5px_rgba(0,0,0,0.5)] px-3 py-1 text-xs sm:text-sm">
         <span className="relative z-10 truncate font-black uppercase tracking-wide text-red-100 drop-shadow-sm">
           {title}
         </span>
@@ -1479,7 +1479,7 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
-      <div className="relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
+      <div className="relative overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
         <div className="relative z-10 px-3 sm:px-6 py-2.5 sm:py-5 flex items-center justify-between gap-3 sm:gap-6">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             <div className="w-1 sm:w-1.5 h-8 sm:h-12 bg-gradient-to-b from-red-500 to-red-600 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0" />
@@ -2945,7 +2945,7 @@ export default function FavoritesClient() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-red-400 shadow-sm border border-white/10">
                     <Heart className="w-4 h-4 md:w-5 md:h-5 fill-red-400" />
                   </div>
@@ -2956,7 +2956,7 @@ export default function FavoritesClient() {
                     Total
                   </div>
                 </div>
-                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400 shadow-sm border border-white/10">
                     <Film className="w-4 h-4 md:w-5 md:h-5" />
                   </div>
@@ -2967,7 +2967,7 @@ export default function FavoritesClient() {
                     Películas
                   </div>
                 </div>
-                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400 shadow-sm border border-white/10">
                     <TvGlyph className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
                   </div>
@@ -2998,7 +2998,7 @@ export default function FavoritesClient() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar..."
-                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:border-red-500/50 placeholder:text-zinc-400 border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-white"
+                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-red-500/50 placeholder:text-zinc-400 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-white"
               />
               {q && (
                 <button
@@ -3012,10 +3012,10 @@ export default function FavoritesClient() {
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] ${
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] ${
                 mobileFiltersOpen
-                  ? "border-red-500/50 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                  : "text-zinc-200 hover:border-white/30 hover:bg-black/30"
+                  ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                  : "text-zinc-200 hover:bg-black/30"
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
@@ -3207,7 +3207,7 @@ export default function FavoritesClient() {
                       </InlineDropdown>
                     </div>
                     <div className="flex-1 flex gap-2">
-                      <div className="flex rounded-xl p-1 border h-11 items-center flex-1 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                      <div className="flex rounded-xl p-1 h-11 items-center flex-1 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                         <button
                           onClick={() => setViewMode("list")}
                           className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
@@ -3245,10 +3245,10 @@ export default function FavoritesClient() {
                             imageMode === "poster" ? "backdrop" : "poster",
                           )
                         }
-                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] ${
+                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] ${
                           imageMode === "backdrop"
-                            ? "border-red-500/50 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                            : "text-zinc-200 hover:border-white/30 hover:bg-black/30"
+                            ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                            : "text-zinc-200 hover:bg-black/30"
                         }`}
                         title={
                           imageMode === "poster"
@@ -3277,7 +3277,7 @@ export default function FavoritesClient() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar por título..."
-                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:border-red-500/50 placeholder:text-zinc-400 border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-white"
+                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-red-500/50 placeholder:text-zinc-400 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-white"
               />
               {q && (
                 <button
@@ -3455,7 +3455,7 @@ export default function FavoritesClient() {
               )}
             </InlineDropdown>
 
-            <div className="flex rounded-xl p-1 border h-11 items-center shrink-0 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+            <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
               <button
                 onClick={() => setViewMode("list")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
@@ -3488,7 +3488,7 @@ export default function FavoritesClient() {
               </button>
             </div>
 
-            <div className="flex rounded-xl p-1 border h-11 items-center shrink-0 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+            <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
               <button
                 onClick={() => setImageMode("poster")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${

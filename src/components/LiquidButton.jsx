@@ -16,6 +16,7 @@ export default function LiquidButton({
   activeColor = "blue",
   loading = false,
   groupId = "default",
+  fillPercentage,
   ...props
 }) {
   const buttonRef = useRef(null);
@@ -480,7 +481,7 @@ export default function LiquidButton({
 
   const primaryColor = toRgba(currentColors.rgb, 1);
   const secondaryColor = toRgba(currentColors.secondary, 1);
-  const bgColor = toRgba(currentColors.rgb, 0.15);
+  const bgColor = toRgba(currentColors.rgb, 0.3);
   const hoverScale = isHovered && !disabled ? 1.12 : 1;
   const proximityScale = proximityGlow > 0 ? 1 + proximityGlow * 0.08 : 1;
   const explosionScale = isExploding ? 1.18 : 1;
@@ -501,13 +502,13 @@ export default function LiquidButton({
         relative overflow-hidden
         w-12 h-12 rounded-full
         flex items-center justify-center
-        border backdrop-blur-[50px]
+        backdrop-blur-[50px]
         ${
           disabled
-            ? "border-white/10 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 text-white/30 cursor-not-allowed"
+            ? "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-white/30 cursor-not-allowed"
             : active
-              ? "border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
-              : "border-white/20 bg-white/5 bg-gradient-to-br from-white/10 via-white/5 to-black/20 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:border-white/30 hover:bg-white/10 hover:text-white"
+              ? "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+              : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-white/10 hover:text-white"
         }
         ${isExploding ? "" : "transition-all duration-300"}
         ${className}
@@ -517,7 +518,6 @@ export default function LiquidButton({
         transition: isExploding
           ? "transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1)"
           : undefined,
-        borderColor: active && !disabled ? primaryColor : undefined,
         backgroundColor: active && !disabled ? bgColor : undefined,
         color: active && !disabled ? secondaryColor : undefined,
         boxShadow:
@@ -571,6 +571,20 @@ export default function LiquidButton({
               border: `2px solid ${primaryColor}`,
               opacity: 0.3 + proximityGlow * 0.4 + (isExploding ? 0.3 : 0),
               animation: "liquidPulse 2s ease-in-out infinite",
+            }}
+          />
+        )}
+
+      {/* Efecto de relleno estilo batería */}
+      {fillPercentage !== undefined &&
+        fillPercentage !== null &&
+        fillPercentage > 0 && (
+          <div
+            className="absolute bottom-0 left-0 w-full pointer-events-none transition-all duration-1000 ease-out z-0"
+            style={{
+              height: `${Math.min(100, Math.max(0, fillPercentage))}%`,
+              background: `linear-gradient(to top, ${toRgba(currentColors.rgb, 0.4)}, ${toRgba(currentColors.rgb, 0.15)})`,
+              boxShadow: `0 -2px 10px ${toRgba(currentColors.secondary, 0.3)}`,
             }}
           />
         )}
