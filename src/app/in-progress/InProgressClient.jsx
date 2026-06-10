@@ -1783,7 +1783,7 @@ export default function InProgressClient() {
 
         {/* ========== FILTERS (same pattern as History) ========== */}
         <motion.div
-          className="sticky top-20 z-[60] space-y-3 mb-6 transition-all duration-300"
+          className="sticky top-20 z-[70] space-y-3 mb-6 transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}

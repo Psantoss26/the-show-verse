@@ -1337,7 +1337,7 @@ function GroupingDropdownContent({
 
 function SubGroupDivider({ title, count }) {
   return (
-    <div className="sticky top-[206px] lg:top-[224px] z-[45] flex items-center gap-3 py-1.5 sm:py-2 -mx-2 px-2 sm:mx-0 sm:px-0">
+    <div className="flex items-center gap-3 py-1.5 sm:py-2">
       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-red-500/40 to-red-500/15" />
       <div className="relative overflow-hidden inline-flex max-w-[70%] items-center gap-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-3 py-1 text-xs sm:text-sm">
         <span className="relative z-10 truncate font-black uppercase tracking-wide text-red-100 drop-shadow-sm">
@@ -1523,7 +1523,9 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
               className={`bg-gradient-to-b from-red-500 to-red-600 shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0 transition-all duration-300 ${isSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
             />
 
-            <div className="min-w-0 flex-1 transition-all duration-300">
+            <div
+              className={`min-w-0 flex-1 transition-all duration-300 ${isSticky ? "flex flex-wrap items-center gap-x-3 gap-y-1" : ""}`}
+            >
               <h2
                 className={`font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md transition-all duration-300 ${isSticky ? "text-base sm:text-lg" : "text-base sm:text-2xl"}`}
               >
@@ -1531,7 +1533,7 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
               </h2>
 
               <div
-                className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 transition-all duration-300 ${isSticky ? "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 mt-0 text-[10px] sm:text-xs w-max pointer-events-none" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
+                className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 transition-all duration-300 ${isSticky ? "mt-0 text-[10px] sm:text-xs" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
               >
                 <span className="text-zinc-300 font-bold">{count}</span>
                 <span>items</span>
@@ -3030,7 +3032,7 @@ export default function FavoritesClient() {
 
         {/* Filters */}
         <motion.div
-          className="sticky top-20 z-[60] space-y-3 mb-6 transition-all duration-300"
+          className="sticky top-20 z-[70] space-y-3 mb-6 transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
