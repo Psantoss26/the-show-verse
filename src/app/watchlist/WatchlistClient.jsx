@@ -1040,7 +1040,7 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
-      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-xl">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-xl">
         <div className="relative z-10 px-3 sm:px-6 py-2.5 sm:py-5 flex items-center justify-between gap-3 sm:gap-6">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             <div className="w-1 sm:w-1.5 h-8 sm:h-12 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.4)] shrink-0" />
